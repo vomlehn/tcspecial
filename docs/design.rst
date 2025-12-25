@@ -79,20 +79,32 @@ and a set of per-payload interface operations.
 
 Global Control and Status
 -------------------------
-Init            Go through initialization and bring up all static DHUs
-Shutdown        Disconnect all static and dynamic DHUs
-Map             Send a vector of DHU statues: inactive static, active static,
-                active dynamic
+:Init:              Go through initialization and bring up all static DHUs
+
+:Shutdown:          Disconnect all static and dynamic DHUs
+
+:Map:               Send a vector of DHU statues: inactive static, active
+                    static, active dynamic
 
 Per-DHU Control and Status
 --------------------------
-StartStatic S   Start static DHU S. Configuration data included.  S is a value
-                from 1 to n, where n is the number of static DHUs.
-StopStatic S    Stop static DHU S. This must be between 1 and n.
-StartDynamic D  Start dynamic DHU D. Configuration data included.  A DHU
-                identifer D is supplied in the command. It must not be in use
-                and be >n.
-StopDynamic D   Stop dynamic DHU D, where D is >n and is in use.
-StatusDHU I     Return status for DHU I. Information returned
-                Total number of bytes read and the number written
-                Total number of I/O reads and I/O writes
+:StartStatic S:     Start static DHU S. Configuration data included.  S is a
+                    value from 1 to n, where n is the number of static DHUs.
+
+:StopStatic S:      Stop static DHU S. This must be between 1 and n.
+
+:StartDynamic D:    Start dynamic DHU D. Configuration data included.  A DHU
+                    identifer D is supplied in the command. It must not be in
+                    use and be >n.
+
+:StopDynamic D:     Stop dynamic DHU D, where D is >n and is in use.
+
+:StatusDHU I:       Return status for DHU I. Information returned:
+
+* Total number of bytes read
+
+* Total number of bytes written
+
+* Total number of I/O reads
+
+* Total number of I/O writes

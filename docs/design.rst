@@ -1,4 +1,6 @@
-#Telenex (Telemetry Nexus)
+=========================
+Telenex (Telemetry Nexus)
+=========================
 
 Telenex is a framework for passing commands to payload devices from
 an operations center (OC) and relaying
@@ -12,17 +14,23 @@ data, etc.) statically allocated before entering its main loop, with
 dynamically allocated resources, or a combination of static and dynamic
 allocation.
 
-##Payload System Software
+Payload System Software
+=======================
+
 Payload system software consists of a command interpreter and some number
 of data handling units.
 
-###Command Interpreter
+Command Interpreter
+-------------------
+
 The payload system
 software has a command interpreter with two threads. The threads manage
 commands from the OC and status messages to the OC. I/O is done
 with datagrams. Status messages are queued with a fix
 
-###Data Handling Units
+Data Handling Units
+-------------------
+
 Payload system software also has data handling units (DHU) which consist of a
 thread handling data from OC to a payload and another thread operating in
 the opposite direction. OC data is read and written with the same file
@@ -34,4 +42,5 @@ operation that waits for a read or write file descriptor operation
 to be possible. The select-like() operation also waits on another
 file descriptor, which is written by the 
 
-##Telenex Library
+Telenex Library
+===============

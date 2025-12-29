@@ -1,5 +1,5 @@
-design.html: design.rst
-	pandoc $^ -o $@
+design.html: design.rst table.css
+	pandoc -s --css=$(word 2,$^) -o $@ $<
 
 design.txt: design.rst
 	pandoc $^ -o $@

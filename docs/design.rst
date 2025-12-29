@@ -17,8 +17,37 @@ allocation.
 Payload System Software
 =======================
 
-Payload system software consists of a command interpreter and some number
-of data handling units.
+Payload system software consists of a command interpreter(CI) and some number
+of data handling units (DHs).
+
+Resource Allocation
+-------------------
+In an ideal world, resources would be allocated at link time (really, process
+load time). From a practical standpoint, however, the constraint of
+pre-execution allocation is not possible to meet for verious reasons. For
+example, configuration-dependent code may require runtime allocations. The
+constraint Telenex is intend to obey is to have all allocations done before
+entering the main loop. CI and DHs have main loops with the patterns:
+
+.. table:: CI and DH resource management loop
+
++------------+------+-----------------------------------------------+
+| Step | Command    | Action                                        |
++======+=====+======+===============================================+
+| 1    | Allocate   | Open file descriptors, allocate buffers,      |
+|      |            | create thread stacks, etc.                    |
++------+------------+-----------------------------------------------+
+| 2    | Start      | Perform I/O in both directions                |
++------+------------+-----------------------------------------------+
+| 3    | Stop       | Stop I/O. The next command is either:         |
++------+------------+-------+---------------------------------------+
+|                   | Start | Loop back to step 2                   |
+|                   +-------+---------------------------------------+
+|                   | Exit  | Free all resources and shut down      |
+|                   |       | threads                               |
++------+------------+-------+---------------------------------------+
+
+
 
 Command Interpreter (CI)
 ------------------------

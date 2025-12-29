@@ -20,41 +20,104 @@ Payload System Software
 Payload system software consists of a command interpreter and some number
 of data handling units.
 
-Command Interpreter
--------------------
+Command Interpreter (CI)
+------------------------
 
 The payload system
 software has a command interpreter with two threads. The threads manage
 commands from the OC and status messages to the OC. I/O is done
-with datagrams. Status messages are queued with a fix.
+with datagrams. Status messages are queued with a fixed-length queue.
+The connection between the OC and the CI is implemented with a UDP/IP
+datagram.
 
-Data Handling Units
+The CI has a Vec<DH> which holds all of the allocated DHs.
+
+Initialization
+^^^^^^^^^^^^^^
+When created, a CI uses a socket interface to initialize a datagram
+connection to
+OC. The connection
+
+Data Handlers (DHs)
 -------------------
 
-Data Handling Units (DHUs) receive a command from the OC via a Command Origin.
-They respond to commands and send synchronous and asynchronous telemetry
-by sending it to a Command Destination, which results in it being sent
-to the OC.
+Data handlers (DHs) are responsible for relaying data between the OC and
+a payload. Data is transmitted between the OC and a DH is done with a
+UDP/IP link. The data exchange between a DH and a payload may be done
+with stream and datagram methods. 
 
-Similarly, command responses, and synchronous and asynchronous telemetry
-comes from a payload via a Telemetry Origin. Data sent to a payload goes
-through a Telemetry Destination.
+A DH has four functions used to send and receive data:
+
+* oc_read(): receives data from the OC. No protocol conversion done.
+* oc_write(): sends data to the OC. No protocol conversion done.
+* payload_read(): receives data from a payload. Protocol conversion possible.
+* payload_write(): sends data to a payload. Protocol conversion possible.
+
+A communication path between the OC and a DH uses UDP/IP. A path between
+a DH and a payload uses one of multiple different communication protocols.
+For example:
+
+.. code-block:: text
+   :dedent: 4
+
+    ....|    |
+    ...|    |
+
+.. code-block:: text
+   :dedent: 0
+
+         ______            _____            _________
+        |      |          |     |          |         |
+        |  OC  |<-------->| DH1 |<-------->| Payload |
+        |______|  UDP/IP  |_____|  serial  |_________|
+
+The serial interface consists of bytes written at arbitrary times.
+
+DHs may also be composited to perform protocol translation. For example,
+instead of a simple stream of bytes, the stream of data may consist of
+a byte count followed by the counted number of bytes. This could be used
+to assemble packets from the stream of bytes. This might look like:
+
+.. code-block:: text
+   :dedent: 4
+
+         ______            _____                _____            _________
+        |      |          |     |              |     |          |         |
+        |  OC  |<-------->| DH1 |<------------>| DH2 |<-------->| Payload |
+        |______|  UDP/IP  |_____|  packetizer  |_____|  serial  |_________|
+
+A call to oc_read() in DH2 then becomes a call to oc_read() in DH1.
+
+
+
+aaa
+^^^
+
+bbb
+"""
+
+
+It is also possible to stack any number of DHs together to create protocol
+stacks. A stacking DH must be added to the payload side of another DH.
+
+
+
 
 Command Origins and Destinations, and Telemetry Origins and Destinations,
-may be either connections to other DHUs, which allows compositing protocols,
-or file descriptors. In the case of DHU connections, sending and receving
-data involves a call to the DHU on the other side of the connection. This
-will resolve to a DHU with a file descriptor.
+may be either connections to other DHs, which allows compositing protocols,
+or file descriptors. In the case of DH connections, sending and receving
+data involves a call to the DH on the other side of the connection. This
+will resolve to a DH with a file descriptor.
 
-Each DHU is associated with a pipe, from which it reads one byte. This pipe
-is written to by the command interpreter when it wants to wake up the DHU
-to shut the threads down or perform another action. Each DHU thus has one
+Each DH is associated with a pipe, from which it reads one byte. This pipe
+is written to by the command interpreter when it wants to wake up the DH
+to shut the threads down or perform another action. Each DH thus has one
 file descriptor for reading and writing data to the OC, one file descriptor
 for reading and writing payload data, and a third file descriptor for the
 pipe written by the command interpreter. Waiting for asynchronous I/O
 is done using the mio crate.
 
-Each static DHU is assign static address information. This can be a path to a
+Each static DH is assign static address information. This can be a path to a
 device or a network address.
 
 Payload data can be sent by the payload as datagrams or as a stream. Datagrams
@@ -77,29 +140,72 @@ Telenex Library
 The Telenex library has a set of operations for global control and status
 and a set of per-payload interface operations.
 
-Global Control and Status
+Commands and Telementry
+-----------------------
+Commands are sent to the CI and telemetry returned from the CI as network
+messages, using the socket interface. The communication system must use the
+same protocol, e.g. UDP/IP.
+
+Note that all commands must be idempotent. That is, if a command is sent twice
+without any intervening commands, the Telenex state will be the same as if
+it had just been sent once. This allows the OC to handle lost commands and
+telemetry without requiring closed loop communications.
+
+The CI and each DH maintain a separate serial number which is sent with 
+each command. That serial number is returned in the telemetry that corresponds
+to that command. The CI also has beacon telemetry that includes a separate
+serial number, allowing for detection of lost beacon telemetry.
+
+
+CI Commands and Telemetry
 -------------------------
-:Init:              Go through initialization and bring up all static DHUs
+Each CI command has a corresponding telemetry message indicating the
+success or failure of the command. There is also a beacon telemetry message
+send periodically without a command.
 
-:Shutdown:          Disconnect all static and dynamic DHUs
+Commands
+^^^^^^^^
+:Init:      Go through initialization and bring up all static DHs
 
-:Map:               Send a vector of DHU statues: inactive static, active
-                    static, active dynamic
+:Config:    Set CI configuration:
 
-Per-DHU Control and Status
+* Set Beacon interval. It is not possible to disable the beacon entirely,
+  but it can be set to a very long value.
+
+:Shutdown:  Disconnect all static and dynamic DHs
+
+:Ping:      Request status from the CI        
+
+:SendMap:   Send a vector of DH states:
+
+Telemetry
+^^^^^^^^^
+:Beacon:    This telemetry is sent automatically
+
+:InitTelem: Return
+
+Per-DH Control and Status
 --------------------------
-:StartStatic S:     Start static DHU S. Configuration data included.  S is a
-                    value from 1 to n, where n is the number of static DHUs.
+Allocate NAME:  Start thread and allocate buffers for the DH with the given
+                name. Includes:
 
-:StopStatic S:      Stop static DHU S. This must be between 1 and n.
+* DH name
+* Stream/Datagram
+* Timeout (in nanoseconds)
+* 
+* Address/device/DH specifier
+  * If network: <Host>:<Port>
+  * If device: name of device
+  * If DH push: name of 
+* 
 
-:StartDynamic D:    Start dynamic DHU D. Configuration data included.  A DHU
-                    identifer D is supplied in the command. It must not be in
-                    use and be >n.
+Free NAME:
 
-:StopDynamic D:     Stop dynamic DHU D, where D is >n and is in use.
+Activate NAME:
 
-:StatusDHU I:       Return status for DHU I. Information returned:
+Deactivate NAME:
+
+:StatusDH NAME:       Return status for DH I. Information returned:
 
 * Total number of bytes read
 
@@ -108,3 +214,174 @@ Per-DHU Control and Status
 * Total number of I/O reads
 
 * Total number of I/O writes
+
+Command Interpreter (CI) Types
+==============================
+The Command Interpreter uses
+
+.. code-block:: rust
+    trait CI {
+        read_oc(&mut [u8
+
+Data Handler (DH) Types
+=======================
+There are several DH types. The individual DH types are derived from the
+following trait:
+
+.. code-block:: rust
+    trait DH {
+        fn name() -> &str;
+        fn read_oc(&mut [u8], usize) -> Result<usize, TelenexError>;
+        fn write_oc(&[u8], usize) -> Result<usize, TelenexError>;
+        fn read_oc(&mut [u8], usize) -> Result<usize, TelenexError>;
+        fn read_oc(&[u8], usize) -> Result<usize, TelenexError>;
+        fn get_stats() -> TelenexStats;
+        fn start() -> TelenexError;
+        fn stop() -> TelenexError;
+    }
+
+    struct TelenexStats {
+        bytes_read:     usize;
+        bytes_written:  usize;
+        io_reads:       usize;
+        io_writes:      usize;
+    };
+
+The control interpreter passes two file descriptors to each DH as it is
+starting up: a file descriptor to be used to write data to the OC and
+another one used to wake up a DH when the command interpreter needs the
+DH to do something. The file descriptor for payload communication is
+opened by the appropriate DH. These two file descriptors are passed using:
+
+.. code-block:: rust
+    struct DHFds {
+        oc_fd:      usize,
+        ci_fd:      usize,
+    }
+
+Stream DHs
+-----------
+Buffers are managed with various types. Stream buffers are allocated once
+when the DH is created:
+
+.. code-block:: rust
+    struct DHStreamBuffer {
+       alloc_size:  usize,
+       buf:         Vec<u8>,
+    }
+
+    impl DHStreamBuffer {
+        fn new(alloc_size: usize) -> Result<DHBuffer, TelenexError> {
+            let mut buf = Vec::new();
+            buf.try_reserve(alloc_size).
+                .map_error(|e| TelenexError::AllocFailed(e, alloc_size))?;
+            DHBuffer {
+                alloc_size,
+                buf,
+            }
+        }
+    }
+
+Stream DHs use the following type to hold the DH name and statistics:
+
+.. code-block:: rust
+    struct StreamDH {
+        name:        &str,
+        stats:      TelenexStatus,
+    }
+
+File descriptor-based stream DHs need buffer. These are statically sized.
+We try to fill the buffer entirely, but set a timer to indicate we should
+send whatever is in the buffer if it isn't full.
+
+.. code-block:: rust
+   struct FdStreamDH {
+        stream_dhu: StreamDH,
+        max_time:   Time,
+        buffer:     DHStreamBuffer;
+        dhu_fds:    DHFds,
+        payload_fd: i32,
+    }
+
+    impl FDStreamDH {
+        fn new(name: &str, max_time: Time, DHStreamBuffer, dhu_fds: DHFds) -> Result<FDStreamDH>;
+    }
+
+Streams using socket interfaces use the following:
+
+.. code-block:: rust
+    struct SocketStreamDH {
+        fd_stream_dhu:  FdStreamDH,
+        address:        IPAddress,
+    }
+
+    impl SocketStreamDH {
+        fn new(stream_dhu: &StreamDH, address: IPAddress) -> Result<SocketStreamDH, TelenexError>;
+    }
+
+Streams using device interfaces use the following:
+
+.. code-block:: rust
+    struct DeviceStreamDH {
+        fd_stream_dhu:  FdStreamDH,
+        path:           &str,
+   }
+
+FIXME: need to figure out how to propogate the CI pipe file descriptor,
+especially since there may be multiple composites that lead to the same
+DH.
+
+DHs that are composited don't use file descriptors. Instead, they call the
+various OC and payload read and write interfaces directly:
+
+.. code-block:: rust
+
+    struct CompositeDH {
+        stream_dhu:     StreamDH,
+        ci_fd:          FDESC,
+    }
+
+    impl FdCompositeDH {
+        fn new(name: &str, ci_fd: FDESC, oc_dhu: &DH, payload_dhu: &DH) -> Result<FdStreamDH, TelenexError>;
+    }
+
+Datagram DHs
+-------------
+Datagram buffers can be allocated once, or reallocated when datagrams are too
+large to read, depending on the alloc_ok flag:
+
+.. code-block:: rust
+    struct DHDatagramBuffer {
+       buffer:      DHStreamBuffer,
+       realloc_ok:  bool,
+    }
+
+    impl DHDatagramBuffer {
+        fn new(alloc_size: usize, realloc_ok: bool, dhu_fds, address: IPAddress`) -> Result<DHBuffer, TelenexError> {
+            let buffer = DHStreamBuffer::new(alloc_size)?;
+            DHBuffer {
+                buffer,
+                realloc_ok,
+            }
+        }
+    }
+
+Datagram DHs are similar to stream DHs:
+
+.. code-block:: rust
+    struct DatagramDH {
+        name:           &str,
+        stats:          TelenexStatus,
+        buffer:         DHDatagramBuffer,
+        dhu_fds:        DHFds,
+        payload_fd:     i32,
+        address:        IPAddress,
+    }
+
+    impl DatagramDH {
+        fn new(datagram_dhu: &DatagramDH, address: IPAddress, alloc_ok) -> Result<DatagramDH, TelenexError> {
+        }
+    }
+
+    impl DH for DatagramDH {
+    }

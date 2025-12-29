@@ -36,12 +36,51 @@ Initialization
 ^^^^^^^^^^^^^^
 When created, a CI uses a socket interface to initialize a datagram
 connection to
-OC. The connection
+OC. The connection supports all non-deprecated address families and socket types
+supported by Linux.
+
+After the CI command connect is created,
+CI initialization will wait until the CI Init command is received, using
+minimal memory. When the Init command is received, CI will allocate all
+CI memory required prior to responding with an InitStatus telemetry message.
+
+The CI Allocate command is used to after the CI is initialized to allocate
+all DH memory.
+
+Operation
+^^^^^^^^^
+The CI loops, reading commands.
+
+Shutdown
+^^^^^^^^
+Reception of the CI Shutdown command (TBD)
+
+Exit
+^^^^
+When CI receives the Exit command, it terminates the Telenex process.
 
 Data Handlers (DHs)
 -------------------
+The usual lifetime of a DH starts with creation by CI, followed by start up
+of the threads used and allocation of any other resources. It then waits for
+activation. 
 
-Data handlers (DHs) are responsible for relaying data between the OC and
+After activation, it enters a loop relaying data between OC
+and a payload. During I/O, it may receive notification from CI that something
+command needs to be done. This could be something like transmitting statistics
+or deactivating the DH.
+
+After the DH is deactivated, all resources are freed and the threads used are
+exiting.
+
+Initialization
+^^^^^^^^^^^^^^
+When the CI Allocate command is given, a DH is sets up all require resources
+and then waits for a DH Activate command.
+
+Operation
+^^^^^^^^^
+Data handlers (DHs) relay data between the OC and
 a payload. Data is transmitted between the OC and a DH is done with a
 UDP/IP link. The data exchange between a DH and a payload may be done
 with stream and datagram methods. 
@@ -88,20 +127,8 @@ to assemble packets from the stream of bytes. This might look like:
 
 A call to oc_read() in DH2 then becomes a call to oc_read() in DH1.
 
-
-
-aaa
-^^^
-
-bbb
-"""
-
-
 It is also possible to stack any number of DHs together to create protocol
 stacks. A stacking DH must be added to the payload side of another DH.
-
-
-
 
 Command Origins and Destinations, and Telemetry Origins and Destinations,
 may be either connections to other DHs, which allows compositing protocols,
@@ -172,7 +199,12 @@ Commands
 * Set Beacon interval. It is not possible to disable the beacon entirely,
   but it can be set to a very long value.
 
-:Shutdown:  Disconnect all static and dynamic DHs
+:Shutdown:  Disconnect all static and dynamic DHs. CI retains CI-specific
+            resources, then waits for an Init command. No other commands are
+            valid
+
+:Exit:      Shut down Telenex.
+
 
 :Ping:      Request status from the CI        
 

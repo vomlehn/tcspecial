@@ -1,21 +1,52 @@
-=========================
+===========================
 TCSpecial (Telemetry Nexus)
-=========================
+===========================
 
-.. contents:: Table of Contents
-   :depth: 2
-   :backlinks: entry
+Introduction
+============
 
-TCSpecial is a framework for passing commands to payload devices from
+.. table:: NOTE
+
+   +--------------------------------------------------------------------------------+
+   | TCSpecial has been designed for spacecraft and ground communication with high  |
+   | latency communication links. It is just as applicable for other environments,  |
+   | such as submersibles, drones, etc. Simply translate "spacecraft" to your       |
+   | device type.                                                                   |
+   +--------------------------------------------------------------------------------+
+
+TCSpecial is a framework for passing commands to payload devices from            |
 an operations center (OC) and relaying
-telemetry`from the payloads to the OC. It is designed for extensible
-protocol translation for both stream and datagram-oriented operation.
-TCSpecial has a library for linking with other OC software and multi-threaded
-process that runs on the system containing payloads.
+telemetry`from the payloads to the OC. Design goals are:
 
-TCSpecial is designed so that it can allocate all resources (buffers, thread
-data, etc.) before entering its main loop, though it can also allocate
-and free resources afterwards, if needed.
+* On the spacecraft:
+
+  * Provides the tcspecial executable to run on the spacecraft
+
+  * Allow for "before main loop" guarantee of completion of memory allocation. (Things
+    started after the main loop begins will allocate all memory on start up)
+
+  * Support for as many protocols as possible for payloads
+
+  * Support for stacking custom payload protocols
+
+  * Written in Rust to:
+
+    * Provide a high degree of portability
+
+    * Take advantage of Rust memory ownership features to eliminate many errors
+
+    * Leverage the many features Rust has to produce clean, well documented code, with many contemporary to make it easy to write code.
+
+  * Control of communication links so that they can be brought up or down
+
+* On the ground
+  
+  * TCSpecialLib (tcslib) has a library for linking with other OC software and multi-threaded process that run on the ground operations center.
+
+* For Testing
+
+  * TCSpecialTest (tcstest) allows sending commands to, and view telemetry from
+    TCSpecial.
 
 TCSpecial System Software
 =========================

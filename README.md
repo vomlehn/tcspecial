@@ -17,40 +17,59 @@ own SLIP over COBS[#] implementation.
 
 Key TCSpecial features are:
 
-* Centralized control facility (the Command Interface or CI) that takes commands from
-  the operations center (OC) and sends back telemetry. Telemetry includes an
-  automatic beaconing message
+* On-Board
 
-* Data handlers (DHs) that pass payload command and telemetry data to OC using a wide
-  variety of interfaces and protocols.
+  * Centralized control facility (the Command Interface or CI) that takes commands from
+    the operations center (OC) and sends back telemetry. Telemetry includes an
+    automatic beaconing message
 
-  * Supports standard Linux networking protocols
+  * Data handlers (DHs) that pass payload command and telemetry data to OC using a wide
+    variety of interfaces and protocols.
 
-  * Works standard Linux devices, such as RS-422, SPI,
+    * Supports standard Linux networking protocols
 
-  * Custom stackable DHs allow implementation of custom protocols
+    * Works standard Linux devices, such as RS-422, SPI,
 
-* Per payload and overall TCSpecial statistics include:
+    * Custom stackable DHs allow implementation of custom protocols
 
-  * Byte counts in both directions
-  * I/O counts in both directions
+  * Per payload and overall TCSpecial statistics include:
 
-* "Memory allocation before main loop" philosophy. All TCSpecial memory allocatons
-  are done on CI and DH startup.  As long as CI and DHs are started before the main
-  loop,
-  and any custom DHs allocate memory before the main loop, runtime memory exhaustion
-  will not occur.
+    * Byte counts in both directions
+    * I/O counts in both directions
 
-* If necessary, DHs can be created and terminated at will with configurations
-  either built in or specified as in a CI command. DHs may require memory allocation,
-  so they will normally be started before the main loop. If not, they will still
-  allocate all required memory on DH start up.
+  * "Memory allocation before main loop" philosophy. All TCSpecial memory allocatons
+    are done on CI and DH startup.  As long as CI and DHs are started before the main
+    loop,
+    and any custom DHs allocate memory before the main loop, runtime memory exhaustion
+    will not occur.
+
+  * If necessary, DHs can be created and terminated at will with configurations
+    either built in or specified as in a CI command. DHs may require memory allocation,
+    so they will normally be started before the main loop. If not, they will still
+    allocate all required memory on DH start up.
+
+* Operations Center
+
+  * The TCSpecial library (tcslib) is used to send commands and receive
+    telemetry from
+    the spacecraft. This can be integrated with mission control software such
+    Yamcs.
+
+* Test Software
+
+  * The TCSpecial test interface (tcstest) provides simulated payload devices and
+    uses tcslib to verify the behavior of TCSpecial.
+
 
 To Do
 =====
 * Implement SPI interface
 
 * Implement I2C interface.
+
+* Create HTML and/or YAML interfaces so TCSpecialTest can read them and dynamically
+  create network, device, and, eventually, stackable DHs. The later part has to
+  consider how to dynamically load code.
 
 Mandatory Note About the Name
 =============================

@@ -1,41 +1,41 @@
 =========================
-Telenex (Telemetry Nexus)
+TCSpecial (Telemetry Nexus)
 =========================
 
 .. contents:: Table of Contents
    :depth: 2
    :backlinks: entry
 
-Telenex is a framework for passing commands to payload devices from
+TCSpecial is a framework for passing commands to payload devices from
 an operations center (OC) and relaying
 telemetry`from the payloads to the OC. It is designed for extensible
 protocol translation for both stream and datagram-oriented operation.
-Telenex has a library for linking with other OC software and multi-threaded
+TCSpecial has a library for linking with other OC software and multi-threaded
 process that runs on the system containing payloads.
 
-Telenex is designed so that it can allocate all resources (buffers, thread
+TCSpecial is designed so that it can allocate all resources (buffers, thread
 data, etc.) before entering its main loop, though it can also allocate
 and free resources afterwards, if needed.
 
-Telenex System Software
+TCSpecial System Software
 =======================
 
-Telenex itself is a command interpreter (CI) running on the spacecraft where the
+TCSpecial itself is a command interpreter (CI) running on the spacecraft where the
 payloads are located. CI has one or more threads to handle OC communications. It
 defaults to using datagram communication to the OC, though this is usually actually
 a link to the spacecraft radio. The radio may use a different protocol.
 
-Telenex also has threads associated with each data handler (DH). Each DH
-communicates to payloads via one bi-direction channel. A key feature of Telenex is that
+TCSpecial also has threads associated with each data handler (DH). Each DH
+communicates to payloads via one bi-direction channel. A key feature of TCSpecial is that
 each DH may use a different protocol to communicate with its payload. This includes
 not only the core communication protocols supported by the operating system, such
 as stream or datagram protocols, or serial or parallel interfaces,
 but also stackable DH protocols that can be
 employed to build custom protocol stacks.
 
-In addition to Telenex, there is also Telenexlib, which is a library used in the
-OC for building control applications. For testing purposes, Telenexgui uses
-Telenexlib, along with simulated payloads, to support a simple graphical user interface.
+In addition to TCSpecial, there is also TCSpeciallib, which is a library used in the
+OC for building control applications. For testing purposes, TCSpecialgui uses
+TCSpeciallib, along with simulated payloads, to support a simple graphical user interface.
 
 Resource Allocation
 ===================
@@ -44,7 +44,7 @@ In an ideal world, resources would be allocated at link time (really, process
 load time). From a practical standpoint, however, the constraint of
 pre-execution allocation is not possible to meet for verious reasons. For
 example, configuration-dependent code may require runtime allocations. The
-constraint Telenex is intend to obey is to have all allocations done before
+constraint TCSpecial is intend to obey is to have all allocations done before
 entering the main loop.
 
 This approach allows TeleNex resources to be allocated statically, but
@@ -85,7 +85,7 @@ implementations of the following trait:
        fn buffer() -> &mut[u8],
        fn len() -> usize,
        fn size() -> usize,
-       fn grow(desired_size: usize) -> Result<&mut[u8], TelenexError>,
+       fn grow(desired_size: usize) -> Result<&mut[u8], TCSpecialError>,
        fn max_size() -> usize,
    }
 
@@ -121,7 +121,7 @@ either statically or dynamically sized. They look like:
    }
 
    impl BufferStaticSized {
-       fn new(max_size: usize) -> Result<BufferStaticSized, TelenextError> {
+       fn new(max_size: usize) -> Result<BufferStaticSized, TCSpecialError> {
            BufferStaticSized {
                p:       &[max_size; u8],
                size:    max_size,
@@ -134,9 +134,9 @@ either statically or dynamically sized. They look like:
        fn buffer(&self) -> &mut[u8] { self.p }
        fn len(&self) -> usize { self.len }
        fn size(&self) -> usize { self.size }
-       fn grow(&self, desired_size: usize) Result<(), TelenexError> {
+       fn grow(&self, desired_size: usize) Result<(), TCSpecialError> {
            self.desired_size <= self.size { Ok(self.buffer()) }
-           else { Err(TelenexError::NoMem) }
+           else { Err(TCSpecialError::NoMem) }
        }
        fn max_size(&self) -> usize { self.size() }
    }
@@ -164,7 +164,7 @@ allowed size, and recv() used to read the entire datagram.
    }
 
    impl DatagramBuffer {
-       fn new(max_size: usize) -> Result<DatagramBuffer, TelenextError> {
+       fn new(max_size: usize) -> Result<DatagramBuffer, TCSpecialError> {
            DatagramBuffer {
                p:       Vec<u8>::new(),
                max:     max_size,
@@ -178,11 +178,11 @@ allowed size, and recv() used to read the entire datagram.
        fn buffer<'a>(&self) -> &'a mut[u8] { self.p.as_mut_slice() }
        fn len(&self) -> usize { self.len }
        fn size(&self) -> usize { self.size }
-       fn grow(&self, desired_size: usize) Result<(), TelenexError> {
+       fn grow(&self, desired_size: usize) Result<(), TCSpecialError> {
            self.desired_size <= self.size { Ok(self.buffer) }
            else {
                match self.p.try_reserve_exact(size) {
-                   Err(e) => Err(TelenexError::ReserveFailed(e)),
+                   Err(e) => Err(TCSpecialError::ReserveFailed(e)),
                    Ok(()) => {
                        self.p.resize(desired_size, 0),
                        Ok(self.buffer()),
@@ -465,9 +465,9 @@ This DH is composited with the DH that packetizes streaming data. It converts th
 Packetizing Arbitrary Streaming Data With Constant Overhead Byte Stuffing
 ‐-----‐------------------------------------------------------------------------------------------------------------------
 Read 254  * 4 bytes from the payload, write to a buffer with COBS, stick a u16 header which is a byte count and send to the OC.
-Telenex Library
+TCSpecial Library
 ===============
-The Telenex library has a set of operations for global control and status
+The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.
 
 Commands and Telementry
@@ -477,7 +477,7 @@ messages, using the socket interface. The communication system must use the
 same protocol, e.g. UDP/IP.
 
 Note that all commands must be idempotent. That is, if a command is sent twice
-without any intervening commands, the Telenex state will be the same as if
+without any intervening commands, the TCSpecial state will be the same as if
 it had just been sent once. This allows the OC to handle lost commands and
 telemetry without requiring closed loop communications.
 
@@ -505,7 +505,7 @@ a sucessful ExitStatus message back. (FIXME: check that this works)
 * Set Beacon interval. It is not possible to disable the beacon entirely,
   but it can be set to a very long value.
 
-:Exit:      Shut down Telenex, including all DHs.
+:Exit:      Shut down TCSpecial, including all DHs.
 
 :Ping:      Request status from the CI. This returns the 
 
@@ -621,13 +621,13 @@ following trait:
 .. code-block:: rust
     trait DH {
         fn name() -> &str;
-        fn read_oc(&mut [u8], usize) -> Result<usize, TelenexError>;
-        fn write_oc(&[u8], usize) -> Result<usize, TelenexError>;
-        fn read_oc(&mut [u8], usize) -> Result<usize, TelenexError>;
-        fn read_oc(&[u8], usize) -> Result<usize, TelenexError>;
-        fn get_stats() -> TelenexStats;
-        fn start() -> TelenexError;
-        fn stop() -> TelenexError;
+        fn read_oc(&mut [u8], usize) -> Result<usize, TCSpecialError>;
+        fn write_oc(&[u8], usize) -> Result<usize, TCSpecialError>;
+        fn read_oc(&mut [u8], usize) -> Result<usize, TCSpecialError>;
+        fn read_oc(&[u8], usize) -> Result<usize, TCSpecialError>;
+        fn get_stats() -> TCSpecialStats;
+        fn start() -> TCSpecialError;
+        fn stop() -> TCSpecialError;
     }
 
 DHs are supplied with configuration information as follows:
@@ -638,17 +638,17 @@ DHs are supplied with configuration information as follows:
     use std::net::SocketAddr;
 
     trait DH {
-        fn oc_read(&mut [u8], usize) -> Result<usize, TelenexError>;
-        fn oc_write(&[u8], usize) -> Result<usize, TelenexError>;
-        fn payload_read(&mut [u8], usize) -> Result<usize, TelenexError>;
-        fn payload_write(&[u8], usize) -> Result<usize, TelenexError>;
+        fn oc_read(&mut [u8], usize) -> Result<usize, TCSpecialError>;
+        fn oc_write(&[u8], usize) -> Result<usize, TCSpecialError>;
+        fn payload_read(&mut [u8], usize) -> Result<usize, TCSpecialError>;
+        fn payload_write(&[u8], usize) -> Result<usize, TCSpecialError>;
     }
 
     enum Endpoint {
         Socket(domain: Domain, type: Type, protocol: Option<Protocol>, addr: &str) ->
-            Result<Endpoint, TelenexError>;
-        Device(path: &str) -> Result<Endpoint, TelenexError>
-        Stacked(dh_name, &str) -> Result<Endpoint, TelenexError>;
+            Result<Endpoint, TCSpecialError>;
+        Device(path: &str) -> Result<Endpoint, TCSpecialError>
+        Stacked(dh_name, &str) -> Result<Endpoint, TCSpecialError>;
     }
 
 The control interpreter passes two file descriptors to each DH as it is
@@ -675,10 +675,10 @@ when the DH is created:
     }
 
     impl DHBufferStaticSized {
-        fn new(alloc_size: usize) -> Result<DHBuffer, TelenexError> {
+        fn new(alloc_size: usize) -> Result<DHBuffer, TCSpecialError> {
             let mut buf = Vec::new();
             buf.try_reserve(alloc_size).
-                .map_error(|e| TelenexError::AllocFailed(e, alloc_size))?;
+                .map_error(|e| TCSpecialError::AllocFailed(e, alloc_size))?;
             DHBuffer {
                 alloc_size,
                 buf,
@@ -691,7 +691,7 @@ Stream DHs use the following type to hold the DH name and statistics:
 .. code-block:: rust
     struct StreamDH {
         name:        &str,
-        stats:      TelenexStatus,
+        stats:      TCSpecialStatus,
     }
 
 File descriptor-based stream DHs need buffer. These are statically sized.
@@ -720,7 +720,7 @@ Streams using socket interfaces use the following:
     }
 
     impl SocketStreamDH {
-        fn new(stream_dhu: &StreamDH, address: IPAddress) -> Result<SocketStreamDH, TelenexError>;
+        fn new(stream_dhu: &StreamDH, address: IPAddress) -> Result<SocketStreamDH, TCSpecialError>;
     }
 
 Streams using device interfaces use the following:
@@ -746,7 +746,7 @@ various OC and payload read and write interfaces directly:
     }
 
     impl FdCompositeDH {
-        fn new(name: &str, ci_fd: FDESC, oc_dhu: &DH, payload_dhu: &DH) -> Result<FdStreamDH, TelenexError>;
+        fn new(name: &str, ci_fd: FDESC, oc_dhu: &DH, payload_dhu: &DH) -> Result<FdStreamDH, TCSpecialError>;
     }
 
 Datagram DHs
@@ -761,7 +761,7 @@ large to read, depending on the alloc_ok flag:
     }
 
     impl DHDatagramBuffer {
-        fn new(alloc_size: usize, realloc_ok: bool, dhu_fds, address: IPAddress) -> Result<DHBuffer, TelenexError> {
+        fn new(alloc_size: usize, realloc_ok: bool, dhu_fds, address: IPAddress) -> Result<DHBuffer, TCSpecialError> {
             let buffer = DHBufferStaticSized::new(alloc_size)?;
             DHBuffer {
                 buffer,
@@ -775,7 +775,7 @@ Datagram DHs are similar to stream DHs:
 .. code-block:: rust
     struct DatagramDH {
         name:           &str,
-        stats:          TelenexStatus,
+        stats:          TCSpecialStatus,
         buffer:         DHDatagramBuffer,
         dhu_fds:        DHFds,
         payload_fd:     i32,
@@ -783,7 +783,7 @@ Datagram DHs are similar to stream DHs:
     }
 
     impl DatagramDH {
-        fn new(datagram_dhu: &DatagramDH, address: IPAddress, alloc_ok) -> Result<DatagramDH, TelenexError> {
+        fn new(datagram_dhu: &DatagramDH, address: IPAddress, alloc_ok) -> Result<DatagramDH, TCSpecialError> {
         }
     }
 
@@ -792,16 +792,16 @@ Datagram DHs are similar to stream DHs:
 
 Testing
 =======
-The telenexcmd application is a GUI program used to control simulated payloads
-interacting with telenex using
-the telenexlib library over a datagram connection to telenex. It has a section at the
+The tcspecialcmd application is a GUI program used to control simulated payloads
+interacting with tcspecial using
+the tcspeciallib library over a datagram connection to tcspecial. It has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
 The rest of the window
 is devoted to eight rectanges for issuing of commands to one of up to eight
 DHs and view their responses. The DHs are named dh0 through dh7.
 
-Telenex and telenexcmd are started asynchronously.
-Closing the window causes telenexcmd to terminate immediately.
+TCSpecial and tcspecialcmd are started asynchronously.
+Closing the window causes tcspecialcmd to terminate immediately.
 
 Possible Enhancements
 =====================

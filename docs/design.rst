@@ -18,7 +18,7 @@ data, etc.) before entering its main loop, though it can also allocate
 and free resources afterwards, if needed.
 
 TCSpecial System Software
-=======================
+=========================
 
 TCSpecial itself is a command interpreter (CI) running on the spacecraft where the
 payloads are located. CI has one or more threads to handle OC communications. It
@@ -67,7 +67,7 @@ the DH has something to do. The sequence is:
    #. When the "wait for I/O ready" operation completes:
       #. If the pipe file descriptor is ready:
          
-      uu#. Read one byte from the pipe file descriptor.
+      #. Read one byte from the pipe file descriptor.
          #. Call a CI function to perform the desired function. This may return
             a value indicated the DH should exit its threads.
       #. Else, if the DH I/O file descriptor is ready:
@@ -75,8 +75,15 @@ the DH has something to do. The sequence is:
 #. Perform the DH I/O file descriptor operation, reading any pending data in a
    a non-blocking mode, or writing the whole output buffer.
 
-Statically vs. Dynamically Sized I/O Buffers
-============================================
+Strean vs. Datagram I/O Buffers
+===============================
+Datagram I/O reads entire messages at a time so a single read() or recv() operation will
+get all data in the message.
+
+Stream I/O differs from datagram I/O in that read and write boundaries are independent. Thus, the stream of
+bytes written as [0x01 0x02 0x03 0x04] in a single operation may be read as four one-byte read()/recv()
+operation or as a single four-byte operation.
+
 I/O buffers may have statically or dynamically determined sizes. They are
 implementations of the following trait:
 

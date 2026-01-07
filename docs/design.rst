@@ -1,6 +1,6 @@
-=========
-TCSpecial
-=========
+================
+TCSpecial Design
+================
 
 Introduction
 ============
@@ -163,24 +163,21 @@ the DH has something to do. The sequence is:
 #. Perform the DH I/O file descriptor operation, reading any pending data in a
    a non-blocking mode, or writing the whole output buffer.
 
-Strean vs. Datagram I/O Buffers
+Datagram vs. Stream I/O Buffers
 ===============================
-Datagram I/O reads entire messages at a time so a single read() or recv() operation will
+Datagram input reads entire messages at a time so a single read() or recv()
+operation will
 get all data in the message.
 
 Stream I/O differs from datagram I/O in that read and write boundaries are independent. Thus, the stream of
 bytes written as [0x01 0x02 0x03 0x04] in a single operation may be read as four one-byte read()/recv()
 operation or as a single four-byte operation.
 
-I/O buffers may have statically or dynamically determined sizes. They are
-implementations of the following trait:
+I/O buffers are all built on the following trait:
 
 .. code-block:: rust
-   trait BufferBase {
-       fn buffer() -> &mut[u8],
-       fn len() -> usize,
-       fn size() -> usize,
-       fn grow(desired_size: usize) -> Result<&mut[u8], TCSpecialError>,
+   trait BufferBase<'a> {
+       fn buffer() -> &'a mut[u8],
        fn max_size() -> usize,
    }
 
@@ -189,110 +186,103 @@ The functions are:
 :buffer():
 Pointer to the buffer
 
-:len():
-Number of valid bytes in the buffer
-
-:size():
-Number of bytes that is allocated for the buffer
-
-:grow(desired_size):
-Changes the number of bytes allocated for the buffer to the desired size
-
 :max_size:
-Limit to the number of bytes that can be allocated for the buffer.  Clearly,
-size() <= max_size()
+Number of bytes allocated for the buffer.
 
-Statically Sized Buffers
-------------------------
-Stream buffers are always of a fixed size, whereas datagram buffers may be
-either statically or dynamically sized. They look like:
-
+Datagram Buffers
+----------------
+Since datagram reads get the entire message at once, they have a simple
+definition:
 .. code-block:: rust
-
-   struct BufferStaticSized {
-      p:      &mut[u8],
-      size:   usize,
-      len:    usize,
-   }
-
-   impl BufferStaticSized {
-       fn new(max_size: usize) -> Result<BufferStaticSized, TCSpecialError> {
-           BufferStaticSized {
-               p:       &[max_size; u8],
-               size:    max_size,
-               len:     0,
-           }
-       }
-   }
-
-   impl BufferBase for BufferStaticSized {
-       fn buffer(&self) -> &mut[u8] { self.p }
-       fn len(&self) -> usize { self.len }
-       fn size(&self) -> usize { self.size }
-       fn grow(&self, desired_size: usize) Result<(), TCSpecialError> {
-           self.desired_size <= self.size { Ok(self.buffer()) }
-           else { Err(TCSpecialError::NoMem) }
-       }
-       fn max_size(&self) -> usize { self.size() }
-   }
-
-Note that grow does not reallocate memory if the buffer is already big enough,
-and it returns an error if it isn't. Thus, all I/O to the buffer will be limited
-in size. Statically sized buffers don't do memory allocations after they are created
-and so are more performant.
-
-Dynamically Sized Buffers
--------------------------
-Unlike buffers used for stream I/O, dynamically sized buffers may be used for datagrams.
-In this case, the usual recv() operation is performed only after a recv()
-operation with the MSG_PEEK and MSG_TRUNC options indicate that more data is
-available than will fit in the buffer. The buffer is then grown, up to the maximum
-allowed size, and recv() used to read the entire datagram.
-
-.. code-block:: rust
-
    struct DatagramBuffer {
-      v:    Vec<u8>,
-      max:  usize,
-      size: usize,
-      len:  usize,
+       p:               Vec<u8>,
+       desired_size:    usize,
    }
 
    impl DatagramBuffer {
-       fn new(max_size: usize) -> Result<DatagramBuffer, TCSpecialError> {
-           DatagramBuffer {
-               p:       Vec<u8>::new(),
-               max:     max_size,
-               size:    max_size,
-               len:     0,
+       fn new<'a>(desired_size: usize) -> Result<&'a mut [u8], TCSpecialError> {
+           let p = Vec<u8>.new(desired_size);
+
+           match p.try_reserve_exact(desired_size) {
+               Err(e) => Err(TCSpecialError::ReserveFailed(e)),
+               Ok(()) => {
+                   p.resize(desired_size, 0),
+
+                   Ok(DatagramBufer {
+                       p,
+                       desired_size,
+                   })
+               },
            }
        }
+    }
+
+    impl BufferBase<'a> for DatagramBuffer {
+        fn buffer(&self) -> &'a mut[u8] {
+            self.p.as_mut_slice()
+        }
+        fn max_size(&self) -> usize {
+            self.max_size
+        }
+    }
+
+Stream Buffers
+--------------
+Since data comes in on streams in a generally unscheduled fashion, the actual
+amount that may be read generally depends on how much time is spent reading
+data before returning it. Thus, stream buffers are similar to datagram buffers
+but include a Duration value indicating the time to wait between one byte
+becoming avilable, i.e. when the wait for data ready returns, and the actual
+read is done for data. These buffers look like:
+.. code-block:: rust
+
+   use core::time::Duration;
+
+   struct DatagramBuffer {
+       p:               Vec<u8>,
+       desired_size:    usize,
+       delay:           Duration,
    }
 
-   impl BufferBase for DatagramBuffer {
-       fn buffer<'a>(&self) -> &'a mut[u8] { self.p.as_mut_slice() }
-       fn len(&self) -> usize { self.len }
-       fn size(&self) -> usize { self.size }
-       fn grow(&self, desired_size: usize) Result<(), TCSpecialError> {
-           self.desired_size <= self.size { Ok(self.buffer) }
-           else {
-               match self.p.try_reserve_exact(size) {
-                   Err(e) => Err(TCSpecialError::ReserveFailed(e)),
-                   Ok(()) => {
-                       self.p.resize(desired_size, 0),
-                       Ok(self.buffer()),
-                   }
-               }
+   impl DatagramBuffer {
+       fn new<'a>(desired_size: usize, delay: Duration) -> Result<&'a mut [u8], TCSpecialError> {
+           let p = Vec<u8>.new(desired_size);
+
+           match p.try_reserve_exact(desired_size) {
+               Err(e) => Err(TCSpecialError::ReserveFailed(e)),
+               Ok(()) => {
+                   p.resize(desired_size, 0),
+
+                   Ok(DatagramBufer {
+                       p,
+                       desired_size,
+                       delay,
+                   })
+               },
            }
        }
-       fn max_size(&self) -> usize { self.max() }
-   }
+    }
 
-Note that grow does not reallocate memory if the buffer is already big enough and
-doesn't free it if there is unused space.
+    impl BufferBase<'a> for DatagramBuffer {
+        fn buffer(&self) -> &'a mut[u8] {
+            self.p.as_mut_slice()
+        }
+        fn max_size(&self) -> usize {
+            self.max_size
+        }
+        fn delay(&self) -> Duration {
+            self.delay
+        }
+    }
+
+Spacecraft Software
+===================
+The software running on the spacecraft is TCspecial. This has a command
+interpreter and some number of data handlers (DHs). The CI talks to ground
+software and to the DHs. The DHs talk to the CI and to the payloads.
 
 Command Interpreter (CI)
-========================
+------------------------
 
 The payload system
 software has a command interpreter with two threads. The threads manage
@@ -300,7 +290,7 @@ commands from the OC and status messages to the OC. I/O is done
 with datagrams. Status messages are queued with a fixed-length queue.
 
 Ground/Space Link
------------------
+^^^^^^^^^^^^^^^^^
 The connection between the OC and the CI is usually implemented with a UDP/IP
 datagram since it is generally the ground/space link, for which TCP/IP
 is unsuitable beyond MEO. However, TCP/IP may be suitable if the link is
@@ -310,21 +300,21 @@ The CI has a Mutex<BTreeMap<<DH>>> which holds all of the allocated DHs. The
 use of a Mutex allows status of all DHs to be determined atomically.
 
 Initialization
---------------
+^^^^^^^^^^^^^^
 When the CI starts up, it will allocate all resources, including threads
 and communication links. It then enters the main loop.
 
 Main Loop
----------
+^^^^^^^^^
 The main CI loop simply reads and processes command from the OC, along with
 periodic sending Beacon Telemetry. The Exit command causes the CI to exit.
 
 Shut Down
----------
+^^^^^^^^^
 During CI shutdown, all DHs are also shut down.
 
 Data Handlers (DHs)
-===================
+-------------------
 The usual lifetime of a DH starts with creation by CI, followed by start up
 of the threads used and allocation of any other resources. It then waits for
 activation. 
@@ -338,12 +328,12 @@ After the DH is deactivated, all resources are freed and the threads used are
 exiting.
 
 Initialization
---------------
+^^^^^^^^^^^^^^
 When the CI Allocate command is given, a DH is sets up all require resources
 and then waits for a DH Activate command.
 
 Main Loop
----------
+^^^^^^^^^
 Data handlers (DHs) relay data between the OC and
 a payload. Data is transmitted between the OC and a DH is done with a
 UDP/IP link. The data exchange between a DH and a payload may be done

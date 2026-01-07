@@ -1,6 +1,6 @@
-===========================
-TCSpecial (Telemetry Nexus)
-===========================
+=========
+TCSpecial
+=========
 
 Introduction
 ============
@@ -18,7 +18,7 @@ TCSpecial is a framework for passing commands to payload devices from           
 an operations center (OC) and relaying
 telemetry`from the payloads to the OC. Design goals are:
 
-* On the spacecraft:
+* On the spacecraft (tcspecial, comprised of the command interpreter (CI) and some number of data handers (DHs):
 
   * Provides the tcspecial executable to run on the spacecraft
 
@@ -39,34 +39,91 @@ telemetry`from the payloads to the OC. Design goals are:
 
   * Control of communication links so that they can be brought up or down
 
-* On the ground
+* On the ground (tcslib)
   
-  * TCSpecialLib (tcslib) has a library for linking with other OC software and multi-threaded process that run on the ground operations center.
+  * Library for linking with other OC software and multi-threaded process that run on the ground operations center.
 
-* For Testing
+* For testing (tcstest)
 
-  * TCSpecialTest (tcstest) allows sending commands to, and view telemetry from
-    TCSpecial.
+  * Allows sending commands to, and view telemetry from tcspecial.
 
-TCSpecial System Software
+Graphically, the system looks like (FIXME: tweak diagram):
+
+.. code-block:: text
+   :dedent: 4
+
+        .=============       ==================    ================= 
+        || Ground Ops||     ||Flight Software ||  ||  Payload Bay  ||
+        |=============|     |==================|  |=================|
+        |  ---------  |     |  -----           |  |                 |
+        | | Mission | |   --->| CI  |          |  |                 |
+        | | Control | |  |  |  -----           |  |                 |
+        | | S/W     | |  |  |  ^ ^ ^           |  |                 |
+        |  ---------  |  |  |  | | |    -----  |  |    -----------  |
+        |      ^      |  |  |  | |  -->| DH0 |<------>| Payload 0 | |
+        |      |      |  |  |  | |      -----  |  |    -----------  |
+        |      v      |  |  |  | |      -----  |  |    -----------  |
+        |  ---------  |  |  |  |  ---->| DH1 |<------>| Payload 1 | |
+        | | tcslib  |<---   |  |        -----  |  |    -----------  |
+        |  ---------  |     |  |          .    |  |                 |
+        \-------------      |  |          .    |  |                 |
+        \                   |  |          .    |  |                 |
+        \                   |  |        -----  |  |    -----------  |
+        \                   |   -----> | DHn |<------>| Payload n | |
+        \                   |           -----  |  |    -----------  |
+        \                    ------------------    -----------------
+
+The mission control software in ground operatioins uses tcslib to communicate with
+the command interpreter, sending commands to it and process telemetry it receives.
+
+The command interpreter and all data handlers run in a process in flight software.
+Some commands from
+mission control are processed immediately, some are translated into commands for
+a data handler. Data sent by data handlers to the command interpreter may be
+interpreted or forward on to tcslib. This extra step allows better control of
+the DH data being sent on the downlink at some cost in efficiency.
+
+DH<i> and Payload <i> pass data back and forth, very possibly with some degree of
+protocol translation.
+
+.. code-block:: text
+   :dedent: 4
+
+        FIXME: use this?
+         ______     ___________________     _________
+        |      |   |                   |   |         |
+        |      |-->| OC        OC      |-->|         |
+        |      |   | read      write   |   |         |
+        |      |   |                   |   |         |
+        |  OC  |   |        DH1        |   | Payload |
+        |      |   |                   |   |         |
+        |      |<--| Payload   Payload |<--|         |
+        |      |   | write     read    |   |         |
+        |______|   |___________________|   |_________|
+
+TCSpecial Flight Software
 =========================
 
-TCSpecial itself is a command interpreter (CI) running on the spacecraft where the
-payloads are located. CI has one or more threads to handle OC communications. It
-defaults to using datagram communication to the OC, though this is usually actually
+Tcspecial hass a command interpreter (CI) running on the spacecraft where the
+payloads are located. CI has one or more threads to handle OC communications, i.e.
+data exchanged with tcslib over a bi-directional communication link. It
+defaults to using datagram communication to the tcslib, though this is usually actually
 a link to the spacecraft radio. The radio may use a different protocol.
 
-TCSpecial also has threads associated with each data handler (DH). Each DH
-communicates to payloads via one bi-direction channel. A key feature of TCSpecial is that
+Tcspecial also has threads associated with each data handler (DH). Each DH
+communicates to payloads via a bi-direction channel. A key feature of tcspecial
+is that
 each DH may use a different protocol to communicate with its payload. This includes
 not only the core communication protocols supported by the operating system, such
 as stream or datagram protocols, or serial or parallel interfaces,
 but also stackable DH protocols that can be
 employed to build custom protocol stacks.
 
-In addition to TCSpecial, there is also TCSpeciallib, which is a library used in the
-OC for building control applications. For testing purposes, TCSpecialgui uses
-TCSpeciallib, along with simulated payloads, to support a simple graphical user interface.
+Tcslib is used for building control applications using mission control
+software such as YAMCS or MCT.
+
+For testing purposes, tcstest uses
+tcslib, along with simulated payloads, to support a simple graphical user interface.
 
 Resource Allocation
 ===================
@@ -603,6 +660,8 @@ Deactivate NAME:
 
 :StatusDH NAME:       Return status for DH I. Information returned:
 
+* Timestamp
+
 * Total number of bytes read
 
 * Total number of bytes written
@@ -620,13 +679,14 @@ are zeroed with the respective Allocate commands and not reset afterwards.
 
    type IoCount = u32;
    type CmdSN = u32;
-   type DHName = [u8; 32];
+   type DHId = [u16; 32];
 
     struct IoStats {
-        bytes_read:     IoCount;
-        bytes_written:  IoCount;
-        io_reads:       IoCount;
-        io_writes:      IoCount;
+        timestamp:      Duration,
+        bytes_read:     IoCount,
+        bytes_written:  IoCount,
+        io_reads:       IoCount,
+        io_writes:      IoCount,
     };
 
 Command Interpreter (CI) Types
@@ -849,3 +909,11 @@ Possible Enhancements
 Though most or all of on-board spacecraft protocols are based on datagrams, use
 of error correcting stream-based protocols are also a reasonable choice for this
 purpose. Build-time selection of these seems useful.
+
+Development Approach
+====================
+As of this writing, this design document is all there is of TCSpecial. The intent
+is to use AI to generate it from this code. Going from design to code, if
+AI is ready, should both save time and improve quality but these will only
+be true to the extent that the design is accurate and complete. Right now
+I am using Claude Code as the AI code generator.

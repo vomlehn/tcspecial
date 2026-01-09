@@ -1,6 +1,9 @@
 ================
 TCSpecial Design
 ================
+.. contents:: Table of Contents
+   :depth: 4
+   :local:
 
 Introduction
 ============
@@ -50,9 +53,8 @@ telemetry`from the payloads to the OC. Design goals are:
 Graphically, the system looks like (FIXME: tweak diagram):
 
 .. code-block:: text
-   :dedent: 4
 
-        .=============       ==================    ================= 
+         =============       ==================    ================= 
         || Ground Ops||     ||Flight Software ||  ||  Payload Bay  ||
         |=============|     |==================|  |=================|
         |  ---------  |     |  -----           |  |                 |
@@ -66,12 +68,12 @@ Graphically, the system looks like (FIXME: tweak diagram):
         |  ---------  |  |  |  |  ---->| DH1 |<------>| Payload 1 | |
         | | tcslib  |<---   |  |        -----  |  |    -----------  |
         |  ---------  |     |  |          .    |  |                 |
-        \-------------      |  |          .    |  |                 |
-        \                   |  |          .    |  |                 |
-        \                   |  |        -----  |  |    -----------  |
-        \                   |   -----> | DHn |<------>| Payload n | |
-        \                   |           -----  |  |    -----------  |
-        \                    ------------------    -----------------
+         -------------      |  |          .    |  |                 |
+                            |  |          .    |  |                 |
+                            |  |        -----  |  |    -----------  |
+                            |   -----> | DHn |<------>| Payload n | |
+                            |           -----  |  |    -----------  |
+                             ------------------    -----------------
 
 The mission control software in ground operatioins uses tcslib to communicate with
 the command interpreter, sending commands to it and process telemetry it receives.
@@ -87,7 +89,6 @@ DH<i> and Payload <i> pass data back and forth, very possibly with some degree o
 protocol translation.
 
 .. code-block:: text
-   :dedent: 4
 
         FIXME: use this?
          ______     ___________________     _________
@@ -149,19 +150,22 @@ is done by passing a pipe file descriptor and writing a byte to it to indicate
 the DH has something to do. The sequence is:
 
 #. Set up DH I/O parameters for DH I/O file descriptor
-#. Enter a loop
-   #. Perform file descriptor "wait for I/O ready" operations, such as
-      select(), epoll(), etc. The mio crate might also be useful.
+#. Enter a loop:
+
+   #. Perform file descriptor "wait for I/O ready" operations, such as select(), epoll(), etc. The mio crate might also be useful.
    #. When the "wait for I/O ready" operation completes:
+
       #. If the pipe file descriptor is ready:
-         
-      #. Read one byte from the pipe file descriptor.
-         #. Call a CI function to perform the desired function. This may return
-            a value indicated the DH should exit its threads.
-      #. Else, if the DH I/O file descriptor is ready:
-         #. Exit the loop
-#. Perform the DH I/O file descriptor operation, reading any pending data in a
-   a non-blocking mode, or writing the whole output buffer.
+
+         #. Read one byte from the pipe file descriptor.
+
+            #. Call a CI function to perform the desired function. This may return a value indicated the DH should exit its threads.
+
+      #. Else:
+
+         #. If the DH I/O file descriptor is ready:
+
+            #. Perform the DH I/O file descriptor operation, reading any pending data in a a non-blocking mode, or writing the whole output buffer.
 
 Datagram vs. Stream I/O Buffers
 ===============================
@@ -176,6 +180,7 @@ operation or as a single four-byte operation.
 I/O buffers are all built on the following trait:
 
 .. code-block:: rust
+
    trait BufferBase<'a> {
        fn buffer() -> &'a mut[u8],
        fn max_size() -> usize,
@@ -184,16 +189,20 @@ I/O buffers are all built on the following trait:
 The functions are:
 
 :buffer():
+
 Pointer to the buffer
 
 :max_size:
+
 Number of bytes allocated for the buffer.
 
 Datagram Buffers
 ----------------
 Since datagram reads get the entire message at once, they have a simple
 definition:
+
 .. code-block:: rust
+
    struct DatagramBuffer {
        p:               Vec<u8>,
        desired_size:    usize,
@@ -217,6 +226,8 @@ definition:
        }
     }
 
+.. code-block:: rust
+
     impl BufferBase<'a> for DatagramBuffer {
         fn buffer(&self) -> &'a mut[u8] {
             self.p.as_mut_slice()
@@ -238,11 +249,15 @@ read is done for data. These buffers look like:
 
    use core::time::Duration;
 
+.. code-block:: rust
+
    struct DatagramBuffer {
        p:               Vec<u8>,
        desired_size:    usize,
        delay:           Duration,
    }
+
+.. code-block:: rust
 
    impl DatagramBuffer {
        fn new<'a>(desired_size: usize, delay: Duration) -> Result<&'a mut [u8], TCSpecialError> {
@@ -262,6 +277,8 @@ read is done for data. These buffers look like:
            }
        }
     }
+
+.. code-block:: rust
 
     impl BufferBase<'a> for DatagramBuffer {
         fn buffer(&self) -> &'a mut[u8] {
@@ -351,7 +368,6 @@ a DH and a payload uses one of multiple different communication protocols.
 For example:
 
 .. code-block:: text
-   :dedent: 4
 
          ______     ___________________     _________
         |      |   |                   |   |         |
@@ -368,7 +384,6 @@ In another case, the payload may write a stream but a DH could be composited
 to packetize the data, say, by adding a byte count before the data.
 
 .. code-block:: text
-   :dedent: 4
 
          ______     ___________________     ___________________     _________
         |      |   |                   |   |                   |   |         |
@@ -410,12 +425,11 @@ that no allocations be done after initialization.
 
 When data is being read as a stream, there are two options:
 
-:Send any data: All pending data on the file descriptor will
-                be read when there is at least one byte pending.
+:Send any data: All pending data on the file descriptor will be read when there is at least one byte pending.
 
-:Wait for full: Wait for the buffer to fill up. A timer is set so that, if
-                the buffer does not fill up, all data in the input buffer
-                is sent
+:Wait for full: Wait for the buffer to fill up. A timer is set so that, if the buffer does not fill up, all data in the input buffer is sent
+
+
 
 DH Links
 ========
@@ -587,6 +601,7 @@ lose the CmdSN. Thus, it starts by sending an Exit command until it receives
 a sucessful ExitStatus message back. (FIXME: check that this works)
 
 :Config:    Set CI configuration:
+
 * Set Beacon interval. It is not possible to disable the beacon entirely,
   but it can be set to a very long value.
 
@@ -619,13 +634,13 @@ Command Status
 Autonmously Generated Messages
 """"""""""""""""""""""""""""""
 
-:Beacon:    This telemetry is sent automatically. It consists of a vector
-            with elements consisting of:
+:Beacon:    This telemetry is sent automatically. It consists of a vector with elements consisting of:
+
 * DH name: Name of the DH
-* OC Data received: bool--0 if nothing was received from the OC by this DH
-  since the last beacon was sent for this DH, 1 if something was received
-* Payload Data received: bool--0 if nothing was received from the payload
-  since the last beacon was sent for this DH, 1 if something was received
+
+* OC Data received: bool--0 if nothing was received from the OC by this DH since the last beacon was sent for this DH, 1 if something was received
+
+* Payload Data received: bool--0 if nothing was received from the payload since the last beacon was sent for this DH, 1 if something was received
 
 Per-DH Control and Status
 --------------------------
@@ -707,6 +722,7 @@ There are several DH types. The individual DH types are derived from the
 following trait:
 
 .. code-block:: rust
+
     trait DH {
         fn name() -> &str;
         fn read_oc(&mut [u8], usize) -> Result<usize, TCSpecialError>;
@@ -719,7 +735,7 @@ following trait:
     }
 
 DHs are supplied with configuration information as follows:
-`
+
 .. code-block:: rust
 
     use socket2::{Socket, Domain, Type, Protocol};
@@ -746,6 +762,7 @@ DH to do something. The file descriptor for payload communication is
 opened by the appropriate DH. These two file descriptors are passed using:
 
 .. code-block:: rust
+
     struct DHFds {
         oc_fd:      FDESC,
         ci_fd:      FDESC,
@@ -757,6 +774,7 @@ Buffers are managed with various types. Stream buffers are allocated once
 when the DH is created:
 
 .. code-block:: rust
+
     struct DHBufferStaticSized {
        alloc_size:  usize,
        buf:         Vec<u8>,
@@ -777,6 +795,7 @@ when the DH is created:
 Stream DHs use the following type to hold the DH name and statistics:
 
 .. code-block:: rust
+
     struct StreamDH {
         name:        &str,
         stats:      TCSpecialStatus,
@@ -787,6 +806,7 @@ We try to fill the buffer entirely, but set a timer to indicate we should
 send whatever is in the buffer if it isn't full.
 
 .. code-block:: rust
+
    struct FdStreamDH {
         stream_dhu: StreamDH,
         max_time:   Time,
@@ -802,6 +822,7 @@ send whatever is in the buffer if it isn't full.
 Streams using socket interfaces use the following:
 
 .. code-block:: rust
+
     struct SocketStreamDH {
         fd_stream_dhu:  FdStreamDH,
         address:        IPAddress,
@@ -814,6 +835,7 @@ Streams using socket interfaces use the following:
 Streams using device interfaces use the following:
 
 .. code-block:: rust
+
     struct DeviceStreamDH {
         fd_stream_dhu:  FdStreamDH,
         path:           &str,
@@ -843,6 +865,7 @@ Datagram buffers can be allocated once, or reallocated when datagrams are too
 large to read, depending on the alloc_ok flag:
 
 .. code-block:: rust
+
     struct DHDatagramBuffer {
        buffer:      DHBufferStaticSized,
        realloc_ok:  bool,
@@ -861,6 +884,7 @@ large to read, depending on the alloc_ok flag:
 Datagram DHs are similar to stream DHs:
 
 .. code-block:: rust
+
     struct DatagramDH {
         name:           &str,
         stats:          TCSpecialStatus,

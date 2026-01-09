@@ -1,15 +1,13 @@
 O = ../OUT
 
-all:	design.d requirements.d
+all:	design.html requirements.html
 
-.PHONY: design.d
-design.d:
-	cd design && $(MAKE) SOURCEDIR=. BUILDDIR=../$O html
+design.html: design.rst
+	rst2html design.rst design.html
 
-.PHONY: requirements.d
-requirements.d:
-	cd requirements && $(MAKE) SOURCEDIR=. BUILDDIR=../$O html
+requirements.html: requirements.rst
+	rst2html requirements.rst requirements.html
 
 .PHONY: clean
 clean:
-	rm -rf $O
+	rm -f design.html requirements.html

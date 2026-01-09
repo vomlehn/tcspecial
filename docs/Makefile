@@ -1,9 +1,15 @@
-design.html: design.rst table.css
-	pandoc -s --css=$(word 2,$^) -o $@ $< --toc
+O = ../OUT
 
-design.txt: design.rst
-	pandoc $^ -o $@ --toc
+all:	design.d requirements.d
+
+.PHONY: design.d
+design.d:
+	cd design && $(MAKE) SOURCEDIR=. BUILDDIR=../$O html
+
+.PHONY: requirements.d
+requirements.d:
+	cd requirements && $(MAKE) SOURCEDIR=. BUILDDIR=../$O html
 
 .PHONY: clean
 clean:
-	rm -f design.html design.txt
+	rm -rf $O

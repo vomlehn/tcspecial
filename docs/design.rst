@@ -146,6 +146,18 @@ may fail, so the CI and DH code must be prepared to handle failures in
 in the operating system and retry at intervals if the various protocols do
 not already support this.
 
+Relays
+======
+
+Endpoints
+=========
+
+Read Endpoints
+--------------
+
+Write Endpoints
+---------------
+
 Interrupting I/O
 ================
 It is a requirement that the CI be able to order DHs to perform various operations, such

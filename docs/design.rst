@@ -54,26 +54,30 @@ Graphically, the system looks like (FIXME: tweak diagram):
 
 .. code-block:: text
 
-         =============       ==================    ================= 
-        || Ground Ops||     ||Flight Software ||  ||  Payload Bay  ||
-        |=============|     |==================|  |=================|
-        |  ---------  |     |  -----           |  |                 |
-        | | Mission | |   --->| CI  |          |  |                 |
-        | | Control | |  |  |  -----           |  |                 |
-        | | S/W     | |  |  |  ^ ^ ^           |  |                 |
-        |  ---------  |  |  |  | | |    -----  |  |    -----------  |
-        |      ^      |  |  |  | |  -->| DH0 |<------>| Payload 0 | |
-        |      |      |  |  |  | |      -----  |  |    -----------  |
-        |      v      |  |  |  | |      -----  |  |    -----------  |
-        |  ---------  |  |  |  |  ---->| DH1 |<------>| Payload 1 | |
-        | | tcslib  |<---   |  |        -----  |  |    -----------  |
-        |  ---------  |     |  |          .    |  |                 |
-         -------------      |  |          .    |  |                 |
-                            |  |          .    |  |                 |
-                            |  |        -----  |  |    -----------  |
-                            |   -----> | DHn |<------>| Payload n | |
-                            |           -----  |  |    -----------  |
-                             ------------------    -----------------
+         ===============       =======================    ================ 
+        ||  Ground Ops ||     ||   Flight Software   ||  ||  Payload Bay ||
+        |===============|     |=======================|  |================|
+        |   ---------   |     |   -----               |  |                |
+        |  | Mission |  |   ---->| CI  |              |  |                |
+        |  | Control |  |  |  |   -----               |  |                |
+        |  | S/W     |  |  |  |   ^ ^ ^               |  |                |
+        |   ---------   |  |  |   | | |    -----      |  |   -----------  |
+        |       ^       |  |  |   | |  -->| DH0 |<--------->| Payload 0 | |
+        |       |       |  |  |   | |      -----      |  |   -----------  |
+        |       v       |  |  |   | |      -----      |  |                |
+        |   ---------   |  |  |   |  ---->| DH1 |<-   |  |                |
+        |  | tcslib  |<----   |   |        -----   |  |  |                |
+        |   ---------   |     |   |    ------------   |  |                |
+         ---------------      |   |   |    -----      |  |   -----------  |
+                              |   |    -->| DH2 |<--------->| Payload 1 | |
+                              |   |        -----      |  |   -----------  |
+                              |   |          .        |  |                |
+                              |   |          .        |  |                |
+                              |   |          .        |  |                |
+                              |   |        -----      |  |   -----------  |
+                              |    -----> | DHn |<--------->| Payload n | |
+                              |            -----      |  |   -----------  |
+                               -----------------------    ----------------
 
 The mission control software in ground operatioins uses tcslib to communicate with
 the command interpreter, sending commands to it and process telemetry it receives.
@@ -239,6 +243,10 @@ definition:
 
 Stream Buffers
 --------------
+Stream I/O generally requires a trade off between latency and efficiency. Using select or similar interface means waiting for one or more bytes, whereas a straight forward read of a buffer length might cause a wait for a full buffers worth of bytes. To accommodate this, stream I/O uses a select like interface to wait for at least a byte,  followed by a short delay for more data to arrive, followed by a non- blocking read. The delay can be zero. 
+
+
+
 Since data comes in on streams in a generally unscheduled fashion, the actual
 amount that may be read generally depends on how much time is spent reading
 data before returning it. Thus, stream buffers are similar to datagram buffers

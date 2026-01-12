@@ -21,6 +21,10 @@ TCSpecial is a framework for passing commands to payload devices from           
 an operations center (OC) and relaying
 telemetry`from the payloads to the OC. Design goals are:
 
+* Extensible protocol usage
+
+* Written in Rust to provide for more reliable operation
+
 * On the spacecraft (tcspecial, comprised of the command interpreter (CI) and some number of data handers (DHs):
 
   * Provides the tcspecial executable to run on the spacecraft
@@ -48,36 +52,33 @@ telemetry`from the payloads to the OC. Design goals are:
 
 * For testing (tcstest)
 
-  * Allows sending commands to, and view telemetry from tcspecial.
+  * Allows sending commands to, and view telemetry from tcspeci
 
 Graphically, the system looks like (FIXME: tweak diagram):
 
 .. code-block:: text
 
-         ===============       =======================    ================ 
-        ||  Ground Ops ||     ||   Flight Software   ||  ||  Payload Bay ||
-        |===============|     |=======================|  |================|
-        |   ---------   |     |   -----               |  |                |
-        |  | Mission |  |   ---->| CI  |              |  |                |
-        |  | Control |  |  |  |   -----               |  |                |
-        |  | S/W     |  |  |  |   ^ ^ ^               |  |                |
-        |   ---------   |  |  |   | | |    -----      |  |   -----------  |
-        |       ^       |  |  |   | |  -->| DH0 |<--------->| Payload 0 | |
-        |       |       |  |  |   | |      -----      |  |   -----------  |
-        |       v       |  |  |   | |      -----      |  |                |
-        |   ---------   |  |  |   |  ---->| DH1 |<-   |  |                |
-        |  | tcslib  |<----   |   |        -----   |  |  |                |
-        |   ---------   |     |   |    ------------   |  |                |
-         ---------------      |   |   |    -----      |  |   -----------  |
-                              |   |    -->| DH2 |<--------->| Payload 1 | |
-                              |   |        -----      |  |   -----------  |
-                              |   |          .        |  |                |
-                              |   |          .        |  |                |
-                              |   |          .        |  |                |
-                              |   |        -----      |  |   -----------  |
-                              |    -----> | DHn |<--------->| Payload n | |
-                              |            -----      |  |   -----------  |
-                               -----------------------    ----------------
+         ===============       =======================      =================
+        ||  Ground Ops ||     ||   Flight Software   ||    ||  Payload Bay  ||
+        |===============|     |=======================|    |=================|
+        |   ---------   |     |      -------------   |     |                 |
+        |  | Mission |  |   -----+->| Command     |  |     |                 |
+        |  | Control |  |  |  |  |  | Interpreter |  |     |                 |
+        |  | S/W     |  |  |  |  |  +-------------+  |     |   -----------   |
+        |   ---------   |  |  |  +->| Data        |<--------->| Payload 0 |  |
+        |       ^       |  |  |  |  | Handler 0   |  |     |   -----------   |
+        |       |       |  |  |  |  +-------------+  |     |   -----------   |
+        |       v       |  |  |  +->| Data        |<--------->| Payload 1 |  |
+        |   ---------   |  |  |  |  | Handler 1   |  |     |   -----------   |
+        |  | tcslib  |<----   |  |  +-------------+  |     |                 |
+        |   ---------   |     |  |  |      .      |  |     |                 |
+         ---------------      |  |         .         |     |                 |
+                              |  |  |      .      |  |     |                 |
+                              |  |  +-------------+  |     |   -----------   |
+                              |  +->| Data        |<--------->| Payload n |  |
+                              |     | Handler n   |  |     |   -----------   |
+                              |      -------------   |     |                 |
+                               ----------------------       -----------------
 
 The mission control software in ground operatioins uses tcslib to communicate with
 the command interpreter, sending commands to it and process telemetry it receives.

@@ -8,90 +8,168 @@ TCSpecial Design
 Introduction
 ============
 
-.. table:: NOTE
+.. note::
+   TCSpecial has been designed for spacecraft and ground communication with high
+   latency communication links. It is just as applicable for other environments,
+   such as submersibles, drones, etc. Simply translate "spacecraft" to your
+   device type.
 
-   +--------------------------------------------------------------------------------+
-   | TCSpecial has been designed for spacecraft and ground communication with high  |
-   | latency communication links. It is just as applicable for other environments,  |
-   | such as submersibles, drones, etc. Simply translate "spacecraft" to your       |
-   | device type.                                                                   |
-   +--------------------------------------------------------------------------------+
+FIXME: Revise this.
 
-TCSpecial is a framework for passing commands to payload devices from            |
-an operations center (OC) and relaying
-telemetry`from the payloads to the OC. Design goals are:
+* Centralized control
 
-* Extensible protocol usage
+  * Statistics
+    
+    * Bytes transferred and I/O operations attempted and completed
 
-* Written in Rust to provide for more reliable operation
+    * Maintained on global and per payload basis
 
-* On the spacecraft (tcspecial, comprised of the command interpreter (CI) and some number of data handers (DHs):
+  * Memory allocation complete during initialization
 
-  * Provides the tcspecial executable to run on the spacecraft
+* Code comprised of:
+  
+  * tcspecial: process running on spacecraft
 
-  * Allow for "before main loop" guarantee of completion of memory allocation. (Things
-    started after the main loop begins will allocate all memory on start up)
+  * tcslib: ground software library providing simple integration with mission control software
 
-  * Support for as many protocols as possible for payloads
+  * tcstest: Simple interface using tcslib for visualizing tcspecial operation and doing testing
 
-  * Support for stacking custom payload protocols
+* Standard set of payload interfaces
 
-  * Written in Rust to:
+  * Stream and datagram
+  
+  * Network and device
 
-    * Provide a high degree of portability
+    * Support for <n> interfaces on Linux
+
+    * No limit to device support--specified by name
+
+* Radio interfaces
+
+  * UDP standard
+
+* Straight-forward extensibility for custom payload and uplink/downlink interfaces
+
+* Written in Rust:
+
+    * Provides a high degree of portability
 
     * Take advantage of Rust memory ownership features to eliminate many errors
 
-    * Leverage the many features Rust has to produce clean, well documented code, with many contemporary to make it easy to write code.
+    * Leverage the many features Rust has to produce clean, well documented code, with many modern features to make it easy to write code.
 
-  * Control of communication links so that they can be brought up or down
 
-* On the ground (tcslib)
-  
-  * Library for linking with other OC software and multi-threaded process that run on the ground operations center.
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+From a high level, tcspecial looks like (excluding tcstest):
 
-* For testing (tcstest)
+FIXME: tweak diagram):
 
-  * Allows sending commands to, and view telemetry from tcspeci
-
-Graphically, the system looks like (FIXME: tweak diagram):
+**High-Level View of TCSpecial**
 
 .. code-block:: text
 
-         ===============       =======================      =================
-        ||  Ground Ops ||     ||   Flight Software   ||    ||  Payload Bay  ||
-        |===============|     |=======================|    |=================|
-        |   ---------   |     |      -------------   |     |                 |
-        |  | Mission |  |   -----+->| Command     |  |     |                 |
-        |  | Control |  |  |  |  |  | Interpreter |  |     |                 |
-        |  | S/W     |  |  |  |  |  +-------------+  |     |   -----------   |
-        |   ---------   |  |  |  +->| Data        |<--------->| Payload 0 |  |
-        |       ^       |  |  |  |  | Handler 0   |  |     |   -----------   |
-        |       |       |  |  |  |  +-------------+  |     |   -----------   |
-        |       v       |  |  |  +->| Data        |<--------->| Payload 1 |  |
-        |   ---------   |  |  |  |  | Handler 1   |  |     |   -----------   |
-        |  | tcslib  |<----   |  |  +-------------+  |     |                 |
-        |   ---------   |     |  |  |      .      |  |     |                 |
-         ---------------      |  |         .         |     |                 |
-                              |  |  |      .      |  |     |                 |
-                              |  |  +-------------+  |     |   -----------   |
-                              |  +->| Data        |<--------->| Payload n |  |
-                              |     | Handler n   |  |     |   -----------   |
-                              |      -------------   |     |                 |
-                               ----------------------       -----------------
+        GROUND          :                     SPACE
+     ===================:===================================================
+                        : 
+      ===============   :    =====================       =================
+     ||  Ground Ops ||  :   ||  Flight Software  ||     ||  Payload Bay  ||
+     |===============|  :   |=====================|     |=================|
+     |   ---------   |  :   |     =============   |     |                 |
+     |  | Mission |  |  : ----   | tcspecial   |  |     |                 |
+     |  | Control |  |  :|  | |  +-------------+  |     |                 |
+     |  | S/W     |  |  :|  | |  | Command     |  |     |                 |
+     |   ---------   |  :|  | +->| Interpreter |  |     |                 |
+     |       ^       |  :|  | |  +-------------+  |     |   -----------   |
+     |       |       |  :|  | |  | Data        |<--------->| Payload 0 |  |
+     |       v       |  :|  | +->| Handler 0   |  |     |   -----------   |
+     |   ---------   |  :|  | |  +-------------+  |     |   -----------   |
+     |  | tcslib  |<----:   | |  | Data        |<--------->| Payload 1 |  |
+     |   ---------   |  :   | |  | Handler 1   |  |     |   -----------   |
+      ---------------   :   | |  |      .      |  |     |                 |
+                        :   | |         .         |     |                 |
+                        :   | |  |      .      |  |     |                 |
+                        :   | |  +-------------+  |     |   -----------   |
+                        :   | +->| Data        |<--------->| Payload n |  |
+                        :   |    | Handler n   |  |     |   -----------   |
+                        :   |     -------------   |     |                 |
+                        :    ---------------------       -----------------
 
-The mission control software in ground operatioins uses tcslib to communicate with
-the command interpreter, sending commands to it and process telemetry it receives.
+On the ground, the tcslib library is used by the mission control software (such as YAMCS
+or MCT) to issue commands and receive telemetry. These are transmitted over
+what is shown as a single communications link, though these could be using
+multiple frequencies.
 
-The command interpreter and all data handlers run in a process in flight software.
-Some commands from
-mission control are processed immediately, some are translated into commands for
-a data handler. Data sent by data handlers to the command interpreter may be
-interpreted or forward on to tcslib. This extra step allows better control of
-the DH data being sent on the downlink at some cost in efficiency.
+Commands sent through tcslib go to the tcscmd process, directed as appropriate to
+either the command interpreter or the the
+various data handlers. This is shown as a multiplex link, but other options
+can be easily implemented.
 
-DH<i> and Payload <i> pass data back and forth, very possibly with some degree of
-protocol translation.
+Telemetry from the command interpreter and the
+data handlers could also be transmitted in various ways. Each data handler
+will generally communicate to a single payload, though payloads may use
+multiple data handlers for various communication links. Data handlers all run
+in the same address space, so any need for data handlers to communicate with
+each other is straight forward to implement.
+
+Tcscmd
+======
+
+EndPoints
+---------
+Endpoints handle the low level I/O and each one is associated with a thread.
+Though it would be straight forward to
+handle data transmission and reception via other methods, the current Endpoint
+implementation is built on file descriptors. Endpoints can be ReadEndpoints or
+WriteEndpoints. In both cases, they wait for I/O to become possible on a file
+descriptor.
+
+In order for tcscmd to notify a given endpoint that it has some action
+to perform, it passes it a pipe file descriptor during endpoint initialization.
+When it wants an endpoint to perform some action, it writes a byte to that
+file descriptor.
+By waiting on the I/O file descriptor and the pipe file descriptor, the Endpoint
+will know that it has a command waiting or I/O waiting, or conceivable both,
+by using select(), epoll(), or a similar call.
+
+The availability of data on the pipe file descriptor takes precedence over
+the readiness for the I/O file descriptor. This way the endpoint will know
+if should exit even it has pending I/O that would block. If the endpoint has
+not been told to exit, it will return to wait for the pipe or I/O file
+descriptors to indicate I/O can be performed.
+
+If no data is available on the pipe file descriptor but I/O is ready on the
+I/O file descriptor, the appropriate read or write action, using non-blocking
+I/O, is performed. If it read data, it will generally follow the non-blocking
+read with a write. The I/O file descriptor for the write will again be waited
+for, along with a read on the pipe file descriptor.
+
+Stream and Datagram Endpoints
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Datagram Endpoints
+""""""""""""""""""
+
+Stream Endpoints
+""""""""""""""""
+
+Network and Device Endpoints
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Network Endpoints
+"""""""""""""""""
+
+Device Endpoints
+""""""""""""""""
+
+Custom Endpoints
+----------------
+
+Links
+=====
+
+Custom Links
+------------
+
 
 .. code-block:: text
 

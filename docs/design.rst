@@ -14,7 +14,7 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
-FIXME: Revise this.
+FIXME: Revise this to reflect user interest.
 
 * Centralized control
 
@@ -59,10 +59,11 @@ FIXME: Revise this.
     * Leverage the many features Rust has to produce clean, well documented code, with many modern features to make it easy to write code.
 
 
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-From a high level, tcspecial looks like (excluding tcstest):
-
-FIXME: tweak diagram):
+High-Level View of tcspecial
+----------------------------
+Tcspecial fits into the ground and space portions of the command and telemetry
+systems as follows:
+FIXME: tweak diagram as necessary):
 
 **High-Level View of TCSpecial**
 
@@ -97,11 +98,13 @@ FIXME: tweak diagram):
 On the ground, the tcslib library is used by the mission control software (such as YAMCS
 or MCT) to issue commands and receive telemetry. These are transmitted over
 what is shown as a single communications link, though these could be using
-multiple frequencies.
+multiple frequencies or channels.
 
 Commands sent through tcslib go to the tcscmd process, directed as appropriate to
 either the command interpreter or the the
-various data handlers. This is shown as a multiplex link, but other options
+various data handlers. This is shown as a multiplexed link, such as something
+using an IP address for the command interpretter and each of the
+data handlers, the but other options
 can be easily implemented.
 
 Telemetry from the command interpreter and the
@@ -123,46 +126,217 @@ implementation is built on file descriptors. Endpoints can be ReadEndpoints or
 WriteEndpoints. In both cases, they wait for I/O to become possible on a file
 descriptor.
 
+Requirement
+    Each Endpoint has an I/O file descriptor
+
+Requirement
+    Each Endpoint has a command file descriptor
+
 In order for tcscmd to notify a given endpoint that it has some action
-to perform, it passes it a pipe file descriptor during endpoint initialization.
+to perform, it passes it a command file descriptor, which is a pipe
+interface, during endpoint initialization.
 When it wants an endpoint to perform some action, it writes a byte to that
 file descriptor.
-By waiting on the I/O file descriptor and the pipe file descriptor, the Endpoint
-will know that it has a command waiting or I/O waiting, or conceivable both,
+By waiting on the I/O file descriptor for a read or write, and the command file
+descriptor, for a read, the Endpoint
+will know that it has a command waiting or I/O waiting, or conceivably both,
 by using select(), epoll(), or a similar call.
 
-The availability of data on the pipe file descriptor takes precedence over
-the readiness for the I/O file descriptor. This way the endpoint will know
-if should exit even it has pending I/O that would block. If the endpoint has
-not been told to exit, it will return to wait for the pipe or I/O file
-descriptors to indicate I/O can be performed.
+Requirement
+    When an Endpoint needs to perform I/O, it first uses a select()-like interface
+    to wait for the the I/O file descriptor to become ready for a read or write,
+    depending on the operation, and a read of the command file descriptor.
 
-If no data is available on the pipe file descriptor but I/O is ready on the
-I/O file descriptor, the appropriate read or write action, using non-blocking
-I/O, is performed. If it read data, it will generally follow the non-blocking
-read with a write. The I/O file descriptor for the write will again be waited
-for, along with a read on the pipe file descriptor.
+Requirement
+    When the select()-like operation completes, the Endpoint will first check the
+    command file descriptor
+
+Requirement
+    If the command file descriptor has data ready, the Endpoint will read one byte
+    from that file descriptor and call the command interpreter to handle the command.
+
+Requirement
+    Regardless whether the command interpreter command handle is successful or not,
+    the Endpoint will return the the select()-like call.
+
+Requirement
+    If the select()-like call indicates an operation can be performed on the I/O
+    file descriptor and one cannot be performed on the command file descriptor, it
+    will issue the appropriate I/O with the NO_DELAY option.
+
+Requirement
+   When the I/O file descriptor operation succeeds, the Endpoint will return a status
+   of Ok(n) where n is a u32 indicate the number of bytes transferred.
+
+Requirement
+   If the I/O file descriptor operation fails, it will be repeated after a delay
+
+Requirement
+   The initial value of the delay is a configurable named EndpointDelayInit
+
+Requirement
+   Each time the I/O file descriptor fails, the delay is set to twice its previous
+   value up to a configurable named EndpointDelayMax.
+
+Requirement
+   If the next value of the delay reaches EndpointDelayMax, the Endpoint will
+   exit with an appropriate Err() value.
 
 Stream and Datagram Endpoints
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Stream data flows along a communication link as one or more bytes at a time with
+generally irregular timing and without any error checking. 
+Datagrams differ in that all data in a datagram is either transferred in a complete
+block with no errors, or it is discarded.
 
 Datagram Endpoints
 """"""""""""""""""
+A consequence of datagrams being transferred in a single block is that select()-like
+calls indicate that the entire datagram is present or none is. There is no need to
+read a piece at a time. It is possible to read the amount of data available and allocate
+a bigger buffer but tcspecial does not support this capability.
 
 Stream Endpoints
 """"""""""""""""
+Streams do not have embedded markers to indicate data boundaries, so select()-like
+calls indicate only that one or more bytes are available. Transferring one byte
+at a time will incur a significant amount of overhead, so tcspecial can delay for
+some time to collect more bytes. This configurable is known as StreamEPDelay.
+
+When the select()-like operation indicates at least one byte is available,
+Stream Endpoints with values of StreamEPDelay, the Stream Endpoint will pause
+for StreamEPDelay and only afterwards perform a non-blocking read of up to the
+buffer size to get the data.
 
 Network and Device Endpoints
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Endpoints may correspond to a variety of file descriptor types. In a broad
+sense, these are network-related and device-related. While device-related
+file descriptors are generally stream devices, network-related file
+descriptors may behave like streams or datagrams.
 
 Network Endpoints
 """""""""""""""""
 
-Device Endpoints
-""""""""""""""""
+The table below lists network protocols supported on Linux-based systems. The
+protocols below are generally available, see the man page for socket(2) and
+other, associated, documentation. The protocol family, socket type, and protocol
+information is provided to the Rust Socket::new() interface as follows:
 
-Custom Endpoints
-----------------
+.. code-block:: rust
+
+   use socket2::{Domain, Type, Protocol, Socket};
+
+   pub fn new(domain: Domain, type_: Type, protocol: Option<Protocol>) -> io::Result<Socket>
+
+
+In the following table, all socket types except for SOCK_STREAM have datagram
+semantics. SOCK_STREAM types have stream semantics.
+
+FIXME: What are the semantics of those items marked TBD?
+
+**Linux Networking Families and Types**
+
++--------------+----------------+-----------+-----------+
+| domain       | type           | protocol  | Stream or |
+|              |                |           | Datagram  |
++--------------+----------------+-----------+-----------+
+| AF_UNIX      | SOCK_STREAM    | 0         | stream    |
+| or           +----------------+-----------+-----------+
+| AF_LOCAL     | SOCK_DGRAM     | 0         | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_SEQPACKET | 0         | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_INET      | SOCK_STREAM    | 0         | stream    |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | 0         | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RAW       | yes       | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_AX25      | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_IPX       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_APPLETALK | SOCK_DGRAM     | yes       | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RAW       | yes       | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_X25       | SOCK_SEQPACKET | 0         | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_INET6     | SOCK_STREAM    | yes       | stream    |
+|              +----------------+-----------+-----------+
+|              | SOCK_DGRAM     | yes       | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RAW       | yes       | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_DECnet    | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_KEY       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_NETLINK   | SOCK_DGRAM     | yes       | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RAW       | yes       | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_PACKET    | SOCK_DGRAM     | yes       | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RAW       | yes       | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_RDS       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_PPPOX     | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_LLC       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_IB        | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_MPLS      | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_CAN       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_TIPC      | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_BLUETOOTH | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_ALG       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_VSOCK     | SOCK_DGRAM     | yes       | datagram  |
+|              +----------------+-----------+-----------+
+|              | SOCK_RAW       | yes       | datagram  |
++--------------+----------------+-----------+-----------+
+| AF_KCM       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+| AF_XDP       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+
+Protocol support may require configuring the Linux kernel
+to include protocol drivers. Of course, the hardware supporting the protocol
+must also be present. For more information on each of the address families, consult
+the Linux man page address_families(7).
+
+Requirement
+   Tcspecial and tclib must translate the operating system dependent values, such as
+   the address families, types, and protocols, to canonical values, and back again
+   to avoid building in operating system dependent code. All values transmitted
+   must use the canonical values.
+
+Device Endpoints
+^^^^^^^^^^^^^^^^
+Linux device Endpoints open device entries in the /dev directory. This could be:
+
+**Linux Device Endpoints**
+
++----------------+---------------------------------------------+
+| Name           | Description                                 |
++================+=============================================+
+| /dev/ttyS0     | Serial port, such as RS-232 or RS-422       |
++----------------+---------------------------------------------+
+| /dev/ttyUSB0   | USB serial adapter (to RS-232 or RS-422     |
++----------------+---------------------------------------------+
+| /dev/i2c-2     | I2c bus                                     |
++----------------+---------------------------------------------+
+| /dev/spidev0.1 | SPI device                                  |
++----------------+---------------------------------------------+
+
 
 Links
 =====
@@ -225,171 +399,6 @@ may fail, so the CI and DH code must be prepared to handle failures in
 in the operating system and retry at intervals if the various protocols do
 not already support this.
 
-Relays
-======
-
-Endpoints
-=========
-
-Read Endpoints
---------------
-
-Write Endpoints
----------------
-
-Interrupting I/O
-================
-It is a requirement that the CI be able to order DHs to perform various operations, such
-as sending statistics and shutting down, even if the DH has I/O to perform. This
-is done by passing a pipe file descriptor and writing a byte to it to indicate
-the DH has something to do. The sequence is:
-
-#. Set up DH I/O parameters for DH I/O file descriptor
-#. Enter a loop:
-
-   #. Perform file descriptor "wait for I/O ready" operations, such as select(), epoll(), etc. The mio crate might also be useful.
-   #. When the "wait for I/O ready" operation completes:
-
-      #. If the pipe file descriptor is ready:
-
-         #. Read one byte from the pipe file descriptor.
-
-            #. Call a CI function to perform the desired function. This may return a value indicated the DH should exit its threads.
-
-      #. Else:
-
-         #. If the DH I/O file descriptor is ready:
-
-            #. Perform the DH I/O file descriptor operation, reading any pending data in a a non-blocking mode, or writing the whole output buffer.
-
-Datagram vs. Stream I/O Buffers
-===============================
-Datagram input reads entire messages at a time so a single read() or recv()
-operation will
-get all data in the message.
-
-Stream I/O differs from datagram I/O in that read and write boundaries are independent. Thus, the stream of
-bytes written as [0x01 0x02 0x03 0x04] in a single operation may be read as four one-byte read()/recv()
-operation or as a single four-byte operation.
-
-I/O buffers are all built on the following trait:
-
-.. code-block:: rust
-
-   trait BufferBase<'a> {
-       fn buffer() -> &'a mut[u8],
-       fn max_size() -> usize,
-   }
-
-The functions are:
-
-:buffer():
-
-Pointer to the buffer
-
-:max_size:
-
-Number of bytes allocated for the buffer.
-
-Datagram Buffers
-----------------
-Since datagram reads get the entire message at once, they have a simple
-definition:
-
-.. code-block:: rust
-
-   struct DatagramBuffer {
-       p:               Vec<u8>,
-       desired_size:    usize,
-   }
-
-   impl DatagramBuffer {
-       fn new<'a>(desired_size: usize) -> Result<&'a mut [u8], TCSpecialError> {
-           let p = Vec<u8>.new(desired_size);
-
-           match p.try_reserve_exact(desired_size) {
-               Err(e) => Err(TCSpecialError::ReserveFailed(e)),
-               Ok(()) => {
-                   p.resize(desired_size, 0),
-
-                   Ok(DatagramBufer {
-                       p,
-                       desired_size,
-                   })
-               },
-           }
-       }
-    }
-
-.. code-block:: rust
-
-    impl BufferBase<'a> for DatagramBuffer {
-        fn buffer(&self) -> &'a mut[u8] {
-            self.p.as_mut_slice()
-        }
-        fn max_size(&self) -> usize {
-            self.max_size
-        }
-    }
-
-Stream Buffers
---------------
-Stream I/O generally requires a trade off between latency and efficiency. Using select or similar interface means waiting for one or more bytes, whereas a straight forward read of a buffer length might cause a wait for a full buffers worth of bytes. To accommodate this, stream I/O uses a select like interface to wait for at least a byte,  followed by a short delay for more data to arrive, followed by a non- blocking read. The delay can be zero. 
-
-
-
-Since data comes in on streams in a generally unscheduled fashion, the actual
-amount that may be read generally depends on how much time is spent reading
-data before returning it. Thus, stream buffers are similar to datagram buffers
-but include a Duration value indicating the time to wait between one byte
-becoming avilable, i.e. when the wait for data ready returns, and the actual
-read is done for data. These buffers look like:
-.. code-block:: rust
-
-   use core::time::Duration;
-
-.. code-block:: rust
-
-   struct DatagramBuffer {
-       p:               Vec<u8>,
-       desired_size:    usize,
-       delay:           Duration,
-   }
-
-.. code-block:: rust
-
-   impl DatagramBuffer {
-       fn new<'a>(desired_size: usize, delay: Duration) -> Result<&'a mut [u8], TCSpecialError> {
-           let p = Vec<u8>.new(desired_size);
-
-           match p.try_reserve_exact(desired_size) {
-               Err(e) => Err(TCSpecialError::ReserveFailed(e)),
-               Ok(()) => {
-                   p.resize(desired_size, 0),
-
-                   Ok(DatagramBufer {
-                       p,
-                       desired_size,
-                       delay,
-                   })
-               },
-           }
-       }
-    }
-
-.. code-block:: rust
-
-    impl BufferBase<'a> for DatagramBuffer {
-        fn buffer(&self) -> &'a mut[u8] {
-            self.p.as_mut_slice()
-        }
-        fn max_size(&self) -> usize {
-            self.max_size
-        }
-        fn delay(&self) -> Duration {
-            self.delay
-        }
-    }
 
 Spacecraft Software
 ===================
@@ -546,107 +555,6 @@ they exceed the previously expected length and reallocating a larger buffer to b
 able to read the whole packet with truncation. This is only effective up to some
 size, however, the kernel itself will have limitations on the packet size it can read.
 
-Core DH Types
--------------
-
-Core Link Types
----------------
-Core link types are those provided by the operating system. For Linux-based
-systems, these are network link types and device link types.
-
-Network Link Types
-^^^^^^^^^^^^^^^^^^
-The following table lists network protocols supported on Linux-based systems. The
-protocols below are generally available, see the man page for socket(2) and
-other, associated, documentation. The protocol family, socket type, and protocol
-information are those provided to the socket(2) system call.
-
-Protocol support may require configuring the Linux kernel
-to include protocol drivers. Of course, the hardware supporting the protocol
-must also be present. For more information on each of the address families, consult
-the Linux man page address_families(7).
-
-+------------+--------------+----------------+-----------+-----------+
-| Interface  | Protocol     | Socket type    | Stream or | Protocol? |
-|            | Family       |                | Datagram  |           |
-+------------+--------------+----------------+-----------+-----------+
-| Networking | AF_UNIX      | SOCK_STREAM    | stream    | 0         |
-|            |    or        +----------------+-----------+-----------+
-|            | AF_LOCAL     | SOCK_DGRAM     | datagram  | 0         |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_SEQPACKET | datagram  | 0         |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_INET      | SOCK_STREAM    | stream    | 0         |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_DGRAM     | datagram  | 0         |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_RAW       | datagram  | yes       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_AX25      | TBD            | TBD       | TBD       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_IPX       | TBD            | TBD       | TBD       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_APPLETALK | SOCK_DGRAM     | datagram  | yes       |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_RAW       | datagram  | yes       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_X25       | SOCK_SEQPACKET | datagram  | 0         |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_INET6     | SOCK_STREAM    | stream    | yes       |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_DGRAM     | datagram  | yes       |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_RAW       | datagram  | yes       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_DECnet    | TBD            | TBD       | TBD       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_KEY       | TBD            | TBD       | TBD       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_NETLINK   | SOCK_DGRAM     | datagram  | yes       |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_RAW       | datagram  | yes       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_PACKET    | SOCK_DGRAM     | datagram  | yes       |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_RAW       | datagram  | yes       |
-|            +--------------+----------------+-----------+-----------+
-|            | AF_RDS       | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_PPPOX     | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_LLC       | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_IB        | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_MPLS      | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_CAN       | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_TIPC      | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_BLUETOOTH | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_ALG       | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_VSOCK     | SOCK_DGRAM     | datagram  | yes       |
-|            |              +----------------+-----------+-----------+
-|            |              | SOCK_RAW       | datagram  | yes       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_KCM       | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-|            | AF_XDP       | TBD            | TBD       | TBD       |
-+------------+--------------+----------------+-----------+-----------+
-
-Device Link Types
-^^^^^^^^^^^^^^^^^
-Device communication links use direct file interfaces. These can be things like:
-
-* RS-422
-* I2C
-* SPI
-
-or many others. They are specified by supplying a path name and are all stream
-interfaces
 
 Provided Stacked DHs
 ==≈=≈=============
@@ -1022,6 +930,10 @@ Possible Enhancements
 Though most or all of on-board spacecraft protocols are based on datagrams, use
 of error correcting stream-based protocols are also a reasonable choice for this
 purpose. Build-time selection of these seems useful.
+
+:Special tty-based timing of input:
+
+Could use the tty maximum number of characters to read a message.
 
 Development Approach
 ====================

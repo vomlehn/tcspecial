@@ -32,6 +32,8 @@ FIXME: Revise this to reflect user interest.
 
   * tcslib: ground software library providing simple integration with mission control software
 
+  * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
+
   * tcstest: Simple interface using tcslib for visualizing tcspecial operation and doing testing
 
 * Standard set of payload interfaces
@@ -69,31 +71,34 @@ FIXME: tweak diagram as necessary):
 
 .. code-block:: text
 
-        GROUND          :                     SPACE
-     ===================:===================================================
-                        : 
-      ===============   :    =====================       =================
-     ||  Ground Ops ||  :   ||  Flight Software  ||     ||  Payload Bay  ||
-     |===============|  :   |=====================|     |=================|
-     |   ---------   |  :   |     =============   |     |                 |
-     |  | Mission |  |  : ----   | tcspecial   |  |     |                 |
-     |  | Control |  |  :|  | |  +-------------+  |     |                 |
-     |  | S/W     |  |  :|  | |  | Command     |  |     |                 |
-     |   ---------   |  :|  | +->| Interpreter |  |     |                 |
-     |       ^       |  :|  | |  +-------------+  |     |   -----------   |
-     |       |       |  :|  | |  | Data        |<--------->| Payload 0 |  |
-     |       v       |  :|  | +->| Handler 0   |  |     |   -----------   |
-     |   ---------   |  :|  | |  +-------------+  |     |   -----------   |
-     |  | tcslib  |<----:   | |  | Data        |<--------->| Payload 1 |  |
-     |   ---------   |  :   | |  | Handler 1   |  |     |   -----------   |
-      ---------------   :   | |  |      .      |  |     |                 |
-                        :   | |         .         |     |                 |
-                        :   | |  |      .      |  |     |                 |
-                        :   | |  +-------------+  |     |   -----------   |
-                        :   | +->| Data        |<--------->| Payload n |  |
-                        :   |    | Handler n   |  |     |   -----------   |
-                        :   |     -------------   |     |                 |
-                        :    ---------------------       -----------------
+        GROUND             :                     SPACE
+     ======================:===================================================
+                           : 
+      ==================   :    =====================       =================
+     ||  Ground Ops    ||  :   ||  Flight Software  ||     ||  Payload Bay  ||
+     |==================|  :   |=====================|     |=================|
+     |   ---------      |  :   |     =============   |     |                 |
+     |  | Mission |     |  : ----   | tcspecial   |  |     |                 |
+     |  | Control |     |  :|  | |  | (tcsgs)     |  |     |                 |
+     |  | S/W     |     |  :|  | |  +-------------+  |     |                 |
+     |   ---------      |  :|  | |  | Command     |  |     |                 |
+     |       ^          |  :|  | +->| Interpreter |  |     |                 |
+     |       |          |  :|  | |  +-------------+  |     |   -----------   |
+     |       v          |  :|  | |  | Data        |<--------->| Payload 0 |  |
+     |   ------------   |  :|  | +->| Handler 0   |  |     |   -----------   |
+     |  | tcslib     |<-----   | |  +-------------+  |     |   -----------   |
+     |  | (tcslibgs) |  |  :   | |  | Data        |<--------->| Payload 1 |  |
+     |   ------------   |  :
+      ------------------   :   | |  | Handler 1   |  |     |   -----------   |
+                           :   | |  |      .      |  |     |                 |
+
+                           :   | |         .         |     |                 |
+                           :   | |  |      .      |  |     |                 |
+                           :   | |  +-------------+  |     |   -----------   |
+                           :   | +->| Data        |<--------->| Payload n |  |
+                           :   |    | Handler n   |  |     |   -----------   |
+                           :   |     -------------   |     |                 |
+                           :    ---------------------       -----------------
 
 On the ground, the tcslib library is used by the mission control software (such as YAMCS
 or MCT) to issue commands and receive telemetry. These are transmitted over
@@ -114,8 +119,11 @@ multiple data handlers for various communication links. Data handlers all run
 in the same address space, so any need for data handlers to communicate with
 each other is straight forward to implement.
 
-Tcscmd
-======
+The tcslibgs library contains definitions shared between the ground portion of the
+software, tcslib, and the space portion, tcspecial.
+
+Tcspecial
+=========
 
 EndPoints
 ---------
@@ -181,6 +189,10 @@ Requirement
 Requirement
    If the next value of the delay reaches EndpointDelayMax, the Endpoint will
    exit with an appropriate Err() value.
+
+Read and Write Endpoints
+^^^^^^^^^^^^^^^^^^^^^^^^
+FIXME: Fill this out
 
 Stream and Datagram Endpoints
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -338,16 +350,25 @@ Linux device Endpoints open device entries in the /dev directory. This could be:
 +----------------+---------------------------------------------+
 
 
-Links
-=====
+Relays
+======
+Relays contain two Endpoints, a Read Endpoint and a Write Endpoint. Data
+flows in just one direction, from the Read Endpoint to the Write Endpoint.
+A Relay is implemented as a thread that simply looks between the Read and
+Write Endpoints, handling commands from the Command Interpreter as necessary.
+The directions are denoted "Ground to Payload" and "Payload to Ground"
 
-Custom Links
-------------
+Data Handlers
+=============
+Data Handlers package two Relays, one in one direction and one in the
+other. File descriptors are shared between the Read Endpoint of one direction
+and the Write Endpoint of the other direction, and the Write Endpoint of
+the first direction and the Read Endpoint of the other direction, as show below:
 
+**Visualization of a Data Handler**
 
 .. code-block:: text
 
-        FIXME: use this?
          ______     ___________________     _________
         |      |   |                   |   |         |
         |      |-->| OC        OC      |-->|         |
@@ -571,8 +592,9 @@ This DH is composited with the DH that packetizes streaming data. It converts th
 Packetizing Arbitrary Streaming Data With Constant Overhead Byte Stuffing
 ‐-----‐------------------------------------------------------------------------------------------------------------------
 Read 254  * 4 bytes from the payload, write to a buffer with COBS, stick a u16 header which is a byte count and send to the OC.
-TCSpecial Library
-===============
+
+tcslib
+======
 The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.
 
@@ -909,11 +931,11 @@ Datagram DHs are similar to stream DHs:
     impl DH for DatagramDH {
     }
 
-Testing
+tcstest
 =======
-The tcspecialcmd application is a GUI program used to control simulated payloads
+The tcstest is a GUI program used to control simulated payloads
 interacting with tcspecial using
-the tcspeciallib library over a datagram connection to tcspecial. It has a section at the
+the tcslib library over a datagram connection to tcspecial. It has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
 The rest of the window
 is devoted to eight rectanges for issuing of commands to one of up to eight
@@ -922,18 +944,52 @@ DHs and view their responses. The DHs are named dh0 through dh7.
 TCSpecial and tcspecialcmd are started asynchronously.
 Closing the window causes tcspecialcmd to terminate immediately.
 
+Support Definitions
+===================
+There are some definitions that are not closely tied to TCSpecial but which
+are required for TCSpecial. These could be moved to other crates.
+
+WaitReady
+---------
+This trait allows waiting for events:
+
+* File descriptor read data ready
+
+* File descriptor available for writing
+
+* Timer expiration
+
+trait Event {
+}
+
+trait WaitReady {
+    fn add(&mut dyn Event) {
+    }
+
+    fn remove(&dyn Event) {
+    }
+}
+
 Possible Enhancements
 =====================
 
-:Build-time selection of CI and DH protocols to OC/spacecraft radio:
+Build-time selection of CI and DH protocols to OC/spacecraft radio
 
-Though most or all of on-board spacecraft protocols are based on datagrams, use
-of error correcting stream-based protocols are also a reasonable choice for this
-purpose. Build-time selection of these seems useful.
+    Though most or all of on-board spacecraft protocols are based on datagrams, use
+    of error correcting stream-based protocols are also a reasonable choice for this
+    purpose. Build-time selection of these seems useful.
 
-:Special tty-based timing of input:
+Special tty-based timing of input
 
-Could use the tty maximum number of characters to read a message.
+    Could use the ioctl_tty/termios maximum number of characters to read a message.
+
+Tcspecial manual/auto fail over
+
+    Requires sharing the state in a consistent way.
+
+Support for non-Linux ReadyWait
+
+    The ReadyWait trait could be extended to other operating systems.
 
 Development Approach
 ====================

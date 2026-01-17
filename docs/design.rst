@@ -128,11 +128,17 @@ Tcspecial
 EndPoints
 ---------
 Endpoints handle the low level I/O and each one is associated with a thread.
-Though it would be straight forward to
-handle data transmission and reception via other methods, the current Endpoint
-implementation is built on file descriptors. Endpoints can be ReadEndpoints or
-WriteEndpoints. In both cases, they wait for I/O to become possible on a file
-descriptor.
+
+The EndpointWaitable trait defines wait_for_event() as a function that waits for
+an event to occur on a Read or Write trait, similar to the Linux poll()
+system call.
+
+Derived from the EndpointWaitable trait is the trait EndpointReadable,
+which defines
+read() for a Read trait, and EndpointWritable, which defines write() for a
+Write trait. Each is used after EndpointWaitable::wait_for_event() indicates I/O
+of the particular type is possible on a corresponding Read or Write
+trait.
 
 Requirement
     Each Endpoint has an I/O file descriptor
@@ -962,7 +968,7 @@ This trait allows waiting for events:
 trait Event {
 }
 
-trait WaitReady {
+trait EventWaitable {
     fn add(&mut dyn Event) {
     }
 

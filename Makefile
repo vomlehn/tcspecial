@@ -8,6 +8,10 @@ SRC_DIR := src
 DOCS_DIR := docs
 PROMPTS_DIR := prompts
 
+DESIGN=$(DOCS_DIR)/design.rst
+TCSPECIAL = tcspecial
+RUST = $(TCSPECIAL)/rust
+
 # Default target
 all: generate build test
 
@@ -32,13 +36,23 @@ setup:
 	@echo "✓ Directories created"
 
 # Generate project using Claude Code
-generate:
+generate: tcspecial-rust.tar.gz
+	mkdir -p $(TCSPECIAL)
+	tar -C $(TCSPECIAL) -xzf $^
+
+tcspecial-rust.tar.gz: run-claude-code
+	tar czvf tcspecial-rust.tar.gz docs/design.rst rust/
+
+run-claude-code: $(DESIGN)
 	@echo "Generating project with Claude Code..."
-	@if [ ! -f "$(DOCS_DIR)/design.rst" ]; then \
-		echo "Error: design.rst not found in $(DOCS_DIR)/"; \
+	@if [ ! -f "$(DESIGN)" ]; then \
+		echo "Error: $(DESIGN) not found"; \
 		exit 1; \
 	fi
-	@claude --non-interactive < $(PROMPTS_DIR)/create-project.txt
+	claude -p \
+	    "Generate Rust code--tcspecial, tcslib, and tcslibgs-- and tests--tcstest--and create compressed tar file from $(DESIGN)" \
+	   --allowedTools Read,Write,Edit,MultiEdit \
+	    --verbose
 	@echo "✓ Project files generated"
 
 # Alternative: Use echo to pipe commands
@@ -55,62 +69,65 @@ generate-alt:
 # Build the project
 build:
 	@echo "Building the project..."
-	@cargo build --release
+	cd $(RUST) && cargo build --release
 	@echo "✓ Build complete"
 
 # Run tests
 test:
 	@echo "Running tests..."
-	@cargo test
+	cd $(RUST) && cargo test
 	@echo "✓ Tests complete"
 
 # Run the application
 run:
 	@echo "Running $(PROJECT_NAME)..."
-	@cargo run -- list
+	#cd $(RUST) && cargo run -- list
+	cd $(RUST) && cargo run --bin tcspecial
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	@cargo clean
-	@rm -f tasks.json
+	cd $(RUST) && cargo clean
+	rm -f tasks.json
 	@echo "✓ Clean complete"
+
 
 # Clean everything including generated source
 distclean: clean
 	@echo "Removing all generated files..."
-	@rm -rf $(SRC_DIR) tests Cargo.toml Cargo.lock README.md .gitignore
+	#@rm -rf $(SRC_DIR) tests Cargo.toml Cargo.lock README.md .gitignore
+	rm -rf $(TCSPECIAL)
 	@echo "✓ Project reset"
 
 # Install binary globally
 install: build
 	@echo "Installing $(PROJECT_NAME)..."
-	@cargo install --path .
+	cd $(RUST) && cargo install --path .
 	@echo "✓ Installed to ~/.cargo/bin/$(PROJECT_NAME)"
 
 # Check code quality
 check:
 	@echo "Running cargo check..."
-	@cargo check
-	@cargo clippy -- -D warnings
-	@cargo fmt -- --check
+	cd $(RUST) && cargo check
+	cd $(RUST) && cargo clippy -- -D warnings
+	cd $(RUST) && cargo fmt -- --check
 
 # Format code
 format:
-	@cargo fmt
+	cd $(RUST) && cargo fmt
 
 # Create release build
 release: test
 	@echo "Creating release build..."
-	@cargo build --release
+	cd $(RUST) && cargo build --release
 	@echo "✓ Release binary: target/release/$(PROJECT_NAME)"
 
 # Run with example data
 demo: build
 	@echo "Running demo..."
-	@cargo run -- add "Buy groceries" --desc "Milk, eggs, bread"
-	@cargo run -- add "Write documentation"
-	@cargo run -- add "Deploy to production"
-	@cargo run -- list
-	@cargo run -- complete 1
-	@cargo run -- list --pending
+	cd $(RUST) && cargo run -- add "Buy groceries" --desc "Milk, eggs, bread"
+	cd $(RUST) && cargo run -- add "Write documentation"
+	cd $(RUST) && cargo run -- add "Deploy to production"
+	cd $(RUST) && cargo run -- list
+	cd $(RUST) && cargo run -- complete 1
+	cd $(RUST) && cargo run -- list --pending

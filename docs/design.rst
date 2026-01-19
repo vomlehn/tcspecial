@@ -26,7 +26,7 @@ FIXME: Revise this to reflect user interest.
 
   * Memory allocation complete during initialization
 
-* Code comprised of:
+* TCSpecial code s comprised of:
   
   * tcspecial: process running on spacecraft
 
@@ -61,7 +61,7 @@ FIXME: Revise this to reflect user interest.
     * Leverage the many features Rust has to produce clean, well documented code, with many modern features to make it easy to write code.
 
 
-High-Level View of tcspecial
+High-Level View of TCSpecial
 ----------------------------
 Tcspecial fits into the ground and space portions of the command and telemetry
 systems as follows:
@@ -134,30 +134,351 @@ The formats of command and telemetry messages are as given in the document:
 
 Commands and Response Telemetry
 -------------------------------
-Commands cause generation of one or more telemetry responses. 
+Commands cause generation of one or more telemetry responses. Every response
+contains a success failure and may contain additional parameter values
 
-**Comands and Response Telemetry**
 
-+----------+-----------------------------------------------------------------+
-| Name     | Parameters                                                      |
-+==========+============+===========+========================================+
-| PING_CM  | Name       | Type      | Description                            |
-+          +------------+-----------+----------------------------------------+
-|          | None                                                            |
-+----------+------------+-----------+----------------------------------------+
-| PING_TM  | Parameters                                                      |
-+          +------------+-----------+----------------------------------------+
-|          | Name       | Type      |  Description                           |
-|          +------------+-----------+----------------------------------------+
-|          | timestamp  | Timestamp | Spacecraft time when response was sent |
-+----------+------------+-----------+----------------------------------------+
+PING
+^^^^
+Verify that TLSpecial is able to process commands.
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| PING_CM        | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                | None                                                        |
++----------------+----------+-----------+--------------------------------------+
+| PING_TM        | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | timestamp  | Timestamp | Spacecraft time when response was  |
+|                |            |           | sent                               |
++----------------+------------+-----------+------------------------------------+
+
+RESTART_ARM
+^^^^^^^^^^^
+Enable a restart of TCSpecial for the next TBD interval.
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| RESTART_ARM_CM | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                | arm_key    | ArmKey    | Value that must match the RESTART  |
+|                |            |           | command key                        |
++----------------+------------+-----------+------------------------------------+
+| RESTART_ARM_TM | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | None                                                        |
++----------------+------------+-----------+------------------------------------+
+
+RESTART
+^^^^^^^
+Restart TCSpecial if the time is within TBD interval from the last RESTART_ARM
+command and arm_key matches the value of arm_key from the last RESTART_ARM
+command
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| RESTART_CM     | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                | arm_key    | ArmKey    | Value that must match the          |
+|                |            |           | RESTART_ARM command key            |
++----------------+------------+-----------+------------------------------------+
+| RESTART_TM     | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | None                                                        |
++----------------+------------+-----------+------------------------------------+
+
+**The rest of these need work done, but do list the applicatable commands**
+
+START_DH
+^^^^^^^^
+Start a data handler. 
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| START_DH_CM    | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                | dh_id      | DHId      | Identifer to assign to the new     |
+|                +------------+-----------+------------------------------------+
+|                | type       | DHType    | Type of DH, network or device      |
+|                +------------+-----------+------------------------------------+
+|                | name       | DHName    | If the DH is a network interface   |
+|                |            |           | this is server:port optionally     |
+|                |            |           | followed by a colon and a          |
+|                |            |           | protocol. If this is a device      |
+|                |            |           | DH, this is the path to the        |
+|                |            |           | device.                            |
++----------------+------------+-----------+------------------------------------+
+| START_DH_TM    | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | None                                                        |
++----------------+------------+-----------+------------------------------------+
+
+STOP_DH
+^^^^^^^
+Stop stop a data handler. To make this idempotent, if the command has previously
+been executed sucessfully, supplying a DH that has been stopped must also
+produce a successful value. This, in turn, means the dh_id must not be reused.
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| STOP_DH_CM     | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                | dh_id      | DHId      |                                    |
++----------------+------------+-----------+------------------------------------+
+| STOP_DH_TM     | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | None                                                        |
++----------------+------------+-----------+------------------------------------+
+
+QUERY_DH
+^^^^^^^^
+Return statistics from the indicated data handler:
+
+* Spacecraft time
+
+* Number of bytes received
+
+* Number of read operations completed successfully
+
+* Number of read operations that returned an error
+
+* Number of bytes sent
+
+* Number of write operations completed successfull
+  
+* Number of write operations that returned an error
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| QUERY_DH_CM    | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                | dh_id      | DHId      | Value that must match the RESTART  |
+|                |            |           | command key                        |
++----------------+------------+-----------+------------------------------------+
+| QUERY_DH_TM    | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | Statistics                                                  |
++----------------+------------+-----------+------------------------------------+
+
+Configure
+^^^^^^^^^
+Configure various TCSpecial values
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| CONFIG_CM      | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                | beacon_int | BeaconTime| Interval at which BEACON telemetry |
+|                |            |           | is sent                            |
++----------------+------------+-----------+------------------------------------+
+| CONFIG_TM      | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | None                                                        |
++----------------+------------+-----------+------------------------------------+
+
+Configure Data Handler
+^^^^^^^^^^^^^^^^^^^^^^
+Configure various TCSpecial data handler values
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| CONFIG_CM      | Name       | Type      | Description                        |
+|                +------------+-----------+------------------------------------+
+|                |            |           |                                    |
++----------------+------------+-----------+------------------------------------+
+| CONFIG_TM      | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | None                                                        |
++----------------+------------+-----------+------------------------------------+
+
 
 Asynchronous Telemetry
 ----------------------
 Beacon
 
-Tcspecial
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
++----------------+------------+-----------+------------------------------------+
+| BEACON         | Parameters                                                  |
+|                +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | timestamp  | Timestamp | Spacecraft time at which the       |
+|                |            |           | beacon message was sent            |
++----------------+------------+-----------+------------------------------------+
+
+tcspecial
 =========
+Tcspecial hass a command interpreter (CI) running on the spacecraft where the
+payloads are located. CI has one or more threads to handle OC communications, i.e.
+data exchanged with tcslib over a bi-directional communication link. It
+defaults to using datagram communication to the tcslib, though this is usually actually
+a link to the spacecraft radio. The radio may use a different protocol.
+
+Tcspecial also has threads associated with each data handler (DH). Each DH
+communicates to payloads via a bi-direction channel. A key feature of tcspecial
+is that
+each DH may use a different protocol to communicate with its payload. This includes
+not only the core communication protocols supported by the operating system, such
+as stream or datagram protocols, or serial or parallel interfaces,
+but also stackable DH protocols that can be
+employed to build custom protocol stacks.
+
+Command Interpreter (CI)
+------------------------
+The payload system
+software has a command interpreter with two threads. The threads manage
+commands from the OC and status messages to the OC. I/O is done
+with datagrams. Status messages are queued with a fixed-length queue.
+
+Ground/Space Link
+^^^^^^^^^^^^^^^^^
+The connection between the OC and the CI is usually implemented with a UDP/IP
+datagram since it is generally the ground/space link, for which TCP/IP
+is unsuitable beyond MEO. However, TCP/IP may be suitable if the link is
+indirect, that is, to the radio, or for LEO and MEO orbits.
+
+The CI has a Mutex<BTreeMap<<DH>>> which holds all of the allocated DHs. The
+use of a Mutex allows status of all DHs to be determined atomically.
+
+Initialization
+^^^^^^^^^^^^^^
+When the CI starts up, it will allocate all resources, including threads
+and communication links. It then enters the main loop.
+
+Main Loop
+^^^^^^^^^
+The main CI loop simply reads and processes command from the OC, along with
+periodic sending Beacon Telemetry. The Exit command causes the CI to exit.
+
+Shut Down
+^^^^^^^^^
+During CI shutdown, all DHs are also shut down.
+
+Data Handlers (DHs)
+-------------------
+The usual lifetime of a DH starts with creation by CI, followed by start up
+of the threads used and allocation of any other resources. It then waits for
+activation. 
+
+After activation, it enters a loop relaying data between OC
+and a payload. During I/O, it may receive notification from CI that something
+command needs to be done. This could be something like transmitting statistics
+or deactivating the DH.
+
+After the DH is deactivated, all resources are freed and the threads used are
+exiting.
+
+Initialization
+^^^^^^^^^^^^^^
+When the CI Allocate command is given, a DH is sets up all require resources
+and then waits for a DH Activate command.
+
+Main Loop
+^^^^^^^^^
+Data handlers (DHs) relay data between the OC and
+a payload. Data is transmitted between the OC and a DH is done with a
+UDP/IP link. The data exchange between a DH and a payload may be done
+with stream and datagram methods. 
+
+A DH has four functions used to send and receive data:
+
+* oc_read(): receives data from the OC. No protocol conversion done.
+* oc_write(): sends data to the OC. No protocol conversion done.
+* payload_read(): receives data from a payload. Protocol conversion possible.
+* payload_write(): sends data to a payload. Protocol conversion possible.
+
+A communication path between the OC and a DH uses UDP/IP. A path between
+a DH and a payload uses one of multiple different communication protocols.
+For example:
+
+.. code-block:: text
+
+         ______     ___________________     _________
+        |      |   |                   |   |         |
+        |      |-->| OC        OC      |-->|         |
+        |      |   | read      write   |   |         |
+        |      |   |                   |   |         |
+        |  OC  |   |        DH1        |   | Payload |
+        |      |   |                   |   |         |
+        |      |<--| Payload   Payload |<--|         |
+        |      |   | write     read    |   |         |
+        |______|   |___________________|   |_________|
+
+In another case, the payload may write a stream but a DH could be composited
+to packetize the data, say, by adding a byte count before the data.
+
+.. code-block:: text
+
+         ______     ___________________     ___________________     _________
+        |      |   |                   |   |                   |   |         |
+        |      |-->| OC        OC      |-->| OC        OC      |-->|         |
+        |      |   | read      write   |   | read      write   |   |         |
+        |      |   |                   |   |                   |   |         |
+        |  OC  |   |        DH1        |   | DH2 (Packetizer)  |   | Payload |
+        |      |   |                   |   |                   |   |         |
+        |      |<--| Payload   Payload |<--| Payload   Payload |<--|         |
+        |      |   | write     read    |   | write     read    |   |         |
+        |______|   |___________________|   |___________________|   |_________|
+
+
+A call to oc_write() in DH1 then becomes a call to oc_read() in DH2 and
+a call to payload_write() in DH2 becomes a call to payload_read() in DH1
+
+Any number of DHs may be composited to create complex protocol
+stacks. A stacking DH must be added to the payload side of another DH.
+
+Before the read and write interfaces to a non-compositing DHs are called,
+a select(), epoll(), or an equivalent multiple file descriptor wait for
+I/O ready operation is called. In addition to the corresponding read or
+write file descriptor, a pipe file descriptor is supplied to the wait for
+I/O read operation. A byte is written to the pipe file descriptor to
+wake up the DH so that it can read a command from the CI. Thus, each
+wait for I/O ready operation has a pipe file descriptor and a read or write
+file descriptor to either the OC or payoad.
+
+NOTE: The mio crate might be suitable for the wait for I/O ready operation.
+
+Each static DH is assign static address information. This can be a path to a
+device or a network address.
+
+Payload data can be sent by the payload as datagrams or as a stream. Datagrams
+may be a fixed maximum size or a dynamic size. Use of dynamic message sizes
+uses the MSG_PEEK and MSG_TRUC options for recv(). Since it may cause memory
+allocaton operations, it should not be used in applications which require
+that no allocations be done after initialization.
+
+When data is being read as a stream, there are two options:
+
+:Send any data: All pending data on the file descriptor will be read when there is at least one byte pending.
+
+:Wait for full: Wait for the buffer to fill up. A timer is set so that, if the buffer does not fill up, all data in the input buffer is sent
 
 EndPoints
 ---------
@@ -218,6 +539,7 @@ Requirement
 
 Requirement
    If the I/O file descriptor operation fails, it will be repeated after a delay
+   up to a specific number of times
 
 Requirement
    The initial value of the delay is a configurable named EndpointDelayInit
@@ -420,33 +742,9 @@ the first direction and the Read Endpoint of the other direction, as show below:
         |      |   | write     read    |   |         |
         |______|   |___________________|   |_________|
 
-TCSpecial Flight Software
-=========================
-
-Tcspecial hass a command interpreter (CI) running on the spacecraft where the
-payloads are located. CI has one or more threads to handle OC communications, i.e.
-data exchanged with tcslib over a bi-directional communication link. It
-defaults to using datagram communication to the tcslib, though this is usually actually
-a link to the spacecraft radio. The radio may use a different protocol.
-
-Tcspecial also has threads associated with each data handler (DH). Each DH
-communicates to payloads via a bi-direction channel. A key feature of tcspecial
-is that
-each DH may use a different protocol to communicate with its payload. This includes
-not only the core communication protocols supported by the operating system, such
-as stream or datagram protocols, or serial or parallel interfaces,
-but also stackable DH protocols that can be
-employed to build custom protocol stacks.
-
-Tcslib is used for building control applications using mission control
-software such as YAMCS or MCT.
-
-For testing purposes, tcstest uses
-tcslib, along with simulated payloads, to support a simple graphical user interface.
 
 Resource Allocation
-===================
-
+-------------------
 In an ideal world, resources would be allocated at link time (really, process
 load time). From a practical standpoint, however, the constraint of
 pre-execution allocation is not possible to meet for verious reasons. For
@@ -460,148 +758,12 @@ may fail, so the CI and DH code must be prepared to handle failures in
 in the operating system and retry at intervals if the various protocols do
 not already support this.
 
-
-Spacecraft Software
-===================
-The software running on the spacecraft is TCspecial. This has a command
+The software running on the spacecraft is TCSpecial. This has a command
 interpreter and some number of data handlers (DHs). The CI talks to ground
 software and to the DHs. The DHs talk to the CI and to the payloads.
 
-Command Interpreter (CI)
-------------------------
-
-The payload system
-software has a command interpreter with two threads. The threads manage
-commands from the OC and status messages to the OC. I/O is done
-with datagrams. Status messages are queued with a fixed-length queue.
-
-Ground/Space Link
-^^^^^^^^^^^^^^^^^
-The connection between the OC and the CI is usually implemented with a UDP/IP
-datagram since it is generally the ground/space link, for which TCP/IP
-is unsuitable beyond MEO. However, TCP/IP may be suitable if the link is
-indirect, that is, to the radio, or for LEO and MEO orbits.
-
-The CI has a Mutex<BTreeMap<<DH>>> which holds all of the allocated DHs. The
-use of a Mutex allows status of all DHs to be determined atomically.
-
-Initialization
-^^^^^^^^^^^^^^
-When the CI starts up, it will allocate all resources, including threads
-and communication links. It then enters the main loop.
-
-Main Loop
-^^^^^^^^^
-The main CI loop simply reads and processes command from the OC, along with
-periodic sending Beacon Telemetry. The Exit command causes the CI to exit.
-
-Shut Down
-^^^^^^^^^
-During CI shutdown, all DHs are also shut down.
-
-Data Handlers (DHs)
--------------------
-The usual lifetime of a DH starts with creation by CI, followed by start up
-of the threads used and allocation of any other resources. It then waits for
-activation. 
-
-After activation, it enters a loop relaying data between OC
-and a payload. During I/O, it may receive notification from CI that something
-command needs to be done. This could be something like transmitting statistics
-or deactivating the DH.
-
-After the DH is deactivated, all resources are freed and the threads used are
-exiting.
-
-Initialization
-^^^^^^^^^^^^^^
-When the CI Allocate command is given, a DH is sets up all require resources
-and then waits for a DH Activate command.
-
-Main Loop
-^^^^^^^^^
-Data handlers (DHs) relay data between the OC and
-a payload. Data is transmitted between the OC and a DH is done with a
-UDP/IP link. The data exchange between a DH and a payload may be done
-with stream and datagram methods. 
-
-A DH has four functions used to send and receive data:
-
-* oc_read(): receives data from the OC. No protocol conversion done.
-* oc_write(): sends data to the OC. No protocol conversion done.
-* payload_read(): receives data from a payload. Protocol conversion possible.
-* payload_write(): sends data to a payload. Protocol conversion possible.
-
-A communication path between the OC and a DH uses UDP/IP. A path between
-a DH and a payload uses one of multiple different communication protocols.
-For example:
-
-.. code-block:: text
-
-         ______     ___________________     _________
-        |      |   |                   |   |         |
-        |      |-->| OC        OC      |-->|         |
-        |      |   | read      write   |   |         |
-        |      |   |                   |   |         |
-        |  OC  |   |        DH1        |   | Payload |
-        |      |   |                   |   |         |
-        |      |<--| Payload   Payload |<--|         |
-        |      |   | write     read    |   |         |
-        |______|   |___________________|   |_________|
-
-In another case, the payload may write a stream but a DH could be composited
-to packetize the data, say, by adding a byte count before the data.
-
-.. code-block:: text
-
-         ______     ___________________     ___________________     _________
-        |      |   |                   |   |                   |   |         |
-        |      |-->| OC        OC      |-->| OC        OC      |-->|         |
-        |      |   | read      write   |   | read      write   |   |         |
-        |      |   |                   |   |                   |   |         |
-        |  OC  |   |        DH1        |   | DH2 (Packetizer)  |   | Payload |
-        |      |   |                   |   |                   |   |         |
-        |      |<--| Payload   Payload |<--| Payload   Payload |<--|         |
-        |      |   | write     read    |   | write     read    |   |         |
-        |______|   |___________________|   |___________________|   |_________|
-
-
-A call to oc_write() in DH1 then becomes a call to oc_read() in DH2 and
-a call to payload_write() in DH2 becomes a call to payload_read() in DH1
-
-Any number of DHs may be composited to create complex protocol
-stacks. A stacking DH must be added to the payload side of another DH.
-
-Before the read and write interfaces to a non-compositing DHs are called,
-a select(), epoll(), or an equivalent multiple file descriptor wait for
-I/O ready operation is called. In addition to the corresponding read or
-write file descriptor, a pipe file descriptor is supplied to the wait for
-I/O read operation. A byte is written to the pipe file descriptor to
-wake up the DH so that it can read a command from the CI. Thus, each
-wait for I/O ready operation has a pipe file descriptor and a read or write
-file descriptor to either the OC or payoad.
-
-NOTE: The mio crate might be suitable for the wait for I/O ready operation.
-
-Each static DH is assign static address information. This can be a path to a
-device or a network address.
-
-Payload data can be sent by the payload as datagrams or as a stream. Datagrams
-may be a fixed maximum size or a dynamic size. Use of dynamic message sizes
-uses the MSG_PEEK and MSG_TRUC options for recv(). Since it may cause memory
-allocaton operations, it should not be used in applications which require
-that no allocations be done after initialization.
-
-When data is being read as a stream, there are two options:
-
-:Send any data: All pending data on the file descriptor will be read when there is at least one byte pending.
-
-:Wait for full: Wait for the buffer to fill up. A timer is set so that, if the buffer does not fill up, all data in the input buffer is sent
-
-
-
 DH Links
-========
+--------
 Supported DH protocols include networking protocols and device interfaces, such
 as RS-422, as well as stackable protocols. These links can be divided into stream
 and datagram types. Stream data has no delimiters, no error detection and correction
@@ -622,11 +784,11 @@ Provided Stacked DHs
 TeleNex offers several several stacked DHs that can be used as-is and as examples.
 
 Packetizing U32 Streaming Data
---------‐--‐----------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 The payload is sending big-endian u32 data items every three seconds. The DH accumulates up to four of these. If the bytes have a time interval > between 100 mS, that data item is discarded. The resulting packet has a leading byte with a bit set for each valid data item, followed by valid data item values.
 
 Byte Swapping Values
-------------------------------------
+^^^^^^^^^^^^^^^^^^^^
 This DH is composited with the DH that packetizes streaming data. It converts the big-endian u32s to little-endian u32s.
 
 Packetizing Arbitrary Streaming Data With Constant Overhead Byte Stuffing
@@ -636,346 +798,22 @@ Read 254  * 4 bytes from the payload, write to a buffer with COBS, stick a u16 h
 tcslib
 ======
 The TCSpecial library has a set of operations for global control and status
-and a set of per-payload interface operations.
-
-Commands and Telementry
------------------------
-Commands are sent to the CI and telemetry returned from the CI as network
-messages, using the socket interface. The communication system must use the
-same protocol, e.g. UDP/IP.
-
-Note that all commands must be idempotent. That is, if a command is sent twice
-without any intervening commands, the TCSpecial state will be the same as if
-it had just been sent once. This allows the OC to handle lost commands and
-telemetry without requiring closed loop communications.
-
-The CI and each DH maintain a separate serial number which is sent with 
-each command. That serial number is returned in the telemetry that corresponds
-to that command. The CI also has beacon telemetry that includes a separate
-serial number, allowing for detection of lost beacon telemetry.
-
-
-CI Commands and Telemetry
--------------------------
-Each CI command has a corresponding telemetry message indicating the
-success or failure of the command. There is also a beacon telemetry message
-send periodically without a command.
-
-Commands
-^^^^^^^^
-All commands start with a CmdSN indicating the command serial number. This
-value is initially 1 and increments for each command sent.
-If the OC software fails, it will
-lose the CmdSN. Thus, it starts by sending an Exit command until it receives
-a sucessful ExitStatus message back. (FIXME: check that this works)
-
-:Config:    Set CI configuration:
-
-* Set Beacon interval. It is not possible to disable the beacon entirely,
-  but it can be set to a very long value.
-
-:Exit:      Shut down TCSpecial, including all DHs.
-
-:Ping:      Request status from the CI. This returns the 
-
-:SendMap:   Send a vector of DH states:
-
-Telemetry
-^^^^^^^^^
-Telemetry messages are of two types. One is a status reply to a command,
-the other is generated autonomously.
-
-Command Status
-""""""""""""""
-
-:ConfigStatus:
-
-:ExitStatus:
-
-:InitStatus:
-
-:PintStatus:
-
-:SendMapStatus:
-
-:ShutdownStatus:
-
-Autonmously Generated Messages
-""""""""""""""""""""""""""""""
-
-:Beacon:    This telemetry is sent automatically. It consists of a vector with elements consisting of:
-
-* DH name: Name of the DH
-
-* OC Data received: bool--0 if nothing was received from the OC by this DH since the last beacon was sent for this DH, 1 if something was received
-
-* Payload Data received: bool--0 if nothing was received from the payload since the last beacon was sent for this DH, 1 if something was received
-
-Per-DH Control and Status
---------------------------
-Allocate NAME:  Start thread and allocate buffers for the DH with the given
-                name. Includes:
-
-* DH name
-* Stream/Datagram
-* Timeout (in nanoseconds)
-* 
-* Address/device/DH specifier
-  * If network: <Host>:<Port>
-  * If device: name of device
-  * If DH push: name of 
-* 
-
-Free NAME:
-
-Activate NAME:
-
-Deactivate NAME:
-
-:StatusDH NAME:       Return status for DH I. Information returned:
-
-* Timestamp
-
-* Total number of bytes read
-
-* Total number of bytes written
-
-* Total number of I/O reads
-
-* Total number of I/O writes
-
-Common CI and DH Types
-======================
-I/O statistics are maintained for each DH and for the CI. Statistics are
-are zeroed with the respective Allocate commands and not reset afterwards.
-
-.. code-block:: rust
-
-   type IoCount = u32;
-   type CmdSN = u32;
-   type DHId = [u16; 32];
-
-    struct IoStats {
-        timestamp:      Duration,
-        bytes_read:     IoCount,
-        bytes_written:  IoCount,
-        io_reads:       IoCount,
-        io_writes:      IoCount,
-    };
-
-Command Interpreter (CI) Types
-==============================
-The Command Interpreter uses
-
-.. code-block:: rust
-
-    trait CIBase {
-        fn read_oc(&mut [u8], n: usize) -> Result<usize>,
-        fn write_oc(&[u8], n: usize) -> Result<usize>,
-        fn cmd_cn() -> CmdSN;
-        fn do_cmd(&[u8]
-    }
-
-    struct CI {
-        stats:  ItStats,
-        cmd_sn: CmdSN,
-        fd;     FDESC,
-        dh:     Vec<DH>,
-
-
-
-
-Data Handler (DH) Types
-=======================
-There are several DH types. The individual DH types are derived from the
-following trait:
-
-.. code-block:: rust
-
-    trait DH {
-        fn name() -> &str;
-        fn read_oc(&mut [u8], usize) -> Result<usize, TCSpecialError>;
-        fn write_oc(&[u8], usize) -> Result<usize, TCSpecialError>;
-        fn read_oc(&mut [u8], usize) -> Result<usize, TCSpecialError>;
-        fn read_oc(&[u8], usize) -> Result<usize, TCSpecialError>;
-        fn get_stats() -> TCSpecialStats;
-        fn start() -> TCSpecialError;
-        fn stop() -> TCSpecialError;
-    }
-
-DHs are supplied with configuration information as follows:
-
-.. code-block:: rust
-
-    use socket2::{Socket, Domain, Type, Protocol};
-    use std::net::SocketAddr;
-
-    trait DH {
-        fn oc_read(&mut [u8], usize) -> Result<usize, TCSpecialError>;
-        fn oc_write(&[u8], usize) -> Result<usize, TCSpecialError>;
-        fn payload_read(&mut [u8], usize) -> Result<usize, TCSpecialError>;
-        fn payload_write(&[u8], usize) -> Result<usize, TCSpecialError>;
-    }
-
-    enum Endpoint {
-        Socket(domain: Domain, type: Type, protocol: Option<Protocol>, addr: &str) ->
-            Result<Endpoint, TCSpecialError>;
-        Device(path: &str) -> Result<Endpoint, TCSpecialError>
-        Stacked(dh_name, &str) -> Result<Endpoint, TCSpecialError>;
-    }
-
-The control interpreter passes two file descriptors to each DH as it is
-starting up: a file descriptor to be used to write data to the OC and
-another one used to wake up a DH when the command interpreter needs the
-DH to do something. The file descriptor for payload communication is
-opened by the appropriate DH. These two file descriptors are passed using:
-
-.. code-block:: rust
-
-    struct DHFds {
-        oc_fd:      FDESC,
-        ci_fd:      FDESC,
-    }
-
-Stream DHs
------------
-Buffers are managed with various types. Stream buffers are allocated once
-when the DH is created:
-
-.. code-block:: rust
-
-    struct DHBufferStaticSized {
-       alloc_size:  usize,
-       buf:         Vec<u8>,
-    }
-
-    impl DHBufferStaticSized {
-        fn new(alloc_size: usize) -> Result<DHBuffer, TCSpecialError> {
-            let mut buf = Vec::new();
-            buf.try_reserve(alloc_size).
-                .map_error(|e| TCSpecialError::AllocFailed(e, alloc_size))?;
-            DHBuffer {
-                alloc_size,
-                buf,
-            }
-        }
-    }
-
-Stream DHs use the following type to hold the DH name and statistics:
-
-.. code-block:: rust
-
-    struct StreamDH {
-        name:        &str,
-        stats:      TCSpecialStatus,
-    }
-
-File descriptor-based stream DHs need buffer. These are statically sized.
-We try to fill the buffer entirely, but set a timer to indicate we should
-send whatever is in the buffer if it isn't full.
-
-.. code-block:: rust
-
-   struct FdStreamDH {
-        stream_dhu: StreamDH,
-        max_time:   Time,
-        buffer:     DHBufferStaticSized;
-        dhu_fds:    DHFds,
-        payload_fd: i32,
-    }
-
-    impl FDStreamDH {
-        fn new(name: &str, max_time: Time, DHBufferStaticSized, dhu_fds: DHFds) -> Result<FDStreamDH>;
-    }
-
-Streams using socket interfaces use the following:
-
-.. code-block:: rust
-
-    struct SocketStreamDH {
-        fd_stream_dhu:  FdStreamDH,
-        address:        IPAddress,
-    }
-
-    impl SocketStreamDH {
-        fn new(stream_dhu: &StreamDH, address: IPAddress) -> Result<SocketStreamDH, TCSpecialError>;
-    }
-
-Streams using device interfaces use the following:
-
-.. code-block:: rust
-
-    struct DeviceStreamDH {
-        fd_stream_dhu:  FdStreamDH,
-        path:           &str,
-   }
-
-FIXME: need to figure out how to propogate the CI pipe file descriptor,
-especially since there may be multiple composites that lead to the same
-DH.
-
-DHs that are composited don't use file descriptors. Instead, they call the
-various OC and payload read and write interfaces directly:
-
-.. code-block:: rust
-
-    struct CompositeDH {
-        stream_dhu:     StreamDH,
-        ci_fd:          FDESC,
-    }
-
-    impl FdCompositeDH {
-        fn new(name: &str, ci_fd: FDESC, oc_dhu: &DH, payload_dhu: &DH) -> Result<FdStreamDH, TCSpecialError>;
-    }
-
-Datagram DHs
--------------
-Datagram buffers can be allocated once, or reallocated when datagrams are too
-large to read, depending on the alloc_ok flag:
-
-.. code-block:: rust
-
-    struct DHDatagramBuffer {
-       buffer:      DHBufferStaticSized,
-       realloc_ok:  bool,
-    }
-
-    impl DHDatagramBuffer {
-        fn new(alloc_size: usize, realloc_ok: bool, dhu_fds, address: IPAddress) -> Result<DHBuffer, TCSpecialError> {
-            let buffer = DHBufferStaticSized::new(alloc_size)?;
-            DHBuffer {
-                buffer,
-                realloc_ok,
-            }
-        }
-    }
-
-Datagram DHs are similar to stream DHs:
-
-.. code-block:: rust
-
-    struct DatagramDH {
-        name:           &str,
-        stats:          TCSpecialStatus,
-        buffer:         DHDatagramBuffer,
-        dhu_fds:        DHFds,
-        payload_fd:     i32,
-        address:        IPAddress,
-    }
-
-    impl DatagramDH {
-        fn new(datagram_dhu: &DatagramDH, address: IPAddress, alloc_ok) -> Result<DatagramDH, TCSpecialError> {
-        }
-    }
-
-    impl DH for DatagramDH {
-    }
+and a set of per-payload interface operations.  It is used for building control applications using mission control
+software such as YAMCS or MCT.
+
+tcslibgs
+========
+The TCSpecial ground/space library contains definitions used by both
+tcslib and tcspecial.
 
 tcstest
 =======
 The tcstest is a GUI program used to control simulated payloads
 interacting with tcspecial using
-the tcslib library over a datagram connection to tcspecial. It has a section at the
+the tcslib library over a datagram connection to tcspecial.  For testing
+purposes, tcstest uses tcslib, along with simulated payloads, to support a simple GUI.
+
+The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
 The rest of the window
 is devoted to eight rectanges for issuing of commands to one of up to eight
@@ -990,11 +828,7 @@ None.
 
 Notes
 =====
-* Be sure to use BorrowedFd, not i32, when calling PollFd::new()
 
-* In FdEndpoint, the type of io_fd should be related to Read + Write and the type of cmd_fd should be Read.
-
-* In EndpointWaitable, io_fd() and cmd_fd() must return a BorrowedFd<'_>
 
 
 Possible Enhancements

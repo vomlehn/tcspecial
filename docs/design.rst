@@ -122,6 +122,40 @@ each other is straight forward to implement.
 The tcslibgs library contains definitions shared between the ground portion of the
 software, tcslib, and the space portion, tcspecial.
 
+Commands and Telemetry
+======================
+Both command and telemetry messages are subject to loss between the sender
+and the receiver. Thus, commands must be idempotent, generating the same
+resulting state and the same telemetry response
+
+The formats of command and telemetry messages are as given in the document:
+
+   `CCSDS 732.1-B-3 Unified Space Data Link Protocol <https://ccsds.org/Pubs/732x1b3e1.pdf>`_ (Blue Book, June 2024)
+
+Commands and Response Telemetry
+-------------------------------
+Commands cause generation of one or more telemetry responses. 
+
+**Comands and Response Telemetry**
+
++----------+-----------------------------------------------------------------+
+| Name     | Parameters                                                      |
++==========+============+===========+========================================+
+| PING_CM  | Name       | Type      | Description                            |
++          +------------+-----------+----------------------------------------+
+|          | None                                                            |
++----------+------------+-----------+----------------------------------------+
+| PING_TM  | Parameters                                                      |
++          +------------+-----------+----------------------------------------+
+|          | Name       | Type      |  Description                           |
+|          +------------+-----------+----------------------------------------+
+|          | timestamp  | Timestamp | Spacecraft time when response was sent |
++----------+------------+-----------+----------------------------------------+
+
+Asynchronous Telemetry
+----------------------
+Beacon
+
 Tcspecial
 =========
 
@@ -357,7 +391,7 @@ Linux device Endpoints open device entries in the /dev directory. This could be:
 
 
 Relays
-======
+------
 Relays contain two Endpoints, a Read Endpoint and a Write Endpoint. Data
 flows in just one direction, from the Read Endpoint to the Write Endpoint.
 A Relay is implemented as a thread that simply looks between the Read and
@@ -365,7 +399,7 @@ Write Endpoints, handling commands from the Command Interpreter as necessary.
 The directions are denoted "Ground to Payload" and "Payload to Ground"
 
 Data Handlers
-=============
+-------------
 Data Handlers package two Relays, one in one direction and one in the
 other. File descriptors are shared between the Read Endpoint of one direction
 and the Write Endpoint of the other direction, and the Write Endpoint of
@@ -952,29 +986,16 @@ Closing the window causes tcspecialcmd to terminate immediately.
 
 Support Definitions
 ===================
-There are some definitions that are not closely tied to TCSpecial but which
-are required for TCSpecial. These could be moved to other crates.
+None.
 
-WaitReady
----------
-This trait allows waiting for events:
+Notes
+=====
+* Be sure to use BorrowedFd, not i32, when calling PollFd::new()
 
-* File descriptor read data ready
+* In FdEndpoint, the type of io_fd should be related to Read + Write and the type of cmd_fd should be Read.
 
-* File descriptor available for writing
+* In EndpointWaitable, io_fd() and cmd_fd() must return a BorrowedFd<'_>
 
-* Timer expiration
-
-trait Event {
-}
-
-trait EventWaitable {
-    fn add(&mut dyn Event) {
-    }
-
-    fn remove(&dyn Event) {
-    }
-}
 
 Possible Enhancements
 =====================

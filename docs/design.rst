@@ -431,30 +431,9 @@ For example:
         |      |   | write     read    |   |         |
         |______|   |___________________|   |_________|
 
-In another case, the payload may write a stream but a DH could be composited
-to packetize the data, say, by adding a byte count before the data.
+**Insert description of how we push DH Helpers on a DH to modify data as it flows from one side to the other **
 
-.. code-block:: text
-
-         ______     ___________________     ___________________     _________
-        |      |   |                   |   |                   |   |         |
-        |      |-->| OC        OC      |-->| OC        OC      |-->|         |
-        |      |   | read      write   |   | read      write   |   |         |
-        |      |   |                   |   |                   |   |         |
-        |  OC  |   |        DH1        |   | DH2 (Packetizer)  |   | Payload |
-        |      |   |                   |   |                   |   |         |
-        |      |<--| Payload   Payload |<--| Payload   Payload |<--|         |
-        |      |   | write     read    |   | write     read    |   |         |
-        |______|   |___________________|   |___________________|   |_________|
-
-
-A call to oc_write() in DH1 then becomes a call to oc_read() in DH2 and
-a call to payload_write() in DH2 becomes a call to payload_read() in DH1
-
-Any number of DHs may be composited to create complex protocol
-stacks. A stacking DH must be added to the payload side of another DH.
-
-Before the read and write interfaces to a non-compositing DHs are called,
+Before the read and write interfaces to a DH are called,
 a select(), epoll(), or an equivalent multiple file descriptor wait for
 I/O ready operation is called. In addition to the corresponding read or
 write file descriptor, a pipe file descriptor is supplied to the wait for
@@ -468,11 +447,7 @@ NOTE: The mio crate might be suitable for the wait for I/O ready operation.
 Each static DH is assign static address information. This can be a path to a
 device or a network address.
 
-Payload data can be sent by the payload as datagrams or as a stream. Datagrams
-may be a fixed maximum size or a dynamic size. Use of dynamic message sizes
-uses the MSG_PEEK and MSG_TRUC options for recv(). Since it may cause memory
-allocaton operations, it should not be used in applications which require
-that no allocations be done after initialization.
+Payload data can be sent by the payload as datagrams or as a stream. 
 
 When data is being read as a stream, there are two options:
 
@@ -490,8 +465,8 @@ system call.
 
 Derived from the EndpointWaitable trait is the trait EndpointReadable,
 which defines
-read() for a Read trait, and EndpointWritable, which defines write() for a
-Write trait. Each is used after EndpointWaitable::wait_for_event() indicates I/O
+read() for reading, and EndpointWritable, which defines write() for
+writing. Each is used after EndpointWaitable::wait_for_event() indicates I/O
 of the particular type is possible on a corresponding Read or Write
 trait.
 
@@ -551,10 +526,6 @@ Requirement
 Requirement
    If the next value of the delay reaches EndpointDelayMax, the Endpoint will
    exit with an appropriate Err() value.
-
-Read and Write Endpoints
-^^^^^^^^^^^^^^^^^^^^^^^^
-FIXME: Fill this out
 
 Stream and Datagram Endpoints
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -714,18 +685,18 @@ Linux device Endpoints open device entries in the /dev directory. This could be:
 
 Relays
 ------
-Relays contain two Endpoints, a Read Endpoint and a Write Endpoint. Data
-flows in just one direction, from the Read Endpoint to the Write Endpoint.
+Relays contain two Endpoints, an EndpointReadable and an EndpointWritable. Data
+flows in just one direction, from the EndpointReadable to the EndpointWriteable.
 A Relay is implemented as a thread that simply looks between the Read and
-Write Endpoints, handling commands from the Command Interpreter as necessary.
+EndpointWriteables, handling commands from the Command Interpreter as necessary.
 The directions are denoted "Ground to Payload" and "Payload to Ground"
 
 Data Handlers
 -------------
 Data Handlers package two Relays, one in one direction and one in the
-other. File descriptors are shared between the Read Endpoint of one direction
-and the Write Endpoint of the other direction, and the Write Endpoint of
-the first direction and the Read Endpoint of the other direction, as show below:
+other. File descriptors are shared between the EndpointReadable of one direction
+and the EndpointWriteable of the other direction, and the EndpointWriteable of
+the first direction and the EndpointReadable of the other direction, as show below:
 
 **Visualization of a Data Handler**
 

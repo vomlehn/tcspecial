@@ -40,25 +40,18 @@ generate: tcspecial-rust.tar.gz
 	mkdir -p $(TCSPECIAL)
 	tar -C $(TCSPECIAL) -xzf $^
 
-tcspecial-rust.tar.gz: run-claude-code
-	tar czvf tcspecial-rust.tar.gz docs/design.rst rust/
-
-run-claude-code: $(DESIGN)
+tcspecial-rust.tar.gz: $(DESIGN)
 	@echo "Generating project with Claude Code..."
 	@if [ ! -f "$(DESIGN)" ]; then \
 		echo "Error: $(DESIGN) not found"; \
 		exit 1; \
 	fi
 	set -eu; start_time=$$(date +"%s"); \
-	echo claude -p \
+	claude -p \
 	    "Generate Rust code--tcspecial, tcslib, and tcslibgs-- and tests--tcstest--and create compressed tar file from $(DESIGN)" \
 	   --allowedTools Read,Write,Edit,MultiEdit \
 	    --verbose; \
-	end_time=$$(date +"%s"); delta=$$((end_time - start_time)); \
-	sec=$$((delta % 60)); delta=$$((delta / 60)); \
-	min=$$((delta % 60)); delta=$$((delta / 60)); \
-	hour=$$delta; \
-	printf "Elapsed time: %u:%02u:%02u\\n" $$hour $$min $$sec
+	print-elapsed $$start_time
 	@echo "✓ Project files generated"
 
 # Alternative: Use echo to pipe commands
@@ -93,7 +86,8 @@ run:
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	cd $(RUST) && cargo clean
+	-cd $(RUST) && cargo clean
+	rm -f tcspecial-rust.tar.gz
 	rm -f tasks.json
 	@echo "✓ Clean complete"
 

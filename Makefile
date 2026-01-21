@@ -9,8 +9,8 @@ DOCS_DIR := docs
 PROMPTS_DIR := prompts
 
 DESIGN=$(DOCS_DIR)/design.rst
-TCSPECIAL = tcspecial
-RUST = $(TCSPECIAL)/rust
+TCSPECIAL = .
+RUST = .
 
 # Default target
 all: generate build test
@@ -36,23 +36,25 @@ setup:
 	@echo "✓ Directories created"
 
 # Generate project using Claude Code
-generate: tcspecial-rust.tar.gz
-	mkdir -p $(TCSPECIAL)
-	tar -C $(TCSPECIAL) -xzf $^
-
-tcspecial-rust.tar.gz: $(DESIGN)
-	@echo "Generating project with Claude Code..."
-	@if [ ! -f "$(DESIGN)" ]; then \
-		echo "Error: $(DESIGN) not found"; \
-		exit 1; \
-	fi
-	set -eu; start_time=$$(date +"%s"); \
-	claude -p \
-	    "Generate Rust code--tcspecial, tcslib, and tcslibgs-- and tests--tcstest--and create compressed tar file from $(DESIGN)" \
-	   --allowedTools Read,Write,Edit,MultiEdit \
-	    --verbose; \
-	print-elapsed $$start_time
-	@echo "✓ Project files generated"
+generate: $(DESIGN)
+	( \
+		set -eu; \
+		echo "Generating project with Claude Code..."; \
+		if [ ! -f "$(DESIGN)" ]; then \
+			echo "Error: $(DESIGN) not found"; \
+			exit 1; \
+		fi \
+	) 2>&1 | tee generate.out
+	( \
+		set -eu; \
+		start_time=$$(date +"%s"); \
+		claude -p \
+		    "Generate Rust code--tcspecial, tcslib, and tcslibgs-- and tests--tcstest--and create compressed tar file from $(DESIGN)" \
+		   --allowedTools Read,Write,Edit,MultiEdit \
+		    --verbose; \
+		print-elapsed $$start_time \
+		echo "✓ Project files generated" \
+	) 2>&1 | tee -a generate.out
 
 # Alternative: Use echo to pipe commands
 generate-alt:
@@ -67,36 +69,43 @@ generate-alt:
 
 # Build the project
 build:
-	@echo "Building the project..."
-	cd $(RUST) && cargo build --release
-	@echo "✓ Build complete"
+	( \
+		set -eu; \
+		echo "Building the project...";
+		cd $(RUST) && cargo build --release
+		echo "✓ Build complete"
+	) 2>&1 | tee build.out
 
 # Run tests
 test:
-	@echo "Running tests..."
-	cd $(RUST) && cargo test
-	@echo "✓ Tests complete"
+	( \
+		set -eu; \
+	echo "Running tests..."; \
+	cd $(RUST) && cargo test; \
+	echo "✓ Tests complete"; \
+	) 2>&1 | tee run.out
 
 # Run the application
 run:
-	@echo "Running $(PROJECT_NAME)..."
-	#cd $(RUST) && cargo run -- list
-	cd $(RUST) && cargo run --bin tcspecial
+	( \
+		set -eu; \
+		echo "Running $(PROJECT_NAME)..."; \
+		cd $(RUST) && cargo run --bin tcspecial \
+	) 2>&1 | tee run.out
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	-cd $(RUST) && cargo clean
-	rm -f tcspecial-rust.tar.gz
-	rm -f tasks.json
+	cargo clean
+	rm -f generate.out build.out run.out test.out
 	@echo "✓ Clean complete"
 
 
 # Clean everything including generated source
 distclean: clean
 	@echo "Removing all generated files..."
-	#@rm -rf $(SRC_DIR) tests Cargo.toml Cargo.lock README.md .gitignore
-	rm -rf $(TCSPECIAL)
+	rm -f Cargo.lock
+	rm -rf tcslib tcslibgs tcspecial tcstest
 	@echo "✓ Project reset"
 
 # Install binary globally

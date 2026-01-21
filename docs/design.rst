@@ -585,7 +585,7 @@ FIXME: What are the semantics of those items marked TBD?
 +--------------+----------------+-----------+-----------+
 | domain       | type           | protocol  | Stream or |
 |              |                |           | Datagram  |
-+--------------+----------------+-----------+-----------+
++==============+================+===========+===========+
 | AF_UNIX      | SOCK_STREAM    | 0         | stream    |
 | or           +----------------+-----------+-----------+
 | AF_LOCAL     | SOCK_DGRAM     | 0         | datagram  |
@@ -648,10 +648,21 @@ FIXME: What are the semantics of those items marked TBD?
 |              +----------------+-----------+-----------+
 |              | SOCK_RAW       | yes       | datagram  |
 +--------------+----------------+-----------+-----------+
-| AF_KCM       | TBD            | TBD       | TBD       |
-+--------------+----------------+-----------+-----------+
 | AF_XDP       | TBD            | TBD       | TBD       |
 +--------------+----------------+-----------+-----------+
+
+.. note::
+The AF_KCM domain is not suported:
+
+**Unsupported Domains**
+
++--------------+----------------+-----------+-----------+
+| domain       | type           | protocol  | Stream or |
+|              |                |           | Datagram  |
++==============+================+===========+===========+
+| AF_KCM       | TBD            | TBD       | TBD       |
++--------------+----------------+-----------+-----------+
+
 
 Protocol support may require configuring the Linux kernel
 to include protocol drivers. Of course, the hardware supporting the protocol
@@ -788,10 +799,23 @@ The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
 The rest of the window
 is devoted to eight rectanges for issuing of commands to one of up to eight
-DHs and view their responses. The DHs are named dh0 through dh7.
+DHs and view their responses. The DHs are named dh0 through dh7. It displays
+the most recent send message and the most recent received messages.
 
-TCSpecial and tcspecialcmd are started asynchronously.
-Closing the window causes tcspecialcmd to terminate immediately.
+Part of the tcstest code simulates the payloads:
+
+* The fake payloads generate messages at an interval which is their DH ID mod 4, divided by 2.
+  
+* The message generated has a length of 3 plus DH ID mod 3.
+ 
+* If the DH ID, mod 3, is zero, the DH uses TCP/IP and the data in each byte is the index of that byte within the messages, plus 1.
+  
+* If the DH ID, mod 3, is one, the DH uses UDP/IP and the data in each byte is the index of that byte within the messages, plus 1.
+  
+* If the DH ID, mod 3, is two, the DH opens /dev/urandom and reads from it to get the
+  the data
+
+
 
 Support Definitions
 ===================
@@ -805,6 +829,10 @@ These are some things that Claude doesn't seem to figure out by itself.
   value as the result of applying BorrowedFd::borrowed_raw() to it.
 
 * DHId must implement the trait Ord.
+
+* The crate libc must be included to get definitions of AF_UNIX and other address families.
+
+* The crate serde_json must be added to get JSON definitions.
 
 Possible Enhancements
 =====================

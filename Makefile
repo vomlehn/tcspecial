@@ -46,13 +46,14 @@ generate: $(DESIGN)
 		fi \
 	) 2>&1 | tee generate.out
 	( \
+		set -x; \
 		set -eu; \
 		start_time=$$(date +"%s"); \
 		claude -p \
 		    "Generate Rust code--tcspecial, tcslib, and tcslibgs-- and tests--tcstest--and create compressed tar file from $(DESIGN)" \
 		   --allowedTools Read,Write,Edit,MultiEdit \
 		    --verbose; \
-		print-elapsed $$start_time \
+		print-elapsed $$start_time; \
 		echo "✓ Project files generated" \
 	) 2>&1 | tee -a generate.out
 
@@ -71,9 +72,9 @@ generate-alt:
 build:
 	( \
 		set -eu; \
-		echo "Building the project...";
-		cd $(RUST) && cargo build --release
-		echo "✓ Build complete"
+		echo "Building the project..."; \
+		cd $(RUST) && cargo build --release; \
+		echo "✓ Build complete" \
 	) 2>&1 | tee build.out
 
 # Run tests
@@ -96,7 +97,7 @@ run:
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	cargo clean
+	-cargo clean
 	rm -f generate.out build.out run.out test.out
 	@echo "✓ Clean complete"
 

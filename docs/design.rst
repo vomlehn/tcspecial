@@ -797,10 +797,14 @@ Support Definitions
 ===================
 None.
 
-Notes
+Hints
 =====
+These are some things that Claude doesn't seem to figure out by itself.
+
 * Do not pass an i32 to PollFd::new() as the first argument. Instead, pass the i32
   value as the result of applying BorrowedFd::borrowed_raw() to it.
+
+* DHId must implement the trait Ord.
 
 Possible Enhancements
 =====================

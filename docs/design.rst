@@ -799,8 +799,8 @@ None.
 
 Notes
 =====
-
-
+* Do not pass an i32 to PollFd::new() as the first argument. Instead, pass the i32
+  value as the result of applying BorrowedFd::borrowed_raw() to it.
 
 Possible Enhancements
 =====================

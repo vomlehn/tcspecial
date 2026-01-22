@@ -12,6 +12,19 @@ DESIGN=$(DOCS_DIR)/design.rst
 TCSPECIAL = .
 RUST = .
 
+TCS_CODE = tcspecial, tcslib, tcslibgs
+TCS_TEST = tcsmoc, tcssim, tcspayload.json
+TCS_TAR = tcsspecial-rust.tar.gz
+TCS_OUTPUT = compressed tar file $(TCS_TAR)
+PROMPT = Generate Rust code ($(TCS_CODE)) and tests ($(TCS_TEST)), and create $(TCS_OUTPUT) from $(DESIGN)
+
+TCS_CRATES = tcslib tcslibgs tcspecial tcsmoc tcssim tcspayload.json
+
+FIXUP = set -x; \
+		echo "Project fixup..."; \
+		sed -i 's/into_raw_fd/as_raw_fd/g' tcspecial/src/endpoint.rs; \
+		sed -i 's/into_raw_fd/as_raw_fd/g' tcspecial/src/dh.rs
+
 # Default target
 all: generate build test
 
@@ -50,7 +63,7 @@ generate: $(DESIGN)
 		set -eu; \
 		start_time=$$(date +"%s"); \
 		claude -p \
-		    "Generate Rust code--tcspecial, tcslib, and tcslibgs-- and tests--tcstest--and create compressed tar file from $(DESIGN)" \
+		    "$(PROMPT)" \
 		   --allowedTools Read,Write,Edit,MultiEdit \
 		    --verbose; \
 		print-elapsed $$start_time; \
@@ -72,6 +85,7 @@ generate-alt:
 build:
 	( \
 		set -eu; \
+		$(FIXUP); \
 		echo "Building the project..."; \
 		cd $(RUST) && cargo build --release; \
 		echo "✓ Build complete" \
@@ -81,15 +95,17 @@ build:
 test:
 	( \
 		set -eu; \
-	echo "Running tests..."; \
-	cd $(RUST) && cargo test; \
-	echo "✓ Tests complete"; \
+		$(FIXUP); \
+		echo "Running tests..."; \
+		cd $(RUST) && cargo test; \
+		echo "✓ Tests complete"; \
 	) 2>&1 | tee run.out
 
 # Run the application
 run:
 	( \
 		set -eu; \
+		$(FIXUP); \
 		echo "Running $(PROJECT_NAME)..."; \
 		cd $(RUST) && cargo run --bin tcspecial \
 	) 2>&1 | tee run.out
@@ -98,7 +114,7 @@ run:
 clean:
 	@echo "Cleaning build artifacts..."
 	-cargo clean
-	rm -f generate.out build.out run.out test.out
+	rm -f generate.out build.out run.out test.out $(TCS_TAR)
 	@echo "✓ Clean complete"
 
 
@@ -106,7 +122,7 @@ clean:
 distclean: clean
 	@echo "Removing all generated files..."
 	rm -f Cargo.lock
-	rm -rf tcslib tcslibgs tcspecial tcstest
+	rm -rf $(TCS_CRATES)
 	@echo "✓ Project reset"
 
 # Install binary globally
@@ -141,3 +157,8 @@ demo: build
 	cd $(RUST) && cargo run -- list
 	cd $(RUST) && cargo run -- complete 1
 	cd $(RUST) && cargo run -- list --pending
+
+# Duplicate crates
+dup:
+	mkdir dup
+	cp -a $(TCS_CRATES) dup

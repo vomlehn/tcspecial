@@ -14,7 +14,8 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
-FIXME: Revise this to reflect user interest.
+Features
+========
 
 * Centralized control
 
@@ -26,25 +27,40 @@ FIXME: Revise this to reflect user interest.
 
   * Memory allocation complete during initialization
 
-* TCSpecial code s comprised of:
+* TCSpecial code is comprised of:
   
-  * tcspecial: process running on spacecraft
+  * Running on spacecraft
 
-  * tcslib: ground software library providing simple integration with mission control software
+    * tcspecial: process running on spacecraft
 
-  * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
+* Testing software is:
 
   * tcsmoc: Simple interface using tcslib for visualizing tcspecial operation and doing testing. 
 
-* Standard set of payload interfaces
+  * tcssim: Simulated payloads
 
-  * Stream and datagram
+* There are two libraries and a JSON file with payload configuration information:
+
+    * tcslib: ground software library providing simple integration with mission control software
+
+    * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
+
+    * tcspayload.json: Configuration information
+
+      * Network connections support Stream and datagram
+    
+      * Network and device
   
-  * Network and device
+        * Support for <n> interfaces on Linux
+  
+        * Network devices are specified by node and server, like getaddrinfo(), along
+          with the other getaddrinfo() hints.
+  
+        * Other devices are specified by a pathname.
+  
+        * Streams, both network streams, and devices, have a message length and
+          a wait interval.
 
-    * Support for <n> interfaces on Linux
-
-    * No limit to device support--specified by name
 
 * Radio interfaces
 
@@ -71,34 +87,34 @@ FIXME: tweak diagram as necessary):
 
 .. code-block:: text
 
-        GROUND             :                     SPACE
-     ======================:===================================================
-                           : 
-      ==================   :    =====================       =================
-     ||  Ground Ops    ||  :   ||  Flight Software  ||     ||  Payload Bay  ||
-     |==================|  :   |=====================|     |=================|
-     |   ---------      |  :   |     =============   |     |                 |
-     |  | Mission |     |  : ----   | tcspecial   |  |     |                 |
-     |  | Control |     |  :|  | |  | (tcsgs)     |  |     |                 |
-     |  | S/W     |     |  :|  | |  +-------------+  |     |                 |
-     |   ---------      |  :|  | |  | Command     |  |     |                 |
-     |       ^          |  :|  | +->| Interpreter |  |     |                 |
-     |       |          |  :|  | |  +-------------+  |     |   -----------   |
-     |       v          |  :|  | |  | Data        |<--------->| Payload 0 |  |
-     |   ------------   |  :|  | +->| Handler 0   |  |     |   -----------   |
-     |  | tcslib     |<-----   | |  +-------------+  |     |   -----------   |
-     |  | (tcslibgs) |  |  :   | |  | Data        |<--------->| Payload 1 |  |
-     |   ------------   |  :
-      ------------------   :   | |  | Handler 1   |  |     |   -----------   |
-                           :   | |  |      .      |  |     |                 |
-
-                           :   | |         .         |     |                 |
-                           :   | |  |      .      |  |     |                 |
-                           :   | |  +-------------+  |     |   -----------   |
-                           :   | +->| Data        |<--------->| Payload n |  |
-                           :   |    | Handler n   |  |     |   -----------   |
-                           :   |     -------------   |     |                 |
-                           :    ---------------------       -----------------
+          GROUND              :                     SPACE
+   ===========================:===================================================
+                              :
+   +=======================+  :    +=========================+     +=================+
+   ||  Ground Ops         ||  :    ||  Flight Software      ||     ||  Payload Bay  ||
+   +=======================+  :    +=========================+     +=================+
+   |  +---------+          |  :    |    +=================+  |     |                 |
+   |  | Mission |          |  :  ----+->| tcspecial       |  |     |                 |
+   |  | Control |          |  : |  | |  | (tcslibgs)      |  |     |                 |
+   |  | S/W     |          |  : |  | |  +-----------------+  |     |                 |
+   |  +---------+          |  : |  | |  | Command         |  |     |                 |
+   |       ^               |  : |  | +->| Interpreter     |  |     |                 |
+   |       |               |  : |  | |  +-----------------+  |     |  +-----------+  |
+   |       v               |  : |  | |  | Data            |<-------|->| Payload 0 |  |
+   |  +-----------------+  |  : |  | +->| Handler 0       |  |     |  +-----------+  |
+   |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
+   |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
+   |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
+   |  | tcspayload.json |  |  :    | |  |      .          |  |     |                 |
+   |  +-----------------+  |  :    |           .             |     |                 |
+   +-----------------------+  :    | |  |      .          |  |     |                 |
+                              :    | |  +-----------------+  |     |  +-----------+  |
+                              :    | +->| Data            |<--------->| Payload n |  |
+                              :    |    | Handler n       |  |     |  +-----------+  |
+                              :    |    +-----------------+  |     |                 |
+                              :    |    | tcspayload.json |  |     |                 |
+                              :    |    +-----------------+  |     |                 |
+                              :    +-------------------------+     +-----------------+
 
 On the ground, the tcslib library is used by the mission control software (such as YAMCS
 or MCT) to issue commands and receive telemetry. These are transmitted over
@@ -333,8 +349,11 @@ Beacon
 |                |            |           | beacon message was sent            |
 +----------------+------------+-----------+------------------------------------+
 
-tcspecial
+TCSpecial
 =========
+
+tcspecial
+---------
 Tcspecial hass a command interpreter (CI) running on the spacecraft where the
 payloads are located. CI has one or more threads to handle OC communications, i.e.
 data exchanged with tcslib over a bi-directional communication link. It
@@ -351,14 +370,14 @@ but also stackable DH protocols that can be
 employed to build custom protocol stacks.
 
 Command Interpreter (CI)
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 The payload system
 software has a command interpreter with two threads. The threads manage
 commands from the OC and status messages to the OC. I/O is done
 with datagrams. Status messages are queued with a fixed-length queue.
 
 Ground/Space Link
-^^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^^
 The connection between the OC and the CI is usually implemented with a UDP/IP
 datagram since it is generally the ground/space link, for which TCP/IP
 is unsuitable beyond MEO. However, TCP/IP may be suitable if the link is
@@ -368,21 +387,21 @@ The CI has a Mutex<BTreeMap<<DH>>> which holds all of the allocated DHs. The
 use of a Mutex allows status of all DHs to be determined atomically.
 
 Initialization
-^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^
 When the CI starts up, it will allocate all resources, including threads
 and communication links. It then enters the main loop.
 
 Main Loop
-^^^^^^^^^
+"^^^^^^^^^
 The main CI loop simply reads and processes command from the OC, along with
 periodic sending Beacon Telemetry. The Exit command causes the CI to exit.
 
 Shut Down
-^^^^^^^^^
+"^^^^^^^^^
 During CI shutdown, all DHs are also shut down.
 
 Data Handlers (DHs)
--------------------
+^^^^^^^^^^^^^^^^^^^
 The usual lifetime of a DH starts with creation by CI, followed by start up
 of the threads used and allocation of any other resources. It then waits for
 activation. 
@@ -396,12 +415,12 @@ After the DH is deactivated, all resources are freed and the threads used are
 exiting.
 
 Initialization
-^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^
 When the CI Allocate command is given, a DH is sets up all require resources
 and then waits for a DH Activate command.
 
 Main Loop
-^^^^^^^^^
+"^^^^^^^^^
 Data handlers (DHs) relay data between the OC and
 a payload. Data is transmitted between the OC and a DH is done with a
 UDP/IP link. The data exchange between a DH and a payload may be done
@@ -456,7 +475,7 @@ When data is being read as a stream, there are two options:
 :Wait for full: Wait for the buffer to fill up. A timer is set so that, if the buffer does not fill up, all data in the input buffer is sent
 
 EndPoints
----------
+^^^^^^^^^
 Endpoints handle the low level I/O and each one is associated with a thread.
 
 The EndpointWaitable trait defines wait_for_event() as a function that waits for
@@ -528,21 +547,21 @@ Requirement
    exit with an appropriate Err() value.
 
 Stream and Datagram Endpoints
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Stream data flows along a communication link as one or more bytes at a time with
 generally irregular timing and without any error checking. 
 Datagrams differ in that all data in a datagram is either transferred in a complete
 block with no errors, or it is discarded.
 
 Datagram Endpoints
-""""""""""""""""""
+..................
 A consequence of datagrams being transferred in a single block is that select()-like
 calls indicate that the entire datagram is present or none is. There is no need to
 read a piece at a time. It is possible to read the amount of data available and allocate
 a bigger buffer but tcspecial does not support this capability.
 
 Stream Endpoints
-""""""""""""""""
+................
 Streams do not have embedded markers to indicate data boundaries, so select()-like
 calls indicate only that one or more bytes are available. Transferring one byte
 at a time will incur a significant amount of overhead, so tcspecial can delay for
@@ -554,14 +573,14 @@ for StreamEPDelay and only afterwards perform a non-blocking read of up to the
 buffer size to get the data.
 
 Network and Device Endpoints
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Endpoints may correspond to a variety of file descriptor types. In a broad
 sense, these are network-related and device-related. While device-related
 file descriptors are generally stream devices, network-related file
 descriptors may behave like streams or datagrams.
 
 Network Endpoints
-"""""""""""""""""
+.................
 
 The table below lists network protocols supported on Linux-based systems. The
 protocols below are generally available, see the man page for socket(2) and
@@ -652,7 +671,7 @@ FIXME: What are the semantics of those items marked TBD?
 +--------------+----------------+-----------+-----------+
 
 .. note::
-The AF_KCM domain is not suported:
+   The AF_KCM domain is not suported:
 
 **Unsupported Domains**
 
@@ -676,7 +695,7 @@ Requirement
    must use the canonical values.
 
 Device Endpoints
-^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^
 Linux device Endpoints open device entries in the /dev directory. This could be:
 
 **Linux Device Endpoints**
@@ -695,7 +714,7 @@ Linux device Endpoints open device entries in the /dev directory. This could be:
 
 
 Relays
-------
+^^^^^^
 Relays contain two Endpoints, an EndpointReadable and an EndpointWritable. Data
 flows in just one direction, from the EndpointReadable to the EndpointWriteable.
 A Relay is implemented as a thread that simply looks between the Read and
@@ -703,7 +722,7 @@ EndpointWriteables, handling commands from the Command Interpreter as necessary.
 The directions are denoted "Ground to Payload" and "Payload to Ground"
 
 Data Handlers
--------------
+^^^^^^^^^^^^^
 Data Handlers package two Relays, one in one direction and one in the
 other. File descriptors are shared between the EndpointReadable of one direction
 and the EndpointWriteable of the other direction, and the EndpointWriteable of
@@ -726,7 +745,7 @@ the first direction and the EndpointReadable of the other direction, as show bel
 
 
 Resource Allocation
--------------------
+^^^^^^^^^^^^^^^^^^^
 In an ideal world, resources would be allocated at link time (really, process
 load time). From a practical standpoint, however, the constraint of
 pre-execution allocation is not possible to meet for verious reasons. For
@@ -745,7 +764,7 @@ interpreter and some number of data handlers (DHs). The CI talks to ground
 software and to the DHs. The DHs talk to the CI and to the payloads.
 
 DH Links
---------
+^^^^^^^^
 Supported DH protocols include networking protocols and device interfaces, such
 as RS-422, as well as stackable protocols. These links can be divided into stream
 and datagram types. Stream data has no delimiters, no error detection and correction
@@ -766,11 +785,11 @@ Provided Stacked DHs
 TeleNex offers several several stacked DHs that can be used as-is and as examples.
 
 Packetizing U32 Streaming Data
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 The payload is sending big-endian u32 data items every three seconds. The DH accumulates up to four of these. If the bytes have a time interval > between 100 mS, that data item is discarded. The resulting packet has a leading byte with a bit set for each valid data item, followed by valid data item values.
 
 Byte Swapping Values
-^^^^^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^^^^^
 This DH is composited with the DH that packetizes streaming data. It converts the big-endian u32s to little-endian u32s.
 
 Packetizing Arbitrary Streaming Data With Constant Overhead Byte Stuffing
@@ -778,18 +797,76 @@ Packetizing Arbitrary Streaming Data With Constant Overhead Byte Stuffing
 Read 254  * 4 bytes from the payload, write to a buffer with COBS, stick a u16 header which is a byte count and send to the OC.
 
 tcslib
-======
+------
 The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.  It is used for building control applications using mission control
 software such as YAMCS or MCT.
 
 tcslibgs
-========
+--------
 The TCSpecial ground/space library contains definitions used by both
 tcslib and tcspecial.
 
+tcspayload.json
+---------------
+This is a JSON file that defines the actual payloads. It is considered part
+of TCSpecial as it must be supplied, but is also used by the
+test software. The data handlers for payloads have the following configurations:
+
++------+---------+-------------------------+-------------+------------------+
+| DH # | Type    | Configuration           | Packet Size | Packet interval  |
++======+======+============================+=============+==================+
+| 0    | Network | TCP/IP | localhost:5000 | 12 bytes    | 1 packet/second  |
++------+---------+--------+----------------+-------------+------------------+
+| 1    | Network | UDP/IP | localhost:5001 | 11 bytes    | 1 packet/second  |
++------+---------+--------+----------------+-------------+------------------+
+| 2    | Device  | n/a    | /dev/urandom   | 1 byte      | continuous       |
++------+---------+--------+----------------+-------------+------------------+
+| 3    | Network | UDP/IP | localhost:5003 | 15 bytes    | 2 packets/second |
++------+---------+--------+----------------+-------------+------------------+
+
+Testing
+=======
+There are two components of testing software. Tcssim is a GUI used to simulate
+payloads and tcsmoc is used to simulate the MOC. Both allow user interaction
+to change parameters and see what result the changes produce.
+
+**High-Level View of Test Configuration**
+
+.. code-block:: text
+
+          GROUND              :                     SPACE
+   ===========================:===================================================
+                              :
+   +=======================+  :    +=========================+     +=================+
+   ||  Simulated MOC      ||  :    ||  Flight Software      ||     ||  Simulated    ||
+   ||                     ||  :    ||                       ||     || Payloads      ||
+   +=======================+  :    +=========================+     +=================+
+   |  +---------+          |  :    |    +=================+  |     |                 |
+   |  | tcsmoc  |          |  :  ----+->| tcspecial       |  |     |                 |
+   |  | Control |          |  : |  | |  | (tcslibgs)      |  |     |                 |
+   |  | S/W     |          |  : |  | |  +-----------------+  |     |                 |
+   |  +---------+          |  : |  | |  | Command         |  |     |                 |
+   |       ^               |  : |  | +->| Interpreter     |  |     |                 |
+   |       |               |  : |  | |  +-----------------+  |     |  +-----------+  |
+   |       v               |  : |  | |  | Data            |<-------|->| Payload 0 |  |
+   |  +-----------------+  |  : |  | +->| Handler 0       |  |     |  +-----------+  |
+   |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
+   |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
+   |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
+   |  | tcspayload.json |  |  :    | |  |      .          |  |     |                 |
+   |  +-----------------+  |  :    |           .             |     |                 |
+   +-----------------------+  :    | |  |      .          |  |     |                 |
+                              :    | |  +-----------------+  |     |  +-----------+  |
+                              :    | +->| Data            |<--------->| Payload n |  |
+                              :    |    | Handler n       |  |     |  +-----------+  |
+                              :    |    +-----------------+  |     |                 |
+                              :    |    | tcspayload.json |  |     |                 |
+                              :    |    +-----------------+  |     |                 |
+                              :    +-------------------------+     +-----------------+
+
 tcssim
-======
+------
 Tcssim is a GUI simulating the payloads. It gets the payload definition from
 tcspayload.json.
 
@@ -800,7 +877,7 @@ The DHs are named "DH" plus the DH #.
 The packet size and interval can be changed.
 
 tcsmoc
-=======
+------
 The tcsmoc is a GUI program used to control simulated payloads
 interacting with tcspecial using
 the tcslib library over a datagram connection to tcspecial.  For testing
@@ -819,28 +896,12 @@ that is the time and data most recently received.
 Testing requires starting up tcssim before other operations and shutting it down
 when tcsmoc is halted.
 
-tcspayload.json
-===============
-This is a JSON file that defines the actual payloads. These are as follows:
-
-+------+---------+-------------------------+-------------+------------------+
-| DH # | Type    | Configuration           | Packet Size | Packet interval  |
-+======+======+============================+=============+==================+
-| 0    | Network | TCP/IP | localhost:5000 | 12 bytes    | 1 packet/second  |
-+------+---------+--------+----------------+-------------+------------------+
-| 1    | Network | UDP/IP | localhost:5001 | 11 bytes    | 1 packet/second  |
-+------+---------+--------+----------------+-------------+------------------+
-| 2    | Device  | n/a    | /dev/urandom   | 1 byte      | continuous       |
-+------+---------+--------+----------------+-------------+------------------+
-| 3    | Network | UDP/IP | localhost:5003 | 15 bytes    | 2 packets/second |
-+------+---------+--------+----------------+-------------+------------------+
-
 GUI Framework
-=============
-GUIs will all use
+-------------
+The testing GUIs will all use
 slint
 with black on white. All windows will have a go away box which will shut down
-the entire application.
+the entire application, i.e. tcspecial, tcsmod, and tcssim.
 
 Hints
 =====
@@ -855,8 +916,9 @@ These are some things that Claude doesn't seem to figure out by itself.
 
 * The crate serde_json must be added to Cargo.toml for all crates to get JSON definitions.
 
-* To convert TCPStream and UDPSocket types to RawFD, do not use into_raw_fd(). Use
-  as_raw_fd().
+* into_raw_fd() must not be used to convert TCPStream and UDPSocket types to RawFDs.
+
+* as_raw_fd() must be used to convert TCPStream and UDPSocket types to RawFDs.
 
 
 Possible Enhancements

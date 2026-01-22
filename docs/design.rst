@@ -34,7 +34,7 @@ FIXME: Revise this to reflect user interest.
 
   * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
 
-  * tcstest: Simple interface using tcslib for visualizing tcspecial operation and doing testing
+  * tcsmoc: Simple interface using tcslib for visualizing tcspecial operation and doing testing. 
 
 * Standard set of payload interfaces
 
@@ -431,7 +431,7 @@ For example:
         |      |   | write     read    |   |         |
         |______|   |___________________|   |_________|
 
-**Insert description of how we push DH Helpers on a DH to modify data as it flows from one side to the other **
+**Insert description of how we push DH Helpers on a DH to modify data as it flows from one side to the other**
 
 Before the read and write interfaces to a DH are called,
 a select(), epoll(), or an equivalent multiple file descriptor wait for
@@ -788,38 +788,59 @@ tcslibgs
 The TCSpecial ground/space library contains definitions used by both
 tcslib and tcspecial.
 
-tcstest
+tcssim
+======
+Tcssim is a GUI simulating the payloads. It gets the payload definition from
+tcspayload.json.
+
+Each payload occupies a portion of the window, displaying its name, configuration,
+and statistics. It also displays the most recent packets sent and received.
+The DHs are named "DH" plus the DH #.
+
+The packet size and interval can be changed.
+
+tcsmoc
 =======
-The tcstest is a GUI program used to control simulated payloads
+The tcsmoc is a GUI program used to control simulated payloads
 interacting with tcspecial using
 the tcslib library over a datagram connection to tcspecial.  For testing
-purposes, tcstest uses tcslib, along with simulated payloads, to support a simple GUI.
+purposes, tcsmoc uses tcslib, along with simulated payloads, to support a simple GUI.
+
+Tcsmoc gets the payload definition from tcspayload.json.
 
 The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
-The rest of the window
-is devoted to eight rectanges for issuing of commands to one of up to eight
-DHs and view their responses. The DHs are named dh0 through dh7. It displays
-the most recent send message and the most recent received messages.
+Below that are up to eight rectangles. The rectangle is blank if the DH has
+not been started or has been stopped after having been started. Otherwise, it
+displays the DH name, configuration information, packet size, and packet interval.
+Below that it displays the time and the data most recently sent. Underneath
+that is the time and data most recently received.
 
-Part of the tcstest code simulates the payloads:
+Testing requires starting up tcssim before other operations and shutting it down
+when tcsmoc is halted.
 
-* The fake payloads generate messages at an interval which is their DH ID mod 4, divided by 2.
-  
-* The message generated has a length of 3 plus DH ID mod 3.
- 
-* If the DH ID, mod 3, is zero, the DH uses TCP/IP and the data in each byte is the index of that byte within the messages, plus 1.
-  
-* If the DH ID, mod 3, is one, the DH uses UDP/IP and the data in each byte is the index of that byte within the messages, plus 1.
-  
-* If the DH ID, mod 3, is two, the DH opens /dev/urandom and reads from it to get the
-  the data
+tcspayload.json
+===============
+This is a JSON file that defines the actual payloads. These are as follows:
 
++------+---------+-------------------------+-------------+------------------+
+| DH # | Type    | Configuration           | Packet Size | Packet interval  |
++======+======+============================+=============+==================+
+| 0    | Network | TCP/IP | localhost:5000 | 12 bytes    | 1 packet/second  |
++------+---------+--------+----------------+-------------+------------------+
+| 1    | Network | UDP/IP | localhost:5001 | 11 bytes    | 1 packet/second  |
++------+---------+--------+----------------+-------------+------------------+
+| 2    | Device  | n/a    | /dev/urandom   | 1 byte      | continuous       |
++------+---------+--------+----------------+-------------+------------------+
+| 3    | Network | UDP/IP | localhost:5003 | 15 bytes    | 2 packets/second |
++------+---------+--------+----------------+-------------+------------------+
 
-
-Support Definitions
-===================
-None.
+GUI Framework
+=============
+GUIs will all use
+slint
+with black on white. All windows will have a go away box which will shut down
+the entire application.
 
 Hints
 =====
@@ -830,9 +851,13 @@ These are some things that Claude doesn't seem to figure out by itself.
 
 * DHId must implement the trait Ord.
 
-* The crate libc must be included to get definitions of AF_UNIX and other address families.
+* The crate libc must be included to Cargo.toml for all crates to get definitions of AF_UNIX and other address families.
 
-* The crate serde_json must be added to get JSON definitions.
+* The crate serde_json must be added to Cargo.toml for all crates to get JSON definitions.
+
+* To convert TCPStream and UDPSocket types to RawFD, do not use into_raw_fd(). Use
+  as_raw_fd().
+
 
 Possible Enhancements
 =====================
@@ -854,6 +879,7 @@ Tcspecial manual/auto fail over
 Support for non-Linux ReadyWait
 
     The ReadyWait trait could be extended to other operating systems.
+
 
 Development Approach
 ====================

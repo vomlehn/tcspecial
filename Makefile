@@ -18,7 +18,7 @@ TCS_TAR = tcsspecial-rust.tar.gz
 TCS_OUTPUT = compressed tar file $(TCS_TAR)
 PROMPT = Generate Rust code ($(TCS_CODE)) and tests ($(TCS_TEST)), and create $(TCS_OUTPUT) from $(DESIGN)
 
-TCS_CRATES = tcslib tcslibgs tcspecial tcsmoc tcssim tcspayload.json
+TCS_CRATES = tcslib tcslibgs tcsspecial tcsmoc tcssim tcspayload.json
 
 FIXUP = set -x; \
 		echo "Project fixup..."; \
@@ -159,6 +159,8 @@ demo: build
 	cd $(RUST) && cargo run -- list --pending
 
 # Duplicate crates
+.PHONY: dup
 dup:
+	rm -rf dup
 	mkdir dup
 	cp -a $(TCS_CRATES) dup

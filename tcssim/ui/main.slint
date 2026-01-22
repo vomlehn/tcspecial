@@ -1,0 +1,300 @@
+// TCSpecial Payload Simulator GUI
+// Black on white theme as per design specification
+
+import { Button, LineEdit, ComboBox, GridBox, VerticalBox, HorizontalBox, GroupBox, SpinBox } from "std-widgets.slint";
+
+// Payload state
+export enum PayloadState {
+    Stopped,
+    Running,
+    Connected,
+}
+
+// Payload type
+export enum PayloadTypeEnum {
+    TcpServer,
+    UdpServer,
+    Device,
+}
+
+// Payload Panel component
+component PayloadPanel inherits Rectangle {
+    in property <int> payload-id;
+    in-out property <PayloadState> state: PayloadState.Stopped;
+    in-out property <PayloadTypeEnum> payload-type: PayloadTypeEnum.UdpServer;
+    in-out property <string> address: "";
+    in-out property <int> packet-size: 12;
+    in-out property <int> packet-interval-ms: 1000;
+    in-out property <string> status: "Stopped";
+    in-out property <int> packets-sent: 0;
+    in-out property <int> packets-received: 0;
+    in-out property <string> last-sent: "";
+    in-out property <string> last-received: "";
+
+    border-color: black;
+    border-width: 1px;
+    background: state == PayloadState.Connected ? #e8f5e9 :
+                state == PayloadState.Running ? #e3f2fd : white;
+    min-width: 240px;
+    min-height: 200px;
+
+    VerticalBox {
+        padding: 8px;
+        spacing: 6px;
+
+        HorizontalBox {
+            alignment: space-between;
+            Text {
+                text: "DH" + payload-id;
+                font-size: 16px;
+                font-weight: 700;
+                color: black;
+            }
+            Text {
+                text: state == PayloadState.Connected ? "●" :
+                      state == PayloadState.Running ? "◐" : "○";
+                color: state == PayloadState.Connected ? green :
+                       state == PayloadState.Running ? blue : gray;
+                font-size: 16px;
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: black;
+        }
+
+        HorizontalBox {
+            spacing: 4px;
+            Text { text: "Type:"; color: black; vertical-alignment: center; }
+            Text {
+                text: payload-type == PayloadTypeEnum.TcpServer ? "TCP/IP" :
+                      payload-type == PayloadTypeEnum.UdpServer ? "UDP/IP" : "Device";
+                color: #333;
+                vertical-alignment: center;
+            }
+        }
+
+        HorizontalBox {
+            spacing: 4px;
+            Text { text: "Address:"; color: black; vertical-alignment: center; }
+            Text {
+                text: address;
+                color: #333;
+                vertical-alignment: center;
+            }
+        }
+
+        HorizontalBox {
+            spacing: 4px;
+            Text { text: "Packet Size:"; color: black; vertical-alignment: center; }
+            SpinBox {
+                value <=> packet-size;
+                minimum: 1;
+                maximum: 1024;
+                enabled: state == PayloadState.Stopped;
+            }
+            Text { text: "bytes"; color: black; vertical-alignment: center; }
+        }
+
+        HorizontalBox {
+            spacing: 4px;
+            Text { text: "Interval:"; color: black; vertical-alignment: center; }
+            SpinBox {
+                value <=> packet-interval-ms;
+                minimum: 0;
+                maximum: 10000;
+                enabled: state == PayloadState.Stopped;
+            }
+            Text { text: "ms"; color: black; vertical-alignment: center; }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: black;
+        }
+
+        Text {
+            text: "Status: " + status;
+            color: black;
+            font-size: 12px;
+        }
+
+        Text {
+            text: "TX: " + packets-sent + " | RX: " + packets-received;
+            color: #333;
+            font-size: 11px;
+        }
+
+        Text {
+            text: "Last sent: " + last-sent;
+            color: #666;
+            font-size: 10px;
+            overflow: elide;
+        }
+
+        Text {
+            text: "Last recv: " + last-received;
+            color: #666;
+            font-size: 10px;
+            overflow: elide;
+        }
+    }
+}
+
+// Main application window
+export component MainWindow inherits Window {
+    title: "TCSpecial Payload Simulator";
+    min-width: 1024px;
+    min-height: 600px;
+    background: white;
+
+    // Payload 0 properties
+    in-out property <PayloadState> payload0-state: PayloadState.Running;
+    in-out property <PayloadTypeEnum> payload0-type: PayloadTypeEnum.TcpServer;
+    in-out property <string> payload0-address: "127.0.0.1:5000";
+    in-out property <int> payload0-packet-size: 12;
+    in-out property <int> payload0-interval-ms: 1000;
+    in-out property <string> payload0-status: "Listening";
+    in-out property <int> payload0-sent: 0;
+    in-out property <int> payload0-received: 0;
+    in-out property <string> payload0-last-sent: "";
+    in-out property <string> payload0-last-received: "";
+
+    // Payload 1 properties
+    in-out property <PayloadState> payload1-state: PayloadState.Running;
+    in-out property <PayloadTypeEnum> payload1-type: PayloadTypeEnum.UdpServer;
+    in-out property <string> payload1-address: "127.0.0.1:5001";
+    in-out property <int> payload1-packet-size: 11;
+    in-out property <int> payload1-interval-ms: 1000;
+    in-out property <string> payload1-status: "Listening";
+    in-out property <int> payload1-sent: 0;
+    in-out property <int> payload1-received: 0;
+    in-out property <string> payload1-last-sent: "";
+    in-out property <string> payload1-last-received: "";
+
+    // Payload 2 properties (device - /dev/urandom)
+    in-out property <PayloadState> payload2-state: PayloadState.Stopped;
+    in-out property <PayloadTypeEnum> payload2-type: PayloadTypeEnum.Device;
+    in-out property <string> payload2-address: "/dev/urandom";
+    in-out property <int> payload2-packet-size: 1;
+    in-out property <int> payload2-interval-ms: 0;
+    in-out property <string> payload2-status: "Device (passive)";
+    in-out property <int> payload2-sent: 0;
+    in-out property <int> payload2-received: 0;
+    in-out property <string> payload2-last-sent: "";
+    in-out property <string> payload2-last-received: "";
+
+    // Payload 3 properties
+    in-out property <PayloadState> payload3-state: PayloadState.Running;
+    in-out property <PayloadTypeEnum> payload3-type: PayloadTypeEnum.UdpServer;
+    in-out property <string> payload3-address: "127.0.0.1:5003";
+    in-out property <int> payload3-packet-size: 15;
+    in-out property <int> payload3-interval-ms: 500;
+    in-out property <string> payload3-status: "Listening";
+    in-out property <int> payload3-sent: 0;
+    in-out property <int> payload3-received: 0;
+    in-out property <string> payload3-last-sent: "";
+    in-out property <string> payload3-last-received: "";
+
+    // Global status
+    in-out property <string> status-message: "Simulator running";
+
+    VerticalBox {
+        padding: 10px;
+        spacing: 10px;
+
+        // Title and status
+        HorizontalBox {
+            alignment: space-between;
+            Text {
+                text: "TCSpecial Payload Simulator";
+                font-size: 20px;
+                font-weight: 700;
+                color: black;
+            }
+            Text {
+                text: status-message;
+                color: #333;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            height: 2px;
+            background: black;
+        }
+
+        // Payload panels in a grid
+        GroupBox {
+            title: "Simulated Payloads";
+
+            GridBox {
+                spacing: 10px;
+
+                Row {
+                    PayloadPanel {
+                        payload-id: 0;
+                        state: payload0-state;
+                        payload-type: payload0-type;
+                        address: payload0-address;
+                        packet-size <=> payload0-packet-size;
+                        packet-interval-ms <=> payload0-interval-ms;
+                        status: payload0-status;
+                        packets-sent: payload0-sent;
+                        packets-received: payload0-received;
+                        last-sent: payload0-last-sent;
+                        last-received: payload0-last-received;
+                    }
+                    PayloadPanel {
+                        payload-id: 1;
+                        state: payload1-state;
+                        payload-type: payload1-type;
+                        address: payload1-address;
+                        packet-size <=> payload1-packet-size;
+                        packet-interval-ms <=> payload1-interval-ms;
+                        status: payload1-status;
+                        packets-sent: payload1-sent;
+                        packets-received: payload1-received;
+                        last-sent: payload1-last-sent;
+                        last-received: payload1-last-received;
+                    }
+                    PayloadPanel {
+                        payload-id: 2;
+                        state: payload2-state;
+                        payload-type: payload2-type;
+                        address: payload2-address;
+                        packet-size <=> payload2-packet-size;
+                        packet-interval-ms <=> payload2-interval-ms;
+                        status: payload2-status;
+                        packets-sent: payload2-sent;
+                        packets-received: payload2-received;
+                        last-sent: payload2-last-sent;
+                        last-received: payload2-last-received;
+                    }
+                    PayloadPanel {
+                        payload-id: 3;
+                        state: payload3-state;
+                        payload-type: payload3-type;
+                        address: payload3-address;
+                        packet-size <=> payload3-packet-size;
+                        packet-interval-ms <=> payload3-interval-ms;
+                        status: payload3-status;
+                        packets-sent: payload3-sent;
+                        packets-received: payload3-received;
+                        last-sent: payload3-last-sent;
+                        last-received: payload3-last-received;
+                    }
+                }
+            }
+        }
+
+        // Info text
+        Text {
+            text: "Payloads simulate connections for tcspecial data handlers. TCP/UDP servers listen for connections and send periodic packets.";
+            color: #666;
+            font-size: 11px;
+            wrap: word-wrap;
+        }
+    }
+}

@@ -2,19 +2,89 @@
 //!
 //! A GUI application for testing and visualizing tcspecial operation.
 
+use std::process::{Child, Command, exit};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use slint::SharedString;
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::{Command, CommandStatus, DHId, DHName, DHType, PingCommand, QueryDHCommand, StartDHCommand, StopDHCommand};
+use tcslibgs::{Command as TcsCommand, CommandStatus, DHId, DHName, DHType, PingCommand, QueryDHCommand, StartDHCommand, StopDHCommand};
 
 slint::include_modules!();
 
 mod app;
 
+/// Manages the tcssim subprocess
+struct ProcessManager {
+    child: Arc<Mutex<Option<Child>>>,
+}
+
+impl ProcessManager {
+    fn new() -> Self {
+        Self {
+            child: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Starts tcssim in a background thread and exits when it completes
+    fn start_tcssim(&self) {
+        let child = Command::new("cargo")
+            .args(["run", "--bin", "tcssim"])
+            .spawn()
+            .expect("Failed to start tcssim");
+
+        *self.child.lock().unwrap() = Some(child);
+
+        let child_handle = self.child.clone();
+
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_millis(100));
+                let mut guard = child_handle.lock().unwrap();
+                if let Some(ref mut child) = *guard {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            println!("tcssim exited with status: {}", status);
+                            drop(guard);
+                            exit(0);
+                        }
+                        Ok(None) => {
+                            // Still running
+                        }
+                        Err(e) => {
+                            println!("Error waiting for tcssim: {}", e);
+                            drop(guard);
+                            exit(1);
+                        }
+                    }
+                } else {
+                    // Process handle was taken (killed), exit thread
+                    break;
+                }
+            }
+        });
+    }
+
+    /// Kills tcssim and exits the current program
+    fn kill_and_exit(&self) {
+        let mut guard = self.child.lock().unwrap();
+        if let Some(ref mut child) = *guard {
+            let _ = child.kill();
+            let _ = child.wait();
+            println!("tcssim killed");
+        }
+        *guard = None;
+        drop(guard);
+        exit(0);
+    }
+}
+
 fn main() {
     env_logger::init();
+
+    // Start tcssim subprocess
+    let process_manager = Arc::new(ProcessManager::new());
+    process_manager.start_tcssim();
 
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
@@ -203,12 +273,20 @@ fn main() {
         });
     }
 
-    // Quit handler
+    // Quit button handler
     {
-        let ui_weak = ui_weak.clone();
+        let pm = process_manager.clone();
         ui.on_quit_clicked(move || {
-            let ui = ui_weak.unwrap();
-            ui.hide().unwrap();
+            pm.kill_and_exit();
+        });
+    }
+
+    // Window close handler (close box)
+    {
+        let pm = process_manager.clone();
+        ui.window().on_close_requested(move || {
+            pm.kill_and_exit();
+            slint::CloseRequestResponse::HideWindow
         });
     }
 

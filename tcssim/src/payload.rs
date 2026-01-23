@@ -16,7 +16,9 @@ pub struct PayloadConfig {
     pub address: String,
     pub port: u16,
     pub packet_size: Arc<AtomicU32>,
+    pub segment_size: Arc<AtomicU32>,
     pub packet_interval_ms: Arc<AtomicU32>,
+    pub segment_interval_ms: Arc<AtomicU32>,
 }
 
 /// Payload protocol type
@@ -107,9 +109,19 @@ impl SimulatedPayload {
         self.config.packet_size.store(size, Ordering::SeqCst);
     }
 
+    /// Update segment size
+    pub fn set_segment_size(&self, size: u32) {
+        self.config.segment_size.store(size, Ordering::SeqCst);
+    }
+
     /// Update packet interval
     pub fn set_packet_interval(&self, interval_ms: u32) {
         self.config.packet_interval_ms.store(interval_ms, Ordering::SeqCst);
+    }
+
+    /// Update segment interval
+    pub fn set_segment_interval(&self, interval_ms: u32) {
+        self.config.segment_interval_ms.store(interval_ms, Ordering::SeqCst);
     }
 }
 
@@ -149,9 +161,11 @@ fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<s
         if let Some(ref mut stream) = connection {
             // Generate and send data
             let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
-            let interval = config.packet_interval_ms.load(Ordering::SeqCst);
+            let segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
+            let packet_interval = config.packet_interval_ms.load(Ordering::SeqCst);
+            let segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
 
-            if interval > 0 {
+            if packet_interval > 0 {
                 let data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
                 if let Ok(n) = stream.write(&data) {
                     let mut guard = stats.lock().unwrap();
@@ -210,9 +224,11 @@ fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<s
         // Generate and send data if we have a peer
         if let Some(peer) = last_peer {
             let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
-            let interval = config.packet_interval_ms.load(Ordering::SeqCst);
+            let segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
+            let packet_interval = config.packet_interval_ms.load(Ordering::SeqCst);
+            let segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
 
-            if interval > 0 {
+            if packet_interval > 0 {
                 let data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
                 if let Ok(n) = socket.send_to(&data, peer) {
                     let mut guard = stats.lock().unwrap();
@@ -222,9 +238,9 @@ fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<s
             }
         }
 
-        let interval = config.packet_interval_ms.load(Ordering::SeqCst);
-        if interval > 0 {
-            thread::sleep(Duration::from_millis(interval as u64));
+        let packet_interval = config.packet_interval_ms.load(Ordering::SeqCst);
+        if packet_interval > 0 {
+            thread::sleep(Duration::from_millis(packet_interval as u64));
         } else {
             thread::sleep(Duration::from_millis(10));
         }
@@ -237,7 +253,9 @@ fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Ar
 
     while running.load(Ordering::SeqCst) {
         let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
-        let interval = config.packet_interval_ms.load(Ordering::SeqCst);
+        let segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
+        let packet_interval = config.packet_interval_ms.load(Ordering::SeqCst);
+        let segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
 
         // Generate random data (simulating /dev/urandom)
         let _data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
@@ -247,8 +265,8 @@ fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Ar
             guard.bytes_sent += packet_size as u64;
         }
 
-        if interval > 0 {
-            thread::sleep(Duration::from_millis(interval as u64));
+        if packet_interval > 0 {
+            thread::sleep(Duration::from_millis(packet_interval as u64));
         } else {
             thread::sleep(Duration::from_millis(1));
         }
@@ -267,7 +285,9 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 5000,
             packet_size: Arc::new(AtomicU32::new(12)),
+            segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),
+            segment_interval_ms: Arc::new(AtomicU32::new(1000)),
         };
         assert_eq!(config.id, 0);
     }

@@ -26,7 +26,9 @@ fn main() {
             address: "127.0.0.1".to_string(),
             port: 5000,
             packet_size: Arc::new(AtomicU32::new(12)),
+            segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),
+            segment_interval_ms: Arc::new(AtomicU32::new(1000)),
         },
         PayloadConfig {
             id: 1,
@@ -34,7 +36,9 @@ fn main() {
             address: "127.0.0.1".to_string(),
             port: 5001,
             packet_size: Arc::new(AtomicU32::new(11)),
+            segment_size: Arc::new(AtomicU32::new(11)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),
+            segment_interval_ms: Arc::new(AtomicU32::new(1000)),
         },
         PayloadConfig {
             id: 2,
@@ -42,7 +46,9 @@ fn main() {
             address: "/dev/urandom".to_string(),
             port: 0,
             packet_size: Arc::new(AtomicU32::new(1)),
+            segment_size: Arc::new(AtomicU32::new(1)),
             packet_interval_ms: Arc::new(AtomicU32::new(0)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
         },
         PayloadConfig {
             id: 3,
@@ -50,7 +56,9 @@ fn main() {
             address: "127.0.0.1".to_string(),
             port: 5003,
             packet_size: Arc::new(AtomicU32::new(15)),
+            segment_size: Arc::new(AtomicU32::new(15)),
             packet_interval_ms: Arc::new(AtomicU32::new(500)),
+            segment_interval_ms: Arc::new(AtomicU32::new(500)),
         },
     ];
 
@@ -110,11 +118,13 @@ fn main() {
     // Config change handler
     {
         let payloads = payloads.clone();
-        ui.on_config_payload(move |id, packet_size, interval| {
+        ui.on_config_payload(move |id, packet_size, segment_size, packet_interval, segment_interval| {
             let guard = payloads.lock().unwrap();
             if let Some(payload) = guard.get(id as usize) {
                 payload.set_packet_size(packet_size as u32);
-                payload.set_packet_interval(interval as u32);
+                payload.set_segment_size(segment_size as u32);
+                payload.set_packet_interval(packet_interval as u32);
+                payload.set_segment_interval(segment_interval as u32);
             }
         });
     }

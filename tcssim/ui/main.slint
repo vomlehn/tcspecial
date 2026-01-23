@@ -34,7 +34,8 @@ component PayloadPanel inherits Rectangle {
             }
             Text {
                 text: payload-status;
-                color: payload-status == "Running" ? #008000 : #808080;
+                color: payload-status == "Running" ? black : red;
+                font-weight: payload-status == "Running" ? 400 : 700;
             }
         }
 

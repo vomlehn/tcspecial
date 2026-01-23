@@ -2,7 +2,7 @@
 name = "tcslibgs"
 version = "0.1.0"
 edition = "2021"
-description = "TCSpecial ground/space shared library - definitions used by both tcslib and tcspecial"
+description = "TCSpecial ground/space shared library - contains command, telemetry, and type definitions"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

@@ -1,85 +1,48 @@
-//! Error types for TCSpecial
+//! Error definitions for TCSpecial
 
 use thiserror::Error;
-use crate::telemetry::ErrorCode;
 
-/// Main error type for TCSpecial operations
+/// TCSpecial error types
 #[derive(Error, Debug)]
 pub enum TcsError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Configuration error: {0}")]
+    Config(String),
 
     #[error("Protocol error: {0}")]
     Protocol(String),
 
+    #[error("Command error: {0}")]
+    Command(String),
+
     #[error("Data handler error: {0}")]
     DataHandler(String),
 
-    #[error("Command error: {code:?} - {message}")]
-    Command { code: ErrorCode, message: String },
-
-    #[error("Configuration error: {0}")]
-    Configuration(String),
-
-    #[error("Resource allocation failed: {0}")]
-    ResourceAllocation(String),
+    #[error("Endpoint error: {0}")]
+    Endpoint(String),
 
     #[error("Timeout")]
     Timeout,
 
-    #[error("Connection closed")]
-    ConnectionClosed,
+    #[error("Not armed for restart")]
+    NotArmed,
 
-    #[error("Invalid state: {0}")]
-    InvalidState(String),
-}
+    #[error("Invalid arm key")]
+    InvalidArmKey,
 
-impl TcsError {
-    pub fn protocol(msg: impl Into<String>) -> Self {
-        Self::Protocol(msg.into())
-    }
+    #[error("Data handler not found: {0}")]
+    DHNotFound(u32),
 
-    pub fn data_handler(msg: impl Into<String>) -> Self {
-        Self::DataHandler(msg.into())
-    }
+    #[error("Data handler already exists: {0}")]
+    DHExists(u32),
 
-    pub fn command(code: ErrorCode, msg: impl Into<String>) -> Self {
-        Self::Command {
-            code,
-            message: msg.into(),
-        }
-    }
-
-    pub fn configuration(msg: impl Into<String>) -> Self {
-        Self::Configuration(msg.into())
-    }
-
-    pub fn resource_allocation(msg: impl Into<String>) -> Self {
-        Self::ResourceAllocation(msg.into())
-    }
-
-    pub fn invalid_state(msg: impl Into<String>) -> Self {
-        Self::InvalidState(msg.into())
-    }
-
-    /// Convert to an error code for telemetry responses
-    pub fn to_error_code(&self) -> ErrorCode {
-        match self {
-            Self::Io(_) => ErrorCode::IoError,
-            Self::Serialization(_) => ErrorCode::InvalidCommand,
-            Self::Protocol(_) => ErrorCode::InvalidCommand,
-            Self::DataHandler(_) => ErrorCode::DHNotFound,
-            Self::Command { code, .. } => *code,
-            Self::Configuration(_) => ErrorCode::InvalidConfiguration,
-            Self::ResourceAllocation(_) => ErrorCode::ResourceAllocationFailed,
-            Self::Timeout => ErrorCode::IoError,
-            Self::ConnectionClosed => ErrorCode::IoError,
-            Self::InvalidState(_) => ErrorCode::Unknown,
-        }
-    }
+    #[error("Channel error: {0}")]
+    Channel(String),
 }
 
 /// Result type alias for TCSpecial operations
@@ -91,13 +54,7 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        let err = TcsError::protocol("invalid header");
-        assert!(err.to_string().contains("Protocol error"));
-    }
-
-    #[test]
-    fn test_error_code_conversion() {
-        let err = TcsError::Timeout;
-        assert_eq!(err.to_error_code(), ErrorCode::IoError);
+        let err = TcsError::Config("test".to_string());
+        assert_eq!(format!("{}", err), "Configuration error: test");
     }
 }

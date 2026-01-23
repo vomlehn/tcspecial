@@ -1,42 +1,50 @@
 {
-  "payloads": [
-    {
-      "dh_id": 0,
-      "type": "Network",
-      "protocol": "TCP/IP",
-      "address": "localhost:5000",
-      "packet_size": 12,
-      "packet_interval_ms": 1000,
-      "description": "TCP payload with 12-byte packets at 1 packet/second"
-    },
-    {
-      "dh_id": 1,
-      "type": "Network",
-      "protocol": "UDP/IP",
-      "address": "localhost:5001",
-      "packet_size": 11,
-      "packet_interval_ms": 1000,
-      "description": "UDP payload with 11-byte packets at 1 packet/second"
-    },
-    {
-      "dh_id": 2,
-      "type": "Device",
-      "protocol": "n/a",
-      "address": "/dev/urandom",
-      "packet_size": 1,
-      "packet_interval_ms": 0,
-      "description": "Device payload reading 1 byte continuously from /dev/urandom"
-    },
-    {
-      "dh_id": 3,
-      "type": "Network",
-      "protocol": "UDP/IP",
-      "address": "localhost:5003",
-      "packet_size": 15,
-      "packet_interval_ms": 500,
-      "description": "UDP payload with 15-byte packets at 2 packets/second"
+    "version": "1.0",
+    "description": "TCSpecial payload configuration",
+    "data_handlers": [
+        {
+            "dh_id": 0,
+            "name": "DH0",
+            "type": "network",
+            "protocol": "tcp",
+            "address": "localhost",
+            "port": 5000,
+            "packet_size": 12,
+            "packet_interval_ms": 1000
+        },
+        {
+            "dh_id": 1,
+            "name": "DH1",
+            "type": "network",
+            "protocol": "udp",
+            "address": "localhost",
+            "port": 5001,
+            "packet_size": 11,
+            "packet_interval_ms": 1000
+        },
+        {
+            "dh_id": 2,
+            "name": "DH2",
+            "type": "device",
+            "path": "/dev/urandom",
+            "packet_size": 1,
+            "packet_interval_ms": 0
+        },
+        {
+            "dh_id": 3,
+            "name": "DH3",
+            "type": "network",
+            "protocol": "udp",
+            "address": "localhost",
+            "port": 5003,
+            "packet_size": 15,
+            "packet_interval_ms": 500
+        }
+    ],
+    "ci_config": {
+        "address": "0.0.0.0",
+        "port": 4000,
+        "protocol": "udp",
+        "beacon_interval_ms": 5000
     }
-  ],
-  "version": "1.0",
-  "description": "TCSpecial payload definitions for testing with tcsmoc and tcssim"
 }

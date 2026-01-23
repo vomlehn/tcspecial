@@ -31,11 +31,11 @@ Features
   
   * Running on spacecraft
 
-    * tcsspecial: process running on spacecraft
+    * tcspecial: process running on spacecraft
 
 * Testing software is:
 
-  * tcsmoc: Simple interface using tcslib for visualizing tcsspecial operation and doing testing. 
+  * tcsmoc: Simple interface using tcslib for visualizing tcspecial operation and doing testing. 
 
   * tcssim: Simulated payloads
 
@@ -43,7 +43,7 @@ Features
 
     * tcslib: ground software library providing simple integration with mission control software
 
-    * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcsspecial and tcslib
+    * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
 
     * tcspayload.json: Configuration information
 
@@ -60,6 +60,8 @@ Features
   
         * Streams, both network streams, and devices, have a message length and
           a wait interval.
+
+      * There are as many data handlers as are defined in this file.
 
 
 * Radio interfaces
@@ -79,7 +81,7 @@ Features
 
 High-Level View of TCSpecial
 ----------------------------
-Tcsspecial fits into the ground and space portions of the command and telemetry
+Tcspecial fits into the ground and space portions of the command and telemetry
 systems as follows:
 FIXME: tweak diagram as necessary):
 
@@ -94,7 +96,7 @@ FIXME: tweak diagram as necessary):
    ||  Ground Ops         ||  :    ||  Flight Software      ||     ||  Payload Bay  ||
    +=======================+  :    +=========================+     +=================+
    |  +---------+          |  :    |    +=================+  |     |                 |
-   |  | Mission |          |  :  ----+->| tcsspecial      |  |     |                 |
+   |  | Mission |          |  :  ----+->| tcspecial      |  |     |                 |
    |  | Control |          |  : |  | |  | (tcslibgs)      |  |     |                 |
    |  | S/W     |          |  : |  | |  +-----------------+  |     |                 |
    |  +---------+          |  : |  | |  | Command         |  |     |                 |
@@ -136,7 +138,7 @@ in the same address space, so any need for data handlers to communicate with
 each other is straight forward to implement.
 
 The tcslibgs library contains definitions shared between the ground portion of the
-software, tcslib, and the space portion, tcsspecial.
+software, tcslib, and the space portion, tcspecial.
 
 Commands and Telemetry
 ======================
@@ -352,16 +354,16 @@ Beacon
 TCSpecial
 =========
 
-tcsspecial
+tcspecial
 ---------
-Tcsspecial hass a command interpreter (CI) running on the spacecraft where the
+Tcspecial hass a command interpreter (CI) running on the spacecraft where the
 payloads are located. CI has one or more threads to handle OC communications, i.e.
 data exchanged with tcslib over a bi-directional communication link. It
 defaults to using datagram communication to the tcslib, though this is usually actually
 a link to the spacecraft radio. The radio may use a different protocol.
 
-Tcsspecial also has threads associated with each data handler (DH). Each DH
-communicates to payloads via a bi-direction channel. A key feature of tcsspecial
+Tcspecial also has threads associated with each data handler (DH). Each DH
+communicates to payloads via a bi-direction channel. A key feature of tcspecial
 is that
 each DH may use a different protocol to communicate with its payload. This includes
 not only the core communication protocols supported by the operating system, such
@@ -558,13 +560,13 @@ Datagram Endpoints
 A consequence of datagrams being transferred in a single block is that select()-like
 calls indicate that the entire datagram is present or none is. There is no need to
 read a piece at a time. It is possible to read the amount of data available and allocate
-a bigger buffer but tcsspecial does not support this capability.
+a bigger buffer but tcspecial does not support this capability.
 
 Stream Endpoints
 ................
 Streams do not have embedded markers to indicate data boundaries, so select()-like
 calls indicate only that one or more bytes are available. Transferring one byte
-at a time will incur a significant amount of overhead, so tcsspecial can delay for
+at a time will incur a significant amount of overhead, so tcspecial can delay for
 some time to collect more bytes. This configurable is known as StreamEPDelay.
 
 When the select()-like operation indicates at least one byte is available,
@@ -689,7 +691,7 @@ must also be present. For more information on each of the address families, cons
 the Linux man page address_families(7).
 
 Requirement
-   Tcsspecial and tclib must translate the operating system dependent values, such as
+   Tcspecial and tclib must translate the operating system dependent values, such as
    the address families, types, and protocols, to canonical values, and back again
    to avoid building in operating system dependent code. All values transmitted
    must use the canonical values.
@@ -805,7 +807,7 @@ software such as YAMCS or MCT.
 tcslibgs
 --------
 The TCSpecial ground/space library contains definitions used by both
-tcslib and tcsspecial.
+tcslib and tcspecial.
 
 tcspayload.json
 ---------------
@@ -843,7 +845,7 @@ to change parameters and see what result the changes produce.
    ||                     ||  :    ||                       ||     || Payloads      ||
    +=======================+  :    +=========================+     +=================+
    |  +---------+          |  :    |    +=================+  |     |                 |
-   |  | tcsmoc  |          |  :  ----+->| tcsspecial      |  |     |                 |
+   |  | tcsmoc  |          |  :  ----+->| tcspecial      |  |     |                 |
    |  | Control |          |  : |  | |  | (tcslibgs)      |  |     |                 |
    |  | S/W     |          |  : |  | |  +-----------------+  |     |                 |
    |  +---------+          |  : |  | |  | Command         |  |     |                 |
@@ -879,15 +881,16 @@ The packet size and interval can be changed.
 tcsmoc
 ------
 The tcsmoc is a GUI program used to control simulated payloads
-interacting with tcsspecial using
-the tcslib library over a datagram connection to tcsspecial.  For testing
+interacting with tcspecial using
+the tcslib library over a datagram connection to tcspecial.  For testing
 purposes, tcsmoc uses tcslib, along with simulated payloads, to support a simple GUI.
 
 Tcsmoc gets the payload definition from tcspayload.json.
 
 The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
-Below that are up to eight rectangles. The rectangle is blank if the DH has
+Below that are as many rectangles as there are data handlers.
+The rectangle is blank if the DH has
 not been started or has been stopped after having been started. Otherwise, it
 displays the DH name, configuration information, packet size, and packet interval.
 Below that it displays the time and the data most recently sent. Underneath
@@ -901,7 +904,7 @@ GUI Framework
 The testing GUIs will all use
 slint
 with black on white. All windows will have a go away box which will shut down
-the entire application, i.e. tcsspecial, tcsmod, and tcssim.
+the entire application, i.e. tcspecial, tcsmod, and tcssim.
 
 Hints
 =====
@@ -920,6 +923,8 @@ These are some things that Claude doesn't seem to figure out by itself.
 
 * as_raw_fd() must be used to convert TCPStream and UDPSocket types to RawFDs.
 
+* Do not use tokio. Use threads directly.
+
 
 Possible Enhancements
 =====================
@@ -934,7 +939,7 @@ Special tty-based timing of input
 
     Could use the ioctl_tty/termios maximum number of characters to read a message.
 
-Tcsspecial manual/auto fail over
+Tcspecial manual/auto fail over
 
     Requires sharing the state in a consistent way.
 

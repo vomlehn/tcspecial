@@ -1,8 +1,8 @@
 [package]
-name = "tcslib"
+name = "tcspecial"
 version = "0.1.0"
 edition = "2021"
-description = "TCSpecial ground software library for mission control integration"
+description = "TCSpecial spacecraft command interpreter and data handler manager"
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }
@@ -11,3 +11,5 @@ serde_json = "1.0"
 libc = "0.2"
 thiserror = "1.0"
 log = "0.4"
+env_logger = "0.10"
+nix = { version = "0.27", features = ["poll", "fs"] }

@@ -1,268 +1,257 @@
-//! Payload simulation for tcssim
+//! Simulated payload implementation
 
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream, UdpSocket, SocketAddr};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use log::{info, warn, debug, error};
+use std::net::{TcpListener, TcpStream, UdpSocket};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
 use rand::Rng;
-use tcslibgs::{TcsError, TcsResult};
-
-/// Type of payload
-#[derive(Debug, Clone, Copy)]
-pub enum PayloadType {
-    /// TCP server
-    TcpServer,
-    /// UDP server
-    UdpServer,
-}
 
 /// Payload configuration
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PayloadConfig {
-    /// Payload ID (matches DH #)
     pub id: u32,
-    /// Type of payload
-    pub payload_type: PayloadType,
-    /// Address to listen on
+    pub protocol: PayloadProtocol,
     pub address: String,
-    /// Packet size in bytes
-    pub packet_size: usize,
-    /// Interval between packets
-    pub interval: Duration,
+    pub port: u16,
+    pub packet_size: Arc<AtomicU32>,
+    pub packet_interval_ms: Arc<AtomicU32>,
 }
 
-/// Payload statistics for GUI display
+/// Payload protocol type
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PayloadProtocol {
+    Tcp,
+    Udp,
+    Device,
+}
+
+/// Statistics for a payload
+#[derive(Default)]
 pub struct PayloadStats {
-    pub sent: u64,
-    pub received: u64,
-    pub last_sent: String,
-    pub last_received: String,
-    pub status: String,
-    pub connected: bool,
-}
-
-/// Shared stats structure used in main.rs
-pub struct SharedStats {
-    pub sent: u64,
-    pub received: u64,
-    pub last_sent: String,
-    pub last_received: String,
-    pub status: String,
-    pub connected: bool,
+    pub packets_sent: u64,
+    pub packets_recv: u64,
+    pub bytes_sent: u64,
+    pub bytes_recv: u64,
 }
 
 /// Simulated payload
-pub struct Payload {
+pub struct SimulatedPayload {
     config: PayloadConfig,
-    sequence: u32,
-    stats: Arc<Mutex<SharedStats>>,
+    running: Arc<AtomicBool>,
+    thread_handle: Option<JoinHandle<()>>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
 }
 
-impl Payload {
-    pub fn new(config: PayloadConfig, stats: Arc<Mutex<SharedStats>>) -> Self {
+impl SimulatedPayload {
+    /// Create a new simulated payload
+    pub fn new(config: PayloadConfig) -> Self {
         Self {
             config,
-            sequence: 0,
-            stats,
+            running: Arc::new(AtomicBool::new(false)),
+            thread_handle: None,
+            stats: Arc::new(std::sync::Mutex::new(PayloadStats::default())),
         }
     }
 
-    /// Run the payload
-    pub fn run(&mut self, running: Arc<AtomicBool>) -> TcsResult<()> {
-        info!("Starting payload {} on {}", self.config.id, self.config.address);
-
-        match self.config.payload_type {
-            PayloadType::TcpServer => self.run_tcp_server(running),
-            PayloadType::UdpServer => self.run_udp_server(running),
+    /// Start the payload simulation
+    pub fn start(&mut self) -> Result<(), String> {
+        if self.running.load(Ordering::SeqCst) {
+            return Err("Already running".to_string());
         }
-    }
 
-    fn update_status(&self, status: &str) {
-        if let Ok(mut s) = self.stats.lock() {
-            s.status = status.to_string();
-        }
-    }
+        self.running.store(true, Ordering::SeqCst);
+        let running = self.running.clone();
+        let config = self.config.clone();
+        let stats = self.stats.clone();
 
-    fn update_connected(&self, connected: bool) {
-        if let Ok(mut s) = self.stats.lock() {
-            s.connected = connected;
-        }
-    }
-
-    fn record_sent(&self, data: &[u8]) {
-        if let Ok(mut s) = self.stats.lock() {
-            s.sent += 1;
-            s.last_sent = format!("{} bytes: {:02X?}", data.len(), &data[..data.len().min(8)]);
-        }
-    }
-
-    fn record_received(&self, data: &[u8], n: usize) {
-        if let Ok(mut s) = self.stats.lock() {
-            s.received += 1;
-            s.last_received = format!("{} bytes: {:02X?}", n, &data[..n.min(8)]);
-        }
-    }
-
-    /// Run as TCP server
-    fn run_tcp_server(&mut self, running: Arc<AtomicBool>) -> TcsResult<()> {
-        let addr: SocketAddr = self.config.address.parse()
-            .map_err(|_| TcsError::configuration("Invalid address"))?;
-
-        let listener = TcpListener::bind(addr)?;
-        listener.set_nonblocking(true)?;
-
-        info!("Payload {} listening on TCP {}", self.config.id, addr);
-        self.update_status("Listening");
-
-        while running.load(Ordering::SeqCst) {
-            // Accept new connections
-            match listener.accept() {
-                Ok((stream, peer_addr)) => {
-                    info!("Payload {} accepted connection from {}", self.config.id, peer_addr);
-                    self.update_status(&format!("Connected: {}", peer_addr));
-                    self.update_connected(true);
-                    self.handle_tcp_connection(stream, running.clone())?;
-                    self.update_connected(false);
-                    self.update_status("Listening");
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    std::thread::sleep(Duration::from_millis(100));
-                }
-                Err(e) => {
-                    warn!("Payload {} accept error: {}", self.config.id, e);
-                    std::thread::sleep(Duration::from_millis(100));
-                }
+        let handle = thread::spawn(move || {
+            match config.protocol {
+                PayloadProtocol::Tcp => run_tcp_payload(config, running, stats),
+                PayloadProtocol::Udp => run_udp_payload(config, running, stats),
+                PayloadProtocol::Device => run_device_payload(config, running, stats),
             }
-        }
+        });
 
+        self.thread_handle = Some(handle);
         Ok(())
     }
 
-    /// Handle a TCP connection
-    fn handle_tcp_connection(&mut self, mut stream: TcpStream, running: Arc<AtomicBool>) -> TcsResult<()> {
-        stream.set_nonblocking(true)?;
-        stream.set_nodelay(true)?;
+    /// Stop the payload simulation
+    pub fn stop(&mut self) {
+        self.running.store(false, Ordering::SeqCst);
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
+    }
 
-        let mut recv_buf = vec![0u8; 1024];
-        let mut last_send = Instant::now();
+    /// Check if the payload is running
+    pub fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
+    }
 
-        while running.load(Ordering::SeqCst) {
+    /// Get the current statistics
+    pub fn stats(&self) -> PayloadStats {
+        let guard = self.stats.lock().unwrap();
+        PayloadStats {
+            packets_sent: guard.packets_sent,
+            packets_recv: guard.packets_recv,
+            bytes_sent: guard.bytes_sent,
+            bytes_recv: guard.bytes_recv,
+        }
+    }
+
+    /// Update packet size
+    pub fn set_packet_size(&self, size: u32) {
+        self.config.packet_size.store(size, Ordering::SeqCst);
+    }
+
+    /// Update packet interval
+    pub fn set_packet_interval(&self, interval_ms: u32) {
+        self.config.packet_interval_ms.store(interval_ms, Ordering::SeqCst);
+    }
+}
+
+impl Drop for SimulatedPayload {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+/// Run TCP payload simulation
+fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+    let addr = format!("{}:{}", config.address, config.port);
+
+    // Try to bind as server
+    let listener = match TcpListener::bind(&addr) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to bind TCP listener: {}", e);
+            return;
+        }
+    };
+
+    listener.set_nonblocking(true).ok();
+
+    let mut connection: Option<TcpStream> = None;
+    let mut rng = rand::thread_rng();
+
+    while running.load(Ordering::SeqCst) {
+        // Accept new connections
+        if connection.is_none() {
+            if let Ok((stream, _)) = listener.accept() {
+                stream.set_nonblocking(true).ok();
+                connection = Some(stream);
+            }
+        }
+
+        if let Some(ref mut stream) = connection {
+            // Generate and send data
+            let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
+            let interval = config.packet_interval_ms.load(Ordering::SeqCst);
+
+            if interval > 0 {
+                let data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
+                if let Ok(n) = stream.write(&data) {
+                    let mut guard = stats.lock().unwrap();
+                    guard.packets_sent += 1;
+                    guard.bytes_sent += n as u64;
+                }
+            }
+
             // Try to receive data
-            match stream.read(&mut recv_buf) {
-                Ok(0) => {
-                    info!("Payload {} connection closed", self.config.id);
-                    break;
-                }
-                Ok(n) => {
-                    debug!("Payload {} received {} bytes", self.config.id, n);
-                    self.record_received(&recv_buf, n);
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => {
-                    warn!("Payload {} read error: {}", self.config.id, e);
-                    break;
+            let mut buf = vec![0u8; 4096];
+            if let Ok(n) = stream.read(&mut buf) {
+                if n > 0 {
+                    let mut guard = stats.lock().unwrap();
+                    guard.packets_recv += 1;
+                    guard.bytes_recv += n as u64;
                 }
             }
-
-            // Send data at configured interval
-            if last_send.elapsed() >= self.config.interval {
-                let packet = self.generate_packet();
-                match stream.write_all(&packet) {
-                    Ok(()) => {
-                        debug!("Payload {} sent {} bytes", self.config.id, packet.len());
-                        self.record_sent(&packet);
-                        self.sequence += 1;
-                    }
-                    Err(e) => {
-                        warn!("Payload {} write error: {}", self.config.id, e);
-                        break;
-                    }
-                }
-                last_send = Instant::now();
-            }
-
-            std::thread::sleep(Duration::from_millis(10));
         }
 
-        Ok(())
+        let interval = config.packet_interval_ms.load(Ordering::SeqCst);
+        if interval > 0 {
+            thread::sleep(Duration::from_millis(interval as u64));
+        } else {
+            thread::sleep(Duration::from_millis(10));
+        }
     }
+}
 
-    /// Run as UDP server
-    fn run_udp_server(&mut self, running: Arc<AtomicBool>) -> TcsResult<()> {
-        let addr: SocketAddr = self.config.address.parse()
-            .map_err(|_| TcsError::configuration("Invalid address"))?;
+/// Run UDP payload simulation
+fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+    let addr = format!("{}:{}", config.address, config.port);
 
-        let socket = UdpSocket::bind(addr)?;
-        socket.set_nonblocking(true)?;
+    let socket = match UdpSocket::bind(&addr) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Failed to bind UDP socket: {}", e);
+            return;
+        }
+    };
 
-        info!("Payload {} listening on UDP {}", self.config.id, addr);
-        self.update_status("Listening");
+    socket.set_nonblocking(true).ok();
 
-        let mut recv_buf = vec![0u8; 1024];
-        let mut last_send = Instant::now();
-        let mut peer_addr: Option<SocketAddr> = None;
+    let mut rng = rand::thread_rng();
+    let mut last_peer: Option<std::net::SocketAddr> = None;
 
-        while running.load(Ordering::SeqCst) {
-            // Try to receive data
-            match socket.recv_from(&mut recv_buf) {
-                Ok((n, from_addr)) => {
-                    debug!("Payload {} received {} bytes from {}", self.config.id, n, from_addr);
-                    self.record_received(&recv_buf, n);
-                    if peer_addr.is_none() {
-                        self.update_status(&format!("Connected: {}", from_addr));
-                        self.update_connected(true);
-                    }
-                    peer_addr = Some(from_addr);
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => {
-                    warn!("Payload {} recv error: {}", self.config.id, e);
-                }
-            }
-
-            // Send data at configured interval if we have a peer
-            if let Some(addr) = peer_addr {
-                if last_send.elapsed() >= self.config.interval {
-                    let packet = self.generate_packet();
-                    match socket.send_to(&packet, addr) {
-                        Ok(n) => {
-                            debug!("Payload {} sent {} bytes to {}", self.config.id, n, addr);
-                            self.record_sent(&packet);
-                            self.sequence += 1;
-                        }
-                        Err(e) => {
-                            warn!("Payload {} send error: {}", self.config.id, e);
-                        }
-                    }
-                    last_send = Instant::now();
-                }
-            }
-
-            std::thread::sleep(Duration::from_millis(10));
+    while running.load(Ordering::SeqCst) {
+        // Try to receive data
+        let mut buf = vec![0u8; 4096];
+        if let Ok((n, peer)) = socket.recv_from(&mut buf) {
+            last_peer = Some(peer);
+            let mut guard = stats.lock().unwrap();
+            guard.packets_recv += 1;
+            guard.bytes_recv += n as u64;
         }
 
-        Ok(())
+        // Generate and send data if we have a peer
+        if let Some(peer) = last_peer {
+            let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
+            let interval = config.packet_interval_ms.load(Ordering::SeqCst);
+
+            if interval > 0 {
+                let data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
+                if let Ok(n) = socket.send_to(&data, peer) {
+                    let mut guard = stats.lock().unwrap();
+                    guard.packets_sent += 1;
+                    guard.bytes_sent += n as u64;
+                }
+            }
+        }
+
+        let interval = config.packet_interval_ms.load(Ordering::SeqCst);
+        if interval > 0 {
+            thread::sleep(Duration::from_millis(interval as u64));
+        } else {
+            thread::sleep(Duration::from_millis(10));
+        }
     }
+}
 
-    /// Generate a packet with random data
-    fn generate_packet(&self) -> Vec<u8> {
-        let mut rng = rand::thread_rng();
-        let mut packet = Vec::with_capacity(self.config.packet_size);
+/// Run device payload simulation (simulates /dev/urandom-like behavior)
+fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+    let mut rng = rand::thread_rng();
 
-        // First 4 bytes are sequence number (big-endian)
-        packet.extend_from_slice(&self.sequence.to_be_bytes());
+    while running.load(Ordering::SeqCst) {
+        let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
+        let interval = config.packet_interval_ms.load(Ordering::SeqCst);
 
-        // Remaining bytes are random data
-        for _ in 4..self.config.packet_size {
-            packet.push(rng.gen());
+        // Generate random data (simulating /dev/urandom)
+        let _data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
+        {
+            let mut guard = stats.lock().unwrap();
+            guard.packets_sent += 1;
+            guard.bytes_sent += packet_size as u64;
         }
 
-        // Ensure packet is exactly the configured size
-        packet.resize(self.config.packet_size, 0);
-
-        packet
+        if interval > 0 {
+            thread::sleep(Duration::from_millis(interval as u64));
+        } else {
+            thread::sleep(Duration::from_millis(1));
+        }
     }
 }
 
@@ -270,41 +259,16 @@ impl Payload {
 mod tests {
     use super::*;
 
-    fn make_dummy_stats() -> Arc<Mutex<SharedStats>> {
-        Arc::new(Mutex::new(SharedStats {
-            sent: 0,
-            received: 0,
-            last_sent: String::new(),
-            last_received: String::new(),
-            status: String::new(),
-            connected: false,
-        }))
-    }
-
     #[test]
     fn test_payload_config() {
         let config = PayloadConfig {
             id: 0,
-            payload_type: PayloadType::TcpServer,
-            address: "127.0.0.1:5000".to_string(),
-            packet_size: 12,
-            interval: Duration::from_secs(1),
+            protocol: PayloadProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: 5000,
+            packet_size: Arc::new(AtomicU32::new(12)),
+            packet_interval_ms: Arc::new(AtomicU32::new(1000)),
         };
         assert_eq!(config.id, 0);
-        assert_eq!(config.packet_size, 12);
-    }
-
-    #[test]
-    fn test_packet_generation() {
-        let config = PayloadConfig {
-            id: 0,
-            payload_type: PayloadType::UdpServer,
-            address: "127.0.0.1:5000".to_string(),
-            packet_size: 12,
-            interval: Duration::from_secs(1),
-        };
-        let payload = Payload::new(config, make_dummy_stats());
-        let packet = payload.generate_packet();
-        assert_eq!(packet.len(), 12);
     }
 }

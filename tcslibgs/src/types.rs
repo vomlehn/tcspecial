@@ -1,24 +1,21 @@
-//! Common types used throughout TCSpecial
+//! Type definitions shared between ground and space software
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::cmp::Ordering;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Timestamp representing spacecraft time
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Timestamp type for spacecraft time
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Timestamp {
-    /// Seconds since epoch
+    /// Seconds since UNIX epoch
     pub seconds: u64,
-    /// Nanoseconds within the second
+    /// Nanoseconds within the current second
     pub nanoseconds: u32,
 }
 
 impl Timestamp {
-    pub fn new(seconds: u64, nanoseconds: u32) -> Self {
-        Self { seconds, nanoseconds }
-    }
-
+    /// Create a new timestamp from the current system time
     pub fn now() -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
         let duration = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default();
@@ -29,37 +26,33 @@ impl Timestamp {
     }
 }
 
-impl fmt::Display for Timestamp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{:09}", self.seconds, self.nanoseconds)
-    }
-}
-
-/// Key used for arming restart operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ArmKey(pub u32);
-
-/// Data Handler identifier - must implement Ord trait
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+/// Data handler identifier
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct DHId(pub u32);
 
-impl fmt::Display for DHId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DH{}", self.0)
+impl Ord for DHId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
-/// Data Handler type - network or device
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+impl PartialOrd for DHId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Data handler type
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DHType {
-    /// Network-based data handler (TCP/IP, UDP/IP, etc.)
+    /// Network-based data handler (TCP, UDP, etc.)
     Network,
-    /// Device-based data handler (serial ports, I2C, SPI, etc.)
+    /// Device-based data handler (/dev/*)
     Device,
 }
 
-/// Data Handler name/configuration
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Data handler name
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DHName(pub String);
 
 impl DHName {
@@ -68,32 +61,36 @@ impl DHName {
     }
 }
 
+/// Arm key for restart commands
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ArmKey(pub u64);
+
 /// Beacon interval time in milliseconds
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BeaconTime(pub u64);
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BeaconTime(pub u32);
 
 impl Default for BeaconTime {
     fn default() -> Self {
-        Self(10000) // 10 seconds default
+        Self(5000) // 5 seconds default
     }
 }
 
-/// I/O Statistics for a data handler
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+/// Statistics for data handler operations
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Statistics {
-    /// Spacecraft time when statistics were collected
+    /// Timestamp when statistics were collected
     pub timestamp: Option<Timestamp>,
     /// Number of bytes received
     pub bytes_received: u64,
-    /// Number of read operations completed successfully
+    /// Number of successful read operations
     pub reads_completed: u64,
-    /// Number of read operations that returned an error
+    /// Number of failed read operations
     pub reads_failed: u64,
     /// Number of bytes sent
     pub bytes_sent: u64,
-    /// Number of write operations completed successfully
+    /// Number of successful write operations
     pub writes_completed: u64,
-    /// Number of write operations that returned an error
+    /// Number of failed write operations
     pub writes_failed: u64,
 }
 
@@ -108,159 +105,158 @@ impl Statistics {
     }
 }
 
-/// Canonical address family values (OS-independent)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u16)]
-pub enum CanonicalAddressFamily {
-    Unix = 1,
-    Inet = 2,
-    Inet6 = 3,
-    Ax25 = 4,
-    Ipx = 5,
-    Appletalk = 6,
-    X25 = 7,
-    Decnet = 8,
-    Key = 9,
-    Netlink = 10,
-    Packet = 11,
-    Rds = 12,
-    Pppox = 13,
-    Llc = 14,
-    Ib = 15,
-    Mpls = 16,
-    Can = 17,
-    Tipc = 18,
-    Bluetooth = 19,
-    Alg = 20,
-    Vsock = 21,
-    Xdp = 22,
+/// Network protocol type
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NetworkProtocol {
+    Tcp,
+    Udp,
+    UnixStream,
+    UnixDgram,
 }
 
-impl CanonicalAddressFamily {
-    /// Convert from OS-specific address family to canonical
-    #[cfg(target_os = "linux")]
-    pub fn from_os(af: i32) -> Option<Self> {
-        match af {
-            libc::AF_UNIX => Some(Self::Unix),
-            libc::AF_INET => Some(Self::Inet),
-            libc::AF_INET6 => Some(Self::Inet6),
-            libc::AF_AX25 => Some(Self::Ax25),
-            libc::AF_IPX => Some(Self::Ipx),
-            libc::AF_APPLETALK => Some(Self::Appletalk),
-            libc::AF_X25 => Some(Self::X25),
-            libc::AF_KEY => Some(Self::Key),
-            libc::AF_NETLINK => Some(Self::Netlink),
-            libc::AF_PACKET => Some(Self::Packet),
-            libc::AF_PPPOX => Some(Self::Pppox),
-            libc::AF_LLC => Some(Self::Llc),
-            libc::AF_CAN => Some(Self::Can),
-            libc::AF_TIPC => Some(Self::Tipc),
-            libc::AF_BLUETOOTH => Some(Self::Bluetooth),
-            libc::AF_ALG => Some(Self::Alg),
-            libc::AF_VSOCK => Some(Self::Vsock),
-            libc::AF_XDP => Some(Self::Xdp),
-            _ => None,
-        }
-    }
-
-    /// Convert from canonical to OS-specific address family
-    #[cfg(target_os = "linux")]
-    pub fn to_os(self) -> i32 {
-        match self {
-            Self::Unix => libc::AF_UNIX,
-            Self::Inet => libc::AF_INET,
-            Self::Inet6 => libc::AF_INET6,
-            Self::Ax25 => libc::AF_AX25,
-            Self::Ipx => libc::AF_IPX,
-            Self::Appletalk => libc::AF_APPLETALK,
-            Self::X25 => libc::AF_X25,
-            Self::Decnet => libc::AF_DECnet,
-            Self::Key => libc::AF_KEY,
-            Self::Netlink => libc::AF_NETLINK,
-            Self::Packet => libc::AF_PACKET,
-            Self::Rds => libc::AF_RDS,
-            Self::Pppox => libc::AF_PPPOX,
-            Self::Llc => libc::AF_LLC,
-            Self::Ib => libc::AF_IB,
-            Self::Mpls => libc::AF_MPLS,
-            Self::Can => libc::AF_CAN,
-            Self::Tipc => libc::AF_TIPC,
-            Self::Bluetooth => libc::AF_BLUETOOTH,
-            Self::Alg => libc::AF_ALG,
-            Self::Vsock => libc::AF_VSOCK,
-            Self::Xdp => libc::AF_XDP,
-        }
-    }
+/// Configuration for a network endpoint
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NetworkConfig {
+    pub protocol: NetworkProtocol,
+    pub address: String,
+    pub port: u16,
 }
 
-/// Canonical socket type values (OS-independent)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum CanonicalSocketType {
-    Stream = 1,
-    Dgram = 2,
-    Raw = 3,
-    SeqPacket = 4,
+/// Configuration for a device endpoint
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeviceConfig {
+    pub path: String,
 }
 
-impl CanonicalSocketType {
-    #[cfg(target_os = "linux")]
-    pub fn from_os(st: i32) -> Option<Self> {
-        match st {
-            libc::SOCK_STREAM => Some(Self::Stream),
-            libc::SOCK_DGRAM => Some(Self::Dgram),
-            libc::SOCK_RAW => Some(Self::Raw),
-            libc::SOCK_SEQPACKET => Some(Self::SeqPacket),
-            _ => None,
-        }
-    }
+/// Endpoint configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum EndpointConfig {
+    Network(NetworkConfig),
+    Device(DeviceConfig),
+}
 
-    #[cfg(target_os = "linux")]
-    pub fn to_os(self) -> i32 {
-        match self {
-            Self::Stream => libc::SOCK_STREAM,
-            Self::Dgram => libc::SOCK_DGRAM,
-            Self::Raw => libc::SOCK_RAW,
-            Self::SeqPacket => libc::SOCK_SEQPACKET,
-        }
-    }
+/// Data handler configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DHConfig {
+    pub dh_id: DHId,
+    pub name: DHName,
+    pub endpoint: EndpointConfig,
+    pub packet_size: usize,
+    pub packet_interval_ms: u32,
+}
 
-    /// Returns true if this socket type has stream semantics
-    pub fn is_stream(&self) -> bool {
-        matches!(self, Self::Stream)
-    }
+/// Payload configuration file structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PayloadConfig {
+    pub version: String,
+    pub description: String,
+    pub data_handlers: Vec<DHConfigJson>,
+    pub ci_config: CIConfigJson,
+}
 
-    /// Returns true if this socket type has datagram semantics
-    pub fn is_datagram(&self) -> bool {
-        matches!(self, Self::Dgram | Self::Raw | Self::SeqPacket)
+/// JSON representation of DH config
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DHConfigJson {
+    pub dh_id: u32,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub dh_type: String,
+    #[serde(default)]
+    pub protocol: Option<String>,
+    #[serde(default)]
+    pub address: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub path: Option<String>,
+    pub packet_size: usize,
+    pub packet_interval_ms: u32,
+}
+
+impl DHConfigJson {
+    pub fn to_dh_config(&self) -> Result<DHConfig, String> {
+        let endpoint = match self.dh_type.as_str() {
+            "network" => {
+                let protocol = match self.protocol.as_deref() {
+                    Some("tcp") => NetworkProtocol::Tcp,
+                    Some("udp") => NetworkProtocol::Udp,
+                    Some("unix_stream") => NetworkProtocol::UnixStream,
+                    Some("unix_dgram") => NetworkProtocol::UnixDgram,
+                    _ => return Err("Invalid or missing protocol".to_string()),
+                };
+                EndpointConfig::Network(NetworkConfig {
+                    protocol,
+                    address: self.address.clone().ok_or("Missing address")?,
+                    port: self.port.ok_or("Missing port")?,
+                })
+            }
+            "device" => EndpointConfig::Device(DeviceConfig {
+                path: self.path.clone().ok_or("Missing path")?,
+            }),
+            _ => return Err(format!("Invalid DH type: {}", self.dh_type)),
+        };
+
+        Ok(DHConfig {
+            dh_id: DHId(self.dh_id),
+            name: DHName::new(&self.name),
+            endpoint,
+            packet_size: self.packet_size,
+            packet_interval_ms: self.packet_interval_ms,
+        })
     }
 }
 
-/// Configuration for endpoint delays
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct EndpointDelayConfig {
-    /// Initial delay value in milliseconds
-    pub init_ms: u64,
-    /// Maximum delay value in milliseconds
-    pub max_ms: u64,
+/// JSON representation of CI config
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CIConfigJson {
+    pub address: String,
+    pub port: u16,
+    pub protocol: String,
+    pub beacon_interval_ms: u32,
 }
 
-impl Default for EndpointDelayConfig {
-    fn default() -> Self {
-        Self {
-            init_ms: 100,
-            max_ms: 5000,
-        }
+/// Command interpreter configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CIConfig {
+    pub address: String,
+    pub port: u16,
+    pub protocol: NetworkProtocol,
+    pub beacon_interval: BeaconTime,
+}
+
+impl CIConfigJson {
+    pub fn to_ci_config(&self) -> Result<CIConfig, String> {
+        let protocol = match self.protocol.as_str() {
+            "tcp" => NetworkProtocol::Tcp,
+            "udp" => NetworkProtocol::Udp,
+            _ => return Err(format!("Invalid protocol: {}", self.protocol)),
+        };
+
+        Ok(CIConfig {
+            address: self.address.clone(),
+            port: self.port,
+            protocol,
+            beacon_interval: BeaconTime(self.beacon_interval_ms),
+        })
     }
 }
 
-/// Stream endpoint delay configuration
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct StreamEPDelay(pub u64);
+/// Result status for command responses
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum CommandStatus {
+    Success,
+    Failure,
+    InvalidCommand,
+    InvalidParameter,
+    NotArmed,
+    NotFound,
+    AlreadyExists,
+    Timeout,
+}
 
-impl Default for StreamEPDelay {
-    fn default() -> Self {
-        Self(10) // 10ms default delay
+impl CommandStatus {
+    pub fn is_success(&self) -> bool {
+        matches!(self, CommandStatus::Success)
     }
 }
 
@@ -269,30 +265,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_timestamp() {
-        let ts = Timestamp::new(1234567890, 123456789);
-        assert_eq!(ts.seconds, 1234567890);
-        assert_eq!(ts.nanoseconds, 123456789);
-    }
-
-    #[test]
-    fn test_dh_id_ordering() {
+    fn test_dhid_ordering() {
         let id1 = DHId(1);
         let id2 = DHId(2);
         assert!(id1 < id2);
     }
 
     #[test]
-    fn test_statistics_default() {
-        let stats = Statistics::new();
-        assert_eq!(stats.bytes_received, 0);
-        assert_eq!(stats.reads_completed, 0);
+    fn test_timestamp_now() {
+        let ts = Timestamp::now();
+        assert!(ts.seconds > 0);
     }
 
     #[test]
-    fn test_socket_type_semantics() {
-        assert!(CanonicalSocketType::Stream.is_stream());
-        assert!(CanonicalSocketType::Dgram.is_datagram());
-        assert!(CanonicalSocketType::SeqPacket.is_datagram());
+    fn test_statistics_with_timestamp() {
+        let stats = Statistics::new().with_timestamp();
+        assert!(stats.timestamp.is_some());
     }
 }

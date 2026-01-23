@@ -1,4 +1,4 @@
-import { Button, GroupBox, LineEdit, ListView, VerticalBox, HorizontalBox, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
+import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
 
 component DHPanel inherits Rectangle {
     in property <string> dh-name: "DH0";
@@ -21,11 +21,12 @@ component DHPanel inherits Rectangle {
     border-width: 1px;
     min-height: 180px;
 
-    VerticalBox {
+    VerticalLayout {
         padding: 8px;
         spacing: 4px;
+        height: 200px;
 
-        HorizontalBox {
+        HorizontalLayout {
             Text {
                 text: dh-name;
                 font-size: 14px;
@@ -37,17 +38,20 @@ component DHPanel inherits Rectangle {
             }
         }
 
-        Text {
-            text: "Config: " + dh-config;
-            font-size: 11px;
+        HorizontalLayout {
+            height: 12px;
+            Text {
+                text: "Config: " + dh-config;
+                font-size: 11px;
+            }
         }
 
-        HorizontalBox {
+        HorizontalLayout {
             Text { text: "Packet Size: " + packet-size + " bytes"; font-size: 11px; }
             Text { text: "Interval: " + packet-interval + " ms"; font-size: 11px; }
         }
 
-        HorizontalBox {
+        HorizontalLayout {
             spacing: 4px;
             Button {
                 text: "Start";
@@ -61,7 +65,7 @@ component DHPanel inherits Rectangle {
 
         GroupBox {
             title: "Last Sent";
-            HorizontalBox {
+            HorizontalLayout {
                 Text { text: last-sent-time; font-size: 10px; }
                 Text { text: last-sent-data; font-size: 10px; }
             }
@@ -69,13 +73,13 @@ component DHPanel inherits Rectangle {
 
         GroupBox {
             title: "Last Received";
-            HorizontalBox {
+            HorizontalLayout {
                 Text { text: last-recv-time; font-size: 10px; }
                 Text { text: last-recv-data; font-size: 10px; }
             }
         }
 
-        HorizontalBox {
+        HorizontalLayout {
             Text { text: "Sent: " + bytes-sent + " bytes"; font-size: 10px; }
             Text { text: "Recv: " + bytes-recv + " bytes"; font-size: 10px; }
         }
@@ -126,7 +130,7 @@ export component MainWindow inherits Window {
     callback stop-dh(int);
     callback quit-clicked();
 
-    VerticalBox {
+    VerticalLayout {
         padding: 10px;
         spacing: 10px;
 
@@ -134,10 +138,10 @@ export component MainWindow inherits Window {
         GroupBox {
             title: "Command Interpreter";
 
-            VerticalBox {
+            VerticalLayout {
                 spacing: 8px;
 
-                HorizontalBox {
+                HorizontalLayout {
                     spacing: 8px;
                     Text { text: "Address:"; vertical-alignment: center; }
                     LineEdit {
@@ -159,7 +163,7 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                HorizontalBox {
+                HorizontalLayout {
                     spacing: 8px;
                     Button {
                         text: "Ping";
@@ -172,7 +176,7 @@ export component MainWindow inherits Window {
                     Text { text: "Last Beacon: " + beacon-time; vertical-alignment: center; }
                 }
 
-                HorizontalBox {
+                HorizontalLayout {
                     Text { text: "Last Response: " + last-response; font-size: 11px; }
                 }
             }
@@ -181,10 +185,13 @@ export component MainWindow inherits Window {
         // Data Handlers Section
         GroupBox {
             title: "Data Handlers";
+            height: 600px;
 
             ScrollView {
+                height: 600px;
                 GridBox {
                     spacing: 10px;
+                    height: 700px;
 
                     Row {
                         DHPanel {
@@ -250,7 +257,7 @@ export component MainWindow inherits Window {
         }
 
         // Quit Button
-        HorizontalBox {
+        HorizontalLayout {
             Rectangle { }
             Button {
                 text: "Quit";

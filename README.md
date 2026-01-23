@@ -8,6 +8,22 @@ which has influenced the design to work with non-reliable communication links.
 However, it will work find over any distance and is extensible to use reliable links
 and.
 
+# To Run
+
+This is a pre-pre-pre-alpha release that mostly displays the GUI. There is a
+design document in docs/design.rst. The docs/Makefile will build design.html
+for viewing.
+
+* Clone the source
+
+* Type:
+
+     make run
+
+  There are make clean and make distclean targets.
+
+# Stuff
+
 TCSpecial supports standard network protocols and devices for communication, as
 well as allowing custom protocols. So, it would be possible to implement your
 own SLIP over COBS[#] implementation.

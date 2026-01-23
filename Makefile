@@ -4,6 +4,7 @@
 
 # Project variables
 PROJECT_NAME := task-manager
+SIM_NAME := simulator
 SRC_DIR := src
 DOCS_DIR := docs
 PROMPTS_DIR := prompts
@@ -26,6 +27,9 @@ FIXUP = set -x; \
 		sed -i 's/into_raw_fd/as_raw_fd/g' g/src/endpoint.rs; \
 		sed -i 's/into_raw_fd/as_raw_fd/g' g/src/dh.rs;
 FIXUP =
+
+FIXUP_TEST =
+FIXUP_SIM =
 
 # Default target
 all: generate build test
@@ -97,19 +101,28 @@ build:
 test:
 	( \
 		set -eu; \
-		$(FIXUP) \
+		$(FIXUP_TEST) \
 		echo "Running tests..."; \
 		cd $(RUST) && cargo test; \
 		echo "✓ Tests complete"; \
 	)
 
-# Run the application
+# Run the MOC application
 run:
 	( \
 		set -eu; \
 		$(FIXUP) \
 		echo "Running $(PROJECT_NAME)..."; \
 		cd $(RUST) && cargo run --bin tcsmoc \
+	)
+
+# Run the simulation application
+runsim:
+	( \
+		set -eu; \
+		$(FIXUP_SIM) \
+		echo "Running $(SIM_NAME)..."; \
+		cd $(RUST) && cargo run --bin tcssim \
 	)
 
 # Clean build artifacts

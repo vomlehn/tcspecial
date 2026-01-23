@@ -113,7 +113,7 @@ run:
 		set -eu; \
 		$(FIXUP) \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && cargo run --bin tcsmoc \
+		cd $(RUST) && RUST_LOG=info cargo run --bin tcsmoc \
 	)
 
 # Run the simulation application
@@ -122,7 +122,7 @@ runsim:
 		set -eu; \
 		$(FIXUP_SIM) \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && cargo run --bin tcssim \
+		cd $(RUST) && RUST_LOG=info cargo run --bin tcssim \
 	)
 
 # Clean build artifacts

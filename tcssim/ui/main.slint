@@ -22,80 +22,83 @@ component PayloadPanel inherits Rectangle {
     background: #f0f0f0;
     border-color: #808080;
     border-width: 1px;
-    min-height: 800px;
+    min-height: 200px;  // Much smaller
 
-    VerticalBox {
-        padding: 1px;
-        spacing: 1px;
+    VerticalLayout {
+        padding: 4px;
+        spacing: 2px;
 
-        HorizontalBox {
+        // Header row - combine name and status
+        HorizontalLayout {
+            spacing: 4px;
+            height: 18px;
             Text {
                 text: payload-name;
-                font-size: 14px;
+                font-size: 11px;
                 font-weight: 700;
+                vertical-alignment: top;
             }
             Text {
                 text: payload-status;
-                color: payload-status == "Running" ? black : red;
+                font-size: 11px;
                 font-weight: payload-status == "Running" ? 400 : 700;
+                vertical-alignment: top;
+                color: payload-status == "Running" ? black : red;
             }
         }
 
-        Text {
-            text: "Config: " + payload-config;
-            font-size: 11px;
+        HorizontalLayout {
+            spacing: 4px;
+            height: 18px;
+            Text {
+                text: "Config: " + payload-config;
+                font-size: 9px;
+                vertical-alignment: top;
+            }
         }
 
-        HorizontalBox {
-            spacing: 1px;
-            Text { text: "Packet Size:"; vertical-alignment: center; font-size: 11px; }
+        // Combine multiple inputs on same row
+        HorizontalLayout {
+            height: 22px;
+            spacing: 0px;
+            Text { text: "Pkt:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
                 value <=> packet-size;
                 minimum: 1;
                 maximum: 32;
                 edited => { config-changed(); }
             }
-            Text { text: "bytes"; vertical-alignment: center; font-size: 11px; }
-        }
-
-        HorizontalBox {
-            spacing: 1px;
-            Text { text: "Segment Size:"; vertical-alignment: center; font-size: 11px; }
+            Text { text: "Seg:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
                 value <=> segment-size;
                 minimum: 1;
                 maximum: 32;
                 edited => { config-changed(); }
             }
-            Text { text: "bytes"; vertical-alignment: center; font-size: 11px; }
         }
 
-        HorizontalBox {
-            spacing: 1px;
-            Text { text: "Packet Interval:"; vertical-alignment: center; font-size: 11px; }
+        HorizontalLayout {
+            height: 22px;
+            spacing: 0px;
+            Text { text: "Pkt Int:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
                 value <=> packet-interval;
                 minimum: 0;
                 maximum: 10000;
                 edited => { config-changed(); }
             }
-            Text { text: "ms"; vertical-alignment: center; font-size: 11px; }
-        }
-
-        HorizontalBox {
-            spacing: 1px;
-            Text { text: "Segment Interval:"; vertical-alignment: center; font-size: 11px; }
+            Text { text: "Seg Int:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
                 value <=> segment-interval;
                 minimum: 0;
                 maximum: 10000;
                 edited => { config-changed(); }
             }
-            Text { text: "ms"; vertical-alignment: center; font-size: 11px; }
         }
 
-        HorizontalBox {
-            spacing: 1px;
+        HorizontalLayout {
+            height: 24px;
+            spacing: 2px;
             Button {
                 text: "Start";
                 clicked => { start-clicked(); }
@@ -106,25 +109,18 @@ component PayloadPanel inherits Rectangle {
             }
         }
 
-        GroupBox {
-            title: "Last Sent";
-            VerticalBox {
-                Text { text: "Time: " + last-sent-time; font-size: 10px; }
-                Text { text: "Data: " + last-sent-data; font-size: 10px; }
-            }
+        // Compact stats
+        HorizontalLayout {
+            height: 14px;
+            Text { text: "Sent: " + last-sent-time + " " + last-sent-data; font-size: 9px; }
         }
-
-        GroupBox {
-            title: "Last Received";
-            VerticalBox {
-                Text { text: "Time: " + last-recv-time; font-size: 10px; }
-                Text { text: "Data: " + last-recv-data; font-size: 10px; }
-            }
+        HorizontalLayout {
+            height: 14px;
+            Text { text: "Recv: " + last-recv-time + " " + last-recv-data; font-size: 9px; }
         }
-
-        HorizontalBox {
-            Text { text: "Sent: " + packets-sent + " pkts"; font-size: 10px; }
-            Text { text: "Recv: " + packets-recv + " pkts"; font-size: 10px; }
+        HorizontalLayout {
+            height: 14px;
+            Text { text: "Pkts: " + packets-sent + " sent / " + packets-recv + " recv"; font-size: 9px; }
         }
     }
 }
@@ -132,7 +128,7 @@ component PayloadPanel inherits Rectangle {
 export component MainWindow inherits Window {
     title: "TCSpecial Payload Simulator";
     min-width: 800px;
-    min-height: 1600px;
+    min-height: 600px;
     background: white;
 
     // Payload 0 properties
@@ -192,9 +188,9 @@ export component MainWindow inherits Window {
     callback config-payload(int, int, int, int, int);
     callback quit-clicked();
 
-    VerticalBox {
-        padding: 1px;
-        spacing: 1px;
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
 
         Text {
             text: "Simulated Payloads";
@@ -205,7 +201,8 @@ export component MainWindow inherits Window {
 
         ScrollView {
             GridBox {
-                spacing: 1px;
+                spacing: 0px;
+                height: 300px;
 
                 Row {
                     PayloadPanel {
@@ -289,7 +286,7 @@ export component MainWindow inherits Window {
             }
         }
 
-        HorizontalBox {
+        HorizontalLayout {
             Rectangle { }
             Button {
                 text: "Quit All";

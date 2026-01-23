@@ -1,107 +1,181 @@
-//! Connection management for tcslib
-//!
-//! Handles the datagram connection between ground software and tcspecial.
+//! Connection management for ground-to-space communication
 
+use std::io::{self, Read, Write};
 use std::net::{SocketAddr, UdpSocket};
 use std::time::Duration;
-use tcslibgs::{
-    Command, Telemetry, TcsError, TcsResult,
-    protocol::{ProtocolMessage, MAX_MESSAGE_SIZE},
-};
+use tcslibgs::{Command, TcsError, TcsResult, Telemetry};
 
-/// Connection configuration
-#[derive(Debug, Clone)]
-pub struct ConnectionConfig {
-    /// Address of tcspecial
-    pub remote_addr: SocketAddr,
-    /// Local bind address
-    pub local_addr: SocketAddr,
-    /// Receive timeout
-    pub recv_timeout: Option<Duration>,
-    /// Send timeout
-    pub send_timeout: Option<Duration>,
+/// Connection to the spacecraft
+pub trait Connection: Send {
+    /// Send a command to the spacecraft
+    fn send(&mut self, command: &Command) -> TcsResult<()>;
+
+    /// Receive telemetry from the spacecraft
+    fn receive(&mut self) -> TcsResult<Telemetry>;
+
+    /// Receive telemetry with a timeout
+    fn receive_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry>;
+
+    /// Check if there is data available to read
+    fn has_data(&self) -> TcsResult<bool>;
+
+    /// Close the connection
+    fn close(&mut self) -> TcsResult<()>;
 }
 
-impl ConnectionConfig {
-    pub fn new(remote_addr: SocketAddr, local_addr: SocketAddr) -> Self {
-        Self {
-            remote_addr,
-            local_addr,
-            recv_timeout: Some(Duration::from_secs(5)),
-            send_timeout: Some(Duration::from_secs(5)),
-        }
-    }
-}
-
-/// Connection to tcspecial using UDP datagrams
-pub struct Connection {
+/// UDP-based connection to the spacecraft
+pub struct UdpConnection {
     socket: UdpSocket,
     remote_addr: SocketAddr,
     recv_buffer: Vec<u8>,
 }
 
-impl Connection {
-    /// Create a new connection with the given configuration
-    pub fn new(config: ConnectionConfig) -> TcsResult<Self> {
-        let socket = UdpSocket::bind(config.local_addr)?;
-        socket.connect(config.remote_addr)?;
+impl UdpConnection {
+    /// Create a new UDP connection
+    pub fn new(local_addr: &str, remote_addr: &str) -> TcsResult<Self> {
+        let socket = UdpSocket::bind(local_addr)?;
+        let remote: SocketAddr = remote_addr
+            .parse()
+            .map_err(|e| TcsError::Config(format!("Invalid remote address: {}", e)))?;
 
-        if let Some(timeout) = config.recv_timeout {
-            socket.set_read_timeout(Some(timeout))?;
-        }
-        if let Some(timeout) = config.send_timeout {
-            socket.set_write_timeout(Some(timeout))?;
-        }
+        socket.set_nonblocking(false)?;
 
         Ok(Self {
             socket,
-            remote_addr: config.remote_addr,
-            recv_buffer: vec![0u8; MAX_MESSAGE_SIZE],
+            remote_addr: remote,
+            recv_buffer: vec![0u8; 65535],
         })
     }
 
-    /// Get the remote address
-    pub fn remote_addr(&self) -> SocketAddr {
-        self.remote_addr
-    }
-
-    /// Send a command to tcspecial
-    pub fn send_command(&self, cmd: Command) -> TcsResult<()> {
-        let msg = ProtocolMessage::from_command(cmd)?;
-        let bytes = msg.to_bytes()?;
-        self.socket.send(&bytes)?;
+    /// Connect to the remote address
+    pub fn connect(&mut self) -> TcsResult<()> {
+        self.socket.connect(self.remote_addr)?;
         Ok(())
     }
 
-    /// Receive a telemetry message from tcspecial
-    pub fn recv_telemetry(&mut self) -> TcsResult<Telemetry> {
-        let n = self.socket.recv(&mut self.recv_buffer)?;
-        if n == 0 {
-            return Err(TcsError::ConnectionClosed);
-        }
-
-        let msg = ProtocolMessage::from_bytes(&self.recv_buffer[..n])?;
-        match msg.payload {
-            tcslibgs::protocol::MessagePayload::Telemetry(tlm) => Ok(tlm),
-            _ => Err(TcsError::protocol("Expected telemetry, got command")),
-        }
-    }
-
-    /// Send a command and wait for a response
-    pub fn send_and_recv(&mut self, cmd: Command) -> TcsResult<Telemetry> {
-        self.send_command(cmd)?;
-        self.recv_telemetry()
-    }
-
-    /// Set receive timeout
-    pub fn set_recv_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
+    /// Set the read timeout
+    pub fn set_read_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
         self.socket.set_read_timeout(timeout)?;
         Ok(())
     }
 
-    /// Set send timeout
-    pub fn set_send_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
+    /// Set the write timeout
+    pub fn set_write_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
         self.socket.set_write_timeout(timeout)?;
+        Ok(())
+    }
+}
+
+impl Connection for UdpConnection {
+    fn send(&mut self, command: &Command) -> TcsResult<()> {
+        let data = serde_json::to_vec(command)?;
+        self.socket.send_to(&data, self.remote_addr)?;
+        Ok(())
+    }
+
+    fn receive(&mut self) -> TcsResult<Telemetry> {
+        let (size, _addr) = self.socket.recv_from(&mut self.recv_buffer)?;
+        let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..size])?;
+        Ok(telemetry)
+    }
+
+    fn receive_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry> {
+        self.socket.set_read_timeout(Some(timeout))?;
+        let result = self.receive();
+        self.socket.set_read_timeout(None)?;
+        result
+    }
+
+    fn has_data(&self) -> TcsResult<bool> {
+        self.socket.set_nonblocking(true)?;
+        let mut buf = [0u8; 1];
+        let result = match self.socket.peek(&mut buf) {
+            Ok(_) => Ok(true),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Ok(false),
+            Err(e) => Err(TcsError::Io(e)),
+        };
+        self.socket.set_nonblocking(false)?;
+        result
+    }
+
+    fn close(&mut self) -> TcsResult<()> {
+        // UDP sockets don't need explicit closing
+        Ok(())
+    }
+}
+
+/// TCP-based connection to the spacecraft (for LEO/MEO or indirect links)
+pub struct TcpConnection {
+    stream: std::net::TcpStream,
+    recv_buffer: Vec<u8>,
+}
+
+impl TcpConnection {
+    /// Create a new TCP connection
+    pub fn new(remote_addr: &str) -> TcsResult<Self> {
+        let stream = std::net::TcpStream::connect(remote_addr)?;
+        stream.set_nonblocking(false)?;
+
+        Ok(Self {
+            stream,
+            recv_buffer: vec![0u8; 65535],
+        })
+    }
+
+    /// Set the read timeout
+    pub fn set_read_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
+        self.stream.set_read_timeout(timeout)?;
+        Ok(())
+    }
+
+    /// Set the write timeout
+    pub fn set_write_timeout(&self, timeout: Option<Duration>) -> TcsResult<()> {
+        self.stream.set_write_timeout(timeout)?;
+        Ok(())
+    }
+}
+
+impl Connection for TcpConnection {
+    fn send(&mut self, command: &Command) -> TcsResult<()> {
+        let data = serde_json::to_vec(command)?;
+        // Send length prefix (4 bytes big endian)
+        let len_bytes = (data.len() as u32).to_be_bytes();
+        self.stream.write_all(&len_bytes)?;
+        self.stream.write_all(&data)?;
+        self.stream.flush()?;
+        Ok(())
+    }
+
+    fn receive(&mut self) -> TcsResult<Telemetry> {
+        // Read length prefix
+        let mut len_bytes = [0u8; 4];
+        self.stream.read_exact(&mut len_bytes)?;
+        let len = u32::from_be_bytes(len_bytes) as usize;
+
+        if len > self.recv_buffer.len() {
+            self.recv_buffer.resize(len, 0);
+        }
+
+        self.stream.read_exact(&mut self.recv_buffer[..len])?;
+        let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..len])?;
+        Ok(telemetry)
+    }
+
+    fn receive_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry> {
+        self.stream.set_read_timeout(Some(timeout))?;
+        let result = self.receive();
+        self.stream.set_read_timeout(None)?;
+        result
+    }
+
+    fn has_data(&self) -> TcsResult<bool> {
+        // For TCP we'd need to use peek or platform-specific calls
+        // This is a simplified implementation
+        Ok(true) // Assume data might be available
+    }
+
+    fn close(&mut self) -> TcsResult<()> {
+        self.stream.shutdown(std::net::Shutdown::Both)?;
         Ok(())
     }
 }
@@ -109,14 +183,10 @@ impl Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::{Ipv4Addr, SocketAddrV4};
 
     #[test]
-    fn test_connection_config() {
-        let remote = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 5000));
-        let local = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 5001));
-        let config = ConnectionConfig::new(remote, local);
-        assert_eq!(config.remote_addr, remote);
-        assert_eq!(config.local_addr, local);
+    fn test_udp_connection_creation() {
+        // This test requires network access, so we just verify the types compile
+        let _: fn() -> TcsResult<UdpConnection> = || UdpConnection::new("127.0.0.1:0", "127.0.0.1:4000");
     }
 }

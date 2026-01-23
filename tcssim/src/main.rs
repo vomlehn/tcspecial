@@ -1,170 +1,180 @@
 //! TCSpecial Payload Simulator (tcssim)
 //!
-//! A GUI simulating payloads for testing tcspecial. The payloads are:
-//!
-//! | DH # | Type    | Configuration          | Packet Size | Packet Interval  |
-//! |------|---------|------------------------|-------------|------------------|
-//! | 0    | Network | TCP/IP localhost:5000  | 12 bytes    | 1 packet/second  |
-//! | 1    | Network | UDP/IP localhost:5001  | 11 bytes    | 1 packet/second  |
-//! | 2    | Device  | /dev/urandom           | 1 byte      | continuous       |
-//! | 3    | Network | UDP/IP localhost:5003  | 15 bytes    | 2 packets/second |
-//!
-//! Uses Slint for the GUI framework with black on white theme.
+//! A GUI application for simulating payloads that communicate with tcspecial.
+
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+use slint::SharedString;
 
 mod payload;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
-use std::rc::Rc;
-use std::cell::RefCell;
-use log::{info, error};
-use payload::{PayloadConfig, PayloadType, Payload, SharedStats};
+use payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
 
 slint::include_modules!();
 
 fn main() {
-    // Initialize logging
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .format_timestamp_millis()
-        .init();
+    env_logger::init();
 
-    info!("TCSSim payload simulator starting up");
+    let ui = MainWindow::new().unwrap();
+    let ui_weak = ui.as_weak();
 
-    let running = Arc::new(AtomicBool::new(true));
-
-    // Create shared stats for each payload
-    let stats: Vec<Arc<Mutex<SharedStats>>> = (0..4)
-        .map(|_| Arc::new(Mutex::new(SharedStats {
-            sent: 0,
-            received: 0,
-            last_sent: String::new(),
-            last_received: String::new(),
-            status: "Listening".to_string(),
-            connected: false,
-        })))
-        .collect();
-
-    // Define payload configurations
+    // Create payload configurations from tcspayload.json spec
     let configs = vec![
         PayloadConfig {
             id: 0,
-            payload_type: PayloadType::TcpServer,
-            address: "127.0.0.1:5000".to_string(),
-            packet_size: 12,
-            interval: Duration::from_secs(1),
+            protocol: PayloadProtocol::Tcp,
+            address: "127.0.0.1".to_string(),
+            port: 5000,
+            packet_size: Arc::new(AtomicU32::new(12)),
+            packet_interval_ms: Arc::new(AtomicU32::new(1000)),
         },
         PayloadConfig {
             id: 1,
-            payload_type: PayloadType::UdpServer,
-            address: "127.0.0.1:5001".to_string(),
-            packet_size: 11,
-            interval: Duration::from_secs(1),
+            protocol: PayloadProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: 5001,
+            packet_size: Arc::new(AtomicU32::new(11)),
+            packet_interval_ms: Arc::new(AtomicU32::new(1000)),
         },
-        // DH 2 is /dev/urandom which doesn't need simulation (passive device)
+        PayloadConfig {
+            id: 2,
+            protocol: PayloadProtocol::Device,
+            address: "/dev/urandom".to_string(),
+            port: 0,
+            packet_size: Arc::new(AtomicU32::new(1)),
+            packet_interval_ms: Arc::new(AtomicU32::new(0)),
+        },
         PayloadConfig {
             id: 3,
-            payload_type: PayloadType::UdpServer,
-            address: "127.0.0.1:5003".to_string(),
-            packet_size: 15,
-            interval: Duration::from_millis(500),
+            protocol: PayloadProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: 5003,
+            packet_size: Arc::new(AtomicU32::new(15)),
+            packet_interval_ms: Arc::new(AtomicU32::new(500)),
         },
     ];
 
-    // Start payload threads
-    let mut handles = Vec::new();
+    // Create simulated payloads
+    let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(
+        configs.into_iter().map(|c| SimulatedPayload::new(c)).collect()
+    ));
 
-    for config in configs {
-        let r = running.clone();
-        let stats_idx = if config.id == 3 { 3 } else { config.id as usize };
-        let stats_clone = stats[stats_idx].clone();
-
-        let handle = thread::spawn(move || {
-            let mut payload = Payload::new(config, stats_clone);
-            if let Err(e) = payload.run(r) {
-                error!("Payload error: {}", e);
+    // Start payload handler
+    {
+        let payloads = payloads.clone();
+        let ui_weak = ui_weak.clone();
+        ui.on_start_payload(move |id| {
+            let ui = ui_weak.unwrap();
+            let mut guard = payloads.lock().unwrap();
+            if let Some(payload) = guard.get_mut(id as usize) {
+                match payload.start() {
+                    Ok(_) => {
+                        let status = SharedString::from("Running");
+                        match id {
+                            0 => ui.set_p0_status(status),
+                            1 => ui.set_p1_status(status),
+                            2 => ui.set_p2_status(status),
+                            3 => ui.set_p3_status(status),
+                            _ => {}
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to start payload {}: {}", id, e);
+                    }
+                }
             }
         });
-        handles.push(handle);
     }
 
-    info!("All payloads started. Starting GUI...");
-
-    // Create and run the GUI
-    let main_window = MainWindow::new().unwrap();
-
-    // Set up Ctrl+C handler
-    let running_clone = running.clone();
-    let window_weak = main_window.as_weak();
-    ctrlc::set_handler(move || {
-        info!("Received shutdown signal");
-        running_clone.store(false, Ordering::SeqCst);
-        // Close the window
-        if let Some(window) = window_weak.upgrade() {
-            window.hide().ok();
-        }
-    }).expect("Error setting Ctrl+C handler");
-
-    // Set up timer to update GUI from stats
-    let stats_clone: Vec<Arc<Mutex<SharedStats>>> = stats.iter().map(|s| s.clone()).collect();
-    let window_weak = main_window.as_weak();
-    let timer = slint::Timer::default();
-    timer.start(
-        slint::TimerMode::Repeated,
-        Duration::from_millis(100),
-        move || {
-            if let Some(window) = window_weak.upgrade() {
-                update_gui(&window, &stats_clone);
+    // Stop payload handler
+    {
+        let payloads = payloads.clone();
+        let ui_weak = ui_weak.clone();
+        ui.on_stop_payload(move |id| {
+            let ui = ui_weak.unwrap();
+            let mut guard = payloads.lock().unwrap();
+            if let Some(payload) = guard.get_mut(id as usize) {
+                payload.stop();
+                let status = SharedString::from("Stopped");
+                match id {
+                    0 => ui.set_p0_status(status),
+                    1 => ui.set_p1_status(status),
+                    2 => ui.set_p2_status(status),
+                    3 => ui.set_p3_status(status),
+                    _ => {}
+                }
             }
-        },
-    );
-
-    // Run the GUI event loop
-    main_window.run().unwrap();
-
-    // Signal threads to stop
-    running.store(false, Ordering::SeqCst);
-
-    info!("Waiting for payload threads to finish...");
-
-    for handle in handles {
-        let _ = handle.join();
+        });
     }
 
-    info!("TCSSim shutdown complete");
-}
-
-fn update_gui(window: &MainWindow, stats: &[Arc<Mutex<SharedStats>>]) {
-    // Update payload 0
-    if let Ok(s) = stats[0].lock() {
-        window.set_payload0_sent(s.sent as i32);
-        window.set_payload0_received(s.received as i32);
-        window.set_payload0_last_sent(s.last_sent.clone().into());
-        window.set_payload0_last_received(s.last_received.clone().into());
-        window.set_payload0_status(s.status.clone().into());
-        window.set_payload0_state(if s.connected { PayloadState::Connected } else { PayloadState::Running });
+    // Config change handler
+    {
+        let payloads = payloads.clone();
+        ui.on_config_payload(move |id, packet_size, interval| {
+            let guard = payloads.lock().unwrap();
+            if let Some(payload) = guard.get(id as usize) {
+                payload.set_packet_size(packet_size as u32);
+                payload.set_packet_interval(interval as u32);
+            }
+        });
     }
 
-    // Update payload 1
-    if let Ok(s) = stats[1].lock() {
-        window.set_payload1_sent(s.sent as i32);
-        window.set_payload1_received(s.received as i32);
-        window.set_payload1_last_sent(s.last_sent.clone().into());
-        window.set_payload1_last_received(s.last_received.clone().into());
-        window.set_payload1_status(s.status.clone().into());
-        window.set_payload1_state(if s.connected { PayloadState::Connected } else { PayloadState::Running });
+    // Quit handler
+    {
+        let payloads = payloads.clone();
+        let ui_weak = ui_weak.clone();
+        ui.on_quit_clicked(move || {
+            // Stop all payloads
+            let mut guard = payloads.lock().unwrap();
+            for payload in guard.iter_mut() {
+                payload.stop();
+            }
+            drop(guard);
+
+            let ui = ui_weak.unwrap();
+            ui.hide().unwrap();
+        });
     }
 
-    // Payload 2 is passive (device)
+    // Periodic update timer
+    {
+        let payloads = payloads.clone();
+        let ui_weak = ui_weak.clone();
+        let timer = slint::Timer::default();
+        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
+            let ui = match ui_weak.upgrade() {
+                Some(ui) => ui,
+                None => return,
+            };
 
-    // Update payload 3
-    if let Ok(s) = stats[3].lock() {
-        window.set_payload3_sent(s.sent as i32);
-        window.set_payload3_received(s.received as i32);
-        window.set_payload3_last_sent(s.last_sent.clone().into());
-        window.set_payload3_last_received(s.last_received.clone().into());
-        window.set_payload3_status(s.status.clone().into());
-        window.set_payload3_state(if s.connected { PayloadState::Connected } else { PayloadState::Running });
+            let guard = payloads.lock().unwrap();
+            for (i, payload) in guard.iter().enumerate() {
+                let stats = payload.stats();
+                match i {
+                    0 => {
+                        ui.set_p0_packets_sent(stats.packets_sent as i32);
+                        ui.set_p0_packets_recv(stats.packets_recv as i32);
+                    }
+                    1 => {
+                        ui.set_p1_packets_sent(stats.packets_sent as i32);
+                        ui.set_p1_packets_recv(stats.packets_recv as i32);
+                    }
+                    2 => {
+                        ui.set_p2_packets_sent(stats.packets_sent as i32);
+                        ui.set_p2_packets_recv(stats.packets_recv as i32);
+                    }
+                    3 => {
+                        ui.set_p3_packets_sent(stats.packets_sent as i32);
+                        ui.set_p3_packets_recv(stats.packets_recv as i32);
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        // Keep timer alive
+        std::mem::forget(timer);
     }
+
+    ui.run().unwrap();
 }

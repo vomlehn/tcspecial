@@ -1,181 +1,264 @@
 //! Protocol definitions for TCSpecial
 //!
-//! The formats of command and telemetry messages follow the CCSDS 732.1-B-3
-//! Unified Space Data Link Protocol (Blue Book, June 2024).
+//! Provides canonical values for operating system dependent values like
+//! address families, socket types, and protocols.
 
 use serde::{Deserialize, Serialize};
-use crate::commands::Command;
-use crate::telemetry::Telemetry;
 
-/// Protocol version
-pub const PROTOCOL_VERSION: u8 = 1;
-
-/// Maximum message size in bytes
-pub const MAX_MESSAGE_SIZE: usize = 65535;
-
-/// Protocol message header
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MessageHeader {
-    /// Protocol version
-    pub version: u8,
-    /// Message type (0 = command, 1 = telemetry)
-    pub msg_type: u8,
-    /// Total message length including header
-    pub length: u16,
+/// Canonical address family values
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u16)]
+pub enum AddressFamily {
+    Unix = 1,
+    Inet = 2,
+    Inet6 = 10,
+    Ax25 = 3,
+    Ipx = 4,
+    Appletalk = 5,
+    X25 = 9,
+    Decnet = 12,
+    Key = 15,
+    Netlink = 16,
+    Packet = 17,
+    Rds = 21,
+    Pppox = 24,
+    Llc = 26,
+    Ib = 27,
+    Mpls = 28,
+    Can = 29,
+    Tipc = 30,
+    Bluetooth = 31,
+    Alg = 38,
+    Vsock = 40,
+    Xdp = 44,
 }
 
-impl MessageHeader {
-    pub fn for_command(payload_len: usize) -> Self {
-        Self {
-            version: PROTOCOL_VERSION,
-            msg_type: 0,
-            length: (payload_len + 4) as u16, // 4 bytes for header
-        }
-    }
-
-    pub fn for_telemetry(payload_len: usize) -> Self {
-        Self {
-            version: PROTOCOL_VERSION,
-            msg_type: 1,
-            length: (payload_len + 4) as u16,
-        }
-    }
-}
-
-/// A framed protocol message containing either a command or telemetry
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProtocolMessage {
-    pub header: MessageHeader,
-    pub payload: MessagePayload,
-}
-
-/// Payload of a protocol message
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MessagePayload {
-    Command(Command),
-    Telemetry(Telemetry),
-}
-
-impl ProtocolMessage {
-    /// Create a protocol message from a command
-    pub fn from_command(cmd: Command) -> Result<Self, serde_json::Error> {
-        let payload_bytes = cmd.to_bytes()?;
-        Ok(Self {
-            header: MessageHeader::for_command(payload_bytes.len()),
-            payload: MessagePayload::Command(cmd),
-        })
-    }
-
-    /// Create a protocol message from telemetry
-    pub fn from_telemetry(tlm: Telemetry) -> Result<Self, serde_json::Error> {
-        let payload_bytes = tlm.to_bytes()?;
-        Ok(Self {
-            header: MessageHeader::for_telemetry(payload_bytes.len()),
-            payload: MessagePayload::Telemetry(tlm),
-        })
-    }
-
-    /// Serialize the entire message to bytes
-    pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
-        serde_json::to_vec(self)
-    }
-
-    /// Deserialize a message from bytes
-    pub fn from_bytes(data: &[u8]) -> Result<Self, serde_json::Error> {
-        serde_json::from_slice(data)
-    }
-
-    /// Check if this is a command message
-    pub fn is_command(&self) -> bool {
-        matches!(self.payload, MessagePayload::Command(_))
-    }
-
-    /// Check if this is a telemetry message
-    pub fn is_telemetry(&self) -> bool {
-        matches!(self.payload, MessagePayload::Telemetry(_))
-    }
-
-    /// Get the command if this is a command message
-    pub fn as_command(&self) -> Option<&Command> {
-        match &self.payload {
-            MessagePayload::Command(cmd) => Some(cmd),
+impl AddressFamily {
+    /// Convert from OS-specific value to canonical value
+    pub fn from_os(value: i32) -> Option<Self> {
+        match value {
+            libc::AF_UNIX => Some(AddressFamily::Unix),
+            libc::AF_INET => Some(AddressFamily::Inet),
+            libc::AF_INET6 => Some(AddressFamily::Inet6),
+            libc::AF_AX25 => Some(AddressFamily::Ax25),
+            libc::AF_IPX => Some(AddressFamily::Ipx),
+            libc::AF_APPLETALK => Some(AddressFamily::Appletalk),
+            libc::AF_X25 => Some(AddressFamily::X25),
+            libc::AF_DECnet => Some(AddressFamily::Decnet),
+            libc::AF_KEY => Some(AddressFamily::Key),
+            libc::AF_NETLINK => Some(AddressFamily::Netlink),
+            libc::AF_PACKET => Some(AddressFamily::Packet),
+            libc::AF_RDS => Some(AddressFamily::Rds),
+            libc::AF_PPPOX => Some(AddressFamily::Pppox),
+            libc::AF_LLC => Some(AddressFamily::Llc),
+            libc::AF_IB => Some(AddressFamily::Ib),
+            libc::AF_MPLS => Some(AddressFamily::Mpls),
+            libc::AF_CAN => Some(AddressFamily::Can),
+            libc::AF_TIPC => Some(AddressFamily::Tipc),
+            libc::AF_BLUETOOTH => Some(AddressFamily::Bluetooth),
+            libc::AF_ALG => Some(AddressFamily::Alg),
+            libc::AF_VSOCK => Some(AddressFamily::Vsock),
+            libc::AF_XDP => Some(AddressFamily::Xdp),
             _ => None,
         }
     }
 
-    /// Get the telemetry if this is a telemetry message
-    pub fn as_telemetry(&self) -> Option<&Telemetry> {
-        match &self.payload {
-            MessagePayload::Telemetry(tlm) => Some(tlm),
+    /// Convert from canonical value to OS-specific value
+    pub fn to_os(&self) -> i32 {
+        match self {
+            AddressFamily::Unix => libc::AF_UNIX,
+            AddressFamily::Inet => libc::AF_INET,
+            AddressFamily::Inet6 => libc::AF_INET6,
+            AddressFamily::Ax25 => libc::AF_AX25,
+            AddressFamily::Ipx => libc::AF_IPX,
+            AddressFamily::Appletalk => libc::AF_APPLETALK,
+            AddressFamily::X25 => libc::AF_X25,
+            AddressFamily::Decnet => libc::AF_DECnet,
+            AddressFamily::Key => libc::AF_KEY,
+            AddressFamily::Netlink => libc::AF_NETLINK,
+            AddressFamily::Packet => libc::AF_PACKET,
+            AddressFamily::Rds => libc::AF_RDS,
+            AddressFamily::Pppox => libc::AF_PPPOX,
+            AddressFamily::Llc => libc::AF_LLC,
+            AddressFamily::Ib => libc::AF_IB,
+            AddressFamily::Mpls => libc::AF_MPLS,
+            AddressFamily::Can => libc::AF_CAN,
+            AddressFamily::Tipc => libc::AF_TIPC,
+            AddressFamily::Bluetooth => libc::AF_BLUETOOTH,
+            AddressFamily::Alg => libc::AF_ALG,
+            AddressFamily::Vsock => libc::AF_VSOCK,
+            AddressFamily::Xdp => libc::AF_XDP,
+        }
+    }
+}
+
+/// Canonical socket type values
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u16)]
+pub enum SocketType {
+    Stream = 1,
+    Dgram = 2,
+    Raw = 3,
+    Seqpacket = 5,
+}
+
+impl SocketType {
+    /// Convert from OS-specific value to canonical value
+    pub fn from_os(value: i32) -> Option<Self> {
+        match value {
+            libc::SOCK_STREAM => Some(SocketType::Stream),
+            libc::SOCK_DGRAM => Some(SocketType::Dgram),
+            libc::SOCK_RAW => Some(SocketType::Raw),
+            libc::SOCK_SEQPACKET => Some(SocketType::Seqpacket),
             _ => None,
         }
     }
+
+    /// Convert from canonical value to OS-specific value
+    pub fn to_os(&self) -> i32 {
+        match self {
+            SocketType::Stream => libc::SOCK_STREAM,
+            SocketType::Dgram => libc::SOCK_DGRAM,
+            SocketType::Raw => libc::SOCK_RAW,
+            SocketType::Seqpacket => libc::SOCK_SEQPACKET,
+        }
+    }
+
+    /// Check if this socket type has stream semantics
+    pub fn is_stream(&self) -> bool {
+        matches!(self, SocketType::Stream)
+    }
+
+    /// Check if this socket type has datagram semantics
+    pub fn is_datagram(&self) -> bool {
+        !self.is_stream()
+    }
 }
 
-/// Data handler protocol configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DHProtocolConfig {
-    /// Whether the protocol uses stream or datagram semantics
-    pub is_stream: bool,
-    /// Buffer size for reads
-    pub read_buffer_size: usize,
-    /// Buffer size for writes
-    pub write_buffer_size: usize,
-    /// Delay for stream endpoints in milliseconds
-    pub stream_delay_ms: Option<u64>,
+/// Protocol configuration for socket creation
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SocketConfig {
+    pub family: AddressFamily,
+    pub socket_type: SocketType,
+    pub protocol: i32,
 }
 
-impl Default for DHProtocolConfig {
-    fn default() -> Self {
+impl SocketConfig {
+    pub fn tcp_v4() -> Self {
         Self {
-            is_stream: false, // Default to datagram
-            read_buffer_size: 4096,
-            write_buffer_size: 4096,
-            stream_delay_ms: None,
+            family: AddressFamily::Inet,
+            socket_type: SocketType::Stream,
+            protocol: 0,
+        }
+    }
+
+    pub fn udp_v4() -> Self {
+        Self {
+            family: AddressFamily::Inet,
+            socket_type: SocketType::Dgram,
+            protocol: 0,
+        }
+    }
+
+    pub fn tcp_v6() -> Self {
+        Self {
+            family: AddressFamily::Inet6,
+            socket_type: SocketType::Stream,
+            protocol: 0,
+        }
+    }
+
+    pub fn udp_v6() -> Self {
+        Self {
+            family: AddressFamily::Inet6,
+            socket_type: SocketType::Dgram,
+            protocol: 0,
+        }
+    }
+
+    pub fn unix_stream() -> Self {
+        Self {
+            family: AddressFamily::Unix,
+            socket_type: SocketType::Stream,
+            protocol: 0,
+        }
+    }
+
+    pub fn unix_dgram() -> Self {
+        Self {
+            family: AddressFamily::Unix,
+            socket_type: SocketType::Dgram,
+            protocol: 0,
         }
     }
 }
 
-impl DHProtocolConfig {
-    pub fn stream() -> Self {
+/// Message framing for stream protocols
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MessageFrame {
+    /// Length of the message (not including the length field itself)
+    pub length: u32,
+    /// Message data
+    pub data: Vec<u8>,
+}
+
+impl MessageFrame {
+    pub fn new(data: Vec<u8>) -> Self {
         Self {
-            is_stream: true,
-            stream_delay_ms: Some(10),
-            ..Default::default()
+            length: data.len() as u32,
+            data,
         }
     }
 
-    pub fn datagram() -> Self {
-        Self {
-            is_stream: false,
-            stream_delay_ms: None,
-            ..Default::default()
+    /// Serialize the frame to bytes (length prefix + data)
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(4 + self.data.len());
+        bytes.extend_from_slice(&self.length.to_be_bytes());
+        bytes.extend_from_slice(&self.data);
+        bytes
+    }
+
+    /// Deserialize a frame from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() < 4 {
+            return None;
         }
+        let length = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        if bytes.len() < 4 + length as usize {
+            return None;
+        }
+        Some(Self {
+            length,
+            data: bytes[4..4 + length as usize].to_vec(),
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::PingCommand;
 
     #[test]
-    fn test_protocol_message_command() {
-        let cmd = Command::Ping(PingCommand::new(1));
-        let msg = ProtocolMessage::from_command(cmd).unwrap();
-        assert!(msg.is_command());
-        assert!(!msg.is_telemetry());
+    fn test_address_family_conversion() {
+        let af = AddressFamily::Inet;
+        assert_eq!(af.to_os(), libc::AF_INET);
+        assert_eq!(AddressFamily::from_os(libc::AF_INET), Some(AddressFamily::Inet));
     }
 
     #[test]
-    fn test_protocol_message_roundtrip() {
-        let cmd = Command::Ping(PingCommand::new(42));
-        let msg = ProtocolMessage::from_command(cmd).unwrap();
-        let bytes = msg.to_bytes().unwrap();
-        let decoded = ProtocolMessage::from_bytes(&bytes).unwrap();
-        assert!(decoded.is_command());
-        if let Some(cmd) = decoded.as_command() {
-            assert_eq!(cmd.sequence(), 42);
-        }
+    fn test_socket_type_conversion() {
+        let st = SocketType::Stream;
+        assert_eq!(st.to_os(), libc::SOCK_STREAM);
+        assert!(st.is_stream());
+        assert!(!st.is_datagram());
+    }
+
+    #[test]
+    fn test_message_frame() {
+        let data = vec![1, 2, 3, 4, 5];
+        let frame = MessageFrame::new(data.clone());
+        let bytes = frame.to_bytes();
+        let parsed = MessageFrame::from_bytes(&bytes).unwrap();
+        assert_eq!(parsed.data, data);
     }
 }

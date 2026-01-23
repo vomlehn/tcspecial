@@ -12,18 +12,20 @@ DESIGN=$(DOCS_DIR)/design.rst
 TCSPECIAL = .
 RUST = .
 
-TCS_CODE = tcspecial, tcslib, tcslibgs
+TCS_CODE = g, tcslib, tcslibgs
 TCS_TEST = tcsmoc, tcssim, tcspayload.json
-TCS_TAR = tcsspecial-rust.tar.gz
+TCS_RUST = g-rust
+TCS_TAR = $(TCS_RUST).tar.gz
 TCS_OUTPUT = compressed tar file $(TCS_TAR)
 PROMPT = Generate Rust code ($(TCS_CODE)) and tests ($(TCS_TEST)), and create $(TCS_OUTPUT) from $(DESIGN)
 
-TCS_CRATES = tcslib tcslibgs tcsspecial tcsmoc tcssim tcspayload.json
+TCS_CRATES = tcslib tcslibgs g tcsmoc tcssim tcspayload.json
 
 FIXUP = set -x; \
 		echo "Project fixup..."; \
-		sed -i 's/into_raw_fd/as_raw_fd/g' tcspecial/src/endpoint.rs; \
-		sed -i 's/into_raw_fd/as_raw_fd/g' tcspecial/src/dh.rs
+		sed -i 's/into_raw_fd/as_raw_fd/g' g/src/endpoint.rs; \
+		sed -i 's/into_raw_fd/as_raw_fd/g' g/src/dh.rs;
+FIXUP =
 
 # Default target
 all: generate build test
@@ -85,7 +87,7 @@ generate-alt:
 build:
 	( \
 		set -eu; \
-		$(FIXUP); \
+		$(FIXUP) \
 		echo "Building the project..."; \
 		cd $(RUST) && cargo build --release; \
 		echo "✓ Build complete" \
@@ -95,34 +97,36 @@ build:
 test:
 	( \
 		set -eu; \
-		$(FIXUP); \
+		$(FIXUP) \
 		echo "Running tests..."; \
 		cd $(RUST) && cargo test; \
 		echo "✓ Tests complete"; \
-	) 2>&1 | tee run.out
+	)
 
 # Run the application
 run:
 	( \
 		set -eu; \
-		$(FIXUP); \
+		$(FIXUP) \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && cargo run --bin tcspecial \
-	) 2>&1 | tee run.out
+		cd $(RUST) && cargo run --bin tcsmoc \
+	)
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
 	-cargo clean
 	rm -f generate.out build.out run.out test.out $(TCS_TAR)
+	rm -rf $(TCS_RUST) $(TCS_TAR)
 	@echo "✓ Clean complete"
 
 
 # Clean everything including generated source
 distclean: clean
 	@echo "Removing all generated files..."
-	rm -f Cargo.lock
+	rm -f Cargo.lock Cargo.toml
 	rm -rf $(TCS_CRATES)
+	rm -rf target
 	@echo "✓ Project reset"
 
 # Install binary globally

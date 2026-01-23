@@ -1,164 +1,183 @@
-//! High-level client interface for tcslib
-//!
-//! Provides a convenient API for sending commands and receiving telemetry.
+//! TCSpecial client for ground software integration
 
-use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 use tcslibgs::{
-    commands::*,
-    telemetry::*,
-    TcsError, TcsResult,
-    ArmKey, BeaconTime, DHId, DHName, DHType, Statistics,
+    ArmKey, BeaconTime, Command, CommandStatus, ConfigCommand, DHId, DHName, DHType,
+    PingCommand, QueryDHCommand, RestartArmCommand, RestartCommand, StartDHCommand,
+    Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
 };
-use crate::connection::{Connection, ConnectionConfig};
 
-/// High-level client for communicating with tcspecial
+use crate::connection::Connection;
+
+/// Default timeout for command responses
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// TCSpecial client for sending commands and receiving telemetry
 pub struct TcsClient {
-    connection: Connection,
+    connection: Box<dyn Connection>,
     sequence: AtomicU32,
+    timeout: Duration,
 }
 
 impl TcsClient {
-    /// Create a new client connecting to the given remote address
-    pub fn connect(remote_addr: SocketAddr, local_addr: SocketAddr) -> TcsResult<Self> {
-        let config = ConnectionConfig::new(remote_addr, local_addr);
-        let connection = Connection::new(config)?;
-        Ok(Self {
+    /// Create a new client with the given connection
+    pub fn new(connection: Box<dyn Connection>) -> Self {
+        Self {
             connection,
             sequence: AtomicU32::new(1),
-        })
+            timeout: DEFAULT_TIMEOUT,
+        }
+    }
+
+    /// Set the command timeout
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = timeout;
     }
 
     /// Get the next sequence number
     fn next_sequence(&self) -> u32 {
-        self.sequence.fetch_add(1, Ordering::Relaxed)
+        self.sequence.fetch_add(1, Ordering::SeqCst)
     }
 
-    /// Send a PING command and receive response
-    pub fn ping(&mut self) -> TcsResult<PingTelemetry> {
+    /// Send a command and wait for the response
+    fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
+        self.connection.send(&command)?;
+        self.connection.receive_timeout(self.timeout)
+    }
+
+    /// Send a PING command
+    pub fn ping(&mut self) -> TcsResult<tcslibgs::PingTelemetry> {
         let seq = self.next_sequence();
         let cmd = Command::Ping(PingCommand::new(seq));
-        let tlm = self.connection.send_and_recv(cmd)?;
+        let response = self.send_command(cmd)?;
 
-        match tlm {
-            Telemetry::Ping(ping_tlm) => Ok(ping_tlm),
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+        match response {
+            Telemetry::Ping(tm) => Ok(tm),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
 
-    /// Arm a restart with the given key
-    pub fn restart_arm(&mut self, arm_key: ArmKey) -> TcsResult<RestartArmTelemetry> {
+    /// Send a RESTART_ARM command
+    pub fn restart_arm(&mut self, arm_key: ArmKey) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::RestartArm(RestartArmCommand::new(seq, arm_key));
-        let tlm = self.connection.send_and_recv(cmd)?;
+        let response = self.send_command(cmd)?;
 
-        match tlm {
-            Telemetry::RestartArm(restart_arm_tlm) => Ok(restart_arm_tlm),
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+        match response {
+            Telemetry::RestartArm(tm) => Ok(tm.header.status),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
 
-    /// Execute a restart (must be armed first)
-    pub fn restart(&mut self, arm_key: ArmKey) -> TcsResult<RestartTelemetry> {
+    /// Send a RESTART command
+    pub fn restart(&mut self, arm_key: ArmKey) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::Restart(RestartCommand::new(seq, arm_key));
-        let tlm = self.connection.send_and_recv(cmd)?;
+        let response = self.send_command(cmd)?;
 
-        match tlm {
-            Telemetry::Restart(restart_tlm) => Ok(restart_tlm),
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+        match response {
+            Telemetry::Restart(tm) => Ok(tm.header.status),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
 
-    /// Start a data handler
-    pub fn start_dh(
-        &mut self,
-        dh_id: DHId,
-        dh_type: DHType,
-        name: DHName,
-    ) -> TcsResult<StartDHTelemetry> {
+    /// Send a START_DH command
+    pub fn start_dh(&mut self, dh_id: DHId, dh_type: DHType, name: DHName) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::StartDH(StartDHCommand::new(seq, dh_id, dh_type, name));
-        let tlm = self.connection.send_and_recv(cmd)?;
+        let response = self.send_command(cmd)?;
 
-        match tlm {
-            Telemetry::StartDH(start_dh_tlm) => Ok(start_dh_tlm),
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+        match response {
+            Telemetry::StartDH(tm) => Ok(tm.header.status),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
 
-    /// Stop a data handler
-    pub fn stop_dh(&mut self, dh_id: DHId) -> TcsResult<StopDHTelemetry> {
+    /// Send a STOP_DH command
+    pub fn stop_dh(&mut self, dh_id: DHId) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::StopDH(StopDHCommand::new(seq, dh_id));
-        let tlm = self.connection.send_and_recv(cmd)?;
+        let response = self.send_command(cmd)?;
 
-        match tlm {
-            Telemetry::StopDH(stop_dh_tlm) => Ok(stop_dh_tlm),
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+        match response {
+            Telemetry::StopDH(tm) => Ok(tm.header.status),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
 
-    /// Query statistics from a data handler
-    pub fn query_dh(&mut self, dh_id: DHId) -> TcsResult<Statistics> {
+    /// Send a QUERY_DH command
+    pub fn query_dh(&mut self, dh_id: DHId) -> TcsResult<(CommandStatus, Statistics)> {
         let seq = self.next_sequence();
         let cmd = Command::QueryDH(QueryDHCommand::new(seq, dh_id));
-        let tlm = self.connection.send_and_recv(cmd)?;
+        let response = self.send_command(cmd)?;
 
-        match tlm {
-            Telemetry::QueryDH(query_dh_tlm) => {
-                if let ResponseStatus::Failure(code) = query_dh_tlm.base.status {
-                    return Err(TcsError::command(code, "Query DH failed"));
-                }
-                query_dh_tlm.statistics.ok_or_else(|| {
-                    TcsError::protocol("Missing statistics in response")
-                })
-            }
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+        match response {
+            Telemetry::QueryDH(tm) => Ok((tm.header.status, tm.statistics)),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
 
-    /// Configure TCSpecial global settings
-    pub fn configure(&mut self, beacon_interval: Option<BeaconTime>) -> TcsResult<ConfigTelemetry> {
+    /// Send a CONFIG command
+    pub fn configure(&mut self, beacon_interval: BeaconTime) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
-        let mut cmd_inner = ConfigCommand::new(seq);
-        if let Some(interval) = beacon_interval {
-            cmd_inner = cmd_inner.with_beacon_interval(interval);
-        }
-        let cmd = Command::Config(cmd_inner);
-        let tlm = self.connection.send_and_recv(cmd)?;
+        let cmd = Command::Config(ConfigCommand::new(seq, beacon_interval));
+        let response = self.send_command(cmd)?;
 
-        match tlm {
-            Telemetry::Config(config_tlm) => Ok(config_tlm),
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+        match response {
+            Telemetry::Config(tm) => Ok(tm.header.status),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
 
-    /// Configure a data handler
-    pub fn configure_dh(&mut self, dh_id: DHId) -> TcsResult<ConfigDHTelemetry> {
-        let seq = self.next_sequence();
-        let cmd = Command::ConfigDH(ConfigDHCommand::new(seq, dh_id));
-        let tlm = self.connection.send_and_recv(cmd)?;
+    /// Receive telemetry (blocking)
+    pub fn receive_telemetry(&mut self) -> TcsResult<Telemetry> {
+        self.connection.receive()
+    }
 
-        match tlm {
-            Telemetry::ConfigDH(config_dh_tlm) => Ok(config_dh_tlm),
-            _ => Err(TcsError::protocol("Unexpected telemetry type")),
+    /// Receive telemetry with timeout
+    pub fn receive_telemetry_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry> {
+        self.connection.receive_timeout(timeout)
+    }
+
+    /// Check if there is telemetry available
+    pub fn has_telemetry(&self) -> TcsResult<bool> {
+        self.connection.has_data()
+    }
+
+    /// Close the client connection
+    pub fn close(&mut self) -> TcsResult<()> {
+        self.connection.close()
+    }
+}
+
+/// Builder for TcsClient
+pub struct TcsClientBuilder {
+    timeout: Duration,
+}
+
+impl TcsClientBuilder {
+    pub fn new() -> Self {
+        Self {
+            timeout: DEFAULT_TIMEOUT,
         }
     }
 
-    /// Receive asynchronous telemetry (like beacons)
-    pub fn recv_async_telemetry(&mut self) -> TcsResult<Telemetry> {
-        self.connection.recv_telemetry()
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
     }
 
-    /// Get the underlying connection for advanced use
-    pub fn connection(&self) -> &Connection {
-        &self.connection
+    pub fn build(self, connection: Box<dyn Connection>) -> TcsClient {
+        let mut client = TcsClient::new(connection);
+        client.set_timeout(self.timeout);
+        client
     }
+}
 
-    /// Get mutable access to the underlying connection
-    pub fn connection_mut(&mut self) -> &mut Connection {
-        &mut self.connection
+impl Default for TcsClientBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -167,10 +186,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sequence_increment() {
-        // This test just verifies the atomic counter works
-        let counter = AtomicU32::new(1);
-        assert_eq!(counter.fetch_add(1, Ordering::Relaxed), 1);
-        assert_eq!(counter.fetch_add(1, Ordering::Relaxed), 2);
+    fn test_client_builder() {
+        let builder = TcsClientBuilder::new()
+            .timeout(Duration::from_secs(10));
+        assert_eq!(builder.timeout, Duration::from_secs(10));
     }
 }

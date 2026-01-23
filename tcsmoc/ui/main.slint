@@ -1,210 +1,136 @@
-// TCSpecial Mission Operations Center GUI
-// Black on white theme as per design specification
+import { Button, GroupBox, LineEdit, ListView, VerticalBox, HorizontalBox, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
 
-import { Button, LineEdit, ComboBox, GridBox, VerticalBox, HorizontalBox, GroupBox, ScrollView } from "std-widgets.slint";
-
-// DH Panel state
-export enum DHState {
-    Idle,
-    Active,
-    Stopped,
-}
-
-// DH Type
-export enum DHTypeEnum {
-    Network,
-    Device,
-}
-
-// Data Handler Panel component
 component DHPanel inherits Rectangle {
-    in property <int> dh-id;
-    in-out property <DHState> state: DHState.Idle;
-    in-out property <DHTypeEnum> dh-type: DHTypeEnum.Network;
-    in-out property <string> config-name: "";
-    in-out property <string> status: "Idle";
-    in-out property <string> stats: "";
-    in property <bool> connected: false;
+    in property <string> dh-name: "DH0";
+    in property <string> dh-config: "UDP localhost:5000";
+    in property <string> dh-status: "Stopped";
+    in property <int> packet-size: 12;
+    in property <int> packet-interval: 1000;
+    in property <string> last-sent-time: "--:--:--";
+    in property <string> last-sent-data: "";
+    in property <string> last-recv-time: "--:--:--";
+    in property <string> last-recv-data: "";
+    in property <int> bytes-sent: 0;
+    in property <int> bytes-recv: 0;
 
     callback start-clicked();
     callback stop-clicked();
-    callback query-clicked();
 
-    border-color: black;
+    background: #f0f0f0;
+    border-color: #808080;
     border-width: 1px;
-    background: state == DHState.Active ? #e8f5e9 :
-                state == DHState.Stopped ? #fff3e0 : white;
-    min-width: 220px;
     min-height: 180px;
 
     VerticalBox {
         padding: 8px;
-        spacing: 6px;
+        spacing: 4px;
 
         HorizontalBox {
-            alignment: space-between;
             Text {
-                text: "DH" + dh-id;
-                font-size: 16px;
+                text: dh-name;
+                font-size: 14px;
                 font-weight: 700;
-                color: black;
             }
             Text {
-                text: state == DHState.Active ? "●" :
-                      state == DHState.Stopped ? "○" : "◯";
-                color: state == DHState.Active ? green :
-                       state == DHState.Stopped ? orange : gray;
-                font-size: 16px;
+                text: dh-status;
+                color: dh-status == "Active" ? #008000 : #808080;
             }
         }
 
-        Rectangle {
-            height: 1px;
-            background: black;
+        Text {
+            text: "Config: " + dh-config;
+            font-size: 11px;
         }
 
         HorizontalBox {
-            spacing: 4px;
-            Text { text: "Type:"; color: black; vertical-alignment: center; }
-            ComboBox {
-                model: ["Network", "Device"];
-                current-index: dh-type == DHTypeEnum.Network ? 0 : 1;
-                enabled: state == DHState.Idle;
-                selected(idx) => {
-                    dh-type = idx == 0 ? DHTypeEnum.Network : DHTypeEnum.Device;
-                }
-            }
-        }
-
-        HorizontalBox {
-            spacing: 4px;
-            Text { text: "Config:"; color: black; vertical-alignment: center; }
-            LineEdit {
-                text <=> config-name;
-                enabled: state == DHState.Idle;
-            }
+            Text { text: "Packet Size: " + packet-size + " bytes"; font-size: 11px; }
+            Text { text: "Interval: " + packet-interval + " ms"; font-size: 11px; }
         }
 
         HorizontalBox {
             spacing: 4px;
             Button {
                 text: "Start";
-                enabled: connected && (state == DHState.Idle || state == DHState.Stopped);
                 clicked => { start-clicked(); }
             }
             Button {
                 text: "Stop";
-                enabled: connected && state == DHState.Active;
                 clicked => { stop-clicked(); }
             }
-            Button {
-                text: "Query";
-                enabled: connected && state == DHState.Active;
-                clicked => { query-clicked(); }
+        }
+
+        GroupBox {
+            title: "Last Sent";
+            HorizontalBox {
+                Text { text: last-sent-time; font-size: 10px; }
+                Text { text: last-sent-data; font-size: 10px; }
             }
         }
 
-        Rectangle {
-            height: 1px;
-            background: black;
+        GroupBox {
+            title: "Last Received";
+            HorizontalBox {
+                Text { text: last-recv-time; font-size: 10px; }
+                Text { text: last-recv-data; font-size: 10px; }
+            }
         }
 
-        Text {
-            text: "Status: " + status;
-            color: black;
-            font-size: 12px;
-        }
-
-        Text {
-            text: stats;
-            color: #333;
-            font-size: 10px;
-            wrap: word-wrap;
+        HorizontalBox {
+            Text { text: "Sent: " + bytes-sent + " bytes"; font-size: 10px; }
+            Text { text: "Recv: " + bytes-recv + " bytes"; font-size: 10px; }
         }
     }
 }
 
-// Main application window
 export component MainWindow inherits Window {
-    title: "TCSpecial Mission Operations Center";
-    min-width: 1024px;
-    min-height: 768px;
+    title: "TCSpecial MOC";
+    min-width: 800px;
+    min-height: 600px;
     background: white;
 
-    // Connection state
-    in-out property <bool> connected: false;
-    in-out property <string> remote-addr: "127.0.0.1:5000";
-    in-out property <string> local-addr: "127.0.0.1:5100";
-    in-out property <string> status-message: "Not connected";
-    in-out property <string> beacon-interval: "10000";
-    in-out property <string> arm-key: "12345";
+    in-out property <string> ci-status: "Disconnected";
+    in-out property <string> ci-address: "127.0.0.1:4000";
+    in-out property <string> last-response: "";
+    in-out property <string> beacon-time: "--:--:--";
 
-    // DH states
-    in-out property <DHState> dh0-state: DHState.Idle;
-    in-out property <DHState> dh1-state: DHState.Idle;
-    in-out property <DHState> dh2-state: DHState.Idle;
-    in-out property <DHState> dh3-state: DHState.Idle;
-    in-out property <DHState> dh4-state: DHState.Idle;
-    in-out property <DHState> dh5-state: DHState.Idle;
-    in-out property <DHState> dh6-state: DHState.Idle;
-    in-out property <DHState> dh7-state: DHState.Idle;
+    // DH properties
+    in-out property <string> dh0-status: "Stopped";
+    in-out property <string> dh0-last-sent: "";
+    in-out property <string> dh0-last-recv: "";
+    in-out property <int> dh0-bytes-sent: 0;
+    in-out property <int> dh0-bytes-recv: 0;
 
-    // DH configs
-    in-out property <string> dh0-config: "localhost:5000:tcp";
-    in-out property <string> dh1-config: "localhost:5001:udp";
-    in-out property <string> dh2-config: "/dev/urandom";
-    in-out property <string> dh3-config: "localhost:5003:udp";
-    in-out property <string> dh4-config: "localhost:5004";
-    in-out property <string> dh5-config: "localhost:5005";
-    in-out property <string> dh6-config: "localhost:5006";
-    in-out property <string> dh7-config: "localhost:5007";
+    in-out property <string> dh1-status: "Stopped";
+    in-out property <string> dh1-last-sent: "";
+    in-out property <string> dh1-last-recv: "";
+    in-out property <int> dh1-bytes-sent: 0;
+    in-out property <int> dh1-bytes-recv: 0;
 
-    // DH types
-    in-out property <DHTypeEnum> dh0-type: DHTypeEnum.Network;
-    in-out property <DHTypeEnum> dh1-type: DHTypeEnum.Network;
-    in-out property <DHTypeEnum> dh2-type: DHTypeEnum.Device;
-    in-out property <DHTypeEnum> dh3-type: DHTypeEnum.Network;
-    in-out property <DHTypeEnum> dh4-type: DHTypeEnum.Network;
-    in-out property <DHTypeEnum> dh5-type: DHTypeEnum.Network;
-    in-out property <DHTypeEnum> dh6-type: DHTypeEnum.Network;
-    in-out property <DHTypeEnum> dh7-type: DHTypeEnum.Network;
+    in-out property <string> dh2-status: "Stopped";
+    in-out property <string> dh2-last-sent: "";
+    in-out property <string> dh2-last-recv: "";
+    in-out property <int> dh2-bytes-sent: 0;
+    in-out property <int> dh2-bytes-recv: 0;
 
-    // DH statuses
-    in-out property <string> dh0-status: "Idle";
-    in-out property <string> dh1-status: "Idle";
-    in-out property <string> dh2-status: "Idle";
-    in-out property <string> dh3-status: "Idle";
-    in-out property <string> dh4-status: "Idle";
-    in-out property <string> dh5-status: "Idle";
-    in-out property <string> dh6-status: "Idle";
-    in-out property <string> dh7-status: "Idle";
+    in-out property <string> dh3-status: "Stopped";
+    in-out property <string> dh3-last-sent: "";
+    in-out property <string> dh3-last-recv: "";
+    in-out property <int> dh3-bytes-sent: 0;
+    in-out property <int> dh3-bytes-recv: 0;
 
-    // DH stats
-    in-out property <string> dh0-stats: "";
-    in-out property <string> dh1-stats: "";
-    in-out property <string> dh2-stats: "";
-    in-out property <string> dh3-stats: "";
-    in-out property <string> dh4-stats: "";
-    in-out property <string> dh5-stats: "";
-    in-out property <string> dh6-stats: "";
-    in-out property <string> dh7-stats: "";
-
-    // Callbacks for actions
     callback connect-clicked();
     callback disconnect-clicked();
     callback ping-clicked();
-    callback configure-clicked();
-    callback arm-clicked();
-    callback restart-clicked();
-    callback dh-start(int, DHTypeEnum, string);
-    callback dh-stop(int);
-    callback dh-query(int);
+    callback query-all-clicked();
+    callback start-dh(int);
+    callback stop-dh(int);
+    callback quit-clicked();
 
     VerticalBox {
         padding: 10px;
         spacing: 10px;
 
-        // Command Interpreter section
+        // CI Control Section
         GroupBox {
             title: "Command Interpreter";
 
@@ -213,25 +139,23 @@ export component MainWindow inherits Window {
 
                 HorizontalBox {
                     spacing: 8px;
-                    Text { text: "Remote:"; color: black; vertical-alignment: center; }
+                    Text { text: "Address:"; vertical-alignment: center; }
                     LineEdit {
-                        text <=> remote-addr;
-                        enabled: !connected;
-                    }
-                    Text { text: "Local:"; color: black; vertical-alignment: center; }
-                    LineEdit {
-                        text <=> local-addr;
-                        enabled: !connected;
+                        text <=> ci-address;
+                        min-width: 150px;
                     }
                     Button {
-                        text: connected ? "Disconnect" : "Connect";
-                        clicked => {
-                            if (connected) {
-                                disconnect-clicked();
-                            } else {
-                                connect-clicked();
-                            }
-                        }
+                        text: "Connect";
+                        clicked => { connect-clicked(); }
+                    }
+                    Button {
+                        text: "Disconnect";
+                        clicked => { disconnect-clicked(); }
+                    }
+                    Text {
+                        text: "Status: " + ci-status;
+                        color: ci-status == "Connected" ? #008000 : #ff0000;
+                        vertical-alignment: center;
                     }
                 }
 
@@ -239,158 +163,98 @@ export component MainWindow inherits Window {
                     spacing: 8px;
                     Button {
                         text: "Ping";
-                        enabled: connected;
                         clicked => { ping-clicked(); }
                     }
-                    Rectangle { width: 10px; }
-                    Text { text: "Beacon (ms):"; color: black; vertical-alignment: center; }
-                    LineEdit {
-                        text <=> beacon-interval;
-                        enabled: connected;
-                        width: 60px;
-                    }
                     Button {
-                        text: "Configure";
-                        enabled: connected;
-                        clicked => { configure-clicked(); }
+                        text: "Query All DHs";
+                        clicked => { query-all-clicked(); }
                     }
-                    Rectangle { width: 10px; }
-                    Text { text: "Arm Key:"; color: black; vertical-alignment: center; }
-                    LineEdit {
-                        text <=> arm-key;
-                        enabled: connected;
-                        width: 60px;
-                    }
-                    Button {
-                        text: "Arm";
-                        enabled: connected;
-                        clicked => { arm-clicked(); }
-                    }
-                    Button {
-                        text: "Restart";
-                        enabled: connected;
-                        clicked => { restart-clicked(); }
-                    }
+                    Text { text: "Last Beacon: " + beacon-time; vertical-alignment: center; }
                 }
 
                 HorizontalBox {
-                    spacing: 4px;
-                    Text { text: "Status:"; color: black; font-weight: 600; }
-                    Text { text: status-message; color: black; }
+                    Text { text: "Last Response: " + last-response; font-size: 11px; }
                 }
             }
         }
 
-        // Data Handlers section
+        // Data Handlers Section
         GroupBox {
             title: "Data Handlers";
 
-            GridBox {
-                spacing: 10px;
+            ScrollView {
+                GridBox {
+                    spacing: 10px;
 
-                // Row 0: DH0-DH3
-                Row {
-                    DHPanel {
-                        dh-id: 0;
-                        state <=> dh0-state;
-                        dh-type <=> dh0-type;
-                        config-name <=> dh0-config;
-                        status: dh0-status;
-                        stats: dh0-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(0, dh0-type, dh0-config); }
-                        stop-clicked => { dh-stop(0); }
-                        query-clicked => { dh-query(0); }
+                    Row {
+                        DHPanel {
+                            dh-name: "DH0";
+                            dh-config: "TCP localhost:5000";
+                            dh-status: dh0-status;
+                            packet-size: 12;
+                            packet-interval: 1000;
+                            last-sent-data: dh0-last-sent;
+                            last-recv-data: dh0-last-recv;
+                            bytes-sent: dh0-bytes-sent;
+                            bytes-recv: dh0-bytes-recv;
+                            start-clicked => { start-dh(0); }
+                            stop-clicked => { stop-dh(0); }
+                        }
+
+                        DHPanel {
+                            dh-name: "DH1";
+                            dh-config: "UDP localhost:5001";
+                            dh-status: dh1-status;
+                            packet-size: 11;
+                            packet-interval: 1000;
+                            last-sent-data: dh1-last-sent;
+                            last-recv-data: dh1-last-recv;
+                            bytes-sent: dh1-bytes-sent;
+                            bytes-recv: dh1-bytes-recv;
+                            start-clicked => { start-dh(1); }
+                            stop-clicked => { stop-dh(1); }
+                        }
                     }
-                    DHPanel {
-                        dh-id: 1;
-                        state <=> dh1-state;
-                        dh-type <=> dh1-type;
-                        config-name <=> dh1-config;
-                        status: dh1-status;
-                        stats: dh1-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(1, dh1-type, dh1-config); }
-                        stop-clicked => { dh-stop(1); }
-                        query-clicked => { dh-query(1); }
-                    }
-                    DHPanel {
-                        dh-id: 2;
-                        state <=> dh2-state;
-                        dh-type <=> dh2-type;
-                        config-name <=> dh2-config;
-                        status: dh2-status;
-                        stats: dh2-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(2, dh2-type, dh2-config); }
-                        stop-clicked => { dh-stop(2); }
-                        query-clicked => { dh-query(2); }
-                    }
-                    DHPanel {
-                        dh-id: 3;
-                        state <=> dh3-state;
-                        dh-type <=> dh3-type;
-                        config-name <=> dh3-config;
-                        status: dh3-status;
-                        stats: dh3-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(3, dh3-type, dh3-config); }
-                        stop-clicked => { dh-stop(3); }
-                        query-clicked => { dh-query(3); }
+
+                    Row {
+                        DHPanel {
+                            dh-name: "DH2";
+                            dh-config: "Device /dev/urandom";
+                            dh-status: dh2-status;
+                            packet-size: 1;
+                            packet-interval: 0;
+                            last-sent-data: dh2-last-sent;
+                            last-recv-data: dh2-last-recv;
+                            bytes-sent: dh2-bytes-sent;
+                            bytes-recv: dh2-bytes-recv;
+                            start-clicked => { start-dh(2); }
+                            stop-clicked => { stop-dh(2); }
+                        }
+
+                        DHPanel {
+                            dh-name: "DH3";
+                            dh-config: "UDP localhost:5003";
+                            dh-status: dh3-status;
+                            packet-size: 15;
+                            packet-interval: 500;
+                            last-sent-data: dh3-last-sent;
+                            last-recv-data: dh3-last-recv;
+                            bytes-sent: dh3-bytes-sent;
+                            bytes-recv: dh3-bytes-recv;
+                            start-clicked => { start-dh(3); }
+                            stop-clicked => { stop-dh(3); }
+                        }
                     }
                 }
+            }
+        }
 
-                // Row 1: DH4-DH7
-                Row {
-                    DHPanel {
-                        dh-id: 4;
-                        state <=> dh4-state;
-                        dh-type <=> dh4-type;
-                        config-name <=> dh4-config;
-                        status: dh4-status;
-                        stats: dh4-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(4, dh4-type, dh4-config); }
-                        stop-clicked => { dh-stop(4); }
-                        query-clicked => { dh-query(4); }
-                    }
-                    DHPanel {
-                        dh-id: 5;
-                        state <=> dh5-state;
-                        dh-type <=> dh5-type;
-                        config-name <=> dh5-config;
-                        status: dh5-status;
-                        stats: dh5-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(5, dh5-type, dh5-config); }
-                        stop-clicked => { dh-stop(5); }
-                        query-clicked => { dh-query(5); }
-                    }
-                    DHPanel {
-                        dh-id: 6;
-                        state <=> dh6-state;
-                        dh-type <=> dh6-type;
-                        config-name <=> dh6-config;
-                        status: dh6-status;
-                        stats: dh6-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(6, dh6-type, dh6-config); }
-                        stop-clicked => { dh-stop(6); }
-                        query-clicked => { dh-query(6); }
-                    }
-                    DHPanel {
-                        dh-id: 7;
-                        state <=> dh7-state;
-                        dh-type <=> dh7-type;
-                        config-name <=> dh7-config;
-                        status: dh7-status;
-                        stats: dh7-stats;
-                        connected: connected;
-                        start-clicked => { dh-start(7, dh7-type, dh7-config); }
-                        stop-clicked => { dh-stop(7); }
-                        query-clicked => { dh-query(7); }
-                    }
-                }
+        // Quit Button
+        HorizontalBox {
+            Rectangle { }
+            Button {
+                text: "Quit";
+                clicked => { quit-clicked(); }
             }
         }
     }

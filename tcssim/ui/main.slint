@@ -5,7 +5,9 @@ component PayloadPanel inherits Rectangle {
     in property <string> payload-config: "TCP localhost:5000";
     in property <string> payload-status: "Stopped";
     in-out property <int> packet-size: 12;
+    in-out property <int> segment-size: 12;
     in-out property <int> packet-interval: 1000;
+    in-out property <int> segment-interval: 1000;
     in property <string> last-sent-time: "--:--:--";
     in property <string> last-sent-data: "";
     in property <string> last-recv-time: "--:--:--";
@@ -20,11 +22,11 @@ component PayloadPanel inherits Rectangle {
     background: #f0f0f0;
     border-color: #808080;
     border-width: 1px;
-    min-height: 200px;
+    min-height: 800px;
 
     VerticalBox {
-        padding: 8px;
-        spacing: 4px;
+        padding: 1px;
+        spacing: 1px;
 
         HorizontalBox {
             Text {
@@ -45,20 +47,32 @@ component PayloadPanel inherits Rectangle {
         }
 
         HorizontalBox {
-            spacing: 4px;
+            spacing: 1px;
             Text { text: "Packet Size:"; vertical-alignment: center; font-size: 11px; }
             SpinBox {
                 value <=> packet-size;
                 minimum: 1;
-                maximum: 1024;
+                maximum: 32;
                 edited => { config-changed(); }
             }
             Text { text: "bytes"; vertical-alignment: center; font-size: 11px; }
         }
 
         HorizontalBox {
-            spacing: 4px;
-            Text { text: "Interval:"; vertical-alignment: center; font-size: 11px; }
+            spacing: 1px;
+            Text { text: "Segment Size:"; vertical-alignment: center; font-size: 11px; }
+            SpinBox {
+                value <=> segment-size;
+                minimum: 1;
+                maximum: 32;
+                edited => { config-changed(); }
+            }
+            Text { text: "bytes"; vertical-alignment: center; font-size: 11px; }
+        }
+
+        HorizontalBox {
+            spacing: 1px;
+            Text { text: "Packet Interval:"; vertical-alignment: center; font-size: 11px; }
             SpinBox {
                 value <=> packet-interval;
                 minimum: 0;
@@ -69,7 +83,19 @@ component PayloadPanel inherits Rectangle {
         }
 
         HorizontalBox {
-            spacing: 4px;
+            spacing: 1px;
+            Text { text: "Segment Interval:"; vertical-alignment: center; font-size: 11px; }
+            SpinBox {
+                value <=> segment-interval;
+                minimum: 0;
+                maximum: 10000;
+                edited => { config-changed(); }
+            }
+            Text { text: "ms"; vertical-alignment: center; font-size: 11px; }
+        }
+
+        HorizontalBox {
+            spacing: 1px;
             Button {
                 text: "Start";
                 clicked => { start-clicked(); }
@@ -106,13 +132,15 @@ component PayloadPanel inherits Rectangle {
 export component MainWindow inherits Window {
     title: "TCSpecial Payload Simulator";
     min-width: 800px;
-    min-height: 600px;
+    min-height: 1600px;
     background: white;
 
     // Payload 0 properties
     in-out property <string> p0-status: "Stopped";
     in-out property <int> p0-packet-size: 12;
-    in-out property <int> p0-interval: 1000;
+    in-out property <int> p0-segment-size: 12;
+    in-out property <int> p0-packet-interval: 1000;
+    in-out property <int> p0-segment-interval: 1000;
     in-out property <string> p0-last-sent-time: "--:--:--";
     in-out property <string> p0-last-sent-data: "";
     in-out property <string> p0-last-recv-time: "--:--:--";
@@ -123,7 +151,9 @@ export component MainWindow inherits Window {
     // Payload 1 properties
     in-out property <string> p1-status: "Stopped";
     in-out property <int> p1-packet-size: 11;
-    in-out property <int> p1-interval: 1000;
+    in-out property <int> p1-segment-size: 11;
+    in-out property <int> p1-packet-interval: 1000;
+    in-out property <int> p1-segment-interval: 1000;
     in-out property <string> p1-last-sent-time: "--:--:--";
     in-out property <string> p1-last-sent-data: "";
     in-out property <string> p1-last-recv-time: "--:--:--";
@@ -134,7 +164,9 @@ export component MainWindow inherits Window {
     // Payload 2 properties
     in-out property <string> p2-status: "Stopped";
     in-out property <int> p2-packet-size: 1;
-    in-out property <int> p2-interval: 0;
+    in-out property <int> p2-segment-size: 1;
+    in-out property <int> p2-packet-interval: 0;
+    in-out property <int> p2-segment-interval: 0;
     in-out property <string> p2-last-sent-time: "--:--:--";
     in-out property <string> p2-last-sent-data: "";
     in-out property <string> p2-last-recv-time: "--:--:--";
@@ -145,7 +177,9 @@ export component MainWindow inherits Window {
     // Payload 3 properties
     in-out property <string> p3-status: "Stopped";
     in-out property <int> p3-packet-size: 15;
-    in-out property <int> p3-interval: 500;
+    in-out property <int> p3-segment-size: 15;
+    in-out property <int> p3-packet-interval: 500;
+    in-out property <int> p3-segment-interval: 500;
     in-out property <string> p3-last-sent-time: "--:--:--";
     in-out property <string> p3-last-sent-data: "";
     in-out property <string> p3-last-recv-time: "--:--:--";
@@ -155,12 +189,12 @@ export component MainWindow inherits Window {
 
     callback start-payload(int);
     callback stop-payload(int);
-    callback config-payload(int, int, int);
+    callback config-payload(int, int, int, int, int);
     callback quit-clicked();
 
     VerticalBox {
-        padding: 10px;
-        spacing: 10px;
+        padding: 1px;
+        spacing: 1px;
 
         Text {
             text: "Simulated Payloads";
@@ -171,7 +205,7 @@ export component MainWindow inherits Window {
 
         ScrollView {
             GridBox {
-                spacing: 10px;
+                spacing: 1px;
 
                 Row {
                     PayloadPanel {
@@ -179,7 +213,9 @@ export component MainWindow inherits Window {
                         payload-config: "TCP localhost:5000";
                         payload-status: p0-status;
                         packet-size <=> p0-packet-size;
-                        packet-interval <=> p0-interval;
+                        segment-size <=> p0-segment-size;
+                        packet-interval <=> p0-packet-interval;
+                        segment-interval <=> p0-segment-interval;
                         last-sent-time: p0-last-sent-time;
                         last-sent-data: p0-last-sent-data;
                         last-recv-time: p0-last-recv-time;
@@ -188,7 +224,7 @@ export component MainWindow inherits Window {
                         packets-recv: p0-packets-recv;
                         start-clicked => { start-payload(0); }
                         stop-clicked => { stop-payload(0); }
-                        config-changed => { config-payload(0, p0-packet-size, p0-interval); }
+                        config-changed => { config-payload(0, p0-packet-size, p0-segment-size, p0-packet-interval, p0-segment-interval); }
                     }
 
                     PayloadPanel {
@@ -196,7 +232,9 @@ export component MainWindow inherits Window {
                         payload-config: "UDP localhost:5001";
                         payload-status: p1-status;
                         packet-size <=> p1-packet-size;
-                        packet-interval <=> p1-interval;
+                        segment-size <=> p1-segment-size;
+                        packet-interval <=> p1-packet-interval;
+                        segment-interval <=> p1-segment-interval;
                         last-sent-time: p1-last-sent-time;
                         last-sent-data: p1-last-sent-data;
                         last-recv-time: p1-last-recv-time;
@@ -205,7 +243,7 @@ export component MainWindow inherits Window {
                         packets-recv: p1-packets-recv;
                         start-clicked => { start-payload(1); }
                         stop-clicked => { stop-payload(1); }
-                        config-changed => { config-payload(1, p1-packet-size, p1-interval); }
+                        config-changed => { config-payload(1, p1-packet-size, p1-segment-size, p1-packet-interval, p1-segment-interval); }
                     }
                 }
 
@@ -215,7 +253,9 @@ export component MainWindow inherits Window {
                         payload-config: "Device /dev/urandom";
                         payload-status: p2-status;
                         packet-size <=> p2-packet-size;
-                        packet-interval <=> p2-interval;
+                        segment-size <=> p2-segment-size;
+                        packet-interval <=> p2-packet-interval;
+                        segment-interval <=> p2-segment-interval;
                         last-sent-time: p2-last-sent-time;
                         last-sent-data: p2-last-sent-data;
                         last-recv-time: p2-last-recv-time;
@@ -224,7 +264,7 @@ export component MainWindow inherits Window {
                         packets-recv: p2-packets-recv;
                         start-clicked => { start-payload(2); }
                         stop-clicked => { stop-payload(2); }
-                        config-changed => { config-payload(2, p2-packet-size, p2-interval); }
+                        config-changed => { config-payload(2, p2-packet-size, p2-segment-size, p2-packet-interval, p2-segment-interval); }
                     }
 
                     PayloadPanel {
@@ -232,7 +272,9 @@ export component MainWindow inherits Window {
                         payload-config: "UDP localhost:5003";
                         payload-status: p3-status;
                         packet-size <=> p3-packet-size;
-                        packet-interval <=> p3-interval;
+                        segment-size <=> p3-segment-size;
+                        packet-interval <=> p3-packet-interval;
+                        segment-interval <=> p3-segment-interval;
                         last-sent-time: p3-last-sent-time;
                         last-sent-data: p3-last-sent-data;
                         last-recv-time: p3-last-recv-time;
@@ -241,7 +283,7 @@ export component MainWindow inherits Window {
                         packets-recv: p3-packets-recv;
                         start-clicked => { start-payload(3); }
                         stop-clicked => { stop-payload(3); }
-                        config-changed => { config-payload(3, p3-packet-size, p3-interval); }
+                        config-changed => { config-payload(3, p3-packet-size, p3-segment-size, p3-packet-interval, p3-segment-interval); }
                     }
                 }
             }

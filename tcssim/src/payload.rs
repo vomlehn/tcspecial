@@ -11,7 +11,7 @@ use rand::Rng;
 /// Payload configuration
 #[derive(Clone)]
 pub struct PayloadConfig {
-    pub id: u32,
+    pub _id: u32,
     pub protocol: PayloadProtocol,
     pub address: String,
     pub port: u16,
@@ -89,7 +89,7 @@ impl SimulatedPayload {
     }
 
     /// Check if the payload is running
-    pub fn is_running(&self) -> bool {
+    pub fn _is_running(&self) -> bool {
         self.running.load(Ordering::SeqCst)
     }
 
@@ -161,9 +161,9 @@ fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<s
         if let Some(ref mut stream) = connection {
             // Generate and send data
             let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
-            let segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
+            let _segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
             let packet_interval = config.packet_interval_ms.load(Ordering::SeqCst);
-            let segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
+            let _segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
 
             if packet_interval > 0 {
                 let data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
@@ -224,9 +224,9 @@ fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<s
         // Generate and send data if we have a peer
         if let Some(peer) = last_peer {
             let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
-            let segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
+            let _segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
             let packet_interval = config.packet_interval_ms.load(Ordering::SeqCst);
-            let segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
+            let _segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
 
             if packet_interval > 0 {
                 let data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
@@ -253,9 +253,9 @@ fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Ar
 
     while running.load(Ordering::SeqCst) {
         let packet_size = config.packet_size.load(Ordering::SeqCst) as usize;
-        let segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
+        let _segment_size = config.segment_size.load(Ordering::SeqCst) as usize;
         let packet_interval = config.packet_interval_ms.load(Ordering::SeqCst);
-        let segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
+        let _segment_interval = config.segment_interval_ms.load(Ordering::SeqCst);
 
         // Generate random data (simulating /dev/urandom)
         let _data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();

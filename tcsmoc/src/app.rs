@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tcslibgs::Statistics;
 
 /// Format a timestamp for display
-pub fn format_timestamp(seconds: u64, nanos: u32) -> String {
+pub fn _format_timestamp(seconds: u64, _nanos: u32) -> String {
     let total_secs = seconds % 86400; // Seconds in a day
     let hours = total_secs / 3600;
     let minutes = (total_secs % 3600) / 60;
@@ -13,15 +13,15 @@ pub fn format_timestamp(seconds: u64, nanos: u32) -> String {
 }
 
 /// Format current time for display
-pub fn current_time_str() -> String {
+pub fn _current_time_str() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-    format_timestamp(duration.as_secs(), duration.subsec_nanos())
+    _format_timestamp(duration.as_secs(), duration.subsec_nanos())
 }
 
 /// Format bytes as hex string
-pub fn bytes_to_hex(bytes: &[u8], max_len: usize) -> String {
+pub fn _bytes_to_hex(bytes: &[u8], max_len: usize) -> String {
     let display_bytes = if bytes.len() > max_len {
         &bytes[..max_len]
     } else {
@@ -40,7 +40,7 @@ pub fn bytes_to_hex(bytes: &[u8], max_len: usize) -> String {
 
 /// Data handler display state
 #[derive(Clone, Default)]
-pub struct DHDisplayState {
+pub struct _DHDisplayState {
     pub dh_id: u32,
     pub status: String,
     pub last_sent_time: String,
@@ -50,7 +50,8 @@ pub struct DHDisplayState {
     pub stats: Statistics,
 }
 
-impl DHDisplayState {
+impl _DHDisplayState {
+/*
     pub fn new(dh_id: u32) -> Self {
         Self {
             dh_id,
@@ -62,20 +63,30 @@ impl DHDisplayState {
             stats: Statistics::default(),
         }
     }
+*/
+
+/*
 
     pub fn update_stats(&mut self, stats: Statistics) {
         self.stats = stats;
     }
+*/
+
+/*
 
     pub fn update_sent(&mut self, data: &[u8]) {
         self.last_sent_time = current_time_str();
         self.last_sent_data = bytes_to_hex(data, 8);
     }
+*/
+
+/*
 
     pub fn update_recv(&mut self, data: &[u8]) {
         self.last_recv_time = current_time_str();
         self.last_recv_data = bytes_to_hex(data, 8);
     }
+*/
 }
 
 #[cfg(test)]

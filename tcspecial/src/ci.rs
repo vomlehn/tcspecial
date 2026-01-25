@@ -5,10 +5,11 @@
 use std::collections::BTreeMap;
 use crate::Beacon;
 use std::net::UdpSocket;
-use std::os::unix::io::AsRawFd;
+//use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
+//use std::thread;
+//use std::time::{Duration, Instant};
+use std::time::Instant;
 use tcslibgs::{
     ArmKey, BeaconTelemetry, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
     DHConfig, DHId, PingTelemetry, QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
@@ -180,7 +181,7 @@ impl CommandInterpreter {
         self.running = true;
         let mut recv_buffer = vec![0u8; 65535];
         let mut last_beacon = Instant::now();
-        let mut last_client_addr: Option<std::net::SocketAddr> = None;
+        let mut _last_client_addr: Option<std::net::SocketAddr> = None;
 
 /*
         // Set a timeout for receiving so we can send beacons
@@ -202,7 +203,7 @@ impl CommandInterpreter {
             // Try to receive a command
             match self.socket.recv_from(&mut recv_buffer) {
                 Ok((size, addr)) => {
-                    last_client_addr = Some(addr);
+                    _last_client_addr = Some(addr);
 
                     // Parse and process command
                     match serde_json::from_slice::<Command>(&recv_buffer[..size]) {

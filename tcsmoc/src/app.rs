@@ -1,7 +1,7 @@
 //! Application state and logic for tcsmoc
 
 use std::time::{SystemTime, UNIX_EPOCH};
-use tcslibgs::{DHId, Statistics};
+use tcslibgs::Statistics;
 
 /// Format a timestamp for display
 pub fn format_timestamp(seconds: u64, nanos: u32) -> String {

@@ -3,9 +3,8 @@
 //! A GUI application for simulating payloads that communicate with tcspecial.
 
 use slint::SharedString;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 mod payload;
 

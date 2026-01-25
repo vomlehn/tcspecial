@@ -186,7 +186,7 @@ impl CommandInterpreter {
         // Set a timeout for receiving so we can send beacons
         self.socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 */
-        let beacon = Beacon::new(BEACON_DEFAULT_MS, "0.0.0.0".parse().unwrap());
+        let beacon = Beacon::new(BEACON_DEFAULT_MS, "0.0.0.0:0".parse().unwrap());
 
         while self.running {
 /*

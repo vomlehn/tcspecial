@@ -25,6 +25,7 @@ pub struct Beacon {
 
 impl Beacon {
     pub fn new(interval: Duration, dest_addr: std::net::SocketAddr) -> Option<Beacon> {
+eprintln!("Beacon::new: entered");
         if interval == Duration::from_secs(0) {
             return None;
         }
@@ -46,21 +47,25 @@ impl Beacon {
             b_clone.beacon();
         });
 
+eprintln!("Beacon::new: exit");
         Some(b)
     }
 
     // FIXME: check result type
     fn beacon(&self) -> TcsResult<()> {
+eprintln!("Beacon::beacon: entered");
         // Bind to a local address
         let socket = UdpSocket::bind("0.0.0.0:0")?; // 0 = let OS pick a port
 
         self.send_beacon(&socket, &self.dest_addr);
 
         loop {
+eprintln!("Beacon::beacon: loop");
             let mut expiration = self.pair.lock.lock().unwrap();
 
             // Wait until expiration time or until notified
             while *expiration > SystemTime::now() {
+eprintln!("Beacon::beacon: while");
                 eprintln!("Worker: waiting for signal...");
                 let timeout = expiration
                     .duration_since(SystemTime::now())

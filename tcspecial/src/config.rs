@@ -29,6 +29,8 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> TcsResult<(CIConfig, Vec<DHConfig
 pub mod constants {
     use std::time::Duration;
 
+    pub const BEACON_DEFAULT_MS: Duration = Duration::from_millis(2000);
+
     /// Initial delay for endpoint retry
     pub const ENDPOINT_DELAY_INIT: Duration = Duration::from_millis(100);
 

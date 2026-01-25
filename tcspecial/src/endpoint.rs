@@ -55,8 +55,8 @@ fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, timeout_ms: i
     let cmd_borrowed = unsafe { BorrowedFd::borrow_raw(cmd_fd) };
 
     let mut poll_fds = [
-        PollFd::new(io_borrowed, io_events),
-        PollFd::new(cmd_borrowed, PollFlags::POLLIN),
+        PollFd::new(&io_borrowed, io_events),
+        PollFd::new(&cmd_borrowed, PollFlags::POLLIN),
     ];
 
     match poll(&mut poll_fds, timeout_ms) {
@@ -279,7 +279,27 @@ impl EndpointWritable for DeviceEndpoint {
 }
 
 /// Factory for creating endpoints from configuration
-pub fn create_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn EndpointReadable + Send>> {
+pub fn create_reader_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn EndpointReadable + Send>> {
+    match config {
+        EndpointConfig::Network(net_config) => {
+            match net_config.protocol {
+                NetworkProtocol::Udp => {
+                    Ok(Box::new(UdpEndpoint::new(net_config)?))
+                }
+                NetworkProtocol::Tcp => {
+                    Ok(Box::new(TcpEndpoint::new_server(net_config)?))
+                }
+                _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
+            }
+        }
+        EndpointConfig::Device(dev_config) => {
+            Ok(Box::new(DeviceEndpoint::new(dev_config)?))
+        }
+    }
+}
+
+/// Factory for creating endpoints from configuration
+pub fn create_writer_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn EndpointWritable + Send>> {
     match config {
         EndpointConfig::Network(net_config) => {
             match net_config.protocol {

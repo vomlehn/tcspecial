@@ -7,10 +7,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-mod beacon;
 mod payload;
 
-use beacon::Beacon;
 use payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
 
 slint::include_modules!();
@@ -20,7 +18,6 @@ fn main() {
 
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
-    Beacon::new(Duration::from_secs(2));
 
     // Create payload configurations from tcspayload.json spec
     let configs = vec![

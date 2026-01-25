@@ -6,7 +6,10 @@ use std::env;
 use std::process;
 use tcspecial::{config::load_config, CommandInterpreter};
 
+use tcspecial::Beacon;
+
 fn main() {
+eprintln!("Starting tcsspecial");
     // Initialize logging
     env_logger::init();
 

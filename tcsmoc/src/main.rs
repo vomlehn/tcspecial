@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 use slint::SharedString;
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::{Command as TcsCommand, CommandStatus, DHId, DHName, DHType, PingCommand, QueryDHCommand, StartDHCommand, StopDHCommand};
+use tcslibgs::{CommandStatus, DHId, DHName, DHType};
 
 slint::include_modules!();
 

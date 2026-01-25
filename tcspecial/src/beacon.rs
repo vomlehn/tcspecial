@@ -66,7 +66,6 @@ eprintln!("Beacon::beacon: loop");
             // Wait until expiration time or until notified
             while *expiration > SystemTime::now() {
 eprintln!("Beacon::beacon: while");
-                eprintln!("Worker: waiting for signal...");
                 let timeout = expiration
                     .duration_since(SystemTime::now())
                     .unwrap_or(Duration::from_millis(1));
@@ -79,7 +78,7 @@ eprintln!("Beacon::beacon: while");
                 }
             }
 
-            eprintln!("Signal received or timeout");
+            eprintln!("Beacon::beacon: Signal received or timeout");
 
             // Send the beacon
             self.send_beacon(&socket, &self.dest_addr);
@@ -89,7 +88,6 @@ eprintln!("Beacon::beacon: while");
             let now = SystemTime::now();
             *expiration = now + interval;
         }
-       return Ok(())
     }
 
     pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {

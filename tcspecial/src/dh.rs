@@ -91,7 +91,7 @@ impl DataHandler {
         let payload_writer = create_writer_endpoint(&self.config.endpoint)?;
 
         // Create relays
-        let mut g2p_relay = Relay::new(
+        let g2p_relay = Relay::new(
             RelayDirection::GroundToPayload,
             oc_reader,
             payload_writer,
@@ -99,7 +99,7 @@ impl DataHandler {
             cmd_write,
         );
 
-        let mut p2g_relay = Relay::new(
+        let p2g_relay = Relay::new(
             RelayDirection::PayloadToGround,
             payload_reader,
             oc_writer,

@@ -6,12 +6,12 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream, UdpSocket};
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::time::Duration;
+//use std::time::Duration;
 use nix::poll::{poll, PollFd, PollFlags};
 use std::os::fd::BorrowedFd;
 use tcslibgs::{DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
-use crate::config::constants::{ENDPOINT_BUFFER_SIZE, ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX, ENDPOINT_MAX_RETRIES};
+use crate::config::constants::{ENDPOINT_BUFFER_SIZE, /*ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX, ENDPOINT_MAX_RETRIES*/};
 
 /// Trait for endpoints that can wait for events
 pub trait EndpointWaitable {

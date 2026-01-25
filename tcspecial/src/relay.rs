@@ -41,9 +41,9 @@ impl Relay {
     /// Create a new relay
     pub fn new(
         direction: RelayDirection,
-        reader: Box<dyn EndpointReadable + Send>,
-        writer: Box<dyn EndpointWritable + Send>,
-        cmd_pipe_read: RawFd,
+        _reader: Box<dyn EndpointReadable + Send>,
+        _writer: Box<dyn EndpointWritable + Send>,
+        _cmd_pipe_read: RawFd,
         cmd_pipe_write: RawFd,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));

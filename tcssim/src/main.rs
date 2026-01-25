@@ -21,7 +21,7 @@ fn main() {
     // Create payload configurations from tcspayload.json spec
     let configs = vec![
         PayloadConfig {
-            id: 0,
+            _id: 0,
             protocol: PayloadProtocol::Tcp,
             address: "127.0.0.1".to_string(),
             port: 5000,
@@ -31,7 +31,7 @@ fn main() {
             segment_interval_ms: Arc::new(AtomicU32::new(1000)),
         },
         PayloadConfig {
-            id: 1,
+            _id: 1,
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5001,
@@ -41,7 +41,7 @@ fn main() {
             segment_interval_ms: Arc::new(AtomicU32::new(1000)),
         },
         PayloadConfig {
-            id: 2,
+            _id: 2,
             protocol: PayloadProtocol::Device,
             address: "/dev/urandom".to_string(),
             port: 0,
@@ -51,7 +51,7 @@ fn main() {
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
         },
         PayloadConfig {
-            id: 3,
+            _id: 3,
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5003,

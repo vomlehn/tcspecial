@@ -27,24 +27,26 @@ impl ProcessManager {
     }
 
     /// Starts tcssim in a background thread and exits when it completes
-    fn start_tcssim(&self) {
+    fn start_child(&self, name: &str) {
         let child = Command::new("cargo")
-            .args(["run", "--bin", "tcssim"])
+            .args(["run", "--bin", name])
             .spawn()
-            .expect("Failed to start tcssim");
+            .expect(format!("Failed to start {}", name).as_str());
 
         *self.child.lock().unwrap() = Some(child);
 
         let child_handle = self.child.clone();
+        let name_clone = name.to_string();
 
         thread::spawn(move || {
+eprintln!("start_child: started {}", name_clone);
             loop {
                 thread::sleep(Duration::from_millis(100));
                 let mut guard = child_handle.lock().unwrap();
                 if let Some(ref mut child) = *guard {
                     match child.try_wait() {
                         Ok(Some(status)) => {
-                            println!("tcssim exited with status: {}", status);
+                            println!("{} exited with status: {}", name_clone, status);
                             drop(guard);
                             exit(0);
                         }
@@ -52,7 +54,7 @@ impl ProcessManager {
                             // Still running
                         }
                         Err(e) => {
-                            println!("Error waiting for tcssim: {}", e);
+                            println!("Error waiting for {}: {}", e, name_clone);
                             drop(guard);
                             exit(1);
                         }
@@ -84,7 +86,8 @@ fn main() {
 
     // Start tcssim subprocess
     let process_manager = Arc::new(ProcessManager::new());
-    process_manager.start_tcssim();
+    process_manager.start_child("tcssim");
+    process_manager.start_child("tcspecial");
 
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();

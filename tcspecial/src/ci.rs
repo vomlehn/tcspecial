@@ -3,6 +3,7 @@
 //! The CI processes commands from the OC and manages data handlers.
 
 use std::collections::BTreeMap;
+use crate::Beacon;
 use std::net::UdpSocket;
 use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
@@ -14,7 +15,7 @@ use tcslibgs::{
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
-use crate::config::constants::RESTART_ARM_TIMEOUT;
+use crate::config::constants::{BEACON_DEFAULT_MS, RESTART_ARM_TIMEOUT};
 use crate::dh::DataHandler;
 
 /// Command interpreter state
@@ -23,6 +24,7 @@ pub struct CommandInterpreter {
     socket: UdpSocket,
     data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
     dh_configs: Vec<DHConfig>,
+    beacon: Option<Beacon>,
     beacon_interval: BeaconTime,
     arm_key: Option<ArmKey>,
     arm_time: Option<Instant>,
@@ -39,6 +41,7 @@ impl CommandInterpreter {
 
         Ok(Self {
             beacon_interval: config.beacon_interval,
+            beacon: None,
             config,
             socket,
             data_handlers: Arc::new(Mutex::new(BTreeMap::new())),
@@ -179,10 +182,14 @@ impl CommandInterpreter {
         let mut last_beacon = Instant::now();
         let mut last_client_addr: Option<std::net::SocketAddr> = None;
 
+/*
         // Set a timeout for receiving so we can send beacons
         self.socket.set_read_timeout(Some(Duration::from_millis(100)))?;
+*/
+        let beacon = Beacon::new(BEACON_DEFAULT_MS, "0.0.0.0".parse().unwrap());
 
         while self.running {
+/*
             // Check if we need to send a beacon
             if last_beacon.elapsed() >= Duration::from_millis(self.beacon_interval.0 as u64) {
                 if let Some(addr) = last_client_addr {
@@ -190,6 +197,7 @@ impl CommandInterpreter {
                 }
                 last_beacon = Instant::now();
             }
+*/
 
             // Try to receive a command
             match self.socket.recv_from(&mut recv_buffer) {

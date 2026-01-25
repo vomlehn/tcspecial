@@ -8,18 +8,23 @@
  * NOTE: Once started, it is not possible to turn beaconing off. Still, setting
  * the interval to a very large interval will effectively do so.
  */
+
+use std::net::UdpSocket;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+use tcslibgs::{BeaconTelemetry, TcsResult, Telemetry};
+
 #[derive(Clone)]
 pub struct Beacon {
-    pair: ArcCondPair<SystemTime>,
-    interval: Arc<Mutex<Duration>>,
+    pair:       ArcCondPair<SystemTime>,
+    interval:   Arc<Mutex<Duration>>,
+    dest_addr:  std::net::SocketAddr
 }
 
 impl Beacon {
-    pub fn new(interval: Duration) -> Option<Beacon> {
+    pub fn new(interval: Duration, dest_addr: std::net::SocketAddr) -> Option<Beacon> {
         if interval == Duration::from_secs(0) {
             return None;
         }
@@ -33,6 +38,7 @@ impl Beacon {
         let b = Beacon {
             pair,
             interval: Arc::new(Mutex::new(interval)),
+            dest_addr,
         };
 
         let b_clone = b.clone();
@@ -43,8 +49,12 @@ impl Beacon {
         Some(b)
     }
 
-    fn beacon(&self) {
-        self.send_beacon();
+    // FIXME: check result type
+    fn beacon(&self) -> TcsResult<()> {
+        // Bind to a local address
+        let socket = UdpSocket::bind("0.0.0.0:0")?; // 0 = let OS pick a port
+
+        self.send_beacon(&socket, &self.dest_addr);
 
         loop {
             let mut expiration = self.pair.lock.lock().unwrap();
@@ -67,22 +77,21 @@ impl Beacon {
             eprintln!("Signal received or timeout");
 
             // Send the beacon
-            self.send_beacon();
+            self.send_beacon(&socket, &self.dest_addr);
 
-            // Calculate next expiration time
+            // Calculate next expiration time1G
             let interval = *self.interval.lock().unwrap();
             let now = SystemTime::now();
             *expiration = now + interval;
         }
+       return Ok(())
     }
 
-    /// Send a single beacon message
-    fn send_beacon(&self) {
-        eprintln!("Sending beacon at {:?}", SystemTime::now());
-        /*
-        let msg = BeaconTelemetry::new();
-        send(msg);
-        */
+    pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {
+        let beacon = Telemetry::Beacon(BeaconTelemetry::new());
+        let data = serde_json::to_vec(&beacon)?;
+        socket.send_to(&data, dest_addr)?;
+        Ok(())
     }
 
     /// Reset the interval to the given value. This will result in the immediate

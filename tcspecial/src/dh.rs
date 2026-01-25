@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tcslibgs::{DHConfig, DHId, DHName, Statistics, TcsError, TcsResult};
 
-use crate::endpoint::{create_endpoint, EndpointReadable, EndpointWritable};
+use crate::endpoint::{create_reader_endpoint, create_writer_endpoint, EndpointReadable, EndpointWritable};
 use crate::relay::{Relay, RelayDirection};
 
 /// Data handler state
@@ -87,8 +87,8 @@ impl DataHandler {
         let (cmd_read, cmd_write) = self.cmd_pipe.ok_or_else(|| TcsError::DataHandler("No command pipe".to_string()))?;
 
         // Create payload endpoint
-        let payload_reader = create_endpoint(&self.config.endpoint)?;
-        let payload_writer = create_endpoint(&self.config.endpoint)?;
+        let payload_reader = create_reader_endpoint(&self.config.endpoint)?;
+        let payload_writer = create_writer_endpoint(&self.config.endpoint)?;
 
         // Create relays
         let mut g2p_relay = Relay::new(

@@ -107,8 +107,17 @@ test:
 		echo "✓ Tests complete"; \
 	)
 
-# Run the MOC application
+# Run the tcspecial application
 run:
+	( \
+		set -eu; \
+		$(FIXUP) \
+		echo "Running $(PROJECT_NAME)..."; \
+		cd $(RUST) && RUST_LOG=info cargo run --bin tcspecial \
+	)
+
+# Run the MOC application
+runmoc:
 	( \
 		set -eu; \
 		$(FIXUP) \

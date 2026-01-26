@@ -408,7 +408,7 @@ The usual lifetime of a DH starts with creation by CI, followed by start up
 of the threads used and allocation of any other resources. It then waits for
 activation. 
 
-After activation, it enters a loop relaying data between OC
+After activation, it enters a loop conduiting data between OC
 and a payload. During I/O, it may receive notification from CI that something
 command needs to be done. This could be something like transmitting statistics
 or deactivating the DH.
@@ -423,7 +423,7 @@ and then waits for a DH Activate command.
 
 Main Loop
 "^^^^^^^^^
-Data handlers (DHs) relay data between the OC and
+Data handlers (DHs) conduit data between the OC and
 a payload. Data is transmitted between the OC and a DH is done with a
 UDP/IP link. The data exchange between a DH and a payload may be done
 with stream and datagram methods. 
@@ -715,17 +715,17 @@ Linux device Endpoints open device entries in the /dev directory. This could be:
 +----------------+---------------------------------------------+
 
 
-Relays
+Conduits
 ^^^^^^
-Relays contain two Endpoints, an EndpointReadable and an EndpointWritable. Data
+Conduits contain two Endpoints, an EndpointReadable and an EndpointWritable. Data
 flows in just one direction, from the EndpointReadable to the EndpointWriteable.
-A Relay is implemented as a thread that simply looks between the Read and
+A Conduit is implemented as a thread that simply looks between the Read and
 EndpointWriteables, handling commands from the Command Interpreter as necessary.
 The directions are denoted "Ground to Payload" and "Payload to Ground"
 
 Data Handlers
 ^^^^^^^^^^^^^
-Data Handlers package two Relays, one in one direction and one in the
+Data Handlers package two Conduits, one in one direction and one in the
 other. File descriptors are shared between the EndpointReadable of one direction
 and the EndpointWriteable of the other direction, and the EndpointWriteable of
 the first direction and the EndpointReadable of the other direction, as show below:

@@ -79,7 +79,7 @@ fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, timeout_ms: i
 /// UDP endpoint for network communication
 pub struct UdpEndpoint {
     socket: UdpSocket,
-    buffer: Vec<u8>,
+    _buffer: Vec<u8>,
 }
 
 impl UdpEndpoint {
@@ -90,7 +90,7 @@ impl UdpEndpoint {
 
         Ok(Self {
             socket,
-            buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
 
@@ -134,8 +134,8 @@ impl EndpointWritable for UdpEndpoint {
 pub struct TcpEndpoint {
     stream: Option<TcpStream>,
     listener: Option<TcpListener>,
-    buffer: Vec<u8>,
-    is_server: bool,
+    _buffer: Vec<u8>,
+    _is_server: bool,
 }
 
 impl TcpEndpoint {
@@ -147,8 +147,8 @@ impl TcpEndpoint {
         Ok(Self {
             stream: None,
             listener: Some(listener),
-            buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
-            is_server: true,
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+            _is_server: true,
         })
     }
 
@@ -160,8 +160,8 @@ impl TcpEndpoint {
         Ok(Self {
             stream: Some(stream),
             listener: None,
-            buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
-            is_server: false,
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+            _is_server: false,
         })
     }
 
@@ -233,7 +233,7 @@ impl EndpointWritable for TcpEndpoint {
 /// Device endpoint for device file I/O
 pub struct DeviceEndpoint {
     file: File,
-    buffer: Vec<u8>,
+    _buffer: Vec<u8>,
 }
 
 impl DeviceEndpoint {
@@ -245,7 +245,7 @@ impl DeviceEndpoint {
 
         Ok(Self {
             file,
-            buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
 }

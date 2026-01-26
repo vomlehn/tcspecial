@@ -1,6 +1,6 @@
-//! Relay implementation for TCSpecial
+//! Conduit implementation for TCSpecial
 //!
-//! Relays move data between endpoints in one direction.
+//! Conduits move data between endpoints in one direction.
 
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,36 +11,36 @@ use tcslibgs::{Statistics, TcsError, TcsResult};
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{EndpointReadable, EndpointWritable, WaitResult};
 
-/// Direction of data flow in a relay
+/// Direction of data flow in a conduit
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RelayDirection {
+pub enum ConduitDirection {
     /// Ground to payload
     GroundToPayload,
     /// Payload to ground
     PayloadToGround,
 }
 
-/// Command for relay control
+/// Command for conduit control
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RelayCommand {
-    /// Stop the relay
+pub enum ConduitCommand {
+    /// Stop the conduit
     Stop,
     /// Get statistics
     GetStats,
 }
 
-/// Relay thread state
-pub struct Relay {
-    direction: RelayDirection,
+/// Conduit thread state
+pub struct Conduit {
+    direction: ConduitDirection,
     running: Arc<AtomicBool>,
     thread_handle: Option<JoinHandle<TcsResult<Statistics>>>,
     cmd_pipe_write: RawFd,
 }
 
-impl Relay {
-    /// Create a new relay
+impl Conduit {
+    /// Create a new conduit
     pub fn new(
-        direction: RelayDirection,
+        direction: ConduitDirection,
         _reader: Box<dyn EndpointReadable + Send>,
         _writer: Box<dyn EndpointWritable + Send>,
         _cmd_pipe_read: RawFd,
@@ -56,10 +56,10 @@ impl Relay {
         }
     }
 
-    /// Start the relay thread
+    /// Start the conduit thread
     pub fn start(&mut self, mut reader: Box<dyn EndpointReadable + Send>, mut writer: Box<dyn EndpointWritable + Send>, cmd_fd: RawFd) -> TcsResult<()> {
         if self.running.load(Ordering::SeqCst) {
-            return Err(TcsError::DataHandler("Relay already running".to_string()));
+            return Err(TcsError::DataHandler("Conduit already running".to_string()));
         }
 
         let running = self.running.clone();
@@ -121,7 +121,7 @@ impl Relay {
         Ok(())
     }
 
-    /// Stop the relay thread
+    /// Stop the conduit thread
     pub fn stop(&mut self) -> TcsResult<Statistics> {
         self.running.store(false, Ordering::SeqCst);
 
@@ -138,18 +138,18 @@ impl Relay {
         }
     }
 
-    /// Check if the relay is running
+    /// Check if the conduit is running
     pub fn is_running(&self) -> bool {
         self.running.load(Ordering::SeqCst)
     }
 
-    /// Get the relay direction
-    pub fn direction(&self) -> RelayDirection {
+    /// Get the conduit direction
+    pub fn direction(&self) -> ConduitDirection {
         self.direction
     }
 }
 
-impl Drop for Relay {
+impl Drop for Conduit {
     fn drop(&mut self) {
         if self.is_running() {
             let _ = self.stop();
@@ -162,7 +162,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_relay_direction() {
-        assert_ne!(RelayDirection::GroundToPayload, RelayDirection::PayloadToGround);
+    fn test_conduit_direction() {
+        assert_ne!(ConduitDirection::GroundToPayload, ConduitDirection::PayloadToGround);
     }
 }

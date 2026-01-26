@@ -44,7 +44,8 @@ eprintln!("Beacon::new: entered");
 
         let b_clone = b.clone();
         thread::spawn(move || {
-            b_clone.beacon();
+// FIXME: add check for error
+            let _ = b_clone.beacon();
         });
 
 eprintln!("Beacon::new: exit");
@@ -57,7 +58,8 @@ eprintln!("Beacon::beacon: entered");
         // Bind to a local address
         let socket = UdpSocket::bind("0.0.0.0:0")?; // 0 = let OS pick a port
 
-        self.send_beacon(&socket, &self.dest_addr);
+// FIXME: add check for error
+        let _ = self.send_beacon(&socket, &self.dest_addr);
 
         loop {
 eprintln!("Beacon::beacon: loop");
@@ -81,7 +83,8 @@ eprintln!("Beacon::beacon: while");
             eprintln!("Beacon::beacon: Signal received or timeout");
 
             // Send the beacon
-            self.send_beacon(&socket, &self.dest_addr);
+// FIXME: add check for error
+            let _ = self.send_beacon(&socket, &self.dest_addr);
 
             // Calculate next expiration time1G
             let interval = *self.interval.lock().unwrap();

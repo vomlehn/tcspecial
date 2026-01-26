@@ -21,16 +21,16 @@ use crate::dh::DataHandler;
 
 /// Command interpreter state
 pub struct CommandInterpreter {
-    config: CIConfig,
+    _beacon: Option<Beacon>,
+    beacon_interval: BeaconTime,
+    _config: CIConfig,
     socket: UdpSocket,
     data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
     dh_configs: Vec<DHConfig>,
-    beacon: Option<Beacon>,
-    beacon_interval: BeaconTime,
     arm_key: Option<ArmKey>,
     arm_time: Option<Instant>,
     running: bool,
-    global_stats: Statistics,
+    _global_stats: Statistics,
 }
 
 impl CommandInterpreter {
@@ -42,15 +42,15 @@ impl CommandInterpreter {
 
         Ok(Self {
             beacon_interval: config.beacon_interval,
-            beacon: None,
-            config,
+            _beacon: None,
+            _config: config,
             socket,
             data_handlers: Arc::new(Mutex::new(BTreeMap::new())),
             dh_configs,
             arm_key: None,
             arm_time: None,
             running: false,
-            global_stats: Statistics::new(),
+            _global_stats: Statistics::new(),
         })
     }
 
@@ -169,7 +169,7 @@ impl CommandInterpreter {
     }
 
     /// Send a beacon telemetry message
-    fn send_beacon(&self, addr: &std::net::SocketAddr) -> TcsResult<()> {
+    fn _send_beacon(&self, addr: &std::net::SocketAddr) -> TcsResult<()> {
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
         self.socket.send_to(&data, addr)?;
@@ -180,14 +180,14 @@ impl CommandInterpreter {
     pub fn run(&mut self) -> TcsResult<()> {
         self.running = true;
         let mut recv_buffer = vec![0u8; 65535];
-        let mut last_beacon = Instant::now();
+        let _last_beacon = Instant::now();
         let mut _last_client_addr: Option<std::net::SocketAddr> = None;
 
 /*
         // Set a timeout for receiving so we can send beacons
         self.socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 */
-        let beacon = Beacon::new(BEACON_DEFAULT_MS, "0.0.0.0:0".parse().unwrap());
+        let _beacon = Beacon::new(BEACON_DEFAULT_MS, "0.0.0.0:0".parse().unwrap());
 
         while self.running {
 /*

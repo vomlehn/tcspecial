@@ -17,12 +17,14 @@ mod app;
 /// Manages the tcssim subprocess
 struct ProcessManager {
     child: Arc<Mutex<Option<Child>>>,
+    name: Mutex<String>,
 }
 
 impl ProcessManager {
     fn new() -> Self {
         Self {
             child: Arc::new(Mutex::new(None)),
+            name: Mutex::new(String::new()),
         }
     }
 
@@ -31,15 +33,16 @@ impl ProcessManager {
         let child = Command::new("cargo")
             .args(["run", "--bin", name])
             .spawn()
-            .expect(format!("Failed to start {}", name).as_str());
+            .expect(&format!("Failed to start {}", name));
 
         *self.child.lock().unwrap() = Some(child);
+        *self.name.lock().unwrap() = name.to_string();
 
         let child_handle = self.child.clone();
         let name_clone = name.to_string();
 
         thread::spawn(move || {
-eprintln!("start_child: started {}", name_clone);
+            eprintln!("start_child: started {}", name_clone);
             loop {
                 thread::sleep(Duration::from_millis(100));
                 let mut guard = child_handle.lock().unwrap();
@@ -54,7 +57,7 @@ eprintln!("start_child: started {}", name_clone);
                             // Still running
                         }
                         Err(e) => {
-                            println!("Error waiting for {}: {}", e, name_clone);
+                            println!("Error waiting for {}: {}", name_clone, e);
                             drop(guard);
                             exit(1);
                         }
@@ -69,6 +72,15 @@ eprintln!("start_child: started {}", name_clone);
 
     /// Kills tcssim and exits the current program
     fn kill_and_exit(&self) {
+        self.kill();
+        exit(0);
+    }
+
+    fn kill(&self) {
+        let name = self.name.lock().unwrap();
+        eprintln!("Kill child {}", *name);
+        drop(name);
+
         let mut guard = self.child.lock().unwrap();
         if let Some(ref mut child) = *guard {
             let _ = child.kill();
@@ -76,8 +88,6 @@ eprintln!("start_child: started {}", name_clone);
             println!("tcssim killed");
         }
         *guard = None;
-        drop(guard);
-        exit(0);
     }
 }
 
@@ -85,9 +95,10 @@ fn main() {
     env_logger::init();
 
     // Start tcssim subprocess
-    let process_manager = Arc::new(ProcessManager::new());
-    process_manager.start_child("tcssim");
-    process_manager.start_child("tcspecial");
+    let process_manager_tcssim = Arc::new(ProcessManager::new());
+    process_manager_tcssim.start_child("tcssim");
+    let process_manager_tcspecial = Arc::new(ProcessManager::new());
+    process_manager_tcspecial.start_child("tcspecial");
 
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
@@ -278,20 +289,29 @@ fn main() {
 
     // Quit button handler
     {
-        let pm = process_manager.clone();
+        let pm_tcssim = process_manager_tcssim.clone();
+        let pm_tcspecial = process_manager_tcspecial.clone();
         ui.on_quit_clicked(move || {
-            pm.kill_and_exit();
+            kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
         });
     }
 
     // Window close handler (close box)
     {
-        let pm = process_manager.clone();
+        let pm_tcssim = process_manager_tcssim.clone();
+        let pm_tcspecial = process_manager_tcspecial.clone();
         ui.window().on_close_requested(move || {
-            pm.kill_and_exit();
+            kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
             slint::CloseRequestResponse::HideWindow
         });
     }
 
     ui.run().unwrap();
+}
+
+fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: &Arc<ProcessManager>) {
+    pm_tcssim.kill();
+    pm_tcspecial.kill();
+    // FIXME: Not really right. Just exit()?
+    exit(0);
 }

@@ -1,6 +1,6 @@
 //! Data Handler implementation for TCSpecial
 //!
-//! Data handlers relay data between the OC (Operations Center) and payloads.
+//! Data handlers conduit data between the OC (Operations Center) and payloads.
 
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,14 +8,14 @@ use std::sync::Arc;
 use tcslibgs::{DHConfig, DHId, DHName, Statistics, TcsError, TcsResult};
 
 use crate::endpoint::{create_reader_endpoint, create_writer_endpoint, EndpointReadable, EndpointWritable};
-use crate::relay::{Relay, RelayDirection};
+use crate::conduit::{Conduit, ConduitDirection};
 
 /// Data handler state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DHState {
     /// Created but not activated
     Created,
-    /// Active and relaying data
+    /// Active and conduiting data
     Active,
     /// Stopped
     Stopped,
@@ -27,8 +27,8 @@ pub struct DataHandler {
     name: DHName,
     config: DHConfig,
     state: DHState,
-    ground_to_payload: Option<Relay>,
-    payload_to_ground: Option<Relay>,
+    ground_to_payload: Option<Conduit>,
+    payload_to_ground: Option<Conduit>,
     stats: Statistics,
     running: Arc<AtomicBool>,
     cmd_pipe: Option<(RawFd, RawFd)>,
@@ -90,30 +90,30 @@ impl DataHandler {
         let payload_reader = create_reader_endpoint(&self.config.endpoint)?;
         let payload_writer = create_writer_endpoint(&self.config.endpoint)?;
 
-        // Create relays
-        let g2p_relay = Relay::new(
-            RelayDirection::GroundToPayload,
+        // Create conduits
+        let g2p_conduit = Conduit::new(
+            ConduitDirection::GroundToPayload,
             oc_reader,
             payload_writer,
             cmd_read,
             cmd_write,
         );
 
-        let p2g_relay = Relay::new(
-            RelayDirection::PayloadToGround,
+        let p2g_conduit = Conduit::new(
+            ConduitDirection::PayloadToGround,
             payload_reader,
             oc_writer,
             cmd_read,
             cmd_write,
         );
 
-        // Note: In a full implementation, we would start the relays here
+        // Note: In a full implementation, we would start the conduits here
         // For now, we just update state
         self.state = DHState::Active;
         self.running.store(true, Ordering::SeqCst);
 
-        self.ground_to_payload = Some(g2p_relay);
-        self.payload_to_ground = Some(p2g_relay);
+        self.ground_to_payload = Some(g2p_conduit);
+        self.payload_to_ground = Some(p2g_conduit);
 
         Ok(())
     }
@@ -127,17 +127,17 @@ impl DataHandler {
 
         self.running.store(false, Ordering::SeqCst);
 
-        // Stop relays and collect statistics
-        if let Some(mut relay) = self.ground_to_payload.take() {
-            if let Ok(stats) = relay.stop() {
+        // Stop conduits and collect statistics
+        if let Some(mut conduit) = self.ground_to_payload.take() {
+            if let Ok(stats) = conduit.stop() {
                 self.stats.bytes_received += stats.bytes_received;
                 self.stats.reads_completed += stats.reads_completed;
                 self.stats.reads_failed += stats.reads_failed;
             }
         }
 
-        if let Some(mut relay) = self.payload_to_ground.take() {
-            if let Ok(stats) = relay.stop() {
+        if let Some(mut conduit) = self.payload_to_ground.take() {
+            if let Ok(stats) = conduit.stop() {
                 self.stats.bytes_sent += stats.bytes_sent;
                 self.stats.writes_completed += stats.writes_completed;
                 self.stats.writes_failed += stats.writes_failed;

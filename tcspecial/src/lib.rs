@@ -8,11 +8,11 @@ pub mod ci;
 pub mod config;
 pub mod dh;
 pub mod endpoint;
-pub mod relay;
+pub mod conduit;
 
 pub use beacon::*;
 pub use ci::*;
 pub use config::*;
 pub use dh::*;
 pub use endpoint::*;
-pub use relay::*;
+pub use conduit::*;

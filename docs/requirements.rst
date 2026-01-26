@@ -15,7 +15,7 @@ Introduction
    +--------------------------------------------------------------------------------+
 
 TCSpecial is a framework for passing commands to payload devices from            |
-an operations center (OC) and relaying
+an operations center (OC) and conduiting
 telemetry`from the payloads to the OC. This document sets for
 requirements for its operation
 

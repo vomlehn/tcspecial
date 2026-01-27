@@ -30,10 +30,10 @@ pub mod constants {
     use std::time::Duration;
 
     // Interval between transmissions of the beacon message
-    pub const BEACON_DEFAULT_MS: Duration = Duration::from_millis(2000);
+    pub const BEACON_DEFAULT_MS: Duration = Duration::from_millis(8000);
 
     // Amount of time after receipt of a beacon message to display green
-    pub const BEACON_GREEN: Duration = Duration::from_millis(2000);
+    pub const BEACON_GREEN: Duration = Duration::from_millis(1000);
 
     // Amount of time after end of displaying green to display yellow
     pub const BEACON_YELLOW: Duration = Duration::from_millis(2000);

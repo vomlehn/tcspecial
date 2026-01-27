@@ -96,6 +96,7 @@ export component MainWindow inherits Window {
     in-out property <string> ci-address: "127.0.0.1:4000";
     in-out property <string> last-response: "";
     in-out property <string> beacon-time: "--:--:--";
+    in-out property <color> indicator-color: transparent;
 
     // DH properties
     in-out property <string> dh0-status: "Stopped";
@@ -174,6 +175,15 @@ export component MainWindow inherits Window {
                         clicked => { query-all-clicked(); }
                     }
                     Text { text: "Last Beacon: " + beacon-time; vertical-alignment: center; }
+
+                    Rectangle {
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 10px;
+                        background: indicator-color;
+                        border-color: #808080;
+                        border-width: 1px;
+                    }
                 }
 
                 HorizontalLayout {

@@ -82,7 +82,7 @@ impl ProcessManager {
         if let Some(ref mut child) = *guard {
             let _ = child.kill();
             let _ = child.wait();
-            println!("tcssim killed");
+            println!("Process killed");
         }
         *guard = None;
     }
@@ -99,7 +99,8 @@ fn main() {
 
     // Start collecting beacon data
     let beacon_addr: std::net::SocketAddr = "0.0.0.0:5550".parse().unwrap();
-    let _beacon_receive = BeaconReceive::new(beacon_addr);
+    let beacon_ui_weak = ui_weak.clone();
+    let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr);
 
     // Start tcssim subprocess
     let process_manager_tcssim = Arc::new(ProcessManager::new());
@@ -313,6 +314,5 @@ fn main() {
 fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: &Arc<ProcessManager>) {
     pm_tcssim.kill();
     pm_tcspecial.kill();
-    // FIXME: Not really right. Just exit()?
     exit(0);
 }

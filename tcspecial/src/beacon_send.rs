@@ -58,7 +58,7 @@ eprintln!("Beacon::new: exit");
 eprintln!("Beacon::beacon_send: entered");
         // Bind to a local address
 //        let socket = UdpSocket::bind(BEACON_NETADDR)?; // 0 = let OS pick a port
-        let socket = UdpSocket::bind(BEACON_NETADDR); // 0 = let OS pick a port
+        let socket = UdpSocket::bind("0.0.0.0:0"); // 0 = let OS pick a port
 eprintln!("beacon_send::socket: {:?}", socket);
 let socket = socket?;
 
@@ -101,6 +101,7 @@ eprintln!("Beacon::beacon_send: while");
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
 eprintln!("BeaconSend::send_beacon: calling send_to");
+eprintln!("BeaconSend::send_beacom: dest_add {:?}", dest_addr);
 //        socket.send_to(&data, dest_addr)?;
         let status = socket.send_to(&data, dest_addr);
 eprintln!("BeaconSend::send_beacon: {:?}", status);

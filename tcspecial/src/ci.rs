@@ -3,7 +3,7 @@
 //! The CI processes commands from the OC and manages data handlers.
 
 use std::collections::BTreeMap;
-use crate::Beacon;
+use crate::beacon_send::BeaconSend;
 use std::net::UdpSocket;
 //use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
@@ -16,12 +16,12 @@ use tcslibgs::{
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
-use crate::config::constants::{BEACON_DEFAULT_MS, RESTART_ARM_TIMEOUT};
+use crate::config::constants::{BEACON_DEFAULT_MS, BEACON_NETADDR, RESTART_ARM_TIMEOUT};
 use crate::dh::DataHandler;
 
 /// Command interpreter state
 pub struct CommandInterpreter {
-    _beacon: Option<Beacon>,
+    _beacon: Option<BeaconSend>,
     beacon_interval: BeaconTime,
     _config: CIConfig,
     socket: UdpSocket,
@@ -187,7 +187,9 @@ impl CommandInterpreter {
         // Set a timeout for receiving so we can send beacons
         self.socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 */
-        let _beacon = Beacon::new(BEACON_DEFAULT_MS, "0.0.0.0:0".parse().unwrap());
+eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
+//        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, BEACON_NETADDR.parse().unwrap());
+        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, "0.0.0.0:5550".parse().unwrap());
 
         while self.running {
 /*

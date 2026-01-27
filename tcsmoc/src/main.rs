@@ -10,9 +10,12 @@ use slint::SharedString;
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{CommandStatus, DHId, DHName, DHType};
 
+use crate::beacon_receive::BeaconReceive;
+
 slint::include_modules!();
 
 mod app;
+mod beacon_receive;
 
 /// Manages the tcssim subprocess
 struct ProcessManager {
@@ -70,12 +73,6 @@ impl ProcessManager {
         });
     }
 
-    /// Kills tcssim and exits the current program
-    fn kill_and_exit(&self) {
-        self.kill();
-        exit(0);
-    }
-
     fn kill(&self) {
         let name = self.name.lock().unwrap();
         eprintln!("Kill child {}", *name);
@@ -92,19 +89,23 @@ impl ProcessManager {
 }
 
 fn main() {
+    eprintln!("TcsMoc running");
     env_logger::init();
+    let ui = MainWindow::new().unwrap();
+    let ui_weak = ui.as_weak();
+
+    // Shared client state
+    let client: Arc<Mutex<Option<TcsClient>>> = Arc::new(Mutex::new(None));
+
+    // Start collecting beacon data
+    let beacon_addr: std::net::SocketAddr = "0.0.0.0:5550".parse().unwrap();
+    let _beacon_receive = BeaconReceive::new(beacon_addr);
 
     // Start tcssim subprocess
     let process_manager_tcssim = Arc::new(ProcessManager::new());
     process_manager_tcssim.start_child("tcssim");
     let process_manager_tcspecial = Arc::new(ProcessManager::new());
     process_manager_tcspecial.start_child("tcspecial");
-
-    let ui = MainWindow::new().unwrap();
-    let ui_weak = ui.as_weak();
-
-    // Shared client state
-    let client: Arc<Mutex<Option<TcsClient>>> = Arc::new(Mutex::new(None));
 
     // Connect button handler
     {

@@ -3,14 +3,14 @@
 //! TCSpecial runs on the spacecraft and manages communication between
 //! ground operations and payloads.
 
-pub mod beacon;
+pub mod beacon_send;
 pub mod ci;
 pub mod config;
 pub mod dh;
 pub mod endpoint;
 pub mod conduit;
 
-pub use beacon::*;
+pub use beacon_send::*;
 pub use ci::*;
 pub use config::*;
 pub use dh::*;

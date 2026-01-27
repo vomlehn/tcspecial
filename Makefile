@@ -22,6 +22,9 @@ PROMPT = Generate Rust code ($(TCS_CODE)) and tests ($(TCS_TEST)), and create $(
 
 TCS_CRATES = tcslib tcslibgs g tcsmoc tcssim tcspayload.json
 
+RELEASE = --release
+RELEASE =
+
 FIXUP = set -x; \
 		echo "Project fixup..."; \
 		sed -i 's/into_raw_fd/as_raw_fd/g' g/src/endpoint.rs; \
@@ -93,7 +96,27 @@ build:
 		set -eu; \
 		$(FIXUP) \
 		echo "Building the project..."; \
-		cd $(RUST) && cargo build --release; \
+		cd $(RUST) && cargo build $(RELEASE) --bin tcspecial; \
+		echo "✓ Build complete" \
+	) 2>&1 | tee build.out
+
+# Build the project
+buildmoc:
+	( \
+		set -eu; \
+		$(FIXUP) \
+		echo "Building the project..."; \
+		cd $(RUST) && cargo build $(RELEASE) --bin tcsmoc; \
+		echo "✓ Build complete" \
+	) 2>&1 | tee build.out
+
+# Build the project
+buildsim:
+	( \
+		set -eu; \
+		$(FIXUP) \
+		echo "Building the project..."; \
+		cd $(RUST) && cargo build $(RELEASE) --bin tcssim; \
 		echo "✓ Build complete" \
 	) 2>&1 | tee build.out
 

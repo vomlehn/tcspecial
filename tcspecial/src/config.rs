@@ -29,7 +29,20 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> TcsResult<(CIConfig, Vec<DHConfig
 pub mod constants {
     use std::time::Duration;
 
+    // Interval between transmissions of the beacon message
     pub const BEACON_DEFAULT_MS: Duration = Duration::from_millis(2000);
+
+    // Amount of time after receipt of a beacon message to display green
+    pub const BEACON_GREEN: Duration = Duration::from_millis(2000);
+
+    // Amount of time after end of displaying green to display yellow
+    pub const BEACON_YELLOW: Duration = Duration::from_millis(2000);
+
+    // Amount of time after displaying yellow to start displaying red
+    pub const BEACON_RED: Duration = Duration::from_millis(3000);
+
+    // FIXME: use getaddrinfo()
+    pub const BEACON_NETADDR: &str = "localhost:5550";
 
     /// Initial delay for endpoint retry
     pub const ENDPOINT_DELAY_INIT: Duration = Duration::from_millis(100);

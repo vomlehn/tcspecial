@@ -11,11 +11,13 @@ use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{CommandStatus, DHId, DHName, DHType};
 
 use crate::beacon_receive::BeaconReceive;
+use crate::config::constants::BEACON_INDICATOR;
 
 slint::include_modules!();
 
 mod app;
 mod beacon_receive;
+mod config;
 
 /// Manages the tcssim subprocess
 struct ProcessManager {
@@ -100,7 +102,7 @@ fn main() {
     // Start collecting beacon data
     let beacon_addr: std::net::SocketAddr = "0.0.0.0:5550".parse().unwrap();
     let beacon_ui_weak = ui_weak.clone();
-    let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr);
+    let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 
     // Start tcssim subprocess
     let process_manager_tcssim = Arc::new(ProcessManager::new());

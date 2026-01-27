@@ -3,6 +3,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+
 use tcslibgs::{CIConfig, DHConfig, PayloadConfig, TcsError, TcsResult};
 
 /// Load payload configuration from a JSON file
@@ -29,17 +30,7 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> TcsResult<(CIConfig, Vec<DHConfig
 pub mod constants {
     use std::time::Duration;
 
-    // Interval between transmissions of the beacon message
-    pub const BEACON_DEFAULT_MS: Duration = Duration::from_millis(8000);
-
-    // Amount of time after receipt of a beacon message to display green
-    pub const BEACON_GREEN: Duration = Duration::from_millis(1000);
-
-    // Amount of time after end of displaying green to display yellow
-    pub const BEACON_YELLOW: Duration = Duration::from_millis(2000);
-
-    // Amount of time after displaying yellow to start displaying red
-    pub const BEACON_RED: Duration = Duration::from_millis(3000);
+    pub const BEACON_DEFAULT_MS: Duration = Duration::new(1000, 0);
 
     // FIXME: use getaddrinfo()
     pub const BEACON_NETADDR: &str = "localhost:5550";

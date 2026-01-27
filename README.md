@@ -18,9 +18,15 @@ for viewing.
 
 * Type:
 
+     make runmoc
+
+  to run the test software
+
+* To run just TCSpecial, use:
+
      make run
 
-  There are make clean and make distclean targets.
+* There are make clean and make distclean targets.
 
 # Stuff
 

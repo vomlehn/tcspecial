@@ -33,7 +33,7 @@ pub mod constants {
     pub const BEACON_DEFAULT_MS: Duration = Duration::new(1000, 0);
 
     // FIXME: use getaddrinfo()
-    pub const BEACON_NETADDR: &str = "localhost:5550";
+    pub const BEACON_NETADDR: &str = "0.0.0.0:5550";
 
     /// Initial delay for endpoint retry
     pub const ENDPOINT_DELAY_INIT: Duration = Duration::from_millis(100);

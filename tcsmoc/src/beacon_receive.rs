@@ -11,59 +11,40 @@ use slint::{Color, Weak};
 use crate::MainWindow;
 use tcslibgs::TcsResult;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum Status {
-    None,           // No status info
-    Green,
-    Yellow,
-    Red,
+/*
+ * Indicator states
+ * Steady:      State that does not blink
+ *              Duration    Duration of this state
+ *              Color:      Color to display
+ * Blinking:    Blinking state
+ *              Duration    Duration of this state
+ *              Duration    Duration of first color ("on")
+ *              Duration    Duration of second color ("off")
+ *              Color       "On" color
+ *              Color       "Off" color
+ */
+#[derive(Copy, Clone)]
+pub enum IndicatorState {
+    Steady(Duration, Color),
+    Blinking(Duration, Duration, Duration, Color, Color),    // Alternating colors
 }
 
 /*
- * Define one phase of the lighted indicator
- * duration:    Duration of this phase
- * color_on:    Color when indicator is on
- * color_off:   If the indicator blinks, this is a Some(Color) and the color
- *              is used when the indicator is off. If it doesn't blink, this
- *              is None.
+ * Collection of indicators
+ * unset        Color to use if the indicator has never received a message
+ * indicators   Array of Indicator states
  */
 #[derive(Clone)]
-pub struct IndicatorPhase {
-    pub duration: Duration,
-    pub color_on: Color,
-    pub color_off: Option<Color>,
+pub struct IndicatorStates {
+    unset:              Color,
+    indicator_states:   Vec<IndicatorState>,
 }
 
-impl IndicatorPhase {
-    pub fn new(duration: Duration, color_on: Color, color_off: Option<Color>) -> IndicatorPhase {
-        IndicatorPhase {
-            duration,
-            color_on,
-            color_off,
-        }
-    }
-}
-
-/*
- * Define the behavior of an indicator as the time since a beacon message was
- * received.
- * blink_duration:  Length of a cycle of blinking, e.g. the off or on period
- * unset:           Color if we've never seen a beacon message for this indicator
- * phases:          List of all phases
- */
-#[derive(Clone)]
-pub struct IndicatorPhases {
-    pub blink_duration: Duration,
-    pub unset: Color,
-    pub phases: Vec<IndicatorPhase>,
-}
-
-impl IndicatorPhases {
-    pub fn new(blink_duration: Duration, unset: Color, phases: Vec<IndicatorPhase>) -> Self {
-        IndicatorPhases {
-            blink_duration,
+impl IndicatorStates {
+    pub fn new(unset: Color, indicator_states: Vec<IndicatorState>) -> Self {
+        IndicatorStates {
             unset,
-            phases,
+            indicator_states,
         }
     }
 
@@ -75,11 +56,11 @@ impl IndicatorPhases {
      * wait only on receipt of a beacon message. If it's Some(), the
      * wait is on receipt of the message or the given Duration value.
      */
-    pub fn color_and_delay(&self, last_beacon: &Option<SystemTime>) -> (Color, Option<Duration>) {
-        // If we haven't seen any beacon messages, just return the unset
+    pub fn delay_and_color(&self, last_beacon: &Option<SystemTime>) -> (Option<Duration>, Color) {
+        // If we haven't seen any beacon messages at all, just return the unset
         // value and sleep until we get a message
         let last = match last_beacon {
-            None => return (self.unset, None),
+            None => return (None, self.unset),
             Some(last) => *last,
         };
 
@@ -88,56 +69,78 @@ impl IndicatorPhases {
         // needs to go back to unset.
         let now = SystemTime::now();
         if last > now {
-            return (self.unset, None);
+            return (None, self.unset);
         }
 
         let elapsed = now.duration_since(last).unwrap();
         let mut cumulative = Duration::ZERO;
 
-        for phase in &self.phases {
-            let phase_end = cumulative + phase.duration;
+        for indicator_state in &self.indicator_states {
+            let duration = match indicator_state {
+                IndicatorState::Steady(duration, _) => duration,
+                IndicatorState::Blinking(duration, _, _, _, _) => duration,
+            };
+
+            let indicator_state_end = cumulative + *duration;
 
             // Check if we are in this phase
-            if elapsed < phase_end {
-                let time_into_phase = elapsed - cumulative;
-                return self.blink_info(phase, time_into_phase, phase_end - elapsed);
+            if elapsed < indicator_state_end {
+                let time_into_state = elapsed - cumulative;
+                return self.blink_info(&indicator_state, time_into_state);
             }
 
-            cumulative = phase_end;
+            cumulative = indicator_state_end;
         }
 
         // Past all phases - return last phase color with no timeout
-        if let Some(last_phase) = self.phases.last() {
-            (last_phase.color_on, None)
-        } else {
-            (self.unset, None)
-        }
+        // FIXME: verify somewhere that the final duration is Duration::MAX
+        (None, self.unset)
     }
 
     /*
      * Determine the current color and how long to the next non-message
      * reception change of color.
+     * indicator:   Reference to an Indicator state
+     * time_into_state: Time elapsed since start of this indicator state
+     *
+     * Returns: pair of time to next state change and color to set
      */
-    fn blink_info(&self, phase: &IndicatorPhase, time_into_phase: Duration, time_to_next_phase: Duration) -> (Color, Option<Duration>) {
-        match phase.color_off {
-            None => {
-                // Not blinking - return on color and time until next phase
-                (phase.color_on, Some(time_to_next_phase))
+    fn blink_info(&self, indicator: &IndicatorState, time_into_state: Duration) -> (Option<Duration>, Color) {
+        match indicator {
+            IndicatorState::Steady(duration, color) => {
+                let remaining = duration.saturating_sub(time_into_state);
+                (Some(remaining), *color)
             }
-            Some(color_off) => {
-                // Blinking - determine if we're in on or off part of blink cycle
-                let blink_offset = time_into_phase.as_millis() % self.blink_duration.as_millis();
-                let half_blink = self.blink_duration.as_millis() / 2;
+            IndicatorState::Blinking(duration, time_on, time_off, color_on, color_off) => {
+                let time_on_ns = time_on.as_nanos();
+                let time_off_ns = time_off.as_nanos();
+                let blink_period_ns = time_on_ns + time_off_ns;
+                let time_into_state_ns = time_into_state.as_nanos();
 
-                if blink_offset < half_blink {
-                    // In first half (on)
-                    let time_to_off = Duration::from_millis((half_blink - blink_offset) as u64);
-                    (phase.color_on, Some(time_to_off.min(time_to_next_phase)))
+                // Compute offset within the current blink cycle
+                let time_offset_ns = time_into_state_ns % blink_period_ns;
+
+                // Are we in the "on" part of the cycle?
+                let on_cycle = time_offset_ns < time_on_ns;
+                eprintln!("time_into_state {:?} time_offset {:?} on_cycle {:?}", time_into_state_ns, time_offset_ns, on_cycle);
+
+                // Time remaining in this state (until next indicator state)
+                let time_remaining_in_state = duration.saturating_sub(time_into_state);
+
+                let result = if on_cycle {
+                    // In "on" part. How much longer until we switch to "off"?
+                    let time_to_off_ns = time_on_ns - time_offset_ns;
+                    let time_to_off = Duration::from_nanos(time_to_off_ns as u64);
+                    // Return the minimum of time to next blink change or time to next state
+                    (Some(time_to_off.min(time_remaining_in_state)), *color_on)
                 } else {
-                    // In second half (off)
-                    let time_to_on = Duration::from_millis((self.blink_duration.as_millis() - blink_offset) as u64);
-                    (color_off, Some(time_to_on.min(time_to_next_phase)))
-                }
+                    // In "off" part. How much longer until we switch to "on"?
+                    let time_to_on_ns = blink_period_ns - time_offset_ns;
+                    let time_to_on = Duration::from_nanos(time_to_on_ns as u64);
+                    (Some(time_to_on.min(time_remaining_in_state)), *color_off)
+                };
+                eprintln!("time to next change {:?}, color {:?}", result.0, result.1);
+                result
             }
         }
     }
@@ -147,21 +150,21 @@ impl IndicatorPhases {
  * last_beacon  Time of last received beacon message
  * src_addr     Address from which to receive beacon messages
  * ui_weak      Slint window with beacon information
- * phases       Indicator phase configuration
+ * indicators   Indicator state configuration
  */
 #[derive(Clone)]
 pub struct BeaconReceive {
-    last_beacon: ArcCondPair<Option<SystemTime>>,
-    src_addr: std::net::SocketAddr,
-    ui_weak: Weak<MainWindow>,
-    phases: IndicatorPhases,
+    last_beacon:        ArcCondPair<Option<SystemTime>>,
+    src_addr:           std::net::SocketAddr,
+    ui_weak:            Weak<MainWindow>,
+    indicator_states:   IndicatorStates,
 }
 
-impl BeaconReceive {
+impl<'a> BeaconReceive {
     pub fn new(
-        ui_weak: Weak<MainWindow>,
-        src_addr: std::net::SocketAddr,
-        phases: IndicatorPhases,
+        ui_weak:            Weak<MainWindow>,
+        src_addr:           std::net::SocketAddr,
+        indicator_states:   IndicatorStates,
     ) -> Option<BeaconReceive> {
         let last_beacon = Arc::new(CondPair {
             lock: Mutex::new(None),
@@ -172,7 +175,7 @@ impl BeaconReceive {
             last_beacon,
             src_addr,
             ui_weak,
-            phases,
+            indicator_states,
         };
 
         let b_clone = b.clone();
@@ -187,7 +190,7 @@ impl BeaconReceive {
     }
 
     /*
-     * Called when a beacon message is received
+     * Receive beacon messages in a loop
      */
     fn receive_beacon(&self) -> TcsResult<()> {
         eprintln!("BeaconReceive::receive_beacon: entered");
@@ -200,12 +203,12 @@ impl BeaconReceive {
         loop {
             // Get current color and timeout duration
             let last_beacon = self.last_beacon.lock.lock().unwrap();
-            let (color, timeout) = self.phases.color_and_delay(&*last_beacon);
+            let (timeout, color) = self.indicator_states.delay_and_color(&*last_beacon);
             drop(last_beacon);
 
             // Set socket timeout
-            socket.set_read_timeout(timeout)?;
             eprintln!("receive_beacon: timeout: {:?}", timeout);
+            socket.set_read_timeout(timeout)?;
 
             // Receive beacon data from socket (or timeout)
             let new_color = match socket.recv_from(&mut buf) {
@@ -219,7 +222,7 @@ impl BeaconReceive {
 
                     // Recalculate color after receiving
                     let last_beacon = self.last_beacon.lock.lock().unwrap();
-                    let (color, _) = self.phases.color_and_delay(&*last_beacon);
+                    let (_, color) = self.indicator_states.delay_and_color(&*last_beacon);
                     Some(color)
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
@@ -246,16 +249,6 @@ impl BeaconReceive {
                 });
             }
         }
-    }
-
-    /*
-     * Wait for the beacon color to change
-     */
-    #[allow(dead_code)]
-    pub fn wait_for_color_change(&self, timeout: Duration) -> bool {
-        let last_beacon = self.last_beacon.lock.lock().unwrap();
-        let (_guard, result) = self.last_beacon.cvar.wait_timeout(last_beacon, timeout).unwrap();
-        !result.timed_out()
     }
 }
 

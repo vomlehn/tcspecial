@@ -6,9 +6,11 @@ use std::process::{Child, Command, exit};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+
 use slint::SharedString;
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{CommandStatus, DHId, DHName, DHType};
+use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::config::constants::BEACON_INDICATOR;
@@ -100,7 +102,7 @@ fn main() {
     let client: Arc<Mutex<Option<TcsClient>>> = Arc::new(Mutex::new(None));
 
     // Start collecting beacon data
-    let beacon_addr: std::net::SocketAddr = "0.0.0.0:5550".parse().unwrap();
+    let beacon_addr: std::net::SocketAddr = BEACON_NETADDR.parse().unwrap();
     let beacon_ui_weak = ui_weak.clone();
     let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 

@@ -188,8 +188,8 @@ impl CommandInterpreter {
         self.socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 */
 eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
-//        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, BEACON_NETADDR.parse().unwrap());
-        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, "0.0.0.0:5550".parse().unwrap());
+        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, BEACON_NETADDR.parse().unwrap());
+//        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, "0.0.0.0:5550".parse().unwrap());
 
         while self.running {
 /*

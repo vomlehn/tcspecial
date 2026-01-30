@@ -15,7 +15,6 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use tcslibgs::{BeaconTelemetry, TcsResult, Telemetry};
-use crate::constants::BEACON_NETADDR;
 
 #[derive(Clone)]
 pub struct BeaconSend {

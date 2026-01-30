@@ -107,10 +107,12 @@ fn main() {
     let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 
     // Start tcssim subprocess
-    let process_manager_tcssim = Arc::new(ProcessManager::new());
-    process_manager_tcssim.start_child("tcssim");
     let process_manager_tcspecial = Arc::new(ProcessManager::new());
     process_manager_tcspecial.start_child("tcspecial");
+    let process_manager_tcssim = Arc::new(ProcessManager::new());
+    process_manager_tcssim.start_child("tcssim");
+    eprintln!("started tcspecial, sleeping, then starting tcssim");
+    crate::thread::sleep(Duration::new(2, 0));
 
     // Connect button handler
     {

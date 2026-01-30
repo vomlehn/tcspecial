@@ -20,7 +20,7 @@ pub mod constants {
     pub static BEACON_INDICATOR: LazyLock<IndicatorStates> = LazyLock::new(|| {
         IndicatorStates::new(
             grey(),                         // unset color
-            [
+            vec![
                 IndicatorState::Steady(Duration::from_millis(1000), green()),
                 IndicatorState::Blinking(Duration::from_millis(4000),
                     Duration::from_millis(1000), Duration::from_millis(1000),
@@ -28,7 +28,7 @@ pub mod constants {
                 IndicatorState::Blinking(Duration::MAX,
                     Duration::from_millis(750), Duration::from_millis(750),
                     red(), transparent()),
-            ].to_vec(),
+            ],
         )
     });
 }

@@ -12,6 +12,7 @@ pub mod constants {
     fn red() -> Color { Color::from_rgb_u8(255, 0, 0) }
     fn green() -> Color { Color::from_rgb_u8(0, 255, 0) }
     fn yellow() -> Color { Color::from_rgb_u8(255, 255, 0) }
+    fn blue() -> Color { Color::from_rgb_u8(0, 0, 255) }
     fn grey() -> Color { Color::from_rgb_u8(127, 127, 127) }
     fn transparent() -> Color { Color::from_argb_u8(0, 0, 0, 0) }
 
@@ -20,12 +21,12 @@ pub mod constants {
         IndicatorStates::new(
             grey(),                         // unset color
             [
-                IndicatorState::Steady(Duration::from_millis(5000), green()),
-                IndicatorState::Blinking(Duration::from_millis(2000),
-                    Duration::from_millis(500), Duration::from_millis(250),
-                    yellow(), transparent()),
+                IndicatorState::Steady(Duration::from_millis(1000), green()),
+                IndicatorState::Blinking(Duration::from_millis(4000),
+                    Duration::from_millis(1000), Duration::from_millis(1000),
+                    blue(), transparent()),
                 IndicatorState::Blinking(Duration::MAX,
-                    Duration::from_millis(250), Duration::from_millis(250),
+                    Duration::from_millis(750), Duration::from_millis(750),
                     red(), transparent()),
             ].to_vec(),
         )

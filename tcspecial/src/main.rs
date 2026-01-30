@@ -9,7 +9,7 @@ use tcspecial::{config::load_config, CommandInterpreter};
 fn main() {
 eprintln!("TCSspecial::main: entered");
     // Initialize logging
-    env_logger::init();
+//    env_logger::init();
 
     // Get config file path from command line or use default
     let config_path = env::args()

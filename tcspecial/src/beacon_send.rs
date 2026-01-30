@@ -65,12 +65,10 @@ let socket = socket?;
         let _ = self.send_beacon(&socket, &self.dest_addr);
 
         loop {
-eprintln!("Beacon::beacon_send: loop");
             let mut expiration = self.pair.lock.lock().unwrap();
 
             // Wait until expiration time or until notified
             while *expiration > SystemTime::now() {
-eprintln!("Beacon::beacon_send: while");
                 let timeout = expiration
                     .duration_since(SystemTime::now())
                     .unwrap_or(Duration::from_millis(1));
@@ -82,8 +80,6 @@ eprintln!("Beacon::beacon_send: while");
                     break;
                 }
             }
-
-            eprintln!("Beacon::beacon: Signal sent or timeout");
 
             // Send the beacon
 // FIXME: add check for error
@@ -99,11 +95,8 @@ eprintln!("Beacon::beacon_send: while");
     pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
-eprintln!("BeaconSend::send_beacon: calling send_to");
-eprintln!("BeaconSend::send_beacom: dest_add {:?}", dest_addr);
-//        socket.send_to(&data, dest_addr)?;
         let status = socket.send_to(&data, dest_addr);
-eprintln!("BeaconSend::send_beacon: {:?}", status);
+eprintln!("BeaconSend::send_beacon: [{:?}] calling send_to {:?}: {:?}", SystemTime::now(), dest_addr, status);
         Ok(())
     }
 

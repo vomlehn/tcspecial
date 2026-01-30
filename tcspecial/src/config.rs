@@ -30,7 +30,7 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> TcsResult<(CIConfig, Vec<DHConfig
 pub mod constants {
     use std::time::Duration;
 
-    pub const BEACON_DEFAULT_MS: Duration = Duration::new(1000, 0);
+    pub const BEACON_DEFAULT_MS: Duration = Duration::new(10, 0);
 
     // FIXME: use getaddrinfo()
     pub const BEACON_NETADDR: &str = "0.0.0.0:5550";

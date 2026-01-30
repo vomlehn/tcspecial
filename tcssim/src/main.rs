@@ -13,7 +13,7 @@ use payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
 slint::include_modules!();
 
 fn main() {
-    env_logger::init();
+//    env_logger::init();
 
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();

@@ -94,7 +94,7 @@ impl ProcessManager {
 
 fn main() {
     eprintln!("TcsMoc running");
-    env_logger::init();
+//    env_logger::init();
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
 

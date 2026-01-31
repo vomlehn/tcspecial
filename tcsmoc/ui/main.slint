@@ -166,15 +166,33 @@ export component MainWindow inherits Window {
 
                 HorizontalLayout {
                     spacing: 8px;
+
                     Button {
-                        text: "Ping";
-                        clicked => { ping-clicked(); }
+                        text: "Command";
+                        clicked => { popup.show(); }
                     }
-                    Button {
-                        text: "Query All DHs";
-                        clicked => { query-all-clicked(); }
+
+                    popup := PopupWindow {
+                        x: 50px;
+                        y: 50px;
+                        width: 150px;
+                        height: 120px;
+
+                        Rectangle {
+                            background: white;
+                            border-color: gray;
+                            border-width: 1px;
+
+                            VerticalLayout {
+                                padding: 5px;
+                                Button { text: "Ping"; clicked => { popup.close(); } }
+                                Button { text: "ARM Restart"; clicked => { popup.close(); } }
+                                Button { text: "Restart"; clicked => { popup.close(); } }
+                                Button { text: "Query"; clicked => { popup.close(); } }
+                                Button { text: "Query DH"; clicked => { popup.close(); } }
+                            }
+                        }
                     }
-                    Text { text: "Last Beacon: " + beacon-time; vertical-alignment: center; }
 
                     Rectangle {
                         width: 20px;

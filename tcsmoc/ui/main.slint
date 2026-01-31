@@ -86,6 +86,8 @@ component DHPanel inherits Rectangle {
     }
 }
 
+export enum MenuAction {ping, arm-restart, restart, query, query-dh, start-dh, stop-dh}
+
 export component MainWindow inherits Window {
     title: "TCSpecial MOC";
     min-width: 800px;
@@ -130,6 +132,7 @@ export component MainWindow inherits Window {
     callback start-dh(int);
     callback stop-dh(int);
     callback quit-clicked();
+    callback menu-action(MenuAction);
 
     VerticalLayout {
         padding: 10px;
@@ -176,7 +179,7 @@ export component MainWindow inherits Window {
                         x: 50px;
                         y: 50px;
                         width: 150px;
-                        height: 120px;
+                        height: 220px;
 
                         Rectangle {
                             background: white;
@@ -185,11 +188,55 @@ export component MainWindow inherits Window {
 
                             VerticalLayout {
                                 padding: 5px;
-                                Button { text: "Ping"; clicked => { popup.close(); } }
-                                Button { text: "ARM Restart"; clicked => { popup.close(); } }
-                                Button { text: "Restart"; clicked => { popup.close(); } }
-                                Button { text: "Query"; clicked => { popup.close(); } }
-                                Button { text: "Query DH"; clicked => { popup.close(); } }
+                                Button {
+                                    text: "Ping"; 
+                                    clicked => {
+                                        menu-action(MenuAction.ping);
+                                        popup.close();
+                                    }
+                                }
+                                Button { 
+                                    text: "ARM Restart";
+                                    clicked => {
+                                        menu-action(MenuAction.arm-restart);
+                                        popup.close();
+                                    } 
+                                }
+                                Button {
+                                    text: "Restart";
+                                    clicked => {
+                                        menu-action(MenuAction.restart);
+                                        popup.close();
+                                    }
+                                }
+                                Button {
+                                    text: "Query"; 
+                                    clicked => {
+                                        menu-action(MenuAction.query);
+                                        popup.close();
+                                    } 
+                                }
+                                Button { 
+                                    text: "Query DH"; 
+                                    clicked => {
+                                        menu-action(MenuAction.query-dh);
+                                        popup.close();
+                                    } 
+                                }
+                                Button { 
+                                    text: "Start DH"; 
+                                    clicked => {
+                                        menu-action(MenuAction.start-dh);
+                                        popup.close();
+                                    } 
+                                }
+                                Button { 
+                                    text: "Stop DH"; 
+                                    clicked => {
+                                        menu-action(MenuAction.stop-dh);
+                                        popup.close();
+                                    } 
+                                }
                             }
                         }
                     }

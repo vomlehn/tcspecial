@@ -94,9 +94,7 @@ impl IndicatorStates {
         // current time, the system time has changed. The beacon indicator
         // needs to go back to unset.
         let now = SystemTime::now();
-        eprintln!("\nlast {:?} > now {:?}", last, now);
         if last > now {
-            eprintln!("No beacon seen");
             return (None, self.unset);
         }
 
@@ -120,7 +118,6 @@ impl IndicatorStates {
             // update the start and try again
             if elapsed >= indicator_end {
                 indicator_start = indicator_end;
-                eprintln!("elapsed {:?} >= indicator_end {:?}", elapsed, indicator_end);
                 continue;
             }
 
@@ -132,7 +129,6 @@ impl IndicatorStates {
                 IndicatorState::Steady(_, color) => {
                     // Time until end of this steady state
                     let time_remaining = indicator_end.saturating_sub(elapsed);
-                    eprintln!("Return steady state(remaining: {:?}, {:?})", time_remaining, color);
                     return (Some(time_remaining), *color);
                 },
                 IndicatorState::Blinking(_, time_on, time_off, color_on, color_off) => {
@@ -145,16 +141,12 @@ impl IndicatorStates {
                     let offset_in_blink_ns = time_into_state_ns % blink_period_ns;
                     let time_on_ns = time_on.as_nanos();
 
-                    eprintln!("time_into_state {:?} offset_in_blink {:?}ns time_on {:?}ns", 
-                              time_into_state, offset_in_blink_ns, time_on_ns);
-                
                     if offset_in_blink_ns < time_on_ns {
                         // We're in the "on" part of the blink
                         let time_to_off_ns = time_on_ns - offset_in_blink_ns;
                         let time_to_off = Duration::from_nanos(time_to_off_ns as u64);
                         let time_remaining_in_state = indicator_end.saturating_sub(elapsed);
                         let timeout = time_to_off.min(time_remaining_in_state);
-                        eprintln!("In time_on, timeout {:?}, color {:?}", timeout, *color_on);
                         return (Some(timeout), *color_on);
                     } else {
                         // We're in the "off" part of the blink
@@ -162,13 +154,11 @@ impl IndicatorStates {
                         let time_to_on = Duration::from_nanos(time_to_on_ns as u64);
                         let time_remaining_in_state = indicator_end.saturating_sub(elapsed);
                         let timeout = time_to_on.min(time_remaining_in_state);
-                        eprintln!("In time_off, timeout {:?}, color {:?}", timeout, *color_off);
                         return (Some(timeout), *color_off);
                     }
                 }
             }
         }
-        eprintln!("Out of indicator states");
         (None, self.unset)
     }
 }
@@ -208,11 +198,10 @@ impl BeaconReceive {
         let b_clone = b.clone();
         thread::spawn(move || {
             if let Err(e) = b_clone.receive_beacon() {
-                eprintln!("Beacon receive error: {}", e);
+                panic!("Beacon receive error: {}", e);
             }
         });
 
-        eprintln!("BeaconReceive::new: exit");
         Some(b)
     }
 
@@ -220,10 +209,8 @@ impl BeaconReceive {
      * Receive beacon messages in a loop
      */
     fn receive_beacon(&self) -> TcsResult<()> {
-        eprintln!("BeaconReceive::receive_beacon: entered");
         // Bind to a local address to receive messages
         let socket = UdpSocket::bind(self.src_addr)?;
-        eprintln!("receive_beacon: socket {:?}", socket);
 
         let mut buf = [0u8; 65535];
 
@@ -234,19 +221,16 @@ impl BeaconReceive {
             drop(last_beacon_guard);
 
             let (timeout, color) = self.indicator_states.delay_and_color(&last_beacon_value);
-            eprintln!("timeout {:?} color {:?}", timeout, color);
 
             // Set socket timeout
-            eprintln!("receive_beacon: timeout: {:?}", timeout);
             socket.set_read_timeout(timeout)?;
 
             // Receive beacon data from socket (or timeout)
             let status = socket.recv_from(&mut buf);
-            eprintln!("=== receive_beacon: [{:?}] status {:?}", SystemTime::now(), status);
             
             let new_color = match status {
                 Ok((size, addr)) => {
-                    eprintln!("receive_beacon: received {} bytes from {}", size, addr);
+//eprintln!("beacon received {} bytes from {}", size, addr);
                     // Update last beacon time
                     let mut last_beacon_guard = self.last_beacon.lock.lock().unwrap();
                     *last_beacon_guard = Some(SystemTime::now());
@@ -256,14 +240,13 @@ impl BeaconReceive {
 
                     // Recalculate color after receiving
                     let (_, color) = self.indicator_states.delay_and_color(&last_beacon_value);
-                    eprintln!("color {:?}", color);
                     Some(color)
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
                     || e.kind() == std::io::ErrorKind::TimedOut =>
                 {
                     // Timeout - update the color
-                    eprintln!("receive_beacon: timeout, updating color");
+//eprintln!("beacon timeout");
                     let last_beacon_guard = self.last_beacon.lock.lock().unwrap();
                     let last_beacon_value = *last_beacon_guard;
                     drop(last_beacon_guard);
@@ -272,12 +255,11 @@ impl BeaconReceive {
                 }
                 Err(e) => {
                     // I/O error
-                    eprintln!("receive_beacon: error receiving: {}", e);
+//panic!("receive_beacon: error receiving: {}", e);
                     Some(self.indicator_states.unset_color())
                 }
             };
 
-            eprintln!("Set new_color to {:?}", new_color);
             // Set the indicator color
             if let Some(color) = new_color {
                 let ui_weak = self.ui_weak.clone();

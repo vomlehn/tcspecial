@@ -21,7 +21,7 @@ pub mod constants {
         IndicatorStates::new(
             grey(),                         // unset color
             vec![
-                IndicatorState::Steady(Duration::from_millis(1000), green()),
+                IndicatorState::Steady(Duration::from_millis(2000), green()),
                 IndicatorState::Blinking(Duration::from_millis(4000),
                     Duration::from_millis(1000), Duration::from_millis(1000),
                     green(), grey()),

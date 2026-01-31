@@ -50,6 +50,7 @@ impl TcsClient {
     pub fn ping(&mut self) -> TcsResult<tcslibgs::PingTelemetry> {
         let seq = self.next_sequence();
         let cmd = Command::Ping(PingCommand::new(seq));
+eprintln!("sending ping command");
         let response = self.send_command(cmd)?;
 
         match response {

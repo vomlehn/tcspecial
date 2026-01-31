@@ -13,7 +13,7 @@ pub mod constants {
     fn green() -> Color { Color::from_rgb_u8(0, 255, 0) }
     fn yellow() -> Color { Color::from_rgb_u8(255, 255, 0) }
     fn blue() -> Color { Color::from_rgb_u8(0, 0, 255) }
-    fn grey() -> Color { Color::from_rgb_u8(127, 127, 127) }
+    fn grey() -> Color { Color::from_rgb_u8(196, 196, 196) }
     fn transparent() -> Color { Color::from_argb_u8(0, 0, 0, 0) }
 
     // Information defining the behavior of the Beacon indicator
@@ -24,10 +24,13 @@ pub mod constants {
                 IndicatorState::Steady(Duration::from_millis(1000), green()),
                 IndicatorState::Blinking(Duration::from_millis(4000),
                     Duration::from_millis(1000), Duration::from_millis(1000),
-                    blue(), transparent()),
+                    green(), grey()),
+                IndicatorState::Blinking(Duration::from_millis(6000),
+                    Duration::from_millis(1000), Duration::from_millis(1000),
+                    yellow(), grey()),
                 IndicatorState::Blinking(Duration::MAX,
-                    Duration::from_millis(750), Duration::from_millis(750),
-                    red(), transparent()),
+                    Duration::from_millis(500), Duration::from_millis(500),
+                    red(), grey()),
             ],
         )
     });

@@ -7,9 +7,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use slint::SharedString;
+use slint::{SharedString, Weak};
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::{CommandStatus, DHId, DHName, DHType};
+use tcslibgs::{ArmKey, CommandStatus, DHId, DHName, DHType};
 use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
@@ -94,7 +94,7 @@ impl ProcessManager {
 
 fn main() {
     eprintln!("TcsMoc running");
-//    env_logger::init();
+    // env_logger::init();
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
 
@@ -112,7 +112,7 @@ fn main() {
     let process_manager_tcssim = Arc::new(ProcessManager::new());
     process_manager_tcssim.start_child("tcssim");
     eprintln!("started tcspecial, sleeping, then starting tcssim");
-    crate::thread::sleep(Duration::new(2, 0));
+    thread::sleep(Duration::new(2, 0));
 
     // Connect button handler
     {
@@ -182,6 +182,76 @@ fn main() {
                 }
             } else {
                 ui.set_last_response(SharedString::from("Not connected"));
+            }
+        });
+    }
+
+    // Menu action handler
+    {
+        let client = client.clone();
+        let ui_weak = ui_weak.clone();
+        ui.on_menu_action(move |action| {
+            let ui = ui_weak.unwrap();
+            let mut guard = client.lock().unwrap();
+
+            match action {
+                MenuAction::Ping => {
+                    if let Some(ref mut c) = *guard {
+                        match c.ping() {
+                            Ok(tm) => {
+                                ui.set_last_response(SharedString::from(format!(
+                                    "PING OK - timestamp: {}.{}",
+                                    tm.timestamp.seconds, tm.timestamp.nanoseconds
+                                )));
+                            }
+                            Err(e) => {
+                                ui.set_last_response(SharedString::from(format!("PING failed: {}", e)));
+                            }
+                        }
+                    } else {
+                        ui.set_last_response(SharedString::from("Not connected"));
+                    }
+                }
+                MenuAction::ArmRestart => {
+                    if let Some(ref mut c) = *guard {
+                        match c.restart_arm(ArmKey(0xf001adad)) {
+                            Ok(status) => {
+                                ui.set_last_response(SharedString::from(format!("ARM_RESTART: {:?}", status)));
+                            }
+                            Err(e) => {
+                                ui.set_last_response(SharedString::from(format!("ARM_RESTART failed: {}", e)));
+                            }
+                        }
+                    } else {
+                        ui.set_last_response(SharedString::from("Not connected"));
+                    }
+                }
+                MenuAction::Restart => {
+                    if let Some(ref mut c) = *guard {
+                        match c.restart(ArmKey(0xf001adad)) {
+                            Ok(status) => {
+                                ui.set_last_response(SharedString::from(format!("RESTART: {:?}", status)));
+                            }
+                            Err(e) => {
+                                ui.set_last_response(SharedString::from(format!("RESTART failed: {}", e)));
+                            }
+                        }
+                    } else {
+                        ui.set_last_response(SharedString::from("Not connected"));
+                    }
+                }
+                MenuAction::Query => {
+                    ui.set_last_response(SharedString::from("Query not yet implemented"));
+                }
+                MenuAction::QueryDh => {
+                    ui.set_last_response(SharedString::from("Query DH - select DH first"));
+                }
+                MenuAction::StartDh => {
+                    ui.set_last_response(SharedString::from("Start DH - select DH first"));
+                }
+                MenuAction::StopDh => {
+                    ui.set_last_response(SharedString::from("Stop DH - select DH first"));
+                }
             }
         });
     }

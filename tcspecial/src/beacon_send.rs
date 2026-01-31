@@ -25,7 +25,6 @@ pub struct BeaconSend {
 
 impl BeaconSend {
     pub fn new(interval: Duration, dest_addr: std::net::SocketAddr) -> Option<BeaconSend> {
-eprintln!("Beacon::new: entered");
         if interval == Duration::from_secs(0) {
             return None;
         }
@@ -48,17 +47,14 @@ eprintln!("Beacon::new: entered");
             let _ = b_clone.beacon_send();
         });
 
-eprintln!("Beacon::new: exit");
         Some(b)
     }
 
     // FIXME: check result type
     fn beacon_send(&self) -> TcsResult<()> {
-eprintln!("Beacon::beacon_send: entered");
         // Bind to a local address
 //        let socket = UdpSocket::bind(BEACON_NETADDR)?; // 0 = let OS pick a port
         let socket = UdpSocket::bind("0.0.0.0:0"); // 0 = let OS pick a port
-eprintln!("beacon_send::socket: {:?}", socket);
 let socket = socket?;
 
 // FIXME: add check for error
@@ -96,7 +92,6 @@ let socket = socket?;
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
         let status = socket.send_to(&data, dest_addr);
-eprintln!("BeaconSend::send_beacon: [{:?}] calling send_to {:?}: {:?}", SystemTime::now(), dest_addr, status);
         Ok(())
     }
 

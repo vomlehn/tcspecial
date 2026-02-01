@@ -8,7 +8,7 @@ use tcslibgs::{
     Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
 };
 
-use crate::connection::Connection;
+use tcslib::Connection;
 
 /// Default timeout for command responses
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);

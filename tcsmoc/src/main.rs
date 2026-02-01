@@ -2,13 +2,16 @@
 //!
 //! A GUI application for testing and visualizing tcspecial operation.
 
+pub mod client;
+
+use slint::SharedString;
 use std::process::{Child, Command, exit};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use slint::SharedString;
-use tcslib::{UdpConnection, TcsClient};
+pub use crate::client::TcsClient;
+use tcslib::UdpConnection;
 use tcslibgs::{ArmKey, CommandStatus, DHId, DHName, DHType};
 use tcspecial::config::constants::BEACON_NETADDR;
 

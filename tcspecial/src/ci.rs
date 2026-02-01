@@ -69,6 +69,7 @@ impl CommandInterpreter {
 
     /// Process a command and return the response telemetry
     fn process_command(&mut self, command: Command) -> Telemetry {
+eprintln!("process_command: {:?}", command);
         match command {
             Command::Ping(cmd) => {
                 Telemetry::Ping(PingTelemetry::new(cmd.header.sequence, CommandStatus::Success))
@@ -172,6 +173,7 @@ impl CommandInterpreter {
     fn _send_beacon(&self, addr: &std::net::SocketAddr) -> TcsResult<()> {
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
+eprintln!("_send_beacon::sendto {:?}", addr);
         self.socket.send_to(&data, addr)?;
         Ok(())
     }
@@ -205,6 +207,7 @@ eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
             // Try to receive a command
             match self.socket.recv_from(&mut recv_buffer) {
                 Ok((size, addr)) => {
+eprintln!("run::recv_from {:?}", addr);
                     _last_client_addr = Some(addr);
 
                     // Parse and process command
@@ -212,6 +215,7 @@ eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
                         Ok(command) => {
                             let response = self.process_command(command);
                             if let Ok(data) = serde_json::to_vec(&response) {
+eprintln!("run::sendto {:?}", addr);
                                 let _ = self.socket.send_to(&data, addr);
                             }
                         }

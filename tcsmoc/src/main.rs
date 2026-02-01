@@ -108,6 +108,7 @@ fn main() {
     process_manager_tcspecial.start_child("tcspecial");
     let process_manager_tcssim = Arc::new(ProcessManager::new());
     process_manager_tcssim.start_child("tcssim");
+
     eprintln!("started tcspecial and tcssim, sleeping to let them initialize");
     thread::sleep(Duration::new(2, 0));
 
@@ -128,77 +129,13 @@ fn main() {
         }
     };
 
-    // Start collecting beacon data
+    // Start receiving beacon data
     let beacon_addr: std::net::SocketAddr = BEACON_NETADDR.parse().unwrap();
     let beacon_ui_weak = ui_weak.clone();
     let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 
-    // Connect button handler - reconnect to potentially different address
-    {
-        let client = client.clone();
-        let ui_weak = ui_weak.clone();
-        ui.on_connect_clicked(move || {
-            let ui = ui_weak.unwrap();
-            let address = ui.get_ci_address().to_string();
-
-            // Parse address
-            let remote_addr = if address.contains(':') {
-                address.clone()
-            } else {
-                format!("{}:4000", address)
-            };
-
-            // Create new connection and replace client
-            match UdpConnection::new("0.0.0.0:0", &remote_addr) {
-                Ok(conn) => {
-                    let mut guard = client.lock().unwrap();
-                    *guard = TcsClient::new(Box::new(conn));
-                    ui.set_ci_status(SharedString::from("Connected"));
-                    ui.set_last_response(SharedString::from(format!("Connected to {}", remote_addr)));
-                }
-                Err(e) => {
-                    ui.set_ci_status(SharedString::from("Error"));
-                    ui.set_last_response(SharedString::from(format!("Connection failed: {}", e)));
-                }
-            }
-        });
-    }
-
-    // Disconnect button handler
-    {
-        let client = client.clone();
-        let ui_weak = ui_weak.clone();
-        ui.on_disconnect_clicked(move || {
-            let ui = ui_weak.unwrap();
-            let mut guard = client.lock().unwrap();
-            let _ = guard.close();
-            ui.set_ci_status(SharedString::from("Disconnected"));
-            ui.set_last_response(SharedString::from("Disconnected"));
-        });
-    }
-
-    // Ping button handler
-    {
-        let client = client.clone();
-        let ui_weak = ui_weak.clone();
-        ui.on_ping_clicked(move || {
-            eprintln!("Ping!");
-            let ui = ui_weak.unwrap();
-            let mut guard = client.lock().unwrap();
-            match guard.ping() {
-                Ok(tm) => {
-                    ui.set_last_response(SharedString::from(format!(
-                        "PING OK - timestamp: {}.{}",
-                        tm.timestamp.seconds, tm.timestamp.nanoseconds
-                    )));
-                }
-                Err(e) => {
-                    ui.set_last_response(SharedString::from(format!("PING failed: {}", e)));
-                }
-            }
-        });
-    }
-
+    handle_main_menu(&ui, ui_weak.clone(), client.clone());
+/*
     // Menu action handler
     {
         let client = client.clone();
@@ -257,105 +194,11 @@ fn main() {
             }
         });
     }
+*/
 
-    // Query all DHs button handler
-    {
-        let client = client.clone();
-        let ui_weak = ui_weak.clone();
-        ui.on_query_all_clicked(move || {
-            let ui = ui_weak.unwrap();
-            let mut guard = client.lock().unwrap();
-            let mut results = Vec::new();
-            for dh_id in 0..4 {
-                match guard.query_dh(DHId(dh_id)) {
-                    Ok((status, stats)) => {
-                        results.push(format!("DH{}: {:?} sent={} recv={}", dh_id, status, stats.bytes_sent, stats.bytes_received));
-
-                        // Update UI for each DH
-                        match dh_id {
-                            0 => {
-                                ui.set_dh0_bytes_sent(stats.bytes_sent as i32);
-                                ui.set_dh0_bytes_recv(stats.bytes_received as i32);
-                            }
-                            1 => {
-                                ui.set_dh1_bytes_sent(stats.bytes_sent as i32);
-                                ui.set_dh1_bytes_recv(stats.bytes_received as i32);
-                            }
-                            2 => {
-                                ui.set_dh2_bytes_sent(stats.bytes_sent as i32);
-                                ui.set_dh2_bytes_recv(stats.bytes_received as i32);
-                            }
-                            3 => {
-                                ui.set_dh3_bytes_sent(stats.bytes_sent as i32);
-                                ui.set_dh3_bytes_recv(stats.bytes_received as i32);
-                            }
-                            _ => {}
-                        }
-                    }
-                    Err(e) => {
-                        results.push(format!("DH{}: Error - {}", dh_id, e));
-                    }
-                }
-            }
-            ui.set_last_response(SharedString::from(results.join("; ")));
-        });
-    }
-
-    // Start DH handler
-    {
-        let client = client.clone();
-        let ui_weak = ui_weak.clone();
-        ui.on_start_dh(move |dh_id| {
-            let ui = ui_weak.unwrap();
-            let mut guard = client.lock().unwrap();
-            let id = DHId(dh_id as u32);
-            let name = DHName::new(format!("DH{}", dh_id));
-            match guard.start_dh(id, DHType::Network, name) {
-                Ok(status) => {
-                    let status_str = if status == CommandStatus::Success { "Active" } else { "Error" };
-                    match dh_id {
-                        0 => ui.set_dh0_status(SharedString::from(status_str)),
-                        1 => ui.set_dh1_status(SharedString::from(status_str)),
-                        2 => ui.set_dh2_status(SharedString::from(status_str)),
-                        3 => ui.set_dh3_status(SharedString::from(status_str)),
-                        _ => {}
-                    }
-                    ui.set_last_response(SharedString::from(format!("START_DH {} - {:?}", dh_id, status)));
-                }
-                Err(e) => {
-                    ui.set_last_response(SharedString::from(format!("START_DH {} failed: {}", dh_id, e)));
-                }
-            }
-        });
-    }
-
-    // Stop DH handler
-    {
-        let client = client.clone();
-        let ui_weak = ui_weak.clone();
-        ui.on_stop_dh(move |dh_id| {
-            let ui = ui_weak.unwrap();
-            let mut guard = client.lock().unwrap();
-            let id = DHId(dh_id as u32);
-            match guard.stop_dh(id) {
-                Ok(status) => {
-                    match dh_id {
-                        0 => ui.set_dh0_status(SharedString::from("Stopped")),
-                        1 => ui.set_dh1_status(SharedString::from("Stopped")),
-                        2 => ui.set_dh2_status(SharedString::from("Stopped")),
-                        3 => ui.set_dh3_status(SharedString::from("Stopped")),
-                        _ => {}
-                    }
-                    ui.set_last_response(SharedString::from(format!("STOP_DH {} - {:?}", dh_id, status)));
-                }
-                Err(e) => {
-                    ui.set_last_response(SharedString::from(format!("STOP_DH {} failed: {}", dh_id, e)));
-                }
-            }
-        });
-    }
-
+    handle_quit(&ui, process_manager_tcssim.clone(), process_manager_tcspecial.clone());
     // Quit button handler
+/*
     {
         let pm_tcssim = process_manager_tcssim.clone();
         let pm_tcspecial = process_manager_tcspecial.clone();
@@ -363,8 +206,11 @@ fn main() {
             kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
         });
     }
+*/
 
+    handle_close(&ui, process_manager_tcssim.clone(), process_manager_tcspecial.clone());
     // Window close handler (close box)
+/*
     {
         let pm_tcssim = process_manager_tcssim.clone();
         let pm_tcspecial = process_manager_tcspecial.clone();
@@ -373,8 +219,178 @@ fn main() {
             slint::CloseRequestResponse::HideWindow
         });
     }
+*/
 
     ui.run().unwrap();
+}
+
+// Menu action handler
+fn handle_main_menu (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
+    ui.on_menu_action(move |action| {
+        let ui = ui_weak.unwrap();
+        let mut guard = client.lock().unwrap();
+
+        match action {
+            MenuAction::Ping => {
+                eprintln!("Ping from menu");
+                match guard.ping() {
+                    Ok(tm) => {
+                        ui.set_last_response(SharedString::from(format!(
+                            "PING OK - timestamp: {}.{}",
+                            tm.timestamp.seconds, tm.timestamp.nanoseconds
+                        )));
+                    }
+                    Err(e) => {
+                        ui.set_last_response(SharedString::from(format!("PING failed: {}", e)));
+                    }
+                }
+            }
+            MenuAction::ArmRestart => {
+                match guard.restart_arm(ArmKey(0xf001adad)) {
+                    Ok(status) => {
+                        ui.set_last_response(SharedString::from(format!("ARM_RESTART: {:?}", status)));
+                    }
+                    Err(e) => {
+                        ui.set_last_response(SharedString::from(format!("ARM_RESTART failed: {}", e)));
+                    }
+                }
+            }
+            MenuAction::Restart => {
+                match guard.restart(ArmKey(0xf001adad)) {
+                    Ok(status) => {
+                        ui.set_last_response(SharedString::from(format!("RESTART: {:?}", status)));
+                    }
+                    Err(e) => {
+                        ui.set_last_response(SharedString::from(format!("RESTART failed: {}", e)));
+                    }
+                }
+            }
+            MenuAction::Query => {
+                ui.set_last_response(SharedString::from("Query - not yet implemented"));
+            }
+            MenuAction::QueryDh => {
+                ui.set_last_response(SharedString::from("Query DH - select DH first"));
+            }
+            MenuAction::StartDh => {
+                ui.set_last_response(SharedString::from("Start DH - select DH first"));
+            }
+            MenuAction::StopDh => {
+                ui.set_last_response(SharedString::from("Stop DH - select DH first"));
+            }
+        }
+    });
+}
+
+// Query all DHs button handler
+fn query_dh_buttons (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
+    let client = client.clone();
+    let ui_weak = ui_weak.clone();
+    ui.on_query_all_clicked(move || {
+        let ui = ui_weak.unwrap();
+        let mut guard = client.lock().unwrap();
+        let mut results = Vec::new();
+        for dh_id in 0..4 {
+            match guard.query_dh(DHId(dh_id)) {
+                Ok((status, stats)) => {
+                    results.push(format!("DH{}: {:?} sent={} recv={}", dh_id, status, stats.bytes_sent, stats.bytes_received));
+
+                    // Update UI for each DH
+                    match dh_id {
+                        0 => {
+                            ui.set_dh0_bytes_sent(stats.bytes_sent as i32);
+                            ui.set_dh0_bytes_recv(stats.bytes_received as i32);
+                        }
+                        1 => {
+                            ui.set_dh1_bytes_sent(stats.bytes_sent as i32);
+                            ui.set_dh1_bytes_recv(stats.bytes_received as i32);
+                        }
+                        2 => {
+                            ui.set_dh2_bytes_sent(stats.bytes_sent as i32);
+                            ui.set_dh2_bytes_recv(stats.bytes_received as i32);
+                        }
+                        3 => {
+                            ui.set_dh3_bytes_sent(stats.bytes_sent as i32);
+                            ui.set_dh3_bytes_recv(stats.bytes_received as i32);
+                        }
+                        _ => {}
+                    }
+                }
+                Err(e) => {
+                    results.push(format!("DH{}: Error - {}", dh_id, e));
+                }
+            }
+        }
+        ui.set_last_response(SharedString::from(results.join("; ")));
+    });
+}
+
+// Start DH handler
+fn start_dh_handler (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
+    let client = client.clone();
+    let ui_weak = ui_weak.clone();
+    ui.on_start_dh(move |dh_id| {
+        let ui = ui_weak.unwrap();
+        let mut guard = client.lock().unwrap();
+        let id = DHId(dh_id as u32);
+        let name = DHName::new(format!("DH{}", dh_id));
+        match guard.start_dh(id, DHType::Network, name) {
+            Ok(status) => {
+                let status_str = if status == CommandStatus::Success { "Active" } else { "Error" };
+                match dh_id {
+                    0 => ui.set_dh0_status(SharedString::from(status_str)),
+                    1 => ui.set_dh1_status(SharedString::from(status_str)),
+                    2 => ui.set_dh2_status(SharedString::from(status_str)),
+                    3 => ui.set_dh3_status(SharedString::from(status_str)),
+                    _ => {}
+                }
+                ui.set_last_response(SharedString::from(format!("START_DH {} - {:?}", dh_id, status)));
+            }
+            Err(e) => {
+                ui.set_last_response(SharedString::from(format!("START_DH {} failed: {}", dh_id, e)));
+            }
+        }
+    });
+}
+
+// Stop DH handler
+fn stop_dh_handler (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
+    let client = client.clone();
+    let ui_weak = ui_weak.clone();
+    ui.on_stop_dh(move |dh_id| {
+        let ui = ui_weak.unwrap();
+        let mut guard = client.lock().unwrap();
+        let id = DHId(dh_id as u32);
+        match guard.stop_dh(id) {
+            Ok(status) => {
+                match dh_id {
+                    0 => ui.set_dh0_status(SharedString::from("Stopped")),
+                    1 => ui.set_dh1_status(SharedString::from("Stopped")),
+                    2 => ui.set_dh2_status(SharedString::from("Stopped")),
+                    3 => ui.set_dh3_status(SharedString::from("Stopped")),
+                    _ => {}
+                }
+                ui.set_last_response(SharedString::from(format!("STOP_DH {} - {:?}", dh_id, status)));
+            }
+            Err(e) => {
+                ui.set_last_response(SharedString::from(format!("STOP_DH {} failed: {}", dh_id, e)));
+            }
+        }
+    });
+}
+
+// Quit button handler
+fn handle_quit(ui: &MainWindow, pm_tcssim: Arc<ProcessManager>, pm_tcspecial: Arc<ProcessManager>) {
+    ui.on_quit_clicked(move || {
+        kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
+    });
+}
+
+    // Window close handler (close box)
+fn handle_close(ui: &MainWindow, pm_tcssim: Arc<ProcessManager>, pm_tcspecial: Arc<ProcessManager>) {
+    ui.window().on_close_requested(move || {
+        kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
+        slint::CloseRequestResponse::HideWindow
+    });
 }
 
 fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: &Arc<ProcessManager>) {

@@ -133,6 +133,7 @@ eprintln!("sending ping command");
 
     /// Receive telemetry (blocking)
     pub fn receive_telemetry(&mut self) -> TcsResult<Telemetry> {
+eprintln!("TcsClient::receive_telemetry: calling self.connection.receive");
         self.connection.receive()
     }
 

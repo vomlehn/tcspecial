@@ -91,6 +91,7 @@ let socket = socket?;
     pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
+eprintln!("send_beacon::sendto {:?}", dest_addr);
         let status = socket.send_to(&data, dest_addr);
         Ok(())
     }

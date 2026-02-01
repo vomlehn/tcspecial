@@ -68,13 +68,15 @@ impl UdpConnection {
 
 impl Connection for UdpConnection {
     fn send(&mut self, command: &Command) -> TcsResult<()> {
+eprintln!("UdpConnection::sendto {:?}", self.remote_addr);
         let data = serde_json::to_vec(command)?;
         self.socket.send_to(&data, self.remote_addr)?;
         Ok(())
     }
 
     fn receive(&mut self) -> TcsResult<Telemetry> {
-        let (size, _addr) = self.socket.recv_from(&mut self.recv_buffer)?;
+        let (size, addr) = self.socket.recv_from(&mut self.recv_buffer)?;
+eprintln!("UdpConnection: recv_from {:?}", addr);
         let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..size])?;
         Ok(telemetry)
     }
@@ -82,6 +84,8 @@ impl Connection for UdpConnection {
     fn receive_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry> {
         self.socket.set_read_timeout(Some(timeout))?;
         let result = self.receive();
+eprintln!("UcpConnection: receive");
+eprintln!("{}", std::backtrace::Backtrace::force_capture());
         self.socket.set_read_timeout(None)?;
         result
     }
@@ -137,6 +141,7 @@ impl TcpConnection {
 
 impl Connection for TcpConnection {
     fn send(&mut self, command: &Command) -> TcsResult<()> {
+eprintln!("TcpConnection::send");
         let data = serde_json::to_vec(command)?;
         // Send length prefix (4 bytes big endian)
         let len_bytes = (data.len() as u32).to_be_bytes();
@@ -157,6 +162,8 @@ impl Connection for TcpConnection {
         }
 
         self.stream.read_exact(&mut self.recv_buffer[..len])?;
+eprintln!("TcpConnection: receive");
+eprintln!("{}", std::backtrace::Backtrace::force_capture());
         let telemetry: Telemetry = serde_json::from_slice(&self.recv_buffer[..len])?;
         Ok(telemetry)
     }
@@ -164,6 +171,7 @@ impl Connection for TcpConnection {
     fn receive_timeout(&mut self, timeout: Duration) -> TcsResult<Telemetry> {
         self.stream.set_read_timeout(Some(timeout))?;
         let result = self.receive();
+eprintln!("TcpConnection: receive_timeout");
         self.stream.set_read_timeout(None)?;
         result
     }

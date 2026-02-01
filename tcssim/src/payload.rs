@@ -230,6 +230,7 @@ fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<s
 
             if packet_interval > 0 {
                 let data: Vec<u8> = (0..packet_size).map(|_| rng.gen()).collect();
+eprintln!("run_udp_payload::sendto {:?}", peer);
                 if let Ok(n) = socket.send_to(&data, peer) {
                     let mut guard = stats.lock().unwrap();
                     guard.packets_sent += 1;

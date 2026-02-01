@@ -171,6 +171,7 @@ impl TcsClientBuilder {
 
     pub fn build(self, connection: Box<dyn Connection>) -> TcsClient {
         let mut client = TcsClient::new(connection);
+eprintln!("build: set client");
         client.set_timeout(self.timeout);
         client
     }

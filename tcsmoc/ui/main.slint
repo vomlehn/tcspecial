@@ -125,6 +125,8 @@ export component MainWindow inherits Window {
     in-out property <int> dh3-bytes-sent: 0;
     in-out property <int> dh3-bytes-recv: 0;
 
+    in-out property <string> beacon-last-recv: "--- --:--.-";
+
     callback connect-clicked();
     callback disconnect-clicked();
     callback ping-clicked();
@@ -241,6 +243,8 @@ export component MainWindow inherits Window {
                         }
                     }
 
+                    Text { text: "Beacon: "; }
+
                     Rectangle {
                         width: 20px;
                         height: 20px;
@@ -249,6 +253,11 @@ export component MainWindow inherits Window {
                         border-color: #808080;
                         border-width: 1px;
                     }
+
+                    Text { text: "Last rcvd: "; }
+
+                    Text { text: beacon-last-recv; font-size: 10px; }
+                        
                 }
 
                 HorizontalLayout {

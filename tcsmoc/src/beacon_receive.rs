@@ -11,6 +11,8 @@ use slint::{Color, Weak};
 use crate::MainWindow;
 use tcslibgs::TcsResult;
 
+const DEBUG_BEACON: bool = false;
+
 /*
  * Indicator states
  * Steady:      State that does not blink
@@ -221,6 +223,9 @@ impl BeaconReceive {
             drop(last_beacon_guard);
 
             let (timeout, color) = self.indicator_states.delay_and_color(&last_beacon_value);
+if DEBUG_BEACON {
+eprintln!("First: timeout {:?} color {:?}", timeout, color);
+}
 
             // Set socket timeout
             socket.set_read_timeout(timeout)?;
@@ -240,6 +245,9 @@ impl BeaconReceive {
 
                     // Recalculate color after receiving
                     let (_, color) = self.indicator_states.delay_and_color(&last_beacon_value);
+if DEBUG_BEACON {
+eprintln!("Msg rcvd: timeout {:?} color {:?}", timeout, color);
+}
                     Some(color)
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
@@ -251,6 +259,9 @@ impl BeaconReceive {
                     let last_beacon_value = *last_beacon_guard;
                     drop(last_beacon_guard);
                     let (_, color) = self.indicator_states.delay_and_color(&last_beacon_value);
+if DEBUG_BEACON {
+eprintln!("Timedout: timeout {:?} color {:?}", timeout, color);
+}
                     Some(color)
                 }
                 Err(e) => {

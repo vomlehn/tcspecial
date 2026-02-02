@@ -282,6 +282,71 @@ eprintln!("Timedout: timeout {:?} color {:?}", timeout, color);
             }
         }
     }
+
+/*
+use std::net::UdpSocket;
+use std::time::{Duration, SystemTime};
+use slint::{Color, Weak, ComponentHandle};
+use crate::config::constants::BEACON_INDICATOR; // Adjust path as needed
+*/
+
+/* FIXME: compare with version above. Claude said:
+ * Why this works
+ * The "Blink" Logic: By using set_read_timeout with the duration returned by
+ * color_and_delay, the loop "wakes up" exactly when it's time to toggle the
+ * light (e.g., every 500ms for a blink), even if no network data has arrived.
+ * 
+ * The Weak Pointer: We use Weak<MainWindow> so that the background thread
+ * doesn't prevent the UI from closing. If the user closes the window,
+ * ui_handle.upgrade() will return None, and the thread can shut down
+ * gracefully.
+ * 
+ * SystemTime Error Handling: Inside color_and_delay (the code I provided in
+ * the previous step), we used unwrap_or(Duration::ZERO) for the time
+ * subtraction. This ensures that if the system clock drifts slightly, your
+ * app doesn't crash.
+ *
+    pub fn receive_beacon(&self, ui_handle: Weak<MainWindow>) -> TcsResult<()> {
+        let socket = UdpSocket::bind("0.0.0.0:0")?; // Bind to any available port
+        // Note: You'll likely want to connect or join a multicast group here
+
+        loop {
+            // 1. Get the current status from our configuration logic
+            let last_beacon = *self.last_beacon.lock.lock().unwrap();
+            let (current_color, next_event_delay) = BEACON_INDICATOR.color_and_delay(last_beacon);
+
+            // 2. Update the UI color
+            let ui_clone = ui_handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = ui_clone.upgrade() {
+                    // Assuming your .slint file has a property called 'beacon_color'
+                    ui.set_beacon_color(current_color);
+                }
+            }).unwrap();
+
+            // 3. Set the socket timeout based on the next state change
+            // If next_event_delay is None, we wait indefinitely (or a default)
+            socket.set_read_timeout(next_event_delay.or(Some(Duration::from_secs(1))))?;
+
+            // 4. Try to receive data
+            let mut buf = [0u8; 1024];
+            match socket.recv_from(&mut buf) {
+                Ok((_amt, _src)) => {
+                    // We got a beacon! Update the timestamp
+                    let mut last_beacon_lock = self.last_beacon.lock.lock().unwrap();
+                    *last_beacon_lock = Some(SystemTime::now());
+                    self.last_beacon.cvar.notify_all();
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
+                    // No data received, but that's okay—the loop will restart,
+                    // re-calculate the color (for blinking), and wait again.
+                    continue;
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+    }
+*/
 }
 
 type ArcCondPair<T> = Arc<CondPair<T>>;

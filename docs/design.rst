@@ -716,7 +716,7 @@ Linux device Endpoints open device entries in the /dev directory. This could be:
 
 
 Conduits
-^^^^^^
+^^^^^^^^
 Conduits contain two Endpoints, an EndpointReadable and an EndpointWritable. Data
 flows in just one direction, from the EndpointReadable to the EndpointWriteable.
 A Conduit is implemented as a thread that simply looks between the Read and
@@ -755,7 +755,7 @@ example, configuration-dependent code may require runtime allocations. The
 constraint TCSpecial is intend to obey is to have all allocations done before
 entering the main loop.
 
-This approach allows TeleNex resources to be allocated statically, but
+This approach allows TCSpecial resources to be allocated statically, but
 the underlying operating system may use dynamic resource allocation. These
 may fail, so the CI and DH code must be prepared to handle failures in
 in the operating system and retry at intervals if the various protocols do
@@ -767,35 +767,80 @@ software and to the DHs. The DHs talk to the CI and to the payloads.
 
 DH Links
 ^^^^^^^^
-Supported DH protocols include networking protocols and device interfaces, such
-as RS-422, as well as stackable protocols. These links can be divided into stream
-and datagram types. Stream data has no delimiters, no error detection and correction
-codes, etc. There may be gaps between bytes and sequences of bytes that can be
-used to identify groups of data.
+Supported DH protocols include networking protocols and device interfaces,
+such as RS-422, as well as stackable protocols. These links can be divided
+into stream and datagram types. Stream data has no delimiters, no error
+detection and correction codes, etc. There may be gaps between bytes and
+sequences of bytes that can be used to identify groups of data.
 
-Datagrams are groups of data with a count or other mechanism to identify the start
-and end locations. Under normal situations, datagrams are limited to a specific
-length, but the DH interfaces optionally 
-allow examining incoming packets to determine whether
-they exceed the previously expected length and reallocating a larger buffer to be
-able to read the whole packet with truncation. This is only effective up to some
-size, however, the kernel itself will have limitations on the packet size it can read.
-
+Datagrams are groups of data with a count or other mechanism to identify the
+start and end locations. Under normal situations, datagrams are limited to a specific length, but the DH interfaces optionally allow examining incoming
+packets to determine whether they exceed the previously expected length and
+reallocating a larger buffer to be able to read the whole packet with
+truncation. This is only effective up to some size, however, the kernel
+itself will have limitations on the packet size it can read.
 
 Provided Stacked DHs
-==≈=≈=============
-TeleNex offers several several stacked DHs that can be used as-is and as examples.
+==≈=≈===============
+TCSpecial offers several several stacked DHs that can be used as-is and as examples.
+
+Supported payload protocols are (or will be):
+
+**Currently supported payload protocols**
+
++-----------------------+----------+----------+--------------------+
+| Name                  | Stream/  | Async/   | Count(n bytes)[#]_ |
+|                       | Datagram | Cmd/Resp | Term(n bytes)[#]_) |
++=======================+==========+==========+====================+
+| UDP/IP Telemetry      | Datagram | Async    | None               |
++-----------------------+----------+----------+--------------------+
+| UDP/IP Cmd/Resp       | Datagram | Cmd/Resp | None               |
++-----------------------+----------+----------+--------------------+
+| TCP/IP Raw            | Stream   | Async    | None [#]_          |
++-----------------------+----------+----------+--------------------+
+| TCP/IP Raw Cmd/Resp   | Stream   | Async    | None [#]_          |
++-----------------------+----------+----------+--------------------+
+| TCP/IP Term           | Stream   | Async    | Term(1-2 bytes)    |
++-----------------------+----------+----------+--------------------+
+| TCP/IP Count          | Stream   | Async    | Count(1-2 bytes)   |
++-----------------------+----------+----------+--------------------+
+| TCP/IP Term Cmd/Resp  | Stream   | Async    | Term(1-2 bytes)    |
++-----------------------+----------+----------+--------------------+
+| TCP/IP Count Cmd/Resp | Stream   | Async    | Count(1-2 bytes)   |
++-----------------------+----------+----------+--------------------+
+| Device Raw            | Stream   | Async    | None [#]_          |
++-----------------------+----------+----------+--------------------+
+| Device Raw Cmd/Resp   | Stream   | Async    | None [#]_          |
++-----------------------+----------+----------+--------------------+
+| Device Term           | Stream   | Async    | Term(1-2 bytes)    |
++-----------------------+----------+----------+--------------------+
+| Device Count          | Stream   | Async    | Count(1-2 bytes)   |
++-----------------------+----------+----------+--------------------+
+| Device Term Cmd/Resp  | Stream   | Async    | Term(1-2 bytes)    |
++-----------------------+----------+----------+--------------------+
+| Device Count Cmd/Resp | Stream   | Async    | Count(1-2 bytes)   |
++-----------------------+----------+----------+--------------------+
+
+.. [#] Counts are the first n bytes of the data.
+
+.. [#] Terminators are the last n bytes of the data.
+
+.. [#] The data rate must be limited to that which can be handled
+   since there is no data throttling.
+
+.. [#] Data volume must be limited to that which can be handled as a
+   response
 
 Packetizing U32 Streaming Data
-"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 The payload is sending big-endian u32 data items every three seconds. The DH accumulates up to four of these. If the bytes have a time interval > between 100 mS, that data item is discarded. The resulting packet has a leading byte with a bit set for each valid data item, followed by valid data item values.
 
 Byte Swapping Values
-"^^^^^^^^^^^^^^^^^^^^
+"^^^^^^^^^^^^^^^^^^^
 This DH is composited with the DH that packetizes streaming data. It converts the big-endian u32s to little-endian u32s.
 
 Packetizing Arbitrary Streaming Data With Constant Overhead Byte Stuffing
-‐-----‐------------------------------------------------------------------------------------------------------------------
+‐-----‐------------------------------------------------------------------
 Read 254  * 4 bytes from the payload, write to a buffer with COBS, stick a u16 header which is a byte count and send to the OC.
 
 tcslib
@@ -878,6 +923,8 @@ The DHs are named "DH" plus the DH #.
 
 The packet size and interval can be changed.
 
+
+
 tcsmoc
 ------
 The tcsmoc is a GUI program used to control simulated payloads
@@ -902,7 +949,7 @@ when tcsmoc is halted.
 GUI Framework
 -------------
 The testing GUIs will all use
-slint
+the Rust slint crate
 with black on white. All windows will have a go away box which will shut down
 the entire application, i.e. tcspecial, tcsmod, and tcssim.
 

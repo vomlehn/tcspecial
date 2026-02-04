@@ -4,26 +4,18 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use tcslibgs::{CIConfig, DHConfig, PayloadConfig, TcsError, TcsResult};
+use tcslibgs::{CIConfig, DHConfig, TcsError, TcsResult};
 
-/// Load payload configuration from a JSON file
-pub fn load_config<P: AsRef<Path>>(path: P) -> TcsResult<(CIConfig, Vec<DHConfig>)> {
+/// Load tcspecial configuration from a JSON file
+pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
-    let payload_config: PayloadConfig = serde_json::from_reader(reader)?;
+    let tcspecial_tcspecial_config: PayloadConfig = serde_json::from_reader(reader)?;
 
-    let ci_config = payload_config.ci_config.to_ci_config()
+    let tcspecial_config = tcspecial_tcspecial_config.tcspecial_config.to_tcspecial_config()
         .map_err(|e| TcsError::Config(e))?;
 
-    let dh_configs: Result<Vec<DHConfig>, String> = payload_config
-        .data_handlers
-        .iter()
-        .map(|dh| dh.to_dh_config())
-        .collect();
-
-    let dh_configs = dh_configs.map_err(|e| TcsError::Config(e))?;
-
-    Ok((ci_config, dh_configs))
+    Ok(tcspecial_config)
 }
 
 /// Configuration constants
@@ -61,7 +53,7 @@ mod tests {
     use tempfile::NamedTempFile;
 
     #[test]
-    fn test_load_config() {
+    fn test_load_tcspecial_config() {
         let config_json = r#"{
             "version": "1.0",
             "description": "Test config",
@@ -77,7 +69,7 @@ mod tests {
                     "packet_interval_ms": 1000
                 }
             ],
-            "ci_config": {
+            "tcspecial_config": {
                 "address": "0.0.0.0",
                 "port": 4000,
                 "protocol": "udp",
@@ -88,11 +80,11 @@ mod tests {
         let mut temp_file = NamedTempFile::new().unwrap();
         temp_file.write_all(config_json.as_bytes()).unwrap();
 
-        let result = load_config(temp_file.path());
+        let result = load_tcspecial_config(temp_file.path());
         assert!(result.is_ok());
 
-        let (ci_config, dh_configs) = result.unwrap();
-        assert_eq!(ci_config.port, 4000);
-        assert_eq!(dh_configs.len(), 1);
+        let (tcspecial_config, payload_config) = result.unwrap();
+        assert_eq!(tcspecial_config.port, 4000);
+        assert_eq!(payload_config.len(), 1);
     }
 }

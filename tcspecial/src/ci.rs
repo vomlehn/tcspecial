@@ -26,7 +26,7 @@ pub struct CommandInterpreter {
     _config: CIConfig,
     socket: UdpSocket,
     data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
-    dh_configs: Vec<DHConfig>,
+    payload_config: Vec<DHConfig>,
     arm_key: Option<ArmKey>,
     arm_time: Option<Instant>,
     running: bool,
@@ -35,7 +35,7 @@ pub struct CommandInterpreter {
 
 impl CommandInterpreter {
     /// Create a new command interpreter
-    pub fn new(config: CIConfig, dh_configs: Vec<DHConfig>) -> TcsResult<Self> {
+    pub fn new(config: CIConfig, payload_config: Vec<DHConfig>) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
         let socket = UdpSocket::bind(&addr)?;
         socket.set_nonblocking(false)?;
@@ -46,7 +46,7 @@ impl CommandInterpreter {
             _config: config,
             socket,
             data_handlers: Arc::new(Mutex::new(BTreeMap::new())),
-            dh_configs,
+            payload_config,
             arm_key: None,
             arm_time: None,
             running: false,
@@ -59,7 +59,7 @@ impl CommandInterpreter {
         let mut handlers = self.data_handlers.lock()
             .map_err(|_| TcsError::DataHandler("Lock poisoned".to_string()))?;
 
-        for config in &self.dh_configs {
+        for config in &self.payload_config {
             let dh = DataHandler::new(config.clone())?;
             handlers.insert(config.dh_id, dh);
         }
@@ -104,7 +104,7 @@ eprintln!("process_command: {:?}", command);
                         CommandStatus::Success
                     } else {
                         // Find config and create handler
-                        if let Some(config) = self.dh_configs.iter().find(|c| c.dh_id == cmd.dh_id) {
+                        if let Some(config) = self.payload_config.iter().find(|c| c.dh_id == cmd.dh_id) {
                             match DataHandler::new(config.clone()) {
                                 Ok(dh) => {
                                     handlers.insert(cmd.dh_id, dh);

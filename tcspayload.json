@@ -41,10 +41,4 @@
             "packet_interval_ms": 500
         }
     ],
-    "ci_config": {
-        "address": "0.0.0.0",
-        "port": 4000,
-        "protocol": "udp",
-        "beacon_interval_ms": 5000
-    }
 }

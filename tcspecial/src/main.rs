@@ -4,35 +4,46 @@
 
 use std::env;
 use std::process;
-use tcspecial::{config::load_config, CommandInterpreter};
+use tcspecial::{config::load_tcspecial_config, CommandInterpreter};
 
 fn main() {
 eprintln!("TCSspecial::main: entered");
     // Initialize logging
 //    env_logger::init();
 
-    // Get config file path from command line or use default
-    let config_path = env::args()
-        .nth(1)
-        .unwrap_or_else(|| "tcspayload.json".to_string());
-
     println!("TCSpecial starting...");
-    println!("Loading configuration from: {}", config_path);
+
+    let config_path = env::var("TCSPECIAL_CONFIG_PATH").
+        unwrap_or_else(|_| "tcspecial/src/tcspecial.json".to_string());
+    println!("Loading tcspecial configuration from: {}", config_path);
 
     // Load configuration
-    let (ci_config, dh_configs) = match load_config(&config_path) {
+    let tcspecial_config = match load_tcspecial_config(&config_path) {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("Error loading configuration: {}", e);
+            eprintln!("Error loading payload_configuration: {}", e);
             process::exit(1);
         }
     };
 
-    println!("CI config: {}:{}", ci_config.address, ci_config.port);
-    println!("Loaded {} data handler configurations", dh_configs.len());
+    let payload_path = env::var("PAYLOAD_CONFIG_PATH").
+        unwrap_or_else(|_| "tcspayload.json".to_string());
+    println!("Loading payload configuration from: {}", payload_path);
+
+    // Load configuration
+    let payload_config = match load_payload_config(&payload_path) {
+        Ok(payload_config) => payload_config,
+        Err(e) => {
+            eprintln!("Error loading payload configuration: {}", e);
+            process::exit(1);
+        }
+    };
+
+    println!("CI config: {}:{}", tcspecial_config.address, tcspecial_config.port);
+    println!("Loaded {} data handler configurations", payload_config.len());
 
     // Create command interpreter
-    let mut ci = match CommandInterpreter::new(ci_config, dh_configs) {
+    let mut ci = match CommandInterpreter::new(tcspecial_config, payload_config) {
         Ok(ci) => ci,
         Err(e) => {
             eprintln!("Error creating command interpreter: {}", e);

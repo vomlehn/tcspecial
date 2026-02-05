@@ -14,6 +14,63 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
+Data Handlers (DHs)
+===================
+Data handlers are responsible for passing data from the payload to the MOC
+and, if appropriate, in the reverse direction, as well. Data from the MOC
+to the payload is simply passed through, but the variety of payload
+interfaces requires supporting a number of interfaces to payloads. The
+following table details these
+
+All
+
+    name = <name>
+
+    id = <id>
+
+    bidirection = true | false
+
+Networking-Related
+
+    Networking
+
+        address = "<node>:<port>"
+
+        address_family = AF_<af>
+
+        type = SOCK_<type>
+
+        protocol = IPPROTO_<proto>
+            See RFC 1700 for SOCK_RAW
+
+    tty
+
+        path = "device-path"
+
+        data-rate = <n>
+
+        parity = even | odd | none
+
+        bits-per-byte = <n>
+
+Datagram
+
+    Fixed length
+        max-length = <n-bytes>
+
+    Terminated
+        terminator = "string"
+
+    Time-terminated
+        time-terminator = <n nanoseconds>
+
+    Counted
+        length-length = 1 | 2
+
+ Raw
+    max_interbyte_interval
+    max_interval = <interval>
+
 Testing
 =======
 Testing is done with two programs:

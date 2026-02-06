@@ -71,6 +71,19 @@ Datagram
     max_interbyte_interval
     max_interval = <interval>
 
+
+Network
+
+UDP/IP
+
+TCP/IP
+
+tty
+
+I\ :superscript:`2`\ C
+
+SPI
+
 Testing
 =======
 Testing is done with two programs:

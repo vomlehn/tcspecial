@@ -328,3 +328,71 @@ mod tests {
         assert_ne!(WaitResult::IoReady, WaitResult::Timeout);
     }
 }
+
+/*
+ * use socket2::{Socket, Domain, Type, Protocol, SockAddr};
+use std::net::SocketAddr;
+
+fn main() -> std::io::Result<()> {
+    // Equivalent to: socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+
+    // Set options before connecting
+    socket.set_reuse_address(true)?;
+    socket.set_nodelay(true)?;
+
+    // Connect
+    let addr: SocketAddr = "127.0.0.1:7878".parse().unwrap();
+    socket.connect(&SockAddr::from(addr))?;
+
+    // Send/receive
+    socket.send(b"Hello!")?;
+
+    let mut buf = [0u8; 1024];
+    let n = socket.recv(&mut buf)?;
+    println!("Received: {}", String::from_utf8_lossy(&buf[..n]));
+
+    Ok(())
+}
+
+use socket2::{Socket, Domain, Type, Protocol, SockAddr};
+use std::net::SocketAddr;
+
+fn main() -> std::io::Result<()> {
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+
+    socket.set_reuse_address(true)?;
+
+    let addr: SocketAddr = "127.0.0.1:7878".parse().unwrap();
+    socket.bind(&SockAddr::from(addr))?;
+    socket.listen(128)?; // backlog of 128
+
+    let (client, client_addr) = socket.accept()?;
+    println!("Connection from: {:?}", client_addr.as_socket());
+
+    Ok(())
+}
+
+let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+socket.bind(&SockAddr::from(addr))?;
+socket.send_to(b"ping", &SockAddr::from(remote_addr))?;
+
+Key mappings to C
+C                                           socket2
+socket(AF_INET, SOCK_STREAM, 0) Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))
+
+socket(AF_INET6, SOCK_DGRAM, 0) Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))
+
+socket(AF_UNIX, SOCK_STREAM, 0) Socket::new(Domain::UNIX, Type::STREAM, None)
+
+setsockopt(...)                 socket.set_reuse_address(true), etc.
+
+bind(), listen(), accept(), connect()   Same method names on Socket
+
+Converting to std types
+You can convert a socket2::Socket into a std::net::TcpStream (or TcpListener, UdpSocket) when you're done with low-level setup:
+
+let std_stream: std::net::TcpStream = socket.into();
+
+This is a common pattern: use socket2 for fine-grained control during setup, then convert to std types for ergonomic I/O.
+ */

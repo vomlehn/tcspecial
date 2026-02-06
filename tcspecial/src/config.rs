@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use tcslibgs::{CIConfig, DHConfig, TcsError, TcsResult};
+use tcslibgs::{CIConfig, DHConfig, PayloadConfig, TcsError, TcsResult};
 
 /// Load tcspecial configuration from a JSON file
 pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {

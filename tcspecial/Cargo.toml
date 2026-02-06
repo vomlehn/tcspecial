@@ -13,3 +13,4 @@ thiserror = "1.0"
 #log = "0.4"
 #env_logger = "0.10"
 nix = { version = "0.27", features = ["poll", "fs"] }
+socket2 = "0.6.2"

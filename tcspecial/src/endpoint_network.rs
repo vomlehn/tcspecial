@@ -1,4 +1,6 @@
 mod EndpointNetwork {
+use libc::{IPPROTO_TCP, IPPROTO_UDP, IPPROTO_SCTP, IPPROTO_UDPLITE};
+use socket2::{Domain, Type};
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
@@ -7,33 +9,86 @@ enum LinkType {
     Stream,
 }
 
+struct AddressFamily<'a> {
+    af:         Domain,
+    sock_info:  BTreeMap<&'a str, SockInfo<'a>>,
+}
 
-static protocols: LazyLock<BTreeMap<&[&'static str], i32>> = LazyLock::new(|| {
+struct SockInfo<'a> {
+    sock_type:  Type,
+    ipproto:   BTreeMap<&'a str, i32>,
+//    link_type:  LinkType,
+}
+
+pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(|| {
     BTreeMap::from([
-        (&["unix", "local"], 12),
-		(&["inet"], 23),
-		(&["ax25"], 23),
-		(&["ipx"], 23),
-		(&["appletalk"], 23),
-		(&["x25"], 23),
-		(&["inet6"], 23),
-		(&["decnet"], 23),
-		(&["key"], 23),
-		(&["netlink"], 23),
-		(&["packet"], 23),
-		(&["rds"], 23),
-		(&["pppox"], 23),
-		(&["llc"], 23),
-		(&["ib"], 23),
-		(&["mpls"], 23),
-		(&["can"], 23),
-		(&["tipc"], 23),
-		(&["bluetooth"], 23),
-		(&["alg"], 23),
-		(&["vsock"], 23),
-		(&["xdp"], 23),
+        (
+            "unix", AddressFamily {
+                af: Domain::UNIX, sock_info: BTreeMap::from([
+                    (
+                        "stream", SockInfo {
+                            sock_type: Type::STREAM, ipproto: BTreeMap::from([
+                                ("tcp", IPPROTO_TCP),
+                                ("udp", IPPROTO_UDP),
+                                ("sctp", IPPROTO_SCTP),
+                                ("udplite", IPPROTO_UDPLITE),
+                                // FIXME: handle SOCK_RAW from RFC 1709
+                            ])
+                        }
+                    )
+                ])
+            }
+        )
     ])
 });
+        
+
+
+
+
+//                SockInfo{sock_type: Type::STREAM, protocol: &[], 
+//                    link_type: LinkType::Stream},
+//            }])}
+/*
+                "dgram",  {type: SOCK_dgram, protocol: None, link_type: LinkType::Packet},
+                "seqpacket", {type: SOCK_seqpacket, protocol: None, link_type: LinkType::Packet},
+*/
+/*
+        {"local", AddressFamily(AF_local, 
+                "stream", SOCK_stream, None, LinkType::Stream,
+                "dgram",  SOCK_dgram, None, LinkType::Packet,
+                "seqpacket", SOCK_seqpacket, None, LinkType::Packet,
+            ],
+        {"inet", AddressFamily(AF_inet, BTreeMap::from([
+                "stream", SOCK_stream, None, LinkType:::Stream 
+                "dgram", SOCK_dgram, None, :datagram
+                "raw", SOCK_raw, None, LinkType::Packet,
+            ],
+*/
+/*
+        {"ax25", AddressFamily(AF_ax25, :tbd:tbd:tbd
+        {"ipx", AddressFamily(AF_ipx, :tbd:tbd:tbd
+        {"appletalk", AddressFamily(AF_appletalk, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"x25", AddressFamily(AF_x25, BTreeMap::from(["seqpacket", SOCK_seqpacket, None,:0:datagram
+        {"inet6", AddressFamily(AF_inet6, BTreeMap::from(["stream", SOCK_stream, None,:yes:stream sock_dgram:yes:datagram sock_raw:yes:datagram
+        {"decnet", AddressFamily(AF_decnet, :tbd:tbd:tbd
+        {"key", AddressFamily(AF_key, :tbd:tbd:tbd
+        {"netlink", AddressFamily(AF_netlink, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"packet", AddressFamily(AF_packet, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"rds", AddressFamily(AF_rds, :tbd:tbd:tbd
+        {"pppox", AddressFamily(AF_pppox, :tbd:tbd:tbd
+        {"llc", AddressFamily(AF_llc, :tbd:tbd:tbd
+        {"ib", AddressFamily(AF_ib, :tbd:tbd:tbd
+        {"mpls", AddressFamily(AF_mpls, :tbd:tbd:tbd
+        {"can", AddressFamily(AF_can, :tbd:tbd:tbd
+        {"tipc", AddressFamily(AF_tipc, :tbd:tbd:tbd
+        {"bluetooth", AddressFamily(AF_bluetooth, :tbd:tbd:tbd
+        {"alg", AddressFamily(AF_alg, :tbd:tbd:tbd
+        {"vsock", AddressFamily(AF_vsock, BTreeMap::from(["dgram", SOCK_dgram, None,:yes:datagram sock_raw:yes:datagram
+        {"xdp", AddressFamily(AF_xdp, :tbd:tbd:tbd
+    ])
+});
+*/
 
 struct Protocol<'a> {
     name:   &'a [&'static str],

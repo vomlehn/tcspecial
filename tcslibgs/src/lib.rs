@@ -4,13 +4,15 @@
 //! software (tcslib) and the space portion (tcspecial).
 
 pub mod commands;
+pub mod config;
+pub mod error;
+pub mod protocol;
 pub mod telemetry;
 pub mod types;
-pub mod protocol;
-pub mod error;
 
 pub use commands::*;
+pub use config::*;
+pub use error::*;
+pub use protocol::*;
 pub use telemetry::*;
 pub use types::*;
-pub use protocol::*;
-pub use error::*;

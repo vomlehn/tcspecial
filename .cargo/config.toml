@@ -1,0 +1,10 @@
+# Required by the tcslog crate's `write` feature: how finely this machine's
+# clock advances, in nanoseconds. Left unset the crate still builds, but
+# opening a log fails with LogError::TimerResolutionZero.
+#
+# It need not be exact. A writer that finds the value too small doubles it
+# until a segment file name is free and keeps what it arrived at; read the
+# figure in force back with LogWrite::timer_resolution() and build with that
+# next time.
+[env]
+TIMER_RESOLUTION = "1"

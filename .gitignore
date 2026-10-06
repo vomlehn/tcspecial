@@ -22,3 +22,6 @@ target
 README.html
 Cargo.lock
 build.out
+
+# Telemetry log segment files written by tcslog
+telemetry/

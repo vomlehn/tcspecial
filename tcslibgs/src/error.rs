@@ -49,6 +49,9 @@ pub enum TcsError {
 
     #[error("Channel error: {0}")]
     Channel(String),
+
+    #[error("Telemetry log error: {0}")]
+    Log(String),
 }
 
 /// Result type alias for TCSpecial operations

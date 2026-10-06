@@ -12,6 +12,7 @@ endpoint_groups:
     datarate: 115200
     stop_bits: 1
     byte_length: 8
+    packet_size: 512
     stream:
       max_length: 512
       timeout: 250ms
@@ -24,6 +25,7 @@ endpoint_groups:
     datarate: 38400
     stop_bits: 2
     byte_length: 8
+    packet_size: 64
     stream:
       max_length: 64
       timeout: none
@@ -32,6 +34,7 @@ endpoint_groups:
   - name: payload_tcp
     type: network
     protocol: tcp
+    packet_size: 1024
     stream:
       max_length: 4096
       timeout: 1s
@@ -41,9 +44,12 @@ endpoint_groups:
   - name: payload_udp
     type: network
     protocol: udp
+    packet_size: 256
 
   # A stream protocol again, but a Unix-domain socket is named by a path
-  # rather than by a host and port, so its endpoint gives a device.
+  # rather than by a host and port, so its endpoint gives a device. This is
+  # also the one group stating no packet size: the attribute is optional, and
+  # a recorder takes whatever a read delivers.
   - name: payload_unix
     type: network
     protocol: unix_stream
@@ -56,6 +62,7 @@ endpoint_groups:
   # it can be checked against the platform, which is what actually sets it.
   - name: payload_i2c
     type: i2c
+    packet_size: 32
     pec: true
     retries: 2
     timeout: 50ms
@@ -65,6 +72,7 @@ endpoint_groups:
   # peripheral, and the speed is an upper bound rather than an exact rate.
   - name: payload_spi
     type: spi
+    packet_size: 64
     max_speed: 10000000
     mode: 3
     bits_per_word: 8

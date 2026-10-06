@@ -14,6 +14,29 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
+Configuration File Formats
+==========================
+A configuration file may be written in JSON, YAML, or XML. All three describe
+the same settings and are read into the same values, so the choice is one of
+local preference and tooling rather than of capability.
+
+The format is taken from the file's extension:
+
+.. code-block:: text
+
+   .yaml, .yml     YAML
+   .xml            XML
+   anything else   JSON
+
+JSON is the fallback, so a file with no extension, or with an unfamiliar one,
+is read as JSON.
+
+Two differences are worth knowing when moving a file between the formats.
+JSON has no comments, so remarks in a YAML or XML file have nowhere to go in
+JSON. JSON also has no hexadecimal numbers, so a value such as an
+I\ :superscript:`2`\ C address is written there as the string ``"0x48"``
+rather than as ``0x48``; YAML and XML accept either spelling.
+
 Data Handlers (DHs)
 ===================
 Data handlers are responsible for passing data from the payload to the MOC
@@ -82,7 +105,54 @@ tty
 
 I\ :superscript:`2`\ C
 
+    path = "device-path"
+
+    address = <n>
+        With 7-bit addressing, 0x08 through 0x77. The bus reserves 0x00
+        through 0x07 and 0x78 through 0x7F, so no device can answer to one
+        of those. With 10-bit addressing, 0x000 through 0x3FF, none reserved.
+
+    ten-bit = true | false
+        Use 10-bit slave addressing instead of 7-bit.
+
+    pec = true | false
+        SMBus packet error checking, a CRC-8 appended to each transfer.
+
+    retries = <n>
+
+    timeout = <n milliseconds>
+        Rounded up to a multiple of 10 ms by the kernel.
+
+    bus-speed = <n>
+        Informational only. The bus clock rate belongs to the controller and
+        is set by the platform, in the device tree or ACPI; it cannot be
+        changed through /dev/i2c-N.
+
+    There is no parity or byte length to configure. I\ :superscript:`2`\ C
+    fixes the framing at eight data bits, most significant bit first,
+    followed by an acknowledge bit.
+
 SPI
+
+    path = "device-path"
+
+    max-speed = <n bits per second>
+
+    mode = 0 | 1 | 2 | 3
+        Clock polarity and phase, CPOL and CPHA. This must match the
+        peripheral; a mismatch fails the way a wrong data rate fails on a
+        serial port.
+
+    bits-per-word = <n>
+        Commonly 8, though a controller may support other widths.
+
+    bit-order = msb | lsb
+
+    cs-active = low | high
+
+    There is no parity and there are no stop bits. SPI is clocked and
+    full duplex, and a transfer is delimited by the chip select rather than
+    by framing bits.
 
 Testing
 =======

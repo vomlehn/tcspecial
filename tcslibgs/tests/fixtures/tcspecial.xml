@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Equivalent to tcspecial.json and tcspecial.yaml. -->
+<tcspecial>
+    <address>0.0.0.0</address>
+    <port>4000</port>
+    <protocol>udp</protocol>
+    <beacon_interval_ms>5000</beacon_interval_ms>
+    <log_dir>/var/log/tcspecial</log_dir>
+    <log_segment_bytes>65536</log_segment_bytes>
+</tcspecial>

@@ -1,18 +1,18 @@
 //! Configuration loading for TCSpecial
 
-use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
 
-use tcslibgs::{CIConfig, DHConfig, PayloadConfig, TcsError, TcsResult};
+use tcslibgs::{load_config_file, CIConfig, TcsError, TcsResult};
+use tcslibgs::CIConfigJson;
 
-/// Load tcspecial configuration from a JSON file
+/// Load tcspecial configuration from a JSON, YAML, or XML file.
+///
+/// The format is chosen from the file extension; see
+/// `tcslibgs::format::ConfigFormat`.
 pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let tcspecial_tcspecial_config: PayloadConfig = serde_json::from_reader(reader)?;
+    let tcspecial_config_file: CIConfigJson = load_config_file(path)?;
 
-    let tcspecial_config = tcspecial_tcspecial_config.tcspecial_config.to_tcspecial_config()
+    let tcspecial_config = tcspecial_config_file.to_ci_config()
         .map_err(|e| TcsError::Config(e))?;
 
     Ok(tcspecial_config)
@@ -44,47 +44,71 @@ pub mod constants {
 
     /// Restart arm timeout
     pub const RESTART_ARM_TIMEOUT: Duration = Duration::from_secs(60);
+
+    /// First part of every telemetry log segment file name
+    pub const TELEMETRY_LOG_PREFIX: &str = "telem-";
+
+    /// Last part of every telemetry log segment file name
+    pub const TELEMETRY_LOG_SUFFIX: &str = ".tcslog";
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::NamedTempFile;
+    use tcslibgs::NetworkProtocol;
+    use tempfile::Builder;
+
+    /// Write `text` to a temporary file with the given extension, so that
+    /// `load_tcspecial_config` picks the matching parser.
+    fn load_from(ext: &str, text: &str) -> TcsResult<CIConfig> {
+        let mut file = Builder::new().suffix(ext).tempfile().unwrap();
+        file.write_all(text.as_bytes()).unwrap();
+        file.flush().unwrap();
+        load_tcspecial_config(file.path())
+    }
+
+    const JSON: &str = r#"{
+        "address": "0.0.0.0",
+        "port": 4000,
+        "protocol": "udp",
+        "beacon_interval_ms": 5000
+    }"#;
+
+    const YAML: &str = "address: 0.0.0.0\nport: 4000\nprotocol: udp\nbeacon_interval_ms: 5000\n";
+
+    const XML: &str = "<tcspecial>\
+        <address>0.0.0.0</address>\
+        <port>4000</port>\
+        <protocol>udp</protocol>\
+        <beacon_interval_ms>5000</beacon_interval_ms>\
+        </tcspecial>";
 
     #[test]
-    fn test_load_tcspecial_config() {
-        let config_json = r#"{
-            "version": "1.0",
-            "description": "Test config",
-            "data_handlers": [
-                {
-                    "dh_id": 0,
-                    "name": "DH0",
-                    "type": "network",
-                    "protocol": "udp",
-                    "address": "localhost",
-                    "port": 5000,
-                    "packet_size": 12,
-                    "packet_interval_ms": 1000
-                }
-            ],
-            "tcspecial_config": {
-                "address": "0.0.0.0",
-                "port": 4000,
-                "protocol": "udp",
-                "beacon_interval_ms": 5000
-            }
-        }"#;
+    fn test_load_tcspecial_config_every_format() {
+        for (ext, text) in [(".json", JSON), (".yaml", YAML), (".xml", XML)] {
+            let config = load_from(ext, text)
+                .unwrap_or_else(|e| panic!("{ext} failed to load: {e}"));
 
-        let mut temp_file = NamedTempFile::new().unwrap();
-        temp_file.write_all(config_json.as_bytes()).unwrap();
+            assert_eq!(config.address, "0.0.0.0", "{ext}");
+            assert_eq!(config.port, 4000, "{ext}");
+            assert_eq!(config.protocol, NetworkProtocol::Udp, "{ext}");
+            assert_eq!(config.beacon_interval.0, 5000, "{ext}");
+            // Absent in every fixture, so the serde defaults must apply.
+            assert_eq!(config.log_dir, None, "{ext}");
+            assert_eq!(config.log_segment_bytes, 65_536, "{ext}");
+        }
+    }
 
-        let result = load_tcspecial_config(temp_file.path());
-        assert!(result.is_ok());
+    #[test]
+    fn test_unknown_extension_is_parsed_as_json() {
+        let config = load_from(".conf", JSON).unwrap();
+        assert_eq!(config.port, 4000);
+    }
 
-        let (tcspecial_config, payload_config) = result.unwrap();
-        assert_eq!(tcspecial_config.port, 4000);
-        assert_eq!(payload_config.len(), 1);
+    #[test]
+    fn test_bad_protocol_is_rejected() {
+        let bad = YAML.replace("protocol: udp", "protocol: carrier-pigeon");
+        assert!(load_from(".yaml", &bad).is_err());
     }
 }

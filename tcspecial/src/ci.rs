@@ -269,6 +269,8 @@ mod tests {
             port: 0, // Let OS assign port
             protocol: NetworkProtocol::Udp,
             beacon_interval: BeaconTime(5000),
+            log_dir: None,
+            log_segment_bytes: 65_536,
         };
 
         let ci = CommandInterpreter::new(config, vec![]);

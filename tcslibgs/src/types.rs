@@ -146,16 +146,25 @@ pub struct DHConfig {
 }
 
 /// Payload configuration file structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PayloadConfig {
     pub version: String,
     pub description: String,
     pub data_handlers: Vec<DHConfigJson>,
-    pub ci_config: CIConfigJson,
+    /// Retained so a payload file that still carries a CI section parses,
+    /// but unused: the CI reads its own configuration from tcspecial.json.
+    #[serde(default)]
+    pub ci_config: Option<CIConfigJson>,
+}
+
+impl PayloadConfig {
+    pub fn len(&self) -> usize {
+        self.data_handlers.len()
+    }
 }
 
 /// JSON representation of DH config
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DHConfigJson {
     pub dh_id: u32,
     pub name: String,
@@ -206,13 +215,27 @@ impl DHConfigJson {
     }
 }
 
+/// Payload bytes per telemetry log segment file, when the configuration
+/// does not say. The segment file header is added on top of this.
+fn default_log_segment_bytes() -> u32 {
+    65_536
+}
+
 /// JSON representation of CI config
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
     pub address: String,
     pub port: u16,
     pub protocol: String,
     pub beacon_interval_ms: u32,
+    /// Directory holding the telemetry log's segment files. The directory
+    /// must already exist. Telemetry logging is disabled when this is absent.
+    #[serde(default)]
+    pub log_dir: Option<String>,
+    /// Payload bytes per segment file. The segment file header is added to
+    /// this, so it is the space available for telemetry records.
+    #[serde(default = "default_log_segment_bytes")]
+    pub log_segment_bytes: u32,
 }
 
 /// Command interpreter configuration
@@ -222,6 +245,11 @@ pub struct CIConfig {
     pub port: u16,
     pub protocol: NetworkProtocol,
     pub beacon_interval: BeaconTime,
+    /// Directory holding the telemetry log's segment files, or `None` to
+    /// run without a telemetry log.
+    pub log_dir: Option<String>,
+    /// Payload bytes per segment file, not counting the segment file header.
+    pub log_segment_bytes: u32,
 }
 
 impl CIConfigJson {
@@ -237,6 +265,8 @@ impl CIConfigJson {
             port: self.port,
             protocol,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
+            log_dir: self.log_dir.clone(),
+            log_segment_bytes: self.log_segment_bytes,
         })
     }
 }

@@ -51,7 +51,7 @@ fn the_shipped_tcspecial_config_loads() {
 
 #[test]
 fn the_shipped_payload_config_loads() {
-    let path = repo_file("tcspayload.json");
+    let path = repo_file("tcspayload.yaml");
     let handlers = load_payload_config(&path)
         .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
 
@@ -76,7 +76,7 @@ fn the_shipped_payload_config_loads() {
 fn the_shipped_files_have_distinct_data_handler_ids() {
     // A duplicate id parses cleanly and then has one handler shadow another,
     // which is the kind of thing only a test of the real file catches.
-    let handlers = load_payload_config(repo_file("tcspayload.json")).unwrap();
+    let handlers = load_payload_config(repo_file("tcspayload.yaml")).unwrap();
     let mut ids: Vec<_> = handlers.iter().map(|dh| dh.dh_id).collect();
     let before = ids.len();
     ids.sort();

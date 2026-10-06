@@ -1,10 +1,8 @@
 {
-    "version": "1.0",
-    "description": "TCSpecial configuration",
-    "tcspecial_config": {
-        "address": "0.0.0.0",
-        "port": 4000,
-        "protocol": "udp",
-        "beacon_interval_ms": 5000
-    }
+    "address": "0.0.0.0",
+    "port": 4000,
+    "protocol": "udp",
+    "beacon_interval_ms": 5000,
+    "log_dir": "telemetry",
+    "log_segment_bytes": 65536
 }

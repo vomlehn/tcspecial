@@ -16,7 +16,12 @@ use tcslibgs::{
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
-use crate::config::constants::{BEACON_DEFAULT_MS, BEACON_NETADDR, RESTART_ARM_TIMEOUT};
+use tcslog::{Format, LogWrite, SEGMENT_FILE_HEADER_LEN};
+
+use crate::config::constants::{
+    BEACON_DEFAULT_MS, BEACON_NETADDR, RESTART_ARM_TIMEOUT, TELEMETRY_LOG_PREFIX,
+    TELEMETRY_LOG_SUFFIX,
+};
 use crate::dh::DataHandler;
 
 /// Command interpreter state
@@ -31,6 +36,8 @@ pub struct CommandInterpreter {
     arm_time: Option<Instant>,
     running: bool,
     _global_stats: Statistics,
+    /// Telemetry log, or `None` when the configuration gave no log directory.
+    telemetry_log: Option<LogWrite>,
 }
 
 impl CommandInterpreter {
@@ -39,6 +46,31 @@ impl CommandInterpreter {
         let addr = format!("{}:{}", config.address, config.port);
         let socket = UdpSocket::bind(&addr)?;
         socket.set_nonblocking(false)?;
+
+        // Opened here, before the main loop, because LogWrite::new must
+        // enumerate the log directory and so is the one part of tcslog that
+        // allocates. Writing a record afterwards does not, which is what lets
+        // the main loop honour the "allocate before the main loop" rule.
+        let telemetry_log = match config.log_dir.as_deref() {
+            Some(dir) => Some(
+                LogWrite::new(
+                    dir,
+                    TELEMETRY_LOG_PREFIX,
+                    TELEMETRY_LOG_SUFFIX,
+                    SEGMENT_FILE_HEADER_LEN.saturating_add(config.log_segment_bytes),
+                    // TelemetryHeader carries its own Timestamp, so the
+                    // 20-byte VariableTsRc header would store a second copy
+                    // of it. A length is all this log needs to add.
+                    Format::VariableSimple,
+                    // No callbacks: filled segment files stay in the log
+                    // directory until something clears them. There is no
+                    // downlink-of-files path to hand them to yet.
+                    (),
+                )
+                .map_err(|e| TcsError::Log(format!("opening telemetry log in {dir}: {e}")))?,
+            ),
+            None => None,
+        };
 
         Ok(Self {
             beacon_interval: config.beacon_interval,
@@ -51,6 +83,7 @@ impl CommandInterpreter {
             arm_time: None,
             running: false,
             _global_stats: Statistics::new(),
+            telemetry_log,
         })
     }
 
@@ -178,6 +211,19 @@ eprintln!("_send_beacon::sendto {:?}", addr);
         Ok(())
     }
 
+    /// Record one serialized telemetry message in the telemetry log.
+    ///
+    /// A log that cannot be written is reported and otherwise ignored: losing
+    /// the record is better than dropping the telemetry the ground is waiting
+    /// on, so this never fails the caller.
+    fn log_telemetry(&mut self, data: &[u8]) {
+        if let Some(log) = self.telemetry_log.as_mut() {
+            if let Err(e) = log.write(data) {
+                eprintln!("telemetry log write failed: {}", e);
+            }
+        }
+    }
+
     /// Run the command interpreter main loop
     pub fn run(&mut self) -> TcsResult<()> {
         self.running = true;
@@ -215,6 +261,7 @@ eprintln!("run::recv_from {:?}", addr);
                         Ok(command) => {
                             let response = self.process_command(command);
                             if let Ok(data) = serde_json::to_vec(&response) {
+                                self.log_telemetry(&data);
 eprintln!("run::sendto {:?}", addr);
                                 let _ = self.socket.send_to(&data, addr);
                             }
@@ -251,6 +298,13 @@ eprintln!("run::sendto {:?}", addr);
 
         for (_, dh) in handlers.iter_mut() {
             let _ = dh.stop();
+        }
+        drop(handlers);
+
+        if let Some(log) = self.telemetry_log.as_mut() {
+            if let Err(e) = log.flush() {
+                eprintln!("telemetry log flush failed: {}", e);
+            }
         }
 
         Ok(())

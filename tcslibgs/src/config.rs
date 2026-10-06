@@ -1,28 +1,22 @@
 //! Configuration loading for payloads
 
-use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
 
-use tcslibgs::{CIConfig, DHConfig, TcsError, TcsResult};
+use crate::{load_config_file, DHConfig, PayloadConfig, TcsError, TcsResult};
 
-
-/// Load payload configuration from a JSON file
+/// Load payload configuration from a JSON, YAML, or XML file.
+///
+/// The format is chosen from the file extension; see
+/// [`crate::format::ConfigFormat`]. All formats deserialize into the same
+/// [`PayloadConfig`].
 pub fn load_payload_config<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let payload_payload_config: PayloadConfig = serde_json::from_reader(reader)?;
+    let payload_config: PayloadConfig = load_config_file(path)?;
 
-    let payload_config = payload_payload_config.payload_config.to_payload_config()
-        .map_err(|e| TcsError::Config(e))?;
-
-    let payload_config: Result<Vec<DHConfig>, String> = payload_payload_config
+    let dh_configs: Result<Vec<DHConfig>, String> = payload_config
         .data_handlers
         .iter()
         .map(|dh| dh.to_dh_config())
         .collect();
 
-    let payload_config = payload_config.map_err(|e| TcsError::Config(e))?;
-
-    Ok(payload_config)
+    dh_configs.map_err(TcsError::Config)
 }

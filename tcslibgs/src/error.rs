@@ -11,6 +11,12 @@ pub enum TcsError {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("YAML error: {0}")]
+    Yaml(#[from] serde_norway::Error),
+
+    #[error("XML error: {0}")]
+    Xml(#[from] quick_xml::DeError),
+
     #[error("Configuration error: {0}")]
     Config(String),
 

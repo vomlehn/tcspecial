@@ -1,0 +1,116 @@
+# Endpoint configuration for the payload bay.
+general:
+  version: "1.0"
+  description: Flight payload endpoints
+
+endpoint_groups:
+  # Everything an RS-422 payload link shares. No device name appears here:
+  # that is what tells one endpoint of this group from another, so it belongs
+  # to the endpoint.
+  - name: rs422_payload
+    type: serial
+    datarate: 115200
+    stop_bits: 1
+    byte_length: 8
+    stream:
+      max_length: 512
+      timeout: 250ms
+      terminators: [0x0D, 0x0A]
+
+  # A reader that simply hands over 64 bytes at a time. Saying "timeout: none"
+  # is how a file asks for that; leaving the timeout out would be an error.
+  - name: rs422_blockmode
+    type: serial
+    datarate: 38400
+    stop_bits: 2
+    byte_length: 8
+    stream:
+      max_length: 64
+      timeout: none
+
+  # A stream protocol, so it needs a rule for where a read ends.
+  - name: payload_tcp
+    type: network
+    protocol: tcp
+    stream:
+      max_length: 4096
+      timeout: 1s
+
+  # A datagram protocol: the datagram is already the frame, so no stream
+  # section applies.
+  - name: payload_udp
+    type: network
+    protocol: udp
+
+  # A stream protocol again, but a Unix-domain socket is named by a path
+  # rather than by a host and port, so its endpoint gives a device.
+  - name: payload_unix
+    type: network
+    protocol: unix_stream
+    stream:
+      max_length: 1024
+      terminators: [0x0A]
+
+  # An I2C bus. There is no byte length, parity, or stop bits to give: the
+  # protocol fixes the framing of a byte. The bus speed is recorded so that
+  # it can be checked against the platform, which is what actually sets it.
+  - name: payload_i2c
+    type: i2c
+    pec: true
+    retries: 2
+    timeout: 50ms
+    bus_speed: 400000
+
+  # A SPI bus. The mode must be stated, because no default is right for every
+  # peripheral, and the speed is an upper bound rather than an exact rate.
+  - name: payload_spi
+    type: spi
+    max_speed: 10000000
+    mode: 3
+    bits_per_word: 8
+    cs_active: low
+
+endpoints:
+  - name: magnetometer
+    group: rs422_payload
+    device: /dev/ttyS0
+
+  - name: star_tracker
+    group: rs422_payload
+    device: /dev/ttyS1
+
+  - name: spectrometer
+    group: rs422_blockmode
+    device: /dev/ttyUSB0
+
+  - name: camera
+    group: payload_tcp
+    address: 10.0.0.20
+    port: 5000
+
+  - name: housekeeping
+    group: payload_udp
+    address: 10.0.0.21
+    port: 5001
+
+  - name: recorder
+    group: payload_unix
+    device: /run/tcspecial/recorder.sock
+
+  # Two sensors on one bus, differing only in the address the master uses.
+  # That is exactly what an endpoint is for.
+  - name: thermal_a
+    group: payload_i2c
+    device: /dev/i2c-2
+    address: 0x48
+
+  - name: thermal_b
+    group: payload_i2c
+    device: /dev/i2c-2
+    address: 0x49
+
+  # A SPI device node names the bus and the chip select together, so there is
+  # no separate address to give.
+  - name: imu
+    group: payload_spi
+    device: /dev/spidev0.1

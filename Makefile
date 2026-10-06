@@ -45,52 +45,17 @@ help:
 	@echo "  make all         - Generate, build, and test the project"
 	@echo "  make generate    - Use Claude Code to generate project files"
 	@echo "  make build       - Build the Rust project"
+	@echo "  make buildmoc    - Build the MOC portion of the Rust project"
+	@echo "  make buildsim    - Build the simulator portion of the Rust project"
 	@echo "  make test        - Run all tests"
 	@echo "  make run         - Run the application"
+	@echo "  make runmoc      - Run the MOC application"
+	@echo "  make runsim      - Run the simulation application"
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make install     - Install the binary globally"
-	@echo "  make setup       - Initial setup (create directories)"
-
-# Create necessary directories
-setup:
-	@echo "Setting up project structure..."
-	@mkdir -p $(DOCS_DIR) $(PROMPTS_DIR)
-	@echo "✓ Directories created"
-
-# Generate project using Claude Code
-generate: $(DESIGN)
-	( \
-		set -eu; \
-		echo "Generating project with Claude Code..."; \
-		if [ ! -f "$(DESIGN)" ]; then \
-			echo "Error: $(DESIGN) not found"; \
-			exit 1; \
-		fi \
-	) 2>&1 | tee generate.out
-	( \
-		set -x; \
-		set -eu; \
-		start_time=$$(date +"%s"); \
-		claude -p \
-		    "$(PROMPT)" \
-		   --allowedTools Read,Write,Edit,MultiEdit \
-		    --verbose; \
-		print-elapsed $$start_time; \
-		echo "✓ Project files generated" \
-	) 2>&1 | tee -a generate.out
-
-# Alternative: Use echo to pipe commands
-generate-alt:
-	@echo "Generating project with Claude Code (alternative method)..."
-	@echo "Read docs/design.rst and create a complete Rust project with:\n\
-	1. Cargo.toml with dependencies (serde, serde_json, chrono, clap)\n\
-	2. All source files: main.rs, task.rs, storage.rs, cli.rs\n\
-	3. Unit tests in each module\n\
-	4. Integration tests\n\
-	5. README.md and .gitignore\n\
-	Generate all files without confirmation." | claude --model claude-sonnet-4-5-20250929
 
 # Build the project
+.PHONY: build
 build:
 	( \
 		set -eu; \
@@ -101,6 +66,7 @@ build:
 	) 2>&1 | tee build.out
 
 # Build the project
+.PHONY: buildmoc
 buildmoc:
 	( \
 		set -eu; \
@@ -111,6 +77,7 @@ buildmoc:
 	) 2>&1 | tee build.out
 
 # Build the project
+.PHONY: buildsim
 buildsim:
 	( \
 		set -eu; \
@@ -121,6 +88,7 @@ buildsim:
 	) 2>&1 | tee build.out
 
 # Run tests
+.PHONY: test
 test:
 	( \
 		set -eu; \
@@ -131,6 +99,7 @@ test:
 	)
 
 # Run the tcspecial application
+.PHONY: run
 run:
 	( \
 		set -eu; \
@@ -140,6 +109,7 @@ run:
 	)
 
 # Run the MOC application
+.PHONY: runmoc
 runmoc:
 	( \
 		set -eu; \
@@ -149,6 +119,7 @@ runmoc:
 	)
 
 # Run the simulation application
+.PHONY: runsim
 runsim:
 	( \
 		set -eu; \
@@ -158,6 +129,7 @@ runsim:
 	)
 
 # Clean build artifacts
+.PHONY: clean
 clean:
 	@echo "Cleaning build artifacts..."
 	-cargo clean
@@ -167,6 +139,7 @@ clean:
 
 
 # Clean everything including generated source
+.PHONY: distclean
 distclean: clean
 	@echo "Removing all generated files..."
 	rm -f Cargo.lock Cargo.toml
@@ -175,12 +148,14 @@ distclean: clean
 	@echo "✓ Project reset"
 
 # Install binary globally
+.PHONY: install
 install: build
 	@echo "Installing $(PROJECT_NAME)..."
 	cd $(RUST) && cargo install --path .
 	@echo "✓ Installed to ~/.cargo/bin/$(PROJECT_NAME)"
 
 # Check code quality
+.PHONY: check
 check:
 	@echo "Running cargo check..."
 	cd $(RUST) && cargo check
@@ -188,16 +163,19 @@ check:
 	cd $(RUST) && cargo fmt -- --check
 
 # Format code
+.PHONY: format
 format:
 	cd $(RUST) && cargo fmt
 
 # Create release build
+.PHONY: release
 release: test
 	@echo "Creating release build..."
 	cd $(RUST) && cargo build --release
 	@echo "✓ Release binary: target/release/$(PROJECT_NAME)"
 
 # Run with example data
+.PHONY: demo
 demo: build
 	@echo "Running demo..."
 	cd $(RUST) && cargo run -- add "Buy groceries" --desc "Milk, eggs, bread"
@@ -206,10 +184,3 @@ demo: build
 	cd $(RUST) && cargo run -- list
 	cd $(RUST) && cargo run -- complete 1
 	cd $(RUST) && cargo run -- list --pending
-
-# Duplicate crates
-.PHONY: dup
-dup:
-	rm -rf dup
-	mkdir dup
-	cp -a $(TCS_CRATES) dup

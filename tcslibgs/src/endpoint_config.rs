@@ -170,6 +170,16 @@ pub struct GeneralSection {
 pub struct EndpointGroup {
     /// Name endpoints use to refer to this group.
     pub name: String,
+    /// Bytes in one packet exchanged with an endpoint of this group.
+    ///
+    /// Shared by every endpoint of the group, like every other group
+    /// attribute, and applying to all four types: a packet has a size
+    /// whether it travels over a serial line, a socket, or a bus.
+    ///
+    /// `None` for a file that did not state one. An endpoint configuration
+    /// describing only how to reach a device need not, so this is optional;
+    /// a data handler built from one needs it.
+    pub packet_size: Option<u32>,
     /// The attributes, which depend on the type of endpoint.
     pub kind: GroupKind,
 }
@@ -625,6 +635,14 @@ struct GroupWire {
         alias = "@cs-active"
     )]
     cs_active: Option<Scalar>,
+    // Shared: every type of group may state a packet size.
+    #[serde(
+        default,
+        alias = "@packet_size",
+        alias = "packet-size",
+        alias = "@packet-size"
+    )]
+    packet_size: Option<Scalar>,
     // Shared: stream payload protocol attributes.
     #[serde(default)]
     stream: Option<StreamWire>,
@@ -880,6 +898,19 @@ fn validate_group(g: GroupWire) -> EndpointConfigResult<EndpointGroup> {
     let name = g.name.clone();
     let kind_text = g.kind.trim().to_ascii_lowercase();
 
+    // Shared across the four types, so it is read before the match and is
+    // not listed among the type-specific fields any type would reject.
+    let packet_size = match g.packet_size.as_ref() {
+        Some(s) => {
+            let bytes = parse_u32(&name, "packet_size", s)?;
+            if bytes == 0 {
+                return Err(bad(&name, "packet_size must be greater than zero"));
+            }
+            Some(bytes)
+        }
+        None => None,
+    };
+
     let kind = match kind_text.as_str() {
         "serial" => {
             reject_foreign_fields(
@@ -1050,7 +1081,11 @@ fn validate_group(g: GroupWire) -> EndpointConfigResult<EndpointGroup> {
         }
     };
 
-    Ok(EndpointGroup { name, kind })
+    Ok(EndpointGroup {
+        name,
+        packet_size,
+        kind,
+    })
 }
 
 /// Apply the three rules governing a stream section.
@@ -1827,6 +1862,57 @@ endpoints:
                 serial_stream(&format!("      max_length: 8\n      timeout: {text}\n")).unwrap();
             assert_eq!(stream_of(&doc).timeout, Some(want), "for {text}");
         }
+    }
+
+    /// A one-group file of the given type, with `extra` folded into the group.
+    fn group_of_type(kind: &str, extra: &str) -> EndpointConfigResult<EndpointConfigDoc> {
+        let body = match kind {
+            "serial" => {
+                "    datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n\
+                 \x20   stream:\n      max_length: 8\n      timeout: none\n"
+            }
+            "network" => "    protocol: udp\n",
+            "i2c" => "",
+            _ => "    max_speed: 1000000\n    mode: 0\n",
+        };
+        from_yaml_str(&format!(
+            "endpoint_groups:\n  - name: g\n    type: {kind}\n{body}{extra}"
+        ))
+    }
+
+    #[test]
+    fn packet_size_is_read_for_every_type_of_group() {
+        // It is a shared attribute, so no type may treat it as foreign.
+        for kind in ["serial", "network", "i2c", "spi"] {
+            let doc = group_of_type(kind, "    packet_size: 128\n")
+                .unwrap_or_else(|e| panic!("{kind}: {e}"));
+            assert_eq!(doc.group("g").unwrap().packet_size, Some(128), "{kind}");
+        }
+    }
+
+    #[test]
+    fn packet_size_is_optional() {
+        // A file describing only how to reach a device need not state one.
+        for kind in ["serial", "network", "i2c", "spi"] {
+            let doc = group_of_type(kind, "").unwrap_or_else(|e| panic!("{kind}: {e}"));
+            assert_eq!(doc.group("g").unwrap().packet_size, None, "{kind}");
+        }
+    }
+
+    #[test]
+    fn a_zero_packet_size_is_rejected() {
+        // A packet of no bytes is not a packet, and the other sizes and rates
+        // in this format reject zero for the same reason.
+        let e = group_of_type("network", "    packet_size: 0\n").unwrap_err();
+        assert!(format!("{e}").contains("greater than zero"), "got {e}");
+    }
+
+    #[test]
+    fn packet_size_accepts_hex_and_a_hyphenated_name() {
+        let hex = group_of_type("network", "    packet_size: 0x80\n").unwrap();
+        let hyphen = group_of_type("network", "    packet-size: 128\n").unwrap();
+        assert_eq!(hex.group("g").unwrap().packet_size, Some(128));
+        assert_eq!(hyphen.group("g").unwrap().packet_size, Some(128));
     }
 
     #[test]

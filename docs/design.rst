@@ -969,6 +969,44 @@ Requirement
     being ignored, so that a misspelled or misplaced attribute is reported
     where it was written.
 
+Two attributes are shared rather than belonging to one type. The packet size,
+below, applies to every type. The stream payload protocol attributes have a
+section of their own, and apply to the types that carry a stream rather than to
+all four.
+
+**Shared group attributes**
+
++---------------+----------+--------------------------------------------------+
+| Name          | Required | Description                                      |
++===============+==========+==================================================+
+| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
+|               |          | of this group                                    |
++---------------+----------+--------------------------------------------------+
+
+Requirement
+    Any type of group may specify a packet size. A packet has a size whether it
+    travels over a serial line, a socket, or a bus, so this is not an attribute
+    of one type.
+
+Requirement
+    The packet size belongs to the group rather than to the endpoint, because
+    endpoints of one group are configured alike in everything but where they
+    are.
+
+Requirement
+    A packet size of zero is an error. A packet of no bytes is not a packet.
+
+Requirement
+    The packet size is optional. A file describing only how to reach a device
+    need not state one; a data handler built from an endpoint does need it.
+
+.. note::
+   A stream group's ``max_length`` is a different measurement and both may be
+   given. ``max_length`` bounds what a single read of the stream may deliver,
+   which is a property of the framing; ``packet_size`` is how much data a
+   packet carries. For a group reading a fixed number of bytes at a time the
+   two commonly agree, and nothing requires them to.
+
 Serial Groups
 ^^^^^^^^^^^^^
 **Serial group attributes**
@@ -1167,6 +1205,73 @@ have different consequences on a link that goes quiet, so the format does not
 guess. Writing ``timeout: none`` says the first explicitly, and a section with
 neither attribute is reported as an error rather than being taken for it.
 
+The Endpoints Section
+---------------------
+An endpoint names itself, names the group it draws its attributes from, and
+gives what locates it. Which of the locating attributes apply follows from the
+type of that group, so an endpoint is short: everything else was written once,
+in the group.
+
+**Endpoint attributes**
+
++---------------+----------+--------------------------------------------------+
+| Name          | Required | Description                                      |
++===============+==========+==================================================+
+| name          | Yes      | Name of this endpoint, unique within the file    |
++---------------+----------+--------------------------------------------------+
+| group         | Yes      | Name of the group supplying its attributes       |
++---------------+----------+--------------------------------------------------+
+| device        | See      | Path of the device or socket this endpoint uses  |
+|               | below    |                                                  |
++---------------+----------+--------------------------------------------------+
+| address       | See      | Network host, or the address of a device on a    |
+|               | below    | bus                                              |
++---------------+----------+--------------------------------------------------+
+| port          | See      | Network port                                     |
+|               | below    |                                                  |
++---------------+----------+--------------------------------------------------+
+
+Which of the last three apply depends on the group.
+
+**What locates an endpoint of each type**
+
++---------------------+-----------------------------------------------------+
+| Group               | Locating attributes                                 |
++=====================+=====================================================+
+| serial              | ``device``                                          |
++---------------------+-----------------------------------------------------+
+| network, over a     | ``address`` and ``port``                            |
+| host and port       |                                                     |
++---------------------+-----------------------------------------------------+
+| network, over a     | ``device``                                          |
+| Unix-domain socket  |                                                     |
++---------------------+-----------------------------------------------------+
+| i2c                 | ``device``, the bus, and ``address``, the device on |
+|                     | it                                                  |
++---------------------+-----------------------------------------------------+
+| spi                 | ``device``                                          |
++---------------------+-----------------------------------------------------+
+
+Requirement
+    Each endpoint has a name, unique within the file, and names a group defined
+    in the same file. Naming a group that does not exist is an error.
+
+Requirement
+    An endpoint of a network group speaking ``tcp`` or ``udp`` gives an address
+    and a port. One speaking ``unix_stream`` or ``unix_dgram`` gives a device
+    instead, because a Unix-domain socket is named by a path.
+
+Requirement
+    A locating attribute that does not apply to the endpoint's group is an
+    error rather than being ignored, for the same reason it is in a group: a
+    misplaced attribute is reported where it was written.
+
+.. note::
+   The protocol is not an endpoint attribute. It belongs to the network group,
+   with everything else the endpoints of that group share, which is why two
+   endpoints of one group cannot be reached over different transports. The same
+   holds for the packet size.
+
 Value Syntax
 ------------
 XML carries every attribute value as text, while YAML and JSON distinguish
@@ -1258,6 +1363,7 @@ YAML Example
        datarate: 115200
        stop_bits: 1
        byte_length: 8
+       packet_size: 512
        stream:
          max_length: 512
          timeout: 250ms
@@ -1270,6 +1376,7 @@ YAML Example
        datarate: 38400
        stop_bits: 2
        byte_length: 8
+       packet_size: 64
        stream:
          max_length: 64
          timeout: none
@@ -1278,6 +1385,7 @@ YAML Example
      - name: payload_tcp
        type: network
        protocol: tcp
+       packet_size: 1024
        stream:
          max_length: 4096
          timeout: 1s
@@ -1287,9 +1395,12 @@ YAML Example
      - name: payload_udp
        type: network
        protocol: udp
+       packet_size: 256
 
      # A stream protocol again, but a Unix-domain socket is named by a path
-     # rather than by a host and port, so its endpoint gives a device.
+     # rather than by a host and port, so its endpoint gives a device. This is
+     # also the one group stating no packet size: the attribute is optional, and
+     # a recorder takes whatever a read delivers.
      - name: payload_unix
        type: network
        protocol: unix_stream
@@ -1302,6 +1413,7 @@ YAML Example
      # it can be checked against the platform, which is what actually sets it.
      - name: payload_i2c
        type: i2c
+       packet_size: 32
        pec: true
        retries: 2
        timeout: 50ms
@@ -1311,6 +1423,7 @@ YAML Example
      # peripheral, and the speed is an upper bound rather than an exact rate.
      - name: payload_spi
        type: spi
+       packet_size: 64
        max_speed: 10000000
        mode: 3
        bits_per_word: 8
@@ -1377,7 +1490,8 @@ XML Example
             here: that is what tells one endpoint of this group from another,
             so it belongs to the endpoint. -->
        <group name="rs422_payload" type="serial"
-              datarate="115200" stop_bits="1" byte_length="8">
+              datarate="115200" stop_bits="1" byte_length="8"
+              packet_size="512">
          <stream max_length="512" timeout="250ms" terminators="0x0D,0x0A"/>
        </group>
 
@@ -1385,22 +1499,25 @@ XML Example
             timeout="none" is how a file asks for that; leaving the timeout
             out would be an error. -->
        <group name="rs422_blockmode" type="serial"
-              datarate="38400" stop_bits="2" byte_length="8">
+              datarate="38400" stop_bits="2" byte_length="8"
+              packet_size="64">
          <stream max_length="64" timeout="none"/>
        </group>
 
        <!-- A stream protocol, so it needs a rule for where a read ends. -->
-       <group name="payload_tcp" type="network" protocol="tcp">
+       <group name="payload_tcp" type="network" protocol="tcp" packet_size="1024">
          <stream max_length="4096" timeout="1s"/>
        </group>
 
        <!-- A datagram protocol: the datagram is already the frame, so no
             stream section applies. -->
-       <group name="payload_udp" type="network" protocol="udp"/>
+       <group name="payload_udp" type="network" protocol="udp" packet_size="256"/>
 
        <!-- A stream protocol again, but a Unix-domain socket is named by a
             path rather than by a host and port, so its endpoint gives a
-            device. -->
+            device. This is also the one group stating no packet size: the
+            attribute is optional, and a recorder takes whatever a read
+            delivers. -->
        <group name="payload_unix" type="network" protocol="unix_stream">
          <stream max_length="1024" terminators="0x0A"/>
        </group>
@@ -1409,13 +1526,13 @@ XML Example
             the protocol fixes the framing of a byte. The bus speed is recorded
             so that it can be checked against the platform, which is what
             actually sets it. -->
-       <group name="payload_i2c" type="i2c"
+       <group name="payload_i2c" type="i2c" packet_size="32"
               pec="true" retries="2" timeout="50ms" bus_speed="400000"/>
 
        <!-- A SPI bus. The mode must be stated, because no default is right for
             every peripheral, and the speed is an upper bound rather than an
             exact rate. -->
-       <group name="payload_spi" type="spi"
+       <group name="payload_spi" type="spi" packet_size="64"
               max_speed="10000000" mode="3" bits_per_word="8" cs_active="low"/>
 
      </endpoint-groups>

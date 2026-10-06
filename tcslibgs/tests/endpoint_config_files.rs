@@ -52,6 +52,24 @@ fn the_examples_contain_what_the_manual_says_they_do() {
         assert!(types.contains(&wanted), "no {wanted} group in the examples");
     }
 
+    // packet_size is shared by every type, so check one group of each and
+    // the one group that states none -- the examples' proof it is optional.
+    for (group, wanted) in [
+        ("rs422_payload", Some(512)),
+        ("rs422_blockmode", Some(64)),
+        ("payload_tcp", Some(1024)),
+        ("payload_udp", Some(256)),
+        ("payload_i2c", Some(32)),
+        ("payload_spi", Some(64)),
+        ("payload_unix", None),
+    ] {
+        assert_eq!(
+            doc.group(group).unwrap().packet_size,
+            wanted,
+            "{group} has the wrong packet size"
+        );
+    }
+
     // A group holds the shared attributes...
     match &doc.group("rs422_payload").unwrap().kind {
         GroupKind::Serial(s) => {

@@ -11,6 +11,7 @@
       "datarate": 115200,
       "stop_bits": 1,
       "byte_length": 8,
+      "packet_size": 512,
       "stream": {
         "max_length": 512,
         "timeout": "250ms",
@@ -23,6 +24,7 @@
       "datarate": 38400,
       "stop_bits": 2,
       "byte_length": 8,
+      "packet_size": 64,
       "stream": {
         "max_length": 64,
         "timeout": "none"
@@ -32,6 +34,7 @@
       "name": "payload_tcp",
       "type": "network",
       "protocol": "tcp",
+      "packet_size": 1024,
       "stream": {
         "max_length": 4096,
         "timeout": "1s"
@@ -40,7 +43,8 @@
     {
       "name": "payload_udp",
       "type": "network",
-      "protocol": "udp"
+      "protocol": "udp",
+      "packet_size": 256
     },
     {
       "name": "payload_unix",
@@ -54,6 +58,7 @@
     {
       "name": "payload_i2c",
       "type": "i2c",
+      "packet_size": 32,
       "pec": true,
       "retries": 2,
       "timeout": "50ms",
@@ -62,6 +67,7 @@
     {
       "name": "payload_spi",
       "type": "spi",
+      "packet_size": 64,
       "max_speed": 10000000,
       "mode": 3,
       "bits_per_word": 8,

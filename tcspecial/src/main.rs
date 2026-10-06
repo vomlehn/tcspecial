@@ -37,7 +37,7 @@ fn main() {
     };
 
     let payload_path = env::var("PAYLOAD_CONFIG_PATH").
-        unwrap_or_else(|_| "tcspayload.json".to_string());
+        unwrap_or_else(|_| "tcspayload.yaml".to_string());
     info!("Loading payload configuration from: {}", payload_path);
 
     // Load configuration

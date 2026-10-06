@@ -18,7 +18,7 @@ fn main() {
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
 
-    // Create payload configurations from tcspayload.json spec
+    // Create payload configurations from tcspayload.yaml spec
     let configs = vec![
         PayloadConfig {
             _id: 0,

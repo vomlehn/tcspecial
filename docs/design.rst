@@ -39,13 +39,13 @@ Features
 
   * tcssim: Simulated payloads
 
-* There are two libraries and a JSON file with payload configuration information:
+* There are two libraries and a YAML file with payload configuration information:
 
     * tcslib: ground software library providing simple integration with mission control software
 
     * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
 
-    * tcspayload.json: Configuration information
+    * tcspayload.yaml: Configuration information
 
       * Network connections support Stream and datagram
     
@@ -107,14 +107,14 @@ FIXME: tweak diagram as necessary):
    |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
    |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
    |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
-   |  | tcspayload.json |  |  :    | |  |      .          |  |     |                 |
+   |  | tcspayload.yaml |  |  :    | |  |      .          |  |     |                 |
    |  +-----------------+  |  :    |           .             |     |                 |
    +-----------------------+  :    | |  |      .          |  |     |                 |
                               :    | |  +-----------------+  |     |  +-----------+  |
                               :    | +->| Data            |<--------->| Payload n |  |
                               :    |    | Handler n       |  |     |  +-----------+  |
                               :    |    +-----------------+  |     |                 |
-                              :    |    | tcspayload.json |  |     |                 |
+                              :    |    | tcspayload.yaml |  |     |                 |
                               :    |    +-----------------+  |     |                 |
                               :    +-------------------------+     +-----------------+
 
@@ -854,9 +854,9 @@ tcslibgs
 The TCSpecial ground/space library contains definitions used by both
 tcslib and tcspecial.
 
-tcspayload.json
+tcspayload.yaml
 ---------------
-This is a JSON file that defines the actual payloads. It is considered part
+This is a YAML file that defines the actual payloads. It is considered part
 of TCSpecial as it must be supplied, but is also used by the
 test software. The data handlers for payloads have the following configurations:
 
@@ -1475,21 +1475,21 @@ to change parameters and see what result the changes produce.
    |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
    |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
    |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
-   |  | tcspayload.json |  |  :    | |  |      .          |  |     |                 |
+   |  | tcspayload.yaml |  |  :    | |  |      .          |  |     |                 |
    |  +-----------------+  |  :    |           .             |     |                 |
    +-----------------------+  :    | |  |      .          |  |     |                 |
                               :    | |  +-----------------+  |     |  +-----------+  |
                               :    | +->| Data            |<--------->| Payload n |  |
                               :    |    | Handler n       |  |     |  +-----------+  |
                               :    |    +-----------------+  |     |                 |
-                              :    |    | tcspayload.json |  |     |                 |
+                              :    |    | tcspayload.yaml |  |     |                 |
                               :    |    +-----------------+  |     |                 |
                               :    +-------------------------+     +-----------------+
 
 tcssim
 ------
 Tcssim is a GUI simulating the payloads. It gets the payload definition from
-tcspayload.json.
+tcspayload.yaml.
 
 Each payload occupies a portion of the window, displaying its name, configuration,
 and statistics. It also displays the most recent packets sent and received.
@@ -1506,7 +1506,7 @@ interacting with tcspecial using
 the tcslib library over a datagram connection to tcspecial.  For testing
 purposes, tcsmoc uses tcslib, along with simulated payloads, to support a simple GUI.
 
-Tcsmoc gets the payload definition from tcspayload.json.
+Tcsmoc gets the payload definition from tcspayload.yaml.
 
 The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.

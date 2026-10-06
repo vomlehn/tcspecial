@@ -14,13 +14,13 @@ TCSPECIAL = .
 RUST = .
 
 TCS_CODE = g, tcslib, tcslibgs
-TCS_TEST = tcsmoc, tcssim, tcspayload.json
+TCS_TEST = tcsmoc, tcssim, tcspayload.yaml
 TCS_RUST = g-rust
 TCS_TAR = $(TCS_RUST).tar.gz
 TCS_OUTPUT = compressed tar file $(TCS_TAR)
 PROMPT = Generate Rust code ($(TCS_CODE)) and tests ($(TCS_TEST)), and create $(TCS_OUTPUT) from $(DESIGN)
 
-TCS_CRATES = tcslib tcslibgs g tcsmoc tcssim tcspayload.json
+TCS_CRATES = tcslib tcslibgs g tcsmoc tcssim tcspayload.yaml
 
 RELEASE = --release
 RELEASE =

@@ -10,6 +10,7 @@ pub mod dh;
 pub mod endpoint;
 pub mod endpoint_network;
 pub mod conduit;
+pub mod telemetry_log;
 
 pub use beacon_send::*;
 pub use ci::*;
@@ -18,3 +19,4 @@ pub use dh::*;
 pub use endpoint::*;
 pub use endpoint_network::*;
 pub use conduit::*;
+pub use telemetry_log::*;

@@ -16,15 +16,24 @@ use std::time::{Duration, SystemTime};
 
 use tcslibgs::{BeaconTelemetry, TcsResult, Telemetry};
 
+use crate::telemetry_log::TelemetryLog;
+
 #[derive(Clone)]
 pub struct BeaconSend {
     pair:       ArcCondPair<SystemTime>,
     interval:   Arc<Mutex<Duration>>,
-    dest_addr:  std::net::SocketAddr
+    dest_addr:  std::net::SocketAddr,
+    /// The telemetry log every beacon is recorded in, shared with the
+    /// command interpreter so that one log holds all of the telemetry.
+    log:        TelemetryLog,
 }
 
 impl BeaconSend {
-    pub fn new(interval: Duration, dest_addr: std::net::SocketAddr) -> Option<BeaconSend> {
+    pub fn new(
+        interval: Duration,
+        dest_addr: std::net::SocketAddr,
+        log: TelemetryLog,
+    ) -> Option<BeaconSend> {
         if interval == Duration::from_secs(0) {
             return None;
         }
@@ -39,6 +48,7 @@ impl BeaconSend {
             pair,
             interval: Arc::new(Mutex::new(interval)),
             dest_addr,
+            log,
         };
 
         let b_clone = b.clone();
@@ -92,6 +102,9 @@ let socket = socket?;
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
 eprintln!("send_beacon::sendto {:?}", dest_addr);
+        // Recorded before it is sent, as a command response is, so that a
+        // beacon the send fails on is still known to have been produced.
+        self.log.record(&data);
         socket.send_to(&data, dest_addr)?;
         Ok(())
     }

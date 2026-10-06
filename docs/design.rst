@@ -879,7 +879,7 @@ formats describe exactly the same thing and are parsed into exactly the same
 Rust types, so which one a mission uses is a matter of local preference and
 tooling, never of capability. The parser is ``tcslibgs::endpoint_config``; the
 examples at the end of this section are the files in
-``tcslibgs/tests/fixtures/``, which a test parses on every build so that a
+``tcslibgs/tests/actual/``, which a test parses on every build so that a
 documented example cannot quietly stop being valid.
 
 Requirement
@@ -1441,7 +1441,7 @@ XML Example
    </endpoint-configuration>
 
 Both files above describe the same nine endpoints in seven groups, and parse
-into values that compare equal. So does ``endpoints.json`` in the same fixtures
+into values that compare equal. So does ``endpoints.json`` in the same actual
 directory, which is that configuration once more in JSON and which the same
 test holds to the same standard. It is not printed here because a third listing
 of one configuration would show a reader of the first two nothing new.

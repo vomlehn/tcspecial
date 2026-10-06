@@ -1,8 +1,9 @@
 //! The endpoint configuration examples in `docs/design.rst` are these files.
 //!
-//! Keeping the documented examples as fixtures a test actually parses is what
-//! stops the manual and the parser from drifting apart: an example that stops
-//! being valid fails the build rather than quietly misleading a reader.
+//! Keeping the documented examples in `tests/actual`, where a test parses
+//! them, is what stops the manual and the parser from drifting apart: an
+//! example that stops being valid fails the build rather than quietly
+//! misleading a reader.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -11,25 +12,25 @@ use tcslibgs::endpoint_config::{
     self, BitOrder, CsActive, EndpointLocation, GroupKind, SpiMode, StopBits,
 };
 
-fn fixture(name: &str) -> PathBuf {
+fn actual(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
+        .join("tests/actual")
         .join(name)
 }
 
 #[test]
 fn the_documented_examples_parse() {
-    endpoint_config::load(fixture("endpoints.yaml")).expect("endpoints.yaml");
-    endpoint_config::load(fixture("endpoints.xml")).expect("endpoints.xml");
-    endpoint_config::load(fixture("endpoints.json")).expect("endpoints.json");
+    endpoint_config::load(actual("endpoints.yaml")).expect("endpoints.yaml");
+    endpoint_config::load(actual("endpoints.xml")).expect("endpoints.xml");
+    endpoint_config::load(actual("endpoints.json")).expect("endpoints.json");
 }
 
 #[test]
 fn the_documented_examples_describe_the_same_configuration() {
     // The claim design.rst makes about the formats, checked.
-    let yaml = endpoint_config::load(fixture("endpoints.yaml")).unwrap();
-    let xml = endpoint_config::load(fixture("endpoints.xml")).unwrap();
-    let json = endpoint_config::load(fixture("endpoints.json")).unwrap();
+    let yaml = endpoint_config::load(actual("endpoints.yaml")).unwrap();
+    let xml = endpoint_config::load(actual("endpoints.xml")).unwrap();
+    let json = endpoint_config::load(actual("endpoints.json")).unwrap();
     assert_eq!(yaml, xml, "the YAML and XML examples have drifted apart");
     assert_eq!(yaml, json, "the YAML and JSON examples have drifted apart");
 }
@@ -38,7 +39,7 @@ fn the_documented_examples_describe_the_same_configuration() {
 fn the_examples_contain_what_the_manual_says_they_do() {
     // Guards against both examples being identically wrong -- every field
     // silently defaulting, say.
-    let doc = endpoint_config::load(fixture("endpoints.yaml")).unwrap();
+    let doc = endpoint_config::load(actual("endpoints.yaml")).unwrap();
 
     assert_eq!(doc.general.version.as_deref(), Some("1.0"));
     assert_eq!(doc.groups.len(), 7);

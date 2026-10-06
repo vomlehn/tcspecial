@@ -106,7 +106,7 @@ mod tests {
             assert_eq!(config.port, 4000, "{ext}");
             assert_eq!(config.protocol, NetworkProtocol::Udp, "{ext}");
             assert_eq!(config.beacon_interval.0, 5000, "{ext}");
-            // Absent in every fixture, so the serde defaults must apply.
+            // Absent in every actual input, so the serde defaults must apply.
             assert_eq!(config.log_dir, None, "{ext}");
             assert_eq!(config.log_segment_bytes, 65_536, "{ext}");
         }

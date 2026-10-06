@@ -1,22 +1,26 @@
-mod EndpointNetwork {
+//! Address family, socket type, and protocol tables for network endpoints.
+//!
+//! Work in progress: only the unix family is filled in, and the commented-out
+//! blocks below are the families still to be described.
+
 use libc::{IPPROTO_TCP, IPPROTO_UDP, IPPROTO_SCTP, IPPROTO_UDPLITE};
 use socket2::{Domain, Type};
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
-enum LinkType {
+pub enum LinkType {
     Packet,
     Stream,
 }
 
-struct AddressFamily<'a> {
-    af:         Domain,
-    sock_info:  BTreeMap<&'a str, SockInfo<'a>>,
+pub struct AddressFamily<'a> {
+    pub af:         Domain,
+    pub sock_info:  BTreeMap<&'a str, SockInfo<'a>>,
 }
 
-struct SockInfo<'a> {
-    sock_type:  Type,
-    ipproto:   BTreeMap<&'a str, i32>,
+pub struct SockInfo<'a> {
+    pub sock_type:  Type,
+    pub ipproto:   BTreeMap<&'a str, i32>,
 //    link_type:  LinkType,
 }
 
@@ -90,12 +94,12 @@ pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> = LazyLock::new(||
 });
 */
 
-struct Protocol<'a> {
-    name:   &'a [&'static str],
+pub struct Protocol<'a> {
+    pub name:   &'a [&'static str],
 }
 
 impl Protocol<'_> {
-    fn new<'a>(name: &'a[&'static str]) -> Protocol<'a>  {
+    pub fn new<'a>(name: &'a[&'static str]) -> Protocol<'a>  {
         Protocol {
             name,
         }
@@ -137,4 +141,3 @@ AF_VSOCK	SOCK_DGRAM	yes	datagram
 SOCK_RAW	yes	datagram
 AF_XDP	TBD	TBD	TBD
 */
-}

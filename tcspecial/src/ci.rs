@@ -3,6 +3,7 @@
 //! The CI processes commands from the OC and manages data handlers.
 
 use std::collections::BTreeMap;
+use log::{debug, trace};
 use crate::beacon_send::BeaconSend;
 use std::net::UdpSocket;
 //use std::os::unix::io::AsRawFd;
@@ -77,7 +78,7 @@ impl CommandInterpreter {
 
     /// Process a command and return the response telemetry
     fn process_command(&mut self, command: Command) -> Telemetry {
-eprintln!("process_command: {:?}", command);
+        trace!("process_command: {:?}", command);
         match command {
             Command::Ping(cmd) => {
                 Telemetry::Ping(PingTelemetry::new(cmd.header.sequence, CommandStatus::Success))
@@ -191,7 +192,7 @@ eprintln!("process_command: {:?}", command);
         let _last_beacon = Instant::now();
         let mut _last_client_addr: Option<std::net::SocketAddr> = None;
 
-eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
+        debug!("beacon destination {}", BEACON_NETADDR);
         // Beacons go out at the configured interval, and the sender is kept
         // so that a Config command can retime it. It records into the same
         // log as the responses sent below, so the log holds everything that
@@ -206,7 +207,7 @@ eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
             // Try to receive a command
             match self.socket.recv_from(&mut recv_buffer) {
                 Ok((size, addr)) => {
-eprintln!("run::recv_from {:?}", addr);
+                    trace!("run: received from {:?}", addr);
                     _last_client_addr = Some(addr);
 
                     // Parse and process command
@@ -215,7 +216,7 @@ eprintln!("run::recv_from {:?}", addr);
                             let response = self.process_command(command);
                             if let Ok(data) = serde_json::to_vec(&response) {
                                 self.telemetry_log.record(&data);
-eprintln!("run::sendto {:?}", addr);
+                                trace!("run: sending to {:?}", addr);
                                 let _ = self.socket.send_to(&data, addr);
                             }
                         }

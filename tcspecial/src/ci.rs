@@ -11,18 +11,14 @@ use std::sync::{Arc, Mutex};
 //use std::time::{Duration, Instant};
 use std::time::Instant;
 use tcslibgs::{
-    ArmKey, BeaconTelemetry, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
+    ArmKey, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
     DHConfig, DHId, PingTelemetry, QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
-use tcslog::{Format, LogWrite, SEGMENT_FILE_HEADER_LEN};
-
-use crate::config::constants::{
-    BEACON_DEFAULT_MS, BEACON_NETADDR, RESTART_ARM_TIMEOUT, TELEMETRY_LOG_PREFIX,
-    TELEMETRY_LOG_SUFFIX,
-};
+use crate::config::constants::{BEACON_DEFAULT_MS, BEACON_NETADDR, RESTART_ARM_TIMEOUT};
 use crate::dh::DataHandler;
+use crate::telemetry_log::TelemetryLog;
 
 /// Command interpreter state
 pub struct CommandInterpreter {
@@ -36,8 +32,8 @@ pub struct CommandInterpreter {
     arm_time: Option<Instant>,
     running: bool,
     _global_stats: Statistics,
-    /// Telemetry log, or `None` when the configuration gave no log directory.
-    telemetry_log: Option<LogWrite>,
+    /// Telemetry log, shared with every other sender of telemetry.
+    telemetry_log: TelemetryLog,
 }
 
 impl CommandInterpreter {
@@ -47,30 +43,8 @@ impl CommandInterpreter {
         let socket = UdpSocket::bind(&addr)?;
         socket.set_nonblocking(false)?;
 
-        // Opened here, before the main loop, because LogWrite::new must
-        // enumerate the log directory and so is the one part of tcslog that
-        // allocates. Writing a record afterwards does not, which is what lets
-        // the main loop honour the "allocate before the main loop" rule.
-        let telemetry_log = match config.log_dir.as_deref() {
-            Some(dir) => Some(
-                LogWrite::new(
-                    dir,
-                    TELEMETRY_LOG_PREFIX,
-                    TELEMETRY_LOG_SUFFIX,
-                    SEGMENT_FILE_HEADER_LEN.saturating_add(config.log_segment_bytes),
-                    // TelemetryHeader carries its own Timestamp, so the
-                    // 20-byte VariableTsRc header would store a second copy
-                    // of it. A length is all this log needs to add.
-                    Format::VariableSimple,
-                    // No callbacks: filled segment files stay in the log
-                    // directory until something clears them. There is no
-                    // downlink-of-files path to hand them to yet.
-                    (),
-                )
-                .map_err(|e| TcsError::Log(format!("opening telemetry log in {dir}: {e}")))?,
-            ),
-            None => None,
-        };
+        // Opened here, before the main loop: see TelemetryLog::open.
+        let telemetry_log = TelemetryLog::open(&config)?;
 
         Ok(Self {
             beacon_interval: config.beacon_interval,
@@ -202,28 +176,6 @@ eprintln!("process_command: {:?}", command);
         }
     }
 
-    /// Send a beacon telemetry message
-    fn _send_beacon(&self, addr: &std::net::SocketAddr) -> TcsResult<()> {
-        let beacon = Telemetry::Beacon(BeaconTelemetry::new());
-        let data = serde_json::to_vec(&beacon)?;
-eprintln!("_send_beacon::sendto {:?}", addr);
-        self.socket.send_to(&data, addr)?;
-        Ok(())
-    }
-
-    /// Record one serialized telemetry message in the telemetry log.
-    ///
-    /// A log that cannot be written is reported and otherwise ignored: losing
-    /// the record is better than dropping the telemetry the ground is waiting
-    /// on, so this never fails the caller.
-    fn log_telemetry(&mut self, data: &[u8]) {
-        if let Some(log) = self.telemetry_log.as_mut() {
-            if let Err(e) = log.write(data) {
-                eprintln!("telemetry log write failed: {}", e);
-            }
-        }
-    }
-
     /// Run the command interpreter main loop
     pub fn run(&mut self) -> TcsResult<()> {
         self.running = true;
@@ -236,20 +188,15 @@ eprintln!("_send_beacon::sendto {:?}", addr);
         self.socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 */
 eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
-        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, BEACON_NETADDR.parse().unwrap());
-//        let _beacon = BeaconSend::new(BEACON_DEFAULT_MS, "0.0.0.0:5550".parse().unwrap());
+        // The beacon sender records into the same log as the responses sent
+        // below, so the log holds everything that went to the ground.
+        let _beacon = BeaconSend::new(
+            BEACON_DEFAULT_MS,
+            BEACON_NETADDR.parse().unwrap(),
+            self.telemetry_log.clone(),
+        );
 
         while self.running {
-/*
-            // Check if we need to send a beacon
-            if last_beacon.elapsed() >= Duration::from_millis(self.beacon_interval.0 as u64) {
-                if let Some(addr) = last_client_addr {
-                    let _ = self.send_beacon(&addr);
-                }
-                last_beacon = Instant::now();
-            }
-*/
-
             // Try to receive a command
             match self.socket.recv_from(&mut recv_buffer) {
                 Ok((size, addr)) => {
@@ -261,7 +208,7 @@ eprintln!("run::recv_from {:?}", addr);
                         Ok(command) => {
                             let response = self.process_command(command);
                             if let Ok(data) = serde_json::to_vec(&response) {
-                                self.log_telemetry(&data);
+                                self.telemetry_log.record(&data);
 eprintln!("run::sendto {:?}", addr);
                                 let _ = self.socket.send_to(&data, addr);
                             }
@@ -301,11 +248,7 @@ eprintln!("run::sendto {:?}", addr);
         }
         drop(handlers);
 
-        if let Some(log) = self.telemetry_log.as_mut() {
-            if let Err(e) = log.flush() {
-                eprintln!("telemetry log flush failed: {}", e);
-            }
-        }
+        self.telemetry_log.flush();
 
         Ok(())
     }

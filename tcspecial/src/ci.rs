@@ -8,21 +8,22 @@ use std::net::UdpSocket;
 //use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
 //use std::thread;
-//use std::time::{Duration, Instant};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tcslibgs::{
     ArmKey, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
     DHConfig, DHId, PingTelemetry, QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
-use crate::config::constants::{BEACON_DEFAULT_MS, BEACON_NETADDR, RESTART_ARM_TIMEOUT};
+use crate::config::constants::{BEACON_NETADDR, RESTART_ARM_TIMEOUT};
 use crate::dh::DataHandler;
 use crate::telemetry_log::TelemetryLog;
 
 /// Command interpreter state
 pub struct CommandInterpreter {
-    _beacon: Option<BeaconSend>,
+    /// The beacon sender, once the main loop has started it. Held so that a
+    /// Config command can retime it.
+    beacon: Option<BeaconSend>,
     beacon_interval: BeaconTime,
     _config: CIConfig,
     socket: UdpSocket,
@@ -48,7 +49,7 @@ impl CommandInterpreter {
 
         Ok(Self {
             beacon_interval: config.beacon_interval,
-            _beacon: None,
+            beacon: None,
             _config: config,
             socket,
             data_handlers: Arc::new(Mutex::new(BTreeMap::new())),
@@ -167,6 +168,13 @@ eprintln!("process_command: {:?}", command);
             }
             Command::Config(cmd) => {
                 self.beacon_interval = cmd.beacon_interval;
+                // Retime the running sender too, or the new interval would
+                // be recorded and never take effect. set_interval also
+                // expires the current wait, so the next beacon goes out at
+                // once rather than after the old interval elapses.
+                if let Some(beacon) = self.beacon.as_mut() {
+                    beacon.set_interval(Duration::from_millis(cmd.beacon_interval.0 as u64));
+                }
                 Telemetry::Config(ConfigTelemetry::new(cmd.header.sequence, CommandStatus::Success))
             }
             Command::ConfigDH(_cmd) => {
@@ -183,15 +191,13 @@ eprintln!("process_command: {:?}", command);
         let _last_beacon = Instant::now();
         let mut _last_client_addr: Option<std::net::SocketAddr> = None;
 
-/*
-        // Set a timeout for receiving so we can send beacons
-        self.socket.set_read_timeout(Some(Duration::from_millis(100)))?;
-*/
 eprintln!("run: BEACON_NETADDR {:?}", BEACON_NETADDR);
-        // The beacon sender records into the same log as the responses sent
-        // below, so the log holds everything that went to the ground.
-        let _beacon = BeaconSend::new(
-            BEACON_DEFAULT_MS,
+        // Beacons go out at the configured interval, and the sender is kept
+        // so that a Config command can retime it. It records into the same
+        // log as the responses sent below, so the log holds everything that
+        // went to the ground.
+        self.beacon = BeaconSend::new(
+            Duration::from_millis(self.beacon_interval.0 as u64),
             BEACON_NETADDR.parse().unwrap(),
             self.telemetry_log.clone(),
         );

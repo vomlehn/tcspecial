@@ -1,3 +1,2 @@
-design.html
-manual.html
-requirements.html
+# Built from the .rst sources by the Makefile in this directory.
+*.html

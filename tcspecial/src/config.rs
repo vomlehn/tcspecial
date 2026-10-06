@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use tcslibgs::endpoint_config::{self, EndpointConfigDoc};
 use tcslibgs::{load_config_file, CIConfig, TcsError, TcsResult};
 use tcslibgs::CIConfigJson;
 
@@ -16,6 +17,17 @@ pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
         .map_err(|e| TcsError::Config(e))?;
 
     Ok(tcspecial_config)
+}
+
+/// Load an endpoint configuration file in JSON, YAML, or XML.
+///
+/// The format is chosen from the file extension, as it is for every other
+/// configuration file here. What comes back is the groups and the endpoints
+/// drawing on them, already checked against the rules in "Endpoint
+/// Configuration Files" in `docs/design.rst`: a group carries what its
+/// endpoints share, and each endpoint carries what locates it.
+pub fn load_endpoint_config<P: AsRef<Path>>(path: P) -> TcsResult<EndpointConfigDoc> {
+    endpoint_config::load(path).map_err(TcsError::from)
 }
 
 /// Configuration constants
@@ -110,5 +122,95 @@ mod tests {
     fn test_bad_protocol_is_rejected() {
         let bad = YAML.replace("protocol: udp", "protocol: carrier-pigeon");
         assert!(load_from(".yaml", &bad).is_err());
+    }
+
+    // -- endpoint configuration ---------------------------------------------
+
+    /// As `load_from`, for an endpoint configuration file.
+    fn load_endpoints_from(ext: &str, text: &str) -> TcsResult<EndpointConfigDoc> {
+        let mut file = Builder::new().suffix(ext).tempfile().unwrap();
+        file.write_all(text.as_bytes()).unwrap();
+        file.flush().unwrap();
+        load_endpoint_config(file.path())
+    }
+
+    const ENDPOINTS_YAML: &str = "\
+endpoint_groups:
+  - name: bus
+    type: i2c
+    pec: true
+  - name: chip
+    type: spi
+    max_speed: 1000000
+    mode: 0
+endpoints:
+  - name: thermal
+    group: bus
+    device: /dev/i2c-1
+    address: 0x48
+  - name: imu
+    group: chip
+    device: /dev/spidev0.0
+";
+
+    const ENDPOINTS_XML: &str = r#"<endpoint-configuration>
+  <endpoint-groups>
+    <group name="bus" type="i2c" pec="true"/>
+    <group name="chip" type="spi" max_speed="1000000" mode="0"/>
+  </endpoint-groups>
+  <endpoints>
+    <endpoint name="thermal" group="bus" device="/dev/i2c-1" address="0x48"/>
+    <endpoint name="imu" group="chip" device="/dev/spidev0.0"/>
+  </endpoints>
+</endpoint-configuration>"#;
+
+    const ENDPOINTS_JSON: &str = r#"{
+        "endpoint_groups": [
+            { "name": "bus", "type": "i2c", "pec": true },
+            { "name": "chip", "type": "spi", "max_speed": 1000000, "mode": 0 }
+        ],
+        "endpoints": [
+            { "name": "thermal", "group": "bus",
+              "device": "/dev/i2c-1", "address": "0x48" },
+            { "name": "imu", "group": "chip", "device": "/dev/spidev0.0" }
+        ]
+    }"#;
+
+    #[test]
+    fn test_load_endpoint_config_every_format() {
+        for (ext, text) in [
+            (".yaml", ENDPOINTS_YAML),
+            (".xml", ENDPOINTS_XML),
+            (".json", ENDPOINTS_JSON),
+        ] {
+            let doc = load_endpoints_from(ext, text)
+                .unwrap_or_else(|e| panic!("{ext} failed to load: {e}"));
+
+            assert_eq!(doc.groups.len(), 2, "{ext}");
+            assert_eq!(doc.endpoints.len(), 2, "{ext}");
+            assert_eq!(doc.group("bus").unwrap().kind.type_name(), "i2c", "{ext}");
+            assert_eq!(doc.group("chip").unwrap().kind.type_name(), "spi", "{ext}");
+        }
+    }
+
+    #[test]
+    fn test_endpoint_formats_agree() {
+        let yaml = load_endpoints_from(".yaml", ENDPOINTS_YAML).unwrap();
+        let xml = load_endpoints_from(".xml", ENDPOINTS_XML).unwrap();
+        let json = load_endpoints_from(".json", ENDPOINTS_JSON).unwrap();
+        assert_eq!(yaml, xml);
+        assert_eq!(yaml, json);
+    }
+
+    #[test]
+    fn test_endpoint_rule_violations_reach_the_caller() {
+        // The rules live in the parser; what this checks is that a violation
+        // arrives here as an error rather than as a surprising default.
+        let reserved = ENDPOINTS_YAML.replace("address: 0x48", "address: 0x00");
+        let e = load_endpoints_from(".yaml", &reserved).unwrap_err();
+        assert!(format!("{e}").contains("reserved"), "got {e}");
+
+        let no_mode = ENDPOINTS_YAML.replace("    mode: 0\n", "");
+        assert!(load_endpoints_from(".yaml", &no_mode).is_err());
     }
 }

@@ -4,7 +4,8 @@
 
 use std::env;
 use std::process;
-use tcspecial::{config::load_tcspecial_config, CommandInterpreter};
+use tcspecial::config::{load_endpoint_config, load_tcspecial_config};
+use tcspecial::CommandInterpreter;
 use tcslibgs::config::load_payload_config;
 
 fn main() {
@@ -42,6 +43,28 @@ eprintln!("TCSspecial::main: entered");
 
     println!("CI config: {}:{}", tcspecial_config.address, tcspecial_config.port);
     println!("Loaded {} data handler configurations", payload_config.len());
+
+    // An endpoint configuration file is read when one is named. It is not yet
+    // a second source of data handlers: a data handler also needs a packet
+    // size and interval, which the endpoint format does not carry, and an I2C
+    // endpoint has no EndpointConfig to become. Reading it here means a
+    // malformed file is reported at startup rather than whenever the first
+    // reader of it appears.
+    if let Ok(endpoint_path) = env::var("ENDPOINT_CONFIG_PATH") {
+        println!("Loading endpoint configuration from: {}", endpoint_path);
+
+        match load_endpoint_config(&endpoint_path) {
+            Ok(endpoints) => println!(
+                "Loaded {} endpoint groups and {} endpoints",
+                endpoints.groups.len(),
+                endpoints.endpoints.len()
+            ),
+            Err(e) => {
+                eprintln!("Error loading endpoint configuration: {}", e);
+                process::exit(1);
+            }
+        }
+    }
 
     // Create command interpreter
     let mut ci = match CommandInterpreter::new(tcspecial_config, payload_config) {

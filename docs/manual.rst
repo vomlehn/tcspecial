@@ -76,6 +76,47 @@ Networking-Related
 
         bits-per-byte = <n>
 
+    i2c
+
+        path = "device-path"
+            The bus, such as /dev/i2c-2. Two handlers commonly name the same
+            bus and differ only in the address below.
+
+        address = <n>
+            7-bit addressing: 0x08 through 0x77. 10-bit: 0x000 through 0x3FF.
+
+        ten-bit = true | false
+
+        pec = true | false
+
+        retries = <n>
+
+        timeout = <n milliseconds>
+
+        bus-speed = <n>
+            Recorded, not applied. See the I\ :superscript:`2`\ C section
+            below.
+
+    spi
+
+        path = "device-path"
+            The device node, such as /dev/spidev0.1, which names the bus and
+            the chip select together.
+
+        max-speed = <n bits per second>
+
+        mode = 0 | 1 | 2 | 3
+
+        bits-per-word = <n>
+
+        bit-order = msb | lsb
+
+        cs-active = low | high
+
+Neither bus interface takes any of the Datagram or Raw attributes below. A
+master clocks exactly as many bytes as it asks for, so a transfer is already
+bounded and needs no rule for where a read ends.
+
 Datagram
 
     Fixed length

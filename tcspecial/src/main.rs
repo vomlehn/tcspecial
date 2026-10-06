@@ -5,6 +5,7 @@
 use std::env;
 use std::process;
 use tcspecial::{config::load_tcspecial_config, CommandInterpreter};
+use tcslibgs::config::load_payload_config;
 
 fn main() {
 eprintln!("TCSspecial::main: entered");

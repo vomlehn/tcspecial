@@ -1,0 +1,21 @@
+# Equivalent to payload.json and payload.xml. All three must deserialize
+# into an identical PayloadConfig; tests/format_equivalence.rs enforces it.
+#
+# Note the quotes on version: unquoted 1.0 is a YAML float, not a string.
+version: "1.0"
+description: Two data handlers, one of each endpoint kind
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: udp
+    address: localhost
+    port: 5000
+    packet_size: 12
+    packet_interval_ms: 1000
+  - dh_id: 1
+    name: DH1
+    type: device
+    path: /dev/ttyS0
+    packet_size: 64
+    packet_interval_ms: 500

@@ -40,5 +40,5 @@
             "packet_size": 15,
             "packet_interval_ms": 500
         }
-    ],
+    ]
 }

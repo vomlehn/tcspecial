@@ -4,18 +4,22 @@
 # Note the quotes on version: unquoted 1.0 is a YAML float, not a string.
 version: "1.0"
 description: Two data handlers, one of each endpoint kind
-data_handlers:
-  - dh_id: 0
-    name: DH0
+data_handler_groups:
+  - name: udp_localhost
     type: network
     protocol: udp
     address: localhost
-    port: 5000
     packet_size: 12
-    packet_interval_ms: 1000
+data_handlers:
+  # Takes everything but its port from the group it names, so this is also
+  # the proof that an attribute stated only by a group reaches the handler.
+  - dh_id: 0
+    name: DH0
+    group: udp_localhost
+    port: 5000
+  # States every attribute for itself, naming no group.
   - dh_id: 1
     name: DH1
     type: device
     path: /dev/ttyS0
     packet_size: 64
-    packet_interval_ms: 500

@@ -1,11 +1,29 @@
 import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
 
+// One data handler, as the payload configuration file describes it plus what
+// tcspecial reports about it at run time.
+//
+// The window has no knowledge of which data handlers exist: Rust reads them
+// from the payload configuration file and hands them over as this model, so a
+// handler added to or removed from that file adds or removes a panel here.
+export struct DHInfo {
+    // From the configuration file
+    name: string,
+    config: string,
+    packet-size: int,
+    // From tcspecial, by way of the command interpreter
+    status: string,
+    last-sent: string,
+    last-recv: string,
+    bytes-sent: int,
+    bytes-recv: int,
+}
+
 component DHPanel inherits Rectangle {
     in property <string> dh-name: "DH0";
     in property <string> dh-config: "UDP localhost:5000";
     in property <string> dh-status: "Stopped";
     in property <int> packet-size: 12;
-    in property <int> packet-interval: 1000;
     in property <string> last-sent-time: "--:--:--";
     in property <string> last-sent-data: "";
     in property <string> last-recv-time: "--:--:--";
@@ -19,12 +37,10 @@ component DHPanel inherits Rectangle {
     background: #f0f0f0;
     border-color: #808080;
     border-width: 1px;
-    min-height: 180px;
 
     VerticalLayout {
         padding: 8px;
         spacing: 4px;
-        height: 200px;
 
         HorizontalLayout {
             Text {
@@ -47,8 +63,10 @@ component DHPanel inherits Rectangle {
         }
 
         HorizontalLayout {
+            // No packet interval: how often a payload produces a packet is a
+            // property of a simulation rather than of a payload, so it lives in
+            // the simulator's own file and tcssim is what shows it.
             Text { text: "Packet Size: " + packet-size + " bytes"; font-size: 11px; }
-            Text { text: "Interval: " + packet-interval + " ms"; font-size: 11px; }
         }
 
         HorizontalLayout {
@@ -90,8 +108,11 @@ export enum MenuAction { ping, arm-restart, restart, query, query-dh, start-dh, 
 
 export component MainWindow inherits Window {
     title: "TCSpecial MOC Simulator";
-    min-width: 800px;
-    min-height: 600px;
+    // Rust opens the window at the size the panel count calls for; this is
+    // only the floor, below which the command interpreter's controls stop
+    // fitting side by side. It matches MIN_WINDOW_WIDTH in main.rs.
+    min-width: 640px;
+    min-height: 420px;
     background: white;
 
     in-out property <string> ci-status: "Disconnected";
@@ -100,30 +121,20 @@ export component MainWindow inherits Window {
     in-out property <string> beacon-time: "--:--:--";
     in-out property <color> indicator-color: #c0c0c0;
 
-    // DH properties
-    in-out property <string> dh0-status: "Stopped";
-    in-out property <string> dh0-last-sent: "";
-    in-out property <string> dh0-last-recv: "";
-    in-out property <int> dh0-bytes-sent: 0;
-    in-out property <int> dh0-bytes-recv: 0;
+    // The data handlers, read from the payload configuration file by Rust.
+    in-out property <[DHInfo]> dh-model: [];
 
-    in-out property <string> dh1-status: "Stopped";
-    in-out property <string> dh1-last-sent: "";
-    in-out property <string> dh1-last-recv: "";
-    in-out property <int> dh1-bytes-sent: 0;
-    in-out property <int> dh1-bytes-recv: 0;
+    // How many panels to a row. Rust chooses this from the number of data
+    // handlers, picking the shape that leaves the window wider than tall but
+    // as near square as it can; see grid_shape() in main.rs.
+    in-out property <int> columns: 1;
 
-    in-out property <string> dh2-status: "Stopped";
-    in-out property <string> dh2-last-sent: "";
-    in-out property <string> dh2-last-recv: "";
-    in-out property <int> dh2-bytes-sent: 0;
-    in-out property <int> dh2-bytes-recv: 0;
+    // One panel's height, which has to agree with PANEL_HEIGHT in main.rs:
+    // Rust sizes the window by it and the grid below claims that much per row.
+    property <length> panel-height: 210px;
 
-    in-out property <string> dh3-status: "Stopped";
-    in-out property <string> dh3-last-sent: "";
-    in-out property <string> dh3-last-recv: "";
-    in-out property <int> dh3-bytes-sent: 0;
-    in-out property <int> dh3-bytes-recv: 0;
+    // Rows follow from the panel count and the column count.
+    property <int> grid-rows: Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
 
     in-out property <string> beacon-last-recv: "--- --:--.-";
 
@@ -269,72 +280,28 @@ export component MainWindow inherits Window {
         // Data Handlers Section
         GroupBox {
             title: "Data Handlers";
-            height: 600px;
 
             ScrollView {
-                height: 600px;
                 GridBox {
                     spacing: 10px;
-                    height: 700px;
+                    // As tall as the grid needs, rather than a fixed height:
+                    // the window was opened to fit exactly this, and a fixed
+                    // height would either clip the panels or leave a gap.
+                    height: root.grid-rows * root.panel-height;
 
-                    Row {
-                        DHPanel {
-                            dh-name: "DH0";
-                            dh-config: "TCP localhost:5000";
-                            dh-status: dh0-status;
-                            packet-size: 12;
-                            packet-interval: 1000;
-                            last-sent-data: dh0-last-sent;
-                            last-recv-data: dh0-last-recv;
-                            bytes-sent: dh0-bytes-sent;
-                            bytes-recv: dh0-bytes-recv;
-                            start-clicked => { start-dh(0); }
-                            stop-clicked => { stop-dh(0); }
-                        }
-
-                        DHPanel {
-                            dh-name: "DH1";
-                            dh-config: "UDP localhost:5001";
-                            dh-status: dh1-status;
-                            packet-size: 11;
-                            packet-interval: 1000;
-                            last-sent-data: dh1-last-sent;
-                            last-recv-data: dh1-last-recv;
-                            bytes-sent: dh1-bytes-sent;
-                            bytes-recv: dh1-bytes-recv;
-                            start-clicked => { start-dh(1); }
-                            stop-clicked => { stop-dh(1); }
-                        }
-                    }
-
-                    Row {
-                        DHPanel {
-                            dh-name: "DH2";
-                            dh-config: "Device /dev/urandom";
-                            dh-status: dh2-status;
-                            packet-size: 1;
-                            packet-interval: 0;
-                            last-sent-data: dh2-last-sent;
-                            last-recv-data: dh2-last-recv;
-                            bytes-sent: dh2-bytes-sent;
-                            bytes-recv: dh2-bytes-recv;
-                            start-clicked => { start-dh(2); }
-                            stop-clicked => { stop-dh(2); }
-                        }
-
-                        DHPanel {
-                            dh-name: "DH3";
-                            dh-config: "UDP localhost:5003";
-                            dh-status: dh3-status;
-                            packet-size: 15;
-                            packet-interval: 500;
-                            last-sent-data: dh3-last-sent;
-                            last-recv-data: dh3-last-recv;
-                            bytes-sent: dh3-bytes-sent;
-                            bytes-recv: dh3-bytes-recv;
-                            start-clicked => { start-dh(3); }
-                            stop-clicked => { stop-dh(3); }
-                        }
+                    for dh[i] in dh-model: DHPanel {
+                        row: Math.floor(i / Math.max(1, root.columns));
+                        col: Math.mod(i, Math.max(1, root.columns));
+                        dh-name: dh.name;
+                        dh-config: dh.config;
+                        dh-status: dh.status;
+                        packet-size: dh.packet-size;
+                        last-sent-data: dh.last-sent;
+                        last-recv-data: dh.last-recv;
+                        bytes-sent: dh.bytes-sent;
+                        bytes-recv: dh.bytes-recv;
+                        start-clicked => { start-dh(i); }
+                        stop-clicked => { stop-dh(i); }
                     }
                 }
             }

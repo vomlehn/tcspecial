@@ -14,13 +14,25 @@ TCSPECIAL = .
 RUST = .
 
 TCS_CODE = g, tcslib, tcslibgs
-TCS_TEST = tcsmoc, tcssim, tcspayload.yaml
+TCS_TEST = tcsmoc, tcssim, payload1.yaml, payload1sim.yaml
 TCS_RUST = g-rust
 TCS_TAR = $(TCS_RUST).tar.gz
 TCS_OUTPUT = compressed tar file $(TCS_TAR)
 PROMPT = Generate Rust code ($(TCS_CODE)) and tests ($(TCS_TEST)), and create $(TCS_OUTPUT) from $(DESIGN)
 
-TCS_CRATES = tcslib tcslibgs g tcsmoc tcssim tcspayload.yaml
+TCS_CRATES = tcslib tcslibgs g tcsmoc tcssim payload1.yaml payload1sim.yaml
+
+# The payload set to run. tcsmoc takes its payload file as a command line
+# argument and tcssim takes its simulation file in the environment, so run
+# another set with
+#   make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+#   make runsim PAYLOAD_SIM_YAML=payload2sim.yaml
+#
+# runmoc passes both: tcsmoc hands its own payload file to the tcspecial and
+# tcssim it starts, but it never reads the simulation file, so that one reaches
+# tcssim by being in tcsmoc's environment.
+PAYLOAD_YAML = payload1.yaml
+PAYLOAD_SIM_YAML = payload1sim.yaml
 
 RELEASE = --release
 RELEASE =
@@ -115,7 +127,7 @@ runmoc:
 		set -eu; \
 		$(FIXUP) \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=info cargo run --bin tcsmoc \
+		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcsmoc -- $(PAYLOAD_YAML) \
 	)
 
 # Run the simulation application
@@ -125,7 +137,7 @@ runsim:
 		set -eu; \
 		$(FIXUP_SIM) \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=info cargo run --bin tcssim \
+		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcssim \
 	)
 
 # Clean build artifacts

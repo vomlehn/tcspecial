@@ -34,6 +34,17 @@ pub fn load_endpoint_config<P: AsRef<Path>>(path: P) -> TcsResult<EndpointConfig
 pub mod constants {
     use std::time::Duration;
 
+    /// Which environment variable names tcspecial's payload configuration,
+    /// and what it reads when that variable is unset.
+    ///
+    /// Tcsmoc sets this variable on the tcspecial it starts, so that the
+    /// handlers tcspecial serves are the ones tcsmoc's panels describe. It
+    /// lives here rather than in either program so that the name tcsmoc sets
+    /// is the name tcspecial reads, checked by the compiler instead of by
+    /// hoping two string literals stay equal.
+    pub const PAYLOAD_CONFIG_PATH_VAR: &str = "PAYLOAD_CONFIG_PATH";
+    pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "payload1.yaml";
+
     pub const BEACON_DEFAULT_MS: Duration = Duration::new(20, 0);
 
     // FIXME: use getaddrinfo()

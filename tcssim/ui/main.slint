@@ -1,13 +1,39 @@
 import { Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox, ScrollView, GridBox } from "std-widgets.slint";
 
+// One simulated payload: what the payload configuration file says about the
+// data handler it stands in for, what the simulator configuration file says
+// about how to simulate it, and what it has done since it started.
+//
+// Nothing in this window names a payload or fixes how many there are. Rust
+// reads them from the two files and hands them over as this model, so a
+// payload added to or removed from the files adds or removes a panel.
+export struct PayloadInfo {
+    // From the payload configuration file
+    name: string,
+    config: string,
+    packet-size: int,
+    // From the simulator configuration file, and editable here afterwards
+    segment-size: int,
+    packet-interval: int,
+    segment-interval: int,
+    // From the running simulation
+    status: string,
+    last-sent-time: string,
+    last-sent-data: string,
+    last-recv-time: string,
+    last-recv-data: string,
+    packets-sent: int,
+    packets-recv: int,
+}
+
 component PayloadPanel inherits Rectangle {
     in property <string> payload-name: "Payload 0";
     in property <string> payload-config: "TCP localhost:5000";
     in property <string> payload-status: "Stopped";
-    in-out property <int> packet-size: 12;
-    in-out property <int> segment-size: 12;
-    in-out property <int> packet-interval: 1000;
-    in-out property <int> segment-interval: 1000;
+    in property <int> packet-size: 12;
+    in property <int> segment-size: 12;
+    in property <int> packet-interval: 1000;
+    in property <int> segment-interval: 1000;
     in property <string> last-sent-time: "--:--:--";
     in property <string> last-sent-data: "";
     in property <string> last-recv-time: "--:--:--";
@@ -17,12 +43,17 @@ component PayloadPanel inherits Rectangle {
 
     callback start-clicked();
     callback stop-clicked();
-    callback config-changed();
+    // One callback per spin box, each carrying the value just set. The panel
+    // holds no state of its own: what a spin box shows is what the model says,
+    // so an edit has to go back to the model to be seen.
+    callback packet-size-edited(int);
+    callback segment-size-edited(int);
+    callback packet-interval-edited(int);
+    callback segment-interval-edited(int);
 
     background: #f0f0f0;
     border-color: #808080;
     border-width: 1px;
-    min-height: 200px;  // Much smaller
 
     VerticalLayout {
         padding: 4px;
@@ -63,17 +94,17 @@ component PayloadPanel inherits Rectangle {
             spacing: 0px;
             Text { text: "Pkt:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
-                value <=> packet-size;
+                value: packet-size;
                 minimum: 1;
                 maximum: 32;
-                edited => { config-changed(); }
+                edited(v) => { packet-size-edited(v); }
             }
             Text { text: "Seg:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
-                value <=> segment-size;
+                value: segment-size;
                 minimum: 1;
                 maximum: 32;
-                edited => { config-changed(); }
+                edited(v) => { segment-size-edited(v); }
             }
         }
 
@@ -82,17 +113,17 @@ component PayloadPanel inherits Rectangle {
             spacing: 0px;
             Text { text: "Pkt Int:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
-                value <=> packet-interval;
+                value: packet-interval;
                 minimum: 0;
                 maximum: 10000;
-                edited => { config-changed(); }
+                edited(v) => { packet-interval-edited(v); }
             }
             Text { text: "Seg Int:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
-                value <=> segment-interval;
+                value: segment-interval;
                 minimum: 0;
                 maximum: 10000;
-                edited => { config-changed(); }
+                edited(v) => { segment-interval-edited(v); }
             }
         }
 
@@ -127,61 +158,18 @@ component PayloadPanel inherits Rectangle {
 
 export component MainWindow inherits Window {
     title: "TCSpecial Payload Simulator";
-    min-width: 800px;
-    min-height: 600px;
     background: white;
 
-    // Payload 0 properties
-    in-out property <string> p0-status: "Stopped";
-    in-out property <int> p0-packet-size: 12;
-    in-out property <int> p0-segment-size: 12;
-    in-out property <int> p0-packet-interval: 1000;
-    in-out property <int> p0-segment-interval: 1000;
-    in-out property <string> p0-last-sent-time: "--:--:--";
-    in-out property <string> p0-last-sent-data: "";
-    in-out property <string> p0-last-recv-time: "--:--:--";
-    in-out property <string> p0-last-recv-data: "";
-    in-out property <int> p0-packets-sent: 0;
-    in-out property <int> p0-packets-recv: 0;
+    // The simulated payloads, read from the configuration files by Rust.
+    in-out property <[PayloadInfo]> payload-model: [];
 
-    // Payload 1 properties
-    in-out property <string> p1-status: "Stopped";
-    in-out property <int> p1-packet-size: 11;
-    in-out property <int> p1-segment-size: 11;
-    in-out property <int> p1-packet-interval: 1000;
-    in-out property <int> p1-segment-interval: 1000;
-    in-out property <string> p1-last-sent-time: "--:--:--";
-    in-out property <string> p1-last-sent-data: "";
-    in-out property <string> p1-last-recv-time: "--:--:--";
-    in-out property <string> p1-last-recv-data: "";
-    in-out property <int> p1-packets-sent: 0;
-    in-out property <int> p1-packets-recv: 0;
-
-    // Payload 2 properties
-    in-out property <string> p2-status: "Stopped";
-    in-out property <int> p2-packet-size: 1;
-    in-out property <int> p2-segment-size: 1;
-    in-out property <int> p2-packet-interval: 0;
-    in-out property <int> p2-segment-interval: 0;
-    in-out property <string> p2-last-sent-time: "--:--:--";
-    in-out property <string> p2-last-sent-data: "";
-    in-out property <string> p2-last-recv-time: "--:--:--";
-    in-out property <string> p2-last-recv-data: "";
-    in-out property <int> p2-packets-sent: 0;
-    in-out property <int> p2-packets-recv: 0;
-
-    // Payload 3 properties
-    in-out property <string> p3-status: "Stopped";
-    in-out property <int> p3-packet-size: 15;
-    in-out property <int> p3-segment-size: 15;
-    in-out property <int> p3-packet-interval: 500;
-    in-out property <int> p3-segment-interval: 500;
-    in-out property <string> p3-last-sent-time: "--:--:--";
-    in-out property <string> p3-last-sent-data: "";
-    in-out property <string> p3-last-recv-time: "--:--:--";
-    in-out property <string> p3-last-recv-data: "";
-    in-out property <int> p3-packets-sent: 0;
-    in-out property <int> p3-packets-recv: 0;
+    // The shape of the grid, and the size of one panel in it. Rust works the
+    // shape out from how many payloads there are: wider than tall, and as near
+    // square as that allows. The window is sized to match, so these are the
+    // one description of the layout rather than a second one to keep in step.
+    in property <int> columns: 1;
+    in property <length> cell-width: 320px;
+    in property <length> cell-height: 210px;
 
     callback start-payload(int);
     callback stop-payload(int);
@@ -189,12 +177,13 @@ export component MainWindow inherits Window {
     callback quit-clicked();
 
     VerticalLayout {
-        padding: 0px;
+        padding: 4px;
         spacing: 0px;
 
         Text {
             text: "Simulated Payloads";
             font-size: 18px;
+            height: 28px;
             font-weight: 700;
             horizontal-alignment: center;
         }
@@ -202,91 +191,61 @@ export component MainWindow inherits Window {
         ScrollView {
             GridBox {
                 spacing: 0px;
-                height: 300px;
+                height: payload-model.length == 0
+                    ? 0px
+                    : Math.ceil(payload-model.length / columns) * cell-height;
 
-                Row {
-                    PayloadPanel {
-                        payload-name: "Payload 0 (DH0)";
-                        payload-config: "TCP localhost:5000";
-                        payload-status: p0-status;
-                        packet-size <=> p0-packet-size;
-                        segment-size <=> p0-segment-size;
-                        packet-interval <=> p0-packet-interval;
-                        segment-interval <=> p0-segment-interval;
-                        last-sent-time: p0-last-sent-time;
-                        last-sent-data: p0-last-sent-data;
-                        last-recv-time: p0-last-recv-time;
-                        last-recv-data: p0-last-recv-data;
-                        packets-sent: p0-packets-sent;
-                        packets-recv: p0-packets-recv;
-                        start-clicked => { start-payload(0); }
-                        stop-clicked => { stop-payload(0); }
-                        config-changed => { config-payload(0, p0-packet-size, p0-segment-size, p0-packet-interval, p0-segment-interval); }
+                for p[i] in payload-model: PayloadPanel {
+                    row: Math.floor(i / columns);
+                    col: Math.mod(i, columns);
+                    // A minimum rather than a size: the window opens at
+                    // exactly this, and the layout stretches the panels if it
+                    // is made larger. Below it the two spin boxes on a row
+                    // stop fitting side by side.
+                    min-width: cell-width;
+                    min-height: cell-height;
+
+                    payload-name: p.name;
+                    payload-config: p.config;
+                    payload-status: p.status;
+                    packet-size: p.packet-size;
+                    segment-size: p.segment-size;
+                    packet-interval: p.packet-interval;
+                    segment-interval: p.segment-interval;
+                    last-sent-time: p.last-sent-time;
+                    last-sent-data: p.last-sent-data;
+                    last-recv-time: p.last-recv-time;
+                    last-recv-data: p.last-recv-data;
+                    packets-sent: p.packets-sent;
+                    packets-recv: p.packets-recv;
+
+                    start-clicked => { start-payload(i); }
+                    stop-clicked => { stop-payload(i); }
+
+                    // An edit changes the model, so the spin box keeps showing
+                    // it, and then tells Rust the whole set for this payload.
+                    packet-size-edited(v) => {
+                        payload-model[i].packet-size = v;
+                        config-payload(i, v, p.segment-size, p.packet-interval, p.segment-interval);
                     }
-
-                    PayloadPanel {
-                        payload-name: "Payload 1 (DH1)";
-                        payload-config: "UDP localhost:5001";
-                        payload-status: p1-status;
-                        packet-size <=> p1-packet-size;
-                        segment-size <=> p1-segment-size;
-                        packet-interval <=> p1-packet-interval;
-                        segment-interval <=> p1-segment-interval;
-                        last-sent-time: p1-last-sent-time;
-                        last-sent-data: p1-last-sent-data;
-                        last-recv-time: p1-last-recv-time;
-                        last-recv-data: p1-last-recv-data;
-                        packets-sent: p1-packets-sent;
-                        packets-recv: p1-packets-recv;
-                        start-clicked => { start-payload(1); }
-                        stop-clicked => { stop-payload(1); }
-                        config-changed => { config-payload(1, p1-packet-size, p1-segment-size, p1-packet-interval, p1-segment-interval); }
+                    segment-size-edited(v) => {
+                        payload-model[i].segment-size = v;
+                        config-payload(i, p.packet-size, v, p.packet-interval, p.segment-interval);
                     }
-                }
-
-                Row {
-                    PayloadPanel {
-                        payload-name: "Payload 2 (DH2)";
-                        payload-config: "Device /dev/urandom";
-                        payload-status: p2-status;
-                        packet-size <=> p2-packet-size;
-                        segment-size <=> p2-segment-size;
-                        packet-interval <=> p2-packet-interval;
-                        segment-interval <=> p2-segment-interval;
-                        last-sent-time: p2-last-sent-time;
-                        last-sent-data: p2-last-sent-data;
-                        last-recv-time: p2-last-recv-time;
-                        last-recv-data: p2-last-recv-data;
-                        packets-sent: p2-packets-sent;
-                        packets-recv: p2-packets-recv;
-                        start-clicked => { start-payload(2); }
-                        stop-clicked => { stop-payload(2); }
-                        config-changed => { config-payload(2, p2-packet-size, p2-segment-size, p2-packet-interval, p2-segment-interval); }
+                    packet-interval-edited(v) => {
+                        payload-model[i].packet-interval = v;
+                        config-payload(i, p.packet-size, p.segment-size, v, p.segment-interval);
                     }
-
-                    PayloadPanel {
-                        payload-name: "Payload 3 (DH3)";
-                        payload-config: "UDP localhost:5003";
-                        payload-status: p3-status;
-                        packet-size <=> p3-packet-size;
-                        segment-size <=> p3-segment-size;
-                        packet-interval <=> p3-packet-interval;
-                        segment-interval <=> p3-segment-interval;
-                        last-sent-time: p3-last-sent-time;
-                        last-sent-data: p3-last-sent-data;
-                        last-recv-time: p3-last-recv-time;
-                        last-recv-data: p3-last-recv-data;
-                        packets-sent: p3-packets-sent;
-                        packets-recv: p3-packets-recv;
-                        start-clicked => { start-payload(3); }
-                        stop-clicked => { stop-payload(3); }
-                        config-changed => { config-payload(3, p3-packet-size, p3-segment-size, p3-packet-interval, p3-segment-interval); }
+                    segment-interval-edited(v) => {
+                        payload-model[i].segment-interval = v;
+                        config-payload(i, p.packet-size, p.segment-size, p.packet-interval, v);
                     }
                 }
             }
         }
 
         HorizontalLayout {
+            height: 40px;
             Rectangle { }
             Button {
                 text: "Quit All";

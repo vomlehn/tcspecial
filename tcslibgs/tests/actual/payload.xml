@@ -11,15 +11,18 @@
 <payload>
     <version>1.0</version>
     <description>Two data handlers, one of each endpoint kind</description>
-    <data_handlers>
-        <dh_id>0</dh_id>
-        <name>DH0</name>
+    <data_handler_groups>
+        <name>udp_localhost</name>
         <type>network</type>
         <protocol>udp</protocol>
         <address>localhost</address>
-        <port>5000</port>
         <packet_size>12</packet_size>
-        <packet_interval_ms>1000</packet_interval_ms>
+    </data_handler_groups>
+    <data_handlers>
+        <dh_id>0</dh_id>
+        <name>DH0</name>
+        <group>udp_localhost</group>
+        <port>5000</port>
     </data_handlers>
     <data_handlers>
         <dh_id>1</dh_id>
@@ -27,6 +30,5 @@
         <type>device</type>
         <path>/dev/ttyS0</path>
         <packet_size>64</packet_size>
-        <packet_interval_ms>500</packet_interval_ms>
     </data_handlers>
 </payload>

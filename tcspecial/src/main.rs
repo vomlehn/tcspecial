@@ -6,6 +6,7 @@ use std::env;
 use std::process;
 
 use log::{error, info, trace};
+use tcspecial::config::constants::{DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR};
 use tcspecial::config::{load_endpoint_config, load_tcspecial_config};
 use tcspecial::CommandInterpreter;
 use tcslibgs::config::load_payload_config;
@@ -36,8 +37,8 @@ fn main() {
         }
     };
 
-    let payload_path = env::var("PAYLOAD_CONFIG_PATH").
-        unwrap_or_else(|_| "tcspayload.yaml".to_string());
+    let payload_path = env::var(PAYLOAD_CONFIG_PATH_VAR)
+        .unwrap_or_else(|_| DEFAULT_PAYLOAD_CONFIG_PATH.to_string());
     info!("Loading payload configuration from: {}", payload_path);
 
     // Load configuration

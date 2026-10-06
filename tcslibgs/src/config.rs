@@ -8,15 +8,10 @@ use crate::{load_config_file, DHConfig, PayloadConfig, TcsError, TcsResult};
 ///
 /// The format is chosen from the file extension; see
 /// [`crate::format::ConfigFormat`]. All formats deserialize into the same
-/// [`PayloadConfig`].
+/// [`PayloadConfig`], whose data handler groups are resolved here so a caller
+/// gets handlers with every attribute settled.
 pub fn load_payload_config<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> {
     let payload_config: PayloadConfig = load_config_file(path)?;
 
-    let dh_configs: Result<Vec<DHConfig>, String> = payload_config
-        .data_handlers
-        .iter()
-        .map(|dh| dh.to_dh_config())
-        .collect();
-
-    dh_configs.map_err(TcsError::Config)
+    payload_config.to_dh_configs().map_err(TcsError::Config)
 }

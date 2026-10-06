@@ -1,0 +1,48 @@
+# The payloads tcsmoc controls and tcssim simulates.
+#
+# This file describes the payloads themselves: which data handlers exist, how
+# tcspecial reaches each one, and how big its packets are. It deliberately says
+# nothing about how fast a simulated payload produces them or how the simulator
+# divides a packet into segments; those are properties of the simulation rather
+# than of the payload, and live in payload1sim.yaml.
+#
+# A data handler takes its attributes from the group it names, and may then
+# override any of them for itself.
+version: "1.0"
+description: TCSpecial payload set 1
+
+data_handler_groups:
+  # DH1 and DH3 are reached the same way: a UDP socket on this host. What
+  # tells them apart is their port and packet size, so those stay with the
+  # handlers and everything they share is here.
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: tcp
+    address: localhost
+    port: 5000
+    packet_size: 12
+
+  - dh_id: 1
+    name: DH1
+    group: udp_localhost
+    port: 5001
+    packet_size: 11
+
+  - dh_id: 2
+    name: DH2
+    type: device
+    path: /dev/urandom
+    packet_size: 1
+
+  - dh_id: 3
+    name: DH3
+    group: udp_localhost
+    port: 5003
+    packet_size: 15

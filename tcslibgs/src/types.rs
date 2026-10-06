@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Timestamp type for spacecraft time
@@ -142,14 +143,25 @@ pub struct DHConfig {
     pub name: DHName,
     pub endpoint: EndpointConfig,
     pub packet_size: usize,
-    pub packet_interval_ms: u32,
 }
 
 /// Payload configuration file structure
+///
+/// A payload file describes payloads and nothing else. It carries no packet
+/// interval: how fast a payload produces packets is a property of a
+/// simulation rather than of a payload, so it belongs to the simulator's own
+/// configuration file. A file that still states one parses, with the interval
+/// ignored, the same way one still carrying a `ci_config` section does.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PayloadConfig {
     pub version: String,
     pub description: String,
+    /// Named groups of attributes that several data handlers share.
+    ///
+    /// Optional: a file whose handlers have nothing in common, or that prefers
+    /// to spell every one of them out, has no groups.
+    #[serde(default)]
+    pub data_handler_groups: Vec<DHGroupJson>,
     pub data_handlers: Vec<DHConfigJson>,
     /// Retained so a payload file that still carries a CI section parses,
     /// but unused: the CI reads its own configuration from tcspecial.json.
@@ -161,15 +173,87 @@ impl PayloadConfig {
     pub fn len(&self) -> usize {
         self.data_handlers.len()
     }
+
+    /// Look up a data handler group by name.
+    pub fn group(&self, name: &str) -> Option<&DHGroupJson> {
+        self.data_handler_groups.iter().find(|g| g.name == name)
+    }
+
+    /// Settle every data handler into its runtime configuration.
+    ///
+    /// This is where a handler is laid over the group it names, so it is the
+    /// only way to convert a file that uses groups. A group defined twice,
+    /// named by a handler and defined nowhere, or defined and named by no
+    /// handler is an error here rather than a handler quietly taking the wrong
+    /// attributes or none at all.
+    pub fn to_dh_configs(&self) -> Result<Vec<DHConfig>, String> {
+        let mut seen: BTreeSet<&str> = BTreeSet::new();
+        for group in &self.data_handler_groups {
+            if !seen.insert(group.name.as_str()) {
+                return Err(format!(
+                    "data handler group \"{}\" is defined more than once",
+                    group.name
+                ));
+            }
+        }
+
+        let configs: Vec<DHConfig> = self
+            .data_handlers
+            .iter()
+            .map(|dh| {
+                let group = match &dh.group {
+                    Some(name) => Some(self.group(name).ok_or_else(|| {
+                        format!(
+                            "data handler \"{}\" names group \"{}\", which is not defined",
+                            dh.name, name
+                        )
+                    })?),
+                    None => None,
+                };
+                dh.to_dh_config_in(group)
+            })
+            .collect::<Result<_, String>>()?;
+
+        // A group no handler names has no effect on the configuration, which
+        // is exactly what a group whose name a handler misspelled looks like.
+        // Checked after the handlers, so that the misspelling is reported from
+        // the handler's end, where the name actually is.
+        let named: BTreeSet<&str> = self
+            .data_handlers
+            .iter()
+            .filter_map(|dh| dh.group.as_deref())
+            .collect();
+        if let Some(unused) = self
+            .data_handler_groups
+            .iter()
+            .find(|group| !named.contains(group.name.as_str()))
+        {
+            // Worded exactly as the endpoint and simulator configuration
+            // formats word the same rule, so that one rule reads as one rule
+            // wherever it is met.
+            return Err(format!(
+                "data handler group \"{}\" is named by no data handler: name it \
+                 from one, or remove the group",
+                unused.name
+            ));
+        }
+
+        Ok(configs)
+    }
 }
 
-/// JSON representation of DH config
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DHConfigJson {
-    pub dh_id: u32,
+/// A named group of attributes that several data handlers share.
+///
+/// Every attribute is optional, so a group carries exactly what its handlers
+/// have in common and no more. What a group deliberately cannot carry is a
+/// `dh_id` or a `name`: those are what tell one handler of a group from
+/// another, and so belong to the handler.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct DHGroupJson {
+    /// Name data handlers use to refer to this group.
     pub name: String,
-    #[serde(rename = "type")]
-    pub dh_type: String,
+    #[serde(rename = "type", default)]
+    pub dh_type: Option<String>,
     #[serde(default)]
     pub protocol: Option<String>,
     #[serde(default)]
@@ -178,15 +262,73 @@ pub struct DHConfigJson {
     pub port: Option<u16>,
     #[serde(default)]
     pub path: Option<String>,
-    pub packet_size: usize,
-    pub packet_interval_ms: u32,
+    #[serde(default)]
+    pub packet_size: Option<usize>,
+}
+
+/// JSON representation of DH config
+///
+/// Every attribute but `dh_id` and `name` is optional, because a handler
+/// naming a group need only state what it does not take from that group.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DHConfigJson {
+    pub dh_id: u32,
+    pub name: String,
+    /// Name of the group supplying the attributes this handler does not state.
+    #[serde(default)]
+    pub group: Option<String>,
+    #[serde(rename = "type", default)]
+    pub dh_type: Option<String>,
+    #[serde(default)]
+    pub protocol: Option<String>,
+    #[serde(default)]
+    pub address: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub packet_size: Option<usize>,
 }
 
 impl DHConfigJson {
+    /// Convert a handler that states every attribute for itself.
+    ///
+    /// A handler naming a group needs that group's attributes, which only the
+    /// file as a whole knows; use [`PayloadConfig::to_dh_configs`] for those.
     pub fn to_dh_config(&self) -> Result<DHConfig, String> {
-        let endpoint = match self.dh_type.as_str() {
-            "network" => {
-                let protocol = match self.protocol.as_deref() {
+        self.to_dh_config_in(None)
+    }
+
+    /// Convert a handler, taking from `group` whatever the handler does not
+    /// state itself.
+    pub fn to_dh_config_in(&self, group: Option<&DHGroupJson>) -> Result<DHConfig, String> {
+        // The handler wins wherever it says anything, so a group holds what
+        // its handlers share without preventing one of them from differing.
+        let dh_type = self
+            .dh_type
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.dh_type.as_deref()));
+        let protocol = self
+            .protocol
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.protocol.as_deref()));
+        let address = self
+            .address
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.address.as_deref()));
+        let port = self.port.or_else(|| group.and_then(|g| g.port));
+        let path = self
+            .path
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.path.as_deref()));
+        let packet_size = self
+            .packet_size
+            .or_else(|| group.and_then(|g| g.packet_size));
+
+        let endpoint = match dh_type {
+            Some("network") => {
+                let protocol = match protocol {
                     Some("tcp") => NetworkProtocol::Tcp,
                     Some("udp") => NetworkProtocol::Udp,
                     Some("unix_stream") => NetworkProtocol::UnixStream,
@@ -195,22 +337,22 @@ impl DHConfigJson {
                 };
                 EndpointConfig::Network(NetworkConfig {
                     protocol,
-                    address: self.address.clone().ok_or("Missing address")?,
-                    port: self.port.ok_or("Missing port")?,
+                    address: address.ok_or("Missing address")?.to_string(),
+                    port: port.ok_or("Missing port")?,
                 })
             }
-            "device" => EndpointConfig::Device(DeviceConfig {
-                path: self.path.clone().ok_or("Missing path")?,
+            Some("device") => EndpointConfig::Device(DeviceConfig {
+                path: path.ok_or("Missing path")?.to_string(),
             }),
-            _ => return Err(format!("Invalid DH type: {}", self.dh_type)),
+            Some(other) => return Err(format!("Invalid DH type: {}", other)),
+            None => return Err("Missing type".to_string()),
         };
 
         Ok(DHConfig {
             dh_id: DHId(self.dh_id),
             name: DHName::new(&self.name),
             endpoint,
-            packet_size: self.packet_size,
-            packet_interval_ms: self.packet_interval_ms,
+            packet_size: packet_size.ok_or("Missing packet_size")?,
         })
     }
 }
@@ -311,5 +453,205 @@ mod tests {
     fn test_statistics_with_timestamp() {
         let stats = Statistics::new().with_timestamp();
         assert!(stats.timestamp.is_some());
+    }
+
+    /// A payload file as it is really read, so these tests go through the
+    /// same deserialization a file on disk does.
+    fn payload(text: &str) -> PayloadConfig {
+        crate::ConfigFormat::Yaml.parse(text).expect("parses")
+    }
+
+    #[test]
+    fn a_handler_takes_its_groups_attributes() {
+        let config = payload(
+            "
+version: \"1.0\"
+description: one group, two handlers in it
+data_handler_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+data_handlers:
+  - dh_id: 1
+    name: DH1
+    group: udp_localhost
+    port: 5001
+    packet_size: 11
+  - dh_id: 3
+    name: DH3
+    group: udp_localhost
+    port: 5003
+    packet_size: 15
+",
+        );
+
+        let handlers = config.to_dh_configs().unwrap();
+
+        // Everything shared comes from the group; the port and packet size,
+        // which are what tell the two apart, come from each handler.
+        assert_eq!(
+            handlers[0].endpoint,
+            EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "localhost".to_string(),
+                port: 5001,
+            })
+        );
+        assert_eq!(handlers[0].packet_size, 11);
+        assert_eq!(
+            handlers[1].endpoint,
+            EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "localhost".to_string(),
+                port: 5003,
+            })
+        );
+        assert_eq!(handlers[1].packet_size, 15);
+    }
+
+    #[test]
+    fn a_handler_overrides_its_group() {
+        let config = payload(
+            "
+version: \"1.0\"
+description: a handler differing from the group it is in
+data_handler_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+    packet_size: 11
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    group: udp_localhost
+    protocol: tcp
+    port: 5000
+",
+        );
+
+        let handlers = config.to_dh_configs().unwrap();
+
+        assert_eq!(
+            handlers[0].endpoint,
+            EndpointConfig::Network(NetworkConfig {
+                // The handler's own, not the group's udp.
+                protocol: NetworkProtocol::Tcp,
+                address: "localhost".to_string(),
+                port: 5000,
+            })
+        );
+        // Not overridden, so still the group's.
+        assert_eq!(handlers[0].packet_size, 11);
+    }
+
+    #[test]
+    fn a_handler_needs_no_group() {
+        let config = payload(
+            "
+version: \"1.0\"
+description: a handler stating everything for itself
+data_handlers:
+  - dh_id: 2
+    name: DH2
+    type: device
+    path: /dev/urandom
+    packet_size: 1
+",
+        );
+
+        let handlers = config.to_dh_configs().unwrap();
+        assert_eq!(
+            handlers[0].endpoint,
+            EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn a_group_no_handler_names_is_an_error() {
+        // A group with no members has no effect on the configuration, so a
+        // file carrying one is more likely wrong than deliberate.
+        let config = payload(
+            "
+version: \"1.0\"
+description: a group nothing is in
+data_handler_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: tcp
+    address: localhost
+    port: 5000
+    packet_size: 12
+",
+        );
+
+        let message = config.to_dh_configs().expect_err("must be rejected");
+        assert!(
+            message.contains("udp_localhost"),
+            "the error should name the group nothing is in, but said: {message}"
+        );
+    }
+
+    #[test]
+    fn a_misspelled_group_is_reported_from_the_handler_not_the_group() {
+        // A typo leaves the group unnamed and the name undefined at once. The
+        // handler's end is where the misspelling actually is, so that is the
+        // error worth giving.
+        let config = payload(
+            "
+version: \"1.0\"
+description: a handler misspelling the one group
+data_handler_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    group: udp_localhst
+    port: 5000
+    packet_size: 12
+",
+        );
+
+        let message = config.to_dh_configs().expect_err("must be rejected");
+        assert!(
+            message.contains("udp_localhst") && message.contains("DH0"),
+            "the error should name the handler and its misspelling, but said: {message}"
+        );
+    }
+
+    #[test]
+    fn a_handler_with_no_packet_size_anywhere_is_an_error() {
+        // A missing packet size would otherwise resolve to zero, and a handler
+        // whose packets are zero bytes long reads nothing forever.
+        let config = payload(
+            "
+version: \"1.0\"
+description: a handler nothing gives a packet size
+data_handler_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    group: udp_localhost
+    port: 5000
+",
+        );
+
+        assert!(config.to_dh_configs().is_err());
     }
 }

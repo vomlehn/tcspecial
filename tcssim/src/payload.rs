@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn test_payload_config() {
         let config = PayloadConfig {
-            id: 0,
+            _id: 0,
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,
@@ -290,6 +290,15 @@ mod tests {
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),
             segment_interval_ms: Arc::new(AtomicU32::new(1000)),
         };
-        assert_eq!(config.id, 0);
+
+        assert_eq!(config.address, "127.0.0.1");
+        assert_eq!(config.port, 5000);
+        assert!(config.protocol == PayloadProtocol::Udp);
+        // The shared counters are what the sender threads actually read, so
+        // check they survive construction.
+        assert_eq!(config.packet_size.load(Ordering::Relaxed), 12);
+        assert_eq!(config.segment_size.load(Ordering::Relaxed), 12);
+        assert_eq!(config.packet_interval_ms.load(Ordering::Relaxed), 1000);
+        assert_eq!(config.segment_interval_ms.load(Ordering::Relaxed), 1000);
     }
 }

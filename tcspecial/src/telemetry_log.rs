@@ -8,6 +8,8 @@
 
 use std::sync::{Arc, Mutex};
 
+use log::error;
+
 use tcslibgs::{CIConfig, TcsError, TcsResult};
 use tcslog::{Format, LogWrite, SEGMENT_FILE_HEADER_LEN};
 
@@ -71,7 +73,7 @@ impl TelemetryLog {
     pub fn record(&self, data: &[u8]) {
         self.with(|log| {
             if let Err(e) = log.write(data) {
-                eprintln!("telemetry log write failed: {e}");
+                error!("telemetry log write failed: {e}");
             }
         });
     }
@@ -80,7 +82,7 @@ impl TelemetryLog {
     pub fn flush(&self) {
         self.with(|log| {
             if let Err(e) = log.flush() {
-                eprintln!("telemetry log flush failed: {e}");
+                error!("telemetry log flush failed: {e}");
             }
         });
     }
@@ -95,7 +97,7 @@ impl TelemetryLog {
             Ok(mut guard) => f(&mut guard),
             // A writer panicked holding the lock, so the log may be part way
             // through a record. Left alone rather than written past.
-            Err(_) => eprintln!("telemetry log unusable: a writer panicked"),
+            Err(_) => error!("telemetry log unusable: a writer panicked"),
         }
     }
 }

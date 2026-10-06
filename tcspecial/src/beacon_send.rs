@@ -14,6 +14,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+use log::trace;
 use tcslibgs::{BeaconTelemetry, TcsResult, Telemetry};
 
 use crate::telemetry_log::TelemetryLog;
@@ -101,7 +102,7 @@ let socket = socket?;
     pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {
         let beacon = Telemetry::Beacon(BeaconTelemetry::new());
         let data = serde_json::to_vec(&beacon)?;
-eprintln!("send_beacon::sendto {:?}", dest_addr);
+        trace!("send_beacon: sending to {:?}", dest_addr);
         // Recorded before it is sent, as a command response is, so that a
         // beacon the send fails on is still known to have been produced.
         self.log.record(&data);

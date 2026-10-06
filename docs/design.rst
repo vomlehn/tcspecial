@@ -1022,6 +1022,9 @@ Serial Groups
 +---------------+----------+--------------------------------------------------+
 | stream        | Yes      | Stream payload protocol attributes, below        |
 +---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
+|               |          | of this group. Shared by every type; see above   |
++---------------+----------+--------------------------------------------------+
 
 Requirement
     A serial group has a stream section, because a serial port is a stream and
@@ -1039,6 +1042,9 @@ Network Groups
 +---------------+----------+--------------------------------------------------+
 | stream        | See      | Stream payload protocol attributes, below        |
 |               | below    |                                                  |
++---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
+|               |          | of this group. Shared by every type; see above   |
 +---------------+----------+--------------------------------------------------+
 
 Requirement
@@ -1075,6 +1081,9 @@ to complete a transfer.
 | timeout       | No       | How long a transfer waits before it fails        |
 +---------------+----------+--------------------------------------------------+
 | bus_speed     | No       | Bus clock rate in Hz. Recorded, not applied      |
++---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
+|               |          | of this group. Shared by every type; see above   |
 +---------------+----------+--------------------------------------------------+
 
 Requirement
@@ -1143,6 +1152,9 @@ framing bits. What a group carries is the shape of the clock and of a word.
 +---------------+----------+--------------------------------------------------+
 | cs_active     | No       | Chip select asserted ``low`` or ``high``.        |
 |               |          | Default ``low``                                  |
++---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
+|               |          | of this group. Shared by every type; see above   |
 +---------------+----------+--------------------------------------------------+
 
 Requirement

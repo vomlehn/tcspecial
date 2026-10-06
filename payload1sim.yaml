@@ -1,0 +1,41 @@
+# How tcssim simulates the payloads of payload1.yaml.
+#
+# Nothing here describes a payload: payload1.yaml does that, and this file adds
+# only what simulating one needs. The two are joined by name. Every data
+# handler of the payload file needs settings here, and a name here that no data
+# handler has is an error rather than a line with no effect, because a typo is
+# otherwise indistinguishable from a payload that was meant not to be
+# simulated.
+#
+# A payload takes its settings from the group it names, and may then override
+# any of them for itself.
+version: "1.0"
+description: Simulator settings for the payloads of payload1.yaml
+
+simulated_payload_groups:
+  # One packet a second, sent whole.
+  - name: steady_1hz
+    packet_interval_ms: 1000
+    segment_interval_ms: 1000
+
+  # As fast as the payload can be read, which is what a device like
+  # /dev/urandom does.
+  - name: continuous
+    packet_interval_ms: 0
+    segment_interval_ms: 0
+
+simulated_payloads:
+  - name: DH0
+    group: steady_1hz
+
+  - name: DH1
+    group: steady_1hz
+
+  - name: DH2
+    group: continuous
+
+  # Twice a second rather than once, so this one states its own intervals
+  # instead of naming a group.
+  - name: DH3
+    packet_interval_ms: 500
+    segment_interval_ms: 500

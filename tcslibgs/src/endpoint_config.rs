@@ -5,7 +5,9 @@
 //! naming the endpoints themselves. A group carries every attribute shared by
 //! endpoints of its type; what it deliberately does not carry is the device
 //! name or network address, because that is what distinguishes one endpoint
-//! in a group from another and so belongs to the endpoint.
+//! in a group from another and so belongs to the endpoint. Every group has an
+//! endpoint in it: a group nothing names has no effect on the configuration,
+//! which is also what a misspelled group name looks like.
 //!
 //! The syntax of both formats is specified in `docs/design.rst`, under
 //! "Endpoint Configuration Files".
@@ -15,7 +17,7 @@
 //! its YAML spelling, and a section arrives either as a YAML sequence or as
 //! an XML element with repeated children (see [`Section`]).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::marker::PhantomData;
 use std::path::Path;
@@ -63,6 +65,14 @@ pub enum EndpointConfigError {
 
     #[error("endpoint \"{endpoint}\" refers to group \"{group}\", which is not defined")]
     UnknownGroup { endpoint: String, group: String },
+
+    /// Worded exactly as the payload and simulator configuration formats word
+    /// the same rule, so that one rule reads as one rule wherever it is met.
+    #[error(
+        "endpoint group \"{0}\" is named by no endpoint: name it from one, or remove \
+         the group"
+    )]
+    UnusedGroup(String),
 
     #[error(
         "group \"{group}\": unknown endpoint type \"{kind}\": expected \"serial\", \
@@ -870,6 +880,7 @@ fn validate(doc: DocWire) -> EndpointConfigResult<EndpointConfigDoc> {
 
     let mut endpoints: Vec<EndpointDef> = Vec::with_capacity(doc.endpoints.0.len());
     let mut seen: BTreeMap<String, ()> = BTreeMap::new();
+    let mut used: BTreeSet<String> = BTreeSet::new();
 
     for e in doc.endpoints.0 {
         if seen.contains_key(&e.name) {
@@ -882,7 +893,16 @@ fn validate(doc: DocWire) -> EndpointConfigResult<EndpointConfigDoc> {
                 group: e.group.clone(),
             })?;
         seen.insert(e.name.clone(), ());
+        used.insert(e.group.clone());
         endpoints.push(validate_endpoint(e, &groups[idx])?);
+    }
+
+    // A group no endpoint is in has no effect on the configuration, which is
+    // also what a group whose name an endpoint misspelled looks like. Checked
+    // after the endpoints, so that a misspelling is reported from the
+    // endpoint's end, where the name actually is.
+    if let Some(group) = groups.iter().find(|g| !used.contains(&g.name)) {
+        return Err(EndpointConfigError::UnusedGroup(group.name.clone()));
     }
 
     Ok(EndpointConfigDoc {
@@ -1767,6 +1787,18 @@ endpoints:
 
     // -- the stream rules ---------------------------------------------------
 
+    /// An endpoints section putting one endpoint in group `g`.
+    ///
+    /// A group no endpoint is in is rejected, so a test of group parsing has
+    /// to put something in the group it parses. What an endpoint must give
+    /// depends on its group's type, so there is one of these per shape.
+    const DEVICE_ENDPOINT: &str = "endpoints:\n  - name: e\n    group: g\n    \
+                                   device: /dev/ttyS0\n";
+    const NETWORK_ENDPOINT: &str = "endpoints:\n  - name: e\n    group: g\n    \
+                                    address: 192.168.1.10\n    port: 5000\n";
+    const I2C_ENDPOINT: &str = "endpoints:\n  - name: e\n    group: g\n    \
+                                device: /dev/i2c-1\n    address: 0x40\n";
+
     fn serial_stream(stream_body: &str) -> EndpointConfigResult<EndpointConfigDoc> {
         from_yaml_str(&format!(
             "endpoint_groups:\n  \
@@ -1775,7 +1807,7 @@ endpoints:
                datarate: 9600\n    \
                stop_bits: 1\n    \
                byte_length: 8\n    \
-               stream:\n{stream_body}"
+               stream:\n{stream_body}{DEVICE_ENDPOINT}"
         ))
     }
 
@@ -1875,8 +1907,14 @@ endpoints:
             "i2c" => "",
             _ => "    max_speed: 1000000\n    mode: 0\n",
         };
+        let endpoint = match kind {
+            "network" => NETWORK_ENDPOINT,
+            "i2c" => I2C_ENDPOINT,
+            // A serial line and a SPI chip select are both named by a device.
+            _ => DEVICE_ENDPOINT,
+        };
         from_yaml_str(&format!(
-            "endpoint_groups:\n  - name: g\n    type: {kind}\n{body}{extra}"
+            "endpoint_groups:\n  - name: g\n    type: {kind}\n{body}{extra}{endpoint}"
         ))
     }
 
@@ -1957,7 +1995,7 @@ endpoints:
             let yaml = format!(
                 "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
                  stop_bits: {text}\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
-                 timeout: none\n"
+                 timeout: none\n{DEVICE_ENDPOINT}"
             );
             let doc = from_yaml_str(&yaml).unwrap();
             match &doc.group("g").unwrap().kind {
@@ -1984,6 +2022,36 @@ endpoints:
         let e = from_yaml_str(yaml).unwrap_err();
         assert!(
             matches!(e, EndpointConfigError::UnknownGroup { .. }),
+            "got {e:?}"
+        );
+    }
+
+    #[test]
+    fn a_group_no_endpoint_is_in_is_rejected() {
+        // A group with no members has no effect on the configuration, so a
+        // file carrying one is more likely wrong than deliberate.
+        let yaml = format!(
+            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+             \x20 - name: spare\n    type: network\n    protocol: udp\n{NETWORK_ENDPOINT}"
+        );
+        let e = from_yaml_str(&yaml).unwrap_err();
+        assert!(
+            matches!(&e, EndpointConfigError::UnusedGroup(name) if name == "spare"),
+            "got {e:?}"
+        );
+    }
+
+    #[test]
+    fn a_misspelled_group_is_reported_from_the_endpoint_not_the_group() {
+        // A typo leaves the group unused and the name undefined at once. The
+        // endpoint's end is where the misspelling actually is, so that is the
+        // error worth giving.
+        let yaml = "endpoint_groups:\n  - name: payload_udp\n    type: network\n    \
+                    protocol: udp\nendpoints:\n  - name: e\n    group: payload_upd\n    \
+                    address: 192.168.1.10\n    port: 5000\n";
+        let e = from_yaml_str(yaml).unwrap_err();
+        assert!(
+            matches!(&e, EndpointConfigError::UnknownGroup { group, .. } if group == "payload_upd"),
             "got {e:?}"
         );
     }
@@ -2025,9 +2093,11 @@ endpoints:
 
     #[test]
     fn a_datagram_group_needs_no_stream_section() {
-        let doc =
-            from_yaml_str("endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n")
-                .unwrap();
+        let doc = from_yaml_str(&format!(
+            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+             {NETWORK_ENDPOINT}"
+        ))
+        .unwrap();
         assert!(doc.group("g").unwrap().kind.stream().is_none());
     }
 
@@ -2383,17 +2453,17 @@ endpoints:
 
     #[test]
     fn hyphenated_and_underscored_spellings_both_work() {
-        let a = from_yaml_str(
+        let a = from_yaml_str(&format!(
             "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
              stop_bits: 1\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
-             timeout: none\n",
-        )
+             timeout: none\n{DEVICE_ENDPOINT}"
+        ))
         .unwrap();
-        let b = from_yaml_str(
+        let b = from_yaml_str(&format!(
             "endpoint-groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
              stop-bits: 1\n    byte-length: 8\n    stream:\n      max-length: 8\n      \
-             timeout: none\n",
-        )
+             timeout: none\n{DEVICE_ENDPOINT}"
+        ))
         .unwrap();
         assert_eq!(a, b);
     }

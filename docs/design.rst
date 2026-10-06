@@ -39,13 +39,18 @@ Features
 
   * tcssim: Simulated payloads
 
-* There are two libraries and a YAML file with payload configuration information:
+* There are two libraries and two YAML files with payload configuration
+  information:
 
     * tcslib: ground software library providing simple integration with mission control software
 
     * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
 
-    * tcspayload.yaml: Configuration information
+    * payload1.yaml: Configuration information for the payloads tcspecial
+      serves, tcsmoc controls, and tcssim simulates
+
+    * payload1sim.yaml: What simulating those payloads takes, which is not part
+      of describing them
 
       * Network connections support Stream and datagram
     
@@ -107,14 +112,14 @@ FIXME: tweak diagram as necessary):
    |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
    |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
    |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
-   |  | tcspayload.yaml |  |  :    | |  |      .          |  |     |                 |
+   |  |  payload1.yaml  |  |  :    | |  |      .          |  |     |                 |
    |  +-----------------+  |  :    |           .             |     |                 |
    +-----------------------+  :    | |  |      .          |  |     |                 |
                               :    | |  +-----------------+  |     |  +-----------+  |
                               :    | +->| Data            |<--------->| Payload n |  |
                               :    |    | Handler n       |  |     |  +-----------+  |
                               :    |    +-----------------+  |     |                 |
-                              :    |    | tcspayload.yaml |  |     |                 |
+                              :    |    |  payload1.yaml  |  |     |                 |
                               :    |    +-----------------+  |     |                 |
                               :    +-------------------------+     +-----------------+
 
@@ -854,23 +859,276 @@ tcslibgs
 The TCSpecial ground/space library contains definitions used by both
 tcslib and tcspecial.
 
-tcspayload.yaml
----------------
+payload1.yaml
+-------------
 This is a YAML file that defines the actual payloads. It is considered part
 of TCSpecial as it must be supplied, but is also used by the
-test software. The data handlers for payloads have the following configurations:
+test software. All three programs read it: tcspecial serves the payloads it
+describes, tcsmoc controls them, and tcssim simulates them, so a handler
+changed in it changes for all three at once. Its format is given under
+`Payload Configuration Files`_.
 
-+------+---------+-------------------------+-------------+------------------+
-| DH # | Type    | Configuration           | Packet Size | Packet interval  |
-+======+======+============================+=============+==================+
-| 0    | Network | TCP/IP | localhost:5000 | 12 bytes    | 1 packet/second  |
-+------+---------+--------+----------------+-------------+------------------+
-| 1    | Network | UDP/IP | localhost:5001 | 11 bytes    | 1 packet/second  |
-+------+---------+--------+----------------+-------------+------------------+
-| 2    | Device  | n/a    | /dev/urandom   | 1 byte      | continuous       |
-+------+---------+--------+----------------+-------------+------------------+
-| 3    | Network | UDP/IP | localhost:5003 | 15 bytes    | 2 packets/second |
-+------+---------+--------+----------------+-------------+------------------+
+The ``1`` names a payload set rather than a version, leaving room for further
+sets alongside it. The data handlers of this one have the following
+configurations:
+
++------+---------+-------------------------+-------------+
+| DH # | Type    | Configuration           | Packet Size |
++======+======+============================+=============+
+| 0    | Network | TCP/IP | localhost:5000 | 12 bytes    |
++------+---------+--------+----------------+-------------+
+| 1    | Network | UDP/IP | localhost:5001 | 11 bytes    |
++------+---------+--------+----------------+-------------+
+| 2    | Device  | n/a    | /dev/urandom   | 1 byte      |
++------+---------+--------+----------------+-------------+
+| 3    | Network | UDP/IP | localhost:5003 | 15 bytes    |
++------+---------+--------+----------------+-------------+
+
+There is no packet interval here. How often a payload produces a packet is a
+property of a simulation rather than of the payload, so it is stated in a
+simulator configuration file; see `Simulator Configuration Files`_.
+
+Payload Configuration Files
+===========================
+A payload configuration file describes the payloads themselves: which data
+handlers exist, how tcspecial reaches each one, and how big its packets are.
+What it deliberately does not describe is how a simulated payload behaves; see
+`Simulator Configuration Files`_ for that. The parser is
+``tcslibgs::config``, and the shipped file is payload1.yaml.
+
+The format is chosen from the extension exactly as every other configuration
+file's is, so a payload configuration may be written in YAML, JSON, or XML.
+
+File Structure
+--------------
+A payload configuration file has a version, a description, and two sections,
+one of them optional.
+
+data handler groups
+    Named groups of attributes. A group carries what several data handlers have
+    in common. Optional: a file whose handlers share nothing, or that prefers
+    to spell every one of them out, has no groups.
+
+data handlers
+    The data handlers themselves. Each has an id and a name, may name a group,
+    and states whatever attributes it does not take from that group.
+
+**Attributes**
+
++---------------------+--------+---------------------------------------------+
+| Attribute           | Type   | Meaning                                     |
++=====================+========+=============================================+
+| type                | string | ``network`` or ``device``                   |
++---------------------+--------+---------------------------------------------+
+| protocol            | string | ``tcp``, ``udp``, ``unix_stream``, or       |
+|                     |        | ``unix_dgram``. Network handlers only       |
++---------------------+--------+---------------------------------------------+
+| address             | string | Host a network handler connects to          |
++---------------------+--------+---------------------------------------------+
+| port                | number | Port a network handler connects to          |
++---------------------+--------+---------------------------------------------+
+| path                | string | Device a device handler opens               |
++---------------------+--------+---------------------------------------------+
+| packet_size         | number | Bytes in one packet                         |
++---------------------+--------+---------------------------------------------+
+
+A group states any of these; a data handler states any of these plus its
+``dh_id``, its ``name``, and the ``group`` it takes attributes from.
+
+The format has no packet interval. How fast a payload produces packets is a
+property of a simulation rather than of the payload, and belongs to a
+simulator configuration file.
+
+Requirement
+    A payload configuration file states no packet interval. A file that still
+    carries one parses, with the interval ignored, so that a file predating the
+    split between the two does not have to be rewritten to be read.
+
+Requirement
+    A ``dh_id`` and a ``name`` belong to a data handler and never to a group.
+    They are what tell one handler of a group from another.
+
+Requirement
+    A data handler takes each attribute it does not state from the group it
+    names, and overrides any the group does state. A group therefore holds what
+    its handlers share without keeping one of them from differing.
+
+Requirement
+    A data handler has a type and a packet size, from itself or from its group.
+    A handler with no packet size is an error rather than a handler whose
+    packets are zero bytes long.
+
+Requirement
+    A data handler names a group the file defines. A name matching no group is
+    an error, because the handler would otherwise be left with none of the
+    attributes the group was to supply, which is a more confusing failure than
+    the misspelling that really caused it.
+
+Requirement
+    A group name is defined once. Two groups sharing a name is an error rather
+    than one silently shadowing the other.
+
+Requirement
+    A group is named by a data handler. A group no handler names is an error
+    rather than a section with no effect, because that is also what a group
+    whose name a handler misspelled looks like.
+
+A misspelled group name leaves the group unnamed and the name undefined at
+once. The handler's end is where the misspelling actually is, so that is the
+error reported.
+
+Example
+-------
+This is the shipped payload1.yaml. DH1 and DH3 are reached the same way, over a
+UDP socket on this host, so what they share is a group and what tells them
+apart stays with each of them. DH0 and DH2 share nothing with anything and so
+state every attribute for themselves.
+
+.. code-block:: yaml
+
+   version: "1.0"
+   description: TCSpecial payload set 1
+
+   data_handler_groups:
+     - name: udp_localhost
+       type: network
+       protocol: udp
+       address: localhost
+
+   data_handlers:
+     - dh_id: 0
+       name: DH0
+       type: network
+       protocol: tcp
+       address: localhost
+       port: 5000
+       packet_size: 12
+
+     - dh_id: 1
+       name: DH1
+       group: udp_localhost
+       port: 5001
+       packet_size: 11
+
+     - dh_id: 2
+       name: DH2
+       type: device
+       path: /dev/urandom
+       packet_size: 1
+
+     - dh_id: 3
+       name: DH3
+       group: udp_localhost
+       port: 5003
+       packet_size: 15
+
+Simulator Configuration Files
+=============================
+A payload configuration file describes payloads. Simulating one takes more than
+that description holds, and the extra is not payload configuration: how often a
+payload produces a packet, and how it divides a packet into segments, are
+choices about a simulation. They are stated in a separate file, which only
+tcssim reads. The shipped pair is payload1.yaml and payload1sim.yaml; the parser
+is ``tcssim::sim_config``.
+
+The format is chosen from the extension exactly as every other configuration
+file's is, so a simulator configuration may be written in YAML, JSON, or XML.
+
+File Structure
+--------------
+A simulator configuration file has two sections, both optional, and a version
+and description of its own.
+
+simulated payload groups
+    Named groups of settings. A group carries what several simulated payloads
+    have in common.
+
+simulated payloads
+    The simulated payloads themselves. Each names the data handler it stands in
+    for, may name a group, and may state settings of its own.
+
+**Settings**
+
++---------------------+--------+---------------------------------------------+
+| Attribute           | Type   | Meaning                                     |
++=====================+========+=============================================+
+| packet_interval_ms  | number | Milliseconds between packets. 0 is as fast  |
+|                     |        | as the payload can be driven                |
++---------------------+--------+---------------------------------------------+
+| segment_interval_ms | number | Milliseconds between the segments of one    |
+|                     |        | packet. Defaults to the packet interval     |
++---------------------+--------+---------------------------------------------+
+| segment_size        | number | Bytes in one segment. Defaults to the whole |
+|                     |        | packet, whose size the payload file gives   |
++---------------------+--------+---------------------------------------------+
+
+Requirement
+    A simulated payload takes each setting it does not state from the group it
+    names.
+
+Requirement
+    A simulated payload has a packet interval, from itself or from its group. A
+    payload with none is an error rather than a payload driven at a rate nobody
+    chose.
+
+Matching
+--------
+The two files are joined by name, not by position: the order of one file has no
+bearing on the other, and a data handler's id is not a row number.
+
+Requirement
+    A simulated payload names a data handler of the payload configuration file.
+    A name matching no data handler is an error, because a line that matched
+    nothing would otherwise be indistinguishable from a misspelled name.
+
+Requirement
+    Every data handler of the payload configuration file has a simulated payload
+    naming it. A handler nothing names is an error, because the simulator would
+    otherwise start with a payload that never produces anything.
+
+Requirement
+    A name is defined once. Two groups or two simulated payloads sharing a name
+    is an error rather than one silently shadowing the other.
+
+Requirement
+    A group is named by a simulated payload. A group no payload names is an
+    error rather than a group with no effect, for the same reason a payload
+    configuration's unnamed group is: it is also what a misspelled group name
+    looks like. As there, the error is reported from the payload's end.
+
+Example
+-------
+This is the shipped payload1sim.yaml, which simulates the four data handlers of
+payload1.yaml. Two of them are driven alike and so share a group; the last
+states its own rate instead.
+
+.. code-block:: yaml
+
+   version: "1.0"
+   description: Simulator settings for the payloads of payload1.yaml
+
+   simulated_payload_groups:
+     - name: steady_1hz
+       packet_interval_ms: 1000
+       segment_interval_ms: 1000
+
+     - name: continuous
+       packet_interval_ms: 0
+       segment_interval_ms: 0
+
+   simulated_payloads:
+     - name: DH0
+       group: steady_1hz
+
+     - name: DH1
+       group: steady_1hz
+
+     - name: DH2
+       group: continuous
+
+     - name: DH3
+       packet_interval_ms: 500
+       segment_interval_ms: 500
 
 Endpoint Configuration Files
 ============================
@@ -963,6 +1221,16 @@ Requirement
 Requirement
     Each endpoint group has a type, which is one of ``serial``, ``network``,
     ``i2c``, or ``spi``.
+
+Requirement
+    Each endpoint group has an endpoint in it. A group no endpoint names is an
+    error rather than a definition with no effect, because that is also what a
+    group whose name an endpoint misspelled looks like. A misspelled name
+    leaves the group unused and the name undefined at once; the endpoint's end
+    is where the misspelling is, so that is the error reported.
+
+    The payload and simulator configuration formats state the same rule for
+    their own groups, for the same reason.
 
 Requirement
     An attribute that does not apply to a group's type is an error rather than
@@ -1604,27 +1872,60 @@ to change parameters and see what result the changes produce.
    |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
    |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
    |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
-   |  | tcspayload.yaml |  |  :    | |  |      .          |  |     |                 |
+   |  |  payload1.yaml  |  |  :    | |  |      .          |  |     |                 |
    |  +-----------------+  |  :    |           .             |     |                 |
    +-----------------------+  :    | |  |      .          |  |     |                 |
                               :    | |  +-----------------+  |     |  +-----------+  |
                               :    | +->| Data            |<--------->| Payload n |  |
                               :    |    | Handler n       |  |     |  +-----------+  |
                               :    |    +-----------------+  |     |                 |
-                              :    |    | tcspayload.yaml |  |     |                 |
+                              :    |    |  payload1.yaml  |  |     |                 |
                               :    |    +-----------------+  |     |                 |
                               :    +-------------------------+     +-----------------+
 
 tcssim
 ------
-Tcssim is a GUI simulating the payloads. It gets the payload definition from
-tcspayload.yaml.
+Tcssim is a GUI simulating the payloads. It reads two files. The payload
+definition comes from payload1.yaml, named by the ``SIM_PAYLOAD_CONFIG_PATH``
+environment variable when that is set, and says which payloads exist, how each
+is reached, and how big its packets are. What simulating them takes comes from
+payload1sim.yaml, named by ``PAYLOAD_SIM_YAML``; see `Simulator Configuration
+Files`_.
+
+Requirement
+    A payload configuration file describes payloads and says nothing about
+    simulating them. How often a payload produces a packet, and how a packet is
+    divided into segments, are properties of a simulation rather than of a
+    payload, and are stated in the simulator configuration file.
+
+The two are joined by name: a simulated payload names the data handler it stands
+in for. Neither file is read in the order of the other, and neither may be
+silently short.
+
+Requirement
+    Every data handler of the payload file has a simulated payload naming it,
+    and every simulated payload names a data handler of the payload file.
+    Either kind of mismatch is reported rather than simulated around, because a
+    misspelled name is otherwise indistinguishable from a payload deliberately
+    left out.
+
+The window is built from the two files. Nothing in the GUI names a payload or
+fixes how many there are, so a payload added to or removed from the files adds
+or removes a panel.
 
 Each payload occupies a portion of the window, displaying its name, configuration,
 and statistics. It also displays the most recent packets sent and received.
-The DHs are named "DH" plus the DH #.
 
-The packet size and interval can be changed.
+The packet size and interval can be changed, as can the segment size and
+interval. Each starts at what the files gave it: the packet size from the
+payload file, the rest from the simulator file.
+
+The panels are laid out in a grid whose shape follows from how many there are.
+The window is kept wider than it is tall, and among the shapes that satisfy
+that, the one nearest square is chosen; tcssim opens the window at the size that
+shape asks for. The four payloads of the shipped files give a two-by-two grid in
+a 640x496 window. The rule is the one tcsmoc follows, applied to the sizes of
+tcssim's own panels.
 
 
 
@@ -1635,14 +1936,66 @@ interacting with tcspecial using
 the tcslib library over a datagram connection to tcspecial.  For testing
 purposes, tcsmoc uses tcslib, along with simulated payloads, to support a simple GUI.
 
-Tcsmoc gets the payload definition from tcspayload.yaml.
+Tcsmoc gets the payload definition from a file named on its command line, and
+reads payload1.yaml when the command line names none. It takes an argument
+rather than an environment variable because it starts tcspecial and tcssim as
+subprocesses and they inherit its environment: a variable naming tcsmoc's file
+would name theirs too, and so could not point tcsmoc at one file and its
+children at another. An argument belongs to tcsmoc alone.
+
+Requirement
+    Tcsmoc accepts one payload configuration file. A second path is an error
+    rather than an argument with no effect, because it is more likely a mistake
+    about which file is being read than something meant to be ignored.
+
+Each program names its payload file its own way: tcsmoc on its command line,
+tcspecial through ``PAYLOAD_CONFIG_PATH``, and tcssim through
+``SIM_PAYLOAD_CONFIG_PATH``. Tcssim names its simulator configuration
+separately again, through ``PAYLOAD_SIM_YAML``.
+
+Requirement
+    Tcsmoc passes its own payload file to each program it starts, through that
+    program's variable. Tcsmoc builds its panels from that file, so a child
+    reading a different one would serve or simulate payloads the panels do not
+    describe: handlers that never connect, with nothing on screen to say why.
+
+Setting the variable on each child's own command, rather than in tcsmoc's
+environment, is what makes this possible -- it is the thing a single inherited
+variable could not do -- and it overrides any value inherited from the shell.
+For the run of a payload set, tcsmoc's file is the one that counts.
+
+The one file tcsmoc does not pass on is tcssim's simulator configuration.
+Tcsmoc never reads it and so has nothing to say about which one is right;
+tcssim takes it from ``PAYLOAD_SIM_YAML``, inherited from tcsmoc's environment
+like any other variable.
+
+The Makefile names a set once for this reason. ``PAYLOAD_YAML`` reaches tcsmoc
+as its argument and ``PAYLOAD_SIM_YAML`` reaches tcssim in the environment,
+both defaulting to payload set 1, so running another set whole is::
+
+   make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+
+``make runsim`` takes ``PAYLOAD_SIM_YAML`` the same way, for running the
+simulator by itself.
+
+The window is built from that file. Nothing in the GUI names a data handler or
+fixes how many there are, so a handler added to or removed from payload1.yaml
+adds or removes a rectangle.
+
+The rectangles are laid out in a grid whose shape follows from how many there
+are. The window is kept wider than it is tall, and among the shapes that
+satisfy that, the one nearest square is chosen; tcsmoc opens the window at the
+size that shape asks for. The four data handlers of the shipped payload1.yaml
+give a two-by-two grid in a 640x630 window.
 
 The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
 Below that are as many rectangles as there are data handlers.
 The rectangle is blank if the DH has
 not been started or has been stopped after having been started. Otherwise, it
-displays the DH name, configuration information, packet size, and packet interval.
+displays the DH name, configuration information, and packet size. It shows no
+packet interval: that is a simulator setting, stated in payload1sim.yaml and
+shown by tcssim.
 Below that it displays the time and the data most recently sent. Underneath
 that is the time and data most recently received.
 

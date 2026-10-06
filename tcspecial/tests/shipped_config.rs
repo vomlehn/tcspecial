@@ -25,6 +25,34 @@ fn repo_file(relative: &str) -> PathBuf {
         .join(relative)
 }
 
+/// Every shipped payload file.
+///
+/// Discovered rather than listed, so a payload set added to the repository is
+/// covered by these tests without anyone having to remember to name it here.
+/// The simulator files beside them are tcssim's business, not tcspecial's.
+fn shipped_payload_files() -> Vec<PathBuf> {
+    let root = repo_file(".");
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&root)
+        .expect("the repository root is readable")
+        .map(|entry| entry.expect("a readable directory entry").path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|name| name.strip_prefix("payload"))
+                .and_then(|rest| rest.strip_suffix(".yaml"))
+                .is_some_and(|stem| !stem.ends_with("sim"))
+        })
+        .collect();
+
+    files.sort();
+    assert!(
+        !files.is_empty(),
+        "no payload files found in {}",
+        root.display()
+    );
+    files
+}
+
 #[test]
 fn the_shipped_tcspecial_config_loads() {
     let path = repo_file("tcspecial/src/tcspecial.json");
@@ -50,23 +78,41 @@ fn the_shipped_tcspecial_config_loads() {
 }
 
 #[test]
-fn the_shipped_payload_config_loads() {
-    let path = repo_file("tcspayload.yaml");
-    let handlers = load_payload_config(&path)
-        .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
+fn the_shipped_payload_configs_load() {
+    for path in shipped_payload_files() {
+        let handlers = load_payload_config(&path)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
 
-    assert!(!handlers.is_empty(), "no data handlers");
+        let file = path.display();
+        assert!(!handlers.is_empty(), "{file} has no data handlers");
 
-    for dh in &handlers {
-        assert!(!dh.name.0.is_empty(), "data handler {:?} has no name", dh.dh_id);
-        assert_ne!(dh.packet_size, 0, "{:?} has a zero packet size", dh.dh_id);
-        match &dh.endpoint {
-            EndpointConfig::Network(net) => {
-                assert!(!net.address.is_empty(), "{:?} has no address", dh.dh_id);
-                assert_ne!(net.port, 0, "{:?} has no port", dh.dh_id);
-            }
-            EndpointConfig::Device(dev) => {
-                assert!(!dev.path.is_empty(), "{:?} has no device path", dh.dh_id);
+        for dh in &handlers {
+            assert!(
+                !dh.name.0.is_empty(),
+                "{file}: data handler {:?} has no name",
+                dh.dh_id
+            );
+            assert_ne!(
+                dh.packet_size, 0,
+                "{file}: {:?} has a zero packet size",
+                dh.dh_id
+            );
+            match &dh.endpoint {
+                EndpointConfig::Network(net) => {
+                    assert!(
+                        !net.address.is_empty(),
+                        "{file}: {:?} has no address",
+                        dh.dh_id
+                    );
+                    assert_ne!(net.port, 0, "{file}: {:?} has no port", dh.dh_id);
+                }
+                EndpointConfig::Device(dev) => {
+                    assert!(
+                        !dev.path.is_empty(),
+                        "{file}: {:?} has no device path",
+                        dh.dh_id
+                    );
+                }
             }
         }
     }
@@ -76,10 +122,17 @@ fn the_shipped_payload_config_loads() {
 fn the_shipped_files_have_distinct_data_handler_ids() {
     // A duplicate id parses cleanly and then has one handler shadow another,
     // which is the kind of thing only a test of the real file catches.
-    let handlers = load_payload_config(repo_file("tcspayload.yaml")).unwrap();
-    let mut ids: Vec<_> = handlers.iter().map(|dh| dh.dh_id).collect();
-    let before = ids.len();
-    ids.sort();
-    ids.dedup();
-    assert_eq!(before, ids.len(), "two data handlers share a dh_id");
+    for path in shipped_payload_files() {
+        let handlers = load_payload_config(&path).unwrap();
+        let mut ids: Vec<_> = handlers.iter().map(|dh| dh.dh_id).collect();
+        let before = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(
+            before,
+            ids.len(),
+            "{}: two data handlers share a dh_id",
+            path.display()
+        );
+    }
 }

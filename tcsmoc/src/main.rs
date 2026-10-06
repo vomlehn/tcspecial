@@ -4,16 +4,19 @@
 
 pub mod client;
 
-use slint::SharedString;
+use slint::{LogicalSize, Model, ModelRc, SharedString, VecModel};
+use std::env;
 use std::process::{Child, Command, exit};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 pub use crate::client::TcsClient;
 use tcslib::UdpConnection;
-use tcslibgs::{ArmKey, CommandStatus, DHId, DHName, DHType};
-use tcspecial::config::constants::BEACON_NETADDR;
+use tcslibgs::config::load_payload_config;
+use tcslibgs::{ArmKey, CommandStatus, DHConfig, DHType, EndpointConfig, NetworkProtocol};
+use tcspecial::config::constants::{BEACON_NETADDR, PAYLOAD_CONFIG_PATH_VAR};
 
 use crate::beacon_receive::BeaconReceive;
 use crate::config::constants::BEACON_INDICATOR;
@@ -26,6 +29,181 @@ mod config;
 
 /// Default CI address
 const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
+
+/// What the MOC reads when the command line names no payload configuration.
+const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "payload1.yaml";
+
+/// How the MOC's children are told which payload file to read.
+///
+/// Each names its payload configuration with its own variable, so each has to
+/// be told separately; see [`ProcessManager::start_child`]. Tcssim's
+/// simulator configuration is not among these: the MOC never reads it and so
+/// has nothing to say about it, and tcssim takes it from `PAYLOAD_SIM_YAML`,
+/// which it inherits from the MOC's own environment.
+///
+/// Tcspecial's name comes from tcspecial itself, so the compiler keeps the two
+/// in step. Tcssim builds no library to take its name from, so that one is
+/// spelled here and in `tcssim/src/main.rs`; the two must match.
+const TCSPECIAL_PAYLOAD_VAR: &str = PAYLOAD_CONFIG_PATH_VAR;
+const TCSSIM_PAYLOAD_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
+
+/// The payload configuration file named on the command line.
+///
+/// The MOC takes this as an argument rather than from the environment because
+/// it starts tcspecial and tcssim as subprocesses, which inherit its
+/// environment: a variable naming the MOC's file would name theirs too, and
+/// could not point the MOC at one file and its children at another. An
+/// argument belongs to the MOC alone.
+///
+/// One argument is expected, and more than one is refused rather than ignored,
+/// because a second path is more likely a mistake about which file is being
+/// read than something meant to have no effect.
+fn payload_path_from_args<I: Iterator<Item = String>>(mut args: I) -> Result<String, String> {
+    let program = args.next().unwrap_or_else(|| "tcsmoc".to_string());
+    let path = match args.next() {
+        Some(path) => path,
+        None => return Ok(DEFAULT_PAYLOAD_CONFIG_PATH.to_string()),
+    };
+
+    match args.next() {
+        Some(extra) => Err(format!(
+            "unexpected argument \"{}\"\nusage: {} [payload configuration file]",
+            extra, program
+        )),
+        None => Ok(path),
+    }
+}
+
+/// A panel's nominal size, and the height of everything above and below the
+/// grid of them.
+///
+/// These are used only to choose how many columns the grid has and how large
+/// the window opens; the layout itself stretches panels to fit. They have to
+/// agree with `ui/main.slint`, which sizes the grid with the same panel
+/// height.
+const PANEL_WIDTH: f32 = 320.0;
+const PANEL_HEIGHT: f32 = 210.0;
+const CHROME_HEIGHT: f32 = 210.0;
+
+/// The narrowest the window may open, matching `min-width` in the window
+/// itself. Below this the command interpreter's controls no longer fit side by
+/// side.
+const MIN_WINDOW_WIDTH: f32 = 640.0;
+
+/// How the grid of data handler panels is shaped, and the window size that
+/// shape asks for.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct GridShape {
+    columns: usize,
+    rows: usize,
+    width: f32,
+    height: f32,
+}
+
+impl GridShape {
+    /// Width over height. 1.0 is square, above it is wider than tall.
+    fn aspect(&self) -> f32 {
+        self.width / self.height
+    }
+}
+
+/// Choose the grid shape for `panels` data handlers.
+///
+/// The window should be wider than tall but no wider than it has to be, so of
+/// the shapes that are at least square the squarest one wins. Taller-than-wide
+/// shapes are not candidates at all, which is what makes the bias a rule
+/// rather than a tendency.
+fn grid_shape(panels: usize) -> GridShape {
+    // An empty configuration still has to produce a window.
+    let panels = panels.max(1);
+
+    let shape_for = |columns: usize| {
+        let rows = panels.div_ceil(columns);
+        GridShape {
+            columns,
+            rows,
+            width: (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH),
+            height: rows as f32 * PANEL_HEIGHT + CHROME_HEIGHT,
+        }
+    };
+
+    // One column per panel is always at least square -- a single row is only
+    // CHROME_HEIGHT + PANEL_HEIGHT tall and at least MIN_WINDOW_WIDTH wide --
+    // so there is always a candidate, and the fallback is unreachable unless
+    // those constants change.
+    (1..=panels)
+        .map(shape_for)
+        .filter(|shape| shape.width >= shape.height)
+        .min_by(|a, b| a.aspect().total_cmp(&b.aspect()))
+        .unwrap_or_else(|| shape_for(panels))
+}
+
+/// How a data handler's endpoint reads in its panel.
+fn endpoint_description(endpoint: &EndpointConfig) -> String {
+    match endpoint {
+        EndpointConfig::Network(net) => {
+            let protocol = match net.protocol {
+                NetworkProtocol::Tcp => "TCP",
+                NetworkProtocol::Udp => "UDP",
+                NetworkProtocol::UnixStream => "Unix stream",
+                NetworkProtocol::UnixDgram => "Unix datagram",
+            };
+
+            match net.protocol {
+                // A Unix socket is named by a path; its port means nothing.
+                NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
+                    format!("{} {}", protocol, net.address)
+                }
+                _ => format!("{} {}:{}", protocol, net.address, net.port),
+            }
+        }
+        EndpointConfig::Device(dev) => format!("Device {}", dev.path),
+    }
+}
+
+/// Which kind of data handler tcspecial is being asked to start.
+///
+/// START_DH carries the type, and the configuration file is what knows it: a
+/// device handler started as a network handler is a command tcspecial cannot
+/// carry out.
+fn dh_type_of(endpoint: &EndpointConfig) -> DHType {
+    match endpoint {
+        EndpointConfig::Network(_) => DHType::Network,
+        EndpointConfig::Device(_) => DHType::Device,
+    }
+}
+
+/// Turn a data handler from the payload configuration file into the panel the
+/// window shows for it.
+///
+/// The configured values fill in what the file knows; the run-time fields
+/// start empty and are filled in as tcspecial reports on the handler. There is
+/// no packet interval among them: how often a payload produces a packet is a
+/// property of a simulation rather than of a payload, so it is stated in the
+/// simulator's own file and tcssim is what shows it.
+fn dh_info_from(dh: &DHConfig) -> DHInfo {
+    DHInfo {
+        name: SharedString::from(dh.name.0.clone()),
+        config: SharedString::from(endpoint_description(&dh.endpoint)),
+        packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
+        status: SharedString::from("Stopped"),
+        last_sent: SharedString::new(),
+        last_recv: SharedString::new(),
+        bytes_sent: 0,
+        bytes_recv: 0,
+    }
+}
+
+/// Change one panel's contents, leaving the rest of it alone.
+///
+/// A Slint model row is a value rather than a place, so a field is changed by
+/// reading the row, changing it, and putting it back.
+fn update_row(model: &Rc<VecModel<DHInfo>>, row: usize, f: impl FnOnce(&mut DHInfo)) {
+    if let Some(mut info) = model.row_data(row) {
+        f(&mut info);
+        model.set_row_data(row, info);
+    }
+}
 
 /// Manages the tcssim subprocess
 struct ProcessManager {
@@ -41,10 +219,21 @@ impl ProcessManager {
         }
     }
 
-    /// Starts tcssim in a background thread and exits when it completes
-    fn start_child(&self, name: &str) {
+    /// Starts a child in a background thread and exits when it completes.
+    ///
+    /// The child is told which payload file to read, through the variable that
+    /// child names its payload configuration with. Tcsmoc builds its panels
+    /// from that file, so a child reading a different one would simulate or
+    /// serve payloads the panels do not describe -- handlers that never
+    /// connect, with nothing on screen to say why. Setting the variable on the
+    /// child's own command rather than in tcsmoc's environment is what lets
+    /// each child be told separately, and overrides any value inherited from
+    /// the shell: for the run of a payload set, tcsmoc's own file is the one
+    /// that counts.
+    fn start_child(&self, name: &str, payload_var: &str, payload_path: &str) {
         let child = Command::new("cargo")
             .args(["run", "--bin", name])
+            .env(payload_var, payload_path)
             .spawn()
             .expect(&format!("Failed to start {}", name));
 
@@ -100,14 +289,67 @@ impl ProcessManager {
 
 fn main() {
     eprintln!("TcsMoc running");
+
+    // Read the payload configuration before anything else, so a file the MOC
+    // cannot read is reported before subprocesses are started and a window
+    // appears. The window is built from what this file says: the number of
+    // panels, the grid they sit in, and the size the window opens at all
+    // follow from how many data handlers it describes.
+    let payload_path = match payload_path_from_args(env::args()) {
+        Ok(payload_path) => payload_path,
+        Err(e) => {
+            eprintln!("{}", e);
+            exit(1);
+        }
+    };
+    eprintln!("Loading payload configuration from: {}", payload_path);
+
+    let dh_configs: Arc<Vec<DHConfig>> = match load_payload_config(&payload_path) {
+        Ok(dh_configs) => Arc::new(dh_configs),
+        Err(e) => {
+            eprintln!(
+                "Error loading payload configuration from {}: {}",
+                payload_path, e
+            );
+            exit(1);
+        }
+    };
+    eprintln!("Loaded {} data handler configurations", dh_configs.len());
+
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
 
-    // Start tcspecial and tcssim subprocesses first
+    // One panel per configured data handler.
+    let dh_model: Rc<VecModel<DHInfo>> =
+        Rc::new(VecModel::from(dh_configs.iter().map(dh_info_from).collect::<Vec<_>>()));
+    ui.set_dh_model(ModelRc::from(dh_model.clone()));
+
+    // Shape the grid, and open the window at the size that shape wants. The
+    // window cannot work this out for itself: it would need the panel count
+    // before the model is set.
+    let shape = grid_shape(dh_configs.len());
+    eprintln!(
+        "{} data handlers in a {}x{} grid, window {}x{}",
+        dh_configs.len(),
+        shape.columns,
+        shape.rows,
+        shape.width,
+        shape.height
+    );
+    ui.set_columns(i32::try_from(shape.columns).unwrap_or(1));
+    ui.window()
+        .set_size(LogicalSize::new(shape.width, shape.height));
+
+    // Start tcspecial and tcssim subprocesses first, each reading the payload
+    // file tcsmoc read, so all three describe the same payloads.
     let process_manager_tcspecial = Arc::new(ProcessManager::new());
-    process_manager_tcspecial.start_child("tcspecial");
+    process_manager_tcspecial.start_child(
+        "tcspecial",
+        TCSPECIAL_PAYLOAD_VAR,
+        &payload_path,
+    );
     let process_manager_tcssim = Arc::new(ProcessManager::new());
-    process_manager_tcssim.start_child("tcssim");
+    process_manager_tcssim.start_child("tcssim", TCSSIM_PAYLOAD_VAR, &payload_path);
 
     eprintln!("started tcspecial and tcssim, sleeping to let them initialize");
     thread::sleep(Duration::new(2, 0));
@@ -135,6 +377,9 @@ fn main() {
     let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 
     handle_main_menu(&ui, ui_weak.clone(), client.clone());
+    query_dh_buttons(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
+    start_dh_handler(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
+    stop_dh_handler(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
 /*
     // Menu action handler
     {
@@ -282,97 +527,122 @@ fn handle_main_menu (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: 
 }
 
 // Query all DHs button handler
-fn query_dh_buttons (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
-    let client = client.clone();
-    let ui_weak = ui_weak.clone();
+//
+// Which data handlers to ask about comes from the configuration file: the
+// panels are its rows, so a row and its handler share an index.
+fn query_dh_buttons(
+    ui: &MainWindow,
+    ui_weak: slint::Weak<MainWindow>,
+    client: Arc<Mutex<TcsClient>>,
+    dh_configs: Arc<Vec<DHConfig>>,
+    dh_model: Rc<VecModel<DHInfo>>,
+) {
     ui.on_query_all_clicked(move || {
         let ui = ui_weak.unwrap();
         let mut guard = client.lock().unwrap();
         let mut results = Vec::new();
-        for dh_id in 0..4 {
-            match guard.query_dh(DHId(dh_id)) {
-                Ok((status, stats)) => {
-                    results.push(format!("DH{}: {:?} sent={} recv={}", dh_id, status, stats.bytes_sent, stats.bytes_received));
 
-                    // Update UI for each DH
-                    match dh_id {
-                        0 => {
-                            ui.set_dh0_bytes_sent(stats.bytes_sent as i32);
-                            ui.set_dh0_bytes_recv(stats.bytes_received as i32);
-                        }
-                        1 => {
-                            ui.set_dh1_bytes_sent(stats.bytes_sent as i32);
-                            ui.set_dh1_bytes_recv(stats.bytes_received as i32);
-                        }
-                        2 => {
-                            ui.set_dh2_bytes_sent(stats.bytes_sent as i32);
-                            ui.set_dh2_bytes_recv(stats.bytes_received as i32);
-                        }
-                        3 => {
-                            ui.set_dh3_bytes_sent(stats.bytes_sent as i32);
-                            ui.set_dh3_bytes_recv(stats.bytes_received as i32);
-                        }
-                        _ => {}
-                    }
+        for (row, dh) in dh_configs.iter().enumerate() {
+            match guard.query_dh(dh.dh_id) {
+                Ok((status, stats)) => {
+                    results.push(format!(
+                        "{}: {:?} sent={} recv={}",
+                        dh.name.0, status, stats.bytes_sent, stats.bytes_received
+                    ));
+
+                    update_row(&dh_model, row, |info| {
+                        info.bytes_sent = stats.bytes_sent as i32;
+                        info.bytes_recv = stats.bytes_received as i32;
+                    });
                 }
                 Err(e) => {
-                    results.push(format!("DH{}: Error - {}", dh_id, e));
+                    results.push(format!("{}: Error - {}", dh.name.0, e));
                 }
             }
         }
+
         ui.set_last_response(SharedString::from(results.join("; ")));
     });
 }
 
 // Start DH handler
-fn start_dh_handler (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
-    let client = client.clone();
-    let ui_weak = ui_weak.clone();
-    ui.on_start_dh(move |dh_id| {
+//
+// The panel passes its own row; the identity, name, and type of the handler
+// that row stands for come from the configuration file rather than from the
+// row number.
+fn start_dh_handler(
+    ui: &MainWindow,
+    ui_weak: slint::Weak<MainWindow>,
+    client: Arc<Mutex<TcsClient>>,
+    dh_configs: Arc<Vec<DHConfig>>,
+    dh_model: Rc<VecModel<DHInfo>>,
+) {
+    ui.on_start_dh(move |row| {
         let ui = ui_weak.unwrap();
+        let row = row as usize;
+        let dh = match dh_configs.get(row) {
+            Some(dh) => dh,
+            None => return,
+        };
+
         let mut guard = client.lock().unwrap();
-        let id = DHId(dh_id as u32);
-        let name = DHName::new(format!("DH{}", dh_id));
-        match guard.start_dh(id, DHType::Network, name) {
+        match guard.start_dh(dh.dh_id, dh_type_of(&dh.endpoint), dh.name.clone()) {
             Ok(status) => {
-                let status_str = if status == CommandStatus::Success { "Active" } else { "Error" };
-                match dh_id {
-                    0 => ui.set_dh0_status(SharedString::from(status_str)),
-                    1 => ui.set_dh1_status(SharedString::from(status_str)),
-                    2 => ui.set_dh2_status(SharedString::from(status_str)),
-                    3 => ui.set_dh3_status(SharedString::from(status_str)),
-                    _ => {}
-                }
-                ui.set_last_response(SharedString::from(format!("START_DH {} - {:?}", dh_id, status)));
+                let status_str = if status == CommandStatus::Success {
+                    "Active"
+                } else {
+                    "Error"
+                };
+                update_row(&dh_model, row, |info| {
+                    info.status = SharedString::from(status_str);
+                });
+                ui.set_last_response(SharedString::from(format!(
+                    "START_DH {} - {:?}",
+                    dh.name.0, status
+                )));
             }
             Err(e) => {
-                ui.set_last_response(SharedString::from(format!("START_DH {} failed: {}", dh_id, e)));
+                ui.set_last_response(SharedString::from(format!(
+                    "START_DH {} failed: {}",
+                    dh.name.0, e
+                )));
             }
         }
     });
 }
 
 // Stop DH handler
-fn stop_dh_handler (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
-    let client = client.clone();
-    let ui_weak = ui_weak.clone();
-    ui.on_stop_dh(move |dh_id| {
+fn stop_dh_handler(
+    ui: &MainWindow,
+    ui_weak: slint::Weak<MainWindow>,
+    client: Arc<Mutex<TcsClient>>,
+    dh_configs: Arc<Vec<DHConfig>>,
+    dh_model: Rc<VecModel<DHInfo>>,
+) {
+    ui.on_stop_dh(move |row| {
         let ui = ui_weak.unwrap();
+        let row = row as usize;
+        let dh = match dh_configs.get(row) {
+            Some(dh) => dh,
+            None => return,
+        };
+
         let mut guard = client.lock().unwrap();
-        let id = DHId(dh_id as u32);
-        match guard.stop_dh(id) {
+        match guard.stop_dh(dh.dh_id) {
             Ok(status) => {
-                match dh_id {
-                    0 => ui.set_dh0_status(SharedString::from("Stopped")),
-                    1 => ui.set_dh1_status(SharedString::from("Stopped")),
-                    2 => ui.set_dh2_status(SharedString::from("Stopped")),
-                    3 => ui.set_dh3_status(SharedString::from("Stopped")),
-                    _ => {}
-                }
-                ui.set_last_response(SharedString::from(format!("STOP_DH {} - {:?}", dh_id, status)));
+                update_row(&dh_model, row, |info| {
+                    info.status = SharedString::from("Stopped");
+                });
+                ui.set_last_response(SharedString::from(format!(
+                    "STOP_DH {} - {:?}",
+                    dh.name.0, status
+                )));
             }
             Err(e) => {
-                ui.set_last_response(SharedString::from(format!("STOP_DH {} failed: {}", dh_id, e)));
+                ui.set_last_response(SharedString::from(format!(
+                    "STOP_DH {} failed: {}",
+                    dh.name.0, e
+                )));
             }
         }
     });
@@ -397,4 +667,243 @@ fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: &Arc<Process
     pm_tcssim.kill();
     pm_tcspecial.kill();
     exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+    use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig};
+
+    /// Arguments as the program really receives them, the program's own name
+    /// first.
+    fn args(rest: &[&str]) -> std::vec::IntoIter<String> {
+        let mut all = vec!["tcsmoc".to_string()];
+        all.extend(rest.iter().map(|s| s.to_string()));
+        all.into_iter()
+    }
+
+    #[test]
+    fn the_payload_file_comes_from_the_command_line() {
+        assert_eq!(
+            payload_path_from_args(args(&["payload2.yaml"])).unwrap(),
+            "payload2.yaml"
+        );
+    }
+
+    #[test]
+    fn no_argument_reads_the_default_payload_file() {
+        assert_eq!(
+            payload_path_from_args(args(&[])).unwrap(),
+            DEFAULT_PAYLOAD_CONFIG_PATH
+        );
+    }
+
+    #[test]
+    fn a_second_payload_file_is_refused_rather_than_ignored() {
+        // Silently reading the first would leave the second looking as though
+        // it had been read.
+        let message = payload_path_from_args(args(&["payload1.yaml", "payload2.yaml"]))
+            .expect_err("two paths must be refused");
+        assert!(
+            message.contains("payload2.yaml"),
+            "the error should name the extra argument, but said: {message}"
+        );
+    }
+
+    /// The shipped payload file has to be one the MOC can show.
+    ///
+    /// Nothing else checks that: until this test, the window's data handlers
+    /// were transcribed from the file by hand, and a file that had moved on
+    /// showed up only as a panel saying the wrong thing.
+    #[test]
+    fn the_shipped_payload_config_becomes_dh_panels() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(DEFAULT_PAYLOAD_CONFIG_PATH);
+        let dh_configs = load_payload_config(&path)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
+
+        assert!(!dh_configs.is_empty(), "no data handlers to show");
+
+        for (dh, info) in dh_configs.iter().zip(dh_configs.iter().map(dh_info_from)) {
+            assert_eq!(info.name, SharedString::from(dh.name.0.clone()));
+            assert!(!info.config.is_empty(), "{} has no endpoint to show", dh.name.0);
+            // A panel showing a saturated size would be showing a number the
+            // file does not contain.
+            assert_eq!(info.packet_size as usize, dh.packet_size);
+        }
+    }
+
+    /// A device handler is started as a device handler, not as whatever the
+    /// first panel happens to be.
+    #[test]
+    fn a_handler_is_started_as_the_type_its_endpoint_makes_it() {
+        let device = EndpointConfig::Device(DeviceConfig {
+            path: "/dev/urandom".to_string(),
+        });
+        assert!(dh_type_of(&device) == DHType::Device);
+        assert_eq!(endpoint_description(&device), "Device /dev/urandom");
+
+        let network = EndpointConfig::Network(NetworkConfig {
+            protocol: NetworkProtocol::Tcp,
+            address: "localhost".to_string(),
+            port: 5000,
+        });
+        assert!(dh_type_of(&network) == DHType::Network);
+        assert_eq!(endpoint_description(&network), "TCP localhost:5000");
+    }
+
+    /// A Unix socket is named by a path, so its panel does not append a port.
+    #[test]
+    fn a_unix_socket_panel_shows_no_port() {
+        let unix = EndpointConfig::Network(NetworkConfig {
+            protocol: NetworkProtocol::UnixStream,
+            address: "/tmp/dh8".to_string(),
+            port: 0,
+        });
+        assert_eq!(endpoint_description(&unix), "Unix stream /tmp/dh8");
+    }
+
+    /// The panels and the configured data handlers line up by index, which is
+    /// what lets a panel's row number name a data handler.
+    #[test]
+    fn a_panel_row_names_the_handler_at_that_index() {
+        let dh_configs = vec![
+            DHConfig {
+                dh_id: DHId(7),
+                name: DHName::new("DH7"),
+                endpoint: EndpointConfig::Device(DeviceConfig {
+                    path: "/dev/urandom".to_string(),
+                }),
+                packet_size: 4,
+            },
+            DHConfig {
+                dh_id: DHId(9),
+                name: DHName::new("DH9"),
+                endpoint: EndpointConfig::Network(NetworkConfig {
+                    protocol: NetworkProtocol::Udp,
+                    address: "localhost".to_string(),
+                    port: 5009,
+                }),
+                packet_size: 8,
+            },
+        ];
+
+        let model: Vec<DHInfo> = dh_configs.iter().map(dh_info_from).collect();
+
+        assert_eq!(model.len(), dh_configs.len());
+        // Row 1 is DH9, whose id is neither 1 nor its row number.
+        assert_eq!(model[1].name, SharedString::from("DH9"));
+        assert_eq!(dh_configs[1].dh_id, DHId(9));
+    }
+
+    /// How many panel counts to check the grid rules against. Well past any
+    /// plausible payload configuration, so a rule that holds only for small
+    /// counts does not pass.
+    const COUNTS: usize = 64;
+
+    /// The window is never taller than it is wide.
+    ///
+    /// This is the bias, and it has to hold for every panel count rather than
+    /// for the shipped one: a handler added to the configuration file must not
+    /// turn the window into a column.
+    #[test]
+    fn the_window_is_always_at_least_square() {
+        for panels in 1..=COUNTS {
+            let shape = grid_shape(panels);
+            assert!(
+                shape.width >= shape.height,
+                "{panels} panels gives {}x{}, taller than wide",
+                shape.width,
+                shape.height
+            );
+        }
+    }
+
+    /// Of the shapes that are at least square, the chosen one is the squarest.
+    ///
+    /// Checked against every column count rather than against a remembered
+    /// answer, so the rule is what is tested, not the arithmetic of one case.
+    #[test]
+    fn no_other_column_count_is_nearer_square() {
+        for panels in 1..=COUNTS {
+            let chosen = grid_shape(panels);
+
+            for columns in 1..=panels {
+                let rows = panels.div_ceil(columns);
+                let width = (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH);
+                let height = rows as f32 * PANEL_HEIGHT + CHROME_HEIGHT;
+
+                // A taller-than-wide shape is not a candidate, however square.
+                if width < height {
+                    continue;
+                }
+
+                assert!(
+                    chosen.aspect() <= width / height,
+                    "{panels} panels chose {} columns (aspect {}), but {} columns \
+                     is nearer square (aspect {})",
+                    chosen.columns,
+                    chosen.aspect(),
+                    columns,
+                    width / height
+                );
+            }
+        }
+    }
+
+    /// Every panel has a cell, and the grid has no row to spare.
+    #[test]
+    fn the_grid_holds_every_panel_and_no_empty_row() {
+        for panels in 1..=COUNTS {
+            let shape = grid_shape(panels);
+            assert!(
+                shape.columns * shape.rows >= panels,
+                "{panels} panels do not fit in {}x{}",
+                shape.columns,
+                shape.rows
+            );
+            assert!(
+                shape.columns * (shape.rows - 1) < panels,
+                "{panels} panels in {}x{} leaves an empty row",
+                shape.columns,
+                shape.rows
+            );
+        }
+    }
+
+    /// The shipped configuration opens a window that is nearly square.
+    ///
+    /// The other tests fix the rules; this one records what the rules actually
+    /// produce for the file the MOC ships with, so a change to the panel
+    /// constants that ruins the shipped case cannot pass quietly.
+    #[test]
+    fn the_shipped_payload_config_opens_a_nearly_square_window() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(DEFAULT_PAYLOAD_CONFIG_PATH);
+        let dh_configs = load_payload_config(&path)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
+
+        let shape = grid_shape(dh_configs.len());
+        assert!(
+            shape.aspect() < 1.1,
+            "{} opens a {}x{} window, aspect {}, further from square than it \
+             should be",
+            path.display(),
+            shape.width,
+            shape.height,
+            shape.aspect()
+        );
+    }
+
+    /// An unreadable or empty configuration still produces a window.
+    #[test]
+    fn no_panels_still_has_a_shape() {
+        let shape = grid_shape(0);
+        assert_eq!(shape.columns, 1);
+        assert_eq!(shape.rows, 1);
+        assert!(shape.width >= shape.height);
+    }
 }

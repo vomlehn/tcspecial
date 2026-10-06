@@ -12,7 +12,9 @@
 use std::path::{Path, PathBuf};
 
 use serde::de::DeserializeOwned;
-use tcslibgs::{load_config_file, CIConfigJson, ConfigFormat, PayloadConfig};
+use tcslibgs::{
+    load_config_file, CIConfigJson, ConfigFormat, EndpointConfig, NetworkProtocol, PayloadConfig,
+};
 
 fn actual(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -62,16 +64,111 @@ fn payload_actual_file_has_expected_contents() {
         "the payload actual file has no ci_config"
     );
 
+    assert_eq!(config.data_handler_groups.len(), 1);
+    let group = config.group("udp_localhost").expect("the group is defined");
+    assert_eq!(group.dh_type.as_deref(), Some("network"));
+    assert_eq!(group.protocol.as_deref(), Some("udp"));
+    assert_eq!(group.packet_size, Some(12));
+    assert_eq!(group.port, None, "a port tells one handler of a group from another");
+
+    // A handler in the group states only what the group does not carry.
     let network = &config.data_handlers[0];
     assert_eq!(network.dh_id, 0);
-    assert_eq!(network.dh_type, "network");
+    assert_eq!(network.group.as_deref(), Some("udp_localhost"));
+    assert_eq!(network.dh_type, None);
+    assert_eq!(network.packet_size, None);
     assert_eq!(network.port, Some(5000));
     assert_eq!(network.path, None);
 
+    // A handler in no group states everything itself.
     let device = &config.data_handlers[1];
-    assert_eq!(device.dh_type, "device");
+    assert_eq!(device.group, None);
+    assert_eq!(device.dh_type.as_deref(), Some("device"));
     assert_eq!(device.path.as_deref(), Some("/dev/ttyS0"));
     assert_eq!(device.port, None);
+}
+
+#[test]
+fn a_grouped_handler_resolves_the_same_from_every_format() {
+    // The group is only useful if what a handler inherits from it survives
+    // every format, so resolve the whole file rather than inspecting fields.
+    for ext in ["json", "yaml", "xml"] {
+        let config: PayloadConfig = load_config_file(actual(&format!("payload.{ext}"))).unwrap();
+        let handlers = config
+            .to_dh_configs()
+            .unwrap_or_else(|e| panic!("payload.{ext} failed to resolve: {e}"));
+
+        match &handlers[0].endpoint {
+            EndpointConfig::Network(net) => {
+                // All three from the group.
+                assert_eq!(net.protocol, NetworkProtocol::Udp, "payload.{ext}");
+                assert_eq!(net.address, "localhost", "payload.{ext}");
+                // The handler's own.
+                assert_eq!(net.port, 5000, "payload.{ext}");
+            }
+            other => panic!("payload.{ext}: DH0 resolved to {other:?}"),
+        }
+        // Stated by the group alone, so this is what proves an attribute no
+        // handler mentions still reaches it.
+        assert_eq!(handlers[0].packet_size, 12, "payload.{ext}");
+    }
+}
+
+#[test]
+fn a_handler_naming_an_undefined_group_is_rejected() {
+    // Without this, a misspelled group name would leave a handler with no
+    // endpoint attributes at all, which is a different and more confusing
+    // error than the one that is really there.
+    let config: PayloadConfig = ConfigFormat::Yaml
+        .parse(
+            "version: \"1.0\"
+description: one handler naming a group that is not there
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    group: nonesuch
+    port: 5000
+    packet_size: 1
+",
+        )
+        .expect("parses: an undefined group is not a syntax error");
+
+    let message = config.to_dh_configs().expect_err("must be rejected");
+    assert!(
+        message.contains("nonesuch"),
+        "the error should name the missing group, but said: {message}"
+    );
+}
+
+#[test]
+fn a_group_defined_twice_is_rejected() {
+    let config: PayloadConfig = ConfigFormat::Yaml
+        .parse(
+            "version: \"1.0\"
+description: two groups of one name
+data_handler_groups:
+  - name: dup
+    type: network
+    protocol: udp
+    address: localhost
+  - name: dup
+    type: device
+    path: /dev/null
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    group: dup
+    port: 5000
+    packet_size: 1
+",
+        )
+        .expect("parses");
+
+    let message = config.to_dh_configs().expect_err("must be rejected");
+    assert!(
+        message.contains("dup"),
+        "the error should name the repeated group, but said: {message}"
+    );
 }
 
 #[test]
@@ -80,10 +177,9 @@ fn every_format_converts_to_runtime_types() {
     // real runtime types also succeeds from every format.
     for ext in ["json", "yaml", "xml"] {
         let config: PayloadConfig = load_config_file(actual(&format!("payload.{ext}"))).unwrap();
-        for dh in &config.data_handlers {
-            dh.to_dh_config()
-                .unwrap_or_else(|e| panic!("payload.{ext}: {} failed conversion: {e}", dh.name));
-        }
+        config
+            .to_dh_configs()
+            .unwrap_or_else(|e| panic!("payload.{ext} failed conversion: {e}"));
 
         let ci: CIConfigJson = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
         ci.to_ci_config()

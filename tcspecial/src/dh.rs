@@ -185,7 +185,6 @@ mod tests {
                 path: "/dev/null".to_string(),
             }),
             packet_size: 64,
-            packet_interval_ms: 100,
         };
 
         let dh = DataHandler::new(config);

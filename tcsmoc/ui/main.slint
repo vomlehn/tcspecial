@@ -113,11 +113,13 @@ export enum MenuAction { ping, arm-restart, restart, query, query-dh, start-dh, 
 
 export component MainWindow inherits Window {
     title: "TCSpecial MOC Simulator";
-    // Rust opens the window at the size the panel count calls for; this is
-    // only the floor, below which the command interpreter's controls stop
-    // fitting side by side. It matches MIN_WINDOW_WIDTH in main.rs.
-    min-width: 640px;
-    min-height: 420px;
+    // Rust opens the window at the size the panel count calls for; these are
+    // only the floors, below which the command interpreter's controls stop
+    // fitting side by side and the grid stops having room for a row of
+    // panels. They match MIN_WINDOW_WIDTH and CHROME_HEIGHT + PANEL_HEIGHT in
+    // main.rs, which the_window_and_rust_agree_on_the_sizes checks.
+    min-width: 700px;
+    min-height: 482px;
     background: white;
 
     in-out property <string> ci-status: "Disconnected";
@@ -143,8 +145,7 @@ export component MainWindow inherits Window {
 
     in-out property <string> beacon-last-recv: "--- --:--.-";
 
-    callback connect-clicked();
-    callback disconnect-clicked();
+    callback link-clicked();
     callback ping-clicked();
     callback query-all-clicked();
     callback start-dh(int);
@@ -163,25 +164,68 @@ export component MainWindow inherits Window {
             VerticalLayout {
                 spacing: 8px;
 
+                // Everything about the link to tcspecial, in a box of its
+                // own: a label naming it, the address it goes to, the two
+                // buttons that take it up and down, and the status they set.
+                // The border is what makes those a group rather than four
+                // things that happen to sit near each other. The MOC starts
+                // both tcspecial and tcssim, and the command interpreter all
+                // of this reaches is tcspecial's; tcssim is on the far side
+                // of it and is not disconnected by this.
                 HorizontalLayout {
-                    spacing: 8px;
-                    Text { text: "Address:"; vertical-alignment: center; }
-                    LineEdit {
-                        text <=> ci-address;
-                        min-width: 150px;
-                    }
-                    Button {
-                        text: "Connect";
-                        clicked => { connect-clicked(); }
-                    }
-                    Button {
-                        text: "Disconnect";
-                        clicked => { disconnect-clicked(); }
-                    }
-                    Text {
-                        text: "Status: " + ci-status;
-                        color: ci-status == "Connected" ? #008000 : #ff0000;
-                        vertical-alignment: center;
+                    // Keeps the box to its contents rather than stretching it
+                    // the width of the group: with the address field inside
+                    // it, nothing is left beside it to take up the row.
+                    alignment: start;
+
+                    Rectangle {
+                        border-width: 1px;
+                        border-color: #808080;
+                        border-radius: 4px;
+
+                        VerticalLayout {
+                            // The border's own room, counted into
+                            // CHROME_HEIGHT in main.rs.
+                            padding: 6px;
+                            spacing: 2px;
+
+                            Text {
+                                text: "tcspecial link";
+                                horizontal-alignment: center;
+                                font-italic: true;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Text { text: "Address:"; vertical-alignment: center; }
+                                LineEdit {
+                                    text <=> ci-address;
+                                    min-width: 150px;
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: center;
+
+                                // One button, offering whichever of the
+                                // two the link is not: there is never a
+                                // Connect to press on a link that is up, and
+                                // the label is what the press means. Rust
+                                // reads the same status back to find out
+                                // which it was.
+                                Button {
+                                    text: ci-status == "Connected" ? "Disconnect" : "Connect";
+                                    clicked => { link-clicked(); }
+                                }
+                                Text {
+                                    text: "Status: " + ci-status;
+                                    color: ci-status == "Connected" ? #008000 : #ff0000;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
                     }
                 }
 

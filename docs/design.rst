@@ -491,6 +491,30 @@ A DH has four functions used to send and receive data:
 
 A communication path between the OC and a DH uses UDP/IP. A path between
 a DH and a payload uses one of multiple different communication protocols.
+
+Requirement
+    A data handler binds the UDP address its configuration gives as
+    ``oc_address`` and ``oc_port``. That is where the OC sends to, and it is
+    distinct from the address the handler reaches its payload at.
+
+Requirement
+    A data handler sends to the OC at the address the OC last sent from. No
+    configuration states where the OC is, and a datagram's sender is the only
+    statement of it; this is how the command interpreter already answers the
+    ground.
+
+A consequence worth stating: a handler cannot send to the OC before the OC has
+sent to it. Until then its payload-to-ground writes fail and the data is
+dropped, which its statistics record as failed writes rather than as writes of
+no bytes. A handler whose payload only produces telemetry therefore needs the
+OC to speak first, even if only once. Configuring the OC's address instead
+would remove that, at the cost of stating in every payload file where the
+ground is.
+
+The two conduits of a handler share one socket on each side rather than
+binding one each, because an address can be bound once; the conduit reading a
+socket is what learns where the far end is, and the conduit writing it holds a
+duplicate of the same socket, so it sends where the reader learnt.
 For example:
 
 .. code-block:: text

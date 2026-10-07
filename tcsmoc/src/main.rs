@@ -20,16 +20,29 @@ use tcslibgs::{
 use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
+use crate::ci_link::{CiLink, NOT_CONNECTED};
 use crate::config::constants::BEACON_INDICATOR;
 
 slint::include_modules!();
 
 mod app;
 mod beacon_receive;
+mod ci_link;
 mod config;
 
 /// Default CI address
 const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
+
+/// What the window's status line says about the link to the command
+/// interpreter.
+///
+/// `ui/main.slint` compares the status against "Connected" to choose the
+/// colour it is shown in, and defaults it to "Disconnected"; these are the
+/// same strings, named here so the two files can be checked against each
+/// other.
+const CONNECTED_STATUS: &str = "Connected";
+const DISCONNECTED_STATUS: &str = "Disconnected";
+const ERROR_STATUS: &str = "Error";
 
 /// Shown for the time of a transfer that has not happened.
 ///
@@ -89,12 +102,28 @@ const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 /// height.
 const PANEL_WIDTH: f32 = 320.0;
 const PANEL_HEIGHT: f32 = 210.0;
-const CHROME_HEIGHT: f32 = 210.0;
+/// Sixty-two of these are the box around the tcspecial link, which stacks
+/// the line naming it, the address, and the buttons and status, inside a
+/// border with padding of its own. See `MIN_WINDOW_WIDTH`, which carries
+/// them.
+const CHROME_HEIGHT: f32 = 272.0;
 
 /// The narrowest the window may open, matching `min-width` in the window
-/// itself. Below this the command interpreter's controls no longer fit side by
-/// side.
-const MIN_WINDOW_WIDTH: f32 = 640.0;
+/// itself.
+///
+/// What this is for has changed. The command interpreter's controls used to
+/// be a row that stopped fitting below 640; stacked in their box they now
+/// want far less than that, and what the floor holds up instead is the shape
+/// of the grid, which cannot be separated from it: four handlers in two
+/// columns stand 692 tall, and a window that may be narrower than that is
+/// taller than wide, which puts the shape out of the running altogether --
+/// `grid_shape` does not consider such shapes at all, so four panels would
+/// open in a 3x2 grid with two cells empty and two panels would go side by
+/// side instead of stacked. At 700 every panel count keeps the shape it had.
+/// Anything that makes the chrome taller again has to be weighed the same
+/// way, against
+/// `the_shipped_payload_config_opens_a_nearly_square_window`.
+const MIN_WINDOW_WIDTH: f32 = 700.0;
 
 /// How the grid of data handler panels is shaped, and the window size that
 /// shape asks for.
@@ -499,33 +528,33 @@ fn main() {
     eprintln!("sleeping to let the subprocesses initialize");
     thread::sleep(Duration::new(2, 0));
 
-    // Create connection and client on startup
-    let client: Arc<Mutex<TcsClient>> = match UdpConnection::new("0.0.0.0:0", DEFAULT_CI_ADDRESS) {
-        Ok(conn) => {
-            eprintln!("Connected to {}", DEFAULT_CI_ADDRESS);
-            ui.set_ci_status(SharedString::from("Connected"));
-            ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
-            Arc::new(Mutex::new(TcsClient::new(Box::new(conn))))
-        }
-        Err(e) => {
-            eprintln!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e);
-            ui.set_ci_status(SharedString::from("Error"));
-            ui.set_last_response(SharedString::from(format!("Connection failed: {}", e)));
-            // Exit since we can't operate without a connection
-            exit(1);
-        }
-    };
+    // Open the link to the command interpreter on startup, by the same call
+    // the Connect button makes, so the link the window comes up with is the
+    // one that button would have given it.
+    let mut link = CiLink::down();
+    if let Err(e) = link.connect(DEFAULT_CI_ADDRESS) {
+        eprintln!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e);
+        ui.set_ci_status(SharedString::from(ERROR_STATUS));
+        ui.set_last_response(SharedString::from(format!("Connection failed: {}", e)));
+        // Exit since we can't operate without a connection
+        exit(1);
+    }
+    eprintln!("Connected to {}", DEFAULT_CI_ADDRESS);
+    ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
+    ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
+    let link: Arc<Mutex<CiLink>> = Arc::new(Mutex::new(link));
 
     // Start receiving beacon data
     let beacon_addr: std::net::SocketAddr = BEACON_NETADDR.parse().unwrap();
     let beacon_ui_weak = ui_weak.clone();
     let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 
-    handle_main_menu(&ui, ui_weak.clone(), client.clone());
-    query_dh_buttons(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
-    poll_panels(client.clone(), dh_configs.clone(), dh_model.clone());
-    start_dh_handler(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
-    stop_dh_handler(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
+    handle_link_button(&ui, ui_weak.clone(), link.clone());
+    handle_main_menu(&ui, ui_weak.clone(), link.clone());
+    query_dh_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
+    poll_panels(link.clone(), dh_configs.clone(), dh_model.clone());
+    start_dh_handler(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
+    stop_dh_handler(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
 /*
     // Menu action handler
     {
@@ -615,45 +644,114 @@ fn main() {
     ui.run().unwrap();
 }
 
+/// The one button that takes the link up and down.
+///
+/// There were two, and neither did anything: the window declared a callback
+/// for each and nothing in Rust answered them, and a Slint callback with no
+/// handler is silently nothing. Disconnect left the link up and the status
+/// line alone, which is how it was found; Connect looked as though it worked
+/// only because the status line already said Connected, the MOC having
+/// opened the link at startup before the window appeared.
+///
+/// Which way a press goes is decided by what the button offered, read back
+/// from the status the window derives its label from -- not by what the link
+/// turns out to be. The two cannot disagree by any path through this
+/// function, and if they ever did, doing what the label said is the honest
+/// answer and a safe one: `connect` replaces whatever the link had, and
+/// `disconnect` is harmless on a link that is already down.
+fn handle_link_button(
+    ui: &MainWindow,
+    ui_weak: slint::Weak<MainWindow>,
+    link: Arc<Mutex<CiLink>>,
+) {
+    ui.on_link_clicked(move || {
+        let ui = ui_weak.unwrap();
+        let mut guard = link.lock().unwrap();
+
+        if ui.get_ci_status() == CONNECTED_STATUS {
+            // Said in terms of where the link was, not of what the address
+            // box says, which may have been edited since.
+            let address = guard.address().to_string();
+            let was_up = guard.is_connected();
+            guard.disconnect();
+
+            eprintln!("Disconnected from {}", address);
+            ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
+            ui.set_last_response(SharedString::from(if was_up {
+                format!("Disconnected from {}", address)
+            } else {
+                format!("Already disconnected from {}", address)
+            }));
+            return;
+        }
+
+        // Where the address box points now, rather than where the link last
+        // went: typing an address and pressing Connect is how the MOC is told
+        // to talk to a different command interpreter.
+        let address = ui.get_ci_address().to_string();
+        match guard.connect(&address) {
+            Ok(()) => {
+                eprintln!("Connected to {}", address);
+                ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
+                ui.set_last_response(SharedString::from(format!("Connected to {}", address)));
+            }
+            Err(e) => {
+                eprintln!("Failed to connect to {}: {}", address, e);
+                ui.set_ci_status(SharedString::from(ERROR_STATUS));
+                ui.set_last_response(SharedString::from(format!(
+                    "Connection to {} failed: {}",
+                    address, e
+                )));
+            }
+        }
+    });
+}
+
 // Menu action handler
-fn handle_main_menu (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: Arc<Mutex<TcsClient>>) {
+fn handle_main_menu (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, link: Arc<Mutex<CiLink>>) {
     ui.on_menu_action(move |action| {
         let ui = ui_weak.unwrap();
-        let mut guard = client.lock().unwrap();
+        let mut guard = link.lock().unwrap();
 
         match action {
+            // The three actions that send a command ask the link for a
+            // client as they go: `None` is the link being down, which is a
+            // thing to say rather than a command that failed.
             MenuAction::Ping => {
                 eprintln!("Ping from menu");
-                match guard.ping() {
-                    Ok(tm) => {
+                match guard.client().map(|client| client.ping()) {
+                    Some(Ok(tm)) => {
                         ui.set_last_response(SharedString::from(format!(
                             "PING OK - timestamp: {}.{}",
                             tm.timestamp.seconds, tm.timestamp.nanoseconds
                         )));
                     }
-                    Err(e) => {
+                    Some(Err(e)) => {
                         ui.set_last_response(SharedString::from(format!("PING failed: {}", e)));
                     }
+                    None => ui.set_last_response(SharedString::from(NOT_CONNECTED)),
                 }
             }
             MenuAction::ArmRestart => {
-                match guard.restart_arm(ArmKey(0xf001adad)) {
-                    Ok(status) => {
+                match guard.client().map(|client| client.restart_arm(ArmKey(0xf001adad))) {
+                    Some(Ok(status)) => {
                         ui.set_last_response(SharedString::from(format!("ARM_RESTART: {:?}", status)));
                     }
-                    Err(e) => {
+                    Some(Err(e)) => {
                         ui.set_last_response(SharedString::from(format!("ARM_RESTART failed: {}", e)));
                     }
+                    None => ui.set_last_response(SharedString::from(NOT_CONNECTED)),
                 }
             }
             MenuAction::Restart => {
-                match guard.restart(ArmKey(0xf001adad)) {
-                    Ok(status) => {
+                match guard.client().map(|client| client.restart(ArmKey(0xf001adad))) {
+                    Some(Ok(status)) => {
                         ui.set_last_response(SharedString::from(format!("RESTART: {:?}", status)));
                     }
-                    Err(e) => {
+                    Some(Err(e)) => {
                         ui.set_last_response(SharedString::from(format!("RESTART failed: {}", e)));
                     }
+                    None => ui.set_last_response(SharedString::from(NOT_CONNECTED)),
                 }
             }
             MenuAction::Query => {
@@ -679,17 +777,24 @@ fn handle_main_menu (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, client: 
 fn query_dh_buttons(
     ui: &MainWindow,
     ui_weak: slint::Weak<MainWindow>,
-    client: Arc<Mutex<TcsClient>>,
+    link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
 ) {
     ui.on_query_all_clicked(move || {
         let ui = ui_weak.unwrap();
-        let mut guard = client.lock().unwrap();
+        let mut guard = link.lock().unwrap();
+        let client = match guard.client() {
+            Some(client) => client,
+            None => {
+                ui.set_last_response(SharedString::from(NOT_CONNECTED));
+                return;
+            }
+        };
         let mut results = Vec::new();
 
         for (row, dh) in dh_configs.iter().enumerate() {
-            match panel_update_for(&mut guard, row, dh, None) {
+            match panel_update_for(client, row, dh, None) {
                 Some(update) => {
                     results.push(format!(
                         "{}: sent={} recv={}",
@@ -708,6 +813,15 @@ fn query_dh_buttons(
 /// How often the panels are refreshed without being asked.
 const PANEL_POLL_INTERVAL: Duration = Duration::from_millis(1000);
 
+/// How long a poll waits for a handler's answer.
+///
+/// Shorter than the client's own default, because the poller asks again in a
+/// second: an answer that arrives after the next question was already due is
+/// of no use to a panel, and waiting the default five seconds for one only
+/// makes a pass against a wedged tcspecial take tens of seconds. A panel
+/// whose handler did not answer keeps what it last showed either way.
+const POLL_TIMEOUT: Duration = Duration::from_millis(1000);
+
 /// Keep the panels current.
 ///
 /// Until this existed a panel only changed when someone pressed Query All, so
@@ -719,8 +833,11 @@ const PANEL_POLL_INTERVAL: Duration = Duration::from_millis(1000);
 /// to the client's timeout, and four handlers' worth of that on the event loop
 /// would be a window that stops repainting whenever tcspecial is slow. The
 /// thread leaves what it gathered where the timer can pick it up.
+///
+/// The thread asks over a connection of its own, following the link the
+/// buttons control rather than sharing it; see [`poll_pass`] for why.
 fn poll_panels(
-    client: Arc<Mutex<TcsClient>>,
+    link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
 ) {
@@ -733,28 +850,13 @@ fn poll_panels(
             // statistics but not the samples keeps its sample lines.
             let mut last: Vec<Option<PanelUpdate>> = vec![None; dh_configs.len()];
 
+            // The poller's own link, kept wherever the window's link is.
+            let mut poll_link = CiLink::down();
+
             loop {
                 thread::sleep(PANEL_POLL_INTERVAL);
 
-                let mut gathered = Vec::with_capacity(dh_configs.len());
-                {
-                    // Held across the handlers rather than per handler, so a
-                    // click cannot interleave with a poll and leave a panel
-                    // showing one handler's statistics beside another's
-                    // samples.
-                    let mut guard = match client.lock() {
-                        Ok(guard) => guard,
-                        Err(_) => return,
-                    };
-                    for (row, dh) in dh_configs.iter().enumerate() {
-                        if let Some(update) =
-                            panel_update_for(&mut guard, row, dh, last[row].as_ref())
-                        {
-                            last[row] = Some(update.clone());
-                            gathered.push(update);
-                        }
-                    }
-                }
+                let gathered = poll_pass(&link, &mut poll_link, &dh_configs, &mut last);
 
                 if let Ok(mut queue) = pending.lock() {
                     *queue = gathered;
@@ -784,6 +886,64 @@ fn poll_panels(
     std::mem::forget(timer);
 }
 
+/// One pass of the poller: ask every handler what it has moved.
+///
+/// `link` is the link the window's buttons control and `poll_link` the
+/// poller's own, which follows it. The two are separate so that a pass never
+/// holds the lock the window needs: the shared link is locked only long
+/// enough to read where it went, never across a command.
+///
+/// That matters most when the spacecraft has stopped answering. A pass then
+/// waits out its timeout on every handler, and when the poller shared the
+/// window's link, every click waited behind it -- Disconnect included, which
+/// is the one button wanted just then.
+///
+/// Asking over a second connection is also what makes a pass and a click
+/// safe to overlap, which is what the shared lock used to be held for: each
+/// socket gets its own answers, since tcspecial replies to whoever asked, so
+/// no panel can end up showing one handler's statistics beside another's
+/// samples.
+///
+/// `last` is what each panel last showed, carried in and out so a handler
+/// that answers the statistics but not the samples keeps its sample lines.
+/// It is left alone for a handler that did not answer at all.
+fn poll_pass(
+    link: &Mutex<CiLink>,
+    poll_link: &mut CiLink,
+    dh_configs: &[DHConfig],
+    last: &mut [Option<PanelUpdate>],
+) -> Vec<PanelUpdate> {
+    // Where the buttons have the link now. A poisoned lock leaves the poller
+    // where it was rather than taking the panels down with it.
+    let wanted = match link.lock() {
+        Ok(guard) => guard.connected_to().map(str::to_string),
+        Err(_) => return Vec::new(),
+    };
+
+    poll_link.follow(wanted.as_deref());
+    // Said every pass, since `follow` may have just opened a fresh client
+    // and a fresh client starts from the default timeout.
+    poll_link.set_timeout(POLL_TIMEOUT);
+
+    // Nothing to ask while the link is down, and the panels keep what they
+    // last showed rather than being blanked: a disconnect says nothing about
+    // what the handlers did, and polling resumes on its own once Connect
+    // brings the link back up.
+    let client = match poll_link.client() {
+        Some(client) => client,
+        None => return Vec::new(),
+    };
+
+    let mut gathered = Vec::with_capacity(dh_configs.len());
+    for (row, dh) in dh_configs.iter().enumerate() {
+        if let Some(update) = panel_update_for(client, row, dh, last[row].as_ref()) {
+            last[row] = Some(update.clone());
+            gathered.push(update);
+        }
+    }
+    gathered
+}
+
 // Start DH handler
 //
 // The panel passes its own row; the identity, name, and type of the handler
@@ -792,7 +952,7 @@ fn poll_panels(
 fn start_dh_handler(
     ui: &MainWindow,
     ui_weak: slint::Weak<MainWindow>,
-    client: Arc<Mutex<TcsClient>>,
+    link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
 ) {
@@ -804,8 +964,15 @@ fn start_dh_handler(
             None => return,
         };
 
-        let mut guard = client.lock().unwrap();
-        match guard.start_dh(dh.dh_id, dh_type_of(&dh.endpoint), dh.name.clone()) {
+        let mut guard = link.lock().unwrap();
+        let sent = match guard.client() {
+            Some(client) => client.start_dh(dh.dh_id, dh_type_of(&dh.endpoint), dh.name.clone()),
+            None => {
+                ui.set_last_response(SharedString::from(NOT_CONNECTED));
+                return;
+            }
+        };
+        match sent {
             Ok(status) => {
                 let status_str = if status == CommandStatus::Success {
                     "Active"
@@ -834,7 +1001,7 @@ fn start_dh_handler(
 fn stop_dh_handler(
     ui: &MainWindow,
     ui_weak: slint::Weak<MainWindow>,
-    client: Arc<Mutex<TcsClient>>,
+    link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
 ) {
@@ -846,8 +1013,15 @@ fn stop_dh_handler(
             None => return,
         };
 
-        let mut guard = client.lock().unwrap();
-        match guard.stop_dh(dh.dh_id) {
+        let mut guard = link.lock().unwrap();
+        let sent = match guard.client() {
+            Some(client) => client.stop_dh(dh.dh_id),
+            None => {
+                ui.set_last_response(SharedString::from(NOT_CONNECTED));
+                return;
+            }
+        };
+        match sent {
             Ok(status) => {
                 update_row(&dh_model, row, |info| {
                     info.status = SharedString::from("Stopped");
@@ -910,6 +1084,7 @@ mod tests {
     use super::*;
     use std::ffi::OsStr;
     use std::path::Path;
+    use std::time::Instant;
     use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
     use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig, Timestamp};
 
@@ -919,6 +1094,143 @@ mod tests {
         let mut all = vec!["tcsmoc".to_string()];
         all.extend(rest.iter().map(|s| s.to_string()));
         all.into_iter()
+    }
+
+    /// A port nothing in this project uses, so a command sent there is never
+    /// answered and a poll has to wait out its timeout.
+    const UNANSWERED_ADDRESS: &str = "127.0.0.1:65123";
+
+    /// One data handler, for the tests that need something to ask about.
+    fn a_dh() -> DHConfig {
+        DHConfig {
+            dh_id: DHId(1),
+            name: DHName::new("DH1"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/null".to_string(),
+            }),
+            packet_size: 1,
+            oc: None,
+        }
+    }
+
+    /// A poll that is waiting on the spacecraft leaves the window's buttons
+    /// their link.
+    ///
+    /// This is what made Disconnect unusable as soon as it was worth using.
+    /// The poller held the shared link across its commands, so with nothing
+    /// answering, a pass sat on it for a timeout per handler and every click
+    /// waited behind -- a window that does nothing, at the moment the
+    /// operator is trying to take the link down. The poller now asks over a
+    /// link of its own and locks the shared one only to read where it went.
+    #[test]
+    fn a_poll_leaves_the_window_its_link() {
+        let link = Arc::new(Mutex::new(CiLink::down()));
+        link.lock().unwrap().connect(UNANSWERED_ADDRESS).unwrap();
+
+        let pass = {
+            let link = link.clone();
+            thread::spawn(move || {
+                let dh_configs = vec![a_dh()];
+                let mut poll_link = CiLink::down();
+                let mut last = vec![None];
+
+                let started = Instant::now();
+                let gathered = poll_pass(&link, &mut poll_link, &dh_configs, &mut last);
+                (gathered, started.elapsed())
+            })
+        };
+
+        // Far enough in for the pass to be waiting on its first command.
+        thread::sleep(POLL_TIMEOUT / 4);
+
+        let waited = Instant::now();
+        drop(link.lock().unwrap());
+        let waited = waited.elapsed();
+
+        let (gathered, pass_took) = pass.join().unwrap();
+        assert!(
+            gathered.is_empty(),
+            "nothing was answering, so there was nothing to show"
+        );
+        assert!(
+            pass_took >= POLL_TIMEOUT / 2,
+            "the pass answered in {:?}, so it was not waiting and this proves nothing",
+            pass_took
+        );
+        assert!(
+            waited < POLL_TIMEOUT / 2,
+            "a click waited {:?} behind a poll",
+            waited
+        );
+    }
+
+    /// The sizes in the window and the ones Rust works them out from.
+    ///
+    /// Three numbers in `ui/main.slint` are the same numbers as here: the two
+    /// floors the window may not go below, and the height the grid claims per
+    /// row. Nothing but the comments on them has ever said so, and a window
+    /// that disagrees goes wrong quietly -- it opens at a size its own layout
+    /// will not keep, or claims room per row that the opening size did not
+    /// allow for.
+    #[test]
+    fn the_window_and_rust_agree_on_the_sizes() {
+        let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
+        let source = std::fs::read_to_string(&window).unwrap();
+
+        for (what, expected) in [
+            ("min-width", MIN_WINDOW_WIDTH),
+            // The smallest window is the one-row window.
+            ("min-height", CHROME_HEIGHT + PANEL_HEIGHT),
+            ("panel-height", PANEL_HEIGHT),
+        ] {
+            let said = format!("{}: {}px;", what, expected);
+            assert!(
+                source.contains(&said),
+                "{} does not say {:?}",
+                window.display(),
+                said
+            );
+        }
+    }
+
+    /// The status line in the window and the strings Rust sets it to.
+    ///
+    /// Slint does the comparison that colours the line, so nothing in Rust
+    /// fails if the two files drift apart: the line would quietly stop
+    /// turning green on a connection, or come up saying something other than
+    /// what no connection means. Checked against the window's own source
+    /// rather than left to a comment.
+    #[test]
+    fn the_window_and_rust_agree_on_the_status_strings() {
+        let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
+        let source = std::fs::read_to_string(&window).unwrap();
+
+        assert!(
+            source.contains(&format!("ci-status: \"{}\"", DISCONNECTED_STATUS)),
+            "{} does not come up saying {:?}",
+            window.display(),
+            DISCONNECTED_STATUS
+        );
+        assert!(
+            source.contains(&format!("ci-status == \"{}\"", CONNECTED_STATUS)),
+            "{} does not colour the line on {:?}",
+            window.display(),
+            CONNECTED_STATUS
+        );
+
+        // The one button offers the opposite of the status it reads, and a
+        // button offering Connect on a link that is up would be read as a
+        // link that is down.
+        let offered = format!(
+            "ci-status == \"{}\" ? \"Disconnect\" : \"Connect\"",
+            CONNECTED_STATUS
+        );
+        assert!(
+            source.contains(&offered),
+            "{} does not label its link button {:?}",
+            window.display(),
+            offered
+        );
     }
 
     /// A panel's two lines, from the sample telemetry that feeds them.

@@ -37,6 +37,35 @@ const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
 /// reads alike before any query and after one that found nothing moved.
 const NO_TRANSFER_TIME: &str = "--:--:--";
 
+/// How long the MOC waits for an answer when asking whether a tcspecial is
+/// already there.
+///
+/// Short, because this is a question about something on the same machine and
+/// the answer is wanted before a window opens. A tcspecial that cannot answer
+/// a ping this quickly is one the MOC would rather replace than talk to.
+const ALREADY_RUNNING_TIMEOUT: Duration = Duration::from_millis(500);
+
+/// Whether something is already answering as tcspecial at `address`.
+///
+/// Asked by PING rather than by looking for a process or a bound port,
+/// because what matters is whether there is a command interpreter that
+/// answers: a bound port might be anything, and a process by that name might
+/// be wedged. This also finds a tcspecial that is not a local process at all,
+/// which a process search never would.
+///
+/// A link that cannot even be opened counts as nothing running, not as an
+/// error: the MOC's job then is to start one.
+fn tcspecial_already_running(address: &str) -> bool {
+    let connection = match UdpConnection::new("0.0.0.0:0", address) {
+        Ok(connection) => connection,
+        Err(_) => return false,
+    };
+
+    let mut client = TcsClient::new(Box::new(connection));
+    client.set_timeout(ALREADY_RUNNING_TIMEOUT);
+    client.ping().is_ok()
+}
+
 /// The programs the MOC starts.
 ///
 /// Each takes its payload configuration file as an argument, as the MOC does,
@@ -439,13 +468,35 @@ fn main() {
 
     // Start tcspecial and tcssim subprocesses first, each reading the payload
     // file tcsmoc read, so all three describe the same payloads.
+    //
+    // Unless a tcspecial is already there. Starting a second one does not
+    // work and never did: the command interpreter's address can be bound
+    // once, so the second exits and the MOC comes up with a window, no
+    // spacecraft behind it, and the reason only on a terminal nobody is
+    // reading. Talking to the one that is already running is what was wanted
+    // in every case where this happened.
     let [tcspecial, tcssim] = CHILDREN;
-    let process_manager_tcspecial = Arc::new(ProcessManager::new());
-    process_manager_tcspecial.start_child(tcspecial, &payload_path);
+
+    let mut process_manager_tcspecial = None;
+    if tcspecial_already_running(DEFAULT_CI_ADDRESS) {
+        eprintln!(
+            "a tcspecial is already answering at {}, so not starting another",
+            DEFAULT_CI_ADDRESS
+        );
+        ui.set_last_response(SharedString::from(format!(
+            "Using the tcspecial already running at {}",
+            DEFAULT_CI_ADDRESS
+        )));
+    } else {
+        let manager = Arc::new(ProcessManager::new());
+        manager.start_child(tcspecial, &payload_path);
+        process_manager_tcspecial = Some(manager);
+    }
+
     let process_manager_tcssim = Arc::new(ProcessManager::new());
     process_manager_tcssim.start_child(tcssim, &payload_path);
 
-    eprintln!("started tcspecial and tcssim, sleeping to let them initialize");
+    eprintln!("sleeping to let the subprocesses initialize");
     thread::sleep(Duration::new(2, 0));
 
     // Create connection and client on startup
@@ -817,23 +868,40 @@ fn stop_dh_handler(
 }
 
 // Quit button handler
-fn handle_quit(ui: &MainWindow, pm_tcssim: Arc<ProcessManager>, pm_tcspecial: Arc<ProcessManager>) {
+fn handle_quit(
+    ui: &MainWindow,
+    pm_tcssim: Arc<ProcessManager>,
+    pm_tcspecial: Option<Arc<ProcessManager>>,
+) {
     ui.on_quit_clicked(move || {
-        kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
+        kill_and_exit_all(&pm_tcssim, pm_tcspecial.as_ref());
     });
 }
 
     // Window close handler (close box)
-fn handle_close(ui: &MainWindow, pm_tcssim: Arc<ProcessManager>, pm_tcspecial: Arc<ProcessManager>) {
+fn handle_close(
+    ui: &MainWindow,
+    pm_tcssim: Arc<ProcessManager>,
+    pm_tcspecial: Option<Arc<ProcessManager>>,
+) {
     ui.window().on_close_requested(move || {
-        kill_and_exit_all(&pm_tcssim, &pm_tcspecial);
+        kill_and_exit_all(&pm_tcssim, pm_tcspecial.as_ref());
         slint::CloseRequestResponse::HideWindow
     });
 }
 
-fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: &Arc<ProcessManager>) {
+/// Stop what the MOC started, and exit.
+///
+/// `pm_tcspecial` is `None` when a tcspecial was already running and the MOC
+/// attached to it instead of starting one. The MOC does not kill that one:
+/// something else started it, something else may still be using it, and
+/// shutting down a spacecraft's command interpreter because a ground display
+/// was closed is not the MOC's decision to make.
+fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<ProcessManager>>) {
     pm_tcssim.kill();
-    pm_tcspecial.kill();
+    if let Some(pm_tcspecial) = pm_tcspecial {
+        pm_tcspecial.kill();
+    }
     exit(0);
 }
 
@@ -1010,6 +1078,53 @@ mod tests {
             data.ends_with("..."),
             "a sample filling the buffer should show as truncated: {data}"
         );
+    }
+
+    /// Something answering as tcspecial is found, and nothing is not.
+    ///
+    /// The check is a PING over the loopback, so it can be tested without a
+    /// tcspecial: a socket that answers one is indistinguishable from the real
+    /// thing as far as this question goes, which is the point of asking by
+    /// command rather than by looking for a process.
+    #[test]
+    fn an_answering_tcspecial_is_found_and_silence_is_not() {
+        use std::net::UdpSocket;
+        use tcslibgs::{Command, PingTelemetry, Telemetry};
+
+        // Nothing listening: the MOC's job is to start one.
+        let quiet = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let quiet_addr = quiet.local_addr().unwrap().to_string();
+        drop(quiet);
+        assert!(
+            !tcspecial_already_running(&quiet_addr),
+            "an address nothing answers on should read as nothing running"
+        );
+
+        // A socket that answers a PING, which is all the question asks.
+        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let addr = socket.local_addr().unwrap().to_string();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let stub = thread::spawn(move || {
+            let mut buffer = vec![0u8; 65535];
+            let (size, from) = match socket.recv_from(&mut buffer) {
+                Ok(received) => received,
+                Err(_) => return,
+            };
+            let command: Command = serde_json::from_slice(&buffer[..size]).expect("a command");
+            let answer = Telemetry::Ping(PingTelemetry::new(
+                command.sequence(),
+                CommandStatus::Success,
+            ));
+            let _ = socket.send_to(&serde_json::to_vec(&answer).unwrap(), from);
+        });
+
+        assert!(
+            tcspecial_already_running(&addr),
+            "an address that answers a ping should read as a tcspecial running"
+        );
+        stub.join().unwrap();
     }
 
     /// Each child is started on the payload file the MOC read, and told so by

@@ -6,10 +6,11 @@ use std::env;
 use std::process;
 
 use log::{error, info, trace};
-use tcspecial::config::constants::{DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR};
 use tcspecial::config::{load_endpoint_config, load_tcspecial_config};
 use tcspecial::CommandInterpreter;
-use tcslibgs::config::load_payload_config;
+use tcslibgs::config::{
+    load_payload_config, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
+};
 
 fn main() {
     // Default to info so that the startup messages below, which used to

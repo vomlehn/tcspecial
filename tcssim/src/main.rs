@@ -16,7 +16,9 @@ use std::rc::Rc;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex};
 
-use tcslibgs::config::load_payload_config;
+use tcslibgs::config::{
+    load_payload_config, DEFAULT_PAYLOAD_CONFIG_PATH, SIM_PAYLOAD_CONFIG_PATH_VAR,
+};
 use tcslibgs::{DHConfig, EndpointConfig, NetworkProtocol};
 
 mod grid;
@@ -28,15 +30,6 @@ use sim_config::{ResolvedSim, SimConfigFile};
 
 slint::include_modules!();
 
-/// Which environment variable names the payload configuration, and what is
-/// read when that variable is unset.
-///
-/// Tcsmoc sets this variable on the tcssim it starts, so that the payloads
-/// tcssim simulates are the ones tcsmoc's panels describe. Its name is spelled
-/// in `tcsmoc/src/main.rs` as well, because tcssim builds no library for
-/// tcsmoc to take it from; the two must match.
-const PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
-const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "payload1.yaml";
 
 /// Which environment variable names the payload simulation configuration, and
 /// what is read when that variable is unset.
@@ -146,7 +139,7 @@ fn main() {
 
     // Read both configuration files before the window exists, so a file that
     // cannot be read is reported plainly rather than as an empty window.
-    let payload_path = env::var(PAYLOAD_CONFIG_PATH_VAR)
+    let payload_path = env::var(SIM_PAYLOAD_CONFIG_PATH_VAR)
         .unwrap_or_else(|_| DEFAULT_PAYLOAD_CONFIG_PATH.to_string());
     let sim_path = env::var(SIM_CONFIG_PATH_VAR)
         .unwrap_or_else(|_| DEFAULT_SIM_CONFIG_PATH.to_string());

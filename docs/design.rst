@@ -524,9 +524,27 @@ A communication path between the OC and a DH uses UDP/IP. A path between
 a DH and a payload uses one of multiple different communication protocols.
 
 Requirement
+    A data handler connects to its payload's address rather than binding it.
+    The payload is what exists at that address -- a payload configuration says
+    how tcspecial reaches each one -- so the payload listens and the handler
+    reaches out. Tcssim, standing in for payload hardware, is what listens.
+
+Both ends binding the same address is what they did, and an address can be
+bound once, so whichever started second got "address already in use" and no
+data moved through a network handler at all. A device handler was the only one
+that ever worked, because two opens of a device are fine where two binds of a
+socket are not.
+
+A consequence of connecting: a payload must be listening before its handler is
+started. For a TCP payload the connection is refused outright otherwise, so
+the simulated payload is started first and the handler after it.
+
+Requirement
     A data handler binds the UDP address its configuration gives as
     ``oc_address`` and ``oc_port``. That is where the OC sends to, and it is
-    distinct from the address the handler reaches its payload at.
+    distinct from the address the handler reaches its payload at. So a handler
+    binds one of its two addresses and connects the other, and which is which
+    follows from who is expected to find whom.
 
 Requirement
     A data handler sends to the OC at the address the OC last sent from. No
@@ -542,8 +560,12 @@ OC to speak first, even if only once. Configuring the OC's address instead
 would remove that, at the cost of stating in every payload file where the
 ground is.
 
+A handler's payload socket knows where to send from the moment it is
+connected, so a handler can speak to its payload before the payload has said
+anything. Its OC socket does not, and learns as above.
+
 The two conduits of a handler share one socket on each side rather than
-binding one each, because an address can be bound once; the conduit reading a
+opening one each, because a socket cannot be opened twice; the conduit reading a
 socket is what learns where the far end is, and the conduit writing it holds a
 duplicate of the same socket, so it sends where the reader learnt.
 For example:

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tcslibgs::{DHConfig, DHId, DHName, Statistics, TcsError, TcsResult};
 
-use crate::endpoint::{create_endpoint_pair, EndpointReadable, EndpointWritable};
+use crate::endpoint::{connect_endpoint_pair, EndpointReadable, EndpointWritable};
 use crate::conduit::{Conduit, ConduitDirection, DHSamples};
 
 /// Data handler state
@@ -162,7 +162,7 @@ impl DataHandler {
     /// reached from being created at all.
     ///
     /// The payload endpoint is opened here, once, and both conduits share it:
-    /// see [`create_endpoint_pair`].
+    /// see [`connect_endpoint_pair`].
     pub fn start(&mut self, oc_reader: Box<dyn EndpointReadable + Send>, oc_writer: Box<dyn EndpointWritable + Send>) -> TcsResult<()> {
         if self.state != DHState::Created {
             return Err(TcsError::DataHandler("Invalid state for start".to_string()));
@@ -172,9 +172,11 @@ impl DataHandler {
             .cmd_pipes
             .ok_or_else(|| TcsError::DataHandler("No command pipe".to_string()))?;
 
-        // Create payload endpoint. Opened once: a network address cannot be
-        // bound twice, so the two conduits share one socket.
-        let (payload_reader, payload_writer) = create_endpoint_pair(&self.config.endpoint)?;
+        // Reach out to the payload rather than waiting at its address: the
+        // payload is what exists there, and tcssim standing in for one is
+        // what listens. Opened once, because a socket cannot be opened twice
+        // and the two conduits share it.
+        let (payload_reader, payload_writer) = connect_endpoint_pair(&self.config.endpoint)?;
 
         // Create conduits
         let mut g2p_conduit =
@@ -272,6 +274,85 @@ mod tests {
     use super::*;
     use tcslibgs::{DeviceConfig, EndpointConfig, DHName};
 
+    /// A network payload and its handler can both be up at once.
+    ///
+    /// They used to both bind the payload's address, so whichever started
+    /// second got AddrInUse and no data moved through a network handler at
+    /// all. The payload listens now and the handler reaches out to it.
+    ///
+    /// This drives the whole loop, because that is the only way to see that
+    /// both ends are really connected: the ground sends to the handler's OC
+    /// address, the handler passes it to the payload, the payload answers, and
+    /// the answer reaches the ground.
+    #[test]
+    fn a_payload_listening_and_a_handler_connecting_both_come_up() {
+        use std::net::UdpSocket;
+        use std::time::Duration;
+        use tcslibgs::{NetworkConfig, NetworkProtocol};
+
+        // Standing in for tcssim: the payload waits at its own address. Port 0
+        // so this cannot collide with a real one or another test.
+        let payload = UdpSocket::bind("127.0.0.1:0").expect("the payload binds");
+        let payload_addr = payload.local_addr().expect("its address");
+        payload
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let answering = std::thread::spawn(move || {
+            let mut buffer = [0u8; 4096];
+            if let Ok((_, from)) = payload.recv_from(&mut buffer) {
+                let _ = payload.send_to(b"from the payload", from);
+            }
+        });
+
+        let oc = UdpSocket::bind("127.0.0.1:0").expect("a free OC port");
+        let oc_addr = oc.local_addr().expect("its address");
+        drop(oc);
+
+        let config = DHConfig {
+            dh_id: DHId(1),
+            name: DHName::new("Net"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: payload_addr.ip().to_string(),
+                port: payload_addr.port(),
+            }),
+            packet_size: 64,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+        };
+
+        let mut dh = DataHandler::new(config.clone()).unwrap();
+        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            &EndpointConfig::Network(config.oc.clone().unwrap()),
+        )
+        .unwrap();
+        dh.start(oc_reader, oc_writer)
+            .expect("the handler starts with the payload already listening");
+
+        let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
+        ground
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        ground.send_to(b"from the ground", oc_addr).unwrap();
+
+        let mut buffer = [0u8; 4096];
+        let (n, from) = ground
+            .recv_from(&mut buffer)
+            .expect("the payload's answer should reach the ground");
+        assert_eq!(&buffer[..n], b"from the payload");
+        assert_eq!(from, oc_addr, "the answer came from the handler's OC address");
+
+        let stats = dh.statistics();
+        assert_eq!(stats.bytes_received, b"from the ground".len() as u64);
+        assert_eq!(stats.bytes_sent, b"from the payload".len() as u64);
+
+        dh.stop().unwrap();
+        answering.join().unwrap();
+    }
+
     /// A running handler reports what has moved, not nothing.
     ///
     /// The counts used to reach a handler only when its conduits were joined,
@@ -307,7 +388,7 @@ mod tests {
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
         let (oc_reader, oc_writer) =
-            crate::endpoint::create_endpoint_pair(&EndpointConfig::Network(
+            crate::endpoint::bind_endpoint_pair(&EndpointConfig::Network(
                 config.oc.clone().unwrap(),
             ))
             .unwrap();

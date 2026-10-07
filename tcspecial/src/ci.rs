@@ -19,7 +19,7 @@ use tcslibgs::{
 
 use crate::config::constants::{BEACON_NETADDR, RESTART_ARM_TIMEOUT};
 use crate::dh::DataHandler;
-use crate::endpoint::create_endpoint_pair;
+use crate::endpoint::bind_endpoint_pair;
 use crate::telemetry_log::TelemetryLog;
 
 /// Command interpreter state
@@ -77,7 +77,7 @@ fn start_handler(config: &DHConfig) -> TcsResult<DataHandler> {
     })?;
 
     let mut dh = DataHandler::new(config.clone())?;
-    let (oc_reader, oc_writer) = create_endpoint_pair(&EndpointConfig::Network(oc))?;
+    let (oc_reader, oc_writer) = bind_endpoint_pair(&EndpointConfig::Network(oc))?;
     dh.start(oc_reader, oc_writer)?;
     Ok(dh)
 }

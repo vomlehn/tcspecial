@@ -106,8 +106,35 @@ impl DataHandler {
     }
 
     /// Get the statistics
+    ///
+    /// What its conduits have counted, whether they are still running or have
+    /// stopped. `stats` holds what stopped conduits left behind, and a running
+    /// conduit is asked directly, so a handler reports what has moved rather
+    /// than nothing until it is stopped.
+    ///
+    /// Which conduit contributes which half is the handler's own sense, the
+    /// same one its samples use: received is data from the ground, which the
+    /// ground-to-payload conduit reads, and sent is data to the ground, which
+    /// the payload-to-ground conduit writes. The other half of each conduit is
+    /// the payload side of the same bytes and is not counted twice.
     pub fn statistics(&self) -> Statistics {
-        self.stats.clone().with_timestamp()
+        let mut stats = self.stats;
+
+        if let Some(conduit) = &self.ground_to_payload {
+            let live = conduit.statistics();
+            stats.bytes_received += live.bytes_received;
+            stats.reads_completed += live.reads_completed;
+            stats.reads_failed += live.reads_failed;
+        }
+
+        if let Some(conduit) = &self.payload_to_ground {
+            let live = conduit.statistics();
+            stats.bytes_sent += live.bytes_sent;
+            stats.writes_completed += live.writes_completed;
+            stats.writes_failed += live.writes_failed;
+        }
+
+        stats.with_timestamp()
     }
 
     /// What this handler last sent and received.
@@ -244,6 +271,84 @@ impl Drop for DataHandler {
 mod tests {
     use super::*;
     use tcslibgs::{DeviceConfig, EndpointConfig, DHName};
+
+    /// A running handler reports what has moved, not nothing.
+    ///
+    /// The counts used to reach a handler only when its conduits were joined,
+    /// so every one read zero however much had gone through. This drives a
+    /// handler over the loopback and reads the counts while it runs.
+    #[test]
+    fn a_running_handler_reports_what_has_moved() {
+        use std::net::UdpSocket;
+        use std::time::Duration;
+        use tcslibgs::{NetworkConfig, NetworkProtocol};
+
+        // Port 0 for both sides, so this cannot collide with another test or
+        // with a running tcspecial.
+        let probe = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let oc_addr = probe.local_addr().unwrap();
+        drop(probe);
+
+        let config = DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new("Live"),
+            // /dev/urandom is always readable, so the payload-to-ground
+            // conduit has something to move as soon as it starts.
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 64,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+        };
+
+        let mut dh = DataHandler::new(config.clone()).unwrap();
+        let (oc_reader, oc_writer) =
+            crate::endpoint::create_endpoint_pair(&EndpointConfig::Network(
+                config.oc.clone().unwrap(),
+            ))
+            .unwrap();
+        dh.start(oc_reader, oc_writer).unwrap();
+        assert_eq!(dh.state(), DHState::Active);
+
+        // Speak first: until the ground does, the handler has nowhere to send
+        // and every write towards it fails.
+        let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
+        ground
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        ground.send_to(b"hello", oc_addr).unwrap();
+
+        let mut buffer = [0u8; 8192];
+        ground
+            .recv_from(&mut buffer)
+            .expect("the handler should send payload data once spoken to");
+
+        let running = dh.statistics();
+        assert_ne!(
+            running.bytes_sent, 0,
+            "a running handler reported no bytes sent"
+        );
+        assert_eq!(
+            running.bytes_received, 5,
+            "the five bytes the ground sent should be counted"
+        );
+
+        // Stopping folds the conduits' counts into the handler's own, so what
+        // it reports cannot go backwards.
+        dh.stop().unwrap();
+        let stopped = dh.statistics();
+        assert!(
+            stopped.bytes_sent >= running.bytes_sent,
+            "stopping lost counts: {} then {}",
+            running.bytes_sent,
+            stopped.bytes_sent
+        );
+        assert_eq!(stopped.bytes_received, running.bytes_received);
+    }
 
     #[test]
     fn test_dh_creation() {

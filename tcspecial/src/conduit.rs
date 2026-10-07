@@ -52,8 +52,29 @@ pub struct DHSamples {
 pub struct Conduit {
     direction: ConduitDirection,
     running: Arc<AtomicBool>,
-    thread_handle: Option<JoinHandle<TcsResult<Statistics>>>,
+    /// Counted as data moves, and shared so it can be read while it moves.
+    ///
+    /// A conduit's thread used to keep these to itself and hand them back when
+    /// it was joined, which meant a running handler reported nothing: every
+    /// counter read zero until it was stopped, however much had gone through.
+    ///
+    /// Locked rather than tried, unlike the samples beside it: a sample missed
+    /// under contention costs one stale line on a display, where a count
+    /// missed is a count wrong from then on. The lock is held for a few
+    /// additions and by a reader only long enough to copy.
+    stats: Arc<Mutex<Statistics>>,
+    thread_handle: Option<JoinHandle<()>>,
     cmd_pipe_write: RawFd,
+}
+
+/// Add to the counts.
+///
+/// Unlike [`record`], this waits for the lock: a count that went missing would
+/// stay missing, and the hold is a few additions long.
+fn count(stats: &Mutex<Statistics>, f: impl FnOnce(&mut Statistics)) {
+    if let Ok(mut guard) = stats.lock() {
+        f(&mut guard);
+    }
 }
 
 /// Record a sample, unless someone is reading them.
@@ -79,6 +100,7 @@ impl Conduit {
         Self {
             direction,
             running,
+            stats: Arc::new(Mutex::new(Statistics::new())),
             thread_handle: None,
             cmd_pipe_write,
         }
@@ -100,9 +122,9 @@ impl Conduit {
         running.store(true, Ordering::SeqCst);
 
         let direction = self.direction;
+        let stats = self.stats.clone();
 
         let handle = thread::spawn(move || {
-            let mut stats = Statistics::new();
             let mut buffer = vec![0u8; ENDPOINT_BUFFER_SIZE];
 
             while running.load(Ordering::SeqCst) {
@@ -124,8 +146,10 @@ impl Conduit {
                         match reader.read(&mut buffer) {
                             Ok(0) => continue,
                             Ok(n) => {
-                                stats.bytes_received += n as u64;
-                                stats.reads_completed += 1;
+                                count(&stats, |s| {
+                                    s.bytes_received += n as u64;
+                                    s.reads_completed += 1;
+                                });
                                 // Only the ground-facing half of each conduit
                                 // is a sample, so that the two lines a panel
                                 // shows mean what the two byte counters beside
@@ -140,8 +164,10 @@ impl Conduit {
                                 // Write to destination
                                 match writer.write(&buffer[..n]) {
                                     Ok(written) => {
-                                        stats.bytes_sent += written as u64;
-                                        stats.writes_completed += 1;
+                                        count(&stats, |s| {
+                                            s.bytes_sent += written as u64;
+                                            s.writes_completed += 1;
+                                        });
                                         if direction == ConduitDirection::PayloadToGround {
                                             record(&samples, |s| {
                                                 s.sent.record(&buffer[..written])
@@ -149,12 +175,12 @@ impl Conduit {
                                         }
                                     }
                                     Err(_) => {
-                                        stats.writes_failed += 1;
+                                        count(&stats, |s| s.writes_failed += 1);
                                     }
                                 }
                             }
                             Err(_) => {
-                                stats.reads_failed += 1;
+                                count(&stats, |s| s.reads_failed += 1);
                             }
                         }
                     }
@@ -165,11 +191,18 @@ impl Conduit {
                 }
             }
 
-            Ok(stats.with_timestamp())
         });
 
         self.thread_handle = Some(handle);
         Ok(())
+    }
+
+    /// What this conduit has counted so far.
+    ///
+    /// Readable while the conduit runs, which is the point of it: a handler is
+    /// asked for its statistics far more often than it is stopped.
+    pub fn statistics(&self) -> Statistics {
+        self.stats.lock().map(|guard| *guard).unwrap_or_default()
     }
 
     /// Stop the conduit thread
@@ -183,10 +216,14 @@ impl Conduit {
         }
 
         if let Some(handle) = self.thread_handle.take() {
-            handle.join().map_err(|_| TcsError::DataHandler("Thread join failed".to_string()))?
-        } else {
-            Ok(Statistics::new())
+            handle
+                .join()
+                .map_err(|_| TcsError::DataHandler("Thread join failed".to_string()))?;
         }
+
+        // Read after the join, so nothing the thread was in the middle of
+        // counting is left out of what the handler accumulates.
+        Ok(self.statistics())
     }
 
     /// Check if the conduit is running

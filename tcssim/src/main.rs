@@ -226,7 +226,13 @@ fn main() {
     ui.set_columns(shape.columns as i32);
     ui.set_cell_width(grid::PANEL_WIDTH);
     ui.set_cell_height(grid::PANEL_HEIGHT);
-    ui.window().set_size(slint::LogicalSize::new(shape.width, shape.height));
+    // Taller than the grid asks for where there is a third row to look
+    // ahead for, and no taller than the payloads on hand need otherwise. It
+    // is also why the window can open taller than it is wide, which the shape
+    // itself never is: the shape rule chooses the grid, and the room rule
+    // says how much of the window to give it.
+    ui.window()
+        .set_size(grid::window_size(&shape, configs.len()));
 
     // Create simulated payloads
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(
@@ -334,6 +340,143 @@ mod tests {
 
     fn repo_file(name: &str) -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
+    }
+
+    /// Every panel, and each of the three rows of data it ends with, is
+    /// inside the window tcssim opens for each shipped set.
+    ///
+    /// Where `CHROME_HEIGHT` and `CHROME_WIDTH` come from. The window is
+    /// opened here as main() opens it, through Slint's testing backend: no
+    /// display and no event loop, but a real layout with real font metrics,
+    /// so what this measures is what the window does. A panel scrolled out of
+    /// sight is not merely off-screen, it is never built, so the count of
+    /// panels found is part of the check.
+    #[test]
+    fn every_panels_data_is_inside_the_window() {
+        use i_slint_backend_testing as testing;
+        use testing::ElementHandle;
+
+        testing::init_integration_test_with_system_time();
+
+        // Every shipped set, and then more payloads than the three-row floor
+        // covers. Both are needed: the floor leaves the shipped sets rows to
+        // spare, so only a grid taller than the floor can show whether the
+        // panel and chrome sizes are right.
+        let mut cases: Vec<(String, Vec<PayloadInfo>)> = Vec::new();
+        for (payload_path, sim_path) in shipped_sets() {
+            let dh_configs = load_dh_configs(&payload_path)
+                .unwrap_or_else(|e| panic!("{} failed to load: {e}", payload_path.display()));
+            let sim_file = SimConfigFile::load(&sim_path)
+                .unwrap_or_else(|e| panic!("{} failed to load: {e}", sim_path.display()));
+            let sims = sim_file
+                .resolve(&dh_configs)
+                .unwrap_or_else(|e| panic!("{} does not fit: {e}", sim_path.display()));
+
+            cases.push((
+                format!("{}", payload_path.display()),
+                dh_configs
+                    .iter()
+                    .zip(&sims)
+                    .map(|(dh, sim)| payload_info_from(dh, sim))
+                    .collect(),
+            ));
+        }
+        let one = cases[0].1[0].clone();
+        cases.push((
+            "sixteen payloads".to_string(),
+            std::iter::repeat_with(|| one.clone()).take(16).collect(),
+        ));
+
+        for (set, rows) in cases {
+            let panels = rows.len();
+
+            let ui = MainWindow::new().unwrap();
+            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(rows))));
+
+            // Opened as main() opens it, floor and all.
+            let shape = grid::grid_shape(panels);
+            ui.set_columns(shape.columns as i32);
+            ui.set_cell_width(grid::PANEL_WIDTH);
+            ui.set_cell_height(grid::PANEL_HEIGHT);
+            ui.window().set_size(grid::window_size(&shape, panels));
+            ui.show().unwrap();
+
+            let window = ui.window().size().to_logical(1.0);
+
+            // The grid fits the area it is given, across and down: it stood
+            // wider and taller than that area while the padding it keeps
+            // inside the scrolling area was left out of the window size.
+            let area = ElementHandle::find_by_element_id(&ui, "MainWindow::scroll")
+                .next()
+                .expect("the window has a scrolling area for the panels");
+            let grid = ElementHandle::find_by_element_id(&ui, "MainWindow::grid")
+                .next()
+                .expect("the window has a grid of panels");
+            assert!(
+                grid.size().width <= area.size().width
+                    && grid.size().height <= area.size().height,
+                "{set}: the grid is {}x{} in an area {}x{}",
+                grid.size().width,
+                grid.size().height,
+                area.size().width,
+                area.size().height
+            );
+
+            // Room for as many rows as the rule says, and no more than
+            // that: a set of fewer payloads than the window looks ahead for
+            // opens only as tall as those payloads need.
+            let rows = grid::rows_of_room(shape.rows, panels);
+            let wanted = grid::height_for_rows(rows) - grid::CHROME_HEIGHT;
+            assert!(
+                area.size().height >= wanted,
+                "{set}: the panels have {} of the {wanted} that {rows} rows need",
+                area.size().height
+            );
+            assert!(
+                area.size().height < wanted + grid::PANEL_HEIGHT,
+                "{set}: the panels have {}, room for a row more than the {rows} wanted",
+                area.size().height
+            );
+
+            for what in [
+                "PayloadPanel",
+                "PayloadPanel::sent-row",
+                "PayloadPanel::recv-row",
+                "PayloadPanel::packets-row",
+            ] {
+                let found: Vec<_> = if what.contains("::") {
+                    ElementHandle::find_by_element_id(&ui, what).collect()
+                } else {
+                    ElementHandle::find_by_element_type_name(&ui, what).collect()
+                };
+
+                assert_eq!(
+                    found.len(),
+                    panels,
+                    "{set}: {} of {panels} {what} were built, so the rest are \
+                     out of sight",
+                    found.len()
+                );
+
+                // Against the edges of the area the panels live in, which
+                // is where they are cut off, rather than the edges of the
+                // window: below the area is the row with Quit All in it.
+                let area_bottom = area.absolute_position().y + area.size().height;
+                let area_right = area.absolute_position().x + area.size().width;
+                for (n, element) in found.iter().enumerate() {
+                    let bottom = element.absolute_position().y + element.size().height;
+                    let right = element.absolute_position().x + element.size().width;
+                    assert!(
+                        bottom <= area_bottom && right <= area_right,
+                        "{set}: {what} {n} reaches ({right},{bottom}), past the \
+                         ({area_right},{area_bottom}) the panels have in a \
+                         window {}x{}",
+                        window.width,
+                        window.height
+                    );
+                }
+            }
+        }
     }
 
     /// Every shipped payload set: a payload file and the simulator file beside

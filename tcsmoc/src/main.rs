@@ -101,27 +101,77 @@ const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 /// agree with `ui/main.slint`, which sizes the grid with the same panel
 /// height.
 const PANEL_WIDTH: f32 = 320.0;
-const PANEL_HEIGHT: f32 = 210.0;
-/// Sixty-two of these are the box around the tcspecial link, which stacks
-/// the line naming it, the address, and the buttons and status, inside a
-/// border with padding of its own. See `MIN_WINDOW_WIDTH`, which carries
-/// them.
-const CHROME_HEIGHT: f32 = 272.0;
+/// What a panel's contents come to: the sum of the floors its rows declare,
+/// measured through Slint's testing backend rather than guessed, by
+/// `every_panels_data_is_inside_the_window`. This was 210 against the 259 the
+/// panel took when its two readings each sat in a group box of their own, so
+/// the window opened too small for every row and the three rows of data at
+/// the bottom of each panel went over the edge. Those readings are labelled
+/// lines now, which is most of the difference.
+const PANEL_HEIGHT: f32 = 162.0;
+/// Everything above and below the grid: both group box headings, the command
+/// interpreter's own controls, the row holding Quit, and the padding around
+/// them all, and the grid's own padding inside the scrolling area. Measured
+/// the same way, and the estimate it replaces was 272 against the 346 it
+/// really takes.
+const CHROME_HEIGHT: f32 = 346.0;
+
+/// The gap between one panel and the next, matching `spacing` on the grid in
+/// the window. The window has to open tall enough for the gaps as well as the
+/// panels.
+const GRID_SPACING: f32 = 10.0;
+
+/// How many rows of panels the window looks ahead for.
+///
+/// Asked for rather than worked out: a window with room for only the rows a
+/// particular payload file happens to have is one that has to be resized
+/// before a larger file can be watched, and three rows is the room that was
+/// wanted. It is not a floor, though -- see `rows_of_room`.
+const MIN_PANEL_ROWS: usize = 3;
+
+/// How many rows of panels the window opens with room for.
+///
+/// Never fewer than the grid has, so that nothing is cut off; never more than
+/// [`MIN_PANEL_ROWS`], which is as far ahead as the window looks; and never
+/// more rows than there are panels to put in them, so a file of one or two
+/// handlers opens only as tall as those need rather than keeping room it
+/// could not fill.
+fn rows_of_room(rows: usize, panels: usize) -> usize {
+    rows.max(MIN_PANEL_ROWS.min(panels.max(1)))
+}
+
+/// How tall a window with room for `rows` rows of panels is.
+///
+/// One row of them is the window's `min-height`, the least it is ever opened
+/// at; `rows_of_room` says how many rows a particular payload file opens
+/// with.
+fn height_for_rows(rows: usize) -> f32 {
+    let rows = rows.max(1);
+    rows as f32 * PANEL_HEIGHT + (rows - 1) as f32 * GRID_SPACING + CHROME_HEIGHT
+}
+
+/// The size the window opens at for a grid of `shape` holding `panels`.
+fn window_size(shape: &GridShape, panels: usize) -> LogicalSize {
+    LogicalSize::new(
+        shape.width,
+        height_for_rows(rows_of_room(shape.rows, panels)),
+    )
+}
 
 /// The narrowest the window may open, matching `min-width` in the window
 /// itself.
 ///
 /// What this is for has changed. The command interpreter's controls used to
-/// be a row that stopped fitting below 640; stacked in their box they now
-/// want far less than that, and what the floor holds up instead is the shape
-/// of the grid, which cannot be separated from it: four handlers in two
-/// columns stand 692 tall, and a window that may be narrower than that is
-/// taller than wide, which puts the shape out of the running altogether --
+/// be a row that stopped fitting below 640; stacked in their box they want
+/// far less than that, and what the floor holds up instead is the shape of
+/// the grid, which cannot be separated from it: four handlers in two columns
+/// stand 680 tall, and a window that may be narrower than that is taller
+/// than wide, which puts the shape out of the running altogether --
 /// `grid_shape` does not consider such shapes at all, so four panels would
 /// open in a 3x2 grid with two cells empty and two panels would go side by
-/// side instead of stacked. At 700 every panel count keeps the shape it had.
-/// Anything that makes the chrome taller again has to be weighed the same
-/// way, against
+/// side instead of stacked. At 700 every panel count keeps the shape it has
+/// always had. Anything that changes the panel or chrome heights has to be
+/// weighed the same way, against
 /// `the_shipped_payload_config_opens_a_nearly_square_window`.
 const MIN_WINDOW_WIDTH: f32 = 700.0;
 
@@ -158,12 +208,13 @@ fn grid_shape(panels: usize) -> GridShape {
             columns,
             rows,
             width: (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH),
-            height: rows as f32 * PANEL_HEIGHT + CHROME_HEIGHT,
+            height: height_for_rows(rows),
         }
     };
 
     // One column per panel is always at least square -- a single row is only
-    // CHROME_HEIGHT + PANEL_HEIGHT tall and at least MIN_WINDOW_WIDTH wide --
+    // CHROME_HEIGHT + PANEL_HEIGHT tall, with no gap between rows to allow
+    // for, and at least MIN_WINDOW_WIDTH wide --
     // so there is always a candidate, and the fallback is unreachable unless
     // those constants change.
     (1..=panels)
@@ -492,8 +543,12 @@ fn main() {
         shape.height
     );
     ui.set_columns(i32::try_from(shape.columns).unwrap_or(1));
-    ui.window()
-        .set_size(LogicalSize::new(shape.width, shape.height));
+    // Taller than the grid asks for where there is a third row to look ahead
+    // for, and no taller than the panels on hand need otherwise. It is also
+    // why the window can open taller than it is wide, which the shape itself
+    // never is: the shape rule chooses the grid, and the room rule says how
+    // much of the window to give it.
+    ui.window().set_size(window_size(&shape, dh_configs.len()));
 
     // Start tcspecial and tcssim subprocesses first, each reading the payload
     // file tcsmoc read, so all three describe the same payloads.
@@ -1164,6 +1219,167 @@ mod tests {
         );
     }
 
+    /// The room the window opens with, which is a rule rather than a floor.
+    ///
+    /// Three rows are looked ahead for, so a file that grows a row can be
+    /// watched without resizing the window; but a file with fewer panels than
+    /// that opens only as tall as the panels it has, rather than with room
+    /// below that nothing could fill. A grid taller than three rows is given
+    /// all of them.
+    #[test]
+    fn the_window_keeps_room_for_the_rows_there_are_to_fill() {
+        // One and two handlers: as tall as they need and no taller.
+        assert_eq!(rows_of_room(1, 1), 1);
+        assert_eq!(rows_of_room(2, 2), 2);
+
+        // Three or more: three rows of room, whatever the grid came to.
+        assert_eq!(rows_of_room(1, 3), 3);
+        assert_eq!(rows_of_room(2, 4), 3);
+        assert_eq!(rows_of_room(3, 9), 3);
+
+        // And never fewer rows than the grid actually has.
+        assert_eq!(rows_of_room(4, 16), 4);
+        assert_eq!(rows_of_room(8, 64), 8);
+
+        // An empty payload file still opens a window.
+        assert_eq!(rows_of_room(1, 0), 1);
+    }
+
+    /// Every panel, and each of the three rows of data it ends with, is
+    /// inside the window the MOC opens for the shipped configuration.
+    ///
+    /// This is the test for the panels running off the bottom of the window,
+    /// and it is also where `PANEL_HEIGHT` and `CHROME_HEIGHT` come from.
+    /// They used to be estimates, and were 49 and 74 pixels short: each panel
+    /// was given 210 of the 260 its contents take, the window was opened for
+    /// a chrome of 272 that really wants 346, and what fell off the bottom
+    /// was the last rows of the lowest panels -- the two sample lines and the
+    /// byte counters, which is to say the data.
+    ///
+    /// The window is opened here as main() opens it, through Slint's testing
+    /// backend: no display and no event loop, but a real layout with real
+    /// font metrics, so what this measures is what the window does. A panel
+    /// that is scrolled out of sight is not merely off-screen, it is never
+    /// built, so the count of panels found is itself part of the check.
+    #[test]
+    fn every_panels_data_is_inside_the_window() {
+        use i_slint_backend_testing as testing;
+        use testing::ElementHandle;
+
+        testing::init_integration_test_with_system_time();
+
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(DEFAULT_PAYLOAD_CONFIG_PATH);
+        let dh_configs = load_dh_configs(&path)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
+        let shipped: Vec<DHInfo> = dh_configs.iter().map(dh_info_from).collect();
+
+        // More handlers than the three-row floor covers, as well as the
+        // shipped file. Both are needed: the floor leaves the shipped four
+        // rows to spare, so only a grid taller than the floor can show
+        // whether the panel and chrome heights are right.
+        let crowded: Vec<DHInfo> = std::iter::repeat_with(|| shipped[0].clone())
+            .take(16)
+            .collect();
+
+        for (what, rows) in [
+            (format!("{}", path.display()), shipped),
+            ("sixteen handlers".to_string(), crowded),
+        ] {
+            let panels = rows.len();
+
+            let ui = MainWindow::new().unwrap();
+            ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(rows))));
+
+            // Opened as main() opens it, room rule and all.
+            let shape = grid_shape(panels);
+            ui.set_columns(i32::try_from(shape.columns).unwrap());
+            ui.window().set_size(window_size(&shape, panels));
+            ui.show().unwrap();
+
+            let window_height = ui.window().size().to_logical(1.0).height;
+
+            // The grid sits at the top of the area it is given and fits
+            // inside it. Both halves matter: a grid shorter than its area is
+            // centred in it, which is where the gap under the Data Handlers
+            // heading came from, and a grid taller than its area is one whose
+            // lowest panels are below the window.
+            let area = ElementHandle::find_by_element_id(&ui, "MainWindow::scroll")
+                .next()
+                .expect("the window has a scrolling area for the panels");
+            let grid = ElementHandle::find_by_element_id(&ui, "MainWindow::grid")
+                .next()
+                .expect("the window has a grid of panels");
+            assert_eq!(
+                grid.absolute_position().y,
+                area.absolute_position().y,
+                "{what}: the grid does not start at the top of its area"
+            );
+            assert!(
+                grid.size().height <= area.size().height,
+                "{what}: the grid is {} tall in an area {} tall",
+                grid.size().height,
+                area.size().height
+            );
+
+            // Room for as many rows as the rule says, and no more than
+            // that: a configuration of fewer panels than the window looks
+            // ahead for opens only as tall as those panels need.
+            let rows = rows_of_room(shape.rows, panels);
+            let wanted = height_for_rows(rows) - CHROME_HEIGHT;
+            assert!(
+                area.size().height >= wanted,
+                "{what}: the panels have {} of the {wanted} that {rows} rows \
+                 need",
+                area.size().height
+            );
+            assert!(
+                area.size().height < wanted + PANEL_HEIGHT,
+                "{what}: the panels have {}, room for a row more than the \
+                 {rows} wanted",
+                area.size().height
+            );
+
+            // Every panel, and then the three rows of data each one ends
+            // with.
+            for found_what in [
+                "DHPanel",
+                "DHPanel::last-sent-row",
+                "DHPanel::last-recv-row",
+                "DHPanel::counters-row",
+            ] {
+                let found: Vec<_> = if found_what.contains("::") {
+                    ElementHandle::find_by_element_id(&ui, found_what).collect()
+                } else {
+                    ElementHandle::find_by_element_type_name(&ui, found_what).collect()
+                };
+
+                assert_eq!(
+                    found.len(),
+                    panels,
+                    "{what}: {} of {panels} {found_what} were built, so the \
+                     rest are out of sight",
+                    found.len()
+                );
+
+                // Against the bottom of the area the panels live in,
+                // which is where they are cut off, rather than the bottom of
+                // the window: below the area is the row with Quit in it.
+                let area_bottom = area.absolute_position().y + area.size().height;
+                for (n, element) in found.iter().enumerate() {
+                    let bottom = element.absolute_position().y + element.size().height;
+                    assert!(
+                        bottom <= area_bottom && bottom <= window_height,
+                        "{what}: {found_what} {n} ends {bottom} down, past the \
+                         {area_bottom} the panels have in a window \
+                         {window_height} tall"
+                    );
+                }
+            }
+        }
+    }
+
     /// The sizes in the window and the ones Rust works them out from.
     ///
     /// Three numbers in `ui/main.slint` are the same numbers as here: the two
@@ -1179,9 +1395,10 @@ mod tests {
 
         for (what, expected) in [
             ("min-width", MIN_WINDOW_WIDTH),
-            // The smallest window is the one-row window.
-            ("min-height", CHROME_HEIGHT + PANEL_HEIGHT),
+            // The least the window is ever opened at: one row of panels.
+            ("min-height", height_for_rows(1)),
             ("panel-height", PANEL_HEIGHT),
+            ("grid-spacing", GRID_SPACING),
         ] {
             let said = format!("{}: {}px;", what, expected);
             assert!(
@@ -1634,7 +1851,7 @@ mod tests {
             for columns in 1..=panels {
                 let rows = panels.div_ceil(columns);
                 let width = (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH);
-                let height = rows as f32 * PANEL_HEIGHT + CHROME_HEIGHT;
+                let height = height_for_rows(rows);
 
                 // A taller-than-wide shape is not a candidate, however square.
                 if width < height {

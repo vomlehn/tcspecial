@@ -15,5 +15,11 @@ libc = "0.2"
 #env_logger = "0.10"
 rand = "0.8"
 
+[dev-dependencies]
+# Lays the window out headlessly, so a test can measure it. Slint's own
+# testing backend; it uses real font metrics unless a component asks for the
+# fixed test font, which none of these do.
+i-slint-backend-testing = "1.18"
+
 [build-dependencies]
 slint-build = "1.3"

@@ -106,6 +106,84 @@ impl Statistics {
     }
 }
 
+/// Bytes of one transfer kept for display.
+///
+/// A data handler's panel shows what it last sent and last received. Keeping
+/// the whole of a packet to show eight bytes of it would cost a buffer per
+/// direction per handler, so only the head is kept, and only this much of it.
+pub const DH_SAMPLE_BYTES: usize = 8;
+
+/// The time and the first few bytes of one transfer.
+///
+/// Fixed size and `Copy`, so that recording one costs no allocation on the
+/// path that moves payload data, and so that telemetry carrying one has a
+/// layout that does not depend on what the payload sent.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DHSample {
+    /// When the transfer happened, or `None` if none has.
+    ///
+    /// This is the time the data moved, not the time it was asked about: a
+    /// panel showing the latter would count every query as activity.
+    pub time: Option<Timestamp>,
+    /// How many of `bytes` are data.
+    pub len: u8,
+    /// Bytes in the whole transfer, of which `bytes` holds the head.
+    ///
+    /// Kept so that a display can say a packet was longer than what is shown.
+    /// Without it, a transfer of exactly [`DH_SAMPLE_BYTES`] and one of a
+    /// thousand look identical.
+    pub total: u32,
+    /// The first [`DH_SAMPLE_BYTES`] bytes of the transfer, or fewer.
+    pub bytes: [u8; DH_SAMPLE_BYTES],
+}
+
+impl Default for DHSample {
+    fn default() -> Self {
+        Self {
+            time: None,
+            len: 0,
+            total: 0,
+            bytes: [0; DH_SAMPLE_BYTES],
+        }
+    }
+}
+
+impl DHSample {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a transfer that has just happened.
+    ///
+    /// Longer data is truncated to what fits; the panel shows a head and says
+    /// so, and the rest is of no use to it.
+    pub fn record(&mut self, data: &[u8]) {
+        let len = data.len().min(DH_SAMPLE_BYTES);
+        // Cleared rather than overwritten in place, or a short transfer after
+        // a long one would leave the tail of the long one behind it.
+        self.bytes = [0; DH_SAMPLE_BYTES];
+        self.bytes[..len].copy_from_slice(&data[..len]);
+        self.len = len as u8;
+        self.total = u32::try_from(data.len()).unwrap_or(u32::MAX);
+        self.time = Some(Timestamp::now());
+    }
+
+    /// The bytes recorded, which is at most [`DH_SAMPLE_BYTES`] of them.
+    pub fn data(&self) -> &[u8] {
+        &self.bytes[..usize::from(self.len).min(DH_SAMPLE_BYTES)]
+    }
+
+    /// Whether any transfer has been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.time.is_none()
+    }
+
+    /// Whether the transfer was longer than the bytes kept from it.
+    pub fn was_truncated(&self) -> bool {
+        self.total as usize > self.data().len()
+    }
+}
+
 /// Network protocol type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NetworkProtocol {
@@ -459,6 +537,59 @@ mod tests {
     /// same deserialization a file on disk does.
     fn payload(text: &str) -> PayloadConfig {
         crate::ConfigFormat::Yaml.parse(text).expect("parses")
+    }
+
+    #[test]
+    fn a_sample_records_the_head_of_a_transfer() {
+        let mut sample = DHSample::new();
+        assert!(sample.is_empty(), "nothing has moved yet");
+        assert_eq!(sample.data(), &[] as &[u8]);
+
+        sample.record(&[1, 2, 3]);
+        assert!(!sample.is_empty());
+        assert_eq!(sample.data(), &[1, 2, 3]);
+        assert_eq!(sample.total, 3);
+        assert!(!sample.was_truncated());
+        assert!(sample.time.is_some(), "a recorded transfer has a time");
+    }
+
+    #[test]
+    fn a_sample_keeps_only_what_fits() {
+        // A packet may be any size; a sample is one fixed-size value, so the
+        // head is kept and the rest dropped.
+        let long: Vec<u8> = (0..64).collect();
+        let mut sample = DHSample::new();
+        sample.record(&long);
+
+        assert_eq!(sample.data().len(), DH_SAMPLE_BYTES);
+        assert_eq!(sample.data(), &long[..DH_SAMPLE_BYTES]);
+        // The whole length survives, so a display can say there was more.
+        assert_eq!(sample.total, 64);
+        assert!(sample.was_truncated());
+    }
+
+    #[test]
+    fn recording_again_replaces_the_previous_sample() {
+        // Including the bytes the shorter transfer does not reach, or a long
+        // transfer followed by a short one would show the tail of the first.
+        let mut sample = DHSample::new();
+        sample.record(&[9; DH_SAMPLE_BYTES]);
+        sample.record(&[1, 2]);
+
+        assert_eq!(sample.data(), &[1, 2]);
+        assert_eq!(sample.bytes[2..], [0; DH_SAMPLE_BYTES - 2]);
+        assert_eq!(sample.total, 2);
+        assert!(!sample.was_truncated());
+    }
+
+    #[test]
+    fn a_zero_length_transfer_is_still_a_transfer() {
+        // It has a time, so a panel shows when rather than the placeholder.
+        let mut sample = DHSample::new();
+        sample.record(&[]);
+
+        assert!(!sample.is_empty());
+        assert_eq!(sample.data(), &[] as &[u8]);
     }
 
     #[test]

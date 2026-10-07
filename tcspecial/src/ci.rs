@@ -12,7 +12,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tcslibgs::{
     ArmKey, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
-    DHConfig, DHId, PingTelemetry, QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
+    DHConfig, DHId, DHSample, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
+    RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
@@ -166,6 +167,34 @@ impl CommandInterpreter {
                     }
                 };
                 Telemetry::QueryDH(QueryDHTelemetry::new(cmd.header.sequence, status, cmd.dh_id, stats))
+            }
+            Command::QueryDHSample(cmd) => {
+                let (status, samples) = {
+                    let handlers = match self.data_handlers.lock() {
+                        Ok(h) => h,
+                        Err(_) => {
+                            return Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
+                                cmd.header.sequence,
+                                CommandStatus::Failure,
+                                cmd.dh_id,
+                                DHSample::new(),
+                                DHSample::new(),
+                            ))
+                        }
+                    };
+
+                    match handlers.get(&cmd.dh_id) {
+                        Some(dh) => (CommandStatus::Success, dh.samples()),
+                        None => (CommandStatus::NotFound, Default::default()),
+                    }
+                };
+                Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
+                    cmd.header.sequence,
+                    status,
+                    cmd.dh_id,
+                    samples.sent,
+                    samples.received,
+                ))
             }
             Command::Config(cmd) => {
                 self.beacon_interval = cmd.beacon_interval;

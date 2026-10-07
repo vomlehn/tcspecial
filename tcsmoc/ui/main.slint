@@ -13,7 +13,12 @@ export struct DHInfo {
     packet-size: int,
     // From tcspecial, by way of the command interpreter
     status: string,
+    // Each of the two lines carries a time and the data, which the panel
+    // shows side by side; the time is when the data moved, not when it was
+    // asked about.
+    last-sent-time: string,
     last-sent: string,
+    last-recv-time: string,
     last-recv: string,
     bytes-sent: int,
     bytes-recv: int,
@@ -296,7 +301,9 @@ export component MainWindow inherits Window {
                         dh-config: dh.config;
                         dh-status: dh.status;
                         packet-size: dh.packet-size;
+                        last-sent-time: dh.last-sent-time;
                         last-sent-data: dh.last-sent;
+                        last-recv-time: dh.last-recv-time;
                         last-recv-data: dh.last-recv;
                         bytes-sent: dh.bytes-sent;
                         bytes-recv: dh.bytes-recv;

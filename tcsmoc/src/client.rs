@@ -3,9 +3,9 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    ArmKey, BeaconTime, Command, CommandStatus, ConfigCommand, DHId, DHName, DHType,
-    PingCommand, QueryDHCommand, RestartArmCommand, RestartCommand, StartDHCommand,
-    Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
+    ArmKey, BeaconTime, Command, CommandStatus, ConfigCommand, DHId, DHName, DHSample, DHType,
+    PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
+    StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
 };
 
 use tcslib::Connection;
@@ -115,6 +115,23 @@ eprintln!("sending ping command");
 
         match response {
             Telemetry::QueryDH(tm) => Ok((tm.header.status, tm.statistics)),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+        }
+    }
+
+    /// Send a QUERY_DH_SAMPLE command
+    ///
+    /// Returns what the handler last sent and last received, in that order.
+    pub fn query_dh_sample(
+        &mut self,
+        dh_id: DHId,
+    ) -> TcsResult<(CommandStatus, DHSample, DHSample)> {
+        let seq = self.next_sequence();
+        let cmd = Command::QueryDHSample(QueryDHSampleCommand::new(seq, dh_id));
+        let response = self.send_command(cmd)?;
+
+        match response {
+            Telemetry::QueryDHSample(tm) => Ok((tm.header.status, tm.sent, tm.received)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }

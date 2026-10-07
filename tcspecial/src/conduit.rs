@@ -4,9 +4,9 @@
 
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use tcslibgs::{Statistics, TcsError, TcsResult};
+use tcslibgs::{DHSample, Statistics, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{EndpointReadable, EndpointWritable, WaitResult};
@@ -29,12 +29,36 @@ pub enum ConduitCommand {
     GetStats,
 }
 
+/// What a data handler last moved, in each direction.
+///
+/// Shared between the conduit threads that write it and the command
+/// interpreter that reads it, because a conduit's statistics reach the handler
+/// only when the conduit stops, and a panel asks while data is still flowing.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DHSamples {
+    /// The last data written towards its destination.
+    pub sent: DHSample,
+    /// The last data read from its source.
+    pub received: DHSample,
+}
+
 /// Conduit thread state
 pub struct Conduit {
     direction: ConduitDirection,
     running: Arc<AtomicBool>,
     thread_handle: Option<JoinHandle<TcsResult<Statistics>>>,
     cmd_pipe_write: RawFd,
+}
+
+/// Record a sample, unless someone is reading them.
+///
+/// Deliberately best effort: the samples exist for a display, and payload data
+/// must not wait on a panel that happens to be asking. A lost sample costs one
+/// stale line on a screen, where a blocked conduit costs data.
+fn record(samples: &Mutex<DHSamples>, f: impl FnOnce(&mut DHSamples)) {
+    if let Ok(mut guard) = samples.try_lock() {
+        f(&mut guard);
+    }
 }
 
 impl Conduit {
@@ -57,7 +81,13 @@ impl Conduit {
     }
 
     /// Start the conduit thread
-    pub fn start(&mut self, mut reader: Box<dyn EndpointReadable + Send>, mut writer: Box<dyn EndpointWritable + Send>, cmd_fd: RawFd) -> TcsResult<()> {
+    pub fn start(
+        &mut self,
+        mut reader: Box<dyn EndpointReadable + Send>,
+        mut writer: Box<dyn EndpointWritable + Send>,
+        cmd_fd: RawFd,
+        samples: Arc<Mutex<DHSamples>>,
+    ) -> TcsResult<()> {
         if self.running.load(Ordering::SeqCst) {
             return Err(TcsError::DataHandler("Conduit already running".to_string()));
         }
@@ -90,12 +120,16 @@ impl Conduit {
                             Ok(n) => {
                                 stats.bytes_received += n as u64;
                                 stats.reads_completed += 1;
+                                record(&samples, |s| s.received.record(&buffer[..n]));
 
                                 // Write to destination
                                 match writer.write(&buffer[..n]) {
                                     Ok(written) => {
                                         stats.bytes_sent += written as u64;
                                         stats.writes_completed += 1;
+                                        record(&samples, |s| {
+                                            s.sent.record(&buffer[..written])
+                                        });
                                     }
                                     Err(_) => {
                                         stats.writes_failed += 1;

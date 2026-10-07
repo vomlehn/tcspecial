@@ -302,6 +302,55 @@ Return statistics from the indicated data handler:
 |                | Statistics                                                  |
 +----------------+------------+-----------+------------------------------------+
 
+QUERY_DH_SAMPLE
+^^^^^^^^^^^^^^^
+Return what the indicated data handler last sent and last received. Each is
+the time the data moved and the first few bytes of it.
+
+This is a separate command rather than more of QUERY_DH so that the statistics
+every poll asks for stay the size they are. A sample is wanted only while
+someone is looking at a data handler's panel, and carrying payload bytes in
+routine telemetry would spend downlink on data nobody reads.
+
+Requirement
+    A sample carries the time the data moved, not the time it was asked about.
+    A panel showing the latter would read as activity whenever it was looked
+    at.
+
+Requirement
+    A sample carries at most ``DH_SAMPLE_BYTES`` bytes, and the length of the
+    whole transfer. Keeping the length is what lets a display say a packet was
+    longer than what it shows; without it a transfer of exactly that many
+    bytes and one of a thousand look alike.
+
+Requirement
+    A direction that has carried nothing has no time. It is distinct from one
+    that carried a transfer of no bytes, which has a time and no data.
+
+Recording a sample is best effort: the conduit moving payload data does not
+wait for a reader of the samples to finish. A lost sample costs one stale line
+on a display, where a blocked conduit costs data.
+
++----------------+-------------------------------------------------------------+
+| Name           | Parameters                                                  |
++================+============+===========+====================================+
+| QUERY_DH_      | Name       | Type      | Description                        |
+| SAMPLE_CM      +------------+-----------+------------------------------------+
+|                | dh_id      | DHId      | Data handler to ask about          |
++----------------+------------+-----------+------------------------------------+
+| QUERY_DH_      | Parameters                                                  |
+| SAMPLE_TM      +------------+-----------+------------------------------------+
+|                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | dh_id      | DHId      | Data handler this answers for      |
+|                +------------+-----------+------------------------------------+
+|                | sent       | DHSample  | Time and head of the last data     |
+|                |            |           | written towards its destination    |
+|                +------------+-----------+------------------------------------+
+|                | received   | DHSample  | Time and head of the last data     |
+|                |            |           | read from its source               |
++----------------+------------+-----------+------------------------------------+
+
 Configure
 ^^^^^^^^^
 Configure various TCSpecial values
@@ -2063,7 +2112,14 @@ displays the DH name, configuration information, and packet size. It shows no
 packet interval: that is a simulator setting, stated in payload1sim.yaml and
 shown by tcssim.
 Below that it displays the time and the data most recently sent. Underneath
-that is the time and data most recently received.
+that is the time and data most recently received. Both come from
+`QUERY_DH_SAMPLE`_ telemetry, which tcsmoc asks for alongside the statistics;
+the times are when the data moved rather than when it was asked about, and
+data longer than a sample is shown as a head followed by an ellipsis.
+
+A handler whose conduits have carried nothing in a direction shows
+``--:--:--`` and no data for it, which is also what a panel shows before it
+has been queried at all.
 
 Testing requires starting up tcssim before other operations and shutting it down
 when tcsmoc is halted.

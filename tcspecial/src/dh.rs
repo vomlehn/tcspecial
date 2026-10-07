@@ -4,11 +4,11 @@
 
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tcslibgs::{DHConfig, DHId, DHName, Statistics, TcsError, TcsResult};
 
 use crate::endpoint::{create_reader_endpoint, create_writer_endpoint, EndpointReadable, EndpointWritable};
-use crate::conduit::{Conduit, ConduitDirection};
+use crate::conduit::{Conduit, ConduitDirection, DHSamples};
 
 /// Data handler state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +30,9 @@ pub struct DataHandler {
     ground_to_payload: Option<Conduit>,
     payload_to_ground: Option<Conduit>,
     stats: Statistics,
+    /// What this handler last sent and received, written by its conduits as
+    /// data moves and read by the command interpreter when asked.
+    samples: Arc<Mutex<DHSamples>>,
     running: Arc<AtomicBool>,
     cmd_pipe: Option<(RawFd, RawFd)>,
 }
@@ -53,6 +56,7 @@ impl DataHandler {
             ground_to_payload: None,
             payload_to_ground: None,
             stats: Statistics::new(),
+            samples: Arc::new(Mutex::new(DHSamples::default())),
             running: Arc::new(AtomicBool::new(false)),
             cmd_pipe: Some((pipe_fds[0], pipe_fds[1])),
         })
@@ -76,6 +80,24 @@ impl DataHandler {
     /// Get the statistics
     pub fn statistics(&self) -> Statistics {
         self.stats.clone().with_timestamp()
+    }
+
+    /// What this handler last sent and received.
+    ///
+    /// Both are empty until its conduits run: they are what records a sample,
+    /// and `start` does not yet start them. A poisoned lock gives empty
+    /// samples rather than an error, because a display is not worth failing a
+    /// command over.
+    pub fn samples(&self) -> DHSamples {
+        self.samples
+            .lock()
+            .map(|guard| *guard)
+            .unwrap_or_default()
+    }
+
+    /// The samples themselves, for a conduit to record into.
+    pub fn samples_handle(&self) -> Arc<Mutex<DHSamples>> {
+        self.samples.clone()
     }
 
     /// Start the data handler
@@ -107,7 +129,10 @@ impl DataHandler {
             cmd_write,
         );
 
-        // Note: In a full implementation, we would start the conduits here
+        // Note: In a full implementation, we would start the conduits here,
+        // passing each samples_handle() so that what the handler last sent and
+        // received is recorded as it moves. Until then no data flows through a
+        // conduit and every sample stays empty.
         // For now, we just update state
         self.state = DHState::Active;
         self.running.store(true, Ordering::SeqCst);

@@ -23,6 +23,7 @@ pub enum CommandType {
     StartDH,
     StopDH,
     QueryDH,
+    QueryDHSample,
     Config,
     ConfigDH,
 }
@@ -36,6 +37,7 @@ impl CommandType {
             CommandType::StartDH => 0x10,
             CommandType::StopDH => 0x11,
             CommandType::QueryDH => 0x12,
+            CommandType::QueryDHSample => 0x13,
             CommandType::Config => 0x20,
             CommandType::ConfigDH => 0x21,
         }
@@ -49,6 +51,7 @@ impl CommandType {
             0x10 => Some(CommandType::StartDH),
             0x11 => Some(CommandType::StopDH),
             0x12 => Some(CommandType::QueryDH),
+            0x13 => Some(CommandType::QueryDHSample),
             0x20 => Some(CommandType::Config),
             0x21 => Some(CommandType::ConfigDH),
             _ => None,
@@ -172,6 +175,30 @@ impl QueryDHCommand {
     }
 }
 
+/// QUERY_DH_SAMPLE command - ask what a data handler last sent and received
+///
+/// Separate from QUERY_DH so that the statistics every poll asks for stay the
+/// size they are. A sample is wanted only while someone is looking at a
+/// panel, and carrying payload bytes in routine telemetry would spend downlink
+/// on data nobody reads.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QueryDHSampleCommand {
+    pub header: CommandHeader,
+    pub dh_id: DHId,
+}
+
+impl QueryDHSampleCommand {
+    pub fn new(sequence: u32, dh_id: DHId) -> Self {
+        Self {
+            header: CommandHeader {
+                sequence,
+                cmd_type: CommandType::QueryDHSample,
+            },
+            dh_id,
+        }
+    }
+}
+
 /// CONFIG command - configure TCSpecial values
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigCommand {
@@ -220,6 +247,7 @@ pub enum Command {
     StartDH(StartDHCommand),
     StopDH(StopDHCommand),
     QueryDH(QueryDHCommand),
+    QueryDHSample(QueryDHSampleCommand),
     Config(ConfigCommand),
     ConfigDH(ConfigDHCommand),
 }
@@ -233,6 +261,7 @@ impl Command {
             Command::StartDH(cmd) => cmd.header.sequence,
             Command::StopDH(cmd) => cmd.header.sequence,
             Command::QueryDH(cmd) => cmd.header.sequence,
+            Command::QueryDHSample(cmd) => cmd.header.sequence,
             Command::Config(cmd) => cmd.header.sequence,
             Command::ConfigDH(cmd) => cmd.header.sequence,
         }
@@ -246,6 +275,7 @@ impl Command {
             Command::StartDH(cmd) => cmd.header.cmd_type,
             Command::StopDH(cmd) => cmd.header.cmd_type,
             Command::QueryDH(cmd) => cmd.header.cmd_type,
+            Command::QueryDHSample(cmd) => cmd.header.cmd_type,
             Command::Config(cmd) => cmd.header.cmd_type,
             Command::ConfigDH(cmd) => cmd.header.cmd_type,
         }

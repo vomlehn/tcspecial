@@ -3,7 +3,7 @@
 //! Telemetry is sent from space to ground.
 
 use serde::{Deserialize, Serialize};
-use crate::types::{CommandStatus, DHId, Statistics, Timestamp};
+use crate::types::{CommandStatus, DHId, DHSample, Statistics, Timestamp};
 
 /// Telemetry message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -25,6 +25,7 @@ pub enum TelemetryType {
     StartDH,
     StopDH,
     QueryDH,
+    QueryDHSample,
     Config,
     ConfigDH,
     Beacon,
@@ -39,6 +40,7 @@ impl TelemetryType {
             TelemetryType::StartDH => 0x90,
             TelemetryType::StopDH => 0x91,
             TelemetryType::QueryDH => 0x92,
+            TelemetryType::QueryDHSample => 0x93,
             TelemetryType::Config => 0xA0,
             TelemetryType::ConfigDH => 0xA1,
             TelemetryType::Beacon => 0xF0,
@@ -53,6 +55,7 @@ impl TelemetryType {
             0x90 => Some(TelemetryType::StartDH),
             0x91 => Some(TelemetryType::StopDH),
             0x92 => Some(TelemetryType::QueryDH),
+            0x93 => Some(TelemetryType::QueryDHSample),
             0xA0 => Some(TelemetryType::Config),
             0xA1 => Some(TelemetryType::ConfigDH),
             0xF0 => Some(TelemetryType::Beacon),
@@ -175,6 +178,41 @@ impl QueryDHTelemetry {
     }
 }
 
+/// QUERY_DH_SAMPLE telemetry response
+///
+/// Carries what a data handler last sent and last received, each with the time
+/// it happened. Either may be empty, which is what a handler that has moved
+/// nothing in that direction looks like -- distinct from a handler that has
+/// moved zero bytes, which cannot happen.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QueryDHSampleTelemetry {
+    pub header: TelemetryHeader,
+    pub dh_id: DHId,
+    pub sent: DHSample,
+    pub received: DHSample,
+}
+
+impl QueryDHSampleTelemetry {
+    pub fn new(
+        sequence: u32,
+        status: CommandStatus,
+        dh_id: DHId,
+        sent: DHSample,
+        received: DHSample,
+    ) -> Self {
+        Self {
+            header: TelemetryHeader {
+                sequence,
+                tm_type: TelemetryType::QueryDHSample,
+                status,
+            },
+            dh_id,
+            sent,
+            received,
+        }
+    }
+}
+
 /// CONFIG telemetry response
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigTelemetry {
@@ -246,6 +284,7 @@ pub enum Telemetry {
     StartDH(StartDHTelemetry),
     StopDH(StopDHTelemetry),
     QueryDH(QueryDHTelemetry),
+    QueryDHSample(QueryDHSampleTelemetry),
     Config(ConfigTelemetry),
     ConfigDH(ConfigDHTelemetry),
     Beacon(BeaconTelemetry),
@@ -260,6 +299,7 @@ impl Telemetry {
             Telemetry::StartDH(tm) => tm.header.sequence,
             Telemetry::StopDH(tm) => tm.header.sequence,
             Telemetry::QueryDH(tm) => tm.header.sequence,
+            Telemetry::QueryDHSample(tm) => tm.header.sequence,
             Telemetry::Config(tm) => tm.header.sequence,
             Telemetry::ConfigDH(tm) => tm.header.sequence,
             Telemetry::Beacon(tm) => tm.header.sequence,
@@ -274,6 +314,7 @@ impl Telemetry {
             Telemetry::StartDH(tm) => tm.header.tm_type,
             Telemetry::StopDH(tm) => tm.header.tm_type,
             Telemetry::QueryDH(tm) => tm.header.tm_type,
+            Telemetry::QueryDHSample(tm) => tm.header.tm_type,
             Telemetry::Config(tm) => tm.header.tm_type,
             Telemetry::ConfigDH(tm) => tm.header.tm_type,
             Telemetry::Beacon(tm) => tm.header.tm_type,
@@ -288,6 +329,7 @@ impl Telemetry {
             Telemetry::StartDH(tm) => tm.header.status,
             Telemetry::StopDH(tm) => tm.header.status,
             Telemetry::QueryDH(tm) => tm.header.status,
+            Telemetry::QueryDHSample(tm) => tm.header.status,
             Telemetry::Config(tm) => tm.header.status,
             Telemetry::ConfigDH(tm) => tm.header.status,
             Telemetry::Beacon(tm) => tm.header.status,

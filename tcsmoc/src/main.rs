@@ -18,7 +18,10 @@ use tcslibgs::config::{
     load_payload_config, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
     SIM_PAYLOAD_CONFIG_PATH_VAR,
 };
-use tcslibgs::{ArmKey, CommandStatus, DHConfig, DHType, EndpointConfig, NetworkProtocol};
+use tcslibgs::{
+    ArmKey, CommandStatus, DHConfig, DHSample, DHType, EndpointConfig, NetworkProtocol,
+    DH_SAMPLE_BYTES,
+};
 use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
@@ -32,6 +35,12 @@ mod config;
 
 /// Default CI address
 const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
+
+/// Shown for the time of a transfer that has not happened.
+///
+/// The same text `ui/main.slint` defaults its two time lines to, so a panel
+/// reads alike before any query and after one that found nothing moved.
+const NO_TRANSFER_TIME: &str = "--:--:--";
 
 /// The MOC's children, and the variable each one names its payload
 /// configuration with.
@@ -187,10 +196,39 @@ fn dh_info_from(dh: &DHConfig) -> DHInfo {
         config: SharedString::from(endpoint_description(&dh.endpoint)),
         packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
         status: SharedString::from("Stopped"),
+        last_sent_time: SharedString::from(NO_TRANSFER_TIME),
         last_sent: SharedString::new(),
+        last_recv_time: SharedString::from(NO_TRANSFER_TIME),
         last_recv: SharedString::new(),
         bytes_sent: 0,
         bytes_recv: 0,
+    }
+}
+
+/// The two strings a panel shows for one sample: when, and what.
+///
+/// A sample with no time is one whose direction has carried nothing, which is
+/// not the same as having carried no bytes; it shows the placeholder rather
+/// than a time, and no data.
+fn sample_lines(sample: &DHSample) -> (SharedString, SharedString) {
+    match sample.time {
+        Some(time) => {
+            // The sample truncated the transfer, so bytes_to_hex is never the
+            // one doing it here; the ellipsis comes from the length the sample
+            // kept of the whole.
+            let mut data = app::bytes_to_hex(sample.data(), DH_SAMPLE_BYTES);
+            if sample.was_truncated() {
+                data.push_str("...");
+            }
+            (
+                SharedString::from(app::format_timestamp(time.seconds, time.nanoseconds)),
+                SharedString::from(data),
+            )
+        }
+        None => (
+            SharedString::from(NO_TRANSFER_TIME),
+            SharedString::new(),
+        ),
     }
 }
 
@@ -568,6 +606,22 @@ fn query_dh_buttons(
                     results.push(format!("{}: Error - {}", dh.name.0, e));
                 }
             }
+
+            // The samples are a second command, because the statistics every
+            // poll asks for do not carry payload bytes. A handler that cannot
+            // answer leaves its two lines as they were rather than blanking
+            // them: the last thing seen is better than nothing seen.
+            if let Ok((_, sent, received)) = guard.query_dh_sample(dh.dh_id) {
+                update_row(&dh_model, row, |info| {
+                    let (time, data) = sample_lines(&sent);
+                    info.last_sent_time = time;
+                    info.last_sent = data;
+
+                    let (time, data) = sample_lines(&received);
+                    info.last_recv_time = time;
+                    info.last_recv = data;
+                });
+            }
         }
 
         ui.set_last_response(SharedString::from(results.join("; ")));
@@ -683,7 +737,7 @@ mod tests {
     use super::*;
     use std::ffi::OsStr;
     use std::path::Path;
-    use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig};
+    use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig, Timestamp};
 
     /// Arguments as the program really receives them, the program's own name
     /// first.
@@ -691,6 +745,73 @@ mod tests {
         let mut all = vec!["tcsmoc".to_string()];
         all.extend(rest.iter().map(|s| s.to_string()));
         all.into_iter()
+    }
+
+    /// A panel's two lines, from the sample telemetry that feeds them.
+    #[test]
+    fn a_sample_becomes_a_time_and_a_row_of_bytes() {
+        let mut sample = DHSample::new();
+        sample.record(&[0x01, 0xAB, 0xFF]);
+        // The time is the telemetry's, so pin it rather than reading a clock.
+        sample.time = Some(Timestamp {
+            seconds: 3661,
+            nanoseconds: 0,
+        });
+
+        let (time, data) = sample_lines(&sample);
+        assert_eq!(time, SharedString::from("01:01:01"));
+        assert_eq!(data, SharedString::from("01 AB FF"));
+    }
+
+    /// A direction that has carried nothing shows the placeholder, not a time.
+    ///
+    /// A handler that has never moved data and one whose clock read zero must
+    /// not look alike, which is why the sample's time is an Option rather than
+    /// a zero.
+    #[test]
+    fn a_direction_that_has_carried_nothing_shows_no_time() {
+        let (time, data) = sample_lines(&DHSample::new());
+        assert_eq!(time, SharedString::from(NO_TRANSFER_TIME));
+        assert!(data.is_empty());
+    }
+
+    /// The placeholder a fresh panel shows is the one an empty sample gives,
+    /// so a panel does not change appearance on its first query.
+    #[test]
+    fn a_fresh_panel_and_an_empty_sample_agree() {
+        let dh = DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new("DH0"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/null".to_string(),
+            }),
+            packet_size: 1,
+        };
+
+        let info = dh_info_from(&dh);
+        let (time, data) = sample_lines(&DHSample::new());
+        assert_eq!(info.last_sent_time, time);
+        assert_eq!(info.last_recv_time, time);
+        assert_eq!(info.last_sent, data);
+        assert_eq!(info.last_recv, data);
+    }
+
+    /// Longer data is shown as a head with an ellipsis rather than being cut
+    /// off silently.
+    #[test]
+    fn a_truncated_sample_says_so() {
+        let mut sample = DHSample::new();
+        sample.record(&(0..64).collect::<Vec<u8>>());
+        sample.time = Some(Timestamp {
+            seconds: 0,
+            nanoseconds: 0,
+        });
+
+        let (_, data) = sample_lines(&sample);
+        assert!(
+            data.ends_with("..."),
+            "a sample filling the buffer should show as truncated: {data}"
+        );
     }
 
     #[test]

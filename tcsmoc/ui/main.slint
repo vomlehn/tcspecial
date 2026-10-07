@@ -164,19 +164,25 @@ export component MainWindow inherits Window {
             VerticalLayout {
                 spacing: 8px;
 
-                // Everything about the link to tcspecial, in a box of its
-                // own: a label naming it, the address it goes to, the two
-                // buttons that take it up and down, and the status they set.
-                // The border is what makes those a group rather than four
-                // things that happen to sit near each other. The MOC starts
-                // both tcspecial and tcssim, and the command interpreter all
-                // of this reaches is tcspecial's; tcssim is on the far side
-                // of it and is not disconnected by this.
+                // What the MOC has of the spacecraft, in two boxes side by
+                // side: the link it talks over, and the beacon that arrives
+                // whether it talks or not.
+                //
+                // The first holds everything about the link to tcspecial -- a
+                // label naming it, the address it goes to, the button that
+                // takes it up and down, and the status that button sets. The
+                // border is what makes those a group rather than four things
+                // that happen to sit near each other. The MOC starts both
+                // tcspecial and tcssim, and the command interpreter all of
+                // this reaches is tcspecial's; tcssim is on the far side of it
+                // and is not disconnected by this.
                 HorizontalLayout {
-                    // Keeps the box to its contents rather than stretching it
-                    // the width of the group: with the address field inside
-                    // it, nothing is left beside it to take up the row.
+                    // Keeps the boxes to their contents rather than
+                    // stretching them the width of the group: with the
+                    // address field inside one of them, nothing is left
+                    // beside them to take up the row.
                     alignment: start;
+                    spacing: 8px;
 
                     Rectangle {
                         border-width: 1px;
@@ -222,6 +228,53 @@ export component MainWindow inherits Window {
                                 Text {
                                     text: "Status: " + ci-status;
                                     color: ci-status == "Connected" ? #008000 : #ff0000;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // The beacon, beside the link rather than down among the
+                    // commands, because it says the same kind of thing: what
+                    // is arriving from the spacecraft on its own, as against
+                    // what the link beside it is asking for. It is not the
+                    // link, and the border is there to say so -- the beacon
+                    // has a socket of its own and keeps arriving after a
+                    // disconnect, which is a window worth being able to read
+                    // rather than one to be puzzled by.
+                    Rectangle {
+                        border-width: 1px;
+                        border-color: #808080;
+                        border-radius: 4px;
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            // Centred, because this box is the shorter of the
+                            // two and the row is as tall as the other one.
+                            alignment: center;
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Text { text: "Beacon: "; vertical-alignment: center; }
+                                Rectangle {
+                                    width: 20px;
+                                    height: 20px;
+                                    border-radius: 10px;
+                                    background: indicator-color;
+                                    border-color: #808080;
+                                    border-width: 1px;
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Text { text: "Last rcvd: "; vertical-alignment: center; }
+                                Text {
+                                    text: beacon-last-recv;
+                                    font-size: 10px;
                                     vertical-alignment: center;
                                 }
                             }
@@ -303,21 +356,6 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    Text { text: "Beacon: "; }
-
-                    Rectangle {
-                        width: 20px;
-                        height: 20px;
-                        border-radius: 10px;
-                        background: indicator-color;
-                        border-color: #808080;
-                        border-width: 1px;
-                    }
-
-                    Text { text: "Last rcvd: "; }
-
-                    Text { text: beacon-last-recv; font-size: 10px; }
-                        
                 }
 
                 HorizontalLayout {

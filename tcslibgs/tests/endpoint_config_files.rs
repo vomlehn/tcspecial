@@ -173,3 +173,31 @@ fn the_examples_contain_what_the_manual_says_they_do() {
         EndpointLocation::Device { path: "/dev/spidev0.1".into() }
     );
 }
+
+/// The documented examples describe how to reach devices, not data handlers.
+///
+/// They assign no `dh_id`, because an endpoint configuration need not, so
+/// converting one is refused rather than guessing. This pins which of the two
+/// things the examples are, and keeps the conversion honest about what it
+/// requires: if a reader ever adds ids to the examples, this test is what says
+/// the examples changed purpose.
+#[test]
+fn the_documented_examples_assign_no_data_handler_ids() {
+    for name in ["endpoints.yaml", "endpoints.xml", "endpoints.json"] {
+        let doc = endpoint_config::load(actual(name)).expect(name);
+
+        assert!(
+            doc.endpoints.iter().all(|e| e.dh_id.is_none()),
+            "{name}: an example endpoint assigns a dh_id"
+        );
+
+        let message = doc
+            .to_dh_configs()
+            .expect_err(&format!("{name} should not convert"))
+            .to_string();
+        assert!(
+            message.contains("dh_id"),
+            "{name}: the error should say an id is missing, but said: {message}"
+        );
+    }
+}

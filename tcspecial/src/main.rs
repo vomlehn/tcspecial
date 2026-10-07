@@ -54,20 +54,19 @@ fn main() {
     info!("CI config: {}:{}", tcspecial_config.address, tcspecial_config.port);
     info!("Loaded {} data handler configurations", payload_config.len());
 
-    // An endpoint configuration file is read when one is named. It is not yet
-    // a second source of data handlers, though less stands in the way than
-    // once did: an endpoint group carries a packet size now, and a data
-    // handler no longer has an interval for the endpoint format to be missing.
+    // An endpoint configuration file is read when one is named. Its endpoints
+    // can become data handlers -- EndpointConfigDoc::to_dh_configs does it --
+    // but nothing here calls that yet, and the file is read only so that a
+    // malformed one is reported at startup rather than whenever the first
+    // reader of it appears.
     //
-    // What is left is three things. An endpoint has a name and no dh_id, and a
-    // data handler needs one. An I2C endpoint is located by a bus and a slave
-    // address, which no EndpointConfig variant can hold -- there is Network
-    // and Device and nothing for a bus. And a group's packet size is optional,
-    // while a data handler must have one, so a group that states none could
-    // not produce a handler.
-    //
-    // Reading the file here means a malformed one is reported at startup
-    // rather than whenever the first reader of it appears.
+    // What is left is not the conversion but the choice of which file each
+    // program reads. It has to be made for all three at once: tcsmoc's panels,
+    // tcssim's payloads and the handlers served here must describe the same
+    // handlers, so a program reading an endpoint file while the others read a
+    // payload file is the drift the payload set mechanism exists to prevent.
+    // I2C endpoints are the one thing the conversion cannot do, for want of
+    // anywhere to put a bus and a slave address.
     if let Ok(endpoint_path) = env::var("ENDPOINT_CONFIG_PATH") {
         info!("Loading endpoint configuration from: {}", endpoint_path);
 

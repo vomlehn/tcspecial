@@ -28,7 +28,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::format::ConfigFormat;
-use crate::types::NetworkProtocol;
+use crate::types::{
+    DHConfig, DHId, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol,
+};
 use crate::TcsError;
 
 // ---------------------------------------------------------------------------
@@ -124,6 +126,31 @@ pub enum EndpointConfigError {
 
     #[error("group \"{group}\": {message}")]
     BadGroupValue { group: String, message: String },
+
+    // The four below arise only when converting endpoints into data handlers,
+    // not when reading a file. An endpoint configuration describing how to
+    // reach a device is complete without any of them.
+    #[error("endpoint \"{0}\" has no dh_id, and a data handler is addressed by id")]
+    EndpointHasNoDhId(String),
+
+    #[error("endpoints \"{first}\" and \"{second}\" share dh_id {dh_id}")]
+    DuplicateDhId {
+        first: String,
+        second: String,
+        dh_id: u32,
+    },
+
+    #[error(
+        "endpoint \"{endpoint}\" is in group \"{group}\", which states no packet size, \
+         and a data handler needs one"
+    )]
+    GroupHasNoPacketSize { endpoint: String, group: String },
+
+    #[error(
+        "endpoint \"{0}\" is on an I2C bus, which tcspecial cannot open yet, so it \
+         cannot become a data handler"
+    )]
+    EndpointIsOnABus(String),
 }
 
 /// Result of reading an endpoint configuration file.
@@ -162,6 +189,117 @@ impl EndpointConfigDoc {
     /// undefined group is rejected at parse time.
     pub fn group_of(&self, endpoint: &EndpointDef) -> Option<&EndpointGroup> {
         self.group(&endpoint.group)
+    }
+
+    /// Turn these endpoints into data handler configurations.
+    ///
+    /// The two formats describe overlapping things: a payload configuration
+    /// says which data handlers exist and how tcspecial reaches each one, and
+    /// an endpoint configuration says how to reach a device in far more
+    /// detail. This is the bridge, so that the richer description can serve
+    /// where the payload format does today.
+    ///
+    /// Nothing calls it yet. It exists so that the conversion is settled and
+    /// tested before any program depends on it; which file each program reads
+    /// is a separate question, and one that has to be answered for all three
+    /// at once, since tcsmoc's panels, tcssim's payloads and tcspecial's
+    /// handlers must describe the same thing.
+    ///
+    /// Not every endpoint can become a data handler. A file describing only
+    /// how to reach a device is complete without an id or a packet size, and
+    /// an I2C endpoint has no transport tcspecial can open; each of those is
+    /// an error here rather than at the file's own validation, because none of
+    /// them is wrong about the endpoint.
+    pub fn to_dh_configs(&self) -> EndpointConfigResult<Vec<DHConfig>> {
+        let mut by_id: BTreeMap<u32, &str> = BTreeMap::new();
+        let mut configs = Vec::with_capacity(self.endpoints.len());
+
+        for endpoint in &self.endpoints {
+            let group = self
+                .group_of(endpoint)
+                .ok_or_else(|| EndpointConfigError::UnknownGroup {
+                    endpoint: endpoint.name.clone(),
+                    group: endpoint.group.clone(),
+                })?;
+
+            let dh_id = endpoint
+                .dh_id
+                .ok_or_else(|| EndpointConfigError::EndpointHasNoDhId(endpoint.name.clone()))?;
+
+            // A duplicate parses cleanly and then has one handler shadow
+            // another, as it would in a payload file.
+            if let Some(first) = by_id.insert(dh_id, endpoint.name.as_str()) {
+                return Err(EndpointConfigError::DuplicateDhId {
+                    first: first.to_string(),
+                    second: endpoint.name.clone(),
+                    dh_id,
+                });
+            }
+
+            let packet_size = group.packet_size.ok_or_else(|| {
+                EndpointConfigError::GroupHasNoPacketSize {
+                    endpoint: endpoint.name.clone(),
+                    group: group.name.clone(),
+                }
+            })?;
+
+            configs.push(DHConfig {
+                dh_id: DHId(dh_id),
+                name: DHName::new(&endpoint.name),
+                endpoint: endpoint_config_of(endpoint, group)?,
+                packet_size: packet_size as usize,
+            });
+        }
+
+        Ok(configs)
+    }
+}
+
+/// What tcspecial opens to reach one endpoint.
+///
+/// The transport follows from the group and the address from the endpoint,
+/// which is the division the format is built around. A Unix socket is the one
+/// case where the two disagree about shape: its group is a network group, but
+/// it is located by a path rather than by host and port, so it becomes a
+/// network endpoint whose address is that path. Its port is meaningless and
+/// set to zero, which is how a payload file spells the same thing.
+fn endpoint_config_of(
+    endpoint: &EndpointDef,
+    group: &EndpointGroup,
+) -> EndpointConfigResult<EndpointConfig> {
+    match &endpoint.location {
+        // No EndpointConfig can hold a bus and a slave address, and there is
+        // no endpoint implementation that would open one.
+        EndpointLocation::I2c { .. } => {
+            Err(EndpointConfigError::EndpointIsOnABus(endpoint.name.clone()))
+        }
+        EndpointLocation::Network { address, port } => match &group.kind {
+            GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
+                protocol: net.protocol,
+                address: address.clone(),
+                port: *port,
+            })),
+            // Only a network group gives an endpoint a host and a port, so
+            // this is unreachable through the parser; it is an error rather
+            // than a panic because a library should not bring a caller down.
+            _ => Err(bad(
+                &group.name,
+                &format!(
+                    "endpoint \"{}\" has a network address, which a {} group does not give it",
+                    endpoint.name,
+                    group.kind.type_name()
+                ),
+            )),
+        },
+        EndpointLocation::Device { path } => match &group.kind {
+            GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
+                protocol: net.protocol,
+                address: path.clone(),
+                port: 0,
+            })),
+            // A serial line and a SPI chip select are both device nodes.
+            _ => Ok(EndpointConfig::Device(DeviceConfig { path: path.clone() })),
+        },
     }
 }
 
@@ -493,6 +631,13 @@ pub struct EndpointDef {
     pub group: String,
     /// Where this endpoint is.
     pub location: EndpointLocation,
+    /// Identifier of the data handler this endpoint becomes.
+    ///
+    /// `None` for a file that assigns none. An endpoint configuration
+    /// describing only how to reach a device need not, so this is optional
+    /// exactly as a group's packet size is; converting the endpoint into a
+    /// data handler needs it, because a handler is addressed by id.
+    pub dh_id: Option<u32>,
 }
 
 /// What locates one endpoint of a group, and so distinguishes it from the
@@ -690,6 +835,8 @@ struct EndpointWire {
     address: Option<String>,
     #[serde(default, alias = "@port")]
     port: Option<Scalar>,
+    #[serde(default, alias = "@dh_id", alias = "dh-id", alias = "@dh-id")]
+    dh_id: Option<Scalar>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1179,6 +1326,11 @@ enum LocationShape {
 fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigResult<EndpointDef> {
     let kind = group.kind.type_name();
 
+    let dh_id = match e.dh_id.as_ref() {
+        Some(s) => Some(parse_u32(&group.name, "dh_id", s)?),
+        None => None,
+    };
+
     let shape = match &group.kind {
         GroupKind::Serial(_) => LocationShape::Device,
         // A SPI device node names the bus and the chip select together.
@@ -1236,6 +1388,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
             name: e.name,
             group: e.group,
             location: EndpointLocation::I2c { bus, address },
+            dh_id,
         });
     }
 
@@ -1303,6 +1456,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
         name: e.name,
         group: e.group,
         location,
+        dh_id,
     })
 }
 
@@ -2054,6 +2208,205 @@ endpoints:
             matches!(&e, EndpointConfigError::UnknownGroup { group, .. } if group == "payload_upd"),
             "got {e:?}"
         );
+    }
+
+    // -- endpoints as data handlers -----------------------------------------
+
+    /// A whole set of endpoints becoming data handlers.
+    ///
+    /// The transports come from the groups and the addresses from the
+    /// endpoints, which is the division the format exists for.
+    #[test]
+    fn endpoints_become_data_handlers() {
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  \
+             - name: payload_tcp\n    type: network\n    protocol: tcp\n    \
+               packet_size: 1024\n    stream:\n      max_length: 1024\n      \
+               timeout: none\n  \
+             - name: payload_unix\n    type: network\n    protocol: unix_dgram\n    \
+               packet_size: 64\n  \
+             - name: rs422\n    type: serial\n    datarate: 9600\n    stop_bits: 1\n    \
+               byte_length: 8\n    packet_size: 512\n    stream:\n      \
+               max_length: 512\n      timeout: none\n\
+             endpoints:\n  \
+             - name: camera\n    group: payload_tcp\n    dh_id: 0\n    \
+               address: 192.168.1.10\n    port: 5000\n  \
+             - name: recorder\n    group: payload_unix\n    dh_id: 1\n    \
+               device: /run/tcs/recorder.sock\n  \
+             - name: magnetometer\n    group: rs422\n    dh_id: 2\n    \
+               device: /dev/ttyS0\n",
+        )
+        .expect("parses");
+
+        let handlers = doc.to_dh_configs().expect("converts");
+        assert_eq!(handlers.len(), 3);
+
+        assert_eq!(handlers[0].dh_id, DHId(0));
+        assert_eq!(handlers[0].name, DHName::new("camera"));
+        assert_eq!(handlers[0].packet_size, 1024);
+        assert_eq!(
+            handlers[0].endpoint,
+            EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: "192.168.1.10".to_string(),
+                port: 5000,
+            })
+        );
+
+        // A Unix socket is a network endpoint named by a path, with no port.
+        assert_eq!(
+            handlers[1].endpoint,
+            EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::UnixDgram,
+                address: "/run/tcs/recorder.sock".to_string(),
+                port: 0,
+            })
+        );
+        assert_eq!(handlers[1].packet_size, 64);
+
+        // A serial line is a device node.
+        assert_eq!(
+            handlers[2].endpoint,
+            EndpointConfig::Device(DeviceConfig {
+                path: "/dev/ttyS0".to_string()
+            })
+        );
+    }
+
+    /// A SPI endpoint is a device node too: the node names the bus and the
+    /// chip select together.
+    #[test]
+    fn a_spi_endpoint_becomes_a_device_handler() {
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  - name: g\n    type: spi\n    max_speed: 1000000\n    \
+             mode: 0\n    packet_size: 32\n\
+             endpoints:\n  - name: imu\n    group: g\n    dh_id: 7\n    \
+             device: /dev/spidev0.0\n",
+        )
+        .expect("parses");
+
+        let handlers = doc.to_dh_configs().expect("converts");
+        assert_eq!(handlers[0].dh_id, DHId(7));
+        assert_eq!(
+            handlers[0].endpoint,
+            EndpointConfig::Device(DeviceConfig {
+                path: "/dev/spidev0.0".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn an_i2c_endpoint_cannot_become_a_data_handler() {
+        // There is no EndpointConfig that holds a bus and a slave address, and
+        // no endpoint implementation that would open one.
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  - name: g\n    type: i2c\n    packet_size: 8\n\
+             endpoints:\n  - name: thermal_a\n    group: g\n    dh_id: 0\n    \
+             device: /dev/i2c-1\n    address: 0x48\n",
+        )
+        .expect("parses: an I2C endpoint is a perfectly good endpoint");
+
+        let e = doc.to_dh_configs().unwrap_err();
+        assert!(
+            matches!(&e, EndpointConfigError::EndpointIsOnABus(name) if name == "thermal_a"),
+            "got {e:?}"
+        );
+    }
+
+    #[test]
+    fn an_endpoint_with_no_dh_id_cannot_become_a_data_handler() {
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n    \
+             packet_size: 8\n\
+             endpoints:\n  - name: e\n    group: g\n    address: 10.0.0.1\n    \
+             port: 5000\n",
+        )
+        .expect("parses: an id is only needed to become a handler");
+
+        let e = doc.to_dh_configs().unwrap_err();
+        assert!(
+            matches!(&e, EndpointConfigError::EndpointHasNoDhId(name) if name == "e"),
+            "got {e:?}"
+        );
+    }
+
+    #[test]
+    fn two_endpoints_sharing_a_dh_id_are_rejected() {
+        // A duplicate converts cleanly and then has one handler shadow the
+        // other, which is what the payload format rejects as well.
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n    \
+             packet_size: 8\n\
+             endpoints:\n  - name: first\n    group: g\n    dh_id: 3\n    \
+             address: 10.0.0.1\n    port: 5000\n  \
+             - name: second\n    group: g\n    dh_id: 3\n    address: 10.0.0.2\n    \
+             port: 5001\n",
+        )
+        .expect("parses");
+
+        let e = doc.to_dh_configs().unwrap_err();
+        assert!(
+            matches!(&e, EndpointConfigError::DuplicateDhId { dh_id: 3, .. }),
+            "got {e:?}"
+        );
+    }
+
+    #[test]
+    fn an_endpoint_whose_group_states_no_packet_size_cannot_become_a_handler() {
+        // The group attribute is optional, because a file saying only how to
+        // reach a device need not state one. A data handler must have one.
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+             endpoints:\n  - name: e\n    group: g\n    dh_id: 0\n    \
+             address: 10.0.0.1\n    port: 5000\n",
+        )
+        .expect("parses: packet_size is optional");
+
+        let e = doc.to_dh_configs().unwrap_err();
+        assert!(
+            matches!(
+                &e,
+                EndpointConfigError::GroupHasNoPacketSize { endpoint, group }
+                    if endpoint == "e" && group == "g"
+            ),
+            "got {e:?}"
+        );
+    }
+
+    #[test]
+    fn a_dh_id_is_read_from_every_format_and_either_spelling() {
+        let yaml = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n    \
+                    packet_size: 8\n\
+                    endpoints:\n  - name: e\n    group: g\n    dh_id: 0x2a\n    \
+                    address: 10.0.0.1\n    port: 5000\n";
+        let hyphen = yaml.replace("dh_id", "dh-id");
+        // XML carries values as attributes, which reach serde with an `@`
+        // prefix -- so this exercises the `@dh_id` alias rather than `dh_id`.
+        let xml = r#"<endpoint-configuration>
+                       <endpoint-groups>
+                         <group name="g" type="network" protocol="udp" packet_size="8"/>
+                       </endpoint-groups>
+                       <endpoints>
+                         <endpoint name="e" group="g" dh_id="42"
+                                   address="10.0.0.1" port="5000"/>
+                       </endpoints>
+                     </endpoint-configuration>"#;
+        let json = r#"{"endpoint_groups":[{"name":"g","type":"network","protocol":"udp",
+                       "packet_size":8}],
+                       "endpoints":[{"name":"e","group":"g","dh_id":42,
+                       "address":"10.0.0.1","port":5000}]}"#;
+
+        // 0x2a is 42: the id accepts hex as every other number in this format
+        // does.
+        for (label, doc) in [
+            ("yaml", from_yaml_str(yaml).unwrap()),
+            ("hyphenated", from_yaml_str(&hyphen).unwrap()),
+            ("xml", from_xml_str(xml).unwrap()),
+            ("json", from_str(json, ConfigFormat::Json).unwrap()),
+        ] {
+            assert_eq!(doc.endpoints[0].dh_id, Some(42), "{label}");
+            assert_eq!(doc.to_dh_configs().unwrap()[0].dh_id, DHId(42), "{label}");
+        }
     }
 
     #[test]

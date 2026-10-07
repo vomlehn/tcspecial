@@ -1510,8 +1510,11 @@ in the group.
 | port          | See      | Network port                                     |
 |               | below    |                                                  |
 +---------------+----------+--------------------------------------------------+
+| dh_id         | No       | Identifier of the data handler this endpoint     |
+|               |          | becomes; see `Endpoints as Data Handlers`_       |
++---------------+----------+--------------------------------------------------+
 
-Which of the last three apply depends on the group.
+Which of ``device``, ``address`` and ``port`` apply depends on the group.
 
 **What locates an endpoint of each type**
 
@@ -1551,6 +1554,62 @@ Requirement
    with everything else the endpoints of that group share, which is why two
    endpoints of one group cannot be reached over different transports. The same
    holds for the packet size.
+
+Endpoints as Data Handlers
+--------------------------
+A payload configuration file says which data handlers exist and how tcspecial
+reaches each one. An endpoint configuration says how to reach a device in far
+more detail: a serial line's framing, a stream's rules for where one read
+ends, the parameters of a bus. The two therefore overlap, and the endpoint
+format is the richer description of the two.
+
+``EndpointConfigDoc::to_dh_configs`` converts endpoints into the data handler
+configurations the rest of the software already takes. The transport comes
+from the group and the address from the endpoint, which is the division the
+format is built around; the packet size comes from the group, and the id from
+the endpoint, because an id distinguishes one handler from another exactly as
+an address distinguishes one endpoint from another.
+
+Nothing reads a payload set from an endpoint file yet. The conversion exists
+so that it is settled and tested before any program depends on it: which file
+each program reads has to be decided for all three at once, since tcsmoc's
+panels, tcssim's payloads and tcspecial's handlers must describe the same
+handlers, and a program reading a different file is the drift the payload set
+mechanism exists to prevent.
+
+Requirement
+    An endpoint becoming a data handler has a ``dh_id``. An endpoint
+    configuration that assigns none is still valid -- describing how to reach a
+    device needs no handler ids -- so this is an error when converting rather
+    than when reading the file.
+
+Requirement
+    Two endpoints do not share a ``dh_id``. A duplicate converts cleanly and
+    then has one handler shadow another, which is what a payload file rejects
+    as well.
+
+Requirement
+    An endpoint becoming a data handler is in a group that states a packet
+    size. The attribute is optional for the same reason ``dh_id`` is, and
+    required for the same reason: a handler must know how much data a packet
+    carries.
+
+Requirement
+    An endpoint of an I2C group does not become a data handler. There is no
+    endpoint configuration that holds a bus and a slave address together, and
+    no endpoint implementation that would open one, so converting it is an
+    error rather than a handler that cannot be started.
+
+A Unix-domain socket is the one endpoint whose shape differs between the two
+formats. Its group is a network group, but it is located by a path rather than
+by a host and a port, so it becomes a network data handler whose address is
+that path and whose port is zero -- which is how a payload file spells the
+same thing, and why tcsmoc shows no port for one.
+
+The shipped examples assign no ``dh_id``, which makes them endpoint
+configurations rather than payload definitions. A test converts each of them
+and requires the refusal, so that the examples cannot drift into being half of
+each.
 
 Value Syntax
 ------------

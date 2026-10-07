@@ -12,6 +12,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 use std::os::fd::BorrowedFd;
 use tcslibgs::{DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
+use crate::ci::bind_failed;
 use crate::config::constants::{ENDPOINT_BUFFER_SIZE, /*ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX, ENDPOINT_MAX_RETRIES*/};
 
 /// Trait for endpoints that can wait for events
@@ -96,7 +97,8 @@ pub struct UdpEndpoint {
 impl UdpEndpoint {
     pub fn new(config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let socket = UdpSocket::bind(&addr)?;
+        let socket =
+            UdpSocket::bind(&addr).map_err(|e| bind_failed("UDP endpoint", &addr, e))?;
         socket.set_nonblocking(true)?;
 
         Ok(Self {
@@ -191,7 +193,8 @@ pub struct TcpEndpoint {
 impl TcpEndpoint {
     pub fn new_server(config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let listener = TcpListener::bind(&addr)?;
+        let listener =
+            TcpListener::bind(&addr).map_err(|e| bind_failed("TCP endpoint", &addr, e))?;
         listener.set_nonblocking(true)?;
 
         Ok(Self {

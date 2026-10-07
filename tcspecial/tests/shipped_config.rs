@@ -14,7 +14,7 @@
 
 use std::path::{Path, PathBuf};
 
-use tcslibgs::config::load_payload_config;
+use tcslibgs::config::load_dh_configs;
 use tcslibgs::{EndpointConfig, NetworkProtocol};
 use tcspecial::config::load_tcspecial_config;
 
@@ -80,7 +80,7 @@ fn the_shipped_tcspecial_config_loads() {
 #[test]
 fn the_shipped_payload_configs_load() {
     for path in shipped_payload_files() {
-        let handlers = load_payload_config(&path)
+        let handlers = load_dh_configs(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
 
         let file = path.display();
@@ -123,7 +123,7 @@ fn the_shipped_files_have_distinct_data_handler_ids() {
     // A duplicate id parses cleanly and then has one handler shadow another,
     // which is the kind of thing only a test of the real file catches.
     for path in shipped_payload_files() {
-        let handlers = load_payload_config(&path).unwrap();
+        let handlers = load_dh_configs(&path).unwrap();
         let mut ids: Vec<_> = handlers.iter().map(|dh| dh.dh_id).collect();
         let before = ids.len();
         ids.sort();
@@ -146,7 +146,7 @@ fn the_shipped_files_have_distinct_data_handler_ids() {
 #[test]
 fn every_shipped_handler_has_an_oc_address() {
     for path in shipped_payload_files() {
-        for dh in load_payload_config(&path).unwrap() {
+        for dh in load_dh_configs(&path).unwrap() {
             let oc = dh.oc.unwrap_or_else(|| {
                 panic!(
                     "{}: {} has no OC address, so it cannot be started",
@@ -169,7 +169,7 @@ fn every_shipped_handler_has_an_oc_address() {
 #[test]
 fn shipped_handlers_do_not_share_a_port() {
     for path in shipped_payload_files() {
-        let handlers = load_payload_config(&path).unwrap();
+        let handlers = load_dh_configs(&path).unwrap();
         let mut bound: Vec<(String, u16, String)> = Vec::new();
 
         for dh in &handlers {

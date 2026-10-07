@@ -9,7 +9,7 @@ use log::{error, info, trace};
 use tcspecial::config::{load_endpoint_config, load_tcspecial_config};
 use tcspecial::CommandInterpreter;
 use tcslibgs::config::{
-    load_payload_config, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
+    load_dh_configs, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
 };
 
 fn main() {
@@ -43,7 +43,7 @@ fn main() {
     info!("Loading payload configuration from: {}", payload_path);
 
     // Load configuration
-    let payload_config = match load_payload_config(&payload_path) {
+    let payload_config = match load_dh_configs(&payload_path) {
         Ok(payload_config) => payload_config,
         Err(e) => {
             error!("Error loading payload configuration: {}", e);

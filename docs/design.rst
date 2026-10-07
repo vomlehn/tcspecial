@@ -430,6 +430,17 @@ TCSpecial
 
 tcspecial
 ---------
+Tcspecial reads two configuration files. Its own is
+``tcspecial/src/tcspecial.yaml``, named by ``TCSPECIAL_CONFIG_PATH`` when that
+is set, and holds the address the command interpreter listens on, the beacon
+interval, and where the telemetry log goes. The other describes the payloads
+and is named on the command line; see `Payload Configuration Files`_.
+
+Both choose their parser from their extension, as every configuration file in
+the project does, so either may be written in YAML, JSON or XML. The shipped
+one is YAML because that is what the rest of the project's configuration is
+written in; it was JSON when JSON was the only format the project read.
+
 Tcspecial hass a command interpreter (CI) running on the spacecraft where the
 payloads are located. CI has one or more threads to handle OC communications, i.e.
 data exchanged with tcslib over a bi-directional communication link. It

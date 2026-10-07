@@ -173,7 +173,7 @@ distclean: clean
 # with cargo install --path tcsmoc, if that is wanted.
 #
 # Note that tcspecial finds its configuration by relative path -- payload1.yaml
-# and tcspecial/src/tcspecial.json -- so an installed copy run from elsewhere
+# and tcspecial/src/tcspecial.yaml -- so an installed copy run from elsewhere
 # needs PAYLOAD_CONFIG_PATH and TCSPECIAL_CONFIG_PATH set, or a working
 # directory that has those files.
 .PHONY: install

@@ -1,0 +1,19 @@
+# The command interpreter's own configuration.
+#
+# Read by tcspecial at startup, from the path TCSPECIAL_CONFIG_PATH names when
+# it is set. Nothing about the payloads is here: which data handlers exist and
+# how to reach them is a payload configuration, named on tcspecial's command
+# line.
+#
+# This is parsed as YAML because it is named .yaml. Every configuration file in
+# the project chooses its parser from its extension, so the same settings in a
+# .json or .xml file would be read just as well.
+#
+# Note the quotes on the address: unquoted, 0.0.0.0 is a string in YAML only
+# because it happens not to be a number, which is a thin reason to rely on.
+address: "0.0.0.0"
+port: 4000
+protocol: udp
+beacon_interval_ms: 5000
+log_dir: telemetry
+log_segment_bytes: 65536

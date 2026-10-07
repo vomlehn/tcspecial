@@ -34,11 +34,17 @@ pub enum ConduitCommand {
 /// Shared between the conduit threads that write it and the command
 /// interpreter that reads it, because a conduit's statistics reach the handler
 /// only when the conduit stops, and a panel asks while data is still flowing.
+///
+/// Both senses are the handler's, as its statistics are: `received` is data
+/// that came from the ground and `sent` is data that went to it. So one
+/// conduit fills each -- the ground-to-payload conduit on its read, the
+/// payload-to-ground conduit on its write -- rather than both filling both,
+/// which would leave each field holding whichever direction moved last.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DHSamples {
-    /// The last data written towards its destination.
+    /// The last data sent to the ground.
     pub sent: DHSample,
-    /// The last data read from its source.
+    /// The last data received from the ground.
     pub received: DHSample,
 }
 
@@ -95,6 +101,8 @@ impl Conduit {
         let running = self.running.clone();
         running.store(true, Ordering::SeqCst);
 
+        let direction = self.direction;
+
         let handle = thread::spawn(move || {
             let mut stats = Statistics::new();
             let mut buffer = vec![0u8; ENDPOINT_BUFFER_SIZE];
@@ -120,16 +128,27 @@ impl Conduit {
                             Ok(n) => {
                                 stats.bytes_received += n as u64;
                                 stats.reads_completed += 1;
-                                record(&samples, |s| s.received.record(&buffer[..n]));
+                                // Only the ground-facing half of each conduit
+                                // is a sample, so that the two lines a panel
+                                // shows mean what the two byte counters beside
+                                // them mean: received is data from the ground,
+                                // sent is data to it. Recording both halves of
+                                // both conduits leaves each field holding
+                                // whichever direction moved last.
+                                if direction == ConduitDirection::GroundToPayload {
+                                    record(&samples, |s| s.received.record(&buffer[..n]));
+                                }
 
                                 // Write to destination
                                 match writer.write(&buffer[..n]) {
                                     Ok(written) => {
                                         stats.bytes_sent += written as u64;
                                         stats.writes_completed += 1;
-                                        record(&samples, |s| {
-                                            s.sent.record(&buffer[..written])
-                                        });
+                                        if direction == ConduitDirection::PayloadToGround {
+                                            record(&samples, |s| {
+                                                s.sent.record(&buffer[..written])
+                                            });
+                                        }
                                     }
                                     Err(_) => {
                                         stats.writes_failed += 1;

@@ -34,19 +34,47 @@ pub struct DataHandler {
     /// data moves and read by the command interpreter when asked.
     samples: Arc<Mutex<DHSamples>>,
     running: Arc<AtomicBool>,
-    cmd_pipe: Option<(RawFd, RawFd)>,
+    /// One command pipe per conduit: the ground-to-payload conduit's, then
+    /// the payload-to-ground conduit's.
+    ///
+    /// Not one pipe shared. `Conduit::stop` writes a single byte to wake its
+    /// thread out of the poll it is sitting in, and two threads polling one
+    /// read end would race for that byte: whichever read first would take it
+    /// and the other would wait out its timeout instead.
+    cmd_pipes: Option<[(RawFd, RawFd); 2]>,
+}
+
+/// Indices into a handler's command pipes.
+const G2P: usize = 0;
+const P2G: usize = 1;
+
+/// Create a pipe, returning its read and write ends.
+fn command_pipe() -> TcsResult<(RawFd, RawFd)> {
+    let mut fds = [0i32; 2];
+    unsafe {
+        if libc::pipe(fds.as_mut_ptr()) != 0 {
+            return Err(TcsError::Io(std::io::Error::last_os_error()));
+        }
+    }
+    Ok((fds[0], fds[1]))
 }
 
 impl DataHandler {
     /// Create a new data handler
     pub fn new(config: DHConfig) -> TcsResult<Self> {
-        // Create command pipe
-        let mut pipe_fds = [0i32; 2];
-        unsafe {
-            if libc::pipe(pipe_fds.as_mut_ptr()) != 0 {
-                return Err(TcsError::Io(std::io::Error::last_os_error()));
+        // One per conduit; see cmd_pipes. The first is closed if the second
+        // cannot be made, so a failure here leaks no descriptors.
+        let g2p = command_pipe()?;
+        let p2g = match command_pipe() {
+            Ok(pipe) => pipe,
+            Err(e) => {
+                unsafe {
+                    libc::close(g2p.0);
+                    libc::close(g2p.1);
+                }
+                return Err(e);
             }
-        }
+        };
 
         Ok(Self {
             id: config.dh_id,
@@ -58,7 +86,7 @@ impl DataHandler {
             stats: Statistics::new(),
             samples: Arc::new(Mutex::new(DHSamples::default())),
             running: Arc::new(AtomicBool::new(false)),
-            cmd_pipe: Some((pipe_fds[0], pipe_fds[1])),
+            cmd_pipes: Some([g2p, p2g]),
         })
     }
 
@@ -106,7 +134,9 @@ impl DataHandler {
             return Err(TcsError::DataHandler("Invalid state for start".to_string()));
         }
 
-        let (cmd_read, cmd_write) = self.cmd_pipe.ok_or_else(|| TcsError::DataHandler("No command pipe".to_string()))?;
+        let pipes = self
+            .cmd_pipes
+            .ok_or_else(|| TcsError::DataHandler("No command pipe".to_string()))?;
 
         // Create payload endpoint
         let payload_reader = create_reader_endpoint(&self.config.endpoint)?;
@@ -117,16 +147,16 @@ impl DataHandler {
             ConduitDirection::GroundToPayload,
             oc_reader,
             payload_writer,
-            cmd_read,
-            cmd_write,
+            pipes[G2P].0,
+            pipes[G2P].1,
         );
 
         let p2g_conduit = Conduit::new(
             ConduitDirection::PayloadToGround,
             payload_reader,
             oc_writer,
-            cmd_read,
-            cmd_write,
+            pipes[P2G].0,
+            pipes[P2G].1,
         );
 
         // Note: In a full implementation, we would start the conduits here,
@@ -171,11 +201,13 @@ impl DataHandler {
 
         self.state = DHState::Stopped;
 
-        // Close command pipe
-        if let Some((read_fd, write_fd)) = self.cmd_pipe.take() {
-            unsafe {
-                libc::close(read_fd);
-                libc::close(write_fd);
+        // Close command pipes
+        if let Some(pipes) = self.cmd_pipes.take() {
+            for (read_fd, write_fd) in pipes {
+                unsafe {
+                    libc::close(read_fd);
+                    libc::close(write_fd);
+                }
             }
         }
 

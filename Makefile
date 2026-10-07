@@ -20,8 +20,8 @@ RUST = .
 # runmoc passes both: tcsmoc hands its own payload file to the tcspecial and
 # tcssim it starts, but it never reads the simulation file, so that one reaches
 # tcssim by being in tcsmoc's environment.
-PAYLOAD_YAML = payload1.yaml
-PAYLOAD_SIM_YAML = payload1sim.yaml
+PAYLOAD_YAML = payload2.yaml
+PAYLOAD_SIM_YAML = payload2sim.yaml
 
 RELEASE = --release
 RELEASE =

@@ -271,7 +271,20 @@ produce a successful value. This, in turn, means the dh_id must not be reused.
 
 QUERY_DH
 ^^^^^^^^
-Return statistics from the indicated data handler:
+Return statistics from the indicated data handler.
+
+Requirement
+    A running data handler reports what has moved so far. Its conduits count
+    as data passes and a handler reads those counts where they stand, rather
+    than receiving them when a conduit finishes, so a handler that is working
+    does not report an idle one.
+
+Requirement
+    What a handler reports does not go backwards. Stopping a conduit folds its
+    counts into the handler's own, so the same numbers are reported before and
+    after.
+
+The statistics are:
 
 * Spacecraft time
 

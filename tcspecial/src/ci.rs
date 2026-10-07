@@ -3,7 +3,7 @@
 //! The CI processes commands from the OC and manages data handlers.
 
 use std::collections::BTreeMap;
-use log::{debug, error, trace};
+use log::{debug, error, info, trace};
 use crate::beacon_send::BeaconSend;
 use std::net::UdpSocket;
 //use std::os::unix::io::AsRawFd;
@@ -18,7 +18,7 @@ use tcslibgs::{
 };
 
 use crate::config::constants::{BEACON_NETADDR, RESTART_ARM_TIMEOUT};
-use crate::dh::DataHandler;
+use crate::dh::{DHState, DataHandler};
 use crate::endpoint::bind_endpoint_pair;
 use crate::telemetry_log::TelemetryLog;
 
@@ -58,7 +58,10 @@ pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
     }
 }
 
-/// Build a data handler and start it moving data.
+/// Start a data handler moving data.
+///
+/// The handler already exists -- initialize_handlers made one for every entry
+/// in the payload file -- so this opens its OC endpoints and sets it running.
 ///
 /// The OC endpoints are opened here because this is where the OC's address is
 /// known, from `oc` in the handler's configuration. It is opened once and both
@@ -68,18 +71,39 @@ pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
 /// A handler with no OC address cannot be started. It has nowhere to send what
 /// it reads from its payload and nowhere to read what it should write there,
 /// so this says so rather than starting a handler that moves nothing.
-fn start_handler(config: &DHConfig) -> TcsResult<DataHandler> {
+fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
     let oc = config.oc.clone().ok_or_else(|| {
         TcsError::Config(format!(
             "data handler \"{}\" has no OC address: give it oc_address and oc_port",
             config.name.0
         ))
     })?;
-
-    let mut dh = DataHandler::new(config.clone())?;
-    let (oc_reader, oc_writer) = bind_endpoint_pair(&EndpointConfig::Network(oc))?;
+    let (oc_reader, oc_writer) = bind_endpoint_pair(&EndpointConfig::Network(oc.clone()))?;
     dh.start(oc_reader, oc_writer)?;
-    Ok(dh)
+
+    // Said on the way out, not only on the way wrong. Until this was here
+    // tcspecial logged a handler that failed to start and nothing at all about
+    // one that started, so a session where START_DH answered Success and no
+    // data moved left no record of what the handler had been pointed at.
+    info!(
+        "{} started: payload {}, OC {}:{}",
+        config.name.0,
+        endpoint_description(&config.endpoint),
+        oc.address,
+        oc.port
+    );
+
+    Ok(())
+}
+
+/// What a handler's payload endpoint is, in one line of log.
+fn endpoint_description(endpoint: &EndpointConfig) -> String {
+    match endpoint {
+        EndpointConfig::Network(net) => {
+            format!("{:?} {}:{}", net.protocol, net.address, net.port)
+        }
+        EndpointConfig::Device(dev) => format!("device {}", dev.path),
+    }
 }
 
 impl CommandInterpreter {
@@ -152,27 +176,37 @@ impl CommandInterpreter {
                         Err(_) => return Telemetry::StartDH(StartDHTelemetry::new(cmd.header.sequence, CommandStatus::Failure)),
                     };
 
-                    if handlers.contains_key(&cmd.dh_id) {
-                        // Idempotent - already exists
-                        CommandStatus::Success
-                    } else {
-                        // Find config and create handler
-                        if let Some(config) = self.payload_config.iter().find(|c| c.dh_id == cmd.dh_id) {
-                            match start_handler(config) {
-                                Ok(dh) => {
-                                    handlers.insert(cmd.dh_id, dh);
-                                    CommandStatus::Success
-                                }
-                                Err(e) => {
-                                    error!(
-                                        "{}: cannot start: {}",
-                                        config.name.0, e
-                                    );
-                                    CommandStatus::Failure
-                                }
+                    // Existing is not the same as started. initialize_handlers
+                    // puts a handler in this map for every one the payload file
+                    // describes, all of them Created and none of them running,
+                    // so a check for existence answered Success to every
+                    // START_DH and started nothing. What makes this idempotent
+                    // is the state, not the presence.
+                    match handlers.get_mut(&cmd.dh_id) {
+                        None => CommandStatus::NotFound,
+                        Some(dh) if dh.state() == DHState::Active => {
+                            // Genuinely already started.
+                            CommandStatus::Success
+                        }
+                        Some(dh) => {
+                            match self
+                                .payload_config
+                                .iter()
+                                .find(|c| c.dh_id == cmd.dh_id)
+                            {
+                                Some(config) => match start_handler(dh, config) {
+                                    Ok(()) => CommandStatus::Success,
+                                    Err(e) => {
+                                        error!("{}: cannot start: {}", config.name.0, e);
+                                        CommandStatus::Failure
+                                    }
+                                },
+                                // A handler in the map always came from the
+                                // payload file, so this cannot happen; it is a
+                                // status rather than a panic because a command
+                                // interpreter should not die of a surprise.
+                                None => CommandStatus::NotFound,
                             }
-                        } else {
-                            CommandStatus::NotFound
                         }
                     }
                 };
@@ -187,8 +221,14 @@ impl CommandInterpreter {
 
                     if let Some(dh) = handlers.get_mut(&cmd.dh_id) {
                         match dh.stop() {
-                            Ok(_) => CommandStatus::Success,
-                            Err(_) => CommandStatus::Failure,
+                            Ok(_) => {
+                                info!("{} stopped", dh.name().0);
+                                CommandStatus::Success
+                            }
+                            Err(e) => {
+                                error!("{} cannot stop: {}", dh.name().0, e);
+                                CommandStatus::Failure
+                            }
                         }
                     } else {
                         // Idempotent - not found is also success
@@ -420,6 +460,11 @@ mod tests {
         )
         .expect("an interpreter");
 
+        // As main does, and as the test did not: this is what puts a handler
+        // in the map, Created and not running, and what made a check for
+        // existence answer Success to every START_DH.
+        ci.initialize_handlers().expect("handlers are made at startup");
+
         match ci.process_command(Command::StartDH(StartDHCommand::new(
             1,
             DHId(2),
@@ -471,6 +516,81 @@ mod tests {
             stats.bytes_received, 0,
             "a handler that has been spoken to should report receiving something"
         );
+    }
+
+    /// Starting a handler twice is harmless, and the second time starts
+    /// nothing.
+    ///
+    /// This is what the old existence check was reaching for, and it belongs
+    /// on the state: a handler already Active is already started, where one
+    /// merely present is not.
+    #[test]
+    fn starting_a_running_handler_again_is_harmless() {
+        use std::net::UdpSocket;
+        use tcslibgs::{
+            DHConfig, DHName, DeviceConfig, EndpointConfig, NetworkConfig, StartDHCommand,
+        };
+
+        let probe = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let oc_addr = probe.local_addr().unwrap();
+        drop(probe);
+
+        let handler = DHConfig {
+            dh_id: DHId(2),
+            name: DHName::new("DH2"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 1,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+        };
+
+        let mut ci = CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![handler],
+        )
+        .expect("an interpreter");
+        ci.initialize_handlers().unwrap();
+
+        for attempt in 1..=2 {
+            match ci.process_command(Command::StartDH(StartDHCommand::new(
+                attempt,
+                DHId(2),
+                tcslibgs::DHType::Device,
+                DHName::new("DH2"),
+            ))) {
+                Telemetry::StartDH(tm) => assert!(
+                    tm.header.status.is_success(),
+                    "attempt {attempt} said {:?}",
+                    tm.header.status
+                ),
+                other => panic!("expected START_DH telemetry, got {other:?}"),
+            }
+        }
+
+        // The second start must not have opened the OC address a second time,
+        // which would have failed: it is still bound by the first.
+        let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
+        ground
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        ground.send_to(b"ground", oc_addr).unwrap();
+        let mut buffer = [0u8; 8192];
+        let (n, _) = ground
+            .recv_from(&mut buffer)
+            .expect("the handler started once is still the one running");
+        assert_ne!(n, 0);
     }
 
     /// A port already in use says so, and says which.

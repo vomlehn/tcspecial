@@ -148,12 +148,30 @@ distclean: clean
 	$(MAKE) -C $(DOCS_DIR) clean
 	@echo "✓ Clean complete"
 
-# Install binary globally
+# Install the flight software binary.
+#
+# The package has to be named. The workspace root is a virtual manifest, with
+# no package of its own, so installing from there fails outright:
+#   error: found a virtual manifest at Cargo.toml instead of a package manifest
+#
+# No dependency on build, either: cargo install does its own release build, so
+# depending on build would compile everything in debug first and throw it away.
+#
+# Where the binary lands is cargo's business -- ~/.cargo/bin unless
+# CARGO_INSTALL_ROOT or --root says otherwise -- and cargo prints it, so this
+# does not claim a path of its own.
+#
+# tcsmoc and tcssim are test software and are not installed. Either can be,
+# with cargo install --path tcsmoc, if that is wanted.
+#
+# Note that tcspecial finds its configuration by relative path -- payload1.yaml
+# and tcspecial/src/tcspecial.json -- so an installed copy run from elsewhere
+# needs PAYLOAD_CONFIG_PATH and TCSPECIAL_CONFIG_PATH set, or a working
+# directory that has those files.
 .PHONY: install
-install: build
+install:
 	@echo "Installing $(PROJECT_NAME)..."
-	cd $(RUST) && cargo install --path .
-	@echo "✓ Installed to ~/.cargo/bin/$(PROJECT_NAME)"
+	cargo install --path $(PROJECT_NAME)
 
 # Check code quality
 .PHONY: check

@@ -17,7 +17,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex};
 
 use tcslibgs::config::{
-    load_payload_config, DEFAULT_PAYLOAD_CONFIG_PATH, SIM_PAYLOAD_CONFIG_PATH_VAR,
+    load_dh_configs, DEFAULT_PAYLOAD_CONFIG_PATH, SIM_PAYLOAD_CONFIG_PATH_VAR,
 };
 use tcslibgs::{DHConfig, EndpointConfig, NetworkProtocol};
 
@@ -144,7 +144,7 @@ fn main() {
     let sim_path = env::var(SIM_CONFIG_PATH_VAR)
         .unwrap_or_else(|_| DEFAULT_SIM_CONFIG_PATH.to_string());
 
-    let dh_configs = match load_payload_config(&payload_path) {
+    let dh_configs = match load_dh_configs(&payload_path) {
         Ok(dh_configs) => dh_configs,
         Err(e) => {
             eprintln!("Error loading payload configuration from {}: {}", payload_path, e);
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn the_shipped_files_become_simulator_configs() {
         for (payload_path, sim_path) in shipped_sets() {
-            let dh_configs = load_payload_config(&payload_path)
+            let dh_configs = load_dh_configs(&payload_path)
                 .unwrap_or_else(|e| panic!("{} failed to load: {e}", payload_path.display()));
             let sim_file = SimConfigFile::load(&sim_path)
                 .unwrap_or_else(|e| panic!("{} failed to load: {e}", sim_path.display()));
@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn the_shipped_files_give_a_panel_each() {
         for (payload_path, sim_path) in shipped_sets() {
-            let dh_configs = load_payload_config(&payload_path).unwrap();
+            let dh_configs = load_dh_configs(&payload_path).unwrap();
             let sim_file = SimConfigFile::load(&sim_path).unwrap();
             let sims = sim_file.resolve(&dh_configs).unwrap();
 

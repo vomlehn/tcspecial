@@ -248,9 +248,7 @@ impl EndpointConfigDoc {
                 name: DHName::new(&endpoint.name),
                 endpoint: endpoint_config_of(endpoint, group)?,
                 packet_size: packet_size as usize,
-                // An endpoint configuration describes how to reach a device,
-                // and says nothing about where the OC is.
-                oc: None,
+                oc: endpoint.oc.clone(),
             });
         }
 
@@ -641,6 +639,14 @@ pub struct EndpointDef {
     /// exactly as a group's packet size is; converting the endpoint into a
     /// data handler needs it, because a handler is addressed by id.
     pub dh_id: Option<u32>,
+    /// UDP address the data handler this endpoint becomes exchanges payload
+    /// data with the OC on.
+    ///
+    /// Optional, and belonging to the endpoint rather than its group for the
+    /// reason the endpoint's own address does: it is what distinguishes one
+    /// handler from another. Nothing but starting a handler needs it, so an
+    /// endpoint configuration that only says how to reach devices has none.
+    pub oc: Option<NetworkConfig>,
 }
 
 /// What locates one endpoint of a group, and so distinguishes it from the
@@ -840,6 +846,15 @@ struct EndpointWire {
     port: Option<Scalar>,
     #[serde(default, alias = "@dh_id", alias = "dh-id", alias = "@dh-id")]
     dh_id: Option<Scalar>,
+    #[serde(
+        default,
+        alias = "@oc_address",
+        alias = "oc-address",
+        alias = "@oc-address"
+    )]
+    oc_address: Option<String>,
+    #[serde(default, alias = "@oc_port", alias = "oc-port", alias = "@oc-port")]
+    oc_port: Option<Scalar>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1334,6 +1349,41 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
         None => None,
     };
 
+    let oc_port = match e.oc_port.as_ref() {
+        Some(s) => {
+            let port = parse_u32(&group.name, "oc_port", s)?;
+            if port > u16::MAX as u32 {
+                return Err(bad(&group.name, &format!("oc_port {port} is out of range")));
+            }
+            Some(port as u16)
+        }
+        None => None,
+    };
+
+    // Half an OC address reaches nothing and says nothing about which half was
+    // meant, so it is an error rather than a handler with no OC side.
+    let oc = match (e.oc_address.clone(), oc_port) {
+        // The OC link is UDP whatever the payload side of the handler is.
+        (Some(address), Some(port)) => Some(NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address,
+            port,
+        }),
+        (None, None) => None,
+        (Some(_), None) => {
+            return Err(bad(
+                &group.name,
+                &format!("endpoint \"{}\": oc_address without oc_port", e.name),
+            ))
+        }
+        (None, Some(_)) => {
+            return Err(bad(
+                &group.name,
+                &format!("endpoint \"{}\": oc_port without oc_address", e.name),
+            ))
+        }
+    };
+
     let shape = match &group.kind {
         GroupKind::Serial(_) => LocationShape::Device,
         // A SPI device node names the bus and the chip select together.
@@ -1392,6 +1442,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
             group: e.group,
             location: EndpointLocation::I2c { bus, address },
             dh_id,
+            oc,
         });
     }
 
@@ -1460,6 +1511,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
         group: e.group,
         location,
         dh_id,
+        oc,
     })
 }
 

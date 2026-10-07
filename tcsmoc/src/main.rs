@@ -15,7 +15,7 @@ use std::time::Duration;
 pub use crate::client::TcsClient;
 use tcslib::UdpConnection;
 use tcslibgs::config::{
-    load_payload_config, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
+    load_dh_configs, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
     SIM_PAYLOAD_CONFIG_PATH_VAR,
 };
 use tcslibgs::{
@@ -354,7 +354,7 @@ fn main() {
     };
     eprintln!("Loading payload configuration from: {}", payload_path);
 
-    let dh_configs: Arc<Vec<DHConfig>> = match load_payload_config(&payload_path) {
+    let dh_configs: Arc<Vec<DHConfig>> = match load_dh_configs(&payload_path) {
         Ok(dh_configs) => Arc::new(dh_configs),
         Err(e) => {
             eprintln!(
@@ -941,7 +941,7 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_payload_config(&path)
+        let dh_configs = load_dh_configs(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
 
         assert!(!dh_configs.is_empty(), "no data handlers to show");
@@ -1105,7 +1105,7 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_payload_config(&path)
+        let dh_configs = load_dh_configs(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
 
         let shape = grid_shape(dh_configs.len());

@@ -1004,9 +1004,30 @@ data handlers
 +---------------------+--------+---------------------------------------------+
 | packet_size         | number | Bytes in one packet                         |
 +---------------------+--------+---------------------------------------------+
+| oc_address          | string | Host the handler exchanges payload data     |
+|                     |        | with the OC on. Always UDP                  |
++---------------------+--------+---------------------------------------------+
+| oc_port             | number | Port it does so on                          |
++---------------------+--------+---------------------------------------------+
 
 A group states any of these; a data handler states any of these plus its
 ``dh_id``, its ``name``, and the ``group`` it takes attributes from.
+
+The OC address is where a handler is reached from the ground, and is a
+different thing from the address at which it reaches its payload. It is
+commonly shared by every handler of a group, which is why a group may carry
+it, while the port is what tells one handler of a group from another.
+
+Requirement
+    A data handler states both an OC address and an OC port, or neither. Half
+    of an address reaches nothing, and nothing in the file says which half was
+    meant.
+
+Requirement
+    A payload configuration need not give any handler an OC address. Only
+    starting a handler needs one, so a file describing payloads is complete
+    without it and a handler without one is refused at the point it would be
+    started.
 
 The format has no packet interval. How fast a payload produces packets is a
 property of a simulation rather than of the payload, and belongs to a
@@ -1586,6 +1607,11 @@ in the group.
 | dh_id         | No       | Identifier of the data handler this endpoint     |
 |               |          | becomes; see `Endpoints as Data Handlers`_       |
 +---------------+----------+--------------------------------------------------+
+| oc_address    | No       | Host the data handler this endpoint becomes      |
+|               |          | exchanges payload data with the OC on            |
++---------------+----------+--------------------------------------------------+
+| oc_port       | No       | Port it does so on                               |
++---------------+----------+--------------------------------------------------+
 
 Which of ``device``, ``address`` and ``port`` apply depends on the group.
 
@@ -1643,12 +1669,27 @@ format is built around; the packet size comes from the group, and the id from
 the endpoint, because an id distinguishes one handler from another exactly as
 an address distinguishes one endpoint from another.
 
-Nothing reads a payload set from an endpoint file yet. The conversion exists
-so that it is settled and tested before any program depends on it: which file
-each program reads has to be decided for all three at once, since tcsmoc's
-panels, tcssim's payloads and tcspecial's handlers must describe the same
-handlers, and a program reading a different file is the drift the payload set
-mechanism exists to prevent.
+All three programs read data handlers this way. Each is given a file and takes
+its handlers from it whichever kind it is, so a payload set may be written
+either way and the three stay in step: tcsmoc's panels, tcssim's payloads and
+tcspecial's handlers are the same handlers, which is what the payload set
+mechanism exists to keep true. Tcsmoc passes the file it was given to the
+programs it starts, so one argument names the set for all three.
+
+Requirement
+    A file's kind is read from the sections it carries -- ``data_handlers``
+    for a payload configuration, ``endpoints`` or the groups of them for an
+    endpoint configuration -- and not from its name. A file's extension says
+    how it is spelled, YAML or JSON or XML, and both kinds can be written in
+    any of the three.
+
+Requirement
+    A file carrying neither section is an error. It describes no data handlers,
+    and reading it as an endpoint configuration with no endpoints would make an
+    empty document look like a valid one.
+
+The loader is ``tcslibgs::config::load_dh_configs``, and
+``handler_source`` answers which kind a file holds without loading it.
 
 Requirement
     An endpoint becoming a data handler has a ``dh_id``. An endpoint
@@ -1666,6 +1707,13 @@ Requirement
     size. The attribute is optional for the same reason ``dh_id`` is, and
     required for the same reason: a handler must know how much data a packet
     carries.
+
+Requirement
+    An endpoint becoming a data handler that is to be started states an
+    ``oc_address`` and an ``oc_port``, or neither, exactly as a data handler of
+    a payload configuration does. They belong to the endpoint rather than its
+    group, for the reason the endpoint's own address does: they are what
+    distinguish one handler from another.
 
 Requirement
     An endpoint of an I2C group does not become a data handler. There is no

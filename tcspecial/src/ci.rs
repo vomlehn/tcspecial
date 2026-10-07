@@ -40,6 +40,24 @@ pub struct CommandInterpreter {
     telemetry_log: TelemetryLog,
 }
 
+/// Say what could not be bound, and what that usually means.
+///
+/// A bare io::Error carries the kind and nothing else, so the whole of what a
+/// reader got was "Address already in use (os error 98)" -- not which address,
+/// and no hint that the usual cause is a second copy of the program. Both ends
+/// of a data handler bind an address too, so this is used for all of them.
+pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
+    if e.kind() == std::io::ErrorKind::AddrInUse {
+        TcsError::Config(format!(
+            "cannot listen on {addr} for the {what}: address already in use. \
+             Something else holds it -- most often another tcspecial, or a \
+             tcsmoc that starts one of its own"
+        ))
+    } else {
+        TcsError::Config(format!("cannot listen on {addr} for the {what}: {e}"))
+    }
+}
+
 /// Build a data handler and start it moving data.
 ///
 /// The OC endpoints are opened here because this is where the OC's address is
@@ -68,7 +86,7 @@ impl CommandInterpreter {
     /// Create a new command interpreter
     pub fn new(config: CIConfig, payload_config: Vec<DHConfig>) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let socket = UdpSocket::bind(&addr)?;
+        let socket = UdpSocket::bind(&addr).map_err(|e| bind_failed("command interpreter", &addr, e))?;
         socket.set_nonblocking(false)?;
 
         // Opened here, before the main loop: see TelemetryLog::open.
@@ -356,6 +374,47 @@ mod tests {
 
         let ci = CommandInterpreter::new(config, vec![]);
         assert!(ci.is_ok());
+    }
+
+    /// A port already in use says so, and says which.
+    ///
+    /// The bare io::Error behind this said "Address already in use (os error
+    /// 98)" and nothing more -- not the address, and no hint that the usual
+    /// cause is a second copy of the program running.
+    #[test]
+    fn an_address_already_in_use_names_itself() {
+        use std::net::UdpSocket;
+
+        // Hold a port, then ask for the same one.
+        let held = UdpSocket::bind("127.0.0.1:0").expect("a port");
+        let addr = held.local_addr().expect("its address");
+
+        let config = CIConfig {
+            address: addr.ip().to_string(),
+            port: addr.port(),
+            protocol: NetworkProtocol::Udp,
+            beacon_interval: BeaconTime(5000),
+            log_dir: None,
+            log_segment_bytes: 65_536,
+        };
+
+        let message = CommandInterpreter::new(config, vec![])
+            .err()
+            .expect("binding a held port must fail")
+            .to_string();
+
+        assert!(
+            message.contains(&addr.to_string()),
+            "the error should name the address, but said: {message}"
+        );
+        assert!(
+            message.contains("already in use"),
+            "the error should say what is wrong, but said: {message}"
+        );
+        assert!(
+            message.contains("tcspecial"),
+            "the error should suggest the usual cause, but said: {message}"
+        );
     }
 
     /// A command interpreter on a port the OS picks, with no payloads.

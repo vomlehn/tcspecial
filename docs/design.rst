@@ -326,6 +326,13 @@ someone is looking at a data handler's panel, and carrying payload bytes in
 routine telemetry would spend downlink on data nobody reads.
 
 Requirement
+    A command tcspecial does not implement is refused. CONFIG_DH is the one
+    such command: nothing configures a data handler, and the command carries
+    nothing to configure one with, so it answers ``InvalidCommand``. Answering
+    success would tell the ground a handler had been reconfigured when none
+    had, and there is no way to tell that from a success that was earned.
+
+Requirement
     A sample carries the time the data moved, not the time it was asked about.
     A panel showing the latter would read as activity whenever it was looked
     at.
@@ -2223,6 +2230,22 @@ data longer than a sample is shown as a head followed by an ellipsis.
 A handler whose conduits have carried nothing in a direction shows
 ``--:--:--`` and no data for it, which is also what a panel shows before it
 has been queried at all.
+
+Requirement
+    The panels are refreshed without being asked. A handler moving data must
+    not look like one doing nothing, which is what a panel that changed only
+    when a button was pressed showed.
+
+Requirement
+    Asking a handler what to show does not happen on the window's own thread.
+    Each command waits on the spacecraft for as long as the client's timeout
+    allows, and a window that stops repainting while tcspecial is slow to
+    answer is a worse fault than a panel a second out of date.
+
+Requirement
+    A handler that answers the statistics but not the samples keeps the sample
+    lines it had. A blank line says a handler has moved nothing, which is a
+    different thing from a question that went unanswered.
 
 Testing requires starting up tcssim before other operations and shutting it down
 when tcsmoc is halted.

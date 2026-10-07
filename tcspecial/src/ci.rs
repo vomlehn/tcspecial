@@ -238,9 +238,26 @@ impl CommandInterpreter {
                 }
                 Telemetry::Config(ConfigTelemetry::new(cmd.header.sequence, CommandStatus::Success))
             }
-            Command::ConfigDH(_cmd) => {
-                // Not yet implemented
-                Telemetry::ConfigDH(tcslibgs::ConfigDHTelemetry::new(_cmd.header.sequence, CommandStatus::Success))
+            Command::ConfigDH(cmd) => {
+                // Refused rather than answered Success. Nothing here
+                // configures a data handler, and the command carries nothing
+                // to configure it with: ConfigDHCommand has a dh_id and a
+                // note that settings could be added to it. Answering Success
+                // told the ground a handler had been reconfigured when
+                // nothing had happened, which is worse than saying so,
+                // because there is no way to tell it from the real thing.
+                //
+                // InvalidCommand rather than Failure: the handler did not
+                // fail to be configured, the command is one tcspecial does
+                // not implement.
+                error!(
+                    "CONFIG_DH for {:?} refused: tcspecial does not implement it",
+                    cmd.dh_id
+                );
+                Telemetry::ConfigDH(tcslibgs::ConfigDHTelemetry::new(
+                    cmd.header.sequence,
+                    CommandStatus::InvalidCommand,
+                ))
             }
         }
     }
@@ -324,7 +341,7 @@ impl CommandInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::NetworkProtocol;
+    use tcslibgs::{ConfigDHCommand, NetworkProtocol};
 
     #[test]
     fn test_ci_creation() {
@@ -339,5 +356,60 @@ mod tests {
 
         let ci = CommandInterpreter::new(config, vec![]);
         assert!(ci.is_ok());
+    }
+
+    /// A command interpreter on a port the OS picks, with no payloads.
+    fn interpreter() -> CommandInterpreter {
+        CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![],
+        )
+        .expect("an interpreter")
+    }
+
+    /// CONFIG_DH is refused rather than answered with success.
+    ///
+    /// It answered Success while doing nothing, and the command carries
+    /// nothing to configure a handler with, so the ground was told a handler
+    /// had been reconfigured when none had. A control application cannot tell
+    /// a success it earned from one it did not; this pins the refusal, and is
+    /// what will say so if the command is ever implemented.
+    #[test]
+    fn config_dh_is_refused_rather_than_answered_with_success() {
+        let mut ci = interpreter();
+
+        let answer = ci.process_command(Command::ConfigDH(ConfigDHCommand::new(7, DHId(0))));
+
+        match answer {
+            Telemetry::ConfigDH(tm) => {
+                assert!(
+                    !tm.header.status.is_success(),
+                    "an unimplemented command must not report success"
+                );
+                assert_eq!(tm.header.status, CommandStatus::InvalidCommand);
+                // The answer still belongs to the command that asked.
+                assert_eq!(tm.header.sequence, 7);
+            }
+            other => panic!("expected CONFIG_DH telemetry, got {other:?}"),
+        }
+    }
+
+    /// A command that is implemented still answers success, so the test above
+    /// is about CONFIG_DH and not about every command being refused.
+    #[test]
+    fn an_implemented_command_still_succeeds() {
+        let mut ci = interpreter();
+
+        match ci.process_command(Command::Ping(tcslibgs::PingCommand::new(1))) {
+            Telemetry::Ping(tm) => assert!(tm.header.status.is_success()),
+            other => panic!("expected PING telemetry, got {other:?}"),
+        }
     }
 }

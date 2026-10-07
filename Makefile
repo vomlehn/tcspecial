@@ -11,15 +11,23 @@ DOCS_DIR := docs
 DESIGN=$(DOCS_DIR)/design.rst
 RUST = .
 
-# The payload set to run. tcsmoc takes its payload file as a command line
-# argument and tcssim takes its simulation file in the environment, so run
-# another set with
-#   make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
-#   make runsim PAYLOAD_SIM_YAML=payload2sim.yaml
+# The payload set to run.
 #
-# runmoc passes both: tcsmoc hands its own payload file to the tcspecial and
-# tcssim it starts, but it never reads the simulation file, so that one reaches
-# tcssim by being in tcsmoc's environment.
+# PAYLOAD_YAML names the file defining the payloads, which may be written as a
+# payload configuration or as an endpoint configuration; every program takes it
+# as a command line argument. PAYLOAD_SIM_YAML names the simulator settings,
+# which only tcssim reads and which it takes from the environment. So:
+#   make run    PAYLOAD_YAML=payload2.yaml
+#   make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+#   make runsim PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+#
+# runmoc passes both because tcsmoc hands its own payload file to the tcspecial
+# and tcssim it starts, but never reads the simulation file, so that one
+# reaches tcssim by being in tcsmoc's environment.
+#
+# runsim passes both for a different reason: run on its own, tcssim needs the
+# payload file as well as the simulation file, and the two must describe the
+# same set or the names will not match.
 PAYLOAD_YAML = payload2.yaml
 PAYLOAD_SIM_YAML = payload2sim.yaml
 
@@ -97,7 +105,7 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=info cargo run --bin tcspecial \
+		cd $(RUST) && RUST_LOG=info cargo run --bin tcspecial -- $(PAYLOAD_YAML) \
 	)
 
 # Run the MOC application
@@ -115,7 +123,7 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcssim \
+		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcssim -- $(PAYLOAD_YAML) \
 	)
 
 # Clean build artifacts

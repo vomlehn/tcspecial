@@ -47,6 +47,45 @@ pub fn load_payload_config<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> 
     payload_config.to_dh_configs().map_err(TcsError::Config)
 }
 
+/// The payload configuration file a program was told to read.
+///
+/// Every program that serves, controls or simulates a payload set needs to be
+/// pointed at one, and they are all pointed the same way: a command line
+/// argument first, then the program's own environment variable, then
+/// [`DEFAULT_PAYLOAD_CONFIG_PATH`]. The argument comes first because it is
+/// the unambiguous one -- tcsmoc starts the other two as subprocesses and
+/// they inherit its environment, so a variable can reach further than it was
+/// meant to, where an argument cannot.
+///
+/// `var` is the program's variable, or `None` for a program that has none:
+/// tcsmoc deliberately has no variable of its own, for the reason above.
+///
+/// One argument is expected. A second is refused rather than ignored, because
+/// a second path is more likely a mistake about which file is being read than
+/// something meant to have no effect.
+pub fn payload_path_from_args<I: Iterator<Item = String>>(
+    mut args: I,
+    var: Option<&str>,
+) -> Result<String, String> {
+    let program = args.next().unwrap_or_else(|| "program".to_string());
+
+    let from_args = args.next();
+    if let Some(extra) = args.next() {
+        return Err(format!(
+            "unexpected argument \"{}\"\nusage: {} [payload configuration file]",
+            extra, program
+        ));
+    }
+
+    if let Some(path) = from_args {
+        return Ok(path);
+    }
+
+    Ok(var
+        .and_then(|var| std::env::var(var).ok())
+        .unwrap_or_else(|| DEFAULT_PAYLOAD_CONFIG_PATH.to_string()))
+}
+
 /// Which kind of configuration a file holds.
 ///
 /// A file's extension says how it is spelled -- YAML, JSON or XML -- and not
@@ -163,6 +202,59 @@ endpoints:
     address: localhost
     port: 5000
 ";
+
+    /// Arguments as a program really receives them, its own name first.
+    fn args(rest: &[&str]) -> std::vec::IntoIter<String> {
+        let mut all = vec!["program".to_string()];
+        all.extend(rest.iter().map(|s| s.to_string()));
+        all.into_iter()
+    }
+
+    #[test]
+    fn an_argument_names_the_payload_file() {
+        assert_eq!(
+            payload_path_from_args(args(&["payload2.yaml"]), None).unwrap(),
+            "payload2.yaml"
+        );
+    }
+
+    #[test]
+    fn with_no_argument_and_no_variable_the_default_is_read() {
+        assert_eq!(
+            payload_path_from_args(args(&[]), None).unwrap(),
+            DEFAULT_PAYLOAD_CONFIG_PATH
+        );
+    }
+
+    #[test]
+    fn an_argument_beats_the_variable() {
+        // The argument is the unambiguous one: a variable set for one program
+        // reaches the subprocesses it starts, and an argument does not.
+        let var = "TCS_TEST_PAYLOAD_PATH_PRECEDENCE";
+        std::env::set_var(var, "from_the_environment.yaml");
+
+        assert_eq!(
+            payload_path_from_args(args(&["from_the_argument.yaml"]), Some(var)).unwrap(),
+            "from_the_argument.yaml"
+        );
+        // And with no argument the variable is what is left.
+        assert_eq!(
+            payload_path_from_args(args(&[]), Some(var)).unwrap(),
+            "from_the_environment.yaml"
+        );
+
+        std::env::remove_var(var);
+    }
+
+    #[test]
+    fn a_second_payload_file_is_refused_rather_than_ignored() {
+        let message = payload_path_from_args(args(&["one.yaml", "two.yaml"]), None)
+            .expect_err("two paths must be refused");
+        assert!(
+            message.contains("two.yaml"),
+            "the error should name the extra argument, but said: {message}"
+        );
+    }
 
     #[test]
     fn each_kind_of_file_is_recognised_by_its_sections() {

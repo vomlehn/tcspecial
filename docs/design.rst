@@ -2166,42 +2166,58 @@ Requirement
     rather than an argument with no effect, because it is more likely a mistake
     about which file is being read than something meant to be ignored.
 
-Each program names its payload file its own way: tcsmoc on its command line,
-tcspecial through ``PAYLOAD_CONFIG_PATH``, and tcssim through
-``SIM_PAYLOAD_CONFIG_PATH``. Tcssim names its simulator configuration
-separately again, through ``PAYLOAD_SIM_YAML``.
+Every program is pointed at its payload file the same way: as a command line
+argument, failing that the program's own environment variable --
+``PAYLOAD_CONFIG_PATH`` for tcspecial and ``SIM_PAYLOAD_CONFIG_PATH`` for
+tcssim, while tcsmoc has none for the reason below -- and failing that
+payload1.yaml. Tcssim names its simulator configuration separately again,
+through ``PAYLOAD_SIM_YAML``.
 
 Requirement
-    Tcsmoc passes its own payload file to each program it starts, through that
-    program's variable. Tcsmoc builds its panels from that file, so a child
+    An argument naming the payload file takes precedence over any environment
+    variable naming one. The argument is the unambiguous of the two: tcsmoc
+    starts the other programs and they inherit its environment, so a variable
+    can reach further than it was meant to, where an argument reaches exactly
+    the program it is given to.
+
+Requirement
+    One payload file is named. A second argument is an error rather than one
+    with no effect, because it is more likely a mistake about which file is
+    being read than something meant to be ignored.
+
+Requirement
+    Tcsmoc passes its own payload file to each program it starts, as that
+    program's argument. Tcsmoc builds its panels from that file, so a child
     reading a different one would serve or simulate payloads the panels do not
     describe: handlers that never connect, with nothing on screen to say why.
 
-Setting the variable on each child's own command, rather than in tcsmoc's
-environment, is what makes this possible -- it is the thing a single inherited
-variable could not do -- and it overrides any value inherited from the shell.
-For the run of a payload set, tcsmoc's file is the one that counts.
+An argument is what makes this possible. Tcsmoc has no variable of its own
+because its children inherit its environment: a variable naming tcsmoc's file
+would name theirs as well, and could not point one at a different file from
+the other. An argument reaches exactly the program it is given to, and beats
+anything that program would otherwise have taken from the environment, so for
+the run of a payload set tcsmoc's file is the one that counts.
 
-Both variable names are defined in ``tcslibgs::config``, beside the loader
-that reads the file they name, so the name tcsmoc sets for a child is the same
-constant that child reads. Tcsmoc builds each child's command without running
-it, so what a child would be started with is checked by a test rather than by
-starting it: the programs open windows and bind fixed ports, which makes
-running them a poor way to test anything.
+Tcsmoc builds each child's command without running it, so what a child would
+be started with is checked by a test rather than by starting it: the programs
+open windows and bind fixed ports, which makes running them a poor way to test
+anything.
 
 The one file tcsmoc does not pass on is tcssim's simulator configuration.
 Tcsmoc never reads it and so has nothing to say about which one is right;
 tcssim takes it from ``PAYLOAD_SIM_YAML``, inherited from tcsmoc's environment
 like any other variable.
 
-The Makefile names a set once for this reason. ``PAYLOAD_YAML`` reaches tcsmoc
-as its argument and ``PAYLOAD_SIM_YAML`` reaches tcssim in the environment,
-both defaulting to payload set 1, so running another set whole is::
+The Makefile names a set once for this reason. ``PAYLOAD_YAML`` reaches every
+program as its argument and ``PAYLOAD_SIM_YAML`` reaches tcssim in the
+environment, so running another set whole is::
 
    make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
 
-``make runsim`` takes ``PAYLOAD_SIM_YAML`` the same way, for running the
-simulator by itself.
+``make run`` takes ``PAYLOAD_YAML`` for tcspecial alone, and ``make runsim``
+takes both for the simulator alone -- both, because tcssim run by itself needs
+the payload file as well as the simulator file, and the two must describe the
+same set or their names will not match.
 
 The window is built from that file. Nothing in the GUI names a data handler or
 fixes how many there are, so a handler added to or removed from payload1.yaml

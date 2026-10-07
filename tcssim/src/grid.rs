@@ -12,15 +12,63 @@
 //! tcsmoc shapes its own window by the same rule, with the sizes of its own
 //! panels.
 
-/// A panel's nominal size, and the height of everything above and below the
-/// grid of them: the heading and the row holding the quit button.
+/// A panel's nominal size, and everything the window needs beyond the panels
+/// themselves: the heading, the row holding the quit button, the padding
+/// round them, and the grid's own padding inside the scrolling area.
 ///
 /// These are used only to choose how many columns the grid has and how large
 /// the window opens; the layout itself stretches panels to fit. They have to
 /// agree with `ui/main.slint`, which is given the same panel size.
+///
+/// The two chrome figures are measured rather than estimated --
+/// `every_panels_data_is_inside_the_window` opens the window headlessly and
+/// checks them. The height was 76 and wanted 92, and the width was not
+/// allowed for at all: the sixteen pixels of padding the grid keeps inside
+/// the scrolling area, plus the eight the window keeps round that, were
+/// missing from both, so the grid stood wider and taller than the area it was
+/// given and the lowest row of panels was cut off along the bottom.
 pub const PANEL_WIDTH: f32 = 320.0;
 pub const PANEL_HEIGHT: f32 = 210.0;
-pub const CHROME_HEIGHT: f32 = 76.0;
+pub const CHROME_HEIGHT: f32 = 92.0;
+pub const CHROME_WIDTH: f32 = 24.0;
+
+/// How many rows of panels the window looks ahead for.
+///
+/// Asked for rather than worked out: a window with room for only the rows a
+/// particular payload file happens to have is one that has to be resized
+/// before a larger file can be watched, and three rows is the room that was
+/// wanted. It is not a floor, though -- see [`rows_of_room`]. tcsmoc follows
+/// the same rule, in its own panel sizes.
+pub const MIN_PANEL_ROWS: usize = 3;
+
+/// How many rows of panels the window opens with room for.
+///
+/// Never fewer than the grid has, so that nothing is cut off; never more than
+/// [`MIN_PANEL_ROWS`], which is as far ahead as the window looks; and never
+/// more rows than there are payloads to put in them, so a file of one or two
+/// payloads opens only as tall as those need rather than keeping room it
+/// could not fill.
+pub fn rows_of_room(rows: usize, panels: usize) -> usize {
+    rows.max(MIN_PANEL_ROWS.min(panels.max(1)))
+}
+
+/// How tall a window with room for `rows` rows of panels is. The grid sets no
+/// gap between them, so there is none to allow for.
+///
+/// One row of them is the window's `min-height`, the least it is ever opened
+/// at; [`rows_of_room`] says how many rows a particular payload file opens
+/// with.
+pub fn height_for_rows(rows: usize) -> f32 {
+    rows.max(1) as f32 * PANEL_HEIGHT + CHROME_HEIGHT
+}
+
+/// The size the window opens at for a grid of `shape` holding `panels`.
+pub fn window_size(shape: &GridShape, panels: usize) -> slint::LogicalSize {
+    slint::LogicalSize::new(
+        shape.width,
+        height_for_rows(rows_of_room(shape.rows, panels)),
+    )
+}
 
 /// How the grid of payload panels is shaped, and the window size that shape
 /// asks for.
@@ -57,8 +105,8 @@ pub fn grid_shape(panels: usize) -> GridShape {
         GridShape {
             columns,
             rows,
-            width: columns as f32 * PANEL_WIDTH,
-            height: rows as f32 * PANEL_HEIGHT + CHROME_HEIGHT,
+            width: columns as f32 * PANEL_WIDTH + CHROME_WIDTH,
+            height: height_for_rows(rows),
         }
     };
 
@@ -76,12 +124,38 @@ pub fn grid_shape(panels: usize) -> GridShape {
 mod tests {
     use super::*;
 
+    /// The room the window opens with, which is a rule rather than a floor.
+    ///
+    /// Three rows are looked ahead for, so a file that grows a row can be
+    /// watched without resizing the window; but a file with fewer panels than
+    /// that opens only as tall as the panels it has, rather than with room
+    /// below that nothing could fill. A grid taller than three rows is given
+    /// all of them.
+    #[test]
+    fn the_window_keeps_room_for_the_rows_there_are_to_fill() {
+        // One and two payloads: as tall as they need and no taller.
+        assert_eq!(rows_of_room(1, 1), 1);
+        assert_eq!(rows_of_room(2, 2), 2);
+
+        // Three or more: three rows of room, whatever the grid came to.
+        assert_eq!(rows_of_room(1, 3), 3);
+        assert_eq!(rows_of_room(2, 4), 3);
+        assert_eq!(rows_of_room(3, 9), 3);
+
+        // And never fewer rows than the grid actually has.
+        assert_eq!(rows_of_room(4, 16), 4);
+        assert_eq!(rows_of_room(8, 64), 8);
+
+        // An empty payload file still opens a window.
+        assert_eq!(rows_of_room(1, 0), 1);
+    }
+
     /// The shape chosen for the shipped four payloads.
     #[test]
     fn four_panels_make_a_two_by_two() {
         let shape = grid_shape(4);
         assert_eq!((shape.columns, shape.rows), (2, 2));
-        assert_eq!((shape.width, shape.height), (640.0, 496.0));
+        assert_eq!((shape.width, shape.height), (664.0, 512.0));
     }
 
     #[test]
@@ -126,8 +200,8 @@ mod tests {
 
             for columns in 1..=panels {
                 let rows = panels.div_ceil(columns);
-                let width = columns as f32 * PANEL_WIDTH;
-                let height = rows as f32 * PANEL_HEIGHT + CHROME_HEIGHT;
+                let width = columns as f32 * PANEL_WIDTH + CHROME_WIDTH;
+                let height = height_for_rows(rows);
                 if width < height {
                     continue;
                 }

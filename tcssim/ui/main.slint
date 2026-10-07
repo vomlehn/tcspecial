@@ -140,16 +140,16 @@ component PayloadPanel inherits Rectangle {
             }
         }
 
-        // Compact stats
-        HorizontalLayout {
+        // The three rows of data the panel ends with.
+        sent-row := HorizontalLayout {
             height: 14px;
             Text { text: "Sent: " + last-sent-time + " " + last-sent-data; font-size: 9px; }
         }
-        HorizontalLayout {
+        recv-row := HorizontalLayout {
             height: 14px;
             Text { text: "Recv: " + last-recv-time + " " + last-recv-data; font-size: 9px; }
         }
-        HorizontalLayout {
+        packets-row := HorizontalLayout {
             height: 14px;
             Text { text: "Pkts: " + packets-sent + " sent / " + packets-recv + " recv"; font-size: 9px; }
         }
@@ -159,6 +159,11 @@ component PayloadPanel inherits Rectangle {
 export component MainWindow inherits Window {
     title: "TCSpecial Payload Simulator";
     background: white;
+
+    // One row of panels and the chrome, which is the least the window is
+    // ever opened at -- a payload file of one payload. How much more it opens
+    // at is Rust's to say: see rows_of_room() in grid.rs.
+    min-height: 302px;
 
     // The simulated payloads, read from the configuration files by Rust.
     in-out property <[PayloadInfo]> payload-model: [];
@@ -188,8 +193,8 @@ export component MainWindow inherits Window {
             horizontal-alignment: center;
         }
 
-        ScrollView {
-            GridBox {
+        scroll := ScrollView {
+            grid := GridBox {
                 spacing: 0px;
                 height: payload-model.length == 0
                     ? 0px

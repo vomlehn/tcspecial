@@ -47,7 +47,13 @@ component DHPanel inherits Rectangle {
         padding: 8px;
         spacing: 4px;
 
+        // Every row says the least it can be read in. Without that the
+        // panel has no floor at all -- a Text will shrink to nothing and clip
+        // its own glyphs rather than refuse -- and PANEL_HEIGHT would be a
+        // guess about font metrics instead of the sum of these, which
+        // every_panels_data_is_inside_the_window measures.
         HorizontalLayout {
+            min-height: 20px;
             Text {
                 text: dh-name;
                 font-size: 14px;
@@ -68,6 +74,7 @@ component DHPanel inherits Rectangle {
         }
 
         HorizontalLayout {
+            min-height: 16px;
             // No packet interval: how often a payload produces a packet is a
             // property of a simulation rather than of a payload, so it lives in
             // the simulator's own file and tcssim is what shows it.
@@ -86,23 +93,35 @@ component DHPanel inherits Rectangle {
             }
         }
 
-        GroupBox {
-            title: "Last Sent";
-            HorizontalLayout {
-                Text { text: last-sent-time; font-size: 10px; }
-                Text { text: last-sent-data; font-size: 10px; }
-            }
+        // The three rows of data the panel ends with. They are named
+        // because they are the rows that went missing: a panel given less
+        // height than it needs loses them off the bottom first, and
+        // every_panels_data_is_inside_the_window finds them by these names
+        // and requires them to be where they can be seen.
+        // Labelled lines rather than a group box each. A group box spends
+        // some sixty-five pixels on its title and padding to hold one line of
+        // ten point text, and two of them were half the height of the panel:
+        // three rows of panels then wanted a window taller than a 1080 line
+        // screen. The same two readings, named the same way, in a quarter of
+        // the room.
+        last-sent-row := HorizontalLayout {
+            spacing: 4px;
+            min-height: 14px;
+            Text { text: "Last sent:"; font-size: 10px; vertical-alignment: center; }
+            Text { text: last-sent-time; font-size: 10px; vertical-alignment: center; }
+            Text { text: last-sent-data; font-size: 10px; vertical-alignment: center; }
         }
 
-        GroupBox {
-            title: "Last Received";
-            HorizontalLayout {
-                Text { text: last-recv-time; font-size: 10px; }
-                Text { text: last-recv-data; font-size: 10px; }
-            }
+        last-recv-row := HorizontalLayout {
+            spacing: 4px;
+            min-height: 14px;
+            Text { text: "Last rcvd:"; font-size: 10px; vertical-alignment: center; }
+            Text { text: last-recv-time; font-size: 10px; vertical-alignment: center; }
+            Text { text: last-recv-data; font-size: 10px; vertical-alignment: center; }
         }
 
-        HorizontalLayout {
+        counters-row := HorizontalLayout {
+            min-height: 14px;
             Text { text: "Sent: " + bytes-sent + " bytes"; font-size: 10px; }
             Text { text: "Recv: " + bytes-recv + " bytes"; font-size: 10px; }
         }
@@ -119,7 +138,10 @@ export component MainWindow inherits Window {
     // panels. They match MIN_WINDOW_WIDTH and CHROME_HEIGHT + PANEL_HEIGHT in
     // main.rs, which the_window_and_rust_agree_on_the_sizes checks.
     min-width: 700px;
-    min-height: 482px;
+    // One row of panels and the chrome, which is the least the window is ever
+    // opened at -- a payload file of one handler. How much more it opens at
+    // is Rust's to say: see rows_of_room() in main.rs.
+    min-height: 508px;
     background: white;
 
     in-out property <string> ci-status: "Disconnected";
@@ -137,8 +159,19 @@ export component MainWindow inherits Window {
     in-out property <int> columns: 1;
 
     // One panel's height, which has to agree with PANEL_HEIGHT in main.rs:
-    // Rust sizes the window by it and the grid below claims that much per row.
-    property <length> panel-height: 210px;
+    // Rust sizes the window by it and every panel claims at least this much.
+    //
+    // It is what a panel's own contents need, measured rather than guessed:
+    // the sum of the floors the panel's rows declare, which the layout tests
+    // in main.rs read off a window they open headlessly. It was 210 for a
+    // long time against the 259 the panel then took, and the three rows of
+    // data at the bottom of every panel paid the difference.
+    property <length> panel-height: 162px;
+
+    // The gap between one panel and the next, which has to agree with
+    // GRID_SPACING in main.rs: the window opens tall enough for the gaps as
+    // well as the panels.
+    property <length> grid-spacing: 10px;
 
     // Rows follow from the panel count and the column count.
     property <int> grid-rows: Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
@@ -160,6 +193,12 @@ export component MainWindow inherits Window {
         // CI Control Section
         GroupBox {
             title: "Command Interpreter";
+            // Its own height and not a pixel more. Without this it stretches
+            // like the data handler group below it, and since a ScrollView
+            // can always be made smaller, every pixel the two of them argued
+            // over went here: the buttons came out half again as tall as they
+            // should be and the panels lost the room they needed.
+            vertical-stretch: 0;
 
             VerticalLayout {
                 spacing: 8px;
@@ -367,16 +406,21 @@ export component MainWindow inherits Window {
         // Data Handlers Section
         GroupBox {
             title: "Data Handlers";
+            // The one thing that takes up the slack, or gives it up.
+            vertical-stretch: 1;
 
-            ScrollView {
-                GridBox {
-                    spacing: 10px;
-                    // As tall as the grid needs, rather than a fixed height:
-                    // the window was opened to fit exactly this, and a fixed
-                    // height would either clip the panels or leave a gap.
-                    height: root.grid-rows * root.panel-height;
-
+            scroll := ScrollView {
+                grid := GridBox {
+                    spacing: root.grid-spacing;
+                    // No height of its own. It used to claim grid-rows *
+                    // panel-height, which the panels then overran, and a
+                    // ScrollView centres content shorter than itself: that is
+                    // where the gap under the Data Handlers heading came
+                    // from, with the panels hanging off the bottom at the
+                    // same time. Each panel asks for the height it needs
+                    // instead, and the grid is as tall as they come to.
                     for dh[i] in dh-model: DHPanel {
+                        min-height: root.panel-height;
                         row: Math.floor(i / Math.max(1, root.columns));
                         col: Math.mod(i, Math.max(1, root.columns));
                         dh-name: dh.name;
@@ -398,6 +442,7 @@ export component MainWindow inherits Window {
 
         // Quit Button
         HorizontalLayout {
+            vertical-stretch: 0;
             Rectangle { }
             Button {
                 text: "Quit";

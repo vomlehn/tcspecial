@@ -203,6 +203,88 @@ fn dh_info_from(dh: &DHConfig) -> DHInfo {
     }
 }
 
+/// What one panel shows, gathered from a handler.
+///
+/// Plain values rather than a model row, because this crosses a thread: the
+/// asking happens away from the event loop, where blocking is allowed, and
+/// only the applying happens on it. A Slint model is not `Send`, and the
+/// client's commands wait on the spacecraft for as long as its timeout
+/// allows, so doing both in one place would mean a window that stops
+/// repainting whenever tcspecial is slow to answer.
+#[derive(Clone)]
+struct PanelUpdate {
+    row: usize,
+    bytes_sent: i32,
+    bytes_recv: i32,
+    last_sent_time: SharedString,
+    last_sent: SharedString,
+    last_recv_time: SharedString,
+    last_recv: SharedString,
+}
+
+/// Ask one handler what its panel should show.
+///
+/// `None` when it did not answer at all. A handler that answers the statistics
+/// but not the samples keeps the sample lines it had: the last thing seen is
+/// better than nothing seen, and a blank line reads as no data rather than no
+/// answer.
+fn panel_update_for(
+    client: &mut TcsClient,
+    row: usize,
+    dh: &DHConfig,
+    previous: Option<&PanelUpdate>,
+) -> Option<PanelUpdate> {
+    let (_, stats) = client.query_dh(dh.dh_id).ok()?;
+
+    // A second command, because the statistics every poll asks for do not
+    // carry payload bytes.
+    let samples = client.query_dh_sample(dh.dh_id).ok();
+
+    let (last_sent_time, last_sent, last_recv_time, last_recv) = match samples {
+        Some((_, sent, received)) => {
+            let (sent_time, sent_data) = sample_lines(&sent);
+            let (recv_time, recv_data) = sample_lines(&received);
+            (sent_time, sent_data, recv_time, recv_data)
+        }
+        None => match previous {
+            Some(p) => (
+                p.last_sent_time.clone(),
+                p.last_sent.clone(),
+                p.last_recv_time.clone(),
+                p.last_recv.clone(),
+            ),
+            None => (
+                SharedString::from(NO_TRANSFER_TIME),
+                SharedString::new(),
+                SharedString::from(NO_TRANSFER_TIME),
+                SharedString::new(),
+            ),
+        },
+    };
+
+    Some(PanelUpdate {
+        row,
+        bytes_sent: stats.bytes_sent as i32,
+        bytes_recv: stats.bytes_received as i32,
+        last_sent_time,
+        last_sent,
+        last_recv_time,
+        last_recv,
+    })
+}
+
+/// Put a gathered update into its panel.
+fn apply_panel_update(dh_model: &Rc<VecModel<DHInfo>>, update: &PanelUpdate) {
+    update_row(dh_model, update.row, |info| {
+        info.bytes_sent = update.bytes_sent;
+        info.bytes_recv = update.bytes_recv;
+        info.last_sent_time = update.last_sent_time.clone();
+        info.last_sent = update.last_sent.clone();
+        info.last_recv_time = update.last_recv_time.clone();
+        info.last_recv = update.last_recv.clone();
+    });
+}
+
 /// The two strings a panel shows for one sample: when, and what.
 ///
 /// A sample with no time is one whose direction has carried nothing, which is
@@ -423,6 +505,7 @@ fn main() {
 
     handle_main_menu(&ui, ui_weak.clone(), client.clone());
     query_dh_buttons(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
+    poll_panels(client.clone(), dh_configs.clone(), dh_model.clone());
     start_dh_handler(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
     stop_dh_handler(&ui, ui_weak.clone(), client.clone(), dh_configs.clone(), dh_model.clone());
 /*
@@ -588,42 +671,99 @@ fn query_dh_buttons(
         let mut results = Vec::new();
 
         for (row, dh) in dh_configs.iter().enumerate() {
-            match guard.query_dh(dh.dh_id) {
-                Ok((status, stats)) => {
+            match panel_update_for(&mut guard, row, dh, None) {
+                Some(update) => {
                     results.push(format!(
-                        "{}: {:?} sent={} recv={}",
-                        dh.name.0, status, stats.bytes_sent, stats.bytes_received
+                        "{}: sent={} recv={}",
+                        dh.name.0, update.bytes_sent, update.bytes_recv
                     ));
-
-                    update_row(&dh_model, row, |info| {
-                        info.bytes_sent = stats.bytes_sent as i32;
-                        info.bytes_recv = stats.bytes_received as i32;
-                    });
+                    apply_panel_update(&dh_model, &update);
                 }
-                Err(e) => {
-                    results.push(format!("{}: Error - {}", dh.name.0, e));
-                }
-            }
-
-            // The samples are a second command, because the statistics every
-            // poll asks for do not carry payload bytes. A handler that cannot
-            // answer leaves its two lines as they were rather than blanking
-            // them: the last thing seen is better than nothing seen.
-            if let Ok((_, sent, received)) = guard.query_dh_sample(dh.dh_id) {
-                update_row(&dh_model, row, |info| {
-                    let (time, data) = sample_lines(&sent);
-                    info.last_sent_time = time;
-                    info.last_sent = data;
-
-                    let (time, data) = sample_lines(&received);
-                    info.last_recv_time = time;
-                    info.last_recv = data;
-                });
+                None => results.push(format!("{}: no answer", dh.name.0)),
             }
         }
 
         ui.set_last_response(SharedString::from(results.join("; ")));
     });
+}
+
+/// How often the panels are refreshed without being asked.
+const PANEL_POLL_INTERVAL: Duration = Duration::from_millis(1000);
+
+/// Keep the panels current.
+///
+/// Until this existed a panel only changed when someone pressed Query All, so
+/// a handler moving data looked exactly like one doing nothing: the byte
+/// counters and the two sample lines sat at whatever the last click had left.
+///
+/// The asking happens on a thread of its own and the applying on the event
+/// loop. That split is the point: each command waits on the spacecraft for up
+/// to the client's timeout, and four handlers' worth of that on the event loop
+/// would be a window that stops repainting whenever tcspecial is slow. The
+/// thread leaves what it gathered where the timer can pick it up.
+fn poll_panels(
+    client: Arc<Mutex<TcsClient>>,
+    dh_configs: Arc<Vec<DHConfig>>,
+    dh_model: Rc<VecModel<DHInfo>>,
+) {
+    let pending: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
+
+    {
+        let pending = pending.clone();
+        thread::spawn(move || {
+            // What each panel last showed, so a handler that answers the
+            // statistics but not the samples keeps its sample lines.
+            let mut last: Vec<Option<PanelUpdate>> = vec![None; dh_configs.len()];
+
+            loop {
+                thread::sleep(PANEL_POLL_INTERVAL);
+
+                let mut gathered = Vec::with_capacity(dh_configs.len());
+                {
+                    // Held across the handlers rather than per handler, so a
+                    // click cannot interleave with a poll and leave a panel
+                    // showing one handler's statistics beside another's
+                    // samples.
+                    let mut guard = match client.lock() {
+                        Ok(guard) => guard,
+                        Err(_) => return,
+                    };
+                    for (row, dh) in dh_configs.iter().enumerate() {
+                        if let Some(update) =
+                            panel_update_for(&mut guard, row, dh, last[row].as_ref())
+                        {
+                            last[row] = Some(update.clone());
+                            gathered.push(update);
+                        }
+                    }
+                }
+
+                if let Ok(mut queue) = pending.lock() {
+                    *queue = gathered;
+                }
+            }
+        });
+    }
+
+    // On the event loop, where the model may be touched. This does no I/O, so
+    // it cannot hold the window up.
+    let timer = slint::Timer::default();
+    timer.start(
+        slint::TimerMode::Repeated,
+        PANEL_POLL_INTERVAL,
+        move || {
+            let updates = match pending.lock() {
+                Ok(mut queue) => std::mem::take(&mut *queue),
+                Err(_) => return,
+            };
+            for update in &updates {
+                apply_panel_update(&dh_model, update);
+            }
+        },
+    );
+
+    // The timer stops when it is dropped, and this function is returning.
+    std::mem::forget(timer);
 }
 
 // Start DH handler
@@ -746,6 +886,97 @@ mod tests {
     }
 
     /// A panel's two lines, from the sample telemetry that feeds them.
+    /// A gathered update reaches the panel it names, and only that one.
+    #[test]
+    fn an_update_goes_to_its_own_panel() {
+        let dh = DHConfig {
+            dh_id: DHId(1),
+            name: DHName::new("DH1"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/null".to_string(),
+            }),
+            packet_size: 1,
+            oc: None,
+        };
+
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
+            dh_info_from(&dh),
+            dh_info_from(&dh),
+        ]));
+
+        apply_panel_update(
+            &model,
+            &PanelUpdate {
+                row: 1,
+                bytes_sent: 7,
+                bytes_recv: 9,
+                last_sent_time: SharedString::from("01:02:03"),
+                last_sent: SharedString::from("AA BB"),
+                last_recv_time: SharedString::from("04:05:06"),
+                last_recv: SharedString::from("CC"),
+            },
+        );
+
+        let touched = model.row_data(1).unwrap();
+        assert_eq!(touched.bytes_sent, 7);
+        assert_eq!(touched.bytes_recv, 9);
+        assert_eq!(touched.last_sent_time, SharedString::from("01:02:03"));
+        assert_eq!(touched.last_recv, SharedString::from("CC"));
+
+        // Row 0 was not named, so it is untouched.
+        let other = model.row_data(0).unwrap();
+        assert_eq!(other.bytes_sent, 0);
+        assert_eq!(other.last_sent_time, SharedString::from(NO_TRANSFER_TIME));
+    }
+
+    /// A handler that answers the statistics but not the samples keeps the
+    /// sample lines it had, rather than having them blanked.
+    ///
+    /// A blank line reads as a handler that has moved nothing, which is a
+    /// different thing from one that did not answer the question.
+    #[test]
+    fn a_missing_sample_leaves_the_previous_one_showing() {
+        let previous = PanelUpdate {
+            row: 0,
+            bytes_sent: 1,
+            bytes_recv: 2,
+            last_sent_time: SharedString::from("11:22:33"),
+            last_sent: SharedString::from("DE AD"),
+            last_recv_time: SharedString::from("44:55:66"),
+            last_recv: SharedString::from("BE EF"),
+        };
+
+        let dh = DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new("DH0"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/null".to_string(),
+            }),
+            packet_size: 1,
+            oc: None,
+        };
+
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![dh_info_from(&dh)]));
+        apply_panel_update(&model, &previous);
+
+        // What panel_update_for does when the sample query fails: carry the
+        // previous strings through onto the new statistics.
+        let carried = PanelUpdate {
+            bytes_sent: 10,
+            bytes_recv: 20,
+            ..previous.clone()
+        };
+        apply_panel_update(&model, &carried);
+
+        let shown = model.row_data(0).unwrap();
+        assert_eq!(shown.bytes_sent, 10, "the new statistics are shown");
+        assert_eq!(
+            shown.last_sent, previous.last_sent,
+            "the sample lines are the ones last seen"
+        );
+        assert_eq!(shown.last_recv_time, previous.last_recv_time);
+    }
+
     #[test]
     fn a_sample_becomes_a_time_and_a_row_of_bytes() {
         let mut sample = DHSample::new();

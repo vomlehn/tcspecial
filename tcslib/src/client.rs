@@ -1,4 +1,14 @@
 //! TCSpecial client for ground software integration
+//!
+//! This is what a control application built on tcslib talks to tcspecial
+//! through: one set of operations for global control and status, and one set
+//! per data handler. A mission control system such as YAMCS or MCT drives a
+//! [`TcsClient`] rather than speaking the command and telemetry protocol
+//! itself.
+//!
+//! The transport is a [`Connection`], so a client is as happy over a UDP
+//! socket to a radio as over a TCP socket to a test harness, and neither the
+//! operations nor their callers change with it.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -8,7 +18,7 @@ use tcslibgs::{
     StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
 };
 
-use tcslib::Connection;
+use crate::connection::Connection;
 
 /// Default timeout for command responses
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -46,11 +56,12 @@ impl TcsClient {
         self.connection.receive_timeout(self.timeout)
     }
 
+    // -- global control and status ----------------------------------------
+
     /// Send a PING command
     pub fn ping(&mut self) -> TcsResult<tcslibgs::PingTelemetry> {
         let seq = self.next_sequence();
         let cmd = Command::Ping(PingCommand::new(seq));
-eprintln!("sending ping command");
         let response = self.send_command(cmd)?;
 
         match response {
@@ -82,6 +93,8 @@ eprintln!("sending ping command");
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
+
+    // -- per data handler --------------------------------------------------
 
     /// Send a START_DH command
     pub fn start_dh(&mut self, dh_id: DHId, dh_type: DHType, name: DHName) -> TcsResult<CommandStatus> {
@@ -148,9 +161,10 @@ eprintln!("sending ping command");
         }
     }
 
+    // -- telemetry and the connection itself -------------------------------
+
     /// Receive telemetry (blocking)
     pub fn receive_telemetry(&mut self) -> TcsResult<Telemetry> {
-eprintln!("TcsClient::receive_telemetry: calling self.connection.receive");
         self.connection.receive()
     }
 
@@ -189,7 +203,6 @@ impl TcsClientBuilder {
 
     pub fn build(self, connection: Box<dyn Connection>) -> TcsClient {
         let mut client = TcsClient::new(connection);
-eprintln!("build: set client");
         client.set_timeout(self.timeout);
         client
     }

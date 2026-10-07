@@ -2,7 +2,6 @@
 //!
 //! A GUI application for testing and visualizing tcspecial operation.
 
-pub mod client;
 
 use slint::{LogicalSize, Model, ModelRc, SharedString, VecModel};
 use std::env;
@@ -12,8 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-pub use crate::client::TcsClient;
-use tcslib::UdpConnection;
+use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::config::{
     load_dh_configs, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
     SIM_PAYLOAD_CONFIG_PATH_VAR,

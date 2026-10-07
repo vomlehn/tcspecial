@@ -940,6 +940,24 @@ The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.  It is used for building control applications using mission control
 software such as YAMCS or MCT.
 
+Those operations are ``tcslib::client::TcsClient``. A control application
+drives one of those rather than speaking the command and telemetry protocol
+itself: each operation sends its command, waits for the answering telemetry,
+and hands back what that telemetry carried. The global operations are PING,
+RESTART_ARM, RESTART and CONFIG; the per-handler ones are START_DH, STOP_DH,
+QUERY_DH and QUERY_DH_SAMPLE.
+
+Requirement
+    An operation that is not answered within the client's timeout is an error.
+    A control application on a link that has gone quiet is told so rather than
+    left waiting.
+
+The transport is a ``Connection``, so the same client serves a UDP socket to a
+radio and a TCP socket to a test harness without the operations or their
+callers changing. Tcsmoc is built on this client, which is why it is here
+rather than in tcsmoc: a second copy of it would be a second thing to keep
+correct, and the one in tcsmoc was the only one that existed.
+
 tcslibgs
 --------
 The TCSpecial ground/space library contains definitions used by both

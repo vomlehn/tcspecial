@@ -8,9 +8,7 @@ use std::process;
 use log::{error, info, trace};
 use tcspecial::config::{load_endpoint_config, load_tcspecial_config};
 use tcspecial::CommandInterpreter;
-use tcslibgs::config::{
-    load_dh_configs, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
-};
+use tcslibgs::config::{load_dh_configs, payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 
 fn main() {
     // Default to info so that the startup messages below, which used to
@@ -38,8 +36,19 @@ fn main() {
         }
     };
 
-    let payload_path = env::var(PAYLOAD_CONFIG_PATH_VAR)
-        .unwrap_or_else(|_| DEFAULT_PAYLOAD_CONFIG_PATH.to_string());
+    // Named on the command line, or by PAYLOAD_CONFIG_PATH, or the default.
+    // The file may be a payload configuration or an endpoint configuration;
+    // load_dh_configs reads either.
+    let payload_path = match payload_path_from_args(
+        env::args(),
+        Some(PAYLOAD_CONFIG_PATH_VAR),
+    ) {
+        Ok(payload_path) => payload_path,
+        Err(e) => {
+            error!("{}", e);
+            process::exit(1);
+        }
+    };
     info!("Loading payload configuration from: {}", payload_path);
 
     // Load configuration

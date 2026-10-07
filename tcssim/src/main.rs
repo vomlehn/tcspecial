@@ -16,9 +16,7 @@ use std::rc::Rc;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex};
 
-use tcslibgs::config::{
-    load_dh_configs, DEFAULT_PAYLOAD_CONFIG_PATH, SIM_PAYLOAD_CONFIG_PATH_VAR,
-};
+use tcslibgs::config::{load_dh_configs, payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
 use tcslibgs::{DHConfig, EndpointConfig, NetworkProtocol};
 
 mod grid;
@@ -139,8 +137,16 @@ fn main() {
 
     // Read both configuration files before the window exists, so a file that
     // cannot be read is reported plainly rather than as an empty window.
-    let payload_path = env::var(SIM_PAYLOAD_CONFIG_PATH_VAR)
-        .unwrap_or_else(|_| DEFAULT_PAYLOAD_CONFIG_PATH.to_string());
+    let payload_path = match payload_path_from_args(
+        env::args(),
+        Some(SIM_PAYLOAD_CONFIG_PATH_VAR),
+    ) {
+        Ok(payload_path) => payload_path,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
     let sim_path = env::var(SIM_CONFIG_PATH_VAR)
         .unwrap_or_else(|_| DEFAULT_SIM_CONFIG_PATH.to_string());
 

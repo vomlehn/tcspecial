@@ -221,6 +221,18 @@ pub struct DHConfig {
     pub name: DHName,
     pub endpoint: EndpointConfig,
     pub packet_size: usize,
+    /// Where this handler exchanges payload data with the OC.
+    ///
+    /// Always UDP: that is the link between the OC and a data handler. Each
+    /// handler has its own address, because the OC addresses a handler rather
+    /// than the spacecraft and then the handler within it.
+    ///
+    /// `None` for a configuration that assigns none. A handler cannot be
+    /// started without one -- it would have nowhere to send what it reads --
+    /// but a file describing payloads is complete without it, and so is a
+    /// handler converted from an endpoint configuration, which has no OC side
+    /// to give.
+    pub oc: Option<NetworkConfig>,
 }
 
 /// Payload configuration file structure
@@ -342,6 +354,10 @@ pub struct DHGroupJson {
     pub path: Option<String>,
     #[serde(default)]
     pub packet_size: Option<usize>,
+    #[serde(default)]
+    pub oc_address: Option<String>,
+    #[serde(default)]
+    pub oc_port: Option<u16>,
 }
 
 /// JSON representation of DH config
@@ -367,6 +383,15 @@ pub struct DHConfigJson {
     pub path: Option<String>,
     #[serde(default)]
     pub packet_size: Option<usize>,
+    /// Address this handler exchanges payload data with the OC on.
+    ///
+    /// Commonly shared by every handler of a group, which is why a group may
+    /// carry it; the port is what tells one handler of a group from another,
+    /// like a network endpoint's port.
+    #[serde(default)]
+    pub oc_address: Option<String>,
+    #[serde(default)]
+    pub oc_port: Option<u16>,
 }
 
 impl DHConfigJson {
@@ -403,6 +428,11 @@ impl DHConfigJson {
         let packet_size = self
             .packet_size
             .or_else(|| group.and_then(|g| g.packet_size));
+        let oc_address = self
+            .oc_address
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.oc_address.as_deref()));
+        let oc_port = self.oc_port.or_else(|| group.and_then(|g| g.oc_port));
 
         let endpoint = match dh_type {
             Some("network") => {
@@ -426,11 +456,26 @@ impl DHConfigJson {
             None => return Err("Missing type".to_string()),
         };
 
+        // Half an OC address is a mistake rather than a configuration: a
+        // handler given a port and no address, or the reverse, cannot be
+        // reached and nothing about the file says which was meant.
+        let oc = match (oc_address, oc_port) {
+            (Some(address), Some(port)) => Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: address.to_string(),
+                port,
+            }),
+            (None, None) => None,
+            (Some(_), None) => return Err("oc_address without oc_port".to_string()),
+            (None, Some(_)) => return Err("oc_port without oc_address".to_string()),
+        };
+
         Ok(DHConfig {
             dh_id: DHId(self.dh_id),
             name: DHName::new(&self.name),
             endpoint,
             packet_size: packet_size.ok_or("Missing packet_size")?,
+            oc,
         })
     }
 }
@@ -699,6 +744,89 @@ data_handlers:
                 path: "/dev/urandom".to_string()
             })
         );
+    }
+
+    #[test]
+    fn an_oc_address_comes_from_the_handler_or_its_group() {
+        let config = payload(
+            "
+version: \"1.0\"
+description: an OC address shared, a port each
+data_handler_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+    oc_address: 127.0.0.1
+data_handlers:
+  - dh_id: 1
+    name: DH1
+    group: udp_localhost
+    oc_port: 6001
+    port: 5001
+    packet_size: 11
+",
+        );
+
+        let handlers = config.to_dh_configs().unwrap();
+        assert_eq!(
+            handlers[0].oc,
+            Some(NetworkConfig {
+                // The OC link is UDP whatever the payload side is.
+                protocol: NetworkProtocol::Udp,
+                address: "127.0.0.1".to_string(),
+                port: 6001,
+            })
+        );
+    }
+
+    #[test]
+    fn a_handler_needs_no_oc_address() {
+        // A file describing payloads is complete without one; only starting a
+        // handler needs it.
+        let config = payload(
+            "
+version: \"1.0\"
+description: no OC side at all
+data_handlers:
+  - dh_id: 2
+    name: DH2
+    type: device
+    path: /dev/urandom
+    packet_size: 1
+",
+        );
+
+        assert_eq!(config.to_dh_configs().unwrap()[0].oc, None);
+    }
+
+    #[test]
+    fn half_an_oc_address_is_an_error() {
+        // A port with no address, or an address with no port, reaches nothing
+        // and says nothing about which was meant.
+        for (what, line) in [("port", "oc_address: 127.0.0.1"), ("address", "oc_port: 6000")] {
+            let config = payload(&format!(
+                "
+version: \"1.0\"
+description: half an OC address
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    {line}
+    type: device
+    path: /dev/urandom
+    packet_size: 1
+"
+            ));
+
+            let message = config
+                .to_dh_configs()
+                .expect_err(&format!("an OC address with no {what} must be rejected"));
+            assert!(
+                message.contains("oc_"),
+                "the error should name the attributes, but said: {message}"
+            );
+        }
     }
 
     #[test]

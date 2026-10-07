@@ -248,6 +248,9 @@ impl EndpointConfigDoc {
                 name: DHName::new(&endpoint.name),
                 endpoint: endpoint_config_of(endpoint, group)?,
                 packet_size: packet_size as usize,
+                // An endpoint configuration describes how to reach a device,
+                // and says nothing about where the OC is.
+                oc: None,
             });
         }
 

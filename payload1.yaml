@@ -8,6 +8,11 @@
 #
 # A data handler takes its attributes from the group it names, and may then
 # override any of them for itself.
+#
+# oc_address and oc_port are the UDP address the handler exchanges payload data
+# with the OC on, which is a different thing from the address it reaches its
+# payload at. Every handler here shares the address and has a port of its own,
+# numbered to match its dh_id.
 version: "1.0"
 description: TCSpecial payload set 1
 
@@ -23,6 +28,8 @@ data_handler_groups:
 data_handlers:
   - dh_id: 0
     name: DH0
+    oc_address: 127.0.0.1
+    oc_port: 6000
     type: network
     protocol: tcp
     address: localhost
@@ -31,18 +38,24 @@ data_handlers:
 
   - dh_id: 1
     name: DH1
+    oc_address: 127.0.0.1
+    oc_port: 6001
     group: udp_localhost
     port: 5001
     packet_size: 11
 
   - dh_id: 2
     name: DH2
+    oc_address: 127.0.0.1
+    oc_port: 6002
     type: device
     path: /dev/urandom
     packet_size: 1
 
   - dh_id: 3
     name: DH3
+    oc_address: 127.0.0.1
+    oc_port: 6003
     group: udp_localhost
     port: 5003
     packet_size: 15

@@ -136,3 +136,68 @@ fn the_shipped_files_have_distinct_data_handler_ids() {
         );
     }
 }
+
+/// Every shipped handler can be started.
+///
+/// A handler needs an OC address to run: without one it has nowhere to send
+/// what it reads from its payload. The payload format leaves it optional,
+/// because a file describing payloads is complete without it, so nothing but a
+/// test of the real files catches a shipped handler that StartDH would refuse.
+#[test]
+fn every_shipped_handler_has_an_oc_address() {
+    for path in shipped_payload_files() {
+        for dh in load_payload_config(&path).unwrap() {
+            let oc = dh.oc.unwrap_or_else(|| {
+                panic!(
+                    "{}: {} has no OC address, so it cannot be started",
+                    path.display(),
+                    dh.name.0
+                )
+            });
+            assert!(!oc.address.is_empty(), "{}: empty OC address", dh.name.0);
+            assert_ne!(oc.port, 0, "{}: no OC port", dh.name.0);
+        }
+    }
+}
+
+/// No two shipped handlers share an OC port, and none collides with a payload
+/// port on the same host.
+///
+/// Two handlers binding one address is a start that fails at the second, and
+/// an OC port equal to a payload port on the same host is the same collision
+/// one step further away.
+#[test]
+fn shipped_handlers_do_not_share_a_port() {
+    for path in shipped_payload_files() {
+        let handlers = load_payload_config(&path).unwrap();
+        let mut bound: Vec<(String, u16, String)> = Vec::new();
+
+        for dh in &handlers {
+            if let Some(oc) = &dh.oc {
+                bound.push((oc.address.clone(), oc.port, format!("{} OC", dh.name.0)));
+            }
+            if let EndpointConfig::Network(net) = &dh.endpoint {
+                bound.push((
+                    net.address.clone(),
+                    net.port,
+                    format!("{} payload", dh.name.0),
+                ));
+            }
+        }
+
+        for (i, (address, port, what)) in bound.iter().enumerate() {
+            for (other_address, other_port, other) in &bound[i + 1..] {
+                // localhost and 127.0.0.1 are the same host under two names,
+                // so compare the ports and say so when they match.
+                let same_host = address == other_address
+                    || ["localhost", "127.0.0.1"].contains(&address.as_str())
+                        && ["localhost", "127.0.0.1"].contains(&other_address.as_str());
+                assert!(
+                    !(same_host && port == other_port),
+                    "{}: {what} and {other} both want {address}:{port}",
+                    path.display()
+                );
+            }
+        }
+    }
+}

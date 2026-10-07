@@ -1964,6 +1964,13 @@ environment, is what makes this possible -- it is the thing a single inherited
 variable could not do -- and it overrides any value inherited from the shell.
 For the run of a payload set, tcsmoc's file is the one that counts.
 
+Both variable names are defined in ``tcslibgs::config``, beside the loader
+that reads the file they name, so the name tcsmoc sets for a child is the same
+constant that child reads. Tcsmoc builds each child's command without running
+it, so what a child would be started with is checked by a test rather than by
+starting it: the programs open windows and bind fixed ports, which makes
+running them a poor way to test anything.
+
 The one file tcsmoc does not pass on is tcssim's simulator configuration.
 Tcsmoc never reads it and so has nothing to say about which one is right;
 tcssim takes it from ``PAYLOAD_SIM_YAML``, inherited from tcsmoc's environment

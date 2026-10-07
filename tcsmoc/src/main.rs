@@ -14,9 +14,12 @@ use std::time::Duration;
 
 pub use crate::client::TcsClient;
 use tcslib::UdpConnection;
-use tcslibgs::config::load_payload_config;
+use tcslibgs::config::{
+    load_payload_config, DEFAULT_PAYLOAD_CONFIG_PATH, PAYLOAD_CONFIG_PATH_VAR,
+    SIM_PAYLOAD_CONFIG_PATH_VAR,
+};
 use tcslibgs::{ArmKey, CommandStatus, DHConfig, DHType, EndpointConfig, NetworkProtocol};
-use tcspecial::config::constants::{BEACON_NETADDR, PAYLOAD_CONFIG_PATH_VAR};
+use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::config::constants::BEACON_INDICATOR;
@@ -30,22 +33,19 @@ mod config;
 /// Default CI address
 const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
 
-/// What the MOC reads when the command line names no payload configuration.
-const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "payload1.yaml";
-
-/// How the MOC's children are told which payload file to read.
+/// The MOC's children, and the variable each one names its payload
+/// configuration with.
 ///
-/// Each names its payload configuration with its own variable, so each has to
-/// be told separately; see [`ProcessManager::start_child`]. Tcssim's
-/// simulator configuration is not among these: the MOC never reads it and so
-/// has nothing to say about it, and tcssim takes it from `PAYLOAD_SIM_YAML`,
-/// which it inherits from the MOC's own environment.
-///
-/// Tcspecial's name comes from tcspecial itself, so the compiler keeps the two
-/// in step. Tcssim builds no library to take its name from, so that one is
-/// spelled here and in `tcssim/src/main.rs`; the two must match.
-const TCSPECIAL_PAYLOAD_VAR: &str = PAYLOAD_CONFIG_PATH_VAR;
-const TCSSIM_PAYLOAD_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
+/// Both names come from tcslibgs, beside the loader that reads the file, so
+/// the name set here is the one the child reads. Tcssim's simulator
+/// configuration is not among these: the MOC never reads it and so has
+/// nothing to say about which one is right, and tcssim takes it from
+/// `PAYLOAD_SIM_YAML`, inherited from the MOC's environment like any other
+/// variable.
+const CHILDREN: [(&str, &str); 2] = [
+    ("tcspecial", PAYLOAD_CONFIG_PATH_VAR),
+    ("tcssim", SIM_PAYLOAD_CONFIG_PATH_VAR),
+];
 
 /// The payload configuration file named on the command line.
 ///
@@ -205,6 +205,30 @@ fn update_row(model: &Rc<VecModel<DHInfo>>, row: usize, f: impl FnOnce(&mut DHIn
     }
 }
 
+/// The command that starts one of the MOC's children.
+///
+/// The child is told which payload file to read, through the variable that
+/// child names its payload configuration with. Tcsmoc builds its panels from
+/// that file, so a child reading a different one would serve or simulate
+/// payloads the panels do not describe -- handlers that never connect, with
+/// nothing on screen to say why. Setting the variable on the child's own
+/// command rather than in the MOC's environment is what lets each child be
+/// told separately -- the thing one inherited variable could not do -- and it
+/// overrides any value inherited from the shell: for the run of a payload set,
+/// the MOC's own file is the one that counts.
+///
+/// The command is built rather than run so that a test can read what a child
+/// would be started with, without starting it. The children open windows and
+/// bind fixed ports, so a test that spawned them would not be a test anyone
+/// could run twice at once, or alongside a real session.
+fn child_command(name: &str, payload_var: &str, payload_path: &str) -> Command {
+    let mut command = Command::new("cargo");
+    command
+        .args(["run", "--bin", name])
+        .env(payload_var, payload_path);
+    command
+}
+
 /// Manages the tcssim subprocess
 struct ProcessManager {
     child: Arc<Mutex<Option<Child>>>,
@@ -220,20 +244,8 @@ impl ProcessManager {
     }
 
     /// Starts a child in a background thread and exits when it completes.
-    ///
-    /// The child is told which payload file to read, through the variable that
-    /// child names its payload configuration with. Tcsmoc builds its panels
-    /// from that file, so a child reading a different one would simulate or
-    /// serve payloads the panels do not describe -- handlers that never
-    /// connect, with nothing on screen to say why. Setting the variable on the
-    /// child's own command rather than in tcsmoc's environment is what lets
-    /// each child be told separately, and overrides any value inherited from
-    /// the shell: for the run of a payload set, tcsmoc's own file is the one
-    /// that counts.
     fn start_child(&self, name: &str, payload_var: &str, payload_path: &str) {
-        let child = Command::new("cargo")
-            .args(["run", "--bin", name])
-            .env(payload_var, payload_path)
+        let child = child_command(name, payload_var, payload_path)
             .spawn()
             .expect(&format!("Failed to start {}", name));
 
@@ -342,14 +354,11 @@ fn main() {
 
     // Start tcspecial and tcssim subprocesses first, each reading the payload
     // file tcsmoc read, so all three describe the same payloads.
+    let [(tcspecial, tcspecial_var), (tcssim, tcssim_var)] = CHILDREN;
     let process_manager_tcspecial = Arc::new(ProcessManager::new());
-    process_manager_tcspecial.start_child(
-        "tcspecial",
-        TCSPECIAL_PAYLOAD_VAR,
-        &payload_path,
-    );
+    process_manager_tcspecial.start_child(tcspecial, tcspecial_var, &payload_path);
     let process_manager_tcssim = Arc::new(ProcessManager::new());
-    process_manager_tcssim.start_child("tcssim", TCSSIM_PAYLOAD_VAR, &payload_path);
+    process_manager_tcssim.start_child(tcssim, tcssim_var, &payload_path);
 
     eprintln!("started tcspecial and tcssim, sleeping to let them initialize");
     thread::sleep(Duration::new(2, 0));
@@ -672,6 +681,7 @@ fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: &Arc<Process
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsStr;
     use std::path::Path;
     use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig};
 
@@ -697,6 +707,94 @@ mod tests {
             payload_path_from_args(args(&[])).unwrap(),
             DEFAULT_PAYLOAD_CONFIG_PATH
         );
+    }
+
+    /// Each child is started on the payload file the MOC read, through that
+    /// child's own variable and nothing else.
+    ///
+    /// This is what was previously only ever confirmed by running the MOC and
+    /// reading what its children printed.
+    #[test]
+    fn each_child_is_started_on_the_mocs_payload_file() {
+        for (name, var) in CHILDREN {
+            let command = child_command(name, var, "payload2.yaml");
+
+            assert_eq!(command.get_program(), "cargo", "{name}");
+            let args: Vec<&OsStr> = command.get_args().collect();
+            assert_eq!(args, ["run", "--bin", name], "{name}");
+
+            // Exactly one variable, so neither child is handed the other's
+            // and none of the MOC's own environment is overridden besides.
+            let envs: Vec<(&OsStr, Option<&OsStr>)> = command.get_envs().collect();
+            assert_eq!(
+                envs,
+                [(OsStr::new(var), Some(OsStr::new("payload2.yaml")))],
+                "{name}"
+            );
+        }
+    }
+
+    /// The file a child is started on is the one named on the command line.
+    #[test]
+    fn the_children_get_the_file_the_command_line_named() {
+        let payload_path = payload_path_from_args(args(&["payload2.yaml"])).unwrap();
+
+        for (name, var) in CHILDREN {
+            let command = child_command(name, var, &payload_path);
+            let envs: Vec<(&OsStr, Option<&OsStr>)> = command.get_envs().collect();
+            assert_eq!(
+                envs,
+                [(OsStr::new(var), Some(OsStr::new("payload2.yaml")))],
+                "{name} was not given the file the command line named"
+            );
+        }
+    }
+
+    /// With no argument, the children are started on the same default the MOC
+    /// itself reads, so an unconfigured run has all three on one payload set.
+    #[test]
+    fn with_no_argument_every_program_is_on_the_same_default() {
+        let payload_path = payload_path_from_args(args(&[])).unwrap();
+        assert_eq!(payload_path, DEFAULT_PAYLOAD_CONFIG_PATH);
+
+        for (name, var) in CHILDREN {
+            let command = child_command(name, var, &payload_path);
+            let envs: Vec<(&OsStr, Option<&OsStr>)> = command.get_envs().collect();
+            assert_eq!(
+                envs,
+                [(
+                    OsStr::new(var),
+                    Some(OsStr::new(DEFAULT_PAYLOAD_CONFIG_PATH))
+                )],
+                "{name}"
+            );
+        }
+    }
+
+    /// Each child is paired with the variable that child reads.
+    ///
+    /// The pairing is named here rather than read back out of `CHILDREN`,
+    /// because every other test in this file iterates that table and so would
+    /// agree with it however it were wrong -- two entries swapped included.
+    /// The final authority is each child's own reader, which lives in that
+    /// child's binary and so cannot be imported; this is what can be checked
+    /// from here.
+    ///
+    /// Two different variables is the point of them: the children inherit the
+    /// MOC's environment, so one shared name would name the MOC's file and
+    /// theirs at once.
+    #[test]
+    fn each_child_is_paired_with_the_variable_it_reads() {
+        assert_eq!(
+            CHILDREN,
+            [
+                ("tcspecial", PAYLOAD_CONFIG_PATH_VAR),
+                ("tcssim", SIM_PAYLOAD_CONFIG_PATH_VAR),
+            ]
+        );
+
+        let [(_, tcspecial_var), (_, tcssim_var)] = CHILDREN;
+        assert_ne!(tcspecial_var, tcssim_var);
     }
 
     #[test]

@@ -2202,6 +2202,25 @@ Requirement
     reading a different one would serve or simulate payloads the panels do not
     describe: handlers that never connect, with nothing on screen to say why.
 
+Requirement
+    Tcsmoc does not start a tcspecial when one is already running. It asks by
+    PING, and attaches to the one that answers instead of starting a second.
+
+Starting a second never worked: the command interpreter's address can be bound
+once, so the second exits and tcsmoc comes up with a window, no spacecraft
+behind it, and the reason on a terminal nobody is reading. Asking by PING
+rather than by looking for a process or a bound port is deliberate -- what
+matters is whether a command interpreter answers, where a bound port might be
+anything and a process of that name might be wedged -- and it finds a
+tcspecial that is not a local process at all.
+
+Requirement
+    Tcsmoc stops only what it started. A tcspecial it attached to rather than
+    started is left running when tcsmoc closes: something else started it,
+    something else may still be using it, and shutting down a command
+    interpreter because a ground display was closed is not the display's
+    decision.
+
 An argument is what makes this possible. Tcsmoc has no variable of its own
 because its children inherit its environment: a variable naming tcsmoc's file
 would name theirs as well, and could not point one at a different file from

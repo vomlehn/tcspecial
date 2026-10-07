@@ -493,7 +493,8 @@ mod tests {
                 port: 5003,
             }),
             packet_size: 15,
-        };
+     oc: None,
+ };
 
         let info = payload_info_from(&dh, &sim(500, 250, 5));
         assert_eq!(info.name, SharedString::from("DH3"));
@@ -515,7 +516,8 @@ mod tests {
                 path: "/dev/urandom".to_string(),
             }),
             packet_size: 4,
-        };
+     oc: None,
+ };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).unwrap();
         assert_eq!(config.address, "/dev/urandom");
@@ -539,7 +541,8 @@ mod tests {
                 port: 0,
             }),
             packet_size: 4,
-        };
+     oc: None,
+ };
 
         assert!(payload_config_from(&dh, &sim(250, 250, 4)).is_err());
     }

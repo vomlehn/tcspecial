@@ -786,6 +786,7 @@ mod tests {
                 path: "/dev/null".to_string(),
             }),
             packet_size: 1,
+            oc: None,
         };
 
         let info = dh_info_from(&dh);
@@ -996,6 +997,7 @@ mod tests {
                     path: "/dev/urandom".to_string(),
                 }),
                 packet_size: 4,
+                oc: None,
             },
             DHConfig {
                 dh_id: DHId(9),
@@ -1006,6 +1008,7 @@ mod tests {
                     port: 5009,
                 }),
                 packet_size: 8,
+                oc: None,
             },
         ];
 

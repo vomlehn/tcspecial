@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tcslibgs::{DHConfig, DHId, DHName, Statistics, TcsError, TcsResult};
 
-use crate::endpoint::{create_reader_endpoint, create_writer_endpoint, EndpointReadable, EndpointWritable};
+use crate::endpoint::{create_endpoint_pair, EndpointReadable, EndpointWritable};
 use crate::conduit::{Conduit, ConduitDirection, DHSamples};
 
 /// Data handler state
@@ -112,10 +112,9 @@ impl DataHandler {
 
     /// What this handler last sent and received.
     ///
-    /// Both are empty until its conduits run: they are what records a sample,
-    /// and `start` does not yet start them. A poisoned lock gives empty
-    /// samples rather than an error, because a display is not worth failing a
-    /// command over.
+    /// Both are empty until the handler is started and its conduits have
+    /// moved something. A poisoned lock gives empty samples rather than an
+    /// error, because a display is not worth failing a command over.
     pub fn samples(&self) -> DHSamples {
         self.samples
             .lock()
@@ -129,6 +128,14 @@ impl DataHandler {
     }
 
     /// Start the data handler
+    ///
+    /// The OC endpoints are given rather than opened here: the command
+    /// interpreter knows where the OC is, from `oc` in the handler's
+    /// configuration, and opening them there keeps a handler that cannot be
+    /// reached from being created at all.
+    ///
+    /// The payload endpoint is opened here, once, and both conduits share it:
+    /// see [`create_endpoint_pair`].
     pub fn start(&mut self, oc_reader: Box<dyn EndpointReadable + Send>, oc_writer: Box<dyn EndpointWritable + Send>) -> TcsResult<()> {
         if self.state != DHState::Created {
             return Err(TcsError::DataHandler("Invalid state for start".to_string()));
@@ -138,32 +145,37 @@ impl DataHandler {
             .cmd_pipes
             .ok_or_else(|| TcsError::DataHandler("No command pipe".to_string()))?;
 
-        // Create payload endpoint
-        let payload_reader = create_reader_endpoint(&self.config.endpoint)?;
-        let payload_writer = create_writer_endpoint(&self.config.endpoint)?;
+        // Create payload endpoint. Opened once: a network address cannot be
+        // bound twice, so the two conduits share one socket.
+        let (payload_reader, payload_writer) = create_endpoint_pair(&self.config.endpoint)?;
 
         // Create conduits
-        let g2p_conduit = Conduit::new(
-            ConduitDirection::GroundToPayload,
+        let mut g2p_conduit =
+            Conduit::new(ConduitDirection::GroundToPayload, pipes[G2P].1);
+        let mut p2g_conduit =
+            Conduit::new(ConduitDirection::PayloadToGround, pipes[P2G].1);
+
+        // Start both, each on its own command pipe and both recording into
+        // this handler's samples. If the second will not start, the first is
+        // stopped again rather than left running in a handler that reports
+        // itself as never started.
+        g2p_conduit.start(
             oc_reader,
             payload_writer,
             pipes[G2P].0,
-            pipes[G2P].1,
-        );
+            self.samples.clone(),
+        )?;
 
-        let p2g_conduit = Conduit::new(
-            ConduitDirection::PayloadToGround,
+        if let Err(e) = p2g_conduit.start(
             payload_reader,
             oc_writer,
             pipes[P2G].0,
-            pipes[P2G].1,
-        );
+            self.samples.clone(),
+        ) {
+            let _ = g2p_conduit.stop();
+            return Err(e);
+        }
 
-        // Note: In a full implementation, we would start the conduits here,
-        // passing each samples_handle() so that what the handler last sent and
-        // received is recorded as it moves. Until then no data flows through a
-        // conduit and every sample stays empty.
-        // For now, we just update state
         self.state = DHState::Active;
         self.running.store(true, Ordering::SeqCst);
 
@@ -242,6 +254,7 @@ mod tests {
                 path: "/dev/null".to_string(),
             }),
             packet_size: 64,
+            oc: None,
         };
 
         let dh = DataHandler::new(config);

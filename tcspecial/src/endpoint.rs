@@ -98,6 +98,17 @@ impl UdpEndpoint {
         self.socket.connect(addr)?;
         Ok(())
     }
+
+    /// A second endpoint on the same socket.
+    ///
+    /// An address can be bound once, so a conduit pair reading and writing one
+    /// endpoint shares the socket rather than binding it twice.
+    pub fn try_clone(&self) -> TcsResult<Self> {
+        Ok(Self {
+            socket: self.socket.try_clone()?,
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+        })
+    }
 }
 
 impl EndpointWaitable for UdpEndpoint {
@@ -149,6 +160,24 @@ impl TcpEndpoint {
             listener: Some(listener),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
             _is_server: true,
+        })
+    }
+
+    /// A second endpoint on the same listener or stream.
+    ///
+    /// See [`UdpEndpoint::try_clone`]: one bind, two handles.
+    pub fn try_clone(&self) -> TcsResult<Self> {
+        Ok(Self {
+            stream: match &self.stream {
+                Some(stream) => Some(stream.try_clone()?),
+                None => None,
+            },
+            listener: match &self.listener {
+                Some(listener) => Some(listener.try_clone()?),
+                None => None,
+            },
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+            _is_server: self._is_server,
         })
     }
 
@@ -248,6 +277,18 @@ impl DeviceEndpoint {
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
+
+    /// A second endpoint on the same open file.
+    ///
+    /// A device could be opened twice where a socket could not, but one
+    /// description is shared so that both ends of a conduit pair see one file
+    /// position and one set of open flags.
+    pub fn try_clone(&self) -> TcsResult<Self> {
+        Ok(Self {
+            file: self.file.try_clone()?,
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+        })
+    }
 }
 
 impl EndpointWaitable for DeviceEndpoint {
@@ -294,6 +335,39 @@ pub fn create_reader_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn Endp
         }
         EndpointConfig::Device(dev_config) => {
             Ok(Box::new(DeviceEndpoint::new(dev_config)?))
+        }
+    }
+}
+
+/// A reader and a writer for one endpoint, opened once.
+///
+/// A conduit pair needs both ends of the same endpoint: one conduit reads it
+/// and the other writes it. Calling the two factories above for one
+/// configuration opens it twice, which a network address does not allow --
+/// `UdpSocket::bind` and `TcpListener::bind` both fail with `AddrInUse` the
+/// second time -- so the endpoint is opened once here and the second handle is
+/// a duplicate of the first.
+pub fn create_endpoint_pair(
+    config: &EndpointConfig,
+) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
+    match config {
+        EndpointConfig::Network(net_config) => match net_config.protocol {
+            NetworkProtocol::Udp => {
+                let reader = UdpEndpoint::new(net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
+            NetworkProtocol::Tcp => {
+                let reader = TcpEndpoint::new_server(net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
+            _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
+        },
+        EndpointConfig::Device(dev_config) => {
+            let reader = DeviceEndpoint::new(dev_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
         }
     }
 }

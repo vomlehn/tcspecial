@@ -307,6 +307,7 @@ mod tests {
                 port: 5000,
             }),
             packet_size,
+            oc: None,
         }
     }
 

@@ -69,13 +69,11 @@ fn record(samples: &Mutex<DHSamples>, f: impl FnOnce(&mut DHSamples)) {
 
 impl Conduit {
     /// Create a new conduit
-    pub fn new(
-        direction: ConduitDirection,
-        _reader: Box<dyn EndpointReadable + Send>,
-        _writer: Box<dyn EndpointWritable + Send>,
-        _cmd_pipe_read: RawFd,
-        cmd_pipe_write: RawFd,
-    ) -> Self {
+    ///
+    /// The endpoints belong to [`Conduit::start`], not here: a conduit that
+    /// has not started owns nothing to read or write, and taking them twice
+    /// once meant the caller had to hand over two sets.
+    pub fn new(direction: ConduitDirection, cmd_pipe_write: RawFd) -> Self {
         let running = Arc::new(AtomicBool::new(false));
 
         Self {

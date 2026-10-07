@@ -3,7 +3,7 @@
 //! The CI processes commands from the OC and manages data handlers.
 
 use std::collections::BTreeMap;
-use log::{debug, trace};
+use log::{debug, error, trace};
 use crate::beacon_send::BeaconSend;
 use std::net::UdpSocket;
 //use std::os::unix::io::AsRawFd;
@@ -12,13 +12,14 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tcslibgs::{
     ArmKey, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
-    DHConfig, DHId, DHSample, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
-    RestartArmTelemetry, RestartTelemetry,
+    DHConfig, DHId, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
+    QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
 use crate::config::constants::{BEACON_NETADDR, RESTART_ARM_TIMEOUT};
 use crate::dh::DataHandler;
+use crate::endpoint::create_endpoint_pair;
 use crate::telemetry_log::TelemetryLog;
 
 /// Command interpreter state
@@ -37,6 +38,30 @@ pub struct CommandInterpreter {
     _global_stats: Statistics,
     /// Telemetry log, shared with every other sender of telemetry.
     telemetry_log: TelemetryLog,
+}
+
+/// Build a data handler and start it moving data.
+///
+/// The OC endpoints are opened here because this is where the OC's address is
+/// known, from `oc` in the handler's configuration. It is opened once and both
+/// halves come from that one open, for the reason the payload endpoint is: a
+/// UDP address cannot be bound twice.
+///
+/// A handler with no OC address cannot be started. It has nowhere to send what
+/// it reads from its payload and nowhere to read what it should write there,
+/// so this says so rather than starting a handler that moves nothing.
+fn start_handler(config: &DHConfig) -> TcsResult<DataHandler> {
+    let oc = config.oc.clone().ok_or_else(|| {
+        TcsError::Config(format!(
+            "data handler \"{}\" has no OC address: give it oc_address and oc_port",
+            config.name.0
+        ))
+    })?;
+
+    let mut dh = DataHandler::new(config.clone())?;
+    let (oc_reader, oc_writer) = create_endpoint_pair(&EndpointConfig::Network(oc))?;
+    dh.start(oc_reader, oc_writer)?;
+    Ok(dh)
 }
 
 impl CommandInterpreter {
@@ -115,12 +140,18 @@ impl CommandInterpreter {
                     } else {
                         // Find config and create handler
                         if let Some(config) = self.payload_config.iter().find(|c| c.dh_id == cmd.dh_id) {
-                            match DataHandler::new(config.clone()) {
+                            match start_handler(config) {
                                 Ok(dh) => {
                                     handlers.insert(cmd.dh_id, dh);
                                     CommandStatus::Success
                                 }
-                                Err(_) => CommandStatus::Failure,
+                                Err(e) => {
+                                    error!(
+                                        "{}: cannot start: {}",
+                                        config.name.0, e
+                                    );
+                                    CommandStatus::Failure
+                                }
                             }
                         } else {
                             CommandStatus::NotFound

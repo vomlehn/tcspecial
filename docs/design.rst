@@ -535,9 +535,26 @@ data moved through a network handler at all. A device handler was the only one
 that ever worked, because two opens of a device are fine where two binds of a
 socket are not.
 
-A consequence of connecting: a payload must be listening before its handler is
-started. For a TCP payload the connection is refused outright otherwise, so
-the simulated payload is started first and the handler after it.
+Requirement
+    A handler whose payload refuses the connection keeps trying. Nothing
+    listening yet is the ordinary case rather than a fault: a simulated
+    payload is a program someone has to start, and a handler started first
+    would otherwise fail for a reason that fixes itself a moment later.
+
+The delay doubles from ``ENDPOINT_DELAY_INIT``, never exceeds
+``ENDPOINT_DELAY_MAX``, and the whole attempt is bounded by
+``ENDPOINT_CONNECT_BUDGET``.
+
+Requirement
+    The waiting is bounded, and bounded well below the ground's command
+    timeout. START_DH is answered on the command interpreter's own thread, so a
+    handler that waited longer would hold up every other command and leave the
+    ground with no answer rather than a refusal.
+
+Requirement
+    Only a refused connection is retried. An address that cannot be resolved,
+    or a network that cannot be reached, does not become right by being asked
+    again, and repeating those would turn a clear fault into a slow one.
 
 Requirement
     A data handler binds the UDP address its configuration gives as

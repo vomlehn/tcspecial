@@ -376,6 +376,103 @@ mod tests {
         assert!(ci.is_ok());
     }
 
+    /// StartDH actually starts a handler that then moves data.
+    ///
+    /// Written because START_DH answered Success in a running tcsmoc session
+    /// while the handler's OC port was never bound and every counter stayed
+    /// at zero.
+    #[test]
+    fn start_dh_starts_a_handler_that_moves_data() {
+        use std::net::UdpSocket;
+        use std::time::Duration;
+        use tcslibgs::{
+            DHConfig, DHName, DeviceConfig, EndpointConfig, NetworkConfig, StartDHCommand,
+        };
+
+        let oc = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let oc_addr = oc.local_addr().unwrap();
+        drop(oc);
+
+        let handler = DHConfig {
+            dh_id: DHId(2),
+            name: DHName::new("DH2"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 1,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+        };
+
+        let mut ci = CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![handler],
+        )
+        .expect("an interpreter");
+
+        match ci.process_command(Command::StartDH(StartDHCommand::new(
+            1,
+            DHId(2),
+            tcslibgs::DHType::Device,
+            DHName::new("DH2"),
+        ))) {
+            Telemetry::StartDH(tm) => {
+                assert!(tm.header.status.is_success(), "START_DH said {:?}", tm.header.status)
+            }
+            other => panic!("expected START_DH telemetry, got {other:?}"),
+        }
+
+        // Success has to mean the handler is there and listening. Speak to it
+        // and require an answer: that is the whole of what starting it is for.
+        let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
+        ground
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        ground
+            .send_to(b"ground", oc_addr)
+            .expect("the handler's OC address should be bound");
+
+        let mut buffer = [0u8; 8192];
+        let (n, _) = ground
+            .recv_from(&mut buffer)
+            .expect("a started handler should send payload data back");
+        assert_ne!(n, 0);
+
+        // And still there a moment later: a conduit thread that breaks out of
+        // its loop drops the endpoints it owns, which closes the sockets and
+        // leaves a handler that answers Success and then does nothing.
+        std::thread::sleep(Duration::from_millis(500));
+        ground
+            .send_to(b"again", oc_addr)
+            .expect("the OC address should still be bound");
+        let (n, _) = ground
+            .recv_from(&mut buffer)
+            .expect("the handler should still be moving data half a second later");
+        assert_ne!(n, 0);
+
+        let stats = match ci.process_command(Command::QueryDH(tcslibgs::QueryDHCommand::new(
+            2,
+            DHId(2),
+        ))) {
+            Telemetry::QueryDH(tm) => tm.statistics,
+            other => panic!("expected QUERY_DH telemetry, got {other:?}"),
+        };
+        assert_ne!(
+            stats.bytes_received, 0,
+            "a handler that has been spoken to should report receiving something"
+        );
+    }
+
     /// A port already in use says so, and says which.
     ///
     /// The bare io::Error behind this said "Address already in use (os error

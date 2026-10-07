@@ -1,26 +1,20 @@
-# Makefile for automated Rust project creation with Claude Code
+# Makefile for TCSpecial
 
-.PHONY: all setup generate build test clean install help
+.PHONY: all build test clean install help
 
 # Project variables
-PROJECT_NAME := task-manager
-SIM_NAME := simulator
-SRC_DIR := src
+PROJECT_NAME := tcspecial
+MOC_NAME := tcsmoc
+SIM_NAME := tcssim
 DOCS_DIR := docs
-PROMPTS_DIR := prompts
 
 DESIGN=$(DOCS_DIR)/design.rst
-TCSPECIAL = .
 RUST = .
 
-TCS_CODE = g, tcslib, tcslibgs
-TCS_TEST = tcsmoc, tcssim, payload1.yaml, payload1sim.yaml
-TCS_RUST = g-rust
-TCS_TAR = $(TCS_RUST).tar.gz
-TCS_OUTPUT = compressed tar file $(TCS_TAR)
-PROMPT = Generate Rust code ($(TCS_CODE)) and tests ($(TCS_TEST)), and create $(TCS_OUTPUT) from $(DESIGN)
-
-TCS_CRATES = tcslib tcslibgs g tcsmoc tcssim payload1.yaml payload1sim.yaml
+# What distclean removes, which is every crate and configuration file of the
+# project. See the warning on that target.
+TCS_CRATES = tcslib tcslibgs tcsmoc tcssim payload1.yaml payload1sim.yaml \
+	     payload2.yaml payload2sim.yaml
 
 # The payload set to run. tcsmoc takes its payload file as a command line
 # argument and tcssim takes its simulation file in the environment, so run
@@ -37,41 +31,36 @@ PAYLOAD_SIM_YAML = payload1sim.yaml
 RELEASE = --release
 RELEASE =
 
-FIXUP = set -x; \
-		echo "Project fixup..."; \
-		sed -i 's/into_raw_fd/as_raw_fd/g' g/src/endpoint.rs; \
-		sed -i 's/into_raw_fd/as_raw_fd/g' g/src/dh.rs;
-FIXUP =
-
-FIXUP_TEST =
-FIXUP_SIM =
-
 # Default target
-all: generate build test
+all: build test
 
 # Display help
 help:
-	@echo "Makefile for Rust Project with Claude Code"
+	@echo "Makefile for TCSpecial"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make all         - Generate, build, and test the project"
-	@echo "  make generate    - Use Claude Code to generate project files"
-	@echo "  make build       - Build the Rust project"
-	@echo "  make buildmoc    - Build the MOC portion of the Rust project"
-	@echo "  make buildsim    - Build the simulator portion of the Rust project"
+	@echo "  make all         - Build and test the project"
+	@echo "  make build       - Build tcspecial"
+	@echo "  make buildmoc    - Build tcsmoc"
+	@echo "  make buildsim    - Build tcssim"
 	@echo "  make test        - Run all tests"
-	@echo "  make run         - Run the application"
-	@echo "  make runmoc      - Run the MOC application"
-	@echo "  make runsim      - Run the simulation application"
+	@echo "  make run         - Run tcspecial"
+	@echo "  make runmoc      - Run tcsmoc, which starts tcspecial and tcssim"
+	@echo "  make runsim      - Run tcssim alone"
+	@echo "  make check       - cargo check, clippy, and a format check"
+	@echo "  make format      - Reformat the source"
+	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
-	@echo "  make install     - Install the binary globally"
+	@echo "  make distclean   - Remove the source as well; read the Makefile first"
+	@echo "  make install     - Install tcspecial globally"
+	@echo ""
+	@echo "Payload set: make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml"
 
 # Build the project
 .PHONY: build
 build:
 	( \
 		set -eu; \
-		$(FIXUP) \
 		echo "Building the project..."; \
 		cd $(RUST) && cargo build $(RELEASE) --bin tcspecial; \
 		echo "✓ Build complete" \
@@ -82,7 +71,6 @@ build:
 buildmoc:
 	( \
 		set -eu; \
-		$(FIXUP) \
 		echo "Building the project..."; \
 		cd $(RUST) && cargo build $(RELEASE) --bin tcsmoc; \
 		echo "✓ Build complete" \
@@ -93,7 +81,6 @@ buildmoc:
 buildsim:
 	( \
 		set -eu; \
-		$(FIXUP) \
 		echo "Building the project..."; \
 		cd $(RUST) && cargo build $(RELEASE) --bin tcssim; \
 		echo "✓ Build complete" \
@@ -104,7 +91,6 @@ buildsim:
 test:
 	( \
 		set -eu; \
-		$(FIXUP_TEST) \
 		echo "Running tests..."; \
 		cd $(RUST) && cargo test; \
 		echo "✓ Tests complete"; \
@@ -115,7 +101,6 @@ test:
 run:
 	( \
 		set -eu; \
-		$(FIXUP) \
 		echo "Running $(PROJECT_NAME)..."; \
 		cd $(RUST) && RUST_LOG=info cargo run --bin tcspecial \
 	)
@@ -125,8 +110,7 @@ run:
 runmoc:
 	( \
 		set -eu; \
-		$(FIXUP) \
-		echo "Running $(PROJECT_NAME)..."; \
+		echo "Running $(MOC_NAME)..."; \
 		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcsmoc -- $(PAYLOAD_YAML) \
 	)
 
@@ -135,7 +119,6 @@ runmoc:
 runsim:
 	( \
 		set -eu; \
-		$(FIXUP_SIM) \
 		echo "Running $(SIM_NAME)..."; \
 		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcssim \
 	)
@@ -145,15 +128,19 @@ runsim:
 clean:
 	@echo "Cleaning build artifacts..."
 	-cargo clean
-	rm -f generate.out build.out run.out test.out $(TCS_TAR)
-	rm -rf $(TCS_RUST) $(TCS_TAR)
+	rm -f build.out
 	@echo "✓ Clean complete"
 
 
-# Clean everything including generated source
+# Clean everything including the source.
+#
+# WARNING: this deletes the crates and configuration files listed in
+# TCS_CRATES, along with Cargo.toml. It dates from when the tree was generated
+# from design.rst and could be regenerated; it is now hand-written source, and
+# only git stands behind it.
 .PHONY: distclean
 distclean: clean
-	@echo "Removing all generated files..."
+	@echo "Removing all source and generated files..."
 	rm -f Cargo.lock Cargo.toml
 	rm -rf $(TCS_CRATES)
 	rm -rf target
@@ -186,13 +173,3 @@ release: test
 	cd $(RUST) && cargo build --release
 	@echo "✓ Release binary: target/release/$(PROJECT_NAME)"
 
-# Run with example data
-.PHONY: demo
-demo: build
-	@echo "Running demo..."
-	cd $(RUST) && cargo run -- add "Buy groceries" --desc "Milk, eggs, bread"
-	cd $(RUST) && cargo run -- add "Write documentation"
-	cd $(RUST) && cargo run -- add "Deploy to production"
-	cd $(RUST) && cargo run -- list
-	cd $(RUST) && cargo run -- complete 1
-	cd $(RUST) && cargo run -- list --pending

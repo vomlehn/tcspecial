@@ -55,11 +55,19 @@ fn main() {
     info!("Loaded {} data handler configurations", payload_config.len());
 
     // An endpoint configuration file is read when one is named. It is not yet
-    // a second source of data handlers: a data handler also needs a packet
-    // size and interval, which the endpoint format does not carry, and an I2C
-    // endpoint has no EndpointConfig to become. Reading it here means a
-    // malformed file is reported at startup rather than whenever the first
-    // reader of it appears.
+    // a second source of data handlers, though less stands in the way than
+    // once did: an endpoint group carries a packet size now, and a data
+    // handler no longer has an interval for the endpoint format to be missing.
+    //
+    // What is left is three things. An endpoint has a name and no dh_id, and a
+    // data handler needs one. An I2C endpoint is located by a bus and a slave
+    // address, which no EndpointConfig variant can hold -- there is Network
+    // and Device and nothing for a bus. And a group's packet size is optional,
+    // while a data handler must have one, so a group that states none could
+    // not produce a handler.
+    //
+    // Reading the file here means a malformed one is reported at startup
+    // rather than whenever the first reader of it appears.
     if let Ok(endpoint_path) = env::var("ENDPOINT_CONFIG_PATH") {
         info!("Loading endpoint configuration from: {}", endpoint_path);
 

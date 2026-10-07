@@ -8,12 +8,17 @@ pub mod constants {
 
     use crate::beacon_receive::{IndicatorState, IndicatorStates};
 
-    // Color constants - using functions since Color::from_rgb_u8 isn't const
+    // Color constants - using functions since Color::from_rgb_u8 isn't const.
+    // The palette is complete rather than only what is used: blue and
+    // transparent belong to indicators not yet defined, so they are kept and
+    // marked rather than removed and looked up again later.
     fn red() -> Color { Color::from_rgb_u8(255, 0, 0) }
     fn green() -> Color { Color::from_rgb_u8(0, 255, 0) }
     fn yellow() -> Color { Color::from_rgb_u8(255, 255, 0) }
+    #[allow(dead_code)]
     fn blue() -> Color { Color::from_rgb_u8(0, 0, 255) }
     fn grey() -> Color { Color::from_rgb_u8(196, 196, 196) }
+    #[allow(dead_code)]
     fn transparent() -> Color { Color::from_argb_u8(0, 0, 0, 0) }
 
     // Information defining the behavior of the Beacon indicator

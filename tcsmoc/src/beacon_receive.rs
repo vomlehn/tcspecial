@@ -234,8 +234,8 @@ eprintln!("First: timeout {:?} color {:?}", timeout, color);
             let status = socket.recv_from(&mut buf);
             
             let new_color = match status {
-                Ok((size, addr)) => {
-//eprintln!("beacon received {} bytes from {}", size, addr);
+                Ok((_size, _addr)) => {
+//eprintln!("beacon received {} bytes from {}", _size, _addr);
                     // Update last beacon time
                     let mut last_beacon_guard = self.last_beacon.lock.lock().unwrap();
                     *last_beacon_guard = Some(SystemTime::now());
@@ -264,9 +264,9 @@ eprintln!("Timedout: timeout {:?} color {:?}", timeout, color);
 }
                     Some(color)
                 }
-                Err(e) => {
+                Err(_e) => {
                     // I/O error
-//panic!("receive_beacon: error receiving: {}", e);
+//panic!("receive_beacon: error receiving: {}", _e);
                     Some(self.indicator_states.unset_color())
                 }
             };

@@ -48,6 +48,20 @@ pub mod constants {
     /// Maximum number of endpoint retries
     pub const ENDPOINT_MAX_RETRIES: u32 = 10;
 
+    /// How long a data handler keeps trying to reach a payload that refuses
+    /// the connection.
+    ///
+    /// Bounded, and well under the ground's command timeout, because StartDH
+    /// is answered on the command interpreter's own thread: retrying for
+    /// ENDPOINT_MAX_RETRIES with ENDPOINT_DELAY_MAX between attempts would
+    /// take some forty seconds, holding up every other command and leaving
+    /// the ground to time out rather than be told anything.
+    ///
+    /// Two seconds is enough for the case this exists for -- a simulated
+    /// payload started a moment after its handler -- and short enough that a
+    /// payload which is simply not there is reported promptly.
+    pub const ENDPOINT_CONNECT_BUDGET: Duration = Duration::from_secs(2);
+
     /// Stream endpoint delay for collecting bytes
     pub const STREAM_EP_DELAY: Duration = Duration::from_millis(50);
 

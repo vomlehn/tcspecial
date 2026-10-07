@@ -12,7 +12,15 @@ use nix::poll::{poll, PollFd, PollFlags};
 use std::os::fd::BorrowedFd;
 use tcslibgs::{DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
+use std::thread;
+use std::time::Instant;
+
+use log::info;
+
 use crate::ci::bind_failed;
+use crate::config::constants::{
+    ENDPOINT_CONNECT_BUDGET, ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX,
+};
 use crate::config::constants::{ENDPOINT_BUFFER_SIZE, /*ENDPOINT_DELAY_INIT, ENDPOINT_DELAY_MAX, ENDPOINT_MAX_RETRIES*/};
 
 /// Trait for endpoints that can wait for events
@@ -266,6 +274,24 @@ impl TcpEndpoint {
         })
     }
 
+    /// Connect as a client, retrying while refused.
+    ///
+    /// See [`connect_retrying`]. A handler may be started before the payload
+    /// it reaches, and a payload that is not listening yet refuses rather than
+    /// failing in any way that waiting cannot fix.
+    pub fn connect_retrying(config: &NetworkConfig) -> TcsResult<Self> {
+        let addr = format!("{}:{}", config.address, config.port);
+        let stream = connect_retrying(&addr, || TcpStream::connect(&addr))?;
+        stream.set_nonblocking(true)?;
+
+        Ok(Self {
+            stream: Some(stream),
+            listener: None,
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+            _is_server: false,
+        })
+    }
+
     pub fn accept(&mut self) -> TcsResult<bool> {
         if let Some(ref listener) = self.listener {
             match listener.accept() {
@@ -460,6 +486,55 @@ pub fn bind_endpoint_pair(
 /// those this is [`bind_endpoint_pair`] by another name. Two opens of a device
 /// are fine where two binds of a socket are not, which is why the device
 /// handler was the only one that ever worked.
+/// Reach `addr`, retrying while the connection is refused.
+///
+/// A refusal means nothing is listening yet, which is the ordinary case when a
+/// handler is started before the payload it serves: the simulated payload is a
+/// program someone has to press Start on. So the attempt is repeated, with the
+/// delay doubling from [`ENDPOINT_DELAY_INIT`] and never exceeding
+/// [`ENDPOINT_DELAY_MAX`], until [`ENDPOINT_CONNECT_BUDGET`] is spent.
+///
+/// Only a refusal is retried. An address that cannot be resolved, or a network
+/// that cannot be reached, will not become right by being asked again, and
+/// repeating those would turn a clear fault into a slow one.
+fn connect_retrying<T>(
+    addr: &str,
+    mut attempt: impl FnMut() -> io::Result<T>,
+) -> TcsResult<T> {
+    let deadline = Instant::now() + ENDPOINT_CONNECT_BUDGET;
+    let mut delay = ENDPOINT_DELAY_INIT;
+    let mut refusals = 0u32;
+
+    loop {
+        match attempt() {
+            Ok(opened) => {
+                if refusals > 0 {
+                    info!(
+                        "reached {addr} after {refusals} refusal(s): the far end was \
+                         not listening yet"
+                    );
+                }
+                return Ok(opened);
+            }
+            Err(e) if e.kind() == io::ErrorKind::ConnectionRefused => {
+                refusals += 1;
+                let left = deadline.saturating_duration_since(Instant::now());
+                if left.is_zero() {
+                    return Err(TcsError::Config(format!(
+                        "cannot reach {addr}: connection refused for {:?}. Nothing is \
+                         listening there -- a simulated payload has to be started \
+                         before the handler that reaches it",
+                        ENDPOINT_CONNECT_BUDGET
+                    )));
+                }
+                thread::sleep(delay.min(left));
+                delay = (delay * 2).min(ENDPOINT_DELAY_MAX);
+            }
+            Err(e) => return Err(TcsError::Config(format!("cannot reach {addr}: {e}"))),
+        }
+    }
+}
+
 pub fn connect_endpoint_pair(
     config: &EndpointConfig,
 ) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
@@ -471,7 +546,7 @@ pub fn connect_endpoint_pair(
                 Ok((Box::new(reader), Box::new(writer)))
             }
             NetworkProtocol::Tcp => {
-                let reader = TcpEndpoint::new_client(net_config)?;
+                let reader = TcpEndpoint::connect_retrying(net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
@@ -508,6 +583,90 @@ pub fn create_writer_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn Endp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A refused connection is retried until the far end is listening.
+    ///
+    /// This is the ordinary case: a handler may be started before the payload
+    /// it reaches, because the simulated payload is a program someone has to
+    /// press Start on. The listener here appears after the first attempt must
+    /// already have failed.
+    #[test]
+    fn a_refused_connection_is_retried_until_it_is_accepted() {
+        use std::net::{TcpListener, TcpStream};
+        use std::time::{Duration, Instant};
+        use tcslibgs::NetworkProtocol;
+
+        // A port with nothing on it yet, which is what refuses.
+        let probe = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = probe.local_addr().unwrap();
+        drop(probe);
+
+        let listening = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let listener = TcpListener::bind(addr).expect("the far end starts late");
+            listener.accept().expect("and accepts");
+        });
+
+        let config = NetworkConfig {
+            protocol: NetworkProtocol::Tcp,
+            address: addr.ip().to_string(),
+            port: addr.port(),
+        };
+
+        let started = Instant::now();
+        let endpoint = TcpEndpoint::connect_retrying(&config)
+            .expect("a refusal should be waited out, not reported");
+        let waited = started.elapsed();
+
+        assert!(endpoint.is_connected());
+        assert!(
+            waited >= Duration::from_millis(300),
+            "it cannot have connected before the far end was listening: {waited:?}"
+        );
+
+        drop(endpoint);
+        listening.join().unwrap();
+        // Quiet the unused-import warning when the type is only named above.
+        let _ = TcpStream::connect(addr);
+    }
+
+    /// A far end that never listens is reported, and promptly.
+    ///
+    /// Promptness matters: StartDH is answered on the command interpreter's
+    /// own thread, so a handler that waited longer than the ground's command
+    /// timeout would leave the ground with nothing rather than an answer.
+    #[test]
+    fn a_connection_nothing_ever_accepts_is_reported() {
+        use std::net::TcpListener;
+        use std::time::Instant;
+        use tcslibgs::NetworkProtocol;
+
+        let probe = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = probe.local_addr().unwrap();
+        drop(probe);
+
+        let config = NetworkConfig {
+            protocol: NetworkProtocol::Tcp,
+            address: addr.ip().to_string(),
+            port: addr.port(),
+        };
+
+        let started = Instant::now();
+        let message = match TcpEndpoint::connect_retrying(&config) {
+            Ok(_) => panic!("nothing is listening, so this must fail"),
+            Err(e) => e.to_string(),
+        };
+        let waited = started.elapsed();
+
+        assert!(
+            message.contains("refused") && message.contains("started before"),
+            "the error should say what to do about it, but said: {message}"
+        );
+        assert!(
+            waited < ENDPOINT_CONNECT_BUDGET * 2,
+            "it should give up near its budget, but waited {waited:?}"
+        );
+    }
 
     /// A handler's OC socket cannot send until the ground has spoken, and can
     /// afterwards.

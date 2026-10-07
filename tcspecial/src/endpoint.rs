@@ -132,6 +132,36 @@ impl UdpEndpoint {
     pub fn peer(&self) -> Option<SocketAddr> {
         self.peer.lock().ok().and_then(|guard| *guard)
     }
+
+    /// An endpoint that reaches out to `config` rather than waiting at it.
+    ///
+    /// Used for the payload side of a data handler. The payload is the thing
+    /// that exists at an address -- a payload configuration says how tcspecial
+    /// reaches each one -- so tcspecial connects and the payload listens. Both
+    /// binding the same address is what they used to do, and an address can be
+    /// bound once: whichever started second failed.
+    ///
+    /// The local port is whatever is free, because nothing needs to find
+    /// tcspecial at the payload end of the link. The peer is known from the
+    /// start rather than learnt, so a handler can send to its payload before
+    /// the payload has said anything.
+    pub fn connected(config: &NetworkConfig) -> TcsResult<Self> {
+        let addr = format!("{}:{}", config.address, config.port);
+        let socket = UdpSocket::bind("0.0.0.0:0")
+            .map_err(|e| bind_failed("UDP endpoint's local port", "0.0.0.0:0", e))?;
+        socket.set_nonblocking(true)?;
+        socket.connect(&addr).map_err(|e| {
+            TcsError::Config(format!("cannot reach {addr}: {e}"))
+        })?;
+
+        let peer = socket.peer_addr().map_err(TcsError::Io)?;
+
+        Ok(Self {
+            socket,
+            peer: Arc::new(Mutex::new(Some(peer))),
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+        })
+    }
 }
 
 impl EndpointWaitable for UdpEndpoint {
@@ -381,15 +411,19 @@ pub fn create_reader_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn Endp
     }
 }
 
-/// A reader and a writer for one endpoint, opened once.
+/// A reader and a writer that wait at one endpoint, opened once.
+///
+/// For the OC side of a data handler, which the ground sends to at an address
+/// it was told, so this end binds. See [`connect_endpoint_pair`] for the
+/// payload side, which reaches out instead.
 ///
 /// A conduit pair needs both ends of the same endpoint: one conduit reads it
-/// and the other writes it. Calling the two factories above for one
+/// and the other writes it. Calling the two single factories for one
 /// configuration opens it twice, which a network address does not allow --
 /// `UdpSocket::bind` and `TcpListener::bind` both fail with `AddrInUse` the
 /// second time -- so the endpoint is opened once here and the second handle is
 /// a duplicate of the first.
-pub fn create_endpoint_pair(
+pub fn bind_endpoint_pair(
     config: &EndpointConfig,
 ) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
     match config {
@@ -401,6 +435,43 @@ pub fn create_endpoint_pair(
             }
             NetworkProtocol::Tcp => {
                 let reader = TcpEndpoint::new_server(net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
+            _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
+        },
+        EndpointConfig::Device(dev_config) => {
+            let reader = DeviceEndpoint::new(dev_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+    }
+}
+
+/// A reader and a writer that reach out to one endpoint, opened once.
+///
+/// For the payload side of a data handler. The payload is what exists at an
+/// address, so tcspecial connects to it and the payload waits there; tcssim,
+/// standing in for payload hardware, is what listens. Both ends binding the
+/// same address is what they used to do, and an address can be bound once, so
+/// whichever started second got `AddrInUse` and no data moved at all.
+///
+/// A device is neither bound nor connected -- it is opened -- so for one of
+/// those this is [`bind_endpoint_pair`] by another name. Two opens of a device
+/// are fine where two binds of a socket are not, which is why the device
+/// handler was the only one that ever worked.
+pub fn connect_endpoint_pair(
+    config: &EndpointConfig,
+) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
+    match config {
+        EndpointConfig::Network(net_config) => match net_config.protocol {
+            NetworkProtocol::Udp => {
+                let reader = UdpEndpoint::connected(net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
+            NetworkProtocol::Tcp => {
+                let reader = TcpEndpoint::new_client(net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }

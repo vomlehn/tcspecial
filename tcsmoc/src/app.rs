@@ -1,4 +1,13 @@
 //! Application state and logic for tcsmoc
+//!
+//! None of this is reached yet, which is why the module allows dead code. It
+//! is what a panel's last-sent and last-received lines need: design.rst has a
+//! panel showing the time and the data most recently sent, and the same for
+//! received, and main.rs starts those two fields empty and never fills them.
+//! The formatting and the per-handler state for them are here, with tests,
+//! waiting for the panels to be wired up. Delete it only on deciding that
+//! those lines are not wanted.
+#![allow(dead_code)]
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use tcslibgs::Statistics;

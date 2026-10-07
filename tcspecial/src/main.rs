@@ -24,7 +24,7 @@ fn main() {
     info!("TCSpecial starting...");
 
     let config_path = env::var("TCSPECIAL_CONFIG_PATH").
-        unwrap_or_else(|_| "tcspecial/src/tcspecial.json".to_string());
+        unwrap_or_else(|_| "tcspecial/src/tcspecial.yaml".to_string());
     info!("Loading tcspecial configuration from: {}", config_path);
 
     // Load configuration

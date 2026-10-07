@@ -254,7 +254,7 @@ pub struct PayloadConfig {
     pub data_handler_groups: Vec<DHGroupJson>,
     pub data_handlers: Vec<DHConfigJson>,
     /// Retained so a payload file that still carries a CI section parses,
-    /// but unused: the CI reads its own configuration from tcspecial.json.
+    /// but unused: the CI reads its own configuration from tcspecial.yaml.
     #[serde(default)]
     pub ci_config: Option<CIConfigJson>,
 }

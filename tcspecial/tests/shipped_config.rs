@@ -3,7 +3,7 @@
 //! Every other test of the loaders builds its input from an inline string, so
 //! a loader change that the real files do not follow goes unnoticed. That has
 //! happened: when CI configuration moved to a flat `CIConfigJson`,
-//! `tcspecial/src/tcspecial.json` still carried the `tcspecial_config`
+//! `tcspecial/src/tcspecial.yaml` still carried the `tcspecial_config`
 //! wrapper the loader had stopped expecting, and every test stayed green
 //! while the program could not read its own configuration.
 //!
@@ -55,7 +55,7 @@ fn shipped_payload_files() -> Vec<PathBuf> {
 
 #[test]
 fn the_shipped_tcspecial_config_loads() {
-    let path = repo_file("tcspecial/src/tcspecial.json");
+    let path = repo_file("tcspecial/src/tcspecial.yaml");
     let config = load_tcspecial_config(&path)
         .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
 

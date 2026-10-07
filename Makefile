@@ -11,11 +11,6 @@ DOCS_DIR := docs
 DESIGN=$(DOCS_DIR)/design.rst
 RUST = .
 
-# What distclean removes, which is every crate and configuration file of the
-# project. See the warning on that target.
-TCS_CRATES = tcslib tcslibgs tcsmoc tcssim payload1.yaml payload1sim.yaml \
-	     payload2.yaml payload2sim.yaml
-
 # The payload set to run. tcsmoc takes its payload file as a command line
 # argument and tcssim takes its simulation file in the environment, so run
 # another set with
@@ -51,7 +46,7 @@ help:
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
-	@echo "  make distclean   - Remove the source as well; read the Makefile first"
+	@echo "  make distclean   - Remove everything that can be rebuilt"
 	@echo "  make install     - Install tcspecial globally"
 	@echo ""
 	@echo "Payload set: make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml"
@@ -132,19 +127,26 @@ clean:
 	@echo "✓ Clean complete"
 
 
-# Clean everything including the source.
+# Remove everything that can be rebuilt.
 #
-# WARNING: this deletes the crates and configuration files listed in
-# TCS_CRATES, along with Cargo.toml. It dates from when the tree was generated
-# from design.rst and could be regenerated; it is now hand-written source, and
-# only git stands behind it.
+# Everything here is either ignored by git or not tracked by it: the build
+# directory, the dependency lock file, and the HTML built from the .rst
+# sources. Nothing git tracks is touched, so this cannot lose work.
+#
+# It used to delete the crates and Cargo.toml as well, from when the tree was
+# generated out of design.rst and could be regenerated. The source is written
+# by hand now, so deleting it was a way to lose a working tree and nothing
+# else.
+#
+# Note it removes Cargo.lock, which the project does not track: the next build
+# resolves dependency versions afresh.
 .PHONY: distclean
 distclean: clean
-	@echo "Removing all source and generated files..."
-	rm -f Cargo.lock Cargo.toml
-	rm -rf $(TCS_CRATES)
+	@echo "Removing everything that can be rebuilt..."
 	rm -rf target
-	@echo "✓ Project reset"
+	rm -f Cargo.lock
+	$(MAKE) -C $(DOCS_DIR) clean
+	@echo "✓ Clean complete"
 
 # Install binary globally
 .PHONY: install

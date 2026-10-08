@@ -38,17 +38,25 @@ use crate::payload::{
 pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
     let handler = format!("{}:{}", config.address, config.port);
 
-    let socket = match UdpSocket::bind("0.0.0.0:0") {
+    // What this end answers from. Nothing has to find the payload at a
+    // particular port -- the handler learns where it is from the first packet
+    // it gets -- so a file that says nothing gets any interface and whatever
+    // port is free. A file that does say is obeyed: something outside the
+    // simulation, a rule on a firewall or a capture being read afterwards,
+    // may need to know which socket the payload answers from.
+    let mine = format!(
+        "{}:{}",
+        config.own_address.as_deref().unwrap_or("0.0.0.0"),
+        config.own_port.unwrap_or(0)
+    );
+
+    let socket = match UdpSocket::bind(&mine) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Failed to bind UDP socket: {}", e);
+            eprintln!("Failed to bind the UDP payload at {}: {}", mine, e);
             return;
         }
     };
-
-    // Nothing has to find the payload at a particular port -- the handler
-    // learns where it is from the first packet it gets -- so the local port
-    // is whatever is free.
     if let Err(e) = socket.connect(&handler) {
         eprintln!("Failed to reach the handler at {}: {}", handler, e);
         return;
@@ -153,6 +161,8 @@ mod tests {
             port: at.port(),
             bus_address: 0,
             faults: Default::default(),
+            own_address: None,
+            own_port: None,
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
@@ -203,6 +213,16 @@ mod tests {
 
     /// A payload at the handler's address, with faults.
     fn faulty(at: std::net::SocketAddr, faults: Faults) -> SimulatedPayload {
+        answering_from(at, faults, None, None)
+    }
+
+    /// A payload at the handler's address, answering from the socket given.
+    fn answering_from(
+        at: std::net::SocketAddr,
+        faults: Faults,
+        own_address: Option<String>,
+        own_port: Option<u16>,
+    ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             _id: 0,
             protocol: PayloadProtocol::Udp,
@@ -211,6 +231,8 @@ mod tests {
             bus_address: 0,
             triggered: false,
             faults,
+            own_address,
+            own_port,
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(20)),
@@ -224,6 +246,41 @@ mod tests {
         let at = handler.local_addr().expect("its address");
         handler.set_read_timeout(Some(wait)).expect("a read timeout");
         (handler, at)
+    }
+
+    /// A payload told which socket to answer from answers from it.
+    ///
+    /// Nothing in the link needs it -- the handler learns where the payload
+    /// is from the first packet it gets -- but something outside the
+    /// simulation may: a rule on a firewall, or a capture being read
+    /// afterwards. The handler's end sees which socket a datagram came from,
+    /// which is how this is checked.
+    #[test]
+    fn a_payload_answers_from_the_socket_it_was_given() {
+        let (handler, at) = handler_end(Duration::from_secs(5));
+
+        // A port nothing else is on, found by binding and letting go.
+        let spare = UdpSocket::bind("127.0.0.1:0").expect("a spare port");
+        let mine = spare.local_addr().expect("its address").port();
+        drop(spare);
+
+        let mut payload = answering_from(
+            at,
+            Faults::default(),
+            Some("127.0.0.1".to_string()),
+            Some(mine),
+        );
+        payload.start().expect("the payload starts");
+
+        let mut buf = [0u8; 64];
+        let (_, from) = handler.recv_from(&mut buf).expect("a packet");
+        payload.stop();
+
+        assert_eq!(
+            from.port(), mine,
+            "the payload answered from {} rather than the {mine} it was given",
+            from.port()
+        );
     }
 
     /// The stats carry when the last packet went, not just how many.
@@ -458,6 +515,8 @@ mod tests {
             port: at.port(),
             bus_address: 0,
             faults: Default::default(),
+            own_address: None,
+            own_port: None,
             packet_size: Arc::new(AtomicU32::new(8)),
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(50)),

@@ -188,10 +188,12 @@ instead.
 These mistakes are refused rather than ignored, because each of them
 otherwise produces a payload that looks configured and is not:
 
-* A **repeated name or ``dh_id``**. Both pick out one payload: tcspecial keeps
-  its handlers by id, so a repeated id has one silently replace the other, and
-  a simulator configuration is joined to this file by name, so a repeated name
-  has one entry drive two payloads.
+* A **repeated name or ``dh_id``** within the file. Both pick out one
+  payload: tcspecial keeps its handlers by id, so a repeated id has one
+  silently replace the other, and a simulator configuration is joined to this
+  file by name, so a repeated name has one entry drive two payloads. The rule
+  reaches no further than the file -- two payload sets may name their payloads
+  and their groups alike, and the shipped sets do.
 * An **attribute of another kind** -- a device payload stating ``protocol``,
   ``address`` or ``port``, or a network payload stating ``path``. The check is
   made after the group has been laid under the payload, since an attribute
@@ -326,8 +328,9 @@ simulating, and does without it if it is not there.
      name                 the payload this one stands in for
      type                 the kind of payload it is, as the payload file says
      protocol             which transport, for a network payload
-     sim_address          where it is, if this file cares to say
-     sim_port             which port, likewise
+     payload_address      the socket the payload answers from, if this file
+                          cares to say
+     payload_port         which port it answers from, likewise
      group                the group to take unstated settings from, if any
      ...                  any of the settings below
 
@@ -348,20 +351,19 @@ sends. Stating the kind here makes that pairing an error instead.
    protocol               which transport, for a network payload, and refused
                           for any other kind. Must be what the payload file
                           says
-   sim_address            where the payload is: the host, or the socket's path
-                          for a Unix socket. Optional, and compared with the
-                          payload file when stated
-   sim_port               which port the payload is at. Optional, compared
-                          the same way, and refused for a Unix socket, which
-                          is named by a path and has no port
+   payload_address        the socket the simulated payload answers from: a
+                          host for a UDP payload, a path for a Unix datagram
+                          one. Optional, and only for those two kinds
+   payload_port           the port it answers from. Optional, and refused for
+                          a Unix datagram payload, which answers from a path
 
-The address and the port carry the ``sim_`` prefix because the two files mean
-different things by stating them: the payload file decides where a payload is,
-and this file only says where it understands the payload to be. A plain
-``address`` or ``port`` here would read as though the simulator chose it, so
-either is refused with the prefixed name rather than reported as a word
-nothing knows -- it is the likeliest thing to carry across from the payload
-file beside it, and less a mistake than the wrong spelling of something real.
+Where the payload *is* is not stated here at all: the simulator takes it from
+the payload file, which decides it. Writing ``address`` or ``port`` here is
+refused with the file they belong in -- they are the likeliest thing to be
+carried across from the payload file beside this one.
+
+What this file may say about an address is the other end of the same link: the
+socket the simulated payload answers from.
 
 .. code-block:: yaml
 
@@ -369,17 +371,19 @@ file beside it, and less a mistake than the wrong spelling of something real.
      - name: DH0
        type: network
        protocol: udp
-       sim_address: localhost   # not address: it is a statement about the
-       sim_port: 5000           # payload file, not a choice made here
+       payload_address: 127.0.0.1   # the socket this payload answers from,
+       payload_port: 7000           # not the one the handler waits at
        packet_interval_ms: 1000
 
-Unlike the kind and the transport, these two need not be stated at all: an
-address is commonly the same in two payload sets that differ in every other
-way, so requiring it would be duplication asked for and nothing caught. Hosts
-that certainly mean this host count as one host, a Unix socket's
-``sim_address`` is its path, and such a socket takes no ``sim_port`` -- the
-port a payload file gives it means nothing, so one stated here could only be
-compared against a number nobody chose.
+Nothing in the link needs it -- a handler learns where its payload is from the
+first packet it gets -- but something outside the simulation may: a rule on a
+firewall, or a capture being read afterwards. Only a datagram payload has an
+address of its own to bind; a stream payload is the end that waits, so it
+binds the address the payload file gives it. A Unix datagram payload answers
+from a path, so it takes an address and no port. Neither end may be the other:
+a payload told to bind its handler's own socket is refused rather than left to
+fail at the bind. Stating neither gets what every simulator file asked for
+before this existed -- any interface and a port the system chooses.
 
 A word that is not a setting is refused here too -- in a payload, in a group,
 and in the file's own sections. A misspelled setting that was ignored would
@@ -481,11 +485,9 @@ This is the shipped ``payload1sim.yaml``.
    simulated_payload_groups:
      - name: steady_1hz
        packet_interval_ms: 1000
-       segment_interval_ms: 1000
 
      - name: continuous
        packet_interval_ms: 0
-       segment_interval_ms: 0
 
    simulated_payloads:
      - name: DH0
@@ -506,7 +508,6 @@ This is the shipped ``payload1sim.yaml``.
        type: network
        protocol: udp
        packet_interval_ms: 500
-       segment_interval_ms: 500
 
 Endpoint Configuration Files
 ============================

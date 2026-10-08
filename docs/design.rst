@@ -1395,17 +1395,27 @@ Requirement
     the misspelling that really caused it.
 
 Requirement
-    A group name is defined once. Two groups sharing a name is an error rather
-    than one silently shadowing the other.
+    A group name is defined once in a file. Two groups sharing a name is an
+    error rather than one silently shadowing the other.
 
 Requirement
-    A payload name and a ``dh_id`` are each defined once. Both pick out one
-    payload, and a repeat of either parses cleanly and then loses a payload:
+    A payload name and a ``dh_id`` are each defined once in a file. Both pick
+    out one payload, and a repeat of either parses cleanly and then loses a
+    payload:
     tcspecial keeps its handlers by id, so a repeated id has one silently
     replace the other, and a simulator configuration is joined to this file by
     name, so a repeated name has one entry drive two payloads. Reported in the
     words the endpoint configuration format uses for the same rule, which has
     always had it.
+
+Requirement
+    Each of these names is unique within its file and nowhere wider. Two
+    payload sets are two descriptions of what a mission flies, and a set that
+    had to rename its payloads because another set in the same directory had
+    used the names would be renaming them for no reason: a set is read on its
+    own, with the simulator file beside it, and nothing compares the names in
+    one file with the names in another. The shipped sets rely on it -- more
+    than one of them names a payload ``DH0``.
 
 Requirement
     An attribute of another kind of payload is an error. A device payload
@@ -1585,11 +1595,18 @@ that the two files can be checked against each other.
 | protocol            | string | Which transport, for a network payload.     |
 |                     |        | Refused for every other kind                |
 +---------------------+--------+---------------------------------------------+
-| sim_address         | string | Where the payload is: the host, or the      |
-|                     |        | socket's path for a Unix socket. Optional   |
+
+**The payload's own end of the link**, which nothing else states:
+
 +---------------------+--------+---------------------------------------------+
-| sim_port            | number | Which port the payload is at. Optional, and |
-|                     |        | refused for a Unix socket                   |
+| Attribute           | Type   | Meaning                                     |
++=====================+========+=============================================+
+| payload_address     | string | The socket the payload answers from: a host |
+|                     |        | for a UDP payload, a path for a Unix        |
+|                     |        | datagram one. Optional, and only for those  |
++---------------------+--------+---------------------------------------------+
+| payload_port        | number | The port it answers from. Optional, and     |
+|                     |        | refused for a Unix datagram payload         |
 +---------------------+--------+---------------------------------------------+
 
 **Fault injection settings**, each defaulting to no fault at all:
@@ -1683,40 +1700,44 @@ Requirement
     called.
 
 Requirement
-    Where the payload is may be stated as ``sim_address`` and ``sim_port``,
-    and is then compared like the kind and the transport. Unlike them it need
-    not be stated at all: an address is commonly the same in two payload sets
-    that differ in every other way, so requiring it would be duplication asked
-    for and nothing caught.
+    Where the payload is is not stated here. The simulator takes it from the
+    payload configuration, which decides it, so this file stating it again
+    would be a second place to keep in step and nothing gained: ``address``
+    and ``port`` written here are refused with the file they belong in, and
+    with the pair this file does have.
+
+What this file may say about an address is the other end of the same link: the
+socket the simulated payload answers from.
 
 Requirement
-    This file writes them with the ``sim_`` prefix, where the payload
-    configuration writes ``address`` and ``port``, because the two files mean
-    different things by stating it. The payload configuration decides where a
-    payload is; this file only says where it understands the payload to be. A
-    plain ``address`` here would read as though the simulator chose the
-    address, which it does not.
+    A simulated payload may be given the socket it binds for itself, as
+    ``payload_address`` and ``payload_port``. Nothing in the link needs it --
+    a handler learns where its payload is from the first packet it gets -- but
+    something outside the simulation may: a rule on a firewall, or a capture
+    being read afterwards. Stated by neither file otherwise, so there is
+    nothing for this to disagree with.
 
 Requirement
-    ``address`` or ``port`` written here is refused with the prefixed name.
-    They are the two attributes someone writing a simulator file beside a
-    payload file is likeliest to carry across, so such a line is less a
-    mistake than the wrong spelling of something real, and is answered as one.
+    Only a datagram payload has an address of its own to bind. A stream
+    payload is the end that waits, so it binds the address the payload
+    configuration gives it, and a second address stated here would be two
+    answers to where it is; a device, a line, a bus or a peripheral has no
+    address at all.
 
 Requirement
-    Hosts that certainly mean this host are one host, as they are for two
-    handlers claiming one port. A Unix socket's ``sim_address`` is its path
-    and is compared as written, there being nothing to canonicalise.
+    A Unix datagram payload answers from a path, so it takes a
+    ``payload_address`` and no ``payload_port``.
 
 Requirement
-    A Unix socket takes no ``sim_port``. It is named by a path, and the port a
-    payload file gives it means nothing there, so a port stated here could
-    only be compared against a number nobody chose.
+    Neither end may be the other. A payload told to bind its handler's own
+    socket is refused here rather than left to fail at the bind, which says
+    nothing about which file was wrong: two sockets cannot be one, and the two
+    ends of a link are two sockets.
 
 Requirement
-    Neither belongs to a payload that is not reached over a network, and
-    stating one for a device, a line, a bus or a peripheral is an error for
-    the same reason a protocol is.
+    A file that states neither gets what every simulator file asked for before
+    this existed: any interface and a port the system chooses, or for a Unix
+    datagram payload a path beside the handler's.
 
 Requirement
     A group may carry the kind and the transport, like every other setting a
@@ -1806,8 +1827,11 @@ Requirement
     otherwise start with a payload that never produces anything.
 
 Requirement
-    A name is defined once. Two groups or two simulated payloads sharing a name
-    is an error rather than one silently shadowing the other.
+    A name is defined once in a file. Two groups or two simulated payloads
+    sharing a name is an error rather than one silently shadowing the other,
+    and as in the payload configuration the rule reaches no further than the
+    file: a simulator file names the payloads of the set it belongs to, and
+    two sets may name their payloads alike.
 
 Requirement
     A word that is not a setting is an error, in a payload, in a group, and in
@@ -1838,11 +1862,9 @@ states its own rate instead.
    simulated_payload_groups:
      - name: steady_1hz
        packet_interval_ms: 1000
-       segment_interval_ms: 1000
 
      - name: continuous
        packet_interval_ms: 0
-       segment_interval_ms: 0
 
    simulated_payloads:
      - name: DH0
@@ -1863,7 +1885,6 @@ states its own rate instead.
        type: network
        protocol: udp
        packet_interval_ms: 500
-       segment_interval_ms: 500
 
 Endpoint Configuration Files
 ============================

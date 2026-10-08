@@ -951,6 +951,8 @@ mod tests {
             segment_size,
             triggered: false,
             faults: Default::default(),
+            payload_address: None,
+            payload_port: None,
         }
     }
 

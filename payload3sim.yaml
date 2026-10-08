@@ -24,7 +24,6 @@ simulated_payload_groups:
   # One packet a second, sent whole.
   - name: steady_1hz
     packet_interval_ms: 1000
-    segment_interval_ms: 1000
 
 simulated_payloads:
   - name: DH0

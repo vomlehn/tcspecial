@@ -1970,6 +1970,49 @@ payloads:
         );
     }
 
+    /// A name is unique within its file and nowhere wider.
+    ///
+    /// Two payload sets are two descriptions of what a mission flies, and a
+    /// set that had to rename its payloads because another set in the same
+    /// directory had used the names would be renaming them for no reason. A
+    /// set is read on its own; nothing compares the names in one file with
+    /// the names in another, and the shipped sets rely on it -- more than one
+    /// of them names a payload DH0.
+    #[test]
+    fn two_files_may_name_their_payloads_alike() {
+        let one_set = |port: u16, packet_size: usize| {
+            format!(
+                "
+version: \"1.0\"
+description: a set of its own
+payload_groups:
+  - name: localhost_udp
+    type: network
+    protocol: udp
+    address: localhost
+payloads:
+  - dh_id: 0
+    name: DH0
+    group: localhost_udp
+    port: {port}
+    packet_size: {packet_size}
+"
+            )
+        };
+
+        // The same payload name, the same group name, and the same id, in two
+        // files that know nothing of each other.
+        let first = payload(&one_set(5000, 12)).to_dh_configs().expect("the first set");
+        let second = payload(&one_set(6000, 8)).to_dh_configs().expect("the second set");
+
+        assert_eq!(first[0].name.0, second[0].name.0);
+        assert_eq!(first[0].dh_id, second[0].dh_id);
+        assert_ne!(
+            first[0].packet_size, second[0].packet_size,
+            "the two sets describe different payloads under the one name"
+        );
+    }
+
     /// An attribute of another kind of payload is refused.
     ///
     /// Ignoring one is how a device payload comes to carry a port nothing

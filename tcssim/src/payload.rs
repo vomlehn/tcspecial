@@ -55,6 +55,17 @@ pub struct PayloadConfig {
     pub triggered: bool,
     /// What this payload is asked to do wrong; see [`Faults`].
     pub faults: Faults,
+    /// The socket this payload binds for itself, where the simulator file
+    /// states one: a host and a port for a UDP payload, a path for a Unix
+    /// datagram one.
+    ///
+    /// The other end of the link from `address` and `port`, which are the
+    /// handler's. Only the datagram kinds have one to bind: a stream payload
+    /// is the end that waits, so it binds the handler's address. `None` is
+    /// any interface and a port the system chooses, which is what every
+    /// simulator file asked for before this could be stated.
+    pub own_address: Option<String>,
+    pub own_port: Option<u16>,
     pub packet_size: Arc<AtomicU32>,
     pub segment_size: Arc<AtomicU32>,
     pub packet_interval_ms: Arc<AtomicU32>,
@@ -560,6 +571,8 @@ mod tests {
             bus_address: 0,
             triggered: false,
             faults,
+            own_address: None,
+            own_port: None,
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),
@@ -913,6 +926,8 @@ mod tests {
             port: 5000,
             bus_address: 0,
             faults: Default::default(),
+            own_address: None,
+            own_port: None,
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),

@@ -183,6 +183,28 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
         }
     );
 
+    // The socket this payload answers from, where the file asks for one. Not
+    // where the payload is -- that is the payload configuration's line above
+    // -- but the other end of the same link.
+    match (&sim.payload_address, sim.payload_port) {
+        (None, None) => {}
+        (address, port) => {
+            let _ = writeln!(
+                out,
+                "  payload_address  {}",
+                address.as_deref().unwrap_or("any interface")
+            );
+            let _ = writeln!(
+                out,
+                "  payload_port     {}",
+                match port {
+                    Some(port) => port.to_string(),
+                    None => "whichever the system gives".to_string(),
+                }
+            );
+        }
+    }
+
     let faults = &sim.faults;
     if !faults.any() {
         let _ = writeln!(out, "  faults           none, so the payload works");

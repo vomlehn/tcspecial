@@ -113,6 +113,36 @@ fn the_shipped_payload_configs_load() {
                         dh.dh_id
                     );
                 }
+                // The kinds that are device files with terms of their own:
+                // what is checked here is only that each is located, since
+                // what the terms should be is the file's business.
+                EndpointConfig::Serial(serial) => {
+                    assert!(
+                        !serial.path.is_empty(),
+                        "{file}: {:?} has no serial device",
+                        dh.dh_id
+                    );
+                    assert_ne!(
+                        serial.datarate, 0,
+                        "{file}: {:?} has no data rate",
+                        dh.dh_id
+                    );
+                }
+                EndpointConfig::I2c(i2c) => {
+                    assert!(!i2c.bus.is_empty(), "{file}: {:?} has no bus", dh.dh_id);
+                }
+                EndpointConfig::Spi(spi) => {
+                    assert!(
+                        !spi.path.is_empty(),
+                        "{file}: {:?} has no SPI device",
+                        dh.dh_id
+                    );
+                    assert_ne!(
+                        spi.max_speed, 0,
+                        "{file}: {:?} has no clock rate",
+                        dh.dh_id
+                    );
+                }
             }
         }
     }

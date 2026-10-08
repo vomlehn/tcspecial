@@ -13,17 +13,21 @@ use slint::{Model, ModelRc, SharedString, VecModel};
 use std::env;
 use std::process;
 use std::rc::Rc;
-use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex};
 
 use tcslibgs::config::{load_dh_configs, payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
-use tcslibgs::{DHConfig, EndpointConfig, NetworkProtocol};
+use tcslibgs::DHConfig;
 
+mod endpoint;
 mod grid;
 mod payload;
+mod payload_device;
+mod payload_tcp;
+mod payload_udp;
 mod sim_config;
 
-use payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
+use endpoint::{endpoint_description, payload_config_from};
+use payload::{PayloadConfig, SimulatedPayload};
 use sim_config::{ResolvedSim, SimConfigFile};
 
 slint::include_modules!();
@@ -33,73 +37,6 @@ slint::include_modules!();
 /// what is read when that variable is unset.
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
 const DEFAULT_SIM_CONFIG_PATH: &str = "payload1sim.yaml";
-
-/// Turn a data handler and its simulator settings into the simulator's own
-/// configuration.
-///
-/// The payload file describes what tcspecial expects to talk to, so the
-/// simulator takes the other end of it: the handler's endpoint becomes the
-/// address the simulated payload uses. Everything about how the payload
-/// behaves comes from `sim`, which is what the simulator file settled.
-fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadConfig, String> {
-    let (protocol, address, port) = match &dh.endpoint {
-        EndpointConfig::Network(net) => {
-            let protocol = match net.protocol {
-                NetworkProtocol::Tcp => PayloadProtocol::Tcp,
-                NetworkProtocol::Udp => PayloadProtocol::Udp,
-                // The simulator speaks only TCP, UDP, and devices. A Unix
-                // socket handler is a configuration the simulator cannot
-                // stand in for, so say so rather than simulating the wrong
-                // thing.
-                other => {
-                    return Err(format!(
-                        "{} uses {:?}, which the simulator cannot simulate",
-                        dh.name.0, other
-                    ))
-                }
-            };
-            (protocol, net.address.clone(), net.port)
-        }
-        EndpointConfig::Device(dev) => (PayloadProtocol::Device, dev.path.clone(), 0),
-    };
-
-    let packet_size = u32::try_from(dh.packet_size)
-        .map_err(|_| format!("{} has a packet size too large to simulate", dh.name.0))?;
-
-    Ok(PayloadConfig {
-        _id: dh.dh_id.0,
-        protocol,
-        address,
-        port,
-        packet_size: Arc::new(AtomicU32::new(packet_size)),
-        segment_size: Arc::new(AtomicU32::new(sim.segment_size)),
-        packet_interval_ms: Arc::new(AtomicU32::new(sim.packet_interval_ms)),
-        segment_interval_ms: Arc::new(AtomicU32::new(sim.segment_interval_ms)),
-    })
-}
-
-/// How a data handler's endpoint reads in its panel.
-fn endpoint_description(endpoint: &EndpointConfig) -> String {
-    match endpoint {
-        EndpointConfig::Network(net) => {
-            let protocol = match net.protocol {
-                NetworkProtocol::Tcp => "TCP",
-                NetworkProtocol::Udp => "UDP",
-                NetworkProtocol::UnixStream => "Unix stream",
-                NetworkProtocol::UnixDgram => "Unix datagram",
-            };
-
-            match net.protocol {
-                // A Unix socket is named by a path; its port means nothing.
-                NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
-                    format!("{} {}", protocol, net.address)
-                }
-                _ => format!("{} {}:{}", protocol, net.address, net.port),
-            }
-        }
-        EndpointConfig::Device(dev) => format!("Device {}", dev.path),
-    }
-}
 
 /// Turn a data handler and its settled simulator settings into the panel the
 /// window shows for it.
@@ -335,8 +272,7 @@ fn main() {
 mod tests {
     use super::*;
     use std::path::Path;
-    use std::sync::atomic::Ordering;
-    use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig};
+    use tcslibgs::{DHId, DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
 
     fn repo_file(name: &str) -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
@@ -654,45 +590,5 @@ mod tests {
         assert_eq!(info.packet_interval, 500);
         assert_eq!(info.segment_interval, 250);
         assert_eq!(info.segment_size, 5);
-    }
-
-    #[test]
-    fn a_device_handler_simulates_against_its_path() {
-        let dh = DHConfig {
-            dh_id: DHId(7),
-            name: DHName::new("DH7"),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/urandom".to_string(),
-            }),
-            packet_size: 4,
-     oc: None,
- };
-
-        let config = payload_config_from(&dh, &sim(250, 100, 2)).unwrap();
-        assert_eq!(config.address, "/dev/urandom");
-        assert!(config.protocol == PayloadProtocol::Device);
-        // The packet size is the payload file's; everything else is the
-        // simulator file's.
-        assert_eq!(config.packet_size.load(Ordering::SeqCst), 4);
-        assert_eq!(config.segment_size.load(Ordering::SeqCst), 2);
-        assert_eq!(config.packet_interval_ms.load(Ordering::SeqCst), 250);
-        assert_eq!(config.segment_interval_ms.load(Ordering::SeqCst), 100);
-    }
-
-    #[test]
-    fn a_unix_socket_handler_is_refused_rather_than_mis_simulated() {
-        let dh = DHConfig {
-            dh_id: DHId(8),
-            name: DHName::new("DH8"),
-            endpoint: EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::UnixStream,
-                address: "/tmp/dh8".to_string(),
-                port: 0,
-            }),
-            packet_size: 4,
-     oc: None,
- };
-
-        assert!(payload_config_from(&dh, &sim(250, 250, 4)).is_err());
     }
 }

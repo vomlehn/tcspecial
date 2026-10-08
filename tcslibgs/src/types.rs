@@ -1,6 +1,9 @@
 //! Type definitions shared between ground and space software
 
 use serde::{Deserialize, Serialize};
+
+use crate::endpoint_config_serial::StopBits;
+use crate::endpoint_config_spi::{BitOrder, CsActive, SpiMode};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -46,10 +49,16 @@ impl PartialOrd for DHId {
 /// Data handler type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DHType {
-    /// Network-based data handler (TCP, UDP, etc.)
+    /// A handler whose payload is at a network address.
     Network,
-    /// Device-based data handler (/dev/*)
+    /// A handler whose payload is a device file, read as it comes.
     Device,
+    /// A handler whose payload is on a serial line.
+    Serial,
+    /// A handler whose payload is a device on an I2C bus.
+    I2c,
+    /// A handler whose payload is a SPI peripheral.
+    Spi,
 }
 
 /// Data handler name
@@ -207,11 +216,79 @@ pub struct DeviceConfig {
     pub path: String,
 }
 
-/// Endpoint configuration
+/// Configuration for a serial endpoint
+///
+/// A device node and the framing of the line it opens. The framing is here
+/// rather than left to whatever the port was last set to because a serial
+/// line carries no negotiation: both ends must be told the same thing, and a
+/// line read at the wrong rate delivers bytes that are wrong rather than
+/// absent.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SerialConfig {
+    pub path: String,
+    /// Line rate in bits per second.
+    pub datarate: u32,
+    pub stop_bits: StopBits,
+    /// Data bits per byte. A count rather than a `ByteLength`, which is the
+    /// configuration language's checked form: by the time a handler is
+    /// started the count has been checked, and this is the number the line
+    /// is set to.
+    pub byte_length: u8,
+}
+
+/// Configuration for an endpoint on an I2C bus
+///
+/// The one kind of endpoint that two of its own cannot be told apart by
+/// name: several devices sit on one bus, so the bus device and the address
+/// the master sends to are both needed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct I2cConfig {
+    /// The bus device, such as `/dev/i2c-1`.
+    pub bus: String,
+    /// Address of the device on that bus.
+    pub address: u16,
+    /// Address with ten address bits rather than seven.
+    pub ten_bit: bool,
+    /// Append an SMBus packet error check to each transfer.
+    pub pec: bool,
+}
+
+/// Configuration for a SPI endpoint
+///
+/// A device node, which names the bus and the chip select together, and the
+/// terms the peripheral is clocked on. Like a serial line and unlike a
+/// network address, none of it is negotiated.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SpiConfig {
+    pub path: String,
+    /// Greatest clock rate the peripheral accepts, in Hz.
+    pub max_speed: u32,
+    pub mode: SpiMode,
+    /// Bits per word, as a count: see `SerialConfig::byte_length`.
+    pub bits_per_word: u8,
+    pub bit_order: BitOrder,
+    pub cs_active: CsActive,
+}
+
+/// What a data handler does its payload I/O on, and so what kind it is.
+///
+/// One variant per kind of endpoint, each carrying what that kind needs to be
+/// opened and operated. A kind is not a protocol: `Network` carries the
+/// protocol it runs over, and the other four are not addressed that way at
+/// all.
+///
+/// `Device` is a device file opened and read as it comes, and nothing more:
+/// the kinds that are also device files but have terms of their own -- a
+/// serial line's framing, a bus address, a clock mode -- are their own
+/// variants, because a handler that lost those on the way to being started
+/// would open the right file and talk to it wrongly.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EndpointConfig {
     Network(NetworkConfig),
     Device(DeviceConfig),
+    Serial(SerialConfig),
+    I2c(I2cConfig),
+    Spi(SpiConfig),
 }
 
 /// Data handler configuration

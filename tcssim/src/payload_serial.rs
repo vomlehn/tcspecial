@@ -68,7 +68,7 @@ pub fn run_serial_payload(
             if n > 0 {
                 asked = n;
                 let mut guard = stats.lock().unwrap();
-                guard.packets_recv += 1;
+                guard.a_packet_has_come(&buf[..n]);
                 guard.bytes_recv += n as u64;
             }
         }
@@ -101,7 +101,7 @@ pub fn run_serial_payload(
                 let mut guard = stats.lock().unwrap();
                 guard.bytes_sent += bytes;
                 if whole {
-                    guard.packets_sent += 1;
+                    guard.a_packet_has_gone(&packet);
                     sent += 1;
                 }
             }

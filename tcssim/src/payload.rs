@@ -29,8 +29,9 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use rand::Rng;
+use tcslibgs::DHSample;
 
-use crate::sim_config::Faults;
+use tcslibgs::Faults;
 
 /// Payload configuration
 #[derive(Clone)]
@@ -91,6 +92,34 @@ pub struct PayloadStats {
     pub packets_recv: u64,
     pub bytes_sent: u64,
     pub bytes_recv: u64,
+    /// The last whole packet each way: when it moved and the head of it.
+    ///
+    /// The same sample tcspecial keeps for a handler and answers
+    /// QUERY_DH_SAMPLE with, so the panel at this end of a link and the panel
+    /// at the other end show the one transfer the same way. Empty until
+    /// something has moved: a payload that has sent nothing has no time to
+    /// show, which is a different thing from having sent something at
+    /// midnight.
+    pub last_sent: DHSample,
+    pub last_recv: DHSample,
+}
+
+impl PayloadStats {
+    /// A whole packet has gone, now, and this is what it was.
+    ///
+    /// Counted, timed and sampled in one call so the three cannot come apart:
+    /// a count that moved without the time moving would have a panel showing
+    /// traffic at a time it had stopped, which is worse than showing neither.
+    pub fn a_packet_has_gone(&mut self, packet: &[u8]) {
+        self.packets_sent += 1;
+        self.last_sent.record(packet);
+    }
+
+    /// And one has arrived.
+    pub fn a_packet_has_come(&mut self, packet: &[u8]) {
+        self.packets_recv += 1;
+        self.last_recv.record(packet);
+    }
 }
 
 /// Simulated payload
@@ -180,6 +209,8 @@ impl SimulatedPayload {
             packets_recv: guard.packets_recv,
             bytes_sent: guard.bytes_sent,
             bytes_recv: guard.bytes_recv,
+            last_sent: guard.last_sent,
+            last_recv: guard.last_recv,
         }
     }
 

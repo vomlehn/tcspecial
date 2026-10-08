@@ -286,7 +286,7 @@ pub fn run_i2c_payload(
                 let mut guard = stats.lock().unwrap();
                 guard.bytes_sent += bytes;
                 if whole {
-                    guard.packets_sent += 1;
+                    guard.a_packet_has_gone(&packet);
                     sent += 1;
                 }
             }

@@ -73,7 +73,7 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
             if n > 0 {
                 asked = n;
                 let mut guard = stats.lock().unwrap();
-                guard.packets_recv += 1;
+                guard.a_packet_has_come(&buf[..n]);
                 guard.bytes_recv += n as u64;
             }
         }
@@ -105,7 +105,7 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
                 let mut guard = stats.lock().unwrap();
                 guard.bytes_sent += bytes;
                 if whole {
-                    guard.packets_sent += 1;
+                    guard.a_packet_has_gone(&packet);
                     sent += 1;
                 }
             }
@@ -120,8 +120,9 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use crate::sim_config::Faults;
+    use tcslibgs::Faults;
     use std::sync::atomic::AtomicU32;
+    use tcslibgs::Timestamp;
     use std::time::Duration;
 
     /// A UDP payload sends because it is running, not because it was asked.
@@ -223,6 +224,104 @@ mod tests {
         let at = handler.local_addr().expect("its address");
         handler.set_read_timeout(Some(wait)).expect("a read timeout");
         (handler, at)
+    }
+
+    /// The stats carry when the last packet went, not just how many.
+    ///
+    /// Taken at the moment the packet goes rather than when the window next
+    /// looks, which is what makes the panel's time the time of the transfer:
+    /// a time stamped by the refresh would creep forward on a payload that
+    /// had stopped sending.
+    #[test]
+    fn a_sent_packet_is_timed_as_well_as_counted() {
+        let (handler, at) = handler_end(Duration::from_secs(5));
+        let mut payload = faulty(at, Faults::default());
+
+        let before = Timestamp::now().seconds;
+        payload.start().expect("the payload starts");
+
+        let mut buf = [0u8; 64];
+        handler.recv_from(&mut buf).expect("a packet");
+        // The sending thread stamps the stats after the write, so give it the
+        // moment between the two.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let sent = loop {
+            let sample = payload.stats().last_sent;
+            match sample.time {
+                Some(_) => break sample,
+                None if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(10))
+                }
+                None => panic!("a packet arrived and nothing recorded when"),
+            }
+        };
+        let after = Timestamp::now().seconds;
+        payload.stop();
+
+        let went = sent.time.expect("a time, having just been matched");
+        assert!(
+            (before..=after).contains(&went.seconds),
+            "a packet sent between {before} and {after} was timed at {}",
+            went.seconds
+        );
+
+        // And what went: the head of the packet, and its whole length, which
+        // is what lets the panel say a packet was longer than what it shows.
+        assert_eq!(
+            sent.total, 12,
+            "a packet of twelve bytes was sampled as {} bytes",
+            sent.total
+        );
+        assert_eq!(&buf[..sent.data().len()], sent.data(), "the sample is not the bytes that arrived");
+        assert!(
+            payload.stats().last_recv.is_empty(),
+            "nothing was sent to this payload, so it has no received line"
+        );
+    }
+
+    /// And when the last one arrived, which is the other row of the panel.
+    ///
+    /// The handler's end learns where the payload is from the packet it gets,
+    /// a datagram's sender being the only statement of where it came from, so
+    /// this is also the only order in which the two can be timed: the payload
+    /// speaks, and then can be spoken to.
+    #[test]
+    fn a_received_packet_is_timed_too() {
+        let (handler, at) = handler_end(Duration::from_secs(5));
+        let mut payload = faulty(at, Faults::default());
+
+        let before = Timestamp::now().seconds;
+        payload.start().expect("the payload starts");
+
+        let mut buf = [0u8; 64];
+        let (_, from) = handler.recv_from(&mut buf).expect("a packet");
+        handler.send_to(b"ASK", from).expect("the handler asks");
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let received = loop {
+            let sample = payload.stats().last_recv;
+            match sample.time {
+                Some(_) => break sample,
+                None if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(10))
+                }
+                None => panic!("the payload was spoken to and recorded no time"),
+            }
+        };
+        let after = Timestamp::now().seconds;
+        payload.stop();
+
+        let came = received.time.expect("a time, having just been matched");
+        assert!(
+            (before..=after).contains(&came.seconds),
+            "a packet received between {before} and {after} was timed at {}",
+            came.seconds
+        );
+        assert_eq!(
+            received.data(),
+            b"ASK",
+            "the sample is not what the handler sent"
+        );
     }
 
     /// Every packet dropped is a running payload that sends nothing.

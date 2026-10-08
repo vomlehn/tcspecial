@@ -12,7 +12,15 @@ pub mod endpoint_config_serial;
 pub mod endpoint_config_spi;
 pub mod error;
 pub mod format;
+pub mod parameters;
 pub mod protocol;
+/// The simulator's own configuration language.
+///
+/// Here with the other three rather than in tcssim: both GUIs read it now --
+/// one to simulate payloads and one to show what a payload set says -- and a
+/// configuration language read by two programs cannot live inside one of
+/// them.
+pub mod sim_config;
 pub mod telemetry;
 pub mod types;
 
@@ -26,6 +34,8 @@ pub use endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 pub use config::*;
 pub use error::*;
 pub use format::*;
+pub use parameters::*;
 pub use protocol::*;
+pub use sim_config::*;
 pub use telemetry::*;
 pub use types::*;

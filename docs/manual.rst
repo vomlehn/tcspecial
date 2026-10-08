@@ -291,6 +291,8 @@ reads this.
      name                 the payload this one stands in for
      type                 the kind of payload it is, as the payload file says
      protocol             which transport, for a network payload
+     sim_address          where it is, if this file cares to say
+     sim_port             which port, likewise
      group                the group to take unstated settings from, if any
      ...                  any of the settings below
 
@@ -311,6 +313,38 @@ sends. Stating the kind here makes that pairing an error instead.
    protocol               which transport, for a network payload, and refused
                           for any other kind. Must be what the payload file
                           says
+   sim_address            where the payload is: the host, or the socket's path
+                          for a Unix socket. Optional, and compared with the
+                          payload file when stated
+   sim_port               which port the payload is at. Optional, compared
+                          the same way, and refused for a Unix socket, which
+                          is named by a path and has no port
+
+The address and the port carry the ``sim_`` prefix because the two files mean
+different things by stating them: the payload file decides where a payload is,
+and this file only says where it understands the payload to be. A plain
+``address`` or ``port`` here would read as though the simulator chose it, so
+either is refused with the prefixed name rather than reported as a word
+nothing knows -- it is the likeliest thing to carry across from the payload
+file beside it, and less a mistake than the wrong spelling of something real.
+
+.. code-block:: yaml
+
+   simulated_payloads:
+     - name: DH0
+       type: network
+       protocol: udp
+       sim_address: localhost   # not address: it is a statement about the
+       sim_port: 5000           # payload file, not a choice made here
+       packet_interval_ms: 1000
+
+Unlike the kind and the transport, these two need not be stated at all: an
+address is commonly the same in two payload sets that differ in every other
+way, so requiring it would be duplication asked for and nothing caught. Hosts
+that certainly mean this host count as one host, a Unix socket's
+``sim_address`` is its path, and such a socket takes no ``sim_port`` -- the
+port a payload file gives it means nothing, so one stated here could only be
+compared against a number nobody chose.
 
 A word that is not a setting is refused here too -- in a payload, in a group,
 and in the file's own sections. A misspelled setting that was ignored would

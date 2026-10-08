@@ -41,7 +41,9 @@ use std::path::Path;
 
 use serde::de::IgnoredAny;
 use serde::Deserialize;
-use tcslibgs::{load_config_file, DHConfig, DHType, EndpointConfig, NetworkProtocol, TcsResult};
+use tcslibgs::{
+    load_config_file, one_host, DHConfig, DHType, EndpointConfig, NetworkProtocol, TcsResult,
+};
 
 /// What can be wrong with a simulator configuration, once it has parsed.
 ///
@@ -104,8 +106,38 @@ pub enum SimConfigError {
         in_payload_file: NetworkProtocol,
         in_sim_file: NetworkProtocol,
     },
-    /// A protocol stated for a kind of payload that has none.
-    ProtocolForWhatHasNone { payload: String, kind: DHType },
+    /// A setting that belongs to a network payload, stated by a payload of
+    /// some other kind.
+    NotForThisKind {
+        payload: String,
+        kind: DHType,
+        setting: &'static str,
+    },
+    /// A port stated for a socket that is named by a path.
+    NoPortOnAPath {
+        payload: String,
+        protocol: NetworkProtocol,
+    },
+    /// The two files disagree about where the payload is.
+    AddressMismatch {
+        payload: String,
+        in_payload_file: String,
+        in_sim_file: String,
+    },
+    /// The two files disagree about which port.
+    PortMismatch {
+        payload: String,
+        in_payload_file: u16,
+        in_sim_file: u16,
+    },
+    /// An attribute of the payload file written here under the name the
+    /// payload file uses for it.
+    PrefixIt {
+        what: &'static str,
+        name: String,
+        given: &'static str,
+        instead: &'static str,
+    },
     /// A word that is not a setting at all, which is what a misspelled
     /// setting looks like.
     NoSuchSetting {
@@ -238,12 +270,60 @@ impl fmt::Display for SimConfigError {
                 in_sim_file.spelling(),
                 in_payload_file.spelling()
             ),
-            SimConfigError::ProtocolForWhatHasNone { payload, kind } => write!(
-                f,
-                "simulated payload \"{}\" is a {} payload and states a protocol, \
-                 which only a network payload has",
+            SimConfigError::NotForThisKind {
                 payload,
-                kind.spelling()
+                kind,
+                setting,
+            } => write!(
+                f,
+                "simulated payload \"{}\" is a {} payload and states {}, which only \
+                 a network payload has",
+                payload,
+                kind.spelling(),
+                setting
+            ),
+            SimConfigError::NoPortOnAPath { payload, protocol } => write!(
+                f,
+                "simulated payload \"{}\" speaks {} and states sim_port, which it has \
+                 none of: a socket named by a path is reached by that path, and \
+                 sim_address is where it is",
+                payload,
+                protocol.spelling()
+            ),
+            SimConfigError::AddressMismatch {
+                payload,
+                in_payload_file,
+                in_sim_file,
+            } => write!(
+                f,
+                "simulated payload \"{}\" is at \"{}\" here and at \"{}\" in the \
+                 payload configuration. Both files describe the one payload, so \
+                 they cannot disagree about where it is",
+                payload, in_sim_file, in_payload_file
+            ),
+            SimConfigError::PortMismatch {
+                payload,
+                in_payload_file,
+                in_sim_file,
+            } => write!(
+                f,
+                "simulated payload \"{}\" is at port {} here and at port {} in the \
+                 payload configuration. Both files describe the one payload, so \
+                 they cannot disagree about which port it is at",
+                payload, in_sim_file, in_payload_file
+            ),
+            SimConfigError::PrefixIt {
+                what,
+                name,
+                given,
+                instead,
+            } => write!(
+                f,
+                "{} \"{}\" states {}, which this file writes as {}. The payload \
+                 configuration decides where a payload is; this file only says \
+                 where it understands the payload to be, and the prefix is what \
+                 keeps the two from reading as the same statement",
+                what, name, given, instead
             ),
             SimConfigError::IntervalForATriggeredPayload { payload } => write!(
                 f,
@@ -302,14 +382,34 @@ fn nothing_unknown(
     name: &str,
     unknown: &BTreeMap<String, IgnoredAny>,
 ) -> Result<(), SimConfigError> {
-    match unknown.keys().next() {
-        Some(given) => Err(SimConfigError::NoSuchSetting {
+    let Some(given) = unknown.keys().next() else {
+        return Ok(());
+    };
+
+    // The two the payload file spells without a prefix. Someone writing a
+    // simulator file beside a payload file, or copying from one, writes them
+    // the way the payload file does -- so they are named here and answered
+    // with the name this file uses, rather than reported as words nothing
+    // knows.
+    let prefixed = [("address", "sim_address"), ("port", "sim_port")];
+    if let Some((_, instead)) = prefixed.iter().find(|(plain, _)| plain == given) {
+        return Err(SimConfigError::PrefixIt {
             what,
             name: name.to_string(),
-            given: given.clone(),
-        }),
-        None => Ok(()),
+            given: if *instead == "sim_address" {
+                "address"
+            } else {
+                "port"
+            },
+            instead,
+        });
     }
+
+    Err(SimConfigError::NoSuchSetting {
+        what,
+        name: name.to_string(),
+        given: given.clone(),
+    })
 }
 
 /// Check this entry against the payload it names.
@@ -346,13 +446,20 @@ fn what_it_is(
         });
     }
 
-    // A transport belongs to a network payload and to no other kind, so for
-    // every other kind the question is whether one was stated at all.
+    // A transport and an address belong to a network payload and to no other
+    // kind, so for every other kind the question is whether any of them was
+    // stated at all.
     let EndpointConfig::Network(network) = endpoint else {
-        return match settings.protocol {
-            Some(_) => Err(SimConfigError::ProtocolForWhatHasNone {
+        let foreign = [
+            ("a protocol", settings.protocol.is_some()),
+            ("sim_address", settings.sim_address.is_some()),
+            ("sim_port", settings.sim_port.is_some()),
+        ];
+        return match foreign.iter().find(|(_, stated)| *stated) {
+            Some((setting, _)) => Err(SimConfigError::NotForThisKind {
                 payload: name.to_string(),
                 kind: actually,
+                setting,
             }),
             None => Ok(()),
         };
@@ -381,6 +488,53 @@ fn what_it_is(
         });
     }
 
+    // Where the payload is. Stated or not, as the file likes: a kind and a
+    // transport are what tell two payload sets apart whatever else they
+    // share, where an address is commonly the same in both and so would be
+    // duplication asked for and nothing caught. Stated, it is compared.
+    let named_by_a_path = matches!(
+        network.protocol,
+        NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram
+    );
+
+    if let Some(address) = settings.sim_address.as_deref() {
+        // A host written two ways is one host, as it is for two handlers
+        // claiming one port. A path is compared as written, there being
+        // nothing to canonicalise.
+        let (stated, actually) = if named_by_a_path {
+            (address.to_string(), network.address.clone())
+        } else {
+            (one_host(address), one_host(&network.address))
+        };
+        if stated != actually {
+            return Err(SimConfigError::AddressMismatch {
+                payload: name.to_string(),
+                in_payload_file: network.address.clone(),
+                in_sim_file: address.to_string(),
+            });
+        }
+    }
+
+    match (settings.sim_port, named_by_a_path) {
+        // A socket named by a path carries a port in a payload file that
+        // means nothing there, so a port stated here could only be compared
+        // against a number nobody chose.
+        (Some(_), true) => {
+            return Err(SimConfigError::NoPortOnAPath {
+                payload: name.to_string(),
+                protocol: network.protocol,
+            })
+        }
+        (Some(port), false) if port != network.port => {
+            return Err(SimConfigError::PortMismatch {
+                payload: name.to_string(),
+                in_payload_file: network.port,
+                in_sim_file: port,
+            })
+        }
+        _ => {}
+    }
+
     Ok(())
 }
 
@@ -404,6 +558,23 @@ pub struct SimSettings {
     /// kind.
     #[serde(default)]
     pub protocol: Option<String>,
+    /// Where the payload is, for a network payload: the host for a transport
+    /// addressed by one, and the socket's path for a Unix socket.
+    ///
+    /// Written with the `sim_` prefix, where the payload file writes
+    /// `address`, because the two files mean different things by stating it.
+    /// The payload file decides where the payload is; this file only says
+    /// where it understands the payload to be, and is told when the two
+    /// disagree. A plain `address` here would read as though the simulator
+    /// chose the address, which it does not.
+    #[serde(default)]
+    pub sim_address: Option<String>,
+    /// Which port the payload is at, for a transport addressed by one.
+    ///
+    /// Prefixed for the same reason as `sim_address`, and refused for a Unix
+    /// socket, which is named by a path and has no port.
+    #[serde(default)]
+    pub sim_port: Option<u16>,
 
     /// Milliseconds between packets. 0 is as fast as the payload can be driven.
     #[serde(default)]
@@ -468,6 +639,11 @@ impl SimSettings {
         SimSettings {
             dh_type: self.dh_type.clone().or_else(|| base.dh_type.clone()),
             protocol: self.protocol.clone().or_else(|| base.protocol.clone()),
+            sim_address: self
+                .sim_address
+                .clone()
+                .or_else(|| base.sim_address.clone()),
+            sim_port: self.sim_port.or(base.sim_port),
             packet_interval_ms: self.packet_interval_ms.or(base.packet_interval_ms),
             segment_interval_ms: self.segment_interval_ms.or(base.segment_interval_ms),
             segment_size: self.segment_size.or(base.segment_size),
@@ -966,6 +1142,159 @@ simulated_payloads:
             path: "/dev/urandom".to_string(),
         });
         dh
+    }
+
+    /// A network payload at a stated place, for the tests below.
+    fn at(name: &str, protocol: NetworkProtocol, address: &str, port: u16) -> DHConfig {
+        let mut dh = handler(name, 4);
+        dh.endpoint = EndpointConfig::Network(NetworkConfig {
+            protocol,
+            address: address.to_string(),
+            port,
+        });
+        dh
+    }
+
+    /// The payload file's `address` and `port`, written here, are answered
+    /// with the names this file uses.
+    ///
+    /// They are the two attributes someone writing a simulator file beside a
+    /// payload file is most likely to copy across, and the prefix is the
+    /// whole point: the payload file decides where a payload is, and this
+    /// file only says where it understands the payload to be. Reported as a
+    /// suggestion rather than as a word nothing knows, because such a line is
+    /// not so much a mistake as the wrong spelling of something real.
+    #[test]
+    fn the_payload_files_address_and_port_are_answered_with_the_prefixed_names() {
+        for (plain, instead) in [("address: localhost", "sim_address"), ("port: 5000", "sim_port")]
+        {
+            let file = parse(&format!(
+                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: udp\n    packet_interval_ms: 100\n    {plain}\n"
+            ));
+            let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+            assert!(
+                said.contains(instead) && said.contains("DH0"),
+                "writing {plain} should suggest {instead}: {said}"
+            );
+        }
+
+        // A group is read the same way.
+        let file = parse(
+            "simulated_payload_groups:\n  - name: g\n    packet_interval_ms: 100\n    \
+             port: 5000\n\
+             simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    \
+             group: g\n",
+        );
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("sim_port") && said.contains("\"g\""),
+            "the error should name the group and the prefixed name: {said}"
+        );
+    }
+
+    /// Where the payload is may be stated, and is then compared.
+    ///
+    /// Unlike the kind and the transport it need not be stated at all: an
+    /// address is commonly the same in two payload sets that differ in every
+    /// other way, so requiring it would be duplication asked for and nothing
+    /// caught. Stated, it has to agree.
+    #[test]
+    fn a_stated_address_and_port_have_to_agree_with_the_payload_file() {
+        let sim = |extra: &str| {
+            parse(&format!(
+                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: udp\n    packet_interval_ms: 100\n{extra}"
+            ))
+        };
+        let payload = at("DH0", NetworkProtocol::Udp, "localhost", 5000);
+
+        // Agreement, including a host written the other way: localhost and
+        // 127.0.0.1 are one host, as they are for two handlers claiming one
+        // port.
+        sim("    sim_address: localhost\n    sim_port: 5000\n")
+            .resolve(std::slice::from_ref(&payload))
+            .expect("the same place, said twice");
+        sim("    sim_address: 127.0.0.1\n")
+            .resolve(std::slice::from_ref(&payload))
+            .expect("one host under two names is one host");
+
+        // And nothing stated at all, which is every simulator file written
+        // before these existed.
+        sim("")
+            .resolve(std::slice::from_ref(&payload))
+            .expect("nothing to compare");
+
+        let said = format!(
+            "{}",
+            sim("    sim_port: 5001\n")
+                .resolve(std::slice::from_ref(&payload))
+                .unwrap_err()
+        );
+        assert!(
+            said.contains("5001") && said.contains("5000"),
+            "the error should name both ports: {said}"
+        );
+
+        let said = format!(
+            "{}",
+            sim("    sim_address: elsewhere\n")
+                .resolve(&[payload])
+                .unwrap_err()
+        );
+        assert!(
+            said.contains("elsewhere") && said.contains("localhost"),
+            "the error should name both addresses: {said}"
+        );
+    }
+
+    /// A socket named by a path has an address and no port.
+    #[test]
+    fn a_unix_socket_is_at_a_path_and_at_no_port() {
+        let socket = at("DH0", NetworkProtocol::UnixStream, "/tmp/dh.sock", 0);
+        let sim = |extra: &str| {
+            parse(&format!(
+                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: unix_stream\n    packet_interval_ms: 100\n{extra}"
+            ))
+        };
+
+        sim("    sim_address: /tmp/dh.sock\n")
+            .resolve(std::slice::from_ref(&socket))
+            .expect("the path is where it is");
+
+        let said = format!(
+            "{}",
+            sim("    sim_address: /tmp/other.sock\n")
+                .resolve(std::slice::from_ref(&socket))
+                .unwrap_err()
+        );
+        assert!(said.contains("/tmp/other.sock"), "{said}");
+
+        // A port here could only be compared against a number nobody chose:
+        // a payload file gives every network payload a port, and for a socket
+        // named by a path it means nothing.
+        let said = format!("{}", sim("    sim_port: 0\n").resolve(&[socket]).unwrap_err());
+        assert!(
+            said.contains("sim_port") && said.contains("sim_address"),
+            "the error should say which of the two says where it is: {said}"
+        );
+    }
+
+    /// And neither belongs to a payload that is not reached over a network.
+    #[test]
+    fn only_a_network_payload_is_at_an_address() {
+        for stated in ["    sim_address: localhost\n", "    sim_port: 5000\n"] {
+            let file = parse(&format!(
+                "simulated_payloads:\n  - name: DH0\n    type: device\n    \
+                 packet_interval_ms: 0\n{stated}"
+            ));
+            let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
+            assert!(
+                said.contains("device") && said.contains("network"),
+                "{said}"
+            );
+        }
     }
 
     /// A misspelled setting is refused, not ignored.

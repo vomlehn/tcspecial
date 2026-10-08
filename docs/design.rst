@@ -1575,6 +1575,12 @@ that the two files can be checked against each other.
 | protocol            | string | Which transport, for a network payload.     |
 |                     |        | Refused for every other kind                |
 +---------------------+--------+---------------------------------------------+
+| sim_address         | string | Where the payload is: the host, or the      |
+|                     |        | socket's path for a Unix socket. Optional   |
++---------------------+--------+---------------------------------------------+
+| sim_port            | number | Which port the payload is at. Optional, and |
+|                     |        | refused for a Unix socket                   |
++---------------------+--------+---------------------------------------------+
 
 **Fault injection settings**, each defaulting to no fault at all:
 
@@ -1665,6 +1671,42 @@ Requirement
     lists the words that would have worked. The spellings are one table read
     from both files, so the two cannot come to disagree about what a kind is
     called.
+
+Requirement
+    Where the payload is may be stated as ``sim_address`` and ``sim_port``,
+    and is then compared like the kind and the transport. Unlike them it need
+    not be stated at all: an address is commonly the same in two payload sets
+    that differ in every other way, so requiring it would be duplication asked
+    for and nothing caught.
+
+Requirement
+    This file writes them with the ``sim_`` prefix, where the payload
+    configuration writes ``address`` and ``port``, because the two files mean
+    different things by stating it. The payload configuration decides where a
+    payload is; this file only says where it understands the payload to be. A
+    plain ``address`` here would read as though the simulator chose the
+    address, which it does not.
+
+Requirement
+    ``address`` or ``port`` written here is refused with the prefixed name.
+    They are the two attributes someone writing a simulator file beside a
+    payload file is likeliest to carry across, so such a line is less a
+    mistake than the wrong spelling of something real, and is answered as one.
+
+Requirement
+    Hosts that certainly mean this host are one host, as they are for two
+    handlers claiming one port. A Unix socket's ``sim_address`` is its path
+    and is compared as written, there being nothing to canonicalise.
+
+Requirement
+    A Unix socket takes no ``sim_port``. It is named by a path, and the port a
+    payload file gives it means nothing there, so a port stated here could
+    only be compared against a number nobody chose.
+
+Requirement
+    Neither belongs to a payload that is not reached over a network, and
+    stating one for a device, a line, a bus or a peripheral is an error for
+    the same reason a protocol is.
 
 Requirement
     A group may carry the kind and the transport, like every other setting a

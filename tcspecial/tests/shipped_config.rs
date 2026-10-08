@@ -219,7 +219,9 @@ fn shipped_handlers_do_not_share_a_port() {
         for (i, (address, port, what)) in bound.iter().enumerate() {
             for (other_address, other_port, other) in &bound[i + 1..] {
                 // localhost and 127.0.0.1 are the same host under two names,
-                // so compare the ports and say so when they match.
+                // so compare the ports and say so when they match. The loader
+                // refuses a collision now, so this says the shipped files get
+                // past that rule rather than being what enforces it.
                 let same_host = address == other_address
                     || ["localhost", "127.0.0.1"].contains(&address.as_str())
                         && ["localhost", "127.0.0.1"].contains(&other_address.as_str());

@@ -152,6 +152,15 @@ pub enum EndpointConfigError {
         dh_id: u32,
     },
 
+    /// Two handlers want one address, one device file, or one place on a bus.
+    ///
+    /// Carried as its own message because the rule is shared with the payload
+    /// configuration format: the hazard is in the handlers rather than in the
+    /// words that described them, so both formats end at the same check and
+    /// report what it said.
+    #[error("{0}")]
+    Collision(String),
+
     #[error(
         "endpoint \"{endpoint}\" is in group \"{group}\", which states no packet size, \
          and a data handler needs one"
@@ -264,6 +273,9 @@ impl EndpointConfigDoc {
                 mode: Default::default(),
             });
         }
+
+        crate::types::no_two_handlers_claim_one_thing(&configs)
+            .map_err(EndpointConfigError::Collision)?;
 
         Ok(configs)
     }
@@ -1967,6 +1979,48 @@ endpoints:
             matches!(&e, EndpointConfigError::DuplicateDhId { dh_id: 3, .. }),
             "got {e:?}"
         );
+    }
+
+    /// Two endpoints wanting one thing are refused here as in a payload file.
+    ///
+    /// The rule belongs to the handlers rather than to the words that
+    /// described them, so both formats end at the same check. This format is
+    /// also the only one that can describe the kinds where it matters most: a
+    /// serial line opened twice is two handlers splitting one line between
+    /// them, each reporting part of it as though it were the whole.
+    #[test]
+    fn two_endpoints_wanting_one_line_are_rejected() {
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+             byte_length: 8\n    stop_bits: 1\n    packet_size: 8\n    stream:\n      \
+             max_length: 8\n      timeout: none\n\
+             endpoints:\n  - name: first\n    group: g\n    dh_id: 0\n    \
+             path: /dev/ttyS0\n  - name: second\n    group: g\n    dh_id: 1\n    \
+             path: /dev/ttyS0\n",
+        )
+        .expect("parses");
+
+        let e = doc.to_dh_configs().unwrap_err();
+        let said = format!("{e}");
+        assert!(
+            matches!(&e, EndpointConfigError::Collision(_))
+                && said.contains("/dev/ttyS0")
+                && said.contains("first")
+                && said.contains("second"),
+            "got {e:?}"
+        );
+
+        // Two lines, two handlers, which is the ordinary case.
+        let doc = from_yaml_str(
+            "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+             byte_length: 8\n    stop_bits: 1\n    packet_size: 8\n    stream:\n      \
+             max_length: 8\n      timeout: none\n\
+             endpoints:\n  - name: first\n    group: g\n    dh_id: 0\n    \
+             path: /dev/ttyS0\n  - name: second\n    group: g\n    dh_id: 1\n    \
+             path: /dev/ttyS1\n",
+        )
+        .expect("parses");
+        assert_eq!(doc.to_dh_configs().expect("both convert").len(), 2);
     }
 
     #[test]

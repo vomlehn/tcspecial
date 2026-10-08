@@ -22,151 +22,15 @@
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
-use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
 use rand::Rng;
 
-use crate::payload::{
-    make_the_path_lead_to, send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
-};
-
-/// A pty whose slave the configured path leads to, for as long as this lives.
-struct SimulatedLine {
-    /// The master: this end of the line.
-    master: File,
-    /// The slave's name, as the kernel chose it. Kept for the log line that
-    /// says where the configured path leads, which is the one place the name
-    /// is of any use to somebody watching.
-    #[allow(dead_code)]
-    slave: String,
-    /// The path a handler was told to open, which is a link to the slave.
-    named: PathBuf,
-}
-
-impl SimulatedLine {
-    /// Open a pty and make `path` lead to its slave.
-    fn open(path: &str) -> Result<Self, String> {
-        let named = PathBuf::from(path);
-        let (master, slave) = open_pty()?;
-
-        // Raw, before anything is written. A pty slave starts in canonical
-        // mode with echo on, which would send every byte this end writes
-        // straight back to it -- counted as received, and counted twice over
-        // when the handler answers. A handler sets the slave raw when it opens
-        // it, but it may not have opened it yet.
-        make_raw(master.as_raw_fd())?;
-        set_nonblocking(master.as_raw_fd())?;
-
-        make_the_path_lead_to(&named, &slave)?;
-
-        eprintln!("simulated serial line: {} -> {}", named.display(), slave);
-
-        Ok(Self {
-            master,
-            slave,
-            named,
-        })
-    }
-
-    /// The slave's name, which is what a handler really opens.
-    #[cfg(test)]
-    fn slave(&self) -> &str {
-        &self.slave
-    }
-}
-
-impl Drop for SimulatedLine {
-    /// Take the link away with the line, so the path does not outlive the
-    /// pty it leads to. A link left behind points at a slave that is gone,
-    /// and a handler opening it would be told the device does not exist --
-    /// true, but in a way that reads as a missing port rather than a stopped
-    /// simulator.
-    fn drop(&mut self) {
-        if self.named.is_symlink() {
-            let _ = std::fs::remove_file(&self.named);
-        }
-    }
-}
-
-/// Open a pty, returning the master and the slave's name.
-fn open_pty() -> Result<(File, String), String> {
-    // SAFETY: each call is given what it documents and its result is checked
-    // before anything is done with it.
-    let fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-    if fd < 0 {
-        return Err(format!(
-            "no pseudo-terminal could be opened: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-
-    // From here the descriptor is owned, so that an early return closes it.
-    let master = unsafe { File::from_raw_fd(fd) };
-
-    if unsafe { libc::grantpt(fd) } != 0 {
-        return Err(format!(
-            "the pseudo-terminal's slave could not be granted: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-    if unsafe { libc::unlockpt(fd) } != 0 {
-        return Err(format!(
-            "the pseudo-terminal's slave could not be unlocked: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-
-    let mut name = [0 as libc::c_char; 128];
-    if unsafe { libc::ptsname_r(fd, name.as_mut_ptr(), name.len()) } != 0 {
-        return Err(format!(
-            "the pseudo-terminal's slave has no name to be found: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-    let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
-        .to_string_lossy()
-        .into_owned();
-
-    Ok((master, slave))
-}
-
-/// Take the line discipline out of the way: no echo, no editing, no newline
-/// translation. A payload link carries bytes, not lines of text.
-fn make_raw(fd: RawFd) -> Result<(), String> {
-    let mut terms: libc::termios = unsafe { std::mem::zeroed() };
-    if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
-        return Err(format!(
-            "the pseudo-terminal's terms cannot be read: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-    unsafe { libc::cfmakeraw(&mut terms) };
-    if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &terms) } != 0 {
-        return Err(format!(
-            "the pseudo-terminal cannot be set raw: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-    Ok(())
-}
-
-/// Reads must not wait: one thread does the receiving and the sending both.
-fn set_nonblocking(fd: RawFd) -> Result<(), String> {
-    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
-        return Err(format!(
-            "the pseudo-terminal cannot be made non-blocking: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-    Ok(())
-}
+use crate::payload::{send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats};
+use crate::pty::SimulatedNode;
 
 /// Run serial payload simulation
 ///
@@ -179,7 +43,7 @@ pub fn run_serial_payload(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let mut line = match SimulatedLine::open(&config.address) {
+    let mut line = match SimulatedNode::open("a serial line", &config.address) {
         Ok(line) => line,
         Err(e) => {
             eprintln!("Failed to stand in for the serial line: {}", e);
@@ -237,8 +101,11 @@ pub fn run_serial_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pty::make_raw;
+    use std::fs::File;
     use std::os::unix::fs::symlink;
-    use std::path::Path;
+    use std::os::unix::io::AsRawFd;
+    use std::path::{Path, PathBuf};
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
@@ -344,7 +211,7 @@ mod tests {
     #[test]
     fn a_real_device_at_the_path_is_left_alone() {
         let real = Path::new("/dev/null");
-        let e = match SimulatedLine::open(&real.display().to_string()) {
+        let e = match SimulatedNode::open("a serial line", &real.display().to_string()) {
             Ok(_) => panic!("a real device is not ours to displace"),
             Err(e) => e,
         };
@@ -361,7 +228,7 @@ mod tests {
         let path = a_path("occupied");
         std::fs::write(&path, b"not a line").expect("a file in the way");
 
-        let e = match SimulatedLine::open(&path.display().to_string()) {
+        let e = match SimulatedNode::open("a serial line", &path.display().to_string()) {
             Ok(_) => panic!("a file is not ours to displace"),
             Err(e) => e,
         };
@@ -382,7 +249,7 @@ mod tests {
         std::fs::remove_file(&path).ok();
         symlink("/dev/pts/999", &path).expect("a stale link");
 
-        let line = SimulatedLine::open(&path.display().to_string())
+        let line = SimulatedNode::open("a serial line", &path.display().to_string())
             .expect("a link of our own making is ours to replace");
         assert_eq!(
             std::fs::read_link(&path).expect("where it leads now"),

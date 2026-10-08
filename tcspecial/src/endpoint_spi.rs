@@ -15,8 +15,10 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 
+use log::info;
 use nix::poll::PollFlags;
 use tcslibgs::{BitOrder, CsActive, SpiConfig, SpiMode, TcsError, TcsResult};
 
@@ -42,9 +44,68 @@ const SPI_CPHA: u8 = 0x01;
 const SPI_CPOL: u8 = 0x02;
 const SPI_CS_HIGH: u8 = 0x04;
 
+/// Whether the node at the end of the path is a peripheral or a stand-in.
+///
+/// A spidev node takes the requests above and clocks a peripheral on the
+/// terms they set. A terminal takes none of them -- it has no clock to set --
+/// and is what tcssim stands in for a peripheral with, there being no module
+/// that emulates one. The bytes of such a link are real and its clocking does
+/// not exist, so a handler on one is told what it has, once, rather than left
+/// to infer it from transfers that work while the terms did not take.
+///
+/// Nothing else is accepted. A regular file, or a character device that is
+/// neither of these, is a path naming something other than what the
+/// configuration describes, and opening it would be a handler talking
+/// confidently to the wrong thing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Clocking {
+    /// A real spidev node, set to the configured terms.
+    Peripheral,
+    /// A terminal standing in for one: the bytes without the clock.
+    StandIn,
+}
+
+/// Take a terminal's line discipline out of the way, so that what it carries
+/// is bytes: no editing, no echo, no translation of what looks like a line.
+///
+/// The same thing the serial endpoint does to a port, and for the same reason,
+/// but not for the same purpose: there it is part of setting the line to the
+/// terms the configuration gives, and here there are no terms -- it is only
+/// the discipline that would otherwise sit between the two ends of a link
+/// carrying payload data.
+fn make_raw(fd: RawFd, path: &str) -> TcsResult<()> {
+    let mut terms: libc::termios = unsafe { std::mem::zeroed() };
+    if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
+        return Err(TcsError::Endpoint(format!(
+            "{path} is a terminal whose terms cannot be read: {}",
+            std::io::Error::last_os_error()
+        )));
+    }
+
+    unsafe { libc::cfmakeraw(&mut terms) };
+
+    if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &terms) } != 0 {
+        return Err(TcsError::Endpoint(format!(
+            "{path} is a terminal that cannot be set raw: {}",
+            std::io::Error::last_os_error()
+        )));
+    }
+    Ok(())
+}
+
+/// Whether this descriptor is a terminal, which is what a stand-in for a
+/// peripheral is.
+fn is_a_terminal(fd: RawFd) -> bool {
+    // SAFETY: isatty reads the descriptor's kind and nothing else.
+    unsafe { libc::isatty(fd) == 1 }
+}
+
 /// One SPI peripheral, on the terms its configuration gives.
 pub struct SpiEndpoint {
     device: File,
+    /// What this turned out to be, settled when it was opened.
+    #[allow(dead_code)]
+    clocking: Clocking,
     _buffer: Vec<u8>,
 }
 
@@ -54,11 +115,46 @@ impl SpiEndpoint {
         let device = OpenOptions::new()
             .read(true)
             .write(true)
+            // Not this process's terminal. A device that is a tty -- a real
+            // serial port, or a pty standing in for one -- becomes the
+            // controlling terminal of a process that opens it without this,
+            // and then a read from a background process group raises SIGTTIN
+            // and a hangup raises SIGHUP: a handler stopped or killed for
+            // reasons that have nothing to do with its payload.
+            .custom_flags(libc::O_NOCTTY)
             .open(&config.path)?;
 
         let fd = device.as_raw_fd();
 
-        set_u8(fd, SPI_IOC_WR_MODE, mode_bits(config), &config.path, "its mode")?;
+        // The mode first, and what happens to it decides the rest. A node
+        // that refuses it is not a spidev: a terminal is a stand-in to carry
+        // bytes on, and anything else is a configuration naming the wrong
+        // path.
+        match set_u8(fd, SPI_IOC_WR_MODE, mode_bits(config), &config.path, "its mode") {
+            Ok(()) => {}
+            Err(_) if is_a_terminal(fd) => {
+                // The one term that means anything on a terminal: take the
+                // line discipline out of the way. Left canonical, the
+                // discipline holds bytes back until a newline arrives, and
+                // payload data has no lines in it -- so a handler would sit on
+                // a read that never returned while the bytes it wanted were
+                // being edited on its behalf.
+                make_raw(fd, &config.path)?;
+
+                info!(
+                    "{} is a terminal standing in for a SPI peripheral: it will carry \
+                     bytes raw, and the mode, clock rate and word width in the \
+                     configuration are not applied to anything",
+                    config.path
+                );
+                return Ok(Self {
+                    device,
+                    clocking: Clocking::StandIn,
+                    _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+                });
+            }
+            Err(e) => return Err(e),
+        }
         set_u8(
             fd,
             SPI_IOC_WR_BITS_PER_WORD,
@@ -83,6 +179,7 @@ impl SpiEndpoint {
 
         Ok(Self {
             device,
+            clocking: Clocking::Peripheral,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -94,6 +191,7 @@ impl SpiEndpoint {
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             device: self.device.try_clone()?,
+            clocking: self.clocking,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -198,6 +296,67 @@ mod tests {
         );
     }
 
+    /// A terminal is taken as a stand-in for a peripheral, and carries bytes.
+    ///
+    /// Which is what tcssim offers: nothing emulates a SPI peripheral, so what
+    /// it puts at the end of the path is a pty. The terms do not take -- a pty
+    /// has no clock to set -- and the handler says so and carries the bytes
+    /// anyway, because the bytes are the part a stand-in can be honest about.
+    #[test]
+    fn a_terminal_is_taken_as_a_stand_in_and_carries_bytes() {
+        use std::io::Write;
+        use std::os::unix::io::FromRawFd;
+
+        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        assert!(master_fd >= 0, "no pty: {}", std::io::Error::last_os_error());
+        let mut master = unsafe { File::from_raw_fd(master_fd) };
+        assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
+
+        let mut name = [0 as libc::c_char; 128];
+        assert_eq!(
+            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            0
+        );
+        let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
+
+        let config = SpiConfig {
+            path: slave.clone(),
+            max_speed: 1_000_000,
+            mode: SpiMode::Mode0,
+            bits_per_word: 8,
+            bit_order: BitOrder::MsbFirst,
+            cs_active: CsActive::Low,
+        };
+        let mut endpoint = SpiEndpoint::new(&config)
+            .unwrap_or_else(|e| panic!("{slave} was not taken as a stand-in: {e}"));
+        assert_eq!(
+            endpoint.clocking,
+            Clocking::StandIn,
+            "a pty was mistaken for a peripheral"
+        );
+
+        master
+            .write_all(b"from the peripheral")
+            .expect("the far end writes");
+        master.flush().ok();
+        let mut buffer = [0u8; 64];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut got = Vec::new();
+        while got.len() < b"from the peripheral".len()
+            && std::time::Instant::now() < deadline
+        {
+            match endpoint.read(&mut buffer) {
+                Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
+                _ => std::thread::sleep(std::time::Duration::from_millis(10)),
+            }
+        }
+
+        assert_eq!(got, b"from the peripheral");
+    }
+
     /// A file that is not a spidev node is reported, naming what was being set.
     #[test]
     fn a_file_that_is_not_a_spi_device_is_reported() {
@@ -220,5 +379,8 @@ mod tests {
             said.contains(&config.path) && said.contains("mode"),
             "the complaint names neither the device nor what was being set: {said}"
         );
+        // Narrowly: a terminal is a stand-in and a plain file is not. A
+        // handler that accepted anything would open the wrong path
+        // confidently.
     }
 }

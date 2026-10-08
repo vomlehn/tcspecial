@@ -69,16 +69,17 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
             0,
             i2c.address,
         ),
-        // This one it still cannot be. A SPI peripheral has to be clocked by
-        // a controller, and there is no pseudo-device for that: standing in
-        // for one means being the hardware. Refused rather than simulated as
-        // something else.
-        EndpointConfig::Spi(spi) => {
-            return Err(format!(
-                "{} is a SPI peripheral at {}, which the simulator cannot stand in for",
-                dh.name.0, spi.path
-            ))
-        }
+        // A peripheral the simulator can carry the bytes of, though not be:
+        // nothing emulates one, a peripheral being a thing a controller
+        // clocks, so what stands in is a pty as for a serial line. The bytes
+        // and their pacing are real; the clock, the mode and the word are not
+        // simulated at all. See payload_spi, which says what that does and
+        // does not test.
+        //
+        // Nothing of the terms comes this way, for the same reason a line's
+        // do not: what the handler sets is between the handler and the
+        // kernel, and a pty has nowhere to put it.
+        EndpointConfig::Spi(spi) => (PayloadProtocol::Spi, spi.path.clone(), 0, 0),
     };
 
     let packet_size = u32::try_from(dh.packet_size)
@@ -241,49 +242,39 @@ mod tests {
         assert_eq!(config.port, 0, "a bus has no port");
     }
 
-    /// A clocked peripheral is refused, and the refusal says which handler and
-    /// where.
+    /// A SPI peripheral becomes a payload at the configured path too, which
+    /// leaves no kind of endpoint the simulator refuses.
     ///
-    /// It used to arrive here as a plain device, so the simulator would
-    /// cheerfully stand in for a SPI peripheral by writing to its node. Being
-    /// told the simulator cannot be the far end of one is more use than being
-    /// simulated as something else. A serial line has a pty and a bus has
-    /// i2c-stub; a peripheral has to be clocked by a controller, and there is
-    /// no pseudo-device for that.
+    /// It is not the same quality of stand-in as the others, and the file for
+    /// it says so: a pty carries a peripheral's bytes and has none of its
+    /// clocking. What is refused now is not a kind but two protocols -- a Unix
+    /// socket, above -- and that is a different thing: there the simulator
+    /// would be standing in for something it is perfectly able to be, and
+    /// simply has not been taught to.
     #[test]
-    fn the_kinds_the_simulator_cannot_be_are_refused_by_name() {
-        let hardware = [
-            (
-                "DH11",
-                EndpointConfig::Spi(SpiConfig {
-                    path: "/dev/spidev0.0".to_string(),
-                    max_speed: 1_000_000,
-                    mode: SpiMode::Mode0,
-                    bits_per_word: 8,
-                    bit_order: BitOrder::MsbFirst,
-                    cs_active: CsActive::Low,
-                }),
-                "/dev/spidev0.0",
-            ),
-        ];
+    fn a_spi_peripheral_becomes_a_payload_at_the_configured_path() {
+        let dh = DHConfig {
+            dh_id: DHId(11),
+            name: DHName::new("DH11"),
+            endpoint: EndpointConfig::Spi(SpiConfig {
+                path: "/tmp/spidev0.0".to_string(),
+                max_speed: 1_000_000,
+                mode: SpiMode::Mode0,
+                bits_per_word: 8,
+                bit_order: BitOrder::MsbFirst,
+                cs_active: CsActive::Low,
+            }),
+            packet_size: 8,
+            oc: None,
+        };
 
-        for (name, endpoint, where_it_is) in hardware {
-            let dh = DHConfig {
-                dh_id: DHId(9),
-                name: DHName::new(name),
-                endpoint,
-                packet_size: 4,
-                oc: None,
-            };
-
-            let e = match payload_config_from(&dh, &sim(250, 250, 4)) {
-                Ok(_) => panic!("{name}: the simulator cannot be hardware"),
-                Err(e) => e,
-            };
-            assert!(
-                e.contains(name) && e.contains(where_it_is),
-                "the refusal names neither the handler nor where it is: {e}"
-            );
-        }
+        let config =
+            payload_config_from(&dh, &sim(250, 100, 2)).expect("a peripheral is stood in for");
+        assert!(config.protocol == PayloadProtocol::Spi);
+        assert_eq!(config.address, "/tmp/spidev0.0");
+        // None of the clocking comes this way: there is nothing at the other
+        // end of a pty for it to be applied to.
+        assert_eq!(config.port, 0);
+        assert_eq!(config.bus_address, 0);
     }
 }

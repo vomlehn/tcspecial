@@ -1392,7 +1392,6 @@ pub(crate) fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Opt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::DeviceConfig;
 
     /// The same configuration written both ways. These two must parse into
     /// structures that compare equal; that is the point of the module.

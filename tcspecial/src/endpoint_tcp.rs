@@ -174,7 +174,7 @@ impl EndpointWritable for TcpEndpoint {
 /// Only a refusal is retried. An address that cannot be resolved, or a network
 /// that cannot be reached, will not become right by being asked again, and
 /// repeating those would turn a clear fault into a slow one.
-fn connect_retrying<T>(
+pub(crate) fn connect_retrying<T>(
     addr: &str,
     mut attempt: impl FnMut() -> io::Result<T>,
 ) -> TcsResult<T> {

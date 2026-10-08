@@ -31,6 +31,13 @@ RUST = .
 PAYLOAD_YAML = payload2.yaml
 PAYLOAD_SIM_YAML = payload2sim.yaml
 
+# What the programs log, which every run target passes on. A variable rather
+# than a word in each recipe, so that it can be overridden the way the payload
+# set is:
+#   make runmoc RUST_LOG=debug
+#   make run PAYLOAD_YAML=payload1.yaml RUST_LOG=tcspecial::ci=trace
+RUST_LOG = info
+
 RELEASE = --release
 RELEASE =
 
@@ -57,7 +64,8 @@ help:
 	@echo "  make distclean   - Remove everything that can be rebuilt"
 	@echo "  make install     - Install tcspecial globally"
 	@echo ""
-	@echo "Payload set: make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml"
+	@echo "Payload set: make runmoc PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml"
+	@echo "Logging:     make runmoc RUST_LOG=debug"
 
 # Build the project
 .PHONY: build
@@ -105,7 +113,7 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=info cargo run --bin tcspecial -- $(PAYLOAD_YAML) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run --bin tcspecial -- $(PAYLOAD_YAML) \
 	)
 
 # Run the MOC application
@@ -114,7 +122,7 @@ runmoc:
 	( \
 		set -eu; \
 		echo "Running $(MOC_NAME)..."; \
-		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcsmoc -- $(PAYLOAD_YAML) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcsmoc -- $(PAYLOAD_YAML) \
 	)
 
 # Run the simulation application
@@ -123,7 +131,7 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=info PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcssim -- $(PAYLOAD_YAML) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcssim -- $(PAYLOAD_YAML) \
 	)
 
 # Clean build artifacts

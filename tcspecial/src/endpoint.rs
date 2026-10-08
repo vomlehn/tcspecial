@@ -29,6 +29,7 @@ use crate::endpoint_serial::SerialEndpoint;
 use crate::endpoint_spi::SpiEndpoint;
 use crate::endpoint_tcp::TcpEndpoint;
 use crate::endpoint_udp::UdpEndpoint;
+use crate::endpoint_unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
 
 /// Trait for endpoints that can wait for events
 pub trait EndpointWaitable {
@@ -211,7 +212,19 @@ pub fn connect_endpoint_pair(
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
-            _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
+            // A Unix socket divides as TCP and UDP divide, for the same
+            // reason: a stream is accepted and a datagram is not. The
+            // difference is only that both are named by a path.
+            NetworkProtocol::UnixStream => {
+                let reader = UnixStreamEndpoint::connect_retrying(net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
+            NetworkProtocol::UnixDgram => {
+                let reader = UnixDatagramEndpoint::bind(net_config)?;
+                let writer = reader.try_clone()?;
+                Ok((Box::new(reader), Box::new(writer)))
+            }
         },
         EndpointConfig::Device(dev_config) => {
             let reader = DeviceEndpoint::new(dev_config)?;

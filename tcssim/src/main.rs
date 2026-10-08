@@ -26,6 +26,7 @@ mod payload_i2c;
 mod payload_serial;
 mod payload_spi;
 mod payload_tcp;
+mod payload_unix;
 mod pty;
 mod payload_udp;
 mod sim_config;

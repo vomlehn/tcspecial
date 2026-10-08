@@ -514,6 +514,25 @@ the project does, so either may be written in YAML, JSON or XML. The shipped
 one is YAML because that is what the rest of the project's configuration is
 written in; it was JSON when JSON was the only format the project read.
 
+This is the shipped ``tcspecial/src/tcspecial.yaml``:
+
+.. code-block:: yaml
+
+   address: "0.0.0.0"
+   port: 4000
+   protocol: udp
+   beacon_interval_ms: 5000
+   log_dir: telemetry
+   log_segment_bytes: 65536
+
+The address and port are where the command interpreter binds, which is where
+the ground sends commands. The quotes on the address are deliberate: unquoted,
+``0.0.0.0`` is a string in YAML only because it happens not to be a number,
+which is a thin reason to rely on. ``log_dir`` holds the telemetry log's
+segment files and must already exist; logging is off when it is absent.
+``log_segment_bytes`` is the payload bytes in one segment file, the header
+being added on top of that.
+
 Tcspecial hass a command interpreter (CI) running on the spacecraft where the
 payloads are located. CI has one or more threads to handle OC communications, i.e.
 data exchanged with tcslib over a bi-directional communication link. It
@@ -1195,8 +1214,16 @@ Payload Configuration Files
 A payload configuration file describes the payloads themselves: which data
 handlers exist, how tcspecial reaches each one, and how big its packets are.
 What it deliberately does not describe is how a simulated payload behaves; see
-`Simulator Configuration Files`_ for that. The parser is
-``tcslibgs::config``, and the shipped file is payload1.yaml.
+`Simulator Configuration Files`_ for that. The parser is ``tcslibgs::config``.
+
+Two sets are shipped. ``payload1.yaml`` describes four handlers of three
+kinds, which is what exercises the panels and the grid; ``payload2.yaml``
+describes one, which is what a single link is debugged against. Each has a
+simulator configuration beside it, named for it -- ``payload1sim.yaml``,
+``payload2sim.yaml`` -- and a set added by that convention needs no change
+anywhere to be run. ``payload1.yaml`` is what every program falls back to when
+nothing names a file; the Makefile names a set explicitly and defaults to the
+second.
 
 The format is chosen from the extension exactly as every other configuration
 file's is, so a payload configuration may be written in YAML, JSON, or XML.
@@ -1321,6 +1348,8 @@ state every attribute for themselves.
    data_handlers:
      - dh_id: 0
        name: DH0
+       oc_address: 127.0.0.1
+       oc_port: 6000
        type: network
        protocol: tcp
        address: localhost
@@ -1329,21 +1358,32 @@ state every attribute for themselves.
 
      - dh_id: 1
        name: DH1
+       oc_address: 127.0.0.1
+       oc_port: 6001
        group: udp_localhost
        port: 5001
        packet_size: 11
 
      - dh_id: 2
        name: DH2
+       oc_address: 127.0.0.1
+       oc_port: 6002
        type: device
        path: /dev/urandom
        packet_size: 1
 
      - dh_id: 3
        name: DH3
+       oc_address: 127.0.0.1
+       oc_port: 6003
        group: udp_localhost
        port: 5003
        packet_size: 15
+
+Every handler here shares an OC address and has a port of its own, numbered to
+match its ``dh_id``. The OC address could have been a group attribute for that
+reason; it is written out per handler so that the file reads as the four
+handlers it describes rather than as three attributes and an exception.
 
 Simulator Configuration Files
 =============================
@@ -2331,8 +2371,29 @@ payload endpoint, and the five kinds of endpoint are not equally easy to be.
 
 Requirement
     A simulated payload of a network endpoint is a socket of the configured
-    protocol. A stream payload listens; a datagram payload sends to where the
-    handler waits.
+    protocol, for all four of them. A stream payload listens; a datagram
+    payload sends to where the handler waits.
+
+The four divide in two, and which end binds divides with them. A TCP or
+Unix-stream payload listens at the configured address and the handler connects
+to it. A UDP or Unix-datagram payload sends first, so the handler binds that
+address and the payload reaches out to it.
+
+Requirement
+    A Unix-domain socket's address is a path, which outlives the process that
+    bound it, so what is already at that path is looked at before binding. A
+    socket nothing answers was left by a run that was killed rather than
+    stopped and is replaced; a socket something answers belongs to something
+    running and is left alone, with what is there reported; anything that is
+    not a socket is left alone too.
+
+Requirement
+    A simulated Unix-datagram payload binds a path of its own, beside the
+    handler's, so that the handler can answer it. A datagram socket with no
+    path of its own cannot be sent to, where a UDP one gets an address for
+    nothing from its port. The path is derived from the handler's rather than
+    configured, since nothing need name it: the handler learns where its
+    payload is from the first datagram, as it does over UDP.
 
 Requirement
     A simulated payload of a device endpoint produces data and counts it.
@@ -2428,10 +2489,12 @@ the pacing of a payload that produces data in blocks. What it cannot test is
 whether the peripheral would stand being clocked that way, which is a question
 for the peripheral.
 
-So every kind of endpoint can now be simulated. What cannot are two network
-protocols: a Unix-domain socket of either flavour is refused, which is a
-different thing from a kind that has nothing to be -- the simulator is
-perfectly able to be a Unix socket and has not been taught to.
+So every kind of endpoint, and every protocol of the network kind, can be
+simulated. The stand-ins are not all of one quality, and that is the thing to
+keep in view rather than the coverage: a socket is a socket and a pty is a
+line in all but its rate, while a bus is a register bank that every master
+shares and a SPI peripheral is a pty with no clock behind it. Each kind's own
+file says which it is.
 
 Requirement
     A handler opens a payload device with ``O_NOCTTY``. A device that is a
@@ -2543,14 +2606,46 @@ like any other variable.
 
 The Makefile names a set once for this reason. ``PAYLOAD_YAML`` reaches every
 program as its argument and ``PAYLOAD_SIM_YAML`` reaches tcssim in the
-environment, so running another set whole is::
+environment, so one target runs a whole set:
 
-   make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+.. code-block:: console
+
+   $ make runmoc
+   $ make runmoc PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml
+   $ make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+
+Both are named because the two files are a pair: tcsmoc passes the payload file
+on to its children and never reads the simulator file, so naming one of a pair
+is how the two come to describe different sets. That is reported rather than
+run -- every data handler of the payload file must have a simulated payload
+naming it -- but it is reported by tcssim, after tcsmoc has already come up,
+which makes it a confusing way to find out.
 
 ``make run`` takes ``PAYLOAD_YAML`` for tcspecial alone, and ``make runsim``
 takes both for the simulator alone -- both, because tcssim run by itself needs
 the payload file as well as the simulator file, and the two must describe the
-same set or their names will not match.
+same set or their names will not match:
+
+.. code-block:: console
+
+   $ make run PAYLOAD_YAML=payload1.yaml
+   $ make runsim PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml
+   $ make runmoc PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml
+
+Started in that order, the three run as separately as they can: tcsmoc finds
+the tcspecial already there, attaches to it rather than starting a second, and
+leaves it running when its window closes. Which is what one program at a time
+is for -- a debugger on the one being worked on, and the others left alone.
+
+``make help`` lists the targets, and ``RUST_LOG`` reaches every one of them:
+
+.. code-block:: console
+
+   $ make runmoc RUST_LOG=debug
+   $ make run PAYLOAD_YAML=payload1.yaml RUST_LOG=tcspecial::ci=trace
+
+The manual says the same thing from the other end -- what to type to run a
+set -- under "Running the Programs".
 
 The window is built from that file. Nothing in the GUI names a data handler or
 fixes how many there are, so a handler added to or removed from payload1.yaml

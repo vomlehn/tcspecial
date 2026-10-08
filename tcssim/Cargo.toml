@@ -20,6 +20,8 @@ rand = "0.8"
 # testing backend; it uses real font metrics unless a component asks for the
 # fixed test font, which none of these do.
 i-slint-backend-testing = "1.18"
+# Directories and files a test can make and have cleaned up after it.
+tempfile = "3.27.0"
 
 [build-dependencies]
 slint-build = "1.3"

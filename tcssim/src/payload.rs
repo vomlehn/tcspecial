@@ -14,9 +14,13 @@
 //! * [`crate::payload_device`] -- a device, which produces rather than sends
 //! * [`crate::payload_serial`] -- a line, which is a pty the configured path
 //!   leads to
+//! * [`crate::payload_i2c`] -- a device on a bus, which is a chip of the
+//!   kernel's `i2c-stub`
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::os::unix::fs::{symlink, FileTypeExt};
+use std::path::Path;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -25,8 +29,15 @@ use std::time::{Duration, Instant};
 pub struct PayloadConfig {
     pub _id: u32,
     pub protocol: PayloadProtocol,
+    /// Where the payload is, in the terms its kind is located by: a host for
+    /// a network payload, a path for every other kind.
     pub address: String,
+    /// The port, for a network payload; zero for the kinds that have none.
     pub port: u16,
+    /// The address of the device on its bus, for an I2C payload; zero for the
+    /// kinds that are not on one. Not the `port`, which a bus has not, and
+    /// not the `address`, which for a bus is the bus itself.
+    pub bus_address: u16,
     pub packet_size: Arc<AtomicU32>,
     pub segment_size: Arc<AtomicU32>,
     pub packet_interval_ms: Arc<AtomicU32>,
@@ -42,6 +53,9 @@ pub enum PayloadProtocol {
     /// A serial line, which the simulator stands in for with a pty: see
     /// [`crate::payload_serial`].
     Serial,
+    /// A device on an I2C bus, which the simulator stands in for with the
+    /// kernel's `i2c-stub`: see [`crate::payload_i2c`].
+    I2c,
 }
 
 /// Statistics for a payload
@@ -92,6 +106,9 @@ impl SimulatedPayload {
                 }
                 PayloadProtocol::Serial => {
                     crate::payload_serial::run_serial_payload(config, running, stats)
+                }
+                PayloadProtocol::I2c => {
+                    crate::payload_i2c::run_i2c_payload(config, running, stats)
                 }
             }
         });
@@ -149,6 +166,51 @@ impl Drop for SimulatedPayload {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// Make `path` a link to `leads_to`, refusing to displace anything else.
+///
+/// A link the simulator itself left behind -- from a run that was killed
+/// rather than stopped -- is replaced, since it points at a pty that no longer
+/// exists. Anything else at that path is somebody else's: a real port, a file,
+/// a directory. The refusal says which, because "permission denied" on
+/// `/dev/ttyS0` and "there is a real device there" call for different answers.
+pub(crate) fn make_the_path_lead_to(path: &Path, leads_to: &str) -> Result<(), String> {
+    match std::fs::symlink_metadata(path) {
+        Ok(found) if found.file_type().is_symlink() => {
+            std::fs::remove_file(path).map_err(|e| {
+                format!(
+                    "{} is a link left by an earlier run and cannot be replaced: {e}",
+                    path.display()
+                )
+            })?;
+        }
+        Ok(found) if found.file_type().is_char_device() => {
+            return Err(format!(
+                "{} is a real serial device, so the simulator will not stand in for it: \
+                 point the payload file at a path it may create, such as /tmp/{}",
+                path.display(),
+                path.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "ttyS0".to_string())
+            ))
+        }
+        Ok(_) => {
+            return Err(format!(
+                "{} already exists and is not a link the simulator made, so it is left \
+                 alone",
+                path.display()
+            ))
+        }
+        Err(_) => {}
+    }
+
+    symlink(leads_to, path).map_err(|e| {
+        format!(
+            "{} cannot be made to lead to {leads_to}: {e}",
+            path.display()
+        )
+    })
 }
 
 /// How long a wait is taken in one go.
@@ -437,6 +499,7 @@ mod tests {
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,
+            bus_address: 0,
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),

@@ -24,16 +24,17 @@
 
 use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::fs::{symlink, FileTypeExt};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
 use rand::Rng;
 
-use crate::payload::{send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats};
+use crate::payload::{
+    make_the_path_lead_to, send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
+};
 
 /// A pty whose slave the configured path leads to, for as long as this lives.
 struct SimulatedLine {
@@ -91,51 +92,6 @@ impl Drop for SimulatedLine {
             let _ = std::fs::remove_file(&self.named);
         }
     }
-}
-
-/// Make `path` a link to `slave`, refusing to displace anything else.
-///
-/// A link the simulator itself left behind -- from a run that was killed
-/// rather than stopped -- is replaced, since it points at a pty that no longer
-/// exists. Anything else at that path is somebody else's: a real port, a file,
-/// a directory. The refusal says which, because "permission denied" on
-/// `/dev/ttyS0` and "there is a real device there" call for different answers.
-fn make_the_path_lead_to(path: &Path, slave: &str) -> Result<(), String> {
-    match std::fs::symlink_metadata(path) {
-        Ok(found) if found.file_type().is_symlink() => {
-            std::fs::remove_file(path).map_err(|e| {
-                format!(
-                    "{} is a link left by an earlier run and cannot be replaced: {e}",
-                    path.display()
-                )
-            })?;
-        }
-        Ok(found) if found.file_type().is_char_device() => {
-            return Err(format!(
-                "{} is a real serial device, so the simulator will not stand in for it: \
-                 point the payload file at a path it may create, such as /tmp/{}",
-                path.display(),
-                path.file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "ttyS0".to_string())
-            ))
-        }
-        Ok(_) => {
-            return Err(format!(
-                "{} already exists and is not a link the simulator made, so it is left \
-                 alone",
-                path.display()
-            ))
-        }
-        Err(_) => {}
-    }
-
-    symlink(slave, path).map_err(|e| {
-        format!(
-            "{} cannot be made to lead to {slave}: {e}",
-            path.display()
-        )
-    })
 }
 
 /// Open a pty, returning the master and the slave's name.
@@ -281,6 +237,8 @@ pub fn run_serial_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::symlink;
+    use std::path::Path;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
@@ -299,6 +257,7 @@ mod tests {
             protocol: PayloadProtocol::Serial,
             address: path.display().to_string(),
             port: 0,
+            bus_address: 0,
             packet_size: Arc::new(AtomicU32::new(packet)),
             segment_size: Arc::new(AtomicU32::new(segment)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),

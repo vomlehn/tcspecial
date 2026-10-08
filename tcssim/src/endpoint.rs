@@ -29,7 +29,7 @@ use crate::sim_config::ResolvedSim;
 /// address the simulated payload uses. Everything about how the payload
 /// behaves comes from `sim`, which is what the simulator file settled.
 pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadConfig, String> {
-    let (protocol, address, port) = match &dh.endpoint {
+    let (protocol, address, port, bus_address) = match &dh.endpoint {
         EndpointConfig::Network(net) => {
             let protocol = match net.protocol {
                 NetworkProtocol::Tcp => PayloadProtocol::Tcp,
@@ -45,9 +45,9 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
                     ))
                 }
             };
-            (protocol, net.address.clone(), net.port)
+            (protocol, net.address.clone(), net.port, 0)
         }
-        EndpointConfig::Device(dev) => (PayloadProtocol::Device, dev.path.clone(), 0),
+        EndpointConfig::Device(dev) => (PayloadProtocol::Device, dev.path.clone(), 0, 0),
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
@@ -56,19 +56,23 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // The line's terms do not come this way. A pty takes a data rate and
         // ignores it, so what the handler sets them to is between the handler
         // and the kernel, and the simulator has only the path to be at.
-        EndpointConfig::Serial(serial) => {
-            (PayloadProtocol::Serial, serial.path.clone(), 0)
-        }
-        // These two it still cannot be. A bus needs a device that answers an
-        // address on it and a SPI peripheral needs to be clocked: standing in
-        // for either means being the hardware, and there is no pty for that.
-        // Refused rather than simulated as something else.
-        EndpointConfig::I2c(i2c) => {
-            return Err(format!(
-                "{} is I2C device {:#04X} on {}, which the simulator cannot stand in for",
-                dh.name.0, i2c.address, i2c.bus
-            ))
-        }
+        EndpointConfig::Serial(serial) => (PayloadProtocol::Serial, serial.path.clone(), 0, 0),
+        // A bus the simulator can be on, though not by being a device: the
+        // kernel's i2c-stub is an adapter whose chips are a bank of registers
+        // in memory, and every master on that bus reads and writes the same
+        // bank. So the bank is the payload, and the simulator fills it; see
+        // payload_i2c. The bus the handler was told to open is made to lead to
+        // the stub, as a line's path is made to lead to a pty.
+        EndpointConfig::I2c(i2c) => (
+            PayloadProtocol::I2c,
+            i2c.bus.clone(),
+            0,
+            i2c.address,
+        ),
+        // This one it still cannot be. A SPI peripheral has to be clocked by
+        // a controller, and there is no pseudo-device for that: standing in
+        // for one means being the hardware. Refused rather than simulated as
+        // something else.
         EndpointConfig::Spi(spi) => {
             return Err(format!(
                 "{} is a SPI peripheral at {}, which the simulator cannot stand in for",
@@ -81,6 +85,7 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         .map_err(|_| format!("{} has a packet size too large to simulate", dh.name.0))?;
 
     Ok(PayloadConfig {
+        bus_address,
         _id: dh.dh_id.0,
         protocol,
         address,
@@ -206,28 +211,48 @@ mod tests {
         assert_eq!(config.segment_size.load(Ordering::SeqCst), 2);
     }
 
-    /// A bus and a clocked peripheral are refused, and each refusal says which
-    /// handler and where.
+    /// A device on an I2C bus becomes a payload at the bus the handler was
+    /// told to open, carrying the address on it.
     ///
-    /// They used to arrive here as plain devices, so the simulator would
-    /// cheerfully stand in for an I2C device by writing to the bus node.
-    /// Being told that the simulator cannot be the far end of a bus is more
-    /// use than being simulated as something else. Unlike a serial line,
-    /// neither has anything a pty could be: a bus needs a device that answers
-    /// an address on it, and a peripheral needs to be clocked.
+    /// The address is not the port -- a bus has no port -- and not the
+    /// address, which for a bus is the bus itself. It is the one thing about
+    /// an I2C payload that neither of the other two fields could hold, and
+    /// losing it would have the simulator filling the registers of whichever
+    /// device the bus was last pointed at.
+    #[test]
+    fn an_i2c_device_becomes_a_payload_on_its_bus_at_its_address() {
+        let dh = DHConfig {
+            dh_id: DHId(10),
+            name: DHName::new("DH10"),
+            endpoint: EndpointConfig::I2c(I2cConfig {
+                bus: "/tmp/i2c-sim".to_string(),
+                address: 0x48,
+                ten_bit: false,
+                pec: false,
+            }),
+            packet_size: 8,
+            oc: None,
+        };
+
+        let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a bus is simulable");
+        assert!(config.protocol == PayloadProtocol::I2c);
+        assert_eq!(config.address, "/tmp/i2c-sim");
+        assert_eq!(config.bus_address, 0x48);
+        assert_eq!(config.port, 0, "a bus has no port");
+    }
+
+    /// A clocked peripheral is refused, and the refusal says which handler and
+    /// where.
+    ///
+    /// It used to arrive here as a plain device, so the simulator would
+    /// cheerfully stand in for a SPI peripheral by writing to its node. Being
+    /// told the simulator cannot be the far end of one is more use than being
+    /// simulated as something else. A serial line has a pty and a bus has
+    /// i2c-stub; a peripheral has to be clocked by a controller, and there is
+    /// no pseudo-device for that.
     #[test]
     fn the_kinds_the_simulator_cannot_be_are_refused_by_name() {
         let hardware = [
-            (
-                "DH10",
-                EndpointConfig::I2c(I2cConfig {
-                    bus: "/dev/i2c-1".to_string(),
-                    address: 0x48,
-                    ten_bit: false,
-                    pec: false,
-                }),
-                "/dev/i2c-1",
-            ),
             (
                 "DH11",
                 EndpointConfig::Spi(SpiConfig {

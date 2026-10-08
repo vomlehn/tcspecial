@@ -74,8 +74,8 @@ fn main() {
     // tcssim's payloads and the handlers served here must describe the same
     // handlers, so a program reading an endpoint file while the others read a
     // payload file is the drift the payload set mechanism exists to prevent.
-    // I2C endpoints are the one thing the conversion cannot do, for want of
-    // anywhere to put a bus and a slave address.
+    // Every kind of endpoint converts now, I2C included: see
+    // EndpointConfigDoc::to_dh_configs.
     if let Ok(endpoint_path) = env::var("ENDPOINT_CONFIG_PATH") {
         info!("Loading endpoint configuration from: {}", endpoint_path);
 

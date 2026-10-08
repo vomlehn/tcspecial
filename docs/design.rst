@@ -14,6 +14,79 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
+Terminology
+===========
+
+These words are used in one sense each, here and in the code. Several of them
+had been used in two, which is why they are written down: "device" in
+particular had been both a kind of endpoint and a protocol beside TCP and UDP,
+and "endpoint" had been both one end of a data handler's path and an entry in a
+configuration file.
+
+endpoint
+    One end of the path a data handler's data travels. A handler has two: the
+    OC endpoint, where the ground's data arrives and leaves, and the payload
+    endpoint, where the payload's does. An endpoint is of exactly one kind, and
+    the kind decides what is needed to open it and what terms it is operated
+    on.
+
+endpoint kind
+    What an endpoint is made of, and so what locates it and what else must be
+    said about it. There are five: ``network``, ``device``, ``serial``,
+    ``i2c`` and ``spi``. A kind is not a protocol -- a network endpoint carries
+    the protocol it runs over, and no other kind is addressed that way.
+
+device
+    An endpoint that is a device file, opened and read as it comes. Not the
+    general word for hardware: a serial line, an I2C device and a SPI
+    peripheral are all reached through device files and are none of them a
+    device endpoint, because each has terms of its own that a plain device has
+    not. A device *file* is the thing in the filesystem; a device *endpoint* is
+    one of the five kinds.
+
+bus
+    A device that several devices are reached through, each by an address on
+    it. I2C is the one in use. The bus is named by a device file and the device
+    on it by an address, which is why an endpoint on a bus carries both.
+
+payload
+    What is at the far end of a payload endpoint: the instrument, recorder or
+    radio whose data a handler carries. Also what tcssim stands in for, and
+    what a payload configuration file describes.
+
+data handler
+    The pair of conduits between one payload endpoint and one OC endpoint,
+    named by a ``dh_id`` and a name. "Handler" alone always means this.
+
+conduit
+    One direction of one data handler: a thread that reads one endpoint and
+    writes the other. A handler has two, and they share each endpoint between
+    them.
+
+OC
+    The Operations Center: the ground. The OC endpoint of every handler is a
+    UDP address, and the OC's own address is learnt from what it sends rather
+    than configured.
+
+link
+    A configured pairing of two endpoints that data passes between. Used of
+    the whole path, where "endpoint" is used of one end of it.
+
+payload configuration file
+    The file describing payloads: which data handlers exist, how tcspecial
+    reaches each one, and how large its packets are. ``payload1.yaml`` and the
+    rest.
+
+endpoint configuration file
+    The richer file describing endpoints in groups, which can state every term
+    of every kind -- a serial line's framing, a bus's addressing, a SPI
+    peripheral's clock. Its endpoints become data handlers.
+
+simulator configuration file
+    The file describing how a simulated payload behaves: how often it produces
+    a packet and how it divides one into segments. Properties of a simulation
+    rather than of a payload, which is why they are not in the payload file.
+
 Features
 ========
 
@@ -524,10 +597,8 @@ A communication path between the OC and a DH uses UDP/IP. A path between
 a DH and a payload uses one of multiple different communication protocols.
 
 Requirement
-    A data handler connects to its payload's address rather than binding it.
-    The payload is what exists at that address -- a payload configuration says
-    how tcspecial reaches each one -- so the payload listens and the handler
-    reaches out. Tcssim, standing in for payload hardware, is what listens.
+    Exactly one end of a payload link waits at the address the configuration
+    gives, and which end that is follows from which end can speak first.
 
 Both ends binding the same address is what they did, and an address can be
 bound once, so whichever started second got "address already in use" and no
@@ -536,10 +607,29 @@ that ever worked, because two opens of a device are fine where two binds of a
 socket are not.
 
 Requirement
-    A handler whose payload refuses the connection keeps trying. Nothing
-    listening yet is the ordinary case rather than a fault: a simulated
-    payload is a program someone has to start, and a handler started first
-    would otherwise fail for a reason that fixes itself a moment later.
+    For a stream payload the payload waits and the handler connects to it. The
+    payload is what exists at that address, and a stream has to be accepted
+    before anything can pass either way, so the connection itself tells each
+    end where the other is.
+
+Requirement
+    For a datagram payload the handler waits and the payload sends to it. A
+    datagram connect sends nothing, so a payload waiting at that address is
+    never spoken to; and a payload produces data because it is running rather
+    than because it was asked, so it must be able to send without having
+    heard anything. The handler learns where its payload is from the first
+    datagram that arrives, as it does for the OC.
+
+A payload that waits to be spoken to before it sends is a payload that never
+sends over a datagram link. Both ends sat there with nothing moving: the
+handler waiting for data from a payload that was waiting to be asked.
+
+Requirement
+    A handler whose stream payload refuses the connection keeps trying.
+    Nothing listening yet is the ordinary case rather than a fault: a
+    simulated payload is a program someone has to start, and a handler started
+    first would otherwise fail for a reason that fixes itself a moment later.
+    A datagram handler needs none of this, having nothing to be refused by.
 
 The delay doubles from ``ENDPOINT_DELAY_INIT``, never exceeds
 ``ENDPOINT_DELAY_MAX``, and the whole attempt is bounded by
@@ -557,11 +647,27 @@ Requirement
     again, and repeating those would turn a clear fault into a slow one.
 
 Requirement
+    An endpoint is of one of five kinds: ``network``, ``device``, ``serial``,
+    ``i2c`` or ``spi``. The kind decides what locates the endpoint and what
+    terms it is opened on, and a handler carries both: a serial line's framing,
+    the address of a device on a bus, and a SPI peripheral's clock are as much
+    a part of where the payload is as the name of the file.
+
+A serial line, an I2C device and a SPI peripheral are all reached through
+device files, and all three used to become device endpoints on the way to
+being started -- which opened the right file and then talked to it on whatever
+terms it had been left on: a line at the wrong rate, a peripheral in the wrong
+mode. An I2C endpoint could not be started at all, there being nowhere in a
+handler's configuration to put the address of a device on a bus. Each is its
+own kind now, and tcspecial has an endpoint implementation for each.
+
+Requirement
     A data handler binds the UDP address its configuration gives as
     ``oc_address`` and ``oc_port``. That is where the OC sends to, and it is
-    distinct from the address the handler reaches its payload at. So a handler
-    binds one of its two addresses and connects the other, and which is which
-    follows from who is expected to find whom.
+    distinct from the address of the payload link. A handler with a stream
+    payload therefore binds one of its two addresses and connects the other;
+    one with a datagram payload binds both, and learns where each far end is
+    from what arrives.
 
 Requirement
     A data handler sends to the OC at the address the OC last sent from. No
@@ -577,9 +683,11 @@ OC to speak first, even if only once. Configuring the OC's address instead
 would remove that, at the cost of stating in every payload file where the
 ground is.
 
-A handler's payload socket knows where to send from the moment it is
-connected, so a handler can speak to its payload before the payload has said
-anything. Its OC socket does not, and learns as above.
+A handler's stream payload socket knows where to send from the moment it is
+connected, so a handler can speak to such a payload before the payload has
+said anything. Neither its datagram payload socket nor its OC socket does;
+both learn as above, so until each far end has spoken once the writes that way
+fail and the data is dropped.
 
 The two conduits of a handler share one socket on each side rather than
 opening one each, because a socket cannot be opened twice; the conduit reading a
@@ -844,23 +952,40 @@ Requirement
    to avoid building in operating system dependent code. All values transmitted
    must use the canonical values.
 
-Device Endpoints
-"^^^^^^^^^^^^^^^^
-Linux device Endpoints open device entries in the /dev directory. This could be:
+Endpoints Opened Through Device Files
+"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Four of the five endpoint kinds are opened through an entry in ``/dev``. Which
+kind an entry is depends on what is at the end of it, and not on the entry's
+name: the name says where to look, and the kind says what else must be said
+about it and which implementation opens it.
 
-**Linux Device Endpoints**
+**Endpoints Opened Through Device Files**
 
-+----------------+---------------------------------------------+
-| Name           | Description                                 |
-+================+=============================================+
-| /dev/ttyS0     | Serial port, such as RS-232 or RS-422       |
-+----------------+---------------------------------------------+
-| /dev/ttyUSB0   | USB serial adapter (to RS-232 or RS-422     |
-+----------------+---------------------------------------------+
-| /dev/i2c-2     | I2c bus                                     |
-+----------------+---------------------------------------------+
-| /dev/spidev0.1 | SPI device                                  |
-+----------------+---------------------------------------------+
++----------------+-------------------------------+--------------------------+
+| Name           | What is there                 | Endpoint kind            |
++================+===============================+==========================+
+| /dev/ttyS0     | Serial port, RS-232 or RS-422 | ``serial``: the line's   |
+|                |                               | rate and framing are     |
+|                |                               | configured with it       |
++----------------+-------------------------------+--------------------------+
+| /dev/ttyUSB0   | USB serial adapter, to RS-232 | ``serial``, as above     |
+|                | or RS-422                     |                          |
++----------------+-------------------------------+--------------------------+
+| /dev/i2c-2     | I2C bus, with several devices | ``i2c``: the endpoint    |
+|                | addressed on it               | carries the address too  |
++----------------+-------------------------------+--------------------------+
+| /dev/spidev0.1 | SPI peripheral, bus and chip  | ``spi``: the clock, mode |
+|                | select named together         | and word are configured  |
+|                |                               | with it                  |
++----------------+-------------------------------+--------------------------+
+| /dev/urandom   | A character device read as it | ``device``: nothing but  |
+|                | comes                         | the path is needed       |
++----------------+-------------------------------+--------------------------+
+
+A ``device`` endpoint is the last of these and only that: a file opened and
+read as it comes. The other three are device files too, and were device
+endpoints until each was given a kind of its own, which is what let their terms
+reach the handler that opens them.
 
 
 Conduits
@@ -1351,17 +1476,18 @@ endpoints
 The division between the last two sections is the point of the format.
 
 Requirement
-    A group definition carries every attribute of its endpoint type except the
-    one that locates an endpoint: its device name, its network address, or, on
-    a bus that addresses its devices, the address of the device on that bus.
+    A group definition carries every attribute of its endpoint kind except the
+    one that locates an endpoint: its path, its network address, or, on a bus
+    that addresses its devices, the address of the device on that bus.
 
 Requirement
     What locates an endpoint is carried by the endpoint definition.
 
 Requirement
-    An endpoint of an I2C group gives both the bus device and the slave
-    address, because two endpoints of one group commonly sit on the same bus
-    and differ only in which device the master addresses.
+    An endpoint of an I2C group gives both the bus device and the address of
+    the device on that bus, because two endpoints of one group commonly sit on
+    the same bus and differ only in which device the master addresses. Both
+    reach the data handler the endpoint becomes.
 
 Requirement
     An endpoint of a SPI group gives the device node alone. The bus and the
@@ -1804,10 +1930,15 @@ Requirement
     distinguish one handler from another.
 
 Requirement
-    An endpoint of an I2C group does not become a data handler. There is no
-    endpoint configuration that holds a bus and a slave address together, and
-    no endpoint implementation that would open one, so converting it is an
-    error rather than a handler that cannot be started.
+    An endpoint of an I2C group becomes an I2C data handler, carrying the bus
+    device and the address of the device on it. Neither can be left behind: the
+    bus says which file to open and the address says which device on it
+    answers, and a handler holding only the first would talk to whichever
+    device the bus was last pointed at.
+
+It used not to become a handler at all, for want of anywhere in a handler's
+configuration to put the two together. That made an I2C bus a thing that could
+be described in a file and never run.
 
 A Unix-domain socket is the one endpoint whose shape differs between the two
 formats. Its group is a network group, but it is located by a path rather than

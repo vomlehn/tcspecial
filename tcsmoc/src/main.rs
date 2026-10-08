@@ -13,14 +13,12 @@ use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::config::{load_dh_configs, payload_path_from_args};
-use tcslibgs::{
-    ArmKey, CommandStatus, DHConfig, DHSample, DHType, EndpointConfig, NetworkProtocol,
-    DH_SAMPLE_BYTES,
-};
+use tcslibgs::{ArmKey, CommandStatus, DHConfig, DHSample, DH_SAMPLE_BYTES};
 use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, NOT_CONNECTED};
+use crate::endpoint::{dh_type_of, endpoint_description};
 use crate::config::constants::BEACON_INDICATOR;
 
 slint::include_modules!();
@@ -29,6 +27,7 @@ mod app;
 mod beacon_receive;
 mod ci_link;
 mod config;
+mod endpoint;
 
 /// Default CI address
 const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
@@ -222,41 +221,6 @@ fn grid_shape(panels: usize) -> GridShape {
         .filter(|shape| shape.width >= shape.height)
         .min_by(|a, b| a.aspect().total_cmp(&b.aspect()))
         .unwrap_or_else(|| shape_for(panels))
-}
-
-/// How a data handler's endpoint reads in its panel.
-fn endpoint_description(endpoint: &EndpointConfig) -> String {
-    match endpoint {
-        EndpointConfig::Network(net) => {
-            let protocol = match net.protocol {
-                NetworkProtocol::Tcp => "TCP",
-                NetworkProtocol::Udp => "UDP",
-                NetworkProtocol::UnixStream => "Unix stream",
-                NetworkProtocol::UnixDgram => "Unix datagram",
-            };
-
-            match net.protocol {
-                // A Unix socket is named by a path; its port means nothing.
-                NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
-                    format!("{} {}", protocol, net.address)
-                }
-                _ => format!("{} {}:{}", protocol, net.address, net.port),
-            }
-        }
-        EndpointConfig::Device(dev) => format!("Device {}", dev.path),
-    }
-}
-
-/// Which kind of data handler tcspecial is being asked to start.
-///
-/// START_DH carries the type, and the configuration file is what knows it: a
-/// device handler started as a network handler is a command tcspecial cannot
-/// carry out.
-fn dh_type_of(endpoint: &EndpointConfig) -> DHType {
-    match endpoint {
-        EndpointConfig::Network(_) => DHType::Network,
-        EndpointConfig::Device(_) => DHType::Device,
-    }
 }
 
 /// Turn a data handler from the payload configuration file into the panel the
@@ -1139,6 +1103,7 @@ mod tests {
     use super::*;
     use std::ffi::OsStr;
     use std::path::Path;
+    use tcslibgs::{EndpointConfig, NetworkProtocol};
     use std::time::Instant;
     use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
     use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig, Timestamp};
@@ -1749,36 +1714,6 @@ mod tests {
             // file does not contain.
             assert_eq!(info.packet_size as usize, dh.packet_size);
         }
-    }
-
-    /// A device handler is started as a device handler, not as whatever the
-    /// first panel happens to be.
-    #[test]
-    fn a_handler_is_started_as_the_type_its_endpoint_makes_it() {
-        let device = EndpointConfig::Device(DeviceConfig {
-            path: "/dev/urandom".to_string(),
-        });
-        assert!(dh_type_of(&device) == DHType::Device);
-        assert_eq!(endpoint_description(&device), "Device /dev/urandom");
-
-        let network = EndpointConfig::Network(NetworkConfig {
-            protocol: NetworkProtocol::Tcp,
-            address: "localhost".to_string(),
-            port: 5000,
-        });
-        assert!(dh_type_of(&network) == DHType::Network);
-        assert_eq!(endpoint_description(&network), "TCP localhost:5000");
-    }
-
-    /// A Unix socket is named by a path, so its panel does not append a port.
-    #[test]
-    fn a_unix_socket_panel_shows_no_port() {
-        let unix = EndpointConfig::Network(NetworkConfig {
-            protocol: NetworkProtocol::UnixStream,
-            address: "/tmp/dh8".to_string(),
-            port: 0,
-        });
-        assert_eq!(endpoint_description(&unix), "Unix stream /tmp/dh8");
     }
 
     /// The panels and the configured data handlers line up by index, which is

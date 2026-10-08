@@ -172,10 +172,10 @@ impl DataHandler {
             .cmd_pipes
             .ok_or_else(|| TcsError::DataHandler("No command pipe".to_string()))?;
 
-        // Reach out to the payload rather than waiting at its address: the
-        // payload is what exists there, and tcssim standing in for one is
-        // what listens. Opened once, because a socket cannot be opened twice
-        // and the two conduits share it.
+        // Which end of the payload link waits at the configured address
+        // depends on the protocol and on which end can speak first; see
+        // connect_endpoint_pair. Opened once either way, because a socket
+        // cannot be opened twice and the two conduits share it.
         let (payload_reader, payload_writer) = connect_endpoint_pair(&self.config.endpoint)?;
 
         // Create conduits
@@ -274,35 +274,34 @@ mod tests {
     use super::*;
     use tcslibgs::{DeviceConfig, EndpointConfig, DHName};
 
-    /// A network payload and its handler can both be up at once.
+    /// A UDP payload that speaks first, and a handler waiting where it
+    /// speaks to, both come up and data moves both ways.
     ///
     /// They used to both bind the payload's address, so whichever started
     /// second got AddrInUse and no data moved through a network handler at
-    /// all. The payload listens now and the handler reaches out to it.
+    /// all. Then the handler reached out to a payload that listened, which
+    /// works for a stream and not for a datagram: a UDP connect sends
+    /// nothing, so a listening payload heard nothing and -- producing data
+    /// because it is running rather than because it was asked -- had nowhere
+    /// to send it. Both ends sat there with nothing moving. So over UDP the
+    /// handler binds the address and the payload reaches out to it.
     ///
     /// This drives the whole loop, because that is the only way to see that
-    /// both ends are really connected: the ground sends to the handler's OC
-    /// address, the handler passes it to the payload, the payload answers, and
-    /// the answer reaches the ground.
+    /// both ends really found each other: the payload sends unprompted and it
+    /// reaches the ground, and then the ground sends and it reaches the
+    /// payload at the address the handler learnt from that first packet.
     #[test]
-    fn a_payload_listening_and_a_handler_connecting_both_come_up() {
+    fn a_payload_that_speaks_first_and_a_handler_waiting_for_it_both_come_up() {
         use std::net::UdpSocket;
-        use std::time::Duration;
+        use std::time::{Duration, Instant};
         use tcslibgs::{NetworkConfig, NetworkProtocol};
 
-        // Standing in for tcssim: the payload waits at its own address. Port 0
-        // so this cannot collide with a real one or another test.
-        let payload = UdpSocket::bind("127.0.0.1:0").expect("the payload binds");
-        let payload_addr = payload.local_addr().expect("its address");
-        payload
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .unwrap();
-        let answering = std::thread::spawn(move || {
-            let mut buffer = [0u8; 4096];
-            if let Ok((_, from)) = payload.recv_from(&mut buffer) {
-                let _ = payload.send_to(b"from the payload", from);
-            }
-        });
+        // A free address for the handler's payload side, which it binds. Port
+        // 0 and then let go, so this cannot collide with a real one or
+        // another test.
+        let probe = UdpSocket::bind("127.0.0.1:0").expect("a free payload port");
+        let payload_side = probe.local_addr().expect("its address");
+        drop(probe);
 
         let oc = UdpSocket::bind("127.0.0.1:0").expect("a free OC port");
         let oc_addr = oc.local_addr().expect("its address");
@@ -313,8 +312,8 @@ mod tests {
             name: DHName::new("Net"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,
-                address: payload_addr.ip().to_string(),
-                port: payload_addr.port(),
+                address: payload_side.ip().to_string(),
+                port: payload_side.port(),
             }),
             packet_size: 64,
             oc: Some(NetworkConfig {
@@ -330,27 +329,77 @@ mod tests {
         )
         .unwrap();
         dh.start(oc_reader, oc_writer)
-            .expect("the handler starts with the payload already listening");
+            .expect("the handler starts and waits at its payload's address");
 
         let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
         ground
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
+
+        // Standing in for tcssim: the payload has a port of its own and
+        // reaches the handler at the address the handler is waiting on.
+        let payload = UdpSocket::bind("127.0.0.1:0").expect("the payload binds a local port");
+        payload
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        payload.connect(payload_side).expect("it reaches the handler");
+
+        // The handler knows neither address until it is spoken to: no
+        // configuration says where the ground is, and the payload's port is
+        // its own. So the ground speaks once into the dark -- that datagram
+        // has nowhere to go on to and is dropped, which the handler counts as
+        // a failed write -- and the handler now knows where the ground is.
         ground.send_to(b"from the ground", oc_addr).unwrap();
 
+        // The payload sends because it is running, not because it was
+        // asked, and that is what reaches the ground. Said again until it
+        // lands, as a running payload would: the handler drops payload data
+        // until it has read the ground's first datagram, and the two conduits
+        // are threads of their own, so which of the two gets there first is
+        // not fixed.
+        ground
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
         let mut buffer = [0u8; 4096];
-        let (n, from) = ground
-            .recv_from(&mut buffer)
-            .expect("the payload's answer should reach the ground");
-        assert_eq!(&buffer[..n], b"from the payload");
-        assert_eq!(from, oc_addr, "the answer came from the handler's OC address");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let arrived = loop {
+            payload.send(b"from the payload").expect("it sends unprompted");
 
+            if let Ok(arrived) = ground.recv_from(&mut buffer) {
+                break Some(arrived);
+            }
+            if Instant::now() >= deadline {
+                break None;
+            }
+        };
+
+        let (n, from) = arrived.expect("the payload's data should reach the ground");
+        assert_eq!(&buffer[..n], b"from the payload");
+        assert_eq!(from, oc_addr, "it came from the handler's OC address");
+
+        // And now back the other way, to the address the handler learnt from
+        // that packet.
+        ground.send_to(b"from the ground", oc_addr).unwrap();
+        let n = payload
+            .recv(&mut buffer)
+            .expect("the ground's data should reach the payload");
+        assert_eq!(&buffer[..n], b"from the ground");
+
+        // At least one message each way. More, where the payload had to say
+        // itself again.
         let stats = dh.statistics();
-        assert_eq!(stats.bytes_received, b"from the ground".len() as u64);
-        assert_eq!(stats.bytes_sent, b"from the payload".len() as u64);
+        assert!(
+            stats.bytes_received >= b"from the ground".len() as u64,
+            "the ground's data was not read: {} bytes",
+            stats.bytes_received
+        );
+        assert!(
+            stats.bytes_sent >= b"from the payload".len() as u64,
+            "the payload's data did not go to the ground: {} bytes",
+            stats.bytes_sent
+        );
 
         dh.stop().unwrap();
-        answering.join().unwrap();
     }
 
     /// A running handler reports what has moved, not nothing.

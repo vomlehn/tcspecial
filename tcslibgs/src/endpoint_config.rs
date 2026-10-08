@@ -27,9 +27,21 @@ use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::endpoint_config_i2c::{parse_i2c_address, I2cParams};
+use crate::endpoint_config_network::NetworkParams;
+use crate::endpoint_config_serial::SerialParams;
+use crate::endpoint_config_spi::SpiParams;
 use crate::format::ConfigFormat;
+
+// The per-kind types are named from here as well as from their own files, so
+// that a reader of a configuration document reaches everything it can hold
+// through the module that parses it.
+pub use crate::endpoint_config_i2c::I2cParams as I2cGroupParams;
+pub use crate::endpoint_config_serial::{ByteLength, StopBits};
+pub use crate::endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 use crate::types::{
-    DHConfig, DHId, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol,
+    DHConfig, DHId, DHName, EndpointConfig, I2cConfig, NetworkConfig,
+    NetworkProtocol, SerialConfig, SpiConfig,
 };
 use crate::TcsError;
 
@@ -146,11 +158,6 @@ pub enum EndpointConfigError {
     )]
     GroupHasNoPacketSize { endpoint: String, group: String },
 
-    #[error(
-        "endpoint \"{0}\" is on an I2C bus, which tcspecial cannot open yet, so it \
-         cannot become a data handler"
-    )]
-    EndpointIsOnABus(String),
 }
 
 /// Result of reading an endpoint configuration file.
@@ -269,11 +276,25 @@ fn endpoint_config_of(
     group: &EndpointGroup,
 ) -> EndpointConfigResult<EndpointConfig> {
     match &endpoint.location {
-        // No EndpointConfig can hold a bus and a slave address, and there is
-        // no endpoint implementation that would open one.
-        EndpointLocation::I2c { .. } => {
-            Err(EndpointConfigError::EndpointIsOnABus(endpoint.name.clone()))
-        }
+        EndpointLocation::I2c { bus, address } => match &group.kind {
+            GroupKind::I2c(i2c) => Ok(EndpointConfig::I2c(I2cConfig {
+                bus: bus.clone(),
+                address: *address,
+                ten_bit: i2c.ten_bit,
+                pec: i2c.pec,
+            })),
+            // Only an I2C group gives an endpoint a bus and an address, so
+            // this is unreachable through the parser; an error rather than a
+            // panic, because a library should not bring a caller down.
+            _ => Err(bad(
+                &group.name,
+                &format!(
+                    "endpoint \"{}\" is on a bus, which a {} group does not put it on",
+                    endpoint.name,
+                    group.kind.type_name()
+                ),
+            )),
+        },
         EndpointLocation::Network { address, port } => match &group.kind {
             GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
                 protocol: net.protocol,
@@ -292,14 +313,43 @@ fn endpoint_config_of(
                 ),
             )),
         },
-        EndpointLocation::Device { path } => match &group.kind {
+        // Every kind but a network address is located by a device node, and
+        // which kind it is decides what else goes with it. They used all to
+        // become a plain Device, which opened the right file and then talked
+        // to it as though it had no terms of its own: a serial line at
+        // whatever rate the port was last left at, a SPI peripheral at
+        // whatever mode.
+        EndpointLocation::Path { path } => match &group.kind {
             GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
                 protocol: net.protocol,
                 address: path.clone(),
                 port: 0,
             })),
-            // A serial line and a SPI chip select are both device nodes.
-            _ => Ok(EndpointConfig::Device(DeviceConfig { path: path.clone() })),
+            GroupKind::Serial(serial) => Ok(EndpointConfig::Serial(SerialConfig {
+                path: path.clone(),
+                datarate: serial.datarate,
+                stop_bits: serial.stop_bits,
+                byte_length: serial.byte_length.bits(),
+            })),
+            GroupKind::Spi(spi) => Ok(EndpointConfig::Spi(SpiConfig {
+                path: path.clone(),
+                max_speed: spi.max_speed,
+                mode: spi.mode,
+                bits_per_word: spi.bits_per_word.bits(),
+                bit_order: spi.bit_order,
+                cs_active: spi.cs_active,
+            })),
+            // An I2C group's endpoints carry a bus and an address, which the
+            // parser requires of them, so a device node alone in one is a
+            // shape it cannot produce.
+            GroupKind::I2c(_) => Err(bad(
+                &group.name,
+                &format!(
+                    "endpoint \"{}\" names a device alone, but a device on an I2C bus \
+                     needs the bus and the address on it",
+                    endpoint.name
+                ),
+            )),
         },
     }
 }
@@ -367,235 +417,6 @@ impl GroupKind {
     }
 }
 
-/// Attributes of a serial port group.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SerialParams {
-    /// Line rate in bits per second.
-    pub datarate: u32,
-    /// Stop bits following each byte.
-    pub stop_bits: StopBits,
-    /// Data bits in each byte.
-    pub byte_length: ByteLength,
-    /// Stream payload protocol attributes. Required: a serial port is a
-    /// stream, so there is always a rule for where one read ends.
-    pub stream: StreamParams,
-}
-
-/// Attributes of a network group.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct NetworkParams {
-    /// Transport carrying the payload data.
-    pub protocol: NetworkProtocol,
-    /// Stream payload protocol attributes. Present for the stream protocols
-    /// and absent for the datagram protocols, where a datagram is the frame.
-    pub stream: Option<StreamParams>,
-}
-
-/// Attributes of an I2C group.
-///
-/// There is no byte length, parity, or stop bits here, because the protocol
-/// fixes the framing of a byte: eight data bits, most significant first,
-/// followed by an acknowledge bit. What is left to configure is how the
-/// master addresses a device and how hard it tries to complete a transfer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct I2cParams {
-    /// Address devices with ten address bits rather than seven.
-    pub ten_bit: bool,
-    /// Append an SMBus packet error check, a CRC-8, to each transfer.
-    pub pec: bool,
-    /// Times a transfer is retried after a lost arbitration or an
-    /// unexpected NAK.
-    pub retries: u32,
-    /// How long a transfer waits before it fails, rounded up to the 10 ms
-    /// the bus driver keeps it in.
-    pub timeout: Option<Duration>,
-    /// Bus clock rate in Hz, as the file recorded it.
-    ///
-    /// Recorded, never applied: the rate belongs to the bus controller, which
-    /// the platform configures from the device tree or from ACPI, and a
-    /// program holding an endpoint open cannot change it. Keeping it lets the
-    /// rate a group expects be checked against the platform and reported
-    /// plainly, rather than inferred later from corrupted transfers.
-    pub bus_speed: Option<u32>,
-}
-
-impl I2cParams {
-    /// The bus driver keeps a timeout in units of 10 ms, so a timeout that is
-    /// not a whole number of them takes the next one up.
-    pub fn effective_timeout(&self) -> Option<Duration> {
-        self.timeout.map(|t| {
-            let units = t.as_millis().div_ceil(10).max(1);
-            Duration::from_millis(units as u64 * 10)
-        })
-    }
-}
-
-/// Attributes of a SPI group.
-///
-/// As with I2C there is no parity and there are no stop bits: SPI is clocked
-/// and full duplex, and a transfer is delimited by the chip select rather
-/// than by framing bits.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SpiParams {
-    /// Greatest clock rate the peripheral accepts, in Hz.
-    ///
-    /// An upper bound, not an exact rate: a controller divides its own clock
-    /// down and runs at the fastest rate it can produce that does not exceed
-    /// this one.
-    pub max_speed: u32,
-    /// Clock polarity and phase.
-    pub mode: SpiMode,
-    /// Bits in each word.
-    pub bits_per_word: BitsPerWord,
-    /// Which bit of a word goes first.
-    pub bit_order: BitOrder,
-    /// The level at which the chip select is asserted.
-    pub cs_active: CsActive,
-}
-
-/// Clock polarity and phase, the four combinations of which are numbered 0
-/// to 3 by every SPI peripheral's datasheet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum SpiMode {
-    Mode0,
-    Mode1,
-    Mode2,
-    Mode3,
-}
-
-impl SpiMode {
-    /// The mode number, 0 to 3.
-    pub fn number(&self) -> u8 {
-        match self {
-            SpiMode::Mode0 => 0,
-            SpiMode::Mode1 => 1,
-            SpiMode::Mode2 => 2,
-            SpiMode::Mode3 => 3,
-        }
-    }
-
-    /// Clock polarity: the idle level of the clock.
-    pub fn cpol(&self) -> bool {
-        self.number() & 2 != 0
-    }
-
-    /// Clock phase: false samples on the leading edge, true on the trailing.
-    pub fn cpha(&self) -> bool {
-        self.number() & 1 != 0
-    }
-}
-
-impl fmt::Display for SpiMode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.number())
-    }
-}
-
-/// Which bit of a word is sent first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum BitOrder {
-    MsbFirst,
-    LsbFirst,
-}
-
-/// The level at which a chip select is asserted.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum CsActive {
-    Low,
-    High,
-}
-
-/// Bits in each word on a SPI bus.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct BitsPerWord(u8);
-
-impl BitsPerWord {
-    /// Narrowest word a controller offers.
-    pub const MIN: u8 = 1;
-    /// Widest word a controller offers.
-    pub const MAX: u8 = 32;
-    /// The width nearly every peripheral uses.
-    pub const DEFAULT: u8 = 8;
-
-    /// Build a word width, rejecting one no controller can produce.
-    pub fn new(bits: u8) -> Result<Self, String> {
-        if (Self::MIN..=Self::MAX).contains(&bits) {
-            Ok(BitsPerWord(bits))
-        } else {
-            Err(format!(
-                "bits_per_word {bits} is out of range: expected {} to {}",
-                Self::MIN,
-                Self::MAX
-            ))
-        }
-    }
-
-    /// The number of bits.
-    pub fn bits(&self) -> u8 {
-        self.0
-    }
-}
-
-impl Default for BitsPerWord {
-    fn default() -> Self {
-        BitsPerWord(Self::DEFAULT)
-    }
-}
-
-/// Stop bits following each byte on a serial line.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum StopBits {
-    One,
-    OnePointFive,
-    Two,
-}
-
-impl StopBits {
-    /// How this value is spelled in a configuration file.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            StopBits::One => "1",
-            StopBits::OnePointFive => "1.5",
-            StopBits::Two => "2",
-        }
-    }
-}
-
-impl fmt::Display for StopBits {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-/// Data bits in each byte on a serial line.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct ByteLength(u8);
-
-impl ByteLength {
-    /// Smallest byte length a UART offers.
-    pub const MIN: u8 = 5;
-    /// Largest byte length a UART offers.
-    pub const MAX: u8 = 8;
-
-    /// Build a byte length, rejecting one no UART can produce.
-    pub fn new(bits: u8) -> Result<Self, String> {
-        if (Self::MIN..=Self::MAX).contains(&bits) {
-            Ok(ByteLength(bits))
-        } else {
-            Err(format!(
-                "byte_length {bits} is out of range: expected {} to {}",
-                Self::MIN,
-                Self::MAX
-            ))
-        }
-    }
-
-    /// The number of bits.
-    pub fn bits(&self) -> u8 {
-        self.0
-    }
-}
-
 /// Where one read of a stream payload protocol ends.
 ///
 /// `max_length` always bounds a read. A read also ends on whichever of the
@@ -654,12 +475,16 @@ pub struct EndpointDef {
 /// devices, the address of the device on that bus.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum EndpointLocation {
-    /// A path in the filesystem: a serial port, a SPI device node, or a
-    /// Unix-domain socket.
+    /// A path in the filesystem, whatever is at the end of it: a serial port,
+    /// a SPI device node, a plain device, or a Unix-domain socket.
     ///
-    /// A SPI device node names the bus and the chip select together, so it
-    /// needs no separate address.
-    Device { path: String },
+    /// Not named `Device`, which is one *kind* of endpoint: this is how an
+    /// endpoint is located rather than what it is, and four of the five kinds
+    /// are located this way. Which kind it turns out to be follows from the
+    /// group it is in -- a path in a serial group is a line, the same path in
+    /// a SPI group is a peripheral -- and a SPI device node needs no address
+    /// beside it because it names the bus and the chip select together.
+    Path { path: String },
     /// A network host and port.
     Network { address: String, port: u16 },
     /// A bus device and the address of one device on that bus.
@@ -732,42 +557,42 @@ struct GeneralWire {
 }
 
 #[derive(Debug, Deserialize)]
-struct GroupWire {
+pub(crate) struct GroupWire {
     #[serde(alias = "@name")]
-    name: String,
+    pub(crate) name: String,
     #[serde(rename = "type", alias = "@type")]
-    kind: String,
+    pub(crate) kind: String,
     // Serial attributes.
     #[serde(default, alias = "@datarate")]
-    datarate: Option<Scalar>,
+    pub(crate) datarate: Option<Scalar>,
     #[serde(default, alias = "@stop_bits", alias = "stop-bits", alias = "@stop-bits")]
-    stop_bits: Option<Scalar>,
+    pub(crate) stop_bits: Option<Scalar>,
     #[serde(
         default,
         alias = "@byte_length",
         alias = "byte-length",
         alias = "@byte-length"
     )]
-    byte_length: Option<Scalar>,
+    pub(crate) byte_length: Option<Scalar>,
     // Network attributes.
     #[serde(default, alias = "@protocol")]
-    protocol: Option<String>,
+    pub(crate) protocol: Option<String>,
     // I2C attributes.
     #[serde(default, alias = "@ten_bit", alias = "ten-bit", alias = "@ten-bit")]
-    ten_bit: Option<Scalar>,
+    pub(crate) ten_bit: Option<Scalar>,
     #[serde(default, alias = "@pec")]
-    pec: Option<Scalar>,
+    pub(crate) pec: Option<Scalar>,
     #[serde(default, alias = "@retries")]
-    retries: Option<Scalar>,
+    pub(crate) retries: Option<Scalar>,
     #[serde(default, alias = "@timeout")]
-    timeout: Option<Scalar>,
+    pub(crate) timeout: Option<Scalar>,
     #[serde(
         default,
         alias = "@bus_speed",
         alias = "bus-speed",
         alias = "@bus-speed"
     )]
-    bus_speed: Option<Scalar>,
+    pub(crate) bus_speed: Option<Scalar>,
     // SPI attributes.
     #[serde(
         default,
@@ -775,30 +600,30 @@ struct GroupWire {
         alias = "max-speed",
         alias = "@max-speed"
     )]
-    max_speed: Option<Scalar>,
+    pub(crate) max_speed: Option<Scalar>,
     #[serde(default, alias = "@mode")]
-    mode: Option<Scalar>,
+    pub(crate) mode: Option<Scalar>,
     #[serde(
         default,
         alias = "@bits_per_word",
         alias = "bits-per-word",
         alias = "@bits-per-word"
     )]
-    bits_per_word: Option<Scalar>,
+    pub(crate) bits_per_word: Option<Scalar>,
     #[serde(
         default,
         alias = "@bit_order",
         alias = "bit-order",
         alias = "@bit-order"
     )]
-    bit_order: Option<Scalar>,
+    pub(crate) bit_order: Option<Scalar>,
     #[serde(
         default,
         alias = "@cs_active",
         alias = "cs-active",
         alias = "@cs-active"
     )]
-    cs_active: Option<Scalar>,
+    pub(crate) cs_active: Option<Scalar>,
     // Shared: every type of group may state a packet size.
     #[serde(
         default,
@@ -806,30 +631,30 @@ struct GroupWire {
         alias = "packet-size",
         alias = "@packet-size"
     )]
-    packet_size: Option<Scalar>,
+    pub(crate) packet_size: Option<Scalar>,
     // Shared: stream payload protocol attributes.
     #[serde(default)]
-    stream: Option<StreamWire>,
+    pub(crate) stream: Option<StreamWire>,
 }
 
 #[derive(Debug, Deserialize)]
-struct StreamWire {
+pub(crate) struct StreamWire {
     #[serde(
         default,
         alias = "@max_length",
         alias = "max-length",
         alias = "@max-length"
     )]
-    max_length: Option<Scalar>,
+    pub(crate) max_length: Option<Scalar>,
     #[serde(default, alias = "@timeout")]
-    timeout: Option<Scalar>,
+    pub(crate) timeout: Option<Scalar>,
     #[serde(
         default,
         alias = "@terminators",
         alias = "terminator",
         alias = "@terminator"
     )]
-    terminators: Option<ByteList>,
+    pub(crate) terminators: Option<ByteList>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -929,10 +754,10 @@ enum OneOrMany<T> {
 /// Both are kept as text and parsed by the rule for that field, which gives
 /// one spelling of each rule and one wording of each error.
 #[derive(Debug, Clone)]
-struct Scalar(String);
+pub(crate) struct Scalar(String);
 
 impl Scalar {
-    fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         self.0.trim()
     }
 }
@@ -979,7 +804,7 @@ impl<'de> Deserialize<'de> for Scalar {
 /// `<terminator>` children work too, by way of [`Section`]-like flattening
 /// in the untagged enum below.
 #[derive(Debug, Clone)]
-struct ByteList(Vec<String>);
+pub(crate) struct ByteList(Vec<String>);
 
 impl<'de> Deserialize<'de> for ByteList {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -1096,168 +921,14 @@ fn validate_group(g: GroupWire) -> EndpointConfigResult<EndpointGroup> {
         None => None,
     };
 
+    // One arm per kind of group, each in the file that owns that kind: what
+    // a group of that kind may say, what it must say, and what the values it
+    // gives mean are all one subject, and not this function's.
     let kind = match kind_text.as_str() {
-        "serial" => {
-            reject_foreign_fields(
-                &name,
-                "serial",
-                &g,
-                &["datarate", "stop_bits", "byte_length"],
-            )?;
-
-            let datarate = require(&name, "serial", "datarate", g.datarate.as_ref())?;
-            let datarate = parse_u32(&name, "datarate", datarate)?;
-            if datarate == 0 {
-                return Err(bad(&name, "datarate must be greater than zero"));
-            }
-
-            let stop_bits = require(&name, "serial", "stop_bits", g.stop_bits.as_ref())?;
-            let stop_bits = parse_stop_bits(&name, stop_bits)?;
-
-            let byte_length = require(&name, "serial", "byte_length", g.byte_length.as_ref())?;
-            let byte_length = parse_u32(&name, "byte_length", byte_length)?;
-            let byte_length = ByteLength::new(byte_length.min(u8::MAX as u32) as u8)
-                .map_err(|m| bad(&name, &m))?;
-
-            // A serial port is a stream, so a read needs an end.
-            let stream = g.stream.ok_or(EndpointConfigError::MissingGroupField {
-                group: name.clone(),
-                kind: "serial",
-                field: "a stream section",
-            })?;
-            let stream = validate_stream(&name, stream)?;
-
-            GroupKind::Serial(SerialParams {
-                datarate,
-                stop_bits,
-                byte_length,
-                stream,
-            })
-        }
-
-        "network" => {
-            reject_foreign_fields(&name, "network", &g, &["protocol"])?;
-
-            let protocol = require(&name, "network", "protocol", g.protocol.as_ref())?;
-            let protocol = parse_protocol(&name, protocol)?;
-
-            // The stream protocols need a rule for where a read ends; for the
-            // datagram protocols the datagram is already the frame.
-            let stream = match (is_stream_protocol(protocol), g.stream) {
-                (true, Some(s)) => Some(validate_stream(&name, s)?),
-                (true, None) => {
-                    return Err(EndpointConfigError::MissingGroupField {
-                        group: name,
-                        kind: "network",
-                        field: "a stream section",
-                    })
-                }
-                (false, Some(_)) => {
-                    return Err(EndpointConfigError::UnusedGroupField {
-                        group: name,
-                        kind: "datagram network",
-                        field: "a stream section",
-                    })
-                }
-                (false, None) => None,
-            };
-
-            GroupKind::Network(NetworkParams { protocol, stream })
-        }
-
-        "i2c" => {
-            reject_foreign_fields(
-                &name,
-                "i2c",
-                &g,
-                &["ten_bit", "pec", "retries", "timeout", "bus_speed"],
-            )?;
-            reject_stream(&name, "i2c", g.stream.is_some())?;
-
-            let ten_bit = parse_flag(&name, "ten_bit", g.ten_bit.as_ref())?.unwrap_or(false);
-            let pec = parse_flag(&name, "pec", g.pec.as_ref())?.unwrap_or(false);
-
-            let retries = match g.retries.as_ref() {
-                Some(s) => parse_u32(&name, "retries", s)?,
-                None => 0,
-            };
-
-            let timeout = match g.timeout.as_ref() {
-                Some(s) => parse_timeout(&name, s)?,
-                None => None,
-            };
-
-            // Recorded, not applied: see I2cParams::bus_speed. A rate of zero
-            // is still rejected, because a file that records one is making a
-            // claim about the platform and zero is not a claim.
-            let bus_speed = match g.bus_speed.as_ref() {
-                Some(s) => {
-                    let hz = parse_u32(&name, "bus_speed", s)?;
-                    if hz == 0 {
-                        return Err(bad(&name, "bus_speed must be greater than zero"));
-                    }
-                    Some(hz)
-                }
-                None => None,
-            };
-
-            GroupKind::I2c(I2cParams {
-                ten_bit,
-                pec,
-                retries,
-                timeout,
-                bus_speed,
-            })
-        }
-
-        "spi" => {
-            reject_foreign_fields(
-                &name,
-                "spi",
-                &g,
-                &["max_speed", "mode", "bits_per_word", "bit_order", "cs_active"],
-            )?;
-            reject_stream(&name, "spi", g.stream.is_some())?;
-
-            let max_speed = require(&name, "spi", "max_speed", g.max_speed.as_ref())?;
-            let max_speed = parse_u32(&name, "max_speed", max_speed)?;
-            if max_speed == 0 {
-                return Err(bad(&name, "max_speed must be greater than zero"));
-            }
-
-            // Required: no controller default is right for every peripheral,
-            // and a mismatched mode fails the way a mismatched data rate
-            // fails on a serial line.
-            let mode = require(&name, "spi", "mode", g.mode.as_ref())?;
-            let mode = parse_spi_mode(&name, mode)?;
-
-            let bits_per_word = match g.bits_per_word.as_ref() {
-                Some(s) => {
-                    let bits = parse_u32(&name, "bits_per_word", s)?;
-                    BitsPerWord::new(bits.min(u8::MAX as u32) as u8).map_err(|m| bad(&name, &m))?
-                }
-                None => BitsPerWord::default(),
-            };
-
-            let bit_order = match g.bit_order.as_ref() {
-                Some(s) => parse_bit_order(&name, s)?,
-                None => BitOrder::MsbFirst,
-            };
-
-            let cs_active = match g.cs_active.as_ref() {
-                Some(s) => parse_cs_active(&name, s)?,
-                None => CsActive::Low,
-            };
-
-            GroupKind::Spi(SpiParams {
-                max_speed,
-                mode,
-                bits_per_word,
-                bit_order,
-                cs_active,
-            })
-        }
-
+        "serial" => crate::endpoint_config_serial::group_kind_of(&name, g)?,
+        "network" => crate::endpoint_config_network::group_kind_of(&name, g)?,
+        "i2c" => crate::endpoint_config_i2c::group_kind_of(&name, g)?,
+        "spi" => crate::endpoint_config_spi::group_kind_of(&name, g)?,
         other => {
             return Err(EndpointConfigError::UnknownGroupKind {
                 group: name,
@@ -1274,7 +945,7 @@ fn validate_group(g: GroupWire) -> EndpointConfigResult<EndpointGroup> {
 }
 
 /// Apply the three rules governing a stream section.
-fn validate_stream(group: &str, s: StreamWire) -> EndpointConfigResult<StreamParams> {
+pub(crate) fn validate_stream(group: &str, s: StreamWire) -> EndpointConfigResult<StreamParams> {
     // 1. max_length is required.
     let max_length = s
         .max_length
@@ -1332,9 +1003,8 @@ fn validate_stream(group: &str, s: StreamWire) -> EndpointConfigResult<StreamPar
 /// The shape of the thing that locates an endpoint, which follows from the
 /// type of its group.
 enum LocationShape {
-    /// A device name alone: a serial port, a SPI device node, or a
-    /// Unix-domain socket.
-    Device,
+    /// A path alone, whatever kind of endpoint is at the end of it.
+    Path,
     /// A host and a port.
     Network,
     /// A bus device and the address of a device on that bus.
@@ -1385,9 +1055,9 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
     };
 
     let shape = match &group.kind {
-        GroupKind::Serial(_) => LocationShape::Device,
+        GroupKind::Serial(_) => LocationShape::Path,
         // A SPI device node names the bus and the chip select together.
-        GroupKind::Spi(_) => LocationShape::Device,
+        GroupKind::Spi(_) => LocationShape::Path,
         GroupKind::I2c(_) => LocationShape::I2cBusAndAddress,
         // A Unix-domain socket is named by a path, not by host and port.
         GroupKind::Network(n) => {
@@ -1395,7 +1065,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
                 n.protocol,
                 NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram
             ) {
-                LocationShape::Device
+                LocationShape::Path
             } else {
                 LocationShape::Network
             }
@@ -1503,7 +1173,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
                 kind,
                 field: "a device",
             })?;
-        EndpointLocation::Device { path }
+        EndpointLocation::Path { path }
     };
 
     Ok(EndpointDef {
@@ -1519,14 +1189,14 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
 // Scalar parsers
 // ---------------------------------------------------------------------------
 
-fn bad(group: &str, message: &str) -> EndpointConfigError {
+pub(crate) fn bad(group: &str, message: &str) -> EndpointConfigError {
     EndpointConfigError::BadGroupValue {
         group: group.to_string(),
         message: message.to_string(),
     }
 }
 
-fn require<'a, T>(
+pub(crate) fn require<'a, T>(
     group: &str,
     kind: &'static str,
     field: &'static str,
@@ -1587,7 +1257,7 @@ fn type_specific_fields(g: &GroupWire) -> [(&'static str, bool); 14] {
 ///
 /// An attribute that does not apply is an error rather than being ignored, so
 /// that a misspelled or misplaced attribute is reported where it was written.
-fn reject_foreign_fields(
+pub(crate) fn reject_foreign_fields(
     group: &str,
     kind: &'static str,
     g: &GroupWire,
@@ -1603,12 +1273,12 @@ fn reject_foreign_fields(
 
 /// Reject a stream section on a bus type, where a transfer is already bounded
 /// by the number of bytes the master clocks.
-fn reject_stream(group: &str, kind: &'static str, present: bool) -> EndpointConfigResult<()> {
+pub(crate) fn reject_stream(group: &str, kind: &'static str, present: bool) -> EndpointConfigResult<()> {
     reject_unused(group, kind, "a stream section", present)
 }
 
 /// Parse an unsigned value written in decimal, or in hex with an `0x` prefix.
-fn parse_u32(group: &str, field: &str, s: &Scalar) -> EndpointConfigResult<u32> {
+pub(crate) fn parse_u32(group: &str, field: &str, s: &Scalar) -> EndpointConfigResult<u32> {
     let text = s.as_str();
     let parsed = match text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
         Some(hex) => u32::from_str_radix(hex, 16),
@@ -1637,24 +1307,12 @@ fn parse_byte(group: &str, text: &str) -> EndpointConfigResult<u8> {
     }
 }
 
-fn parse_stop_bits(group: &str, s: &Scalar) -> EndpointConfigResult<StopBits> {
-    match s.as_str() {
-        "1" | "1.0" => Ok(StopBits::One),
-        "1.5" => Ok(StopBits::OnePointFive),
-        "2" | "2.0" => Ok(StopBits::Two),
-        other => Err(bad(
-            group,
-            &format!("stop_bits: \"{other}\" is not one of 1, 1.5, or 2"),
-        )),
-    }
-}
-
 /// Parse a flag written `true` or `false`.
 ///
 /// A YAML 1.1 reader folds `yes`, `no`, `on`, and `off` to a boolean before
 /// this sees them, and [`Scalar`] puts the result back as `true` or `false`,
 /// so those spellings work too without being named here.
-fn parse_flag(group: &str, field: &str, s: Option<&Scalar>) -> EndpointConfigResult<Option<bool>> {
+pub(crate) fn parse_flag(group: &str, field: &str, s: Option<&Scalar>) -> EndpointConfigResult<Option<bool>> {
     let Some(s) = s else { return Ok(None) };
     match s.as_str().to_ascii_lowercase().as_str() {
         "true" => Ok(Some(true)),
@@ -1666,133 +1324,11 @@ fn parse_flag(group: &str, field: &str, s: Option<&Scalar>) -> EndpointConfigRes
     }
 }
 
-fn parse_spi_mode(group: &str, s: &Scalar) -> EndpointConfigResult<SpiMode> {
-    match s.as_str() {
-        "0" => Ok(SpiMode::Mode0),
-        "1" => Ok(SpiMode::Mode1),
-        "2" => Ok(SpiMode::Mode2),
-        "3" => Ok(SpiMode::Mode3),
-        other => Err(bad(
-            group,
-            &format!("mode: \"{other}\" is not one of 0, 1, 2, or 3"),
-        )),
-    }
-}
-
-fn parse_bit_order(group: &str, s: &Scalar) -> EndpointConfigResult<BitOrder> {
-    match s.as_str().to_ascii_lowercase().as_str() {
-        "msb" | "msb_first" | "msb-first" => Ok(BitOrder::MsbFirst),
-        "lsb" | "lsb_first" | "lsb-first" => Ok(BitOrder::LsbFirst),
-        other => Err(bad(
-            group,
-            &format!("bit_order: \"{other}\" is not msb or lsb"),
-        )),
-    }
-}
-
-fn parse_cs_active(group: &str, s: &Scalar) -> EndpointConfigResult<CsActive> {
-    match s.as_str().to_ascii_lowercase().as_str() {
-        "low" => Ok(CsActive::Low),
-        "high" => Ok(CsActive::High),
-        other => Err(bad(
-            group,
-            &format!("cs_active: \"{other}\" is not low or high"),
-        )),
-    }
-}
-
-/// Addresses the I2C specification keeps for itself, and so which cannot
-/// name a device.
-///
-/// `0x00` to `0x07` carry the general call, the CBUS address, and the
-/// high-speed master code; `0x78` to `0x7F` carry the 10-bit addressing
-/// prefix and the block the specification reserves for future use. What is
-/// left, `0x08` to `0x77`, is the 112 addresses a 7-bit bus really offers.
-///
-/// These apply to 7-bit addressing only. A 10-bit transfer is introduced by
-/// the `0x78` prefix and then carries its address in the bytes that follow,
-/// so the whole 10-bit space is available.
-const I2C_RESERVED_LOW: std::ops::RangeInclusive<u32> = 0x00..=0x07;
-const I2C_RESERVED_HIGH: std::ops::RangeInclusive<u32> = 0x78..=0x7F;
-
-/// Parse an I2C slave address, in decimal or in hex with an `0x` prefix.
-///
-/// How wide an address may be follows from the group's addressing mode, so
-/// a file that writes a 10-bit address in a 7-bit group is told which of the
-/// two it got wrong.
-fn parse_i2c_address(group: &str, text: &str, ten_bit: bool) -> EndpointConfigResult<u16> {
-    let text = text.trim();
-    let parsed = match text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-        Some(hex) => u32::from_str_radix(hex, 16),
-        None => text.parse::<u32>(),
-    };
-    let value =
-        parsed.map_err(|_| bad(group, &format!("address: \"{text}\" is not a whole number")))?;
-
-    let (limit, width) = if ten_bit { (0x3FF, 10) } else { (0x7F, 7) };
-    if value > limit {
-        // Worth suggesting the wider mode only to a group that is not
-        // already in it.
-        let hint = if ten_bit {
-            ""
-        } else {
-            ". A group addressing its devices with ten bits says ten_bit: true"
-        };
-        return Err(bad(
-            group,
-            &format!("address {text} does not fit in {width} bits: expected 0 to {limit:#X}{hint}"),
-        ));
-    }
-
-    // A reserved address is in range and still cannot name a device, so it is
-    // worth catching here rather than as a silent failure to answer on a bus.
-    if !ten_bit && (I2C_RESERVED_LOW.contains(&value) || I2C_RESERVED_HIGH.contains(&value)) {
-        return Err(bad(
-            group,
-            &format!(
-                "address {text} is reserved by the I2C specification and cannot name a \
-                 device: {:#04X} to {:#04X} and {:#04X} to {:#04X} are reserved, leaving \
-                 {:#04X} to {:#04X} for devices",
-                I2C_RESERVED_LOW.start(),
-                I2C_RESERVED_LOW.end(),
-                I2C_RESERVED_HIGH.start(),
-                I2C_RESERVED_HIGH.end(),
-                I2C_RESERVED_LOW.end() + 1,
-                I2C_RESERVED_HIGH.start() - 1,
-            ),
-        ));
-    }
-
-    Ok(value as u16)
-}
-
-fn parse_protocol(group: &str, text: &str) -> EndpointConfigResult<NetworkProtocol> {
-    match text.trim().to_ascii_lowercase().as_str() {
-        "tcp" => Ok(NetworkProtocol::Tcp),
-        "udp" => Ok(NetworkProtocol::Udp),
-        "unix_stream" | "unix-stream" => Ok(NetworkProtocol::UnixStream),
-        "unix_dgram" | "unix-dgram" => Ok(NetworkProtocol::UnixDgram),
-        other => Err(bad(
-            group,
-            &format!(
-                "protocol: \"{other}\" is not one of tcp, udp, unix_stream, or unix_dgram"
-            ),
-        )),
-    }
-}
-
-fn is_stream_protocol(p: NetworkProtocol) -> bool {
-    matches!(
-        p,
-        NetworkProtocol::Tcp | NetworkProtocol::UnixStream
-    )
-}
-
 /// Parse a timeout: the word `none`, or a whole number with a unit suffix of
 /// `us`, `ms`, or `s`.
 ///
 /// `Ok(None)` is the word `none`: a read that does not time out.
-fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Option<Duration>> {
+pub(crate) fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Option<Duration>> {
     let text = s.as_str();
     let lower = text.to_ascii_lowercase();
 
@@ -1850,6 +1386,7 @@ fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Option<Duratio
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::DeviceConfig;
 
     /// The same configuration written both ways. These two must parse into
     /// structures that compare equal; that is the point of the module.
@@ -1964,13 +1501,13 @@ endpoints:
         assert_eq!(serial.len(), 2);
         assert_eq!(
             serial[0].location,
-            EndpointLocation::Device {
+            EndpointLocation::Path {
                 path: "/dev/ttyS0".to_string()
             }
         );
         assert_eq!(
             serial[1].location,
-            EndpointLocation::Device {
+            EndpointLocation::Path {
                 path: "/dev/ttyS1".to_string()
             }
         );
@@ -2319,19 +1856,24 @@ endpoints:
         );
         assert_eq!(handlers[1].packet_size, 64);
 
-        // A serial line is a device node.
+        // A serial line is its own kind of endpoint: a device node, and the
+        // framing of the line it opens. It used to be a plain device, which
+        // is the right file read at whatever rate the port was left at.
         assert_eq!(
             handlers[2].endpoint,
-            EndpointConfig::Device(DeviceConfig {
-                path: "/dev/ttyS0".to_string()
+            EndpointConfig::Serial(SerialConfig {
+                path: "/dev/ttyS0".to_string(),
+                datarate: 9600,
+                stop_bits: StopBits::One,
+                byte_length: 8,
             })
         );
     }
 
-    /// A SPI endpoint is a device node too: the node names the bus and the
-    /// chip select together.
+    /// A SPI endpoint is named by a device node -- which names the bus and
+    /// the chip select together -- and carries the terms it is clocked on.
     #[test]
-    fn a_spi_endpoint_becomes_a_device_handler() {
+    fn a_spi_endpoint_becomes_a_spi_handler_with_its_terms() {
         let doc = from_yaml_str(
             "endpoint_groups:\n  - name: g\n    type: spi\n    max_speed: 1000000\n    \
              mode: 0\n    packet_size: 32\n\
@@ -2344,27 +1886,43 @@ endpoints:
         assert_eq!(handlers[0].dh_id, DHId(7));
         assert_eq!(
             handlers[0].endpoint,
-            EndpointConfig::Device(DeviceConfig {
-                path: "/dev/spidev0.0".to_string()
-            })
+            EndpointConfig::Spi(SpiConfig {
+                path: "/dev/spidev0.0".to_string(),
+                max_speed: 1_000_000,
+                mode: SpiMode::Mode0,
+                bits_per_word: 8,
+                bit_order: BitOrder::MsbFirst,
+                cs_active: CsActive::Low,
+            }),
+            "a SPI endpoint used to become a plain device handler, which opened \
+             the node and then clocked it however it had been left"
         );
     }
 
+    /// An I2C endpoint becomes a handler carrying both halves of where it is.
+    ///
+    /// It used to become nothing at all: there was no `EndpointConfig` that
+    /// could hold a bus and an address, so the conversion refused, and an I2C
+    /// bus could be described in a file and never run.
     #[test]
-    fn an_i2c_endpoint_cannot_become_a_data_handler() {
-        // There is no EndpointConfig that holds a bus and a slave address, and
-        // no endpoint implementation that would open one.
+    fn an_i2c_endpoint_becomes_an_i2c_handler_with_bus_and_address() {
         let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: i2c\n    packet_size: 8\n\
+            "endpoint_groups:\n  - name: g\n    type: i2c\n    packet_size: 8\n    \
+             pec: true\n\
              endpoints:\n  - name: thermal_a\n    group: g\n    dh_id: 0\n    \
              device: /dev/i2c-1\n    address: 0x48\n",
         )
         .expect("parses: an I2C endpoint is a perfectly good endpoint");
 
-        let e = doc.to_dh_configs().unwrap_err();
-        assert!(
-            matches!(&e, EndpointConfigError::EndpointIsOnABus(name) if name == "thermal_a"),
-            "got {e:?}"
+        let handlers = doc.to_dh_configs().expect("converts");
+        assert_eq!(
+            handlers[0].endpoint,
+            EndpointConfig::I2c(I2cConfig {
+                bus: "/dev/i2c-1".to_string(),
+                address: 0x48,
+                ten_bit: false,
+                pec: true,
+            })
         );
     }
 
@@ -2538,7 +2096,7 @@ endpoints:
         let doc = from_yaml_str(yaml).unwrap();
         assert_eq!(
             doc.endpoints[0].location,
-            EndpointLocation::Device {
+            EndpointLocation::Path {
                 path: "/run/pay.sock".to_string()
             }
         );

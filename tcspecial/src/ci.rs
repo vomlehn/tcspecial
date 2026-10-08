@@ -97,12 +97,30 @@ fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
 }
 
 /// What a handler's payload endpoint is, in one line of log.
+///
+/// Each kind says what locates it, and the terms that cannot be read off the
+/// name: a log line that said only "device /dev/ttyS0" for a serial line left
+/// the rate it was opened at nowhere to be found.
 fn endpoint_description(endpoint: &EndpointConfig) -> String {
     match endpoint {
         EndpointConfig::Network(net) => {
             format!("{:?} {}:{}", net.protocol, net.address, net.port)
         }
         EndpointConfig::Device(dev) => format!("device {}", dev.path),
+        EndpointConfig::Serial(serial) => format!(
+            "serial {} at {} baud, {} data bits, {} stop",
+            serial.path, serial.datarate, serial.byte_length, serial.stop_bits
+        ),
+        EndpointConfig::I2c(i2c) => format!(
+            "I2C device {:#04X} on bus {}{}",
+            i2c.address,
+            i2c.bus,
+            if i2c.pec { ", with PEC" } else { "" }
+        ),
+        EndpointConfig::Spi(spi) => format!(
+            "SPI {} in {} at up to {} Hz, {} bits per word",
+            spi.path, spi.mode, spi.max_speed, spi.bits_per_word
+        ),
     }
 }
 

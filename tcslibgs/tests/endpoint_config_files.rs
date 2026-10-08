@@ -92,11 +92,11 @@ fn the_examples_contain_what_the_manual_says_they_do() {
     assert_eq!(shared.len(), 2);
     assert_eq!(
         shared[0].location,
-        EndpointLocation::Device { path: "/dev/ttyS0".into() }
+        EndpointLocation::Path { path: "/dev/ttyS0".into() }
     );
     assert_eq!(
         shared[1].location,
-        EndpointLocation::Device { path: "/dev/ttyS1".into() }
+        EndpointLocation::Path { path: "/dev/ttyS1".into() }
     );
 
     // The fixed-length case the manual calls out.
@@ -118,7 +118,7 @@ fn the_examples_contain_what_the_manual_says_they_do() {
     let recorder = doc.endpoints.iter().find(|e| e.name == "recorder").unwrap();
     assert_eq!(
         recorder.location,
-        EndpointLocation::Device { path: "/run/tcspecial/recorder.sock".into() }
+        EndpointLocation::Path { path: "/run/tcspecial/recorder.sock".into() }
     );
 
     // An I2C group holds how the master drives the bus...
@@ -170,7 +170,7 @@ fn the_examples_contain_what_the_manual_says_they_do() {
     let imu = doc.endpoints.iter().find(|e| e.name == "imu").unwrap();
     assert_eq!(
         imu.location,
-        EndpointLocation::Device { path: "/dev/spidev0.1".into() }
+        EndpointLocation::Path { path: "/dev/spidev0.1".into() }
     );
 }
 

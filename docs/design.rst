@@ -1488,6 +1488,32 @@ simulated payloads
 |                     |        | packet, whose size the payload file gives   |
 +---------------------+--------+---------------------------------------------+
 
+**Fault injection settings**, each defaulting to no fault at all:
+
++------------------------+--------+------------------------------------------+
+| Attribute              | Type   | Meaning                                  |
++========================+========+==========================================+
+| drop_percent           | number | Packets in a hundred that are never sent |
++------------------------+--------+------------------------------------------+
+| corrupt_percent        | number | Packets in a hundred with one byte       |
+|                        |        | altered                                  |
++------------------------+--------+------------------------------------------+
+| truncate_percent       | number | Packets in a hundred sent short of their |
+|                        |        | size                                     |
++------------------------+--------+------------------------------------------+
+| jitter_ms              | number | Milliseconds a packet may be late,       |
+|                        |        | chosen afresh for each one               |
++------------------------+--------+------------------------------------------+
+| silent_after           | number | Packets after which the payload sends no |
+|                        |        | more, the link still open. 0 is never    |
++------------------------+--------+------------------------------------------+
+| close_after            | number | Packets after which the payload hangs    |
+|                        |        | up. 0 is never                           |
++------------------------+--------+------------------------------------------+
+| ignore_trigger_percent | number | Requests in a hundred a triggered        |
+|                        |        | payload leaves unanswered                |
++------------------------+--------+------------------------------------------+
+
 Requirement
     A simulated payload takes each setting it does not state from the group it
     names.
@@ -1517,6 +1543,72 @@ Requirement
     which a second master on the bus cannot see. A payload that answered
     nothing would look exactly like a handler whose polling had stopped
     working.
+
+Fault Injection
+---------------
+A payload that always works exercises only the path where everything works.
+The settings above have a simulated payload misbehave in the ways a real one
+does, so that a handler's own counting, framing, timeouts and reconnection can
+be made to happen on purpose rather than waited for.
+
+Requirement
+    Fault injection settings appear in the simulator configuration file only.
+    A payload configuration file describes the payloads a mission flies, and
+    nothing flying is configured to drop a tenth of its packets; a fault
+    stated there would also be read by tcspecial, which must be told what the
+    payload is meant to do rather than what the simulator is doing to it.
+
+Requirement
+    A fault setting is inherited from a group exactly as every other setting
+    is. A group of flaky payloads is as much a thing several payloads share as
+    a rate is.
+
+Requirement
+    A percentage is nought to a hundred. A larger number is an error naming
+    the setting and the value, because it is a misunderstanding of the unit
+    rather than a request for a severer fault.
+
+Requirement
+    A dropped packet is not counted as sent. The simulator's counters and the
+    handler's are what tell a dropped packet from a lost one, and counters
+    that agreed about a packet that never existed could not.
+
+Requirement
+    A corrupted byte is never the byte it was, and a truncated packet is
+    always shorter than its size and never empty. A fault that left the data
+    as it found it would have a file asking for a tenth of its packets
+    corrupted quietly get fewer. A packet of one byte is the exception to
+    truncation: there is no length both shorter than one and not empty, so it
+    is sent whole, an empty packet being the dropping fault instead.
+
+Requirement
+    Jitter is waited out before a packet is sent and inside its interval,
+    never added to it. A payload told to send every second still sends every
+    second, with the packet late within that second. Late and never early:
+    early would be the simulator sending sooner than its own configuration
+    asked for.
+
+Requirement
+    A payload that has gone silent keeps its link open. That is what makes it
+    worth simulating separately from one that closed: a wedged instrument
+    looks to the handler exactly like a healthy link carrying nothing.
+
+Requirement
+    A payload that hangs up listens again. The handler has to reconnect, which
+    is the path being exercised, and a payload gone for the rest of the run
+    would exercise it once at most.
+
+Requirement
+    The simulator refuses a fault the payload could not have. Only a stream
+    has a connection to close, so ``close_after`` is refused for every other
+    kind; only a triggered payload is asked for anything, so
+    ``ignore_trigger_percent`` is refused for a periodic one. Either would
+    otherwise sit in the file looking as though it governed something.
+
+Requirement
+    A payload starting with any fault set says so once, in a line of log. A
+    run whose payload was dropping a tenth of its packets should not have to
+    be guessed at from the results afterwards.
 
 Matching
 --------

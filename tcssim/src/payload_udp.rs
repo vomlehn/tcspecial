@@ -12,9 +12,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use rand::Rng;
-
-use crate::payload::{send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats};
+use crate::payload::{
+    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
+};
 
 /// Run UDP payload simulation
 ///
@@ -56,6 +57,9 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
     socket.set_nonblocking(true).ok();
 
     let mut rng = rand::thread_rng();
+    // Packets that have gone, which the faults that are counted rather than
+    // random ask about.
+    let mut sent = 0u64;
 
     while running.load(Ordering::SeqCst) {
         let started = Instant::now();
@@ -77,8 +81,18 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
         // And a packet of its own, asked for or not. Each segment is a
         // datagram, so a packet in four segments arrives as four reads at the
         // handler.
-        if pacing.a_packet_is_due(config.triggered, asked) {
-            let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
+        if pacing.a_packet_is_due(config.triggered, asked)
+                && !ignore_this_request(&config, &mut rng)
+            {
+            let late = lateness(&config, &mut rng);
+            let packet = match a_packet(&config, &pacing, sent, &mut rng) {
+                Produce::Send(packet) => packet,
+                // Dropped, or gone quiet: nothing goes, and nothing
+                // is counted, because nothing moved.
+                Produce::Nothing => Vec::new(),
+            };
+            // However late this one is being made, before it goes.
+            wait_while_running(late, &running);
             let (bytes, whole) = send_in_segments(
                 &packet,
                 pacing.segment_size,
@@ -92,6 +106,7 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
                 guard.bytes_sent += bytes;
                 if whole {
                     guard.packets_sent += 1;
+                    sent += 1;
                 }
             }
         }
@@ -105,6 +120,7 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
+    use crate::sim_config::Faults;
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
 
@@ -135,6 +151,7 @@ mod tests {
             address: at.ip().to_string(),
             port: at.port(),
             bus_address: 0,
+            faults: Default::default(),
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
@@ -183,6 +200,148 @@ mod tests {
         );
     }
 
+    /// A payload at the handler's address, with faults.
+    fn faulty(at: std::net::SocketAddr, faults: Faults) -> SimulatedPayload {
+        SimulatedPayload::new(PayloadConfig {
+            _id: 0,
+            protocol: PayloadProtocol::Udp,
+            address: at.ip().to_string(),
+            port: at.port(),
+            bus_address: 0,
+            triggered: false,
+            faults,
+            packet_size: Arc::new(AtomicU32::new(12)),
+            segment_size: Arc::new(AtomicU32::new(12)),
+            packet_interval_ms: Arc::new(AtomicU32::new(20)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+        })
+    }
+
+    /// A handler's end of the link, waiting with a deadline.
+    fn handler_end(wait: Duration) -> (UdpSocket, std::net::SocketAddr) {
+        let handler = UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
+        let at = handler.local_addr().expect("its address");
+        handler.set_read_timeout(Some(wait)).expect("a read timeout");
+        (handler, at)
+    }
+
+    /// Every packet dropped is a running payload that sends nothing.
+    ///
+    /// Which is the point of the fault: the simulator is up, the handler is
+    /// started, the link is fine, and the data does not come. Nothing is
+    /// counted either -- a dropped packet never existed, so counting it as
+    /// sent would make the statistics disagree with the handler's about what
+    /// moved, and the statistics are what tell the two apart.
+    #[test]
+    fn a_payload_dropping_everything_sends_nothing() {
+        let (handler, at) = handler_end(Duration::from_millis(500));
+        let mut payload = faulty(
+            at,
+            Faults {
+                drop_percent: 100,
+                ..Faults::default()
+            },
+        );
+        payload.start().expect("the payload starts");
+
+        // Many packet intervals' worth of waiting.
+        let mut buf = [0u8; 64];
+        let heard = handler.recv_from(&mut buf);
+        let stats = payload.stats();
+        payload.stop();
+
+        assert!(
+            heard.is_err(),
+            "a payload dropping every packet sent {:?}",
+            heard.map(|(n, _)| n)
+        );
+        assert_eq!(
+            (stats.packets_sent, stats.bytes_sent),
+            (0, 0),
+            "a dropped packet was counted as sent"
+        );
+    }
+
+    /// A truncated packet arrives short, and arrives.
+    ///
+    /// The handler is left holding part of a packet, which is the case its
+    /// own framing has to notice. Short and never empty: a packet of nothing
+    /// is the dropping fault rather than this one, and a handler that saw an
+    /// empty datagram would be reading a different fault than the one asked
+    /// for.
+    #[test]
+    fn a_truncated_packet_arrives_short_of_its_size() {
+        let (handler, at) = handler_end(Duration::from_secs(5));
+        let mut payload = faulty(
+            at,
+            Faults {
+                truncate_percent: 100,
+                ..Faults::default()
+            },
+        );
+        payload.start().expect("the payload starts");
+
+        // A segment size equal to the packet size makes each packet one
+        // datagram, so a datagram's length is a packet's length.
+        let mut buf = [0u8; 64];
+        let mut lengths = Vec::new();
+        while lengths.len() < 5 {
+            let (n, _) = handler.recv_from(&mut buf).expect("a packet");
+            lengths.push(n);
+        }
+        payload.stop();
+
+        assert!(
+            lengths.iter().all(|&n| (1..12).contains(&n)),
+            "a truncated packet of twelve bytes arrived as {lengths:?}: every one \
+             of these should be short of twelve and none of them empty"
+        );
+    }
+
+    /// A payload told to go quiet after so many packets goes quiet, and stays
+    /// that way.
+    ///
+    /// The link is still up and the handler is still waiting: what a stopped
+    /// instrument looks like from the other end, and what a handler reporting
+    /// no data has to be told apart from a handler that was never started.
+    #[test]
+    fn a_payload_going_silent_sends_that_many_and_no_more() {
+        let (handler, at) = handler_end(Duration::from_secs(5));
+        let mut payload = faulty(
+            at,
+            Faults {
+                silent_after: 3,
+                ..Faults::default()
+            },
+        );
+        payload.start().expect("the payload starts");
+
+        let mut buf = [0u8; 64];
+        for which in 1..=3 {
+            handler
+                .recv_from(&mut buf)
+                .unwrap_or_else(|e| panic!("packet {which} of three never came: {e}"));
+        }
+
+        // Then silence, for many more intervals than the three took.
+        handler
+            .set_read_timeout(Some(Duration::from_millis(400)))
+            .expect("a read timeout");
+        let after = handler.recv_from(&mut buf);
+        let stats = payload.stats();
+        payload.stop();
+
+        assert!(
+            after.is_err(),
+            "a payload silent after three packets sent a fourth"
+        );
+        assert_eq!(
+            stats.packets_sent, 3,
+            "a payload silent after three packets sent {}",
+            stats.packets_sent
+        );
+    }
+
     /// Stop stops it. The sending is what Start began and what Stop ends, so
     /// nothing arrives afterwards however long the handler's end waits.
     #[test]
@@ -199,6 +358,7 @@ mod tests {
             address: at.ip().to_string(),
             port: at.port(),
             bus_address: 0,
+            faults: Default::default(),
             packet_size: Arc::new(AtomicU32::new(8)),
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(50)),

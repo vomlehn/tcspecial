@@ -32,7 +32,7 @@ use std::fmt;
 use std::path::Path;
 
 use serde::Deserialize;
-use tcslibgs::{load_config_file, DHConfig, TcsResult};
+use tcslibgs::{load_config_file, DHConfig, EndpointConfig, NetworkProtocol, TcsResult};
 
 /// What can be wrong with a simulator configuration, once it has parsed.
 ///
@@ -60,6 +60,18 @@ pub enum SimConfigError {
     /// A triggered payload was given a packet interval, which it has nothing
     /// to do with: it sends when it is asked.
     IntervalForATriggeredPayload { payload: String },
+    /// A percentage outside nought to a hundred.
+    NotAPercentage {
+        payload: String,
+        setting: &'static str,
+        given: u32,
+    },
+    /// A fault a payload of this kind cannot have.
+    FaultForTheWrongPayload {
+        payload: String,
+        fault: &'static str,
+        why: &'static str,
+    },
 }
 
 impl fmt::Display for SimConfigError {
@@ -97,6 +109,21 @@ impl fmt::Display for SimConfigError {
                  or in the group it names",
                 payload
             ),
+            SimConfigError::NotAPercentage {
+                payload,
+                setting,
+                given,
+            } => write!(
+                f,
+                "simulated payload \"{}\" gives {} as {}, which is a percentage: \
+                 nought to a hundred",
+                payload, given, setting
+            ),
+            SimConfigError::FaultForTheWrongPayload { payload, fault, why } => write!(
+                f,
+                "simulated payload \"{}\" asks for {}, which it cannot have: {}",
+                payload, fault, why
+            ),
             SimConfigError::IntervalForATriggeredPayload { payload } => write!(
                 f,
                 "simulated payload \"{}\" is triggered, so it sends when tcspecial \
@@ -110,6 +137,39 @@ impl fmt::Display for SimConfigError {
 }
 
 impl std::error::Error for SimConfigError {}
+
+/// A percentage, or the complaint that it is not one.
+fn a_percentage(
+    payload: &str,
+    setting: &'static str,
+    given: Option<u32>,
+) -> Result<u32, SimConfigError> {
+    match given {
+        None => Ok(0),
+        Some(percent) if percent <= 100 => Ok(percent),
+        Some(given) => Err(SimConfigError::NotAPercentage {
+            payload: payload.to_string(),
+            setting,
+            given,
+        }),
+    }
+}
+
+/// Whether a payload of this kind has a connection it could close.
+///
+/// A stream has one: the handler connects and the payload may hang up. A
+/// datagram socket has none, and the kinds the handler opens rather than
+/// connects to -- a device, a bus, a line -- have nothing to hang up either.
+fn has_a_connection(endpoint: &EndpointConfig) -> bool {
+    matches!(
+        endpoint,
+        EndpointConfig::Network(net)
+            if matches!(
+                net.protocol,
+                NetworkProtocol::Tcp | NetworkProtocol::UnixStream
+            )
+    )
+}
 
 /// Settings a group or a simulated payload may state.
 ///
@@ -128,6 +188,49 @@ pub struct SimSettings {
     /// size the payload configuration gives the data handler.
     #[serde(default)]
     pub segment_size: Option<u32>,
+
+    // What the payload does wrong, which is the whole reason a simulator is
+    // better than the hardware for some of what it is used for. None of this
+    // has any business in a payload configuration: a payload file describing
+    // a payload that drops packets would be describing hardware nobody would
+    // fly. Every one of them is off when it is absent, so a file that says
+    // nothing about faults describes a payload that works.
+    /// Packets in a hundred that are not sent at all.
+    #[serde(default)]
+    pub drop_percent: Option<u32>,
+    /// Packets in a hundred that go out with a byte of them altered.
+    #[serde(default)]
+    pub corrupt_percent: Option<u32>,
+    /// Packets in a hundred that go out short of their packet size.
+    #[serde(default)]
+    pub truncate_percent: Option<u32>,
+    /// How much later than it should a packet may be, in milliseconds.
+    ///
+    /// Late and never early: a packet sent before the interval the file asked
+    /// for would be the simulator disobeying its own configuration. For a
+    /// payload that answers requests this is the delay before an answer
+    /// rather than an addition to an interval, there being no interval.
+    #[serde(default)]
+    pub jitter_ms: Option<u32>,
+    /// Packets after which the payload stops sending, while staying
+    /// connected.
+    ///
+    /// A payload that has gone quiet without going away, which is what a
+    /// wedged instrument looks like from the handler's end and is harder to
+    /// notice than one that has closed.
+    #[serde(default)]
+    pub silent_after: Option<u64>,
+    /// Packets after which the payload closes the link.
+    ///
+    /// Only for the kinds that have a connection to close.
+    #[serde(default)]
+    pub close_after: Option<u64>,
+    /// Requests in a hundred that a triggered payload does not answer.
+    ///
+    /// What exercises a handler's own waiting: a trigger sent and nothing
+    /// returned is the case a response timeout exists for.
+    #[serde(default)]
+    pub ignore_trigger_percent: Option<u32>,
 }
 
 impl SimSettings {
@@ -138,6 +241,15 @@ impl SimSettings {
             packet_interval_ms: self.packet_interval_ms.or(base.packet_interval_ms),
             segment_interval_ms: self.segment_interval_ms.or(base.segment_interval_ms),
             segment_size: self.segment_size.or(base.segment_size),
+            drop_percent: self.drop_percent.or(base.drop_percent),
+            corrupt_percent: self.corrupt_percent.or(base.corrupt_percent),
+            truncate_percent: self.truncate_percent.or(base.truncate_percent),
+            jitter_ms: self.jitter_ms.or(base.jitter_ms),
+            silent_after: self.silent_after.or(base.silent_after),
+            close_after: self.close_after.or(base.close_after),
+            ignore_trigger_percent: self
+                .ignore_trigger_percent
+                .or(base.ignore_trigger_percent),
         }
     }
 }
@@ -196,6 +308,33 @@ pub struct ResolvedSim {
     /// Whether this payload answers requests rather than sending on its own,
     /// which the payload configuration decides and this file may not.
     pub triggered: bool,
+    /// What this payload does wrong. All zero for one that works.
+    pub faults: Faults,
+}
+
+/// The ways a simulated payload is asked to misbehave.
+///
+/// Zero is off throughout, so the default is a payload that works: a file
+/// that says nothing about faults gets none, which is what every simulator
+/// configuration written before these existed asked for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Faults {
+    pub drop_percent: u32,
+    pub corrupt_percent: u32,
+    pub truncate_percent: u32,
+    pub jitter_ms: u32,
+    pub silent_after: u64,
+    pub close_after: u64,
+    pub ignore_trigger_percent: u32,
+}
+
+impl Faults {
+    /// Whether anything at all is being injected, which is worth one line of
+    /// log when a payload starts: a run whose payload was dropping a tenth of
+    /// its packets should not have to be guessed at afterwards.
+    pub fn any(&self) -> bool {
+        *self != Faults::default()
+    }
 }
 
 impl SimConfigFile {
@@ -295,6 +434,53 @@ impl SimConfigFile {
                     .segment_size
                     .unwrap_or_else(|| u32::try_from(dh.packet_size).unwrap_or(u32::MAX));
 
+                // What this payload is asked to do wrong, and whether it is
+                // a payload that could do it. A percentage above a hundred is
+                // a misunderstanding rather than a severe fault, and a fault
+                // a kind cannot have is a setting that would govern nothing.
+                let faults = Faults {
+                    drop_percent: a_percentage(&payload.name, "drop_percent",
+                        settings.drop_percent)?,
+                    corrupt_percent: a_percentage(&payload.name, "corrupt_percent",
+                        settings.corrupt_percent)?,
+                    truncate_percent: a_percentage(&payload.name, "truncate_percent",
+                        settings.truncate_percent)?,
+                    jitter_ms: settings.jitter_ms.unwrap_or(0),
+                    silent_after: settings.silent_after.unwrap_or(0),
+                    close_after: settings.close_after.unwrap_or(0),
+                    ignore_trigger_percent: a_percentage(
+                        &payload.name,
+                        "ignore_trigger_percent",
+                        settings.ignore_trigger_percent,
+                    )?,
+                };
+
+                // A payload that is not asked for anything has no requests to
+                // ignore, and the setting would sit there looking as though
+                // it did something.
+                if faults.ignore_trigger_percent > 0 && !triggered {
+                    return Err(SimConfigError::FaultForTheWrongPayload {
+                        payload: payload.name.clone(),
+                        fault: "ignore_trigger_percent",
+                        why: "this payload sends on its own, so it is never asked \
+                              for anything to ignore",
+                    });
+                }
+
+                // And closing a link needs a link that can be closed. A
+                // datagram socket has none, and a device, a bus or a
+                // pseudo-terminal is opened by the handler rather than
+                // connected to.
+                if faults.close_after > 0 && !has_a_connection(&dh.endpoint) {
+                    return Err(SimConfigError::FaultForTheWrongPayload {
+                        payload: payload.name.clone(),
+                        fault: "close_after",
+                        why: "this payload has no connection to close: only a \
+                              stream has one, where the handler connects and the \
+                              payload may hang up",
+                    });
+                }
+
                 Ok(ResolvedSim {
                     packet_interval_ms,
                     segment_interval_ms: settings
@@ -302,6 +488,7 @@ impl SimConfigFile {
                         .unwrap_or(packet_interval_ms),
                     segment_size,
                     triggered,
+                    faults,
                 })
             })
             .collect::<Result<_, SimConfigError>>()?;
@@ -380,6 +567,7 @@ simulated_payloads:
                 // Unstated, so a packet is one segment.
                 segment_size: 12,
                 triggered: false,
+                faults: Default::default(),
             }
         );
     }
@@ -498,6 +686,99 @@ simulated_payloads:
                 group: "nonesuch".to_string(),
             })
         );
+    }
+
+    /// The faults are the simulator's alone, and are checked for being
+    /// possible before a run is started on them.
+    #[test]
+    fn a_fault_is_checked_before_a_run_is_started_on_it() {
+        // A percentage is nought to a hundred. Anything else is a
+        // misunderstanding rather than a severe fault.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n    \
+             drop_percent: 150\n",
+        );
+        let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
+        let said = format!("{e}");
+        assert!(
+            said.contains("percentage") && said.contains("150"),
+            "{said}"
+        );
+
+        // A payload that sends on its own is never asked for anything, so it
+        // has no request to ignore.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n    \
+             ignore_trigger_percent: 50\n",
+        );
+        let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
+        let said = format!("{e}");
+        assert!(
+            said.contains("ignore_trigger_percent") && said.contains("sends on its own"),
+            "{said}"
+        );
+
+        // And hanging up needs a link to hang up. handler() makes a UDP
+        // payload, which has none.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n    \
+             close_after: 10\n",
+        );
+        let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
+        let said = format!("{e}");
+        assert!(
+            said.contains("close_after") && said.contains("no connection to close"),
+            "{said}"
+        );
+    }
+
+    /// The faults a file states reach the payload, and a group carries them
+    /// for the payloads that share them.
+    #[test]
+    fn the_faults_reach_the_payload_through_its_group() {
+        let stream = |name: &str| DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new(name),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: "localhost".to_string(),
+                port: 5000,
+            }),
+            packet_size: 4,
+            oc: None,
+            mode: DHMode::Periodic,
+        };
+
+        let file = parse(
+            "simulated_payload_groups:\n  - name: flaky\n    packet_interval_ms: 100\n    \
+             drop_percent: 10\n    jitter_ms: 25\n\
+             simulated_payloads:\n  - name: DH0\n    group: flaky\n    \
+             close_after: 7\n",
+        );
+
+        let resolved = file.resolve(&[stream("DH0")]).expect("resolves");
+        assert_eq!(
+            resolved[0].faults,
+            Faults {
+                drop_percent: 10,
+                jitter_ms: 25,
+                close_after: 7,
+                ..Faults::default()
+            },
+            "a payload takes its group's faults and states its own beside them"
+        );
+        assert!(resolved[0].faults.any());
+    }
+
+    /// A file that says nothing about faults asks for a payload that works,
+    /// which is what every simulator configuration written before these
+    /// existed asked for.
+    #[test]
+    fn a_file_with_no_faults_asks_for_a_payload_that_works() {
+        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n");
+        let resolved = file.resolve(&[handler("DH0", 4)]).expect("resolves");
+        assert_eq!(resolved[0].faults, Faults::default());
+        assert!(!resolved[0].faults.any());
     }
 
     /// A triggered payload takes no interval here, and a periodic one must

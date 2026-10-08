@@ -107,6 +107,7 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
     Ok(PayloadConfig {
         bus_address,
         triggered: dh.mode.polling().is_some(),
+        faults: sim.faults,
         _id: dh.dh_id.0,
         protocol,
         address,
@@ -162,6 +163,7 @@ mod tests {
             segment_interval_ms,
             segment_size,
             triggered: false,
+            faults: Default::default(),
         }
     }
 

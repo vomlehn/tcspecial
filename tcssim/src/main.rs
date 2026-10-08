@@ -474,6 +474,7 @@ mod tests {
             segment_interval_ms,
             segment_size,
             triggered: false,
+            faults: Default::default(),
         }
     }
 

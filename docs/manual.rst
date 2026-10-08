@@ -263,6 +263,56 @@ reads this.
    segment_size           bytes in one segment; defaults to the whole packet,
                           whose size the payload file gives
 
+**Fault injection**
+
+A payload that always works exercises only the path where everything works.
+These settings have a simulated payload misbehave on purpose, so that a
+handler's counting, framing, timeouts and reconnection can be made to happen
+rather than waited for. Each defaults to no fault, so a file that mentions
+none asks for a payload that works -- which is what every simulator
+configuration written before these existed asks for.
+
+.. code-block:: text
+
+   drop_percent           packets in a hundred that are never sent. A dropped
+                          packet is not counted as sent either, which is what
+                          tells it from one lost on the way
+   corrupt_percent        packets in a hundred with one byte altered. Never
+                          left as it was: a corruption that changed nothing
+                          would be a fault that did not happen
+   truncate_percent       packets in a hundred sent short. Always shorter than
+                          the packet size and never empty; a packet of one
+                          byte cannot be shortened and goes whole
+   jitter_ms              milliseconds a packet may be late, chosen afresh for
+                          each one. Waited out inside the interval rather than
+                          added to it, so the rate is unchanged and the packet
+                          arrives late within it
+   silent_after           packets after which the payload sends no more,
+                          leaving its link open; 0 is never. What a wedged
+                          instrument looks like from the handler's end
+   close_after            packets after which the payload hangs up and then
+                          listens again, so the handler has to reconnect;
+                          0 is never. Streams only -- tcp and unix_stream
+   ignore_trigger_percent requests in a hundred a triggered payload leaves
+                          unanswered, which is what a handler's response
+                          timeout exists for. Triggered payloads only
+
+The percentages are nought to a hundred; a larger number is an error naming
+the setting and the value. A fault the payload could not have is an error too:
+``close_after`` for anything but a stream, and ``ignore_trigger_percent`` for a
+payload that sends on its own. Faults belong in this file alone -- a payload
+configuration file describes what a payload is meant to do, and tcspecial reads
+it. A payload that starts with any fault set says so in one line of log, so a
+run is not left to be guessed at afterwards.
+
+.. code-block:: yaml
+
+   simulated_payloads:
+     - name: DH0
+       packet_interval_ms: 500
+       drop_percent: 10        # one packet in ten never arrives
+       jitter_ms: 50           # and the rest are up to 50ms late
+
 The two files are joined by name. Every data handler of the payload file needs
 a simulated payload naming it, and a name here that no handler has is an error
 rather than a line with no effect, because a typo is otherwise

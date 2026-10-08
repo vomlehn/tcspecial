@@ -70,7 +70,10 @@ pub enum SimConfigError {
     NoPacketInterval { payload: String },
     /// A triggered payload was given a packet interval, which it has nothing
     /// to do with: it sends when it is asked.
-    IntervalForATriggeredPayload { payload: String },
+    IntervalForATriggeredPayload {
+        payload: String,
+        setting: &'static str,
+    },
     /// A percentage outside nought to a hundred.
     NotAPercentage {
         payload: String,
@@ -296,13 +299,13 @@ impl fmt::Display for SimConfigError {
                  nothing else states",
                 what, name, given
             ),
-            SimConfigError::IntervalForATriggeredPayload { payload } => write!(
+            SimConfigError::IntervalForATriggeredPayload { payload, setting } => write!(
                 f,
                 "simulated payload \"{}\" is triggered, so it sends when tcspecial \
-                 asks and has no interval of its own: the trigger and how often it \
-                 is sent are in the payload configuration, and nothing about the \
-                 timing of this payload belongs here",
-                payload
+                 asks and has no timing of its own: {} belongs to a payload that \
+                 sends on its own, and the rate a triggered one is asked at is \
+                 packet_interval_ms in the payload configuration",
+                payload, setting
             ),
         }
     }
@@ -845,10 +848,29 @@ impl SimConfigFile {
                 // the file that gave it has not understood which kind of
                 // payload it is simulating.
                 let triggered = dh.mode.polling().is_some();
+                // Neither interval belongs to a payload that answers
+                // requests: it sends when it is asked, so a rate here would
+                // govern nothing, and the segments of one answer go as fast
+                // as they can.
+                if triggered {
+                    for (setting, stated) in [
+                        ("packet_interval_ms", settings.packet_interval_ms.is_some()),
+                        ("segment_interval_ms", settings.segment_interval_ms.is_some()),
+                    ] {
+                        if stated {
+                            return Err(SimConfigError::IntervalForATriggeredPayload {
+                                payload: payload.name.clone(),
+                                setting,
+                            });
+                        }
+                    }
+                }
+
                 let packet_interval_ms = match (triggered, settings.packet_interval_ms) {
                     (true, Some(_)) => {
                         return Err(SimConfigError::IntervalForATriggeredPayload {
                             payload: payload.name.clone(),
+                            setting: "packet_interval_ms",
                         })
                     }
                     (true, None) => 0,
@@ -1615,6 +1637,58 @@ simulated_payloads:
         assert!(!resolved[0].faults.any());
     }
 
+    /// Neither interval belongs to a triggered payload here.
+    ///
+    /// It sends when it is asked, so a packet interval would govern nothing,
+    /// and the segments of one answer go as fast as they can. The rate such a
+    /// payload is asked at is the payload configuration's packet interval,
+    /// which is the whole of the division: one name, in whichever file the
+    /// payload's kind puts it.
+    #[test]
+    fn a_triggered_payload_has_no_timing_here_at_all() {
+        let triggered = |name: &str| DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new(name),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: "localhost".to_string(),
+                port: 5000,
+            }),
+            packet_size: 4,
+            oc: None,
+            mode: DHMode::Triggered {
+                trigger: b"READ\r".to_vec(),
+                interval_ms: 500,
+            },
+        };
+
+        for stated in ["packet_interval_ms: 1000", "segment_interval_ms: 1000"] {
+            let file = parse(&format!(
+                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: tcp\n    {stated}\n"
+            ));
+            let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
+            let named = stated.split(':').next().unwrap();
+            assert!(
+                said.contains(named) && said.contains("packet_interval_ms in the payload"),
+                "{stated}: {said}"
+            );
+        }
+
+        // What such a payload may still say is how it divides an answer:
+        // that is its own business, however it was prompted.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    \
+             segment_size: 2\n",
+        );
+        let resolved = file
+            .resolve(&[triggered("DH0")])
+            .expect("a segment size is not a rate");
+        assert_eq!(resolved[0].segment_size, 2);
+        assert_eq!(resolved[0].packet_interval_ms, 0, "it sends when it is asked");
+        assert_eq!(resolved[0].segment_interval_ms, 0, "and its segments as fast as they can");
+    }
+
     /// A triggered payload takes no interval here, and a periodic one must
     /// have one. Which kind it is, this file does not decide.
     ///
@@ -1635,7 +1709,7 @@ simulated_payloads:
             packet_size: 4,
             oc: None,
             mode: DHMode::Triggered {
-                trigger: "READ".to_string(),
+                trigger: b"READ".to_vec(),
                 interval_ms: 500,
             },
         };

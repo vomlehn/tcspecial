@@ -22,7 +22,7 @@ const WAIT_MS: i32 = 1000;
 /// same place.
 #[derive(Debug, Clone)]
 pub struct Polling {
-    pub trigger: String,
+    pub trigger: Vec<u8>,
     pub interval: Duration,
 }
 
@@ -234,7 +234,7 @@ impl Conduit {
                 // the ground has already sent.
                 if let Some(polling) = &polling {
                     if Instant::now() >= due {
-                        match writer.write(polling.trigger.as_bytes()) {
+                        match writer.write(&polling.trigger) {
                             Ok(written) => count(&stats, |s| {
                                 s.bytes_sent += written as u64;
                                 s.writes_completed += 1;

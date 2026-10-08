@@ -202,7 +202,7 @@ impl DataHandler {
         // on its own. It goes to the conduit that writes the payload, which is
         // the one that already has somewhere to put it.
         let polling = self.config.mode.polling().map(|(trigger, interval_ms)| Polling {
-            trigger: trigger.to_string(),
+            trigger: trigger.to_vec(),
             interval: Duration::from_millis(interval_ms as u64),
         });
         if let Some(polling) = &polling {
@@ -471,7 +471,7 @@ mod tests {
                 port: oc_addr.port(),
             }),
             mode: DHMode::Triggered {
-                trigger: "READ\r".to_string(),
+                trigger: b"READ\r".to_vec(),
                 interval_ms: 50,
             },
         };

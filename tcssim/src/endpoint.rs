@@ -216,7 +216,7 @@ mod tests {
             packet_size: 4,
             oc: None,
             mode: DHMode::Triggered {
-                trigger: "READ".to_string(),
+                trigger: b"READ".to_vec(),
                 interval_ms: 500,
             },
         };
@@ -268,7 +268,7 @@ mod tests {
             packet_size: 8,
             oc: None,
             mode: DHMode::Triggered {
-                trigger: "READ\r".to_string(),
+                trigger: b"READ\r".to_vec(),
                 interval_ms: 500,
             },
         };

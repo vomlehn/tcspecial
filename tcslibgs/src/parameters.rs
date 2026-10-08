@@ -56,8 +56,14 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
             interval_ms,
         } => {
             let _ = writeln!(out, "  mode             triggered, so it answers requests");
-            let _ = writeln!(out, "  trigger          {:?}", trigger);
-            let _ = writeln!(out, "  trigger_interval {interval_ms} ms");
+            // As a file could have written it: a trigger is bytes, and the
+            // notation every trigger can be written in is hexadecimal.
+            let _ = writeln!(
+                out,
+                "  trigger          {}",
+                crate::trigger::trigger_as_written(trigger)
+            );
+            let _ = writeln!(out, "  packet_interval  {interval_ms} ms, the rate its trigger goes out at");
         }
     }
 
@@ -352,7 +358,7 @@ mod tests {
             port: 5000,
         });
         dh.mode = DHMode::Triggered {
-            trigger: "READ\r".to_string(),
+            trigger: b"READ\r".to_vec(),
             interval_ms: 500,
         };
 
@@ -363,13 +369,23 @@ mod tests {
         let shown = payload_parameters(&dh, Some(&sim));
 
         assert!(shown.contains("mode             triggered"), "{shown}");
-        // As the file wrote it, escapes and all: a trigger whose carriage
-        // return was shown as a line break would read as two triggers.
-        assert!(shown.contains(r#"trigger          "READ\r""#), "{shown}");
-        assert!(shown.contains("trigger_interval 500 ms"), "{shown}");
+        // The bytes, in the notation every trigger can be written in: a
+        // trigger whose carriage return was shown as a line break would read
+        // as two triggers.
+        assert!(
+            shown.contains("trigger          0x52 45 41 44 0D"),
+            "{shown}"
+        );
+        // The rate its trigger goes out at, which is this file's to state.
+        assert!(
+            shown.contains("packet_interval  500 ms, the rate its trigger goes out at"),
+            "{shown}"
+        );
+        // And the simulator file states no rate for such a payload at all.
         assert!(
             shown.contains("packet_interval  none"),
-            "a triggered payload has no rate of its own:\n{shown}"
+            "a triggered payload has no rate of its own in the simulator \
+             file:\n{shown}"
         );
     }
 

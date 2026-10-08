@@ -30,6 +30,7 @@ pub mod protocol;
 /// them.
 pub mod sim_config;
 pub mod telemetry;
+pub mod trigger;
 pub mod types;
 
 pub use commands::*;
@@ -46,4 +47,5 @@ pub use parameters::*;
 pub use protocol::*;
 pub use sim_config::*;
 pub use telemetry::*;
+pub use trigger::*;
 pub use types::*;

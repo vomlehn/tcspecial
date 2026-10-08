@@ -9,6 +9,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::poll::PollFlags;
@@ -30,6 +31,13 @@ impl DeviceEndpoint {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
+            // Not this process's terminal. A device that is a tty -- a real
+            // serial port, or a pty standing in for one -- becomes the
+            // controlling terminal of a process that opens it without this,
+            // and then a read from a background process group raises SIGTTIN
+            // and a hangup raises SIGHUP: a handler stopped or killed for
+            // reasons that have nothing to do with its payload.
+            .custom_flags(libc::O_NOCTTY)
             .open(&config.path)?;
 
         Ok(Self {

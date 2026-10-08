@@ -2404,10 +2404,42 @@ thirty-two is a property of SMBus, and the smaller of the two wins without the
 file being refused.
 
 Requirement
-    A SPI endpoint is refused, naming the handler and where it is. A peripheral
-    has to be clocked by a controller, and there is no pseudo-device for that.
-    Refusing is better than simulating something else at that address, which is
-    what treating it as a plain device amounted to.
+    A simulated payload of a SPI endpoint is a pseudo-terminal, as a serial
+    one is, and carries a peripheral's bytes and none of its clocking.
+
+This is the weakest of the stand-ins and the one place the simulator is openly
+not the thing it stands for. Nothing emulates a SPI peripheral: a peripheral is
+what a controller clocks, and nothing in user space can be clocked. What a pty
+offers is the bytes -- a packet, in its segments, at its pace -- and no clock,
+no mode, no chip select and no word width.
+
+Requirement
+    A handler takes a terminal at the end of a SPI path as a stand-in for a
+    peripheral: it carries bytes on it, says once in the log that it is doing
+    so, and does not apply the configured clocking to it, there being nothing
+    to apply it to. Anything else that is not a spidev node is refused.
+
+The narrowness is the point. A terminal is what a stand-in is, and a handler
+that accepted any node it could open would open a wrongly configured path
+confidently -- which is the fault the kinds were separated to prevent.
+
+What such a link tests is a handler's reading and writing of a peripheral and
+the pacing of a payload that produces data in blocks. What it cannot test is
+whether the peripheral would stand being clocked that way, which is a question
+for the peripheral.
+
+So every kind of endpoint can now be simulated. What cannot are two network
+protocols: a Unix-domain socket of either flavour is refused, which is a
+different thing from a kind that has nothing to be -- the simulator is
+perfectly able to be a Unix socket and has not been taught to.
+
+Requirement
+    A handler opens a payload device with ``O_NOCTTY``. A device that is a
+    terminal -- a real serial port, or a pty standing in for one -- otherwise
+    becomes the controlling terminal of the process that opened it, and then a
+    read from a background process group stops the handler with ``SIGTTIN``
+    and a hangup kills it with ``SIGHUP``, for reasons that have nothing to do
+    with the payload.
 
 The window is built from the two files. Nothing in the GUI names a payload or
 fixes how many there are, so a payload added to or removed from the files adds

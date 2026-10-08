@@ -16,6 +16,8 @@
 //!   leads to
 //! * [`crate::payload_i2c`] -- a device on a bus, which is a chip of the
 //!   kernel's `i2c-stub`
+//! * [`crate::payload_spi`] -- a peripheral, which is a pty again: the bytes
+//!   of one, and none of its clocking
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -56,6 +58,10 @@ pub enum PayloadProtocol {
     /// A device on an I2C bus, which the simulator stands in for with the
     /// kernel's `i2c-stub`: see [`crate::payload_i2c`].
     I2c,
+    /// A SPI peripheral, which the simulator stands in for with a pty -- the
+    /// bytes but not the clocking, there being nothing that emulates a
+    /// peripheral: see [`crate::payload_spi`].
+    Spi,
 }
 
 /// Statistics for a payload
@@ -109,6 +115,9 @@ impl SimulatedPayload {
                 }
                 PayloadProtocol::I2c => {
                     crate::payload_i2c::run_i2c_payload(config, running, stats)
+                }
+                PayloadProtocol::Spi => {
+                    crate::payload_spi::run_spi_payload(config, running, stats)
                 }
             }
         });

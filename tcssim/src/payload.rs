@@ -42,6 +42,12 @@ pub struct PayloadConfig {
     /// kinds that are not on one. Not the `port`, which a bus has not, and
     /// not the `address`, which for a bus is the bus itself.
     pub bus_address: u16,
+    /// Whether this payload answers requests rather than sending on its own.
+    ///
+    /// From the payload configuration, not the simulator's: which kind of
+    /// payload a payload is, is a property of the payload. A triggered one
+    /// sends one packet for each trigger it is sent, and nothing otherwise.
+    pub triggered: bool,
     pub packet_size: Arc<AtomicU32>,
     pub segment_size: Arc<AtomicU32>,
     pub packet_interval_ms: Arc<AtomicU32>,
@@ -343,6 +349,21 @@ impl Pacing {
     pub(crate) fn produces(&self) -> bool {
         !self.packet_interval.is_zero()
     }
+
+    /// Whether a packet is due now.
+    ///
+    /// For a payload that sends on its own, every pass of its loop: the
+    /// interval is waited out at the end of the pass rather than tested here.
+    /// For one that answers requests, exactly when a request has arrived --
+    /// `asked` being the bytes just read -- so that a trigger is answered once
+    /// and silence is answered not at all.
+    pub(crate) fn a_packet_is_due(&self, triggered: bool, asked: usize) -> bool {
+        if triggered {
+            asked > 0
+        } else {
+            self.produces()
+        }
+    }
 }
 
 /// Wait out what is left of the packet interval after a packet has gone.
@@ -527,6 +548,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),
             segment_interval_ms: Arc::new(AtomicU32::new(1000)),
+            triggered: false,
         };
 
         assert_eq!(config.address, "127.0.0.1");

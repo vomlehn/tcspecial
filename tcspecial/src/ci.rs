@@ -481,6 +481,7 @@ mod tests {
             // No OC address: a handler that were started would fail for want
             // of one, and nothing here should get that far.
             oc: None,
+                    mode: Default::default(),
         };
 
         let mut ci = CommandInterpreter::new(
@@ -553,6 +554,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+                    mode: Default::default(),
         };
 
         let mut ci = CommandInterpreter::new(
@@ -655,6 +657,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+                    mode: Default::default(),
         };
 
         let mut ci = CommandInterpreter::new(

@@ -108,11 +108,75 @@ share.
    oc_address     the host this handler exchanges payload data with the
                   OC on, which is always UDP
    oc_port        the port it does so on
+   mode           periodic | triggered; absent is periodic
+   trigger        what to send to make the payload answer     triggered only
+   trigger_interval_ms
+                  how often to send it                        triggered only
 
 ``dh_id`` and ``name`` belong to a handler and never to a group: they are what
 tell one handler of a group from another. An OC address and an OC port are
 given together or not at all, and a handler needs them before it can be
 started.
+
+The two kinds of payload
+------------------------
+A payload either sends of its own accord or answers a request, and which it is
+decides where its timing is written down.
+
+**periodic** -- the payload sends and tcspecial reads. Nothing here says when:
+how fast a simulated one produces data is a property of the simulation, so the
+interval is in the simulator file. A periodic payload takes no ``trigger`` and
+no ``trigger_interval_ms``.
+
+**triggered** -- tcspecial sends a request and the payload answers. Both the
+request and how often it goes out are here, because tcspecial does the sending
+and what to send comes from the payload's interface document. The simulator
+file states no interval for such a payload at all.
+
+.. code-block:: yaml
+
+   data_handlers:
+     # Sends on its own: nothing here about timing.
+     - dh_id: 0
+       name: DH0
+       oc_address: 127.0.0.1
+       oc_port: 6000
+       type: network
+       protocol: tcp
+       address: localhost
+       port: 5000
+       packet_size: 12
+
+     # Answers a request: both halves of the request are here. The trigger's
+     # bytes go out as written, so the carriage return its interface asks for
+     # is written as one -- in double quotes, where \r is the character it
+     # names.
+     - dh_id: 1
+       name: DH1
+       oc_address: 127.0.0.1
+       oc_port: 6001
+       type: network
+       protocol: tcp
+       address: localhost
+       port: 5001
+       packet_size: 12
+       mode: triggered
+       trigger: "READ\r"
+       trigger_interval_ms: 500
+
+A file that mixes the two is refused rather than run, in either direction: a
+periodic payload carrying a trigger, or a triggered one with no interval, has
+not said which kind of payload it describes, and either guess would operate it
+in a way nobody asked for.
+
+A datagram payload -- ``udp`` or ``unix_dgram`` -- cannot be triggered. Its
+handler learns where to send from the payload's first packet, so there is
+nowhere to send a request until the payload has spoken, which a triggered
+payload does not do.
+
+Tcspecial counts the triggers it sends apart from the data it carries, which
+``QUERY_DH`` reports: a handler whose triggers climb while nothing arrives is
+one whose payload is not answering.
 
 Only ``network`` and ``device`` handlers can be described this way. A serial
 line, an I\ :superscript:`2`\ C bus or a SPI peripheral has terms this format
@@ -191,7 +255,9 @@ reads this.
 .. code-block:: text
 
    packet_interval_ms     milliseconds between packets; 0 is as fast as the
-                          payload can be driven
+                          payload can be driven. Periodic payloads only: a
+                          triggered one sends when it is asked, and stating
+                          an interval for one is an error
    segment_interval_ms    milliseconds between the segments of one packet;
                           defaults to the packet interval
    segment_size           bytes in one segment; defaults to the whole packet,
@@ -201,6 +267,14 @@ The two files are joined by name. Every data handler of the payload file needs
 a simulated payload naming it, and a name here that no handler has is an error
 rather than a line with no effect, because a typo is otherwise
 indistinguishable from a payload meant to be left out.
+
+A simulated triggered payload sends one packet for each request it is sent and
+nothing otherwise. The segment settings still apply to it -- how a payload
+divides an answer is its own business however it was prompted -- but the packet
+interval does not, and is refused. Two kinds cannot be asked at all and are
+refused outright: a device, which tcspecial opens and reads directly, and a
+device on a bus, where the master's own read is the request and a second master
+cannot see it.
 
 This is the shipped ``payload1sim.yaml``.
 

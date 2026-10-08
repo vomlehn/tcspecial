@@ -57,6 +57,9 @@ pub enum SimConfigError {
     UnusedGroup { group: String },
     /// Neither a simulated payload nor its group states a packet interval.
     NoPacketInterval { payload: String },
+    /// A triggered payload was given a packet interval, which it has nothing
+    /// to do with: it sends when it is asked.
+    IntervalForATriggeredPayload { payload: String },
 }
 
 impl fmt::Display for SimConfigError {
@@ -92,6 +95,14 @@ impl fmt::Display for SimConfigError {
                 f,
                 "simulated payload \"{}\" has no packet interval: state one for it \
                  or in the group it names",
+                payload
+            ),
+            SimConfigError::IntervalForATriggeredPayload { payload } => write!(
+                f,
+                "simulated payload \"{}\" is triggered, so it sends when tcspecial \
+                 asks and has no interval of its own: the trigger and how often it \
+                 is sent are in the payload configuration, and nothing about the \
+                 timing of this payload belongs here",
                 payload
             ),
         }
@@ -173,9 +184,18 @@ pub struct SimConfigFile {
 /// group stated them, or they follow from the handler's packet size.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedSim {
+    /// Milliseconds between packets, for a payload that sends on its own.
+    ///
+    /// Zero for a triggered payload, which sends when it is asked and at no
+    /// rate of its own: there is nothing for an interval to mean, which is
+    /// why stating one in this file for such a payload is an error rather
+    /// than a setting that happens not to be used.
     pub packet_interval_ms: u32,
     pub segment_interval_ms: u32,
     pub segment_size: u32,
+    /// Whether this payload answers requests rather than sending on its own,
+    /// which the payload configuration decides and this file may not.
+    pub triggered: bool,
 }
 
 impl SimConfigFile {
@@ -247,11 +267,27 @@ impl SimConfigFile {
                     None => payload.settings.clone(),
                 };
 
-                let packet_interval_ms = settings.packet_interval_ms.ok_or_else(|| {
-                    SimConfigError::NoPacketInterval {
-                        payload: payload.name.clone(),
+                // Which kind of payload this is was settled by the payload
+                // configuration, and decides whether an interval here means
+                // anything. A triggered payload sends when it is asked: an
+                // interval for one is a setting with nothing to govern, and
+                // the file that gave it has not understood which kind of
+                // payload it is simulating.
+                let triggered = dh.mode.polling().is_some();
+                let packet_interval_ms = match (triggered, settings.packet_interval_ms) {
+                    (true, Some(_)) => {
+                        return Err(SimConfigError::IntervalForATriggeredPayload {
+                            payload: payload.name.clone(),
+                        })
                     }
-                })?;
+                    (true, None) => 0,
+                    (false, Some(interval)) => interval,
+                    (false, None) => {
+                        return Err(SimConfigError::NoPacketInterval {
+                            payload: payload.name.clone(),
+                        })
+                    }
+                };
 
                 // A packet is one segment unless the file divides it, and
                 // segments arrive at the packet rate unless it says otherwise.
@@ -265,6 +301,7 @@ impl SimConfigFile {
                         .segment_interval_ms
                         .unwrap_or(packet_interval_ms),
                     segment_size,
+                    triggered,
                 })
             })
             .collect::<Result<_, SimConfigError>>()?;
@@ -295,7 +332,9 @@ impl SimConfigFile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::{DHId, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol};
+    use tcslibgs::{
+        DHId, DHMode, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol,
+    };
 
     fn handler(name: &str, packet_size: usize) -> DHConfig {
         DHConfig {
@@ -308,6 +347,7 @@ mod tests {
             }),
             packet_size,
             oc: None,
+            mode: Default::default(),
         }
     }
 
@@ -339,6 +379,7 @@ simulated_payloads:
                 segment_interval_ms: 250,
                 // Unstated, so a packet is one segment.
                 segment_size: 12,
+                triggered: false,
             }
         );
     }
@@ -457,6 +498,56 @@ simulated_payloads:
                 group: "nonesuch".to_string(),
             })
         );
+    }
+
+    /// A triggered payload takes no interval here, and a periodic one must
+    /// have one. Which kind it is, this file does not decide.
+    ///
+    /// The division is the point: how fast tcspecial polls a payload is
+    /// flight behaviour and is written in the payload configuration, while
+    /// how fast a simulated payload produces data of its own is a choice
+    /// about the simulation and is written here. A file that stated an
+    /// interval for a triggered payload would be making a choice it does not
+    /// have, and the setting would govern nothing.
+    #[test]
+    fn a_triggered_payload_takes_no_interval_here() {
+        let triggered = |name: &str| DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new(name),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 4,
+            oc: None,
+            mode: DHMode::Triggered {
+                trigger: "READ".to_string(),
+                interval_ms: 500,
+            },
+        };
+
+        // Stated, and refused in terms of where it belongs.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 1000\n",
+        );
+        let e = file.resolve(&[triggered("DH0")]).unwrap_err();
+        let said = format!("{e}");
+        assert!(
+            said.contains("payload configuration") && said.contains("triggered"),
+            "{said}"
+        );
+
+        // Not stated, which is what a triggered payload's settings look like:
+        // the segment settings still apply, since how a payload divides an
+        // answer is its own business.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    segment_size: 2\n",
+        );
+        let resolved = file
+            .resolve(&[triggered("DH0")])
+            .expect("a triggered payload needs no interval");
+        assert!(resolved[0].triggered);
+        assert_eq!(resolved[0].packet_interval_ms, 0, "it sends when it is asked");
+        assert_eq!(resolved[0].segment_size, 2);
     }
 
     #[test]

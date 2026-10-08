@@ -31,6 +31,7 @@ fn stub_statistics() -> Statistics {
         bytes_sent: 44,
         writes_completed: 55,
         writes_failed: 66,
+        triggers_sent: 77,
     }
 }
 

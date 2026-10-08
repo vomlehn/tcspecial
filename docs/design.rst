@@ -1265,6 +1265,14 @@ data handlers
 +---------------------+--------+---------------------------------------------+
 | oc_port             | number | Port it does so on                          |
 +---------------------+--------+---------------------------------------------+
+| mode                | string | ``periodic`` or ``triggered``. Absent is    |
+|                     |        | periodic                                    |
++---------------------+--------+---------------------------------------------+
+| trigger             | string | What to send to make the payload answer.    |
+|                     |        | Triggered only                              |
++---------------------+--------+---------------------------------------------+
+| trigger_interval_ms | number | How often to send it. Triggered only        |
++---------------------+--------+---------------------------------------------+
 
 A group states any of these; a data handler states any of these plus its
 ``dh_id``, its ``name``, and the ``group`` it takes attributes from.
@@ -1284,6 +1292,61 @@ Requirement
     starting a handler needs one, so a file describing payloads is complete
     without it and a handler without one is refused at the point it would be
     started.
+
+How a Payload Is Made to Send
+-----------------------------
+Payloads are generally one of two kinds, and which kind a payload is decides
+where the timing of it is written down.
+
+Requirement
+    A payload is periodic or triggered, and says which. A file that says
+    neither describes a periodic payload, which is both the commoner kind and
+    what every payload file written before there was a mode describes.
+
+Requirement
+    A periodic payload sends of its own accord and tcspecial reads what
+    arrives. It states no trigger and no trigger interval: there is nothing to
+    send it, and how fast a simulated one produces data is a property of the
+    simulation, stated in the simulator configuration file.
+
+Requirement
+    A triggered payload answers a request. It states the trigger to send and
+    how often to send it, both of which are flight behaviour: tcspecial does
+    the sending, and what to send comes from the payload's interface document.
+    Its simulator configuration states no interval at all.
+
+The two sets of attributes are exclusive in both directions, and a file giving
+the wrong one is reported rather than run: either guess about what was meant
+would operate the payload in a way nobody asked for. The exclusion is also
+structural in the Rust the file parses into -- a periodic handler has nowhere
+to put a trigger -- so it cannot be lost downstream of the check.
+
+Requirement
+    A datagram payload cannot be triggered. Its handler learns where to send
+    from the payload's first packet, a datagram's sender being the only
+    statement of where it came from, so there is nowhere to send a trigger
+    until the payload has spoken -- which a triggered payload does not do. A
+    file asking for it is refused rather than left to fail as silence.
+
+Requirement
+    A trigger's bytes go out as the file wrote them. A trigger ending in a
+    carriage return is written with one, in double quotes, where YAML and
+    JSON read ``\r`` and ``\n`` as the characters they name.
+
+Requirement
+    Tcspecial sends a trigger on the conduit that writes the payload, and
+    sends the first one as soon as the handler starts. A payload that answers
+    requests has nothing to say until it has been asked, so waiting out an
+    interval first would be a handler that begins by doing nothing.
+
+Requirement
+    Triggers are counted separately from the data a handler carries. A
+    handler's received and sent are the ground's data in each direction, so
+    the payload side of each conduit is deliberately left out of both -- those
+    are the same bytes seen twice -- and a trigger is a write with no read
+    behind it. Without a count of its own it would appear in no statistic, and
+    a payload that had stopped answering would look exactly like a handler
+    that had stopped asking.
 
 The format has no packet interval. How fast a payload produces packets is a
 property of a simulation rather than of the payload, and belongs to a
@@ -1430,9 +1493,30 @@ Requirement
     names.
 
 Requirement
-    A simulated payload has a packet interval, from itself or from its group. A
-    payload with none is an error rather than a payload driven at a rate nobody
-    chose.
+    A simulated periodic payload has a packet interval, from itself or from
+    its group. One with none is an error rather than a payload driven at a
+    rate nobody chose.
+
+Requirement
+    A simulated triggered payload has no packet interval, and stating one is
+    an error. It sends when tcspecial asks and at no rate of its own, so an
+    interval here would govern nothing -- and a file that gave one has not
+    understood which kind of payload it is simulating. The segment settings
+    still apply: how a payload divides an answer is its own business whichever
+    way it was prompted.
+
+Requirement
+    A simulated triggered payload sends one packet for each request it is
+    sent, and nothing otherwise. A payload that answered on a clock as well
+    would be two kinds at once, and no file could say which rate was which.
+
+Requirement
+    The simulator refuses a triggered payload it cannot hear a request on.
+    Tcspecial opens a device and reads it, so there is nothing for the
+    simulator to be written to; and an I2C master's own read is the trigger,
+    which a second master on the bus cannot see. A payload that answered
+    nothing would look exactly like a handler whose polling had stopped
+    working.
 
 Matching
 --------

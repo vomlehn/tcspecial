@@ -6,10 +6,25 @@ use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
 use tcslibgs::{DHSample, Statistics, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{EndpointReadable, EndpointWritable, WaitResult};
+
+/// How long a conduit waits on its endpoint before looking at anything else.
+const WAIT_MS: i32 = 1000;
+
+/// What a handler sends its payload to get anything back, and how often.
+///
+/// Only a triggered handler has one, and only its ground-to-payload conduit:
+/// the trigger goes the way the ground's data goes, because it goes to the
+/// same place.
+#[derive(Debug, Clone)]
+pub struct Polling {
+    pub trigger: String,
+    pub interval: Duration,
+}
 
 /// Direction of data flow in a conduit
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,12 +122,18 @@ impl Conduit {
     }
 
     /// Start the conduit thread
+    ///
+    /// `polling` is what this conduit sends its payload of its own accord, and
+    /// is given only to the ground-to-payload conduit of a triggered handler.
+    /// Every other conduit only ever copies: it reads one endpoint and writes
+    /// the other, and originates nothing.
     pub fn start(
         &mut self,
         mut reader: Box<dyn EndpointReadable + Send>,
         mut writer: Box<dyn EndpointWritable + Send>,
         cmd_fd: RawFd,
         samples: Arc<Mutex<DHSamples>>,
+        polling: Option<Polling>,
     ) -> TcsResult<()> {
         if self.running.load(Ordering::SeqCst) {
             return Err(TcsError::DataHandler("Conduit already running".to_string()));
@@ -127,9 +148,27 @@ impl Conduit {
         let handle = thread::spawn(move || {
             let mut buffer = vec![0u8; ENDPOINT_BUFFER_SIZE];
 
+            // When the next trigger is due, for a conduit that sends one. Now,
+            // to begin with: a payload that answers requests has nothing to
+            // say until it has been asked, so waiting out an interval first
+            // would be a handler that starts by doing nothing.
+            let mut due = Instant::now();
+
             while running.load(Ordering::SeqCst) {
+                // A conduit that polls waits only as long as the next trigger
+                // allows, so that the interval is the interval rather than the
+                // interval rounded up to the next wait. One that does not poll
+                // keeps the wait it always had.
+                let timeout_ms = match &polling {
+                    None => WAIT_MS,
+                    Some(_) => {
+                        let left = due.saturating_duration_since(Instant::now());
+                        (left.as_millis() as i32).min(WAIT_MS)
+                    }
+                };
+
                 // Wait for I/O or command
-                match reader.wait_for_event(cmd_fd, 1000) {
+                match reader.wait_for_event(cmd_fd, timeout_ms) {
                     Ok(WaitResult::CommandPending) | Ok(WaitResult::Both) => {
                         // Read command byte from pipe
                         let mut cmd_buf = [0u8; 1];
@@ -184,9 +223,29 @@ impl Conduit {
                             }
                         }
                     }
-                    Ok(WaitResult::Timeout) => continue,
+                    Ok(WaitResult::Timeout) => {}
                     Ok(WaitResult::Error) | Err(_) => {
                         break;
+                    }
+                }
+
+                // And then the asking, if this conduit asks. After the copying
+                // rather than before it, so that a trigger never delays data
+                // the ground has already sent.
+                if let Some(polling) = &polling {
+                    if Instant::now() >= due {
+                        match writer.write(polling.trigger.as_bytes()) {
+                            Ok(written) => count(&stats, |s| {
+                                s.bytes_sent += written as u64;
+                                s.writes_completed += 1;
+                                s.triggers_sent += 1;
+                            }),
+                            // A payload that will not take a trigger is one
+                            // that will not be answering either, which its
+                            // failed writes say.
+                            Err(_) => count(&stats, |s| s.writes_failed += 1),
+                        }
+                        due = Instant::now() + polling.interval;
                     }
                 }
             }

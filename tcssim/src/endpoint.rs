@@ -31,19 +31,15 @@ use crate::sim_config::ResolvedSim;
 pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadConfig, String> {
     let (protocol, address, port, bus_address) = match &dh.endpoint {
         EndpointConfig::Network(net) => {
+            // A Unix socket divides as TCP and UDP divide, and which end binds
+            // its path divides with it: the simulator listens at the
+            // configured path for a stream, and sends to it from a path of its
+            // own for a datagram. See payload_unix.
             let protocol = match net.protocol {
                 NetworkProtocol::Tcp => PayloadProtocol::Tcp,
                 NetworkProtocol::Udp => PayloadProtocol::Udp,
-                // The simulator speaks only TCP, UDP, and devices. A Unix
-                // socket handler is a configuration the simulator cannot
-                // stand in for, so say so rather than simulating the wrong
-                // thing.
-                other => {
-                    return Err(format!(
-                        "{} uses {:?}, which the simulator cannot simulate",
-                        dh.name.0, other
-                    ))
-                }
+                NetworkProtocol::UnixStream => PayloadProtocol::UnixStream,
+                NetworkProtocol::UnixDgram => PayloadProtocol::UnixDgram,
             };
             (protocol, net.address.clone(), net.port, 0)
         }
@@ -167,21 +163,39 @@ mod tests {
         assert_eq!(config.segment_interval_ms.load(Ordering::SeqCst), 100);
     }
 
+    /// A Unix socket of either flavour becomes a payload at its path, which
+    /// leaves nothing the simulator refuses.
+    ///
+    /// It used to be refused, and was the last thing that was: not for want of
+    /// anything to be -- a socket is a socket -- but because nobody had
+    /// written it. Which end binds the path still differs by protocol, and
+    /// that is payload_unix's business rather than this one's; what reaches it
+    /// from here is the path and the protocol.
     #[test]
-    fn a_unix_socket_handler_is_refused_rather_than_mis_simulated() {
-        let dh = DHConfig {
-            dh_id: DHId(8),
-            name: DHName::new("DH8"),
-            endpoint: EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::UnixStream,
-                address: "/tmp/dh8".to_string(),
-                port: 0,
-            }),
-            packet_size: 4,
-            oc: None,
-        };
+    fn a_unix_socket_becomes_a_payload_at_its_path() {
+        for (protocol, expected) in [
+            (NetworkProtocol::UnixStream, PayloadProtocol::UnixStream),
+            (NetworkProtocol::UnixDgram, PayloadProtocol::UnixDgram),
+        ] {
+            let dh = DHConfig {
+                dh_id: DHId(8),
+                name: DHName::new("DH8"),
+                endpoint: EndpointConfig::Network(NetworkConfig {
+                    protocol,
+                    address: "/tmp/dh8.sock".to_string(),
+                    port: 0,
+                }),
+                packet_size: 4,
+                oc: None,
+            };
 
-        assert!(payload_config_from(&dh, &sim(250, 250, 4)).is_err());
+            let config =
+                payload_config_from(&dh, &sim(250, 250, 4)).expect("a socket is simulable");
+            assert!(config.protocol == expected, "{protocol:?}");
+            assert_eq!(config.address, "/tmp/dh8.sock");
+            // A Unix socket is named by a path, so its port means nothing.
+            assert_eq!(config.port, 0);
+        }
     }
 
     /// A serial line is a kind the simulator can be: it becomes a payload at
@@ -247,10 +261,9 @@ mod tests {
     ///
     /// It is not the same quality of stand-in as the others, and the file for
     /// it says so: a pty carries a peripheral's bytes and has none of its
-    /// clocking. What is refused now is not a kind but two protocols -- a Unix
-    /// socket, above -- and that is a different thing: there the simulator
-    /// would be standing in for something it is perfectly able to be, and
-    /// simply has not been taught to.
+    /// clocking. With the Unix sockets above, nothing is refused here any
+    /// more -- which puts the burden on each kind's own file to say what its
+    /// stand-in is and is not.
     #[test]
     fn a_spi_peripheral_becomes_a_payload_at_the_configured_path() {
         let dh = DHConfig {

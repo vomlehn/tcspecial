@@ -18,6 +18,8 @@
 //!   kernel's `i2c-stub`
 //! * [`crate::payload_spi`] -- a peripheral, which is a pty again: the bytes
 //!   of one, and none of its clocking
+//! * [`crate::payload_unix`] -- a Unix-domain socket of either flavour, which
+//!   the simulator simply is
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -62,6 +64,12 @@ pub enum PayloadProtocol {
     /// bytes but not the clocking, there being nothing that emulates a
     /// peripheral: see [`crate::payload_spi`].
     Spi,
+    /// A Unix-domain stream, which the simulator listens at: see
+    /// [`crate::payload_unix`].
+    UnixStream,
+    /// A Unix-domain datagram socket, which the simulator sends to from a path
+    /// of its own: see [`crate::payload_unix`].
+    UnixDgram,
 }
 
 /// Statistics for a payload
@@ -118,6 +126,12 @@ impl SimulatedPayload {
                 }
                 PayloadProtocol::Spi => {
                     crate::payload_spi::run_spi_payload(config, running, stats)
+                }
+                PayloadProtocol::UnixStream => {
+                    crate::payload_unix::run_unix_stream_payload(config, running, stats)
+                }
+                PayloadProtocol::UnixDgram => {
+                    crate::payload_unix::run_unix_dgram_payload(config, running, stats)
                 }
             }
         });

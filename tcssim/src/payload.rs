@@ -12,6 +12,8 @@
 //! * [`crate::payload_tcp`] -- a stream the handler connects to
 //! * [`crate::payload_udp`] -- datagrams sent to where the handler waits
 //! * [`crate::payload_device`] -- a device, which produces rather than sends
+//! * [`crate::payload_serial`] -- a line, which is a pty the configured path
+//!   leads to
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
@@ -37,6 +39,9 @@ pub enum PayloadProtocol {
     Tcp,
     Udp,
     Device,
+    /// A serial line, which the simulator stands in for with a pty: see
+    /// [`crate::payload_serial`].
+    Serial,
 }
 
 /// Statistics for a payload
@@ -84,6 +89,9 @@ impl SimulatedPayload {
                 PayloadProtocol::Udp => crate::payload_udp::run_udp_payload(config, running, stats),
                 PayloadProtocol::Device => {
                     crate::payload_device::run_device_payload(config, running, stats)
+                }
+                PayloadProtocol::Serial => {
+                    crate::payload_serial::run_serial_payload(config, running, stats)
                 }
             }
         });

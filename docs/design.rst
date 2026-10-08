@@ -2324,6 +2324,52 @@ Requirement
     misspelled name is otherwise indistinguishable from a payload deliberately
     left out.
 
+Which Kinds Can Be Simulated
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A simulated payload has to be whatever is at the far end of its handler's
+payload endpoint, and the five kinds of endpoint are not equally easy to be.
+
+Requirement
+    A simulated payload of a network endpoint is a socket of the configured
+    protocol. A stream payload listens; a datagram payload sends to where the
+    handler waits.
+
+Requirement
+    A simulated payload of a device endpoint produces data and counts it.
+    Tcspecial opens and reads the device itself, so there is nothing for the
+    simulator to write to and the pacing is the whole of the behaviour.
+
+Requirement
+    A simulated payload of a serial endpoint is a pseudo-terminal. Its slave
+    is a device file with a line discipline behind it, so the handler opens it,
+    sets it to the rate and framing its configuration gives, and reads and
+    writes it as it would a real port; the simulator holds the master.
+
+A pty is a line in every respect but the one it cannot be: the kernel accepts
+a data rate and ignores it, so bytes cross at memory speed whatever the
+configuration says. A simulated line therefore exercises the handler's reading,
+its writing and the terms it sets, and says nothing about whether the rate is
+one the cable would carry.
+
+Requirement
+    The path the handler was told to open is made a symbolic link to the pty's
+    slave for as long as the simulated payload runs, the slave's own name being
+    the kernel's to choose. The link is removed when the payload stops.
+
+Requirement
+    A path that is anything other than a link the simulator itself made is left
+    alone, and what is there is reported. A simulator that unlinked
+    ``/dev/ttyS0`` to stand in for it would be worse than one that could not,
+    and a payload file meant for simulation can name a path the simulator may
+    create.
+
+Requirement
+    An I2C or SPI endpoint is refused, naming the handler and where it is.
+    Standing in for either means being a device that answers an address on a
+    bus, or one that is clocked by a controller, and there is no pseudo-device
+    for that. Refusing is better than simulating something else at that
+    address, which is what treating them as plain devices amounted to.
+
 The window is built from the two files. Nothing in the GUI names a payload or
 fixes how many there are, so a payload added to or removed from the files adds
 or removes a panel.

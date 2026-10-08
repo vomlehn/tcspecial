@@ -48,18 +48,21 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
             (protocol, net.address.clone(), net.port)
         }
         EndpointConfig::Device(dev) => (PayloadProtocol::Device, dev.path.clone(), 0),
-        // The simulator has nothing to be at the far end of these. A serial
-        // line needs a port to open, a bus needs a device that answers an
-        // address on it, and a SPI peripheral needs to be clocked: standing in
-        // for any of them means being the hardware, not a program on a
-        // socket. Refused here rather than simulated as something else, which
-        // is what a plain device would be.
+        // A line the simulator can be: a pty's slave is a device file with a
+        // line discipline behind it, so a handler opens it, sets its terms and
+        // reads it exactly as it would a port. The path the handler was told
+        // to open is made to lead there; see payload_serial.
+        //
+        // The line's terms do not come this way. A pty takes a data rate and
+        // ignores it, so what the handler sets them to is between the handler
+        // and the kernel, and the simulator has only the path to be at.
         EndpointConfig::Serial(serial) => {
-            return Err(format!(
-                "{} is a serial line at {}, which the simulator cannot stand in for",
-                dh.name.0, serial.path
-            ))
+            (PayloadProtocol::Serial, serial.path.clone(), 0)
         }
+        // These two it still cannot be. A bus needs a device that answers an
+        // address on it and a SPI peripheral needs to be clocked: standing in
+        // for either means being the hardware, and there is no pty for that.
+        // Refused rather than simulated as something else.
         EndpointConfig::I2c(i2c) => {
             return Err(format!(
                 "{} is I2C device {:#04X} on {}, which the simulator cannot stand in for",
@@ -175,27 +178,46 @@ mod tests {
         assert!(payload_config_from(&dh, &sim(250, 250, 4)).is_err());
     }
 
-    /// A line, a bus and a clocked peripheral are refused the same way, and
-    /// each refusal says which handler and where.
+    /// A serial line is a kind the simulator can be: it becomes a payload at
+    /// the path the handler was told to open, which the simulator makes lead
+    /// to a pty of its own.
+    #[test]
+    fn a_serial_line_becomes_a_payload_at_the_configured_path() {
+        let dh = DHConfig {
+            dh_id: DHId(9),
+            name: DHName::new("DH9"),
+            endpoint: EndpointConfig::Serial(SerialConfig {
+                path: "/tmp/ttyS0".to_string(),
+                datarate: 9600,
+                stop_bits: StopBits::One,
+                byte_length: 8,
+            }),
+            packet_size: 4,
+            oc: None,
+        };
+
+        let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a line is simulable");
+        assert!(config.protocol == PayloadProtocol::Serial);
+        assert_eq!(config.address, "/tmp/ttyS0");
+        // The line's terms are not the simulator's business: a pty takes a
+        // data rate and ignores it, and what the handler sets is between the
+        // handler and the kernel.
+        assert_eq!(config.packet_size.load(Ordering::SeqCst), 4);
+        assert_eq!(config.segment_size.load(Ordering::SeqCst), 2);
+    }
+
+    /// A bus and a clocked peripheral are refused, and each refusal says which
+    /// handler and where.
     ///
-    /// They used all to arrive here as plain devices, so the simulator would
-    /// cheerfully stand in for a serial line by writing to its node at
-    /// whatever rate the port was left at. Being told that the simulator
-    /// cannot be the far end of a bus is more use than being simulated as
-    /// something else.
+    /// They used to arrive here as plain devices, so the simulator would
+    /// cheerfully stand in for an I2C device by writing to the bus node.
+    /// Being told that the simulator cannot be the far end of a bus is more
+    /// use than being simulated as something else. Unlike a serial line,
+    /// neither has anything a pty could be: a bus needs a device that answers
+    /// an address on it, and a peripheral needs to be clocked.
     #[test]
     fn the_kinds_the_simulator_cannot_be_are_refused_by_name() {
         let hardware = [
-            (
-                "DH9",
-                EndpointConfig::Serial(SerialConfig {
-                    path: "/dev/ttyS0".to_string(),
-                    datarate: 9600,
-                    stop_bits: StopBits::One,
-                    byte_length: 8,
-                }),
-                "/dev/ttyS0",
-            ),
             (
                 "DH10",
                 EndpointConfig::I2c(I2cConfig {

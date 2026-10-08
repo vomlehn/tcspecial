@@ -22,6 +22,7 @@ mod endpoint;
 mod grid;
 mod payload;
 mod payload_device;
+mod payload_serial;
 mod payload_tcp;
 mod payload_udp;
 mod sim_config;

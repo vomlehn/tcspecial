@@ -230,6 +230,68 @@ mod tests {
         assert!(format!("{e}").contains('9'), "{e}");
     }
 
+    /// A pty's slave is a port as far as this endpoint is concerned: it takes
+    /// the terms and carries the bytes.
+    ///
+    /// Which is the whole of what tcssim stands in for a serial line with. The
+    /// terms are stored and ignored by the kernel -- a pty has no cable to run
+    /// at 9600 -- so what this shows is that a handler configured for a line
+    /// opens one, sets it, and reads what the far end sends, with no hardware
+    /// in it anywhere.
+    #[test]
+    fn a_pty_slave_is_a_line_this_endpoint_can_open() {
+        use std::io::Write;
+        use std::os::unix::io::FromRawFd;
+
+        // A pty, as tcssim makes one.
+        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        assert!(master_fd >= 0, "no pty: {}", std::io::Error::last_os_error());
+        let mut master = unsafe { File::from_raw_fd(master_fd) };
+        assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
+
+        let mut name = [0 as libc::c_char; 128];
+        assert_eq!(
+            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            0
+        );
+        let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
+
+        let config = SerialConfig {
+            path: slave.clone(),
+            datarate: 9600,
+            stop_bits: StopBits::One,
+            byte_length: 8,
+        };
+        let mut endpoint = SerialEndpoint::new(&config)
+            .unwrap_or_else(|e| panic!("{slave} would not open as a line: {e}"));
+
+        // What the payload's end writes, the handler's end reads. Raw terms
+        // were applied when the endpoint was opened, so these bytes are not
+        // edited, echoed or translated on the way.
+        master.write_all(b"from the payload").expect("the far end writes");
+        master.flush().ok();
+
+        let mut buffer = [0u8; 64];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut got = Vec::new();
+        while got.len() < b"from the payload".len() && std::time::Instant::now() < deadline {
+            match endpoint.read(&mut buffer) {
+                Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
+                _ => std::thread::sleep(std::time::Duration::from_millis(10)),
+            }
+        }
+
+        assert_eq!(
+            got,
+            b"from the payload",
+            "what came up the line was {:?}",
+            String::from_utf8_lossy(&got)
+        );
+    }
+
     /// A file that is not a serial port is reported as one that cannot be set,
     /// rather than opened and read as though the terms had been applied.
     #[test]

@@ -61,6 +61,112 @@ pub enum DHType {
     Spi,
 }
 
+/// Something one handler takes for itself, and so which no other may take.
+///
+/// A handler's own address is exclusive, and so is the address it reaches the
+/// OC on: two handlers on one of them is a start that fails at the second,
+/// or worse, two handlers splitting one stream between them and each
+/// reporting half of it. The whole point of a bus is the exception, which is
+/// why a device on one is a claim on the address and not on the bus.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Claim {
+    /// A port on a host.
+    Port { host: String, port: u16 },
+    /// A path in the filesystem: a device, a line, a peripheral, or the file
+    /// a Unix socket is named by. One kind of claim for all of them, since
+    /// what collides is the path and not what opens it.
+    Path(String),
+    /// A device on a bus. The bus is shared by design; the address on it is
+    /// not.
+    OnBus { bus: String, address: u16 },
+}
+
+/// The names that mean this host, as one name.
+///
+/// Only the names that are certainly this host. Two names for some other host
+/// -- a hostname and the address it resolves to -- are left as written, since
+/// resolving them is a question for the network and not for a file.
+fn one_host(address: &str) -> String {
+    match address {
+        "localhost" | "127.0.0.1" | "::1" => "localhost".to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// What this handler claims, and what to call each claim in an error.
+fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
+    let mut claims = Vec::new();
+
+    let payload = match &dh.endpoint {
+        EndpointConfig::Network(net) => match net.protocol {
+            // A Unix socket is named by a file rather than by a port.
+            NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
+                Claim::Path(net.address.clone())
+            }
+            NetworkProtocol::Tcp | NetworkProtocol::Udp => Claim::Port {
+                host: one_host(&net.address),
+                port: net.port,
+            },
+        },
+        EndpointConfig::Device(device) => Claim::Path(device.path.clone()),
+        EndpointConfig::Serial(serial) => Claim::Path(serial.path.clone()),
+        EndpointConfig::Spi(spi) => Claim::Path(spi.path.clone()),
+        EndpointConfig::I2c(i2c) => Claim::OnBus {
+            bus: i2c.bus.clone(),
+            address: i2c.address,
+        },
+    };
+    claims.push((payload, format!("{}'s payload", dh.name.0)));
+
+    if let Some(oc) = &dh.oc {
+        claims.push((
+            Claim::Port {
+                host: one_host(&oc.address),
+                port: oc.port,
+            },
+            format!("{}'s OC address", dh.name.0),
+        ));
+    }
+
+    claims
+}
+
+/// How a claim reads in an error.
+fn claim_text(claim: &Claim) -> String {
+    match claim {
+        Claim::Port { host, port } => format!("{host}:{port}"),
+        Claim::Path(path) => path.clone(),
+        Claim::OnBus { bus, address } => format!("address {address:#04X} on {bus}"),
+    }
+}
+
+/// Refuse two handlers that want the same thing.
+///
+/// Both configuration formats end here, because the hazard is in the handlers
+/// rather than in the words that described them: whichever file they were
+/// written in, two handlers at one address cannot both be started, and two
+/// handlers on one device file split its stream between them and each report
+/// part of it as though it were the whole. A handler's own address and the
+/// address it reaches the OC on are compared together, since a port is a port
+/// whatever means to claim it.
+pub fn no_two_handlers_claim_one_thing(handlers: &[DHConfig]) -> Result<(), String> {
+    let mut taken: BTreeMap<Claim, String> = BTreeMap::new();
+
+    for dh in handlers {
+        for (claim, what) in claims_of(dh) {
+            if let Some(first) = taken.get(&claim) {
+                return Err(format!(
+                    "{first} and {what} both want {}",
+                    claim_text(&claim)
+                ));
+            }
+            taken.insert(claim, what);
+        }
+    }
+
+    Ok(())
+}
+
 impl DHType {
     /// The word a configuration file uses for this kind.
     ///
@@ -467,8 +573,7 @@ pub struct DHConfig {
 /// A payload file describes payloads and nothing else. It carries no packet
 /// interval: how fast a payload produces packets is a property of a
 /// simulation rather than of a payload, so it belongs to the simulator's own
-/// configuration file. A file that still states one parses, with the interval
-/// ignored, the same way one still carrying a `ci_config` section does.
+/// configuration file, and one stated here is refused rather than ignored.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct PayloadConfig {
@@ -556,6 +661,8 @@ impl PayloadConfig {
             })
             .collect::<Result<_, String>>()?;
 
+        no_two_handlers_claim_one_thing(&configs)?;
+
         // A group no handler names has no effect on the configuration, which
         // is exactly what a group whose name a handler misspelled looks like.
         // Checked after the handlers, so that the misspelling is reported from
@@ -620,11 +727,15 @@ pub struct DHGroupJson {
     /// How often to send it. Triggered only.
     #[serde(default)]
     pub trigger_interval_ms: Option<u32>,
-    /// Accepted and ignored, as it was before an unknown attribute became an
-    /// error: how fast a simulated payload sends is a property of the
-    /// simulation and belongs in the simulator configuration. A file that
-    /// still states one here is read the way it always was rather than
-    /// refused for a word this language used to let pass.
+    /// Named here only to be refused.
+    ///
+    /// How fast a payload sends is a property of the simulation, so an
+    /// interval belongs in the simulator configuration file. It was ignored
+    /// here for a while, which was the same silence the mode rules exist to
+    /// prevent: a file that states an interval has said something about the
+    /// payload's timing, and reading it as though it had not is reading a
+    /// different file than the one that was written. Kept as a field rather
+    /// than left unknown so that the error can name the file it belongs in.
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
 }
@@ -671,7 +782,7 @@ pub struct DHConfigJson {
     /// How often to send it. Triggered only.
     #[serde(default)]
     pub trigger_interval_ms: Option<u32>,
-    /// Accepted and ignored; see [`DHGroupJson::packet_interval_ms`].
+    /// Named here only to be refused; see [`DHGroupJson::packet_interval_ms`].
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
 }
@@ -815,6 +926,22 @@ impl DHConfigJson {
             (Some(_), None) => return Err("oc_address without oc_port".to_string()),
             (None, Some(_)) => return Err("oc_port without oc_address".to_string()),
         };
+
+        // An interval here is the same mistake the mode rules refuse, and
+        // was tolerated for longer: it says something about the payload's
+        // timing, which this file does not decide. Reported in terms of where
+        // it belongs, since the file plainly meant it somewhere.
+        if self.packet_interval_ms.is_some()
+            || group.is_some_and(|g| g.packet_interval_ms.is_some())
+        {
+            return Err(format!(
+                "payload \"{}\" states a packet interval, which belongs in the \
+                 simulator configuration file: how fast a payload sends is a \
+                 property of the simulation, and a payload file that states one \
+                 is describing a simulation",
+                self.name
+            ));
+        }
 
         // Which kind of payload this is, and the fields that belong to that
         // kind and to no other. A periodic payload carrying a trigger, or a
@@ -1524,6 +1651,157 @@ payloads:
         assert_eq!(distinct.to_dh_configs().expect("both convert").len(), 2);
     }
 
+    /// No two handlers want the same thing.
+    ///
+    /// Two at one port is a start that fails at the second; two on one device
+    /// file is worse, each taking part of the one stream and reporting it as
+    /// though it were the whole. Checked for both at once, and for a
+    /// handler's OC address beside its payload address, since a port is a
+    /// port whatever claims it.
+    #[test]
+    fn no_two_handlers_want_one_address_or_one_device() {
+        let pair = |first: &str, second: &str| {
+            format!(
+                "
+version: \"1.0\"
+description: two payloads
+payloads:
+  - dh_id: 0
+    name: DH0
+    packet_size: 12
+{first}
+  - dh_id: 1
+    name: DH1
+    packet_size: 12
+{second}
+"
+            )
+        };
+
+        let udp = |port: u16| {
+            format!("    type: network\n    protocol: udp\n    address: localhost\n    port: {port}")
+        };
+        let device = |path: &str| format!("    type: device\n    path: {path}");
+
+        // The same host and port, written two ways: localhost and 127.0.0.1
+        // are one host, so naming it differently does not make it a different
+        // port.
+        let said = payload(&pair(&udp(5000), "    type: network\n    protocol: udp\n    address: 127.0.0.1\n    port: 5000"))
+            .to_dh_configs()
+            .expect_err("two payloads at one port");
+        assert!(
+            said.contains("DH0") && said.contains("DH1") && said.contains("5000"),
+            "the error should name both handlers and what they want: {said}"
+        );
+
+        // The same device file.
+        let said = payload(&pair(&device("/dev/ttyS0"), &device("/dev/ttyS0")))
+            .to_dh_configs()
+            .expect_err("two payloads on one device file");
+        assert!(said.contains("/dev/ttyS0"), "{said}");
+
+        // A handler's OC address is as exclusive as its payload address, and
+        // is compared against it: this one would have to bind the port twice.
+        let clash = format!(
+            "
+version: \"1.0\"
+description: an OC address on the payload's own port
+payloads:
+  - dh_id: 0
+    name: DH0
+    packet_size: 12
+    oc_address: 127.0.0.1
+    oc_port: 5000
+{}
+",
+            udp(5000)
+        );
+        let said = payload(&clash)
+            .to_dh_configs()
+            .expect_err("one port for the payload and the OC");
+        assert!(
+            said.contains("payload") && said.contains("OC"),
+            "the error should say which of the two is which: {said}"
+        );
+
+        // And two handlers that want different things convert, which is what
+        // the rule must not get in the way of.
+        let fine = payload(&pair(&udp(5000), &udp(5001)));
+        assert_eq!(fine.to_dh_configs().expect("both convert").len(), 2);
+    }
+
+    /// A bus is shared; a place on it is not.
+    ///
+    /// The one exception the rule has to make, and the reason a claim is on
+    /// the address rather than on the bus device: several devices on one I2C
+    /// bus is what a bus is for, and refusing that would refuse the normal
+    /// case. These handlers cannot be written in a payload file, so they are
+    /// built directly.
+    #[test]
+    fn a_bus_is_shared_and_a_place_on_it_is_not() {
+        let on_bus = |id: u32, name: &str, address: u16| DHConfig {
+            dh_id: DHId(id),
+            name: DHName::new(name),
+            endpoint: EndpointConfig::I2c(I2cConfig {
+                bus: "/dev/i2c-1".to_string(),
+                address,
+                ten_bit: false,
+                pec: false,
+            }),
+            packet_size: 4,
+            oc: None,
+            mode: DHMode::Periodic,
+        };
+
+        no_two_handlers_claim_one_thing(&[on_bus(0, "DH0", 0x48), on_bus(1, "DH1", 0x49)])
+            .expect("two devices on one bus is what a bus is for");
+
+        let said = no_two_handlers_claim_one_thing(&[
+            on_bus(0, "DH0", 0x48),
+            on_bus(1, "DH1", 0x48),
+        ])
+        .expect_err("two devices at one address on one bus");
+        assert!(
+            said.contains("0x48") && said.contains("/dev/i2c-1"),
+            "the error should name the address and the bus: {said}"
+        );
+    }
+
+    /// A Unix socket is named by a file, so it collides like a file.
+    ///
+    /// Its port is meaningless -- two Unix payloads with different ports and
+    /// one path are one socket -- and a device handler opening that same path
+    /// is the same collision from the other side, which is why every path is
+    /// one kind of claim.
+    #[test]
+    fn a_unix_socket_collides_by_its_path() {
+        let socket = |id: u32, name: &str, port: u16| DHConfig {
+            dh_id: DHId(id),
+            name: DHName::new(name),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::UnixStream,
+                address: "/tmp/dh.sock".to_string(),
+                port,
+            }),
+            packet_size: 4,
+            oc: None,
+            mode: DHMode::Periodic,
+        };
+
+        let said = no_two_handlers_claim_one_thing(&[socket(0, "DH0", 0), socket(1, "DH1", 7)])
+            .expect_err("one socket path, whatever the ports say");
+        assert!(said.contains("/tmp/dh.sock"), "{said}");
+
+        let mut device = socket(1, "DH1", 0);
+        device.endpoint = EndpointConfig::Device(DeviceConfig {
+            path: "/tmp/dh.sock".to_string(),
+        });
+        assert!(
+            no_two_handlers_claim_one_thing(&[socket(0, "DH0", 0), device]).is_err(),
+            "a path is a path, whichever kind of handler opens it"
+        );
+    }
+
     /// An attribute of another kind of payload is refused.
     ///
     /// Ignoring one is how a device payload comes to carry a port nothing
@@ -1659,30 +1937,69 @@ payload:
         }
     }
 
-    /// The interval a payload file may still carry is still ignored.
+    /// An interval in a payload file is refused, and told where it belongs.
     ///
-    /// It was accepted and ignored before an unknown attribute became an
-    /// error -- how fast a simulated payload sends is a property of the
-    /// simulation -- and a file carrying one is still read the way it always
-    /// was, rather than refused for a word this language used to let pass.
+    /// It was ignored for a while, which was the same silence the mode rules
+    /// exist to prevent: a file stating an interval has said something about
+    /// the payload's timing, and reading it as though it had not is reading a
+    /// different file than the one that was written. The error names the file
+    /// it belongs in, because the line plainly meant something.
     #[test]
-    fn a_payload_file_still_carrying_an_interval_still_parses() {
-        let config = payload(
-            "
+    fn a_payload_file_may_not_state_an_interval() {
+        let with_interval = |where_: &str| {
+            format!(
+                "
 version: \"1.0\"
-description: a file with an interval left in it
-payloads:
-  - dh_id: 0
-    name: DH0
+description: a file with an interval in it
+payload_groups:
+  - name: g
     type: network
     protocol: udp
     address: localhost
+{group}
+payloads:
+  - dh_id: 0
+    name: DH0
+    group: g
     port: 5000
     packet_size: 12
-    packet_interval_ms: 250
+{payload}
 ",
+                group = if where_ == "group" {
+                    "    packet_interval_ms: 250"
+                } else {
+                    ""
+                },
+                payload = if where_ == "payload" {
+                    "    packet_interval_ms: 250"
+                } else {
+                    ""
+                },
+            )
+        };
+
+        // Stated by the payload, and stated by its group: a group's interval
+        // reaches the payload exactly as its own would.
+        for where_ in ["payload", "group"] {
+            let said = payload(&with_interval(where_))
+                .to_dh_configs()
+                .map(|c| format!("{} payloads", c.len()))
+                .expect_err(&format!(
+                    "an interval stated by the {where_} must be refused"
+                ));
+            assert!(
+                said.contains("simulator configuration file") && said.contains("DH0"),
+                "the error should name the payload and the file it belongs in: {said}"
+            );
+        }
+
+        // And a file that states none converts, which is every payload file
+        // that was written after the two were split.
+        let without = with_interval("neither");
+        assert_eq!(
+            payload(&without).to_dh_configs().expect("converts").len(),
+            1
         );
-        assert_eq!(config.to_dh_configs().expect("parses and converts").len(), 1);
     }
 
     #[test]

@@ -185,8 +185,8 @@ instead.
 
 **What the file will not let pass**
 
-Four mistakes are refused rather than ignored, because each of them otherwise
-produces a payload that looks configured and is not:
+These mistakes are refused rather than ignored, because each of them
+otherwise produces a payload that looks configured and is not:
 
 * A **repeated name or ``dh_id``**. Both pick out one payload: tcspecial keeps
   its handlers by id, so a repeated id has one silently replace the other, and
@@ -201,12 +201,29 @@ produces a payload that looks configured and is not:
   came from.
 * A **word that is not an attribute**. A misspelled ``oc_address`` is a
   payload with nowhere to send its data, and ignoring the word says nothing
-  about it. The lone exception is ``packet_interval_ms``, still accepted and
-  ignored so that a file predating the split between the two files reads as it
-  always did.
+  about it.
 * A **misspelled section**, for the same reason: ``payload`` is not
   ``payloads``, and a file whose only section is misspelled describes no
   payloads at all.
+* A **packet interval**. How fast a payload sends is a property of the
+  simulation, so the interval belongs in the simulator configuration file and
+  the error says so. This was ignored for a while, which was the same silence
+  the two modes exist to prevent -- a file stating an interval has said
+  something about the payload's timing, and reading it as though it had not is
+  reading a different file than the one that was written. An interval a
+  payload takes from its group is refused as one it states itself is.
+* **Two payloads wanting the same thing**. Two at one address cannot both be
+  started; two on one device file, serial line or SPI peripheral is worse,
+  each taking part of the one stream and reporting it as though it were the
+  whole. A payload's own address and its ``oc_address`` are compared together,
+  since a port is a port whatever claims it, and ``localhost``, ``127.0.0.1``
+  and ``::1`` count as one host. A Unix socket collides by its path, its port
+  meaning nothing, and so does a device file opened twice. The exception is a
+  bus: several devices on one I\ :superscript:`2`\ C bus is what a bus is for,
+  so what is claimed there is the bus and the address together.
+
+The same collision rule applies to an endpoint configuration file, which is
+the only one that can describe a serial line, a bus or a peripheral at all.
 
 This is the shipped ``payload1.yaml``. DH1 and DH3 are reached the same way,
 so what they share is a group; DH0 and DH2 share nothing and state everything

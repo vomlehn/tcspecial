@@ -1360,9 +1360,15 @@ property of a simulation rather than of the payload, and belongs to a
 simulator configuration file.
 
 Requirement
-    A payload configuration file states no packet interval. A file that still
-    carries one parses, with the interval ignored, so that a file predating the
-    split between the two does not have to be rewritten to be read.
+    A payload configuration file states no packet interval, and one stated
+    here is an error naming the file it belongs in. How fast a payload sends
+    is a property of the simulation, so a payload file that states an interval
+    is describing a simulation. It was ignored for a while, which was the same
+    silence the mode rules exist to prevent: a file that states an interval
+    has said something about the payload's timing, and reading it as though it
+    had not is reading a different file than the one that was written. An
+    interval a payload takes from its group is refused as one it states
+    itself is.
 
 Requirement
     A ``dh_id`` and a ``name`` belong to a data handler and never to a group.
@@ -1414,9 +1420,39 @@ Requirement
     A word that is not an attribute is an error. A misspelled attribute is
     otherwise ignored, which is silence about something the file plainly
     meant: a payload whose ``oc_address`` is misspelled has nowhere to send
-    its data and nothing says so. The one word kept out of this is
-    ``packet_interval_ms``, which is accepted and ignored as it was before the
-    rule existed.
+    its data and nothing says so. ``packet_interval_ms`` is the one word this
+    language still knows without accepting: it is named so that a file stating
+    one is told which file it belongs in rather than told the word is unknown.
+
+Requirement
+    No two data handlers want the same thing. Two at one address cannot both
+    be started; two on one device file, one serial line or one SPI peripheral
+    is worse, each taking part of the one stream and reporting it as though it
+    were the whole. A handler's own address and the address it reaches the OC
+    on are compared together, since a port is a port whatever claims it.
+
+Requirement
+    Hosts that certainly mean this host -- ``localhost``, ``127.0.0.1`` and
+    ``::1`` -- are one host, so naming a port's host differently does not make
+    it a different port. Two names for some other host are left as written:
+    resolving them is a question for the network rather than for a file.
+
+Requirement
+    A Unix socket collides by its path. It is named by a file rather than by a
+    port, so its port means nothing here, and a device handler opening that
+    same path is the same collision from the other side. Every path is one
+    kind of claim for that reason, whichever kind of handler opens it.
+
+Requirement
+    A bus is shared and a place on it is not. Several devices on one
+    I\ :superscript:`2`\ C bus is what a bus is for, so a claim is on the bus
+    and the address together rather than on the bus device.
+
+Requirement
+    The rule is the same for both configuration formats and is applied in one
+    place. The hazard belongs to the handlers rather than to the words that
+    described them, and the endpoint configuration format is the only one that
+    can describe the kinds where it matters most.
 
 Requirement
     A group is named by a data handler. A group no handler names is an error

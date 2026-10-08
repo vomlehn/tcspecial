@@ -1330,8 +1330,16 @@ Requirement
     the interval it is sent at, both of which are flight behaviour: tcspecial
     does the sending, and what to send comes from the payload's interface
     document. Its simulator configuration states no interval at all, packet
-    or segment: it sends when it is asked, so a rate there would govern
-    nothing and the segments of one answer go as fast as they can.
+    or segment, and takes none from the group it names: it sends when it is
+    asked, so a rate there would govern nothing and the segments of one answer
+    go as fast as they can.
+
+Requirement
+    That holds for an interval a triggered payload inherits as much as one it
+    states. A group's settings reach a payload exactly as its own do, so a
+    payload that could inherit a rate it may not state would be governed by a
+    group it joined for the settings it may -- and the file would read as
+    though the rule had been kept.
 
 Requirement
     The interval is ``packet_interval_ms`` in whichever file states it. One

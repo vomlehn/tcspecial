@@ -1663,15 +1663,32 @@ simulated_payloads:
         };
 
         for stated in ["packet_interval_ms: 1000", "segment_interval_ms: 1000"] {
+            let named = stated.split(':').next().unwrap();
+
+            // Stated by the payload itself.
             let file = parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
                  protocol: tcp\n    {stated}\n"
             ));
             let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
-            let named = stated.split(':').next().unwrap();
             assert!(
                 said.contains(named) && said.contains("packet_interval_ms in the payload"),
                 "{stated}: {said}"
+            );
+
+            // And taken from the group it names, which reaches the payload
+            // exactly as its own would: a payload that inherited a rate it
+            // may not state would be governed by a group it
+            // only joined for the settings it may.
+            let file = parse(&format!(
+                "simulated_payload_groups:\n  - name: driven\n    {stated}\n\
+                 simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: tcp\n    group: driven\n"
+            ));
+            let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
+            assert!(
+                said.contains(named) && said.contains("packet_interval_ms in the payload"),
+                "{stated}, inherited: {said}"
             );
         }
 

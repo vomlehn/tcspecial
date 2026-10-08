@@ -133,8 +133,12 @@ and no ``packet_interval_ms`` here.
 **triggered** -- tcspecial sends a request and the payload answers. Both the
 request and how often it goes out are here, because tcspecial does the sending
 and what to send comes from the payload's interface document. Its entry in the
-simulator file states no interval at all, packet or segment: such a payload
-sends when it is asked, so a rate there would govern nothing.
+simulator file states no interval at all, packet or segment, and takes none
+from the group it names: such a payload sends when it is asked, so a rate
+there would govern nothing. A group's settings reach a payload exactly as its
+own do, so an inherited interval is refused as a stated one is -- a triggered
+payload may share a group for the settings it can use, but not one that states
+a rate.
 
 The interval is ``packet_interval_ms`` in whichever file states it -- one name,
 in the file the payload's kind puts it in. It was ``trigger_interval_ms`` here;

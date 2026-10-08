@@ -256,6 +256,12 @@ impl EndpointConfigDoc {
                 endpoint: endpoint_config_of(endpoint, group)?,
                 packet_size: packet_size as usize,
                 oc: endpoint.oc.clone(),
+                // An endpoint configuration has no mode to give yet, so its
+                // endpoints describe the kind of payload that sends on its
+                // own. A triggered endpoint would need the trigger and its
+                // interval here, which is a group's business -- several
+                // endpoints of one group are commonly polled alike.
+                mode: Default::default(),
             });
         }
 

@@ -81,8 +81,32 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
     let packet_size = u32::try_from(dh.packet_size)
         .map_err(|_| format!("{} has a packet size too large to simulate", dh.name.0))?;
 
+    // A payload that answers requests has to be able to hear one. Two kinds
+    // cannot: tcspecial opens a device and reads it, so there is nothing for
+    // the simulator to be written to, and an I2C master's read is the trigger
+    // itself, which a second master on the bus cannot see. Refused here
+    // rather than simulated as a payload that answers nothing, which would
+    // look exactly like a handler whose polling had stopped working.
+    if dh.mode.polling().is_some() {
+        let cannot = match protocol {
+            PayloadProtocol::Device => Some("a device, which tcspecial reads directly"),
+            PayloadProtocol::I2c => {
+                Some("a bus, where the master's own read is the trigger")
+            }
+            _ => None,
+        };
+        if let Some(cannot) = cannot {
+            return Err(format!(
+                "{} is triggered, but the simulator cannot stand in for a triggered \
+                 payload on {cannot}",
+                dh.name.0
+            ));
+        }
+    }
+
     Ok(PayloadConfig {
         bus_address,
+        triggered: dh.mode.polling().is_some(),
         _id: dh.dh_id.0,
         protocol,
         address,
@@ -128,8 +152,8 @@ mod tests {
     use crate::sim_config::ResolvedSim;
     use std::sync::atomic::Ordering;
     use tcslibgs::{
-        BitOrder, CsActive, DHId, DHName, DeviceConfig, I2cConfig, NetworkConfig, SerialConfig,
-        SpiConfig, SpiMode, StopBits,
+        BitOrder, CsActive, DHId, DHMode, DHName, DeviceConfig, I2cConfig, NetworkConfig,
+        NetworkProtocol, SerialConfig, SpiConfig, SpiMode, StopBits,
     };
 
     fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
@@ -137,6 +161,7 @@ mod tests {
             packet_interval_ms,
             segment_interval_ms,
             segment_size,
+            triggered: false,
         }
     }
 
@@ -150,6 +175,7 @@ mod tests {
             }),
             packet_size: 4,
             oc: None,
+                    mode: Default::default(),
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).unwrap();
@@ -161,6 +187,88 @@ mod tests {
         assert_eq!(config.segment_size.load(Ordering::SeqCst), 2);
         assert_eq!(config.packet_interval_ms.load(Ordering::SeqCst), 250);
         assert_eq!(config.segment_interval_ms.load(Ordering::SeqCst), 100);
+    }
+
+    /// A triggered payload the simulator cannot be the asked end of is
+    /// refused by name, rather than simulated as one that answers nothing.
+    ///
+    /// Two kinds cannot hear a request. Tcspecial opens a device and reads
+    /// it, so there is nothing for the simulator to be written to; and an I2C
+    /// master's own read is the trigger, which a second master on the bus
+    /// cannot see. A payload that answered nothing would look exactly like a
+    /// handler whose polling had stopped working, which is the confusion
+    /// worth refusing.
+    #[test]
+    fn a_triggered_payload_the_simulator_cannot_hear_is_refused() {
+        let triggered = |name: &str, endpoint: EndpointConfig| DHConfig {
+            dh_id: DHId(12),
+            name: DHName::new(name),
+            endpoint,
+            packet_size: 4,
+            oc: None,
+            mode: DHMode::Triggered {
+                trigger: "READ".to_string(),
+                interval_ms: 500,
+            },
+        };
+
+        let deaf = [
+            (
+                "DH12",
+                EndpointConfig::Device(DeviceConfig {
+                    path: "/dev/urandom".to_string(),
+                }),
+                "device",
+            ),
+            (
+                "DH13",
+                EndpointConfig::I2c(I2cConfig {
+                    bus: "/tmp/i2c-sim".to_string(),
+                    address: 0x48,
+                    ten_bit: false,
+                    pec: false,
+                }),
+                "bus",
+            ),
+        ];
+
+        for (name, endpoint, what) in deaf {
+            let e = match payload_config_from(&triggered(name, endpoint), &sim(0, 0, 4)) {
+                Ok(_) => panic!("{name}: the simulator cannot be asked on a {what}"),
+                Err(e) => e,
+            };
+            assert!(
+                e.contains(name) && e.contains(what),
+                "the refusal says neither which handler nor why: {e}"
+            );
+        }
+    }
+
+    /// A triggered payload of a kind that can hear one is simulated, and the
+    /// simulator is told which kind it is.
+    #[test]
+    fn a_triggered_payload_reaches_the_simulator_as_triggered() {
+        let dh = DHConfig {
+            dh_id: DHId(14),
+            name: DHName::new("DH14"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: "localhost".to_string(),
+                port: 5000,
+            }),
+            packet_size: 8,
+            oc: None,
+            mode: DHMode::Triggered {
+                trigger: "READ\r".to_string(),
+                interval_ms: 500,
+            },
+        };
+
+        let config = payload_config_from(&dh, &sim(0, 100, 2)).expect("a stream can be asked");
+        assert!(config.triggered, "the simulator was not told to wait to be asked");
+        // What to send and how often are tcspecial's, and do not come this
+        // way at all: the simulator only has to answer.
+        assert_eq!(config.packet_interval_ms.load(Ordering::SeqCst), 0);
     }
 
     /// A Unix socket of either flavour becomes a payload at its path, which
@@ -187,6 +295,7 @@ mod tests {
                 }),
                 packet_size: 4,
                 oc: None,
+                            mode: Default::default(),
             };
 
             let config =
@@ -214,6 +323,7 @@ mod tests {
             }),
             packet_size: 4,
             oc: None,
+                    mode: Default::default(),
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a line is simulable");
@@ -247,6 +357,7 @@ mod tests {
             }),
             packet_size: 8,
             oc: None,
+                    mode: Default::default(),
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a bus is simulable");
@@ -279,6 +390,7 @@ mod tests {
             }),
             packet_size: 8,
             oc: None,
+            mode: Default::default(),
         };
 
         let config =

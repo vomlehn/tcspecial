@@ -23,7 +23,7 @@ pub fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats
         let started = Instant::now();
         let pacing = Pacing::read(&config);
 
-        if pacing.produces() {
+        if pacing.a_packet_is_due(config.triggered, 0) {
             // Generate random data (simulating /dev/urandom). There is
             // nothing here to write it to -- tcspecial opens the device
             // itself and reads from it, and this stands in only for the

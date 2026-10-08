@@ -145,7 +145,20 @@ pub fn run_unix_stream_payload(
         }
 
         if let Some(ref mut stream) = connection {
-            if pacing.produces() {
+            // Read first, so that a trigger is answered in the pass it
+            // arrives in rather than the one after.
+            let mut asked = 0;
+            let mut buf = vec![0u8; 4096];
+            if let Ok(n) = stream.read(&mut buf) {
+                if n > 0 {
+                    asked = n;
+                    let mut guard = stats.lock().unwrap();
+                    guard.packets_recv += 1;
+                    guard.bytes_recv += n as u64;
+                }
+            }
+
+            if pacing.a_packet_is_due(config.triggered, asked) {
                 let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
                 let (bytes, whole) = send_in_segments(
                     &packet,
@@ -161,15 +174,6 @@ pub fn run_unix_stream_payload(
                     if whole {
                         guard.packets_sent += 1;
                     }
-                }
-            }
-
-            let mut buf = vec![0u8; 4096];
-            if let Ok(n) = stream.read(&mut buf) {
-                if n > 0 {
-                    let mut guard = stats.lock().unwrap();
-                    guard.packets_recv += 1;
-                    guard.bytes_recv += n as u64;
                 }
             }
         }
@@ -220,8 +224,10 @@ pub fn run_unix_dgram_payload(
 
         // Whatever the handler has sent down.
         let mut buf = vec![0u8; 4096];
+        let mut asked = 0;
         if let Ok((n, _)) = socket.recv_from(&mut buf) {
             if n > 0 {
+                asked = n;
                 let mut guard = stats.lock().unwrap();
                 guard.packets_recv += 1;
                 guard.bytes_recv += n as u64;
@@ -231,7 +237,7 @@ pub fn run_unix_dgram_payload(
         // And a packet of its own, asked for or not. A send before the
         // handler has bound its path fails, which is counted as nothing sent
         // rather than as a packet: the handler is not there yet.
-        if pacing.produces() {
+        if pacing.a_packet_is_due(config.triggered, asked) {
             let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
             let (bytes, whole) = send_in_segments(
                 &packet,
@@ -280,6 +286,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),
             segment_interval_ms: Arc::new(AtomicU32::new(20)),
+                    triggered: false,
         })
     }
 

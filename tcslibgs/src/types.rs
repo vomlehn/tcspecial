@@ -102,6 +102,17 @@ pub struct Statistics {
     pub writes_completed: u64,
     /// Number of failed write operations
     pub writes_failed: u64,
+    /// Triggers sent to a triggered payload.
+    ///
+    /// Counted on its own because nothing else counts it. A handler's
+    /// `bytes_received` is the ground's data and its `bytes_sent` is the
+    /// data that went back, so the payload side of each conduit is left out
+    /// of both -- those are the same bytes seen twice. A trigger is a write
+    /// with no read behind it, so without this it would appear in no
+    /// statistic at all, and a payload that had stopped answering would look
+    /// exactly like a handler that had stopped asking.
+    #[serde(default)]
+    pub triggers_sent: u64,
 }
 
 impl Statistics {
@@ -309,6 +320,55 @@ impl EndpointConfig {
     }
 }
 
+/// How a payload is made to send: on its own, or when asked.
+///
+/// Payloads are generally one of two kinds, and which one a payload is decides
+/// where the timing of it is written down. A payload that sends on its own
+/// needs nothing from tcspecial, and how fast it sends is a property of the
+/// payload rather than of the handler -- so a payload file says nothing about
+/// it, and a simulated one takes its rate from the simulator file. A payload
+/// that answers a request needs tcspecial to send one, at some rate, and both
+/// are flight behaviour: what to send comes from the payload's interface
+/// document and so belongs in the payload file.
+///
+/// The two are exclusive by construction here: a periodic handler cannot be
+/// given a trigger, because the variant has nowhere to put one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DHMode {
+    /// The payload sends on its own. Tcspecial reads what arrives.
+    Periodic,
+    /// The payload answers a request, which tcspecial sends at an interval.
+    Triggered {
+        /// What to send. Its bytes go out as they are, so a trigger ending in
+        /// a carriage return is written with one -- in YAML or JSON, inside
+        /// double quotes, where `\r` and `\n` are escapes.
+        trigger: String,
+        /// How often to send it, in milliseconds.
+        interval_ms: u32,
+    },
+}
+
+impl Default for DHMode {
+    /// Periodic, which is both the commoner kind and what every payload file
+    /// written before there was a mode describes.
+    fn default() -> Self {
+        DHMode::Periodic
+    }
+}
+
+impl DHMode {
+    /// What to send and how often, for a handler that has to ask.
+    pub fn polling(&self) -> Option<(&str, u32)> {
+        match self {
+            DHMode::Periodic => None,
+            DHMode::Triggered {
+                trigger,
+                interval_ms,
+            } => Some((trigger, *interval_ms)),
+        }
+    }
+}
+
 /// Data handler configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DHConfig {
@@ -328,6 +388,13 @@ pub struct DHConfig {
     /// handler converted from an endpoint configuration, which has no OC side
     /// to give.
     pub oc: Option<NetworkConfig>,
+    /// How this payload is made to send; see [`DHMode`].
+    ///
+    /// Defaulted rather than required, so that a payload file written before
+    /// there was a mode describes what it always described: a payload that
+    /// sends on its own.
+    #[serde(default)]
+    pub mode: DHMode,
 }
 
 /// Payload configuration file structure
@@ -453,6 +520,15 @@ pub struct DHGroupJson {
     pub oc_address: Option<String>,
     #[serde(default)]
     pub oc_port: Option<u16>,
+    /// ``periodic`` or ``triggered``; see [`DHMode`]. Absent is periodic.
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// What to send to make a triggered payload answer. Triggered only.
+    #[serde(default)]
+    pub trigger: Option<String>,
+    /// How often to send it. Triggered only.
+    #[serde(default)]
+    pub trigger_interval_ms: Option<u32>,
 }
 
 /// JSON representation of DH config
@@ -487,6 +563,15 @@ pub struct DHConfigJson {
     pub oc_address: Option<String>,
     #[serde(default)]
     pub oc_port: Option<u16>,
+    /// ``periodic`` or ``triggered``; see [`DHMode`]. Absent is periodic.
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// What to send to make a triggered payload answer. Triggered only.
+    #[serde(default)]
+    pub trigger: Option<String>,
+    /// How often to send it. Triggered only.
+    #[serde(default)]
+    pub trigger_interval_ms: Option<u32>,
 }
 
 impl DHConfigJson {
@@ -528,6 +613,17 @@ impl DHConfigJson {
             .as_deref()
             .or_else(|| group.and_then(|g| g.oc_address.as_deref()));
         let oc_port = self.oc_port.or_else(|| group.and_then(|g| g.oc_port));
+        let mode = self
+            .mode
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.mode.as_deref()));
+        let trigger = self
+            .trigger
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.trigger.as_deref()));
+        let trigger_interval_ms = self
+            .trigger_interval_ms
+            .or_else(|| group.and_then(|g| g.trigger_interval_ms));
 
         let endpoint = match dh_type {
             Some("network") => {
@@ -565,12 +661,75 @@ impl DHConfigJson {
             (None, Some(_)) => return Err("oc_port without oc_address".to_string()),
         };
 
+        // Which kind of payload this is, and the fields that belong to that
+        // kind and to no other. A periodic payload carrying a trigger, or a
+        // triggered one carrying no interval, is a file that has not decided
+        // which kind it describes -- reported rather than resolved by
+        // guessing, because either guess would run something nobody asked
+        // for.
+        let mode = match mode {
+            None | Some("periodic") => {
+                if trigger.is_some() || trigger_interval_ms.is_some() {
+                    return Err(
+                        "a periodic payload sends on its own, so it takes no trigger \
+                         and no trigger interval: how fast a simulated one sends \
+                         belongs in the simulator configuration"
+                            .to_string(),
+                    );
+                }
+                DHMode::Periodic
+            }
+            Some("triggered") => {
+                // A datagram handler learns where its payload is from the
+                // payload's first packet -- a datagram's sender is the only
+                // statement of it -- so it has nowhere to send a trigger
+                // until it has been spoken to, which is exactly what a
+                // triggered payload will not do. Such a payload is periodic
+                // whether the file says so or not, so the file is corrected
+                // rather than run.
+                if let Some(protocol) = protocol {
+                    if matches!(protocol, "udp" | "unix_dgram") {
+                        return Err(format!(
+                            "a {protocol} payload cannot be triggered: its handler \
+                             learns where to send from the payload's first packet, so \
+                             there is nowhere to send a trigger until the payload has \
+                             spoken -- which a triggered payload does not do"
+                        ));
+                    }
+                }
+
+                let trigger = trigger.ok_or(
+                    "a triggered payload answers a request, so it states the trigger \
+                     to send",
+                )?;
+                let interval_ms = trigger_interval_ms.ok_or(
+                    "a triggered payload states how often its trigger is sent: \
+                     tcspecial does the sending, so the interval is flight behaviour \
+                     and not a simulation setting",
+                )?;
+                if interval_ms == 0 {
+                    return Err("a trigger interval of zero would send without pause"
+                        .to_string());
+                }
+                DHMode::Triggered {
+                    trigger: trigger.to_string(),
+                    interval_ms,
+                }
+            }
+            Some(other) => {
+                return Err(format!(
+                    "{other} is not a mode: a payload is periodic or triggered"
+                ))
+            }
+        };
+
         Ok(DHConfig {
             dh_id: DHId(self.dh_id),
             name: DHName::new(&self.name),
             endpoint,
             packet_size: packet_size.ok_or("Missing packet_size")?,
             oc,
+            mode,
         })
     }
 }
@@ -652,6 +811,153 @@ impl CommandStatus {
 
 #[cfg(test)]
 mod tests {
+    /// A payload file that says nothing about the mode describes the kind of
+    /// payload that sends on its own, which is what every file written before
+    /// there was a mode describes.
+    #[test]
+    fn a_payload_that_states_no_mode_sends_on_its_own() {
+        use super::*;
+
+        let dh = DHConfigJson {
+            dh_id: 0,
+            name: "DH0".to_string(),
+            group: None,
+            dh_type: Some("device".to_string()),
+            protocol: None,
+            address: None,
+            port: None,
+            path: Some("/dev/urandom".to_string()),
+            packet_size: Some(4),
+            oc_address: None,
+            oc_port: None,
+            mode: None,
+            trigger: None,
+            trigger_interval_ms: None,
+        };
+
+        assert_eq!(dh.to_dh_config().expect("converts").mode, DHMode::Periodic);
+    }
+
+    /// A triggered payload carries what to send and how often, and both reach
+    /// the handler: tcspecial does the sending, so both are its business.
+    #[test]
+    fn a_triggered_payload_carries_its_trigger_and_interval() {
+        use super::*;
+
+        let dh = DHConfigJson {
+            dh_id: 1,
+            name: "DH1".to_string(),
+            group: None,
+            dh_type: Some("network".to_string()),
+            protocol: Some("tcp".to_string()),
+            address: Some("localhost".to_string()),
+            port: Some(5000),
+            path: None,
+            packet_size: Some(8),
+            oc_address: None,
+            oc_port: None,
+            mode: Some("triggered".to_string()),
+            // As a file writes it: double quotes, where the escape is the
+            // carriage return the payload's interface asks for.
+            trigger: Some("READ\r".to_string()),
+            trigger_interval_ms: Some(500),
+        };
+
+        let config = dh.to_dh_config().expect("converts");
+        assert_eq!(
+            config.mode,
+            DHMode::Triggered {
+                trigger: "READ\r".to_string(),
+                interval_ms: 500,
+            }
+        );
+        assert_eq!(config.mode.polling(), Some(("READ\r", 500)));
+    }
+
+    /// The two kinds do not mix, in either direction, and the complaint says
+    /// which file the misplaced setting belongs in.
+    #[test]
+    fn the_two_kinds_of_payload_do_not_mix() {
+        use super::*;
+
+        let bare = |mode: Option<&str>, trigger: Option<&str>, interval: Option<u32>| {
+            DHConfigJson {
+                dh_id: 2,
+                name: "DH2".to_string(),
+                group: None,
+                dh_type: Some("network".to_string()),
+                protocol: Some("tcp".to_string()),
+                address: Some("localhost".to_string()),
+                port: Some(5000),
+                path: None,
+                packet_size: Some(8),
+                oc_address: None,
+                oc_port: None,
+                mode: mode.map(str::to_string),
+                trigger: trigger.map(str::to_string),
+                trigger_interval_ms: interval,
+            }
+        };
+
+        // A payload that sends on its own has nothing to be triggered by, and
+        // its rate is the simulator's business.
+        let e = bare(None, Some("READ"), None).to_dh_config().unwrap_err();
+        assert!(e.contains("no trigger"), "{e}");
+        let e = bare(Some("periodic"), None, Some(500))
+            .to_dh_config()
+            .unwrap_err();
+        assert!(e.contains("simulator configuration"), "{e}");
+
+        // A payload that answers requests needs both halves of the request.
+        let e = bare(Some("triggered"), None, Some(500))
+            .to_dh_config()
+            .unwrap_err();
+        assert!(e.contains("states the trigger"), "{e}");
+        let e = bare(Some("triggered"), Some("READ"), None)
+            .to_dh_config()
+            .unwrap_err();
+        assert!(e.contains("how often"), "{e}");
+
+        // And a mode that is neither.
+        let e = bare(Some("occasional"), None, None)
+            .to_dh_config()
+            .unwrap_err();
+        assert!(e.contains("periodic or triggered"), "{e}");
+    }
+
+    /// A datagram payload cannot be triggered, whatever the file says: its
+    /// handler has nowhere to send a trigger until the payload has spoken,
+    /// and a triggered payload does not speak first.
+    #[test]
+    fn a_datagram_payload_cannot_be_triggered() {
+        use super::*;
+
+        for protocol in ["udp", "unix_dgram"] {
+            let dh = DHConfigJson {
+                dh_id: 3,
+                name: "DH3".to_string(),
+                group: None,
+                dh_type: Some("network".to_string()),
+                protocol: Some(protocol.to_string()),
+                address: Some("localhost".to_string()),
+                port: Some(5000),
+                path: None,
+                packet_size: Some(8),
+                oc_address: None,
+                oc_port: None,
+                mode: Some("triggered".to_string()),
+                trigger: Some("READ".to_string()),
+                trigger_interval_ms: Some(500),
+            };
+
+            let e = dh.to_dh_config().unwrap_err();
+            assert!(
+                e.contains("cannot be triggered") && e.contains(protocol),
+                "{e}"
+            );
+        }
+    }
+
     /// Every kind of endpoint makes its own kind of handler.
     ///
     /// Written out one by one rather than derived, because this is the

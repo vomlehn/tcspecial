@@ -57,15 +57,17 @@ pub fn run_spi_payload(
 
         // Whatever the handler has sent this way.
         let mut buf = vec![0u8; 4096];
+        let mut asked = 0;
         if let Ok(n) = node.master.read(&mut buf) {
             if n > 0 {
+                asked = n;
                 let mut guard = stats.lock().unwrap();
                 guard.packets_recv += 1;
                 guard.bytes_recv += n as u64;
             }
         }
 
-        if pacing.produces() {
+        if pacing.a_packet_is_due(config.triggered, asked) {
             let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
             let (bytes, whole) = send_in_segments(
                 &packet,
@@ -129,6 +131,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
+                    triggered: false,
         });
         payload.start().expect("the payload starts");
 

@@ -5,10 +5,12 @@
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use log::info;
 use tcslibgs::{DHConfig, DHId, DHName, Statistics, TcsError, TcsResult};
 
 use crate::endpoint::{connect_endpoint_pair, EndpointReadable, EndpointWritable};
-use crate::conduit::{Conduit, ConduitDirection, DHSamples};
+use crate::conduit::{Conduit, ConduitDirection, DHSamples, Polling};
 
 /// Data handler state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,6 +127,13 @@ impl DataHandler {
             stats.bytes_received += live.bytes_received;
             stats.reads_completed += live.reads_completed;
             stats.reads_failed += live.reads_failed;
+            // And the triggers, which nothing else here counts. A handler's
+            // sent and received are the ground's data in each direction, so
+            // this conduit's writes -- the payload side of what it read --
+            // are deliberately left out of them; a trigger is a write of
+            // this conduit's own, with no read behind it, and would be
+            // invisible without a count of its own.
+            stats.triggers_sent += live.triggers_sent;
         }
 
         if let Some(conduit) = &self.payload_to_ground {
@@ -188,11 +197,27 @@ impl DataHandler {
         // this handler's samples. If the second will not start, the first is
         // stopped again rather than left running in a handler that reports
         // itself as never started.
+        // What this handler has to send its payload to get anything back,
+        // for a payload of the kind that answers requests rather than sending
+        // on its own. It goes to the conduit that writes the payload, which is
+        // the one that already has somewhere to put it.
+        let polling = self.config.mode.polling().map(|(trigger, interval_ms)| Polling {
+            trigger: trigger.to_string(),
+            interval: Duration::from_millis(interval_ms as u64),
+        });
+        if let Some(polling) = &polling {
+            info!(
+                "{}: polling every {:?} with {:?}",
+                self.config.name.0, polling.interval, polling.trigger
+            );
+        }
+
         g2p_conduit.start(
             oc_reader,
             payload_writer,
             pipes[G2P].0,
             self.samples.clone(),
+            polling,
         )?;
 
         if let Err(e) = p2g_conduit.start(
@@ -200,6 +225,9 @@ impl DataHandler {
             oc_writer,
             pipes[P2G].0,
             self.samples.clone(),
+            // Nothing: a trigger goes to the payload, and this is the conduit
+            // that writes the ground.
+            None,
         ) {
             let _ = g2p_conduit.stop();
             return Err(e);
@@ -321,6 +349,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+                    mode: Default::default(),
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -402,6 +431,126 @@ mod tests {
         dh.stop().unwrap();
     }
 
+    /// A triggered handler asks its payload, at the interval its
+    /// configuration gives, and carries the answer to the ground.
+    ///
+    /// Nothing in tcspecial used to send a payload anything of its own
+    /// accord: both conduits only ever copied, one from the OC and one from
+    /// the payload, so a payload that answers requests could be described in
+    /// a file and would never be asked. This drives the whole loop, because
+    /// the asking is only worth anything if the answer gets home.
+    #[test]
+    fn a_triggered_handler_asks_its_payload_and_carries_the_answer() {
+        use std::io::{Read, Write};
+        use std::net::{TcpListener, UdpSocket};
+        use std::time::{Duration, Instant};
+        use tcslibgs::{DHConfig, DHMode, DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
+
+        // A TCP payload, because a triggered payload has to be reachable
+        // before it has spoken: the handler connects to it, so it knows where
+        // to send from the start.
+        let payload = TcpListener::bind("127.0.0.1:0").expect("the payload listens");
+        let payload_addr = payload.local_addr().expect("its address");
+
+        let oc = UdpSocket::bind("127.0.0.1:0").expect("a free OC port");
+        let oc_addr = oc.local_addr().expect("its address");
+        drop(oc);
+
+        let config = DHConfig {
+            dh_id: DHId(4),
+            name: DHName::new("Polled"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: payload_addr.ip().to_string(),
+                port: payload_addr.port(),
+            }),
+            packet_size: 64,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+            mode: DHMode::Triggered {
+                trigger: "READ\r".to_string(),
+                interval_ms: 50,
+            },
+        };
+
+        let mut dh = DataHandler::new(config.clone()).unwrap();
+        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            &EndpointConfig::Network(config.oc.clone().unwrap()),
+        )
+        .unwrap();
+        dh.start(oc_reader, oc_writer)
+            .expect("the handler starts and connects to its payload");
+
+        let (mut asked, _) = payload.accept().expect("the handler connects");
+        asked
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+
+        // The trigger arrives without the ground having said anything.
+        let mut buffer = [0u8; 64];
+        let n = asked.read(&mut buffer).expect("a trigger");
+        assert_eq!(&buffer[..n], b"READ\r");
+
+        // And again, because it is sent at an interval rather than once.
+        let since = Instant::now();
+        let n = asked.read(&mut buffer).expect("a second trigger");
+        assert_eq!(&buffer[..n], b"READ\r");
+        assert!(
+            since.elapsed() >= Duration::from_millis(40),
+            "the second trigger came {:?} after the first, which is no interval \
+             at all",
+            since.elapsed()
+        );
+
+        // The ground has to speak once before an answer can reach it; see
+        // the OC's learnt address.
+        let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
+        ground
+            .set_read_timeout(Some(Duration::from_millis(200)))
+            .unwrap();
+        ground.send_to(b"from the ground", oc_addr).unwrap();
+
+        // Now answer a trigger, as the payload would, until it reaches the
+        // ground: the handler may be between polls when the first answer is
+        // written.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut arrived = None;
+        while arrived.is_none() && Instant::now() < deadline {
+            asked.write_all(b"from the payload").expect("the payload answers");
+            if let Ok((n, _)) = ground.recv_from(&mut buffer) {
+                arrived = Some(buffer[..n].to_vec());
+            }
+        }
+        assert_eq!(
+            arrived.as_deref(),
+            Some(&b"from the payload"[..]),
+            "the payload's answer did not reach the ground"
+        );
+
+        // The triggers are counted apart from the writes they are, so that a
+        // handler whose payload is not answering can be told from one the
+        // ground is not sending to.
+        let stats = dh.statistics();
+        assert!(
+            stats.triggers_sent >= 2,
+            "{} triggers counted",
+            stats.triggers_sent
+        );
+        // And they are counted nowhere else: a handler's bytes_sent is what
+        // went to the ground, so the one answer that reached it is all of
+        // that, however many triggers went the other way.
+        assert_eq!(
+            stats.bytes_sent,
+            b"from the payload".len() as u64,
+            "the triggers were counted as data sent to the ground"
+        );
+
+        dh.stop().unwrap();
+    }
+
     /// A running handler reports what has moved, not nothing.
     ///
     /// The counts used to reach a handler only when its conduits were joined,
@@ -433,6 +582,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+                    mode: Default::default(),
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -490,6 +640,7 @@ mod tests {
             }),
             packet_size: 64,
             oc: None,
+                    mode: Default::default(),
         };
 
         let dh = DataHandler::new(config);

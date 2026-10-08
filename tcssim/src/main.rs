@@ -473,6 +473,7 @@ mod tests {
             packet_interval_ms,
             segment_interval_ms,
             segment_size,
+            triggered: false,
         }
     }
 
@@ -584,6 +585,7 @@ mod tests {
             }),
             packet_size: 15,
      oc: None,
+      mode: Default::default(),
  };
 
         let info = payload_info_from(&dh, &sim(500, 250, 5));

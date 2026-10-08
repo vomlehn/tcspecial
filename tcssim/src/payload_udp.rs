@@ -64,8 +64,10 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
         // Whatever the handler has sent down. The socket is connected, so
         // this is the handler's data and nobody else's.
         let mut buf = vec![0u8; 4096];
+        let mut asked = 0;
         if let Ok(n) = socket.recv(&mut buf) {
             if n > 0 {
+                asked = n;
                 let mut guard = stats.lock().unwrap();
                 guard.packets_recv += 1;
                 guard.bytes_recv += n as u64;
@@ -75,7 +77,7 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
         // And a packet of its own, asked for or not. Each segment is a
         // datagram, so a packet in four segments arrives as four reads at the
         // handler.
-        if pacing.produces() {
+        if pacing.a_packet_is_due(config.triggered, asked) {
             let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
             let (bytes, whole) = send_in_segments(
                 &packet,
@@ -137,6 +139,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
+                    triggered: false,
         });
         payload.start().expect("the payload starts");
 
@@ -200,6 +203,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(50)),
             segment_interval_ms: Arc::new(AtomicU32::new(50)),
+                    triggered: false,
         });
         payload.start().expect("the payload starts");
 

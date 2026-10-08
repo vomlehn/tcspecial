@@ -1130,6 +1130,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+            mode: Default::default(),
         }
     }
 
@@ -1427,6 +1428,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+                    mode: Default::default(),
         };
 
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
@@ -1484,6 +1486,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+                    mode: Default::default(),
         };
 
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![dh_info_from(&dh)]));
@@ -1546,6 +1549,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+                    mode: Default::default(),
         };
 
         let info = dh_info_from(&dh);
@@ -1729,6 +1733,7 @@ mod tests {
                 }),
                 packet_size: 4,
                 oc: None,
+                            mode: Default::default(),
             },
             DHConfig {
                 dh_id: DHId(9),
@@ -1740,6 +1745,7 @@ mod tests {
                 }),
                 packet_size: 8,
                 oc: None,
+                            mode: Default::default(),
             },
         ];
 

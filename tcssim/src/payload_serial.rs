@@ -59,8 +59,10 @@ pub fn run_serial_payload(
 
         // Whatever the handler has written down the line.
         let mut buf = vec![0u8; 4096];
+        let mut asked = 0;
         if let Ok(n) = line.master.read(&mut buf) {
             if n > 0 {
+                asked = n;
                 let mut guard = stats.lock().unwrap();
                 guard.packets_recv += 1;
                 guard.bytes_recv += n as u64;
@@ -71,7 +73,7 @@ pub fn run_serial_payload(
         // than a datagram: a line has no edges, so what divides a packet for
         // a handler reading one is when the bytes arrive, which is what the
         // segment interval decides.
-        if pacing.produces() {
+        if pacing.a_packet_is_due(config.triggered, asked) {
             let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
             let (bytes, whole) = send_in_segments(
                 &packet,
@@ -129,6 +131,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(segment)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
+                    triggered: false,
         })
     }
 

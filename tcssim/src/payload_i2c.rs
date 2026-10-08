@@ -250,7 +250,7 @@ pub fn run_i2c_payload(
         // handler writes to it is what the simulator would read, and reading
         // its own data back and counting it as received would be a lie about
         // where it came from.
-        if pacing.produces() {
+        if pacing.a_packet_is_due(config.triggered, 0) {
             let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
             let segment_size = match pacing.segment_size {
                 0 => I2C_SMBUS_BLOCK_MAX,

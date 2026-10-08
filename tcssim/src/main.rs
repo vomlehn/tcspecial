@@ -1029,20 +1029,37 @@ mod tests {
         }
     }
 
-    /// The payload file is for payloads, so it says nothing about simulating
-    /// them. A packet interval that crept back into it would be read by
-    /// nothing and silently disagree with the simulator file.
+    /// A shipped payload file states a packet interval only where a payload
+    /// is triggered, and no other simulation setting at all.
+    ///
+    /// The interval a payload file may state is the rate a trigger goes out
+    /// at, which is tcspecial's doing and so flight behaviour. Everything
+    /// else about timing and segmentation is the simulator's, and a line of
+    /// it that crept into the payload file would be read by nothing: the
+    /// loader refuses an interval on a periodic payload, but a segment size
+    /// there is an unknown attribute, and this says plainly which file the
+    /// settings belong in.
     #[test]
-    fn the_shipped_payload_files_state_no_simulator_settings() {
+    fn a_shipped_payload_file_states_only_a_triggered_payload_s_interval() {
         for (payload_path, sim_path) in shipped_sets() {
             let text = std::fs::read_to_string(&payload_path).unwrap();
+            // Whether the payload whose attributes are being read is one that
+            // answers requests. Each payload starts with its dh_id.
+            let mut triggered = false;
 
             for (number, line) in text.lines().enumerate() {
                 let line = line.trim().trim_start_matches("- ");
                 if line.starts_with('#') {
                     continue;
                 }
-                for setting in ["packet_interval_ms", "segment_interval_ms", "segment_size"] {
+                if line.starts_with("dh_id") {
+                    triggered = false;
+                }
+                if line.starts_with("mode") && line.contains("triggered") {
+                    triggered = true;
+                }
+
+                for setting in ["segment_interval_ms", "segment_size"] {
                     assert!(
                         !line.starts_with(setting),
                         "{}:{} states {}, which belongs in {}",
@@ -1052,6 +1069,15 @@ mod tests {
                         sim_path.display()
                     );
                 }
+
+                assert!(
+                    !line.starts_with("packet_interval_ms") || triggered,
+                    "{}:{} states packet_interval_ms for a payload that sends on \
+                     its own, whose rate belongs in {}",
+                    payload_path.display(),
+                    number + 1,
+                    sim_path.display()
+                );
             }
         }
     }

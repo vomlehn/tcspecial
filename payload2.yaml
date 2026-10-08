@@ -6,15 +6,18 @@
 # divides a packet into segments; those are properties of the simulation rather
 # than of the payload, and live in payload2sim.yaml.
 #
-# This set has one data handler, so it has no data handler groups: a group
-# carries what several handlers share, and a group no handler names is an
-# error rather than a section with no effect.
+# The set has two payloads, one of each kind: one that sends of its own accord
+# and one that answers a request. Neither takes attributes from a group -- a
+# group carries what several payloads share, and these two share only the host
+# they are on.
 version: "1.0"
 description: TCSpecial payload set 2
 
 payloads:
+  # Sends of its own accord: nothing here about timing, since how fast a
+  # simulated payload sends is a property of the simulation.
   - dh_id: 0
-    name: DH0
+    name: auto-send
     oc_address: 127.0.0.1
     oc_port: 6000
     type: network
@@ -22,3 +25,23 @@ payloads:
     address: localhost
     port: 5000
     packet_size: 12
+
+  # Answers a request. The trigger and the rate it goes out at are both
+  # flight behaviour -- tcspecial does the sending -- so both are here, and
+  # payload2sim.yaml states no interval for this payload at all.
+  #
+  # TCP rather than UDP because a datagram handler learns where its payload is
+  # from the payload's first packet, so it has nowhere to send a trigger until
+  # the payload has spoken, which a triggered payload does not do.
+  - dh_id: 1
+    name: triggered-send
+    oc_address: 127.0.0.1
+    oc_port: 6003
+    type: network
+    protocol: tcp
+    address: localhost
+    port: 5003
+    packet_size: 12
+    mode: triggered
+    trigger: "go"
+    packet_interval_ms: 1000

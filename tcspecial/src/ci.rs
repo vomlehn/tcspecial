@@ -194,38 +194,60 @@ impl CommandInterpreter {
                         Err(_) => return Telemetry::StartDH(StartDHTelemetry::new(cmd.header.sequence, CommandStatus::Failure)),
                     };
 
-                    // Existing is not the same as started. initialize_handlers
-                    // puts a handler in this map for every one the payload file
-                    // describes, all of them Created and none of them running,
-                    // so a check for existence answered Success to every
-                    // START_DH and started nothing. What makes this idempotent
-                    // is the state, not the presence.
-                    match handlers.get_mut(&cmd.dh_id) {
-                        None => CommandStatus::NotFound,
-                        Some(dh) if dh.state() == DHState::Active => {
+                    // A handler in the map always came from the
+                    // configuration, so a missing config cannot happen; it is
+                    // a status rather than a panic because a command
+                    // interpreter should not die of a surprise.
+                    let config = self
+                        .payload_config
+                        .iter()
+                        .find(|c| c.dh_id == cmd.dh_id);
+
+                    match (handlers.get_mut(&cmd.dh_id), config) {
+                        (None, _) | (_, None) => CommandStatus::NotFound,
+
+                        // The kind the command names has to be the kind the
+                        // handler is. Both ends read the same configuration
+                        // file, so a mismatch is not a handler that needs
+                        // starting differently -- it is the two ends
+                        // disagreeing about what that file says, or a command
+                        // made by hand. Starting it anyway would open the
+                        // endpoint the configuration describes while the
+                        // ground believed it had started something else.
+                        //
+                        // Checked before the state, so that a mis-named
+                        // START_DH is refused whether or not the handler
+                        // happens to be running: what is wrong with it is
+                        // wrong either way.
+                        (Some(_), Some(config)) if cmd.dh_type != config.endpoint.kind() => {
+                            error!(
+                                "{}: START_DH asks for a {:?} handler, but it is {:?}",
+                                config.name.0,
+                                cmd.dh_type,
+                                config.endpoint.kind()
+                            );
+                            CommandStatus::InvalidParameter
+                        }
+
+                        // Existing is not the same as started.
+                        // initialize_handlers puts a handler in this map for
+                        // every one the configuration describes, all of them
+                        // Created and none of them running, so a check for
+                        // existence answered Success to every START_DH and
+                        // started nothing. What makes this idempotent is the
+                        // state, not the presence.
+                        (Some(dh), Some(_)) if dh.state() == DHState::Active => {
                             // Genuinely already started.
                             CommandStatus::Success
                         }
-                        Some(dh) => {
-                            match self
-                                .payload_config
-                                .iter()
-                                .find(|c| c.dh_id == cmd.dh_id)
-                            {
-                                Some(config) => match start_handler(dh, config) {
-                                    Ok(()) => CommandStatus::Success,
-                                    Err(e) => {
-                                        error!("{}: cannot start: {}", config.name.0, e);
-                                        CommandStatus::Failure
-                                    }
-                                },
-                                // A handler in the map always came from the
-                                // payload file, so this cannot happen; it is a
-                                // status rather than a panic because a command
-                                // interpreter should not die of a surprise.
-                                None => CommandStatus::NotFound,
+
+                        (Some(dh), Some(config)) => match start_handler(dh, config) {
+                            Ok(()) => CommandStatus::Success,
+                            Err(e) => {
+                                error!("{}: cannot start: {}", config.name.0, e);
+                                CommandStatus::Failure
                             }
-                        }
+                        },
                     }
                 };
                 Telemetry::StartDH(StartDHTelemetry::new(cmd.header.sequence, status))
@@ -437,6 +459,74 @@ mod tests {
     /// StartDH actually starts a handler that then moves data.
     ///
     /// Written because START_DH answered Success in a running tcsmoc session
+    /// A START_DH that names the wrong kind is refused, and starts nothing.
+    ///
+    /// The kind travelled in the command and nothing compared it with the
+    /// handler's own, so the ground could ask for a network handler, be
+    /// answered Success, and have a device opened instead. Both ends read the
+    /// same configuration file, so a mismatch is the two of them disagreeing
+    /// about what that file says -- or a command made by hand -- and neither
+    /// is a thing to carry out.
+    #[test]
+    fn a_start_dh_naming_the_wrong_kind_is_refused() {
+        use tcslibgs::{DHConfig, DHName, DHType, DeviceConfig, EndpointConfig, StartDHCommand};
+
+        let handler = DHConfig {
+            dh_id: DHId(2),
+            name: DHName::new("DH2"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 1,
+            // No OC address: a handler that were started would fail for want
+            // of one, and nothing here should get that far.
+            oc: None,
+        };
+
+        let mut ci = CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![handler],
+        )
+        .expect("an interpreter");
+        ci.initialize_handlers().expect("handlers are made at startup");
+
+        // Every kind but the one it is.
+        for wrong in [DHType::Network, DHType::Serial, DHType::I2c, DHType::Spi] {
+            match ci.process_command(Command::StartDH(StartDHCommand::new(
+                1,
+                DHId(2),
+                wrong,
+                DHName::new("DH2"),
+            ))) {
+                Telemetry::StartDH(tm) => assert_eq!(
+                    tm.header.status,
+                    CommandStatus::InvalidParameter,
+                    "START_DH as {wrong:?} said {:?}",
+                    tm.header.status
+                ),
+                other => panic!("expected START_DH telemetry, got {other:?}"),
+            }
+        }
+
+        // And it started nothing: a refused command leaves the handler as it
+        // was, not half way into being something else.
+        let handlers = ci.data_handlers.lock().expect("the handler map");
+        assert_eq!(
+            handlers
+                .get(&DHId(2))
+                .expect("the handler is still there")
+                .state(),
+            DHState::Created
+        );
+    }
+
     /// while the handler's OC port was never bound and every counter stayed
     /// at zero.
     #[test]

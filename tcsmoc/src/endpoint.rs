@@ -6,10 +6,12 @@
 //! handler a START_DH is asking for, since both follow from the endpoint the
 //! payload configuration file gives.
 //!
-//! One place for both, so that a kind of endpoint added to the configuration
-//! has one file here to be taught about rather than a window to be searched.
+//! Which kind of handler a START_DH asks for is not worked out here: it is
+//! `EndpointConfig::kind`, in tcslibgs, because tcspecial checks the kind a
+//! command names against the same mapping. Two copies of it would be two
+//! chances for the ground to ask for something the spacecraft refuses.
 
-use tcslibgs::{DHType, EndpointConfig, NetworkProtocol};
+use tcslibgs::{EndpointConfig, NetworkProtocol};
 
 /// How a data handler's endpoint reads in its panel.
 pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
@@ -43,34 +45,19 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
     }
 }
 
-/// Which kind of data handler tcspecial is being asked to start.
-///
-/// START_DH carries the type, and the configuration file is what knows it: a
-/// device handler started as a network handler is a command tcspecial cannot
-/// carry out.
-pub fn dh_type_of(endpoint: &EndpointConfig) -> DHType {
-    match endpoint {
-        EndpointConfig::Network(_) => DHType::Network,
-        EndpointConfig::Device(_) => DHType::Device,
-        EndpointConfig::Serial(_) => DHType::Serial,
-        EndpointConfig::I2c(_) => DHType::I2c,
-        EndpointConfig::Spi(_) => DHType::Spi,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use tcslibgs::{DeviceConfig, NetworkConfig};
 
-    /// A device handler is started as a device handler, not as whatever the
-    /// first panel happens to be.
+    /// What a panel says about an endpoint, which is the kind and where it
+    /// is. Which kind of handler to ask for is `EndpointConfig::kind` and is
+    /// tested where it lives.
     #[test]
-    fn a_handler_is_started_as_the_type_its_endpoint_makes_it() {
+    fn a_panel_names_the_kind_of_endpoint_and_where_it_is() {
         let device = EndpointConfig::Device(DeviceConfig {
             path: "/dev/urandom".to_string(),
         });
-        assert!(dh_type_of(&device) == DHType::Device);
         assert_eq!(endpoint_description(&device), "Device /dev/urandom");
 
         let network = EndpointConfig::Network(NetworkConfig {
@@ -78,7 +65,6 @@ mod tests {
             address: "localhost".to_string(),
             port: 5000,
         });
-        assert!(dh_type_of(&network) == DHType::Network);
         assert_eq!(endpoint_description(&network), "TCP localhost:5000");
     }
 

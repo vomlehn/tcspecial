@@ -647,6 +647,22 @@ Requirement
     again, and repeating those would turn a clear fault into a slow one.
 
 Requirement
+    A START_DH naming a kind that is not the handler's kind is refused with
+    ``InvalidParameter``, and starts nothing. The ground and the spacecraft
+    read the same configuration file, so a mismatch is not a handler to be
+    started differently: it is the two ends disagreeing about what that file
+    says, or a command made by hand. Starting it anyway would open the
+    endpoint the configuration describes while the ground believed it had
+    started something else.
+
+The kind a START_DH carries is worked out from the endpoint by one mapping,
+``EndpointConfig::kind``, which both ends use: the ground to say what it is
+asking for and the spacecraft to check what was asked. Two copies of it would
+be two chances for the ground to ask for something the spacecraft refuses. The
+check is made before the handler's state is looked at, so a mis-named START_DH
+is refused whether or not the handler happens to be running.
+
+Requirement
     An endpoint is of one of five kinds: ``network``, ``device``, ``serial``,
     ``i2c`` or ``spi``. The kind decides what locates the endpoint and what
     terms it is opened on, and a handler carries both: a serial line's framing,

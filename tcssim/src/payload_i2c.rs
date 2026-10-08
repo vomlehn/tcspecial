@@ -29,10 +29,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use rand::Rng;
-
 use crate::payload::{
-    make_the_path_lead_to, send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
+    a_packet, lateness, make_the_path_lead_to, send_in_segments, wait_out_packet,
+    wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
 /// Where the kernel lists its I2C adapters, and what the stub's is called.
@@ -240,6 +239,9 @@ pub fn run_i2c_payload(
     };
 
     let mut rng = rand::thread_rng();
+    // Packets that have gone, which the faults that are counted rather than
+    // random ask about.
+    let mut sent = 0u64;
     let fd = bus.bus.as_raw_fd();
 
     while running.load(Ordering::SeqCst) {
@@ -251,12 +253,20 @@ pub fn run_i2c_payload(
         // its own data back and counting it as received would be a lie about
         // where it came from.
         if pacing.a_packet_is_due(config.triggered, 0) {
-            let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
+            let late = lateness(&config, &mut rng);
+            let packet = match a_packet(&config, &pacing, sent, &mut rng) {
+                Produce::Send(packet) => packet,
+                // Dropped, or gone quiet: nothing goes, and nothing
+                // is counted, because nothing moved.
+                Produce::Nothing => Vec::new(),
+            };
             let segment_size = match pacing.segment_size {
                 0 => I2C_SMBUS_BLOCK_MAX,
                 asked => asked.min(I2C_SMBUS_BLOCK_MAX),
             };
 
+            // However late this one is being made, before it goes.
+            wait_while_running(late, &running);
             let (bytes, whole) = send_in_segments(
                 &packet,
                 segment_size,
@@ -277,6 +287,7 @@ pub fn run_i2c_payload(
                 guard.bytes_sent += bytes;
                 if whole {
                     guard.packets_sent += 1;
+                    sent += 1;
                 }
             }
         }

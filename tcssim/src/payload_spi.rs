@@ -25,9 +25,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use rand::Rng;
-
-use crate::payload::{send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats};
+use crate::payload::{
+    a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
+};
 use crate::pty::SimulatedNode;
 
 /// Run SPI payload simulation
@@ -50,6 +51,9 @@ pub fn run_spi_payload(
     };
 
     let mut rng = rand::thread_rng();
+    // Packets that have gone, which the faults that are counted rather than
+    // random ask about.
+    let mut sent = 0u64;
 
     while running.load(Ordering::SeqCst) {
         let started = Instant::now();
@@ -67,8 +71,18 @@ pub fn run_spi_payload(
             }
         }
 
-        if pacing.a_packet_is_due(config.triggered, asked) {
-            let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
+        if pacing.a_packet_is_due(config.triggered, asked)
+                && !ignore_this_request(&config, &mut rng)
+            {
+            let late = lateness(&config, &mut rng);
+            let packet = match a_packet(&config, &pacing, sent, &mut rng) {
+                Produce::Send(packet) => packet,
+                // Dropped, or gone quiet: nothing goes, and nothing
+                // is counted, because nothing moved.
+                Produce::Nothing => Vec::new(),
+            };
+            // However late this one is being made, before it goes.
+            wait_while_running(late, &running);
             let (bytes, whole) = send_in_segments(
                 &packet,
                 pacing.segment_size,
@@ -82,6 +96,7 @@ pub fn run_spi_payload(
                 guard.bytes_sent += bytes;
                 if whole {
                     guard.packets_sent += 1;
+                    sent += 1;
                 }
             }
         }
@@ -127,6 +142,7 @@ mod tests {
             address: path.display().to_string(),
             port: 0,
             bus_address: 0,
+            faults: Default::default(),
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),

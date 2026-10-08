@@ -11,13 +11,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use rand::Rng;
-
-use crate::payload::{send_in_segments, wait_out_packet, Pacing, PayloadConfig, PayloadStats};
+use crate::payload::{
+    a_packet, lateness, send_in_segments, wait_out_packet, wait_while_running, Pacing,
+    PayloadConfig, PayloadStats, Produce,
+};
 
 /// Run device payload simulation (simulates /dev/urandom-like behavior)
 pub fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
     let mut rng = rand::thread_rng();
+    // Packets that have gone, which the faults that are counted rather than
+    // random ask about.
+    let mut sent = 0u64;
 
     while running.load(Ordering::SeqCst) {
         let started = Instant::now();
@@ -31,7 +35,15 @@ pub fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats
             // rather than sent anywhere. The pacing is the point: segments
             // appear at the segment rate, as they would from the far end of a
             // device that delivers a packet in pieces.
-            let packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
+            let late = lateness(&config, &mut rng);
+            let packet = match a_packet(&config, &pacing, sent, &mut rng) {
+                Produce::Send(packet) => packet,
+                // Dropped, or gone quiet: nothing goes, and nothing
+                // is counted, because nothing moved.
+                Produce::Nothing => Vec::new(),
+            };
+            // However late this one is being made, before it goes.
+            wait_while_running(late, &running);
             let (bytes, whole) = send_in_segments(
                 &packet,
                 pacing.segment_size,
@@ -45,6 +57,7 @@ pub fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats
                 guard.bytes_sent += bytes;
                 if whole {
                     guard.packets_sent += 1;
+                    sent += 1;
                 }
             }
         }

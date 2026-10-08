@@ -28,6 +28,10 @@ use std::path::Path;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use rand::Rng;
+
+use crate::sim_config::Faults;
+
 /// Payload configuration
 #[derive(Clone)]
 pub struct PayloadConfig {
@@ -48,6 +52,8 @@ pub struct PayloadConfig {
     /// payload a payload is, is a property of the payload. A triggered one
     /// sends one packet for each trigger it is sent, and nothing otherwise.
     pub triggered: bool,
+    /// What this payload is asked to do wrong; see [`Faults`].
+    pub faults: Faults,
     pub packet_size: Arc<AtomicU32>,
     pub segment_size: Arc<AtomicU32>,
     pub packet_interval_ms: Arc<AtomicU32>,
@@ -110,6 +116,13 @@ impl SimulatedPayload {
     pub fn start(&mut self) -> Result<(), String> {
         if self.running.load(Ordering::SeqCst) {
             return Err("Already running".to_string());
+        }
+
+        // What this payload was told to do wrong, said once. A run whose
+        // payload was dropping a tenth of its packets should not have to be
+        // guessed at from the counters afterwards.
+        if self.config.faults.any() {
+            eprintln!("injecting faults: {:?}", self.config.faults);
         }
 
         self.running.store(true, Ordering::SeqCst);
@@ -321,6 +334,120 @@ pub(crate) fn send_in_segments(
     (sent, true)
 }
 
+/// What becomes of one packet.
+///
+/// A payload that works always sends. One with faults may send something else,
+/// or nothing: dropping a packet and having gone silent are both nothing to
+/// the handler, which is the point of them -- a handler cannot tell a payload
+/// that skipped a packet from one that never had it.
+pub(crate) enum Produce {
+    /// Send these bytes, which may not be the bytes that were generated.
+    Send(Vec<u8>),
+    /// Send nothing at all.
+    Nothing,
+}
+
+/// Make the packet this pass should send, and do to it whatever the faults
+/// ask.
+///
+/// `sent` is how many packets have gone so far, which the faults that are
+/// counted rather than random need: a payload that goes quiet after a hundred
+/// packets has to know it has sent a hundred.
+///
+/// The order is the order a real fault would happen in. A dropped packet is
+/// never generated, there being nothing yet to corrupt. A truncated packet is
+/// cut before it is corrupted, so that the corruption lands in what is
+/// actually sent rather than in the part that was cut off.
+pub(crate) fn a_packet(
+    config: &PayloadConfig,
+    pacing: &Pacing,
+    sent: u64,
+    rng: &mut impl Rng,
+) -> Produce {
+    let faults = &config.faults;
+
+    // Gone quiet and still connected: what a wedged instrument looks like
+    // from the handler's end, and harder to notice than one that closed.
+    if faults.silent_after > 0 && sent >= faults.silent_after {
+        return Produce::Nothing;
+    }
+
+    if happens(faults.drop_percent, rng) {
+        return Produce::Nothing;
+    }
+
+    let mut packet: Vec<u8> = (0..pacing.packet_size).map(|_| rng.gen()).collect();
+
+    // A packet of one byte is left alone: there is no length that is both
+    // shorter than one and not empty, and an empty packet is the dropping
+    // fault rather than this one.
+    if packet.len() > 1 && happens(faults.truncate_percent, rng) {
+        // Shorter than it was, and never empty. Never its own length either:
+        // a packet with every byte still in it was not truncated, so keeping
+        // it in range would have a file asking for a tenth of its packets
+        // truncated quietly get fewer -- the same reason corrupt() never
+        // leaves a byte as it found it.
+        let keep = rng.gen_range(1..packet.len());
+        packet.truncate(keep);
+    }
+
+    if !packet.is_empty() && happens(faults.corrupt_percent, rng) {
+        let which = rng.gen_range(0..packet.len());
+        packet[which] = corrupt(packet[which], rng);
+    }
+
+    Produce::Send(packet)
+}
+
+/// One byte, altered.
+///
+/// Never the byte it was: something is added to it, and never nothing. A
+/// corruption that left the value alone would be a fault that did not happen,
+/// and a run that was told to corrupt a tenth of its packets would quietly
+/// corrupt fewer. Zero is not used as the replacement either -- a zero is a
+/// plausible value and would pass for data, where a byte that has changed is
+/// wrong in the way a checksum or a sequence number is meant to catch.
+fn corrupt(byte: u8, rng: &mut impl Rng) -> u8 {
+    byte.wrapping_add(rng.gen_range(1..=255u8))
+}
+
+/// Whether something that happens `percent` times in a hundred happens now.
+fn happens(percent: u32, rng: &mut impl Rng) -> bool {
+    match percent {
+        0 => false,
+        100 => true,
+        percent => rng.gen_range(0..100) < percent,
+    }
+}
+
+/// How much later than it should this packet is.
+///
+/// Waited before the packet goes rather than added to the interval, which is
+/// what makes it jitter and not a slower rate: the pass still ends when the
+/// interval ends, so a payload told to send every second still sends every
+/// second, with the packet itself a little late inside that. Late and never
+/// early, because early would be the simulator sending before the interval
+/// its own configuration asked for.
+pub(crate) fn lateness(config: &PayloadConfig, rng: &mut impl Rng) -> Duration {
+    match config.faults.jitter_ms {
+        0 => Duration::ZERO,
+        jitter => Duration::from_millis(rng.gen_range(0..=jitter) as u64),
+    }
+}
+
+/// Whether this request goes unanswered.
+///
+/// What exercises a handler's own waiting: a trigger sent and nothing returned
+/// is the case a response timeout exists for.
+pub(crate) fn ignore_this_request(config: &PayloadConfig, rng: &mut impl Rng) -> bool {
+    happens(config.faults.ignore_trigger_percent, rng)
+}
+
+/// Whether the payload hangs up now, for the kinds with a link to hang up.
+pub(crate) fn hangs_up(config: &PayloadConfig, sent: u64) -> bool {
+    config.faults.close_after > 0 && sent >= config.faults.close_after
+}
+
 /// What the sender threads read out of the shared configuration each time
 /// round, since the window can change any of it while a payload runs.
 pub(crate) struct Pacing {
@@ -388,8 +515,218 @@ pub(crate) fn wait_out_packet(pacing: &Pacing, since: Instant, running: &AtomicB
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::AtomicU32;
 
     /// What a packet is divided into, and what the pieces add up to.
+    /// A payload with faults, for the tests below. Everything else is what a
+    /// payload that works has.
+    fn with(faults: Faults) -> PayloadConfig {
+        PayloadConfig {
+            _id: 0,
+            protocol: PayloadProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: 5000,
+            bus_address: 0,
+            triggered: false,
+            faults,
+            packet_size: Arc::new(AtomicU32::new(12)),
+            segment_size: Arc::new(AtomicU32::new(12)),
+            packet_interval_ms: Arc::new(AtomicU32::new(100)),
+            segment_interval_ms: Arc::new(AtomicU32::new(100)),
+        }
+    }
+
+    fn pacing_of(config: &PayloadConfig) -> Pacing {
+        Pacing::read(config)
+    }
+
+    /// A payload with no faults sends every packet, whole, as it always did.
+    #[test]
+    fn a_payload_with_no_faults_sends_every_packet_whole() {
+        let config = with(Faults::default());
+        let pacing = pacing_of(&config);
+        let mut rng = rand::thread_rng();
+
+        for sent in 0..20 {
+            match a_packet(&config, &pacing, sent, &mut rng) {
+                Produce::Send(packet) => assert_eq!(packet.len(), 12),
+                Produce::Nothing => panic!("a payload that works dropped a packet"),
+            }
+        }
+    }
+
+    /// The percentages are tested at their ends, where they are certain.
+    ///
+    /// A tenth of anything cannot be asserted from one run without either a
+    /// seed or a tolerance, and both would be testing the distribution rather
+    /// than the plumbing. Nought and a hundred say whether the knob is
+    /// connected, which is the part that can be got wrong.
+    #[test]
+    fn every_packet_or_none_of_them_is_what_the_ends_of_a_percentage_mean() {
+        let mut rng = rand::thread_rng();
+
+        let all_dropped = with(Faults {
+            drop_percent: 100,
+            ..Faults::default()
+        });
+        for sent in 0..10 {
+            assert!(
+                matches!(
+                    a_packet(&all_dropped, &pacing_of(&all_dropped), sent, &mut rng),
+                    Produce::Nothing
+                ),
+                "a payload dropping everything sent something"
+            );
+        }
+
+        let all_truncated = with(Faults {
+            truncate_percent: 100,
+            ..Faults::default()
+        });
+        for sent in 0..20 {
+            match a_packet(&all_truncated, &pacing_of(&all_truncated), sent, &mut rng) {
+                Produce::Send(packet) => {
+                    // Shorter than the twelve asked for, and not empty.
+                    // Twelve would be a packet that was not truncated, which
+                    // is what a file asking for every packet to be truncated
+                    // did not ask for; empty would be the dropping fault.
+                    assert!(
+                        (1..12).contains(&packet.len()),
+                        "a truncated packet of twelve bytes came back {} bytes long",
+                        packet.len()
+                    );
+                }
+                Produce::Nothing => panic!("truncating is not dropping"),
+            }
+        }
+
+        // A packet of one byte is the case truncation cannot serve: there is
+        // no length both shorter than one and not empty. It goes whole rather
+        // than not at all, because not at all is the other fault.
+        all_truncated.packet_size.store(1, Ordering::SeqCst);
+        for sent in 0..20 {
+            match a_packet(&all_truncated, &pacing_of(&all_truncated), sent, &mut rng) {
+                Produce::Send(packet) => assert_eq!(
+                    packet.len(),
+                    1,
+                    "a one-byte packet cannot be shortened and must still be sent"
+                ),
+                Produce::Nothing => panic!("a packet too short to truncate was dropped"),
+            }
+        }
+
+        // Corruption is of a byte within a packet, so what can be required of
+        // it from outside is that the packet is still a packet: the fault
+        // that can be seen from here is a packet whose length changed, which
+        // would be truncation wearing the wrong name.
+        let all_corrupted = with(Faults {
+            corrupt_percent: 100,
+            ..Faults::default()
+        });
+        for sent in 0..20 {
+            match a_packet(&all_corrupted, &pacing_of(&all_corrupted), sent, &mut rng) {
+                Produce::Send(packet) => assert_eq!(packet.len(), 12),
+                Produce::Nothing => panic!("corrupting is not dropping"),
+            }
+        }
+    }
+
+    /// A corrupted byte is never the byte it was.
+    ///
+    /// Every value, many times over, because the fault is only a fault if it
+    /// changes something: a corruption that left a value alone would be a run
+    /// that corrupted fewer packets than it was told to, and nothing would
+    /// say so.
+    #[test]
+    fn a_corrupted_byte_is_never_the_byte_it_was() {
+        let mut rng = rand::thread_rng();
+        for byte in 0..=255u8 {
+            for _ in 0..20 {
+                assert_ne!(corrupt(byte, &mut rng), byte, "{byte} came back itself");
+            }
+        }
+    }
+
+    /// A payload told to go quiet after so many packets goes quiet, and stays
+    /// that way: that is what distinguishes it from one that drops a few.
+    #[test]
+    fn a_payload_that_goes_quiet_stays_quiet() {
+        let config = with(Faults {
+            silent_after: 3,
+            ..Faults::default()
+        });
+        let pacing = pacing_of(&config);
+        let mut rng = rand::thread_rng();
+
+        for sent in 0..3 {
+            assert!(
+                matches!(a_packet(&config, &pacing, sent, &mut rng), Produce::Send(_)),
+                "it went quiet after {sent} packets rather than 3"
+            );
+        }
+        for sent in 3..30 {
+            assert!(
+                matches!(a_packet(&config, &pacing, sent, &mut rng), Produce::Nothing),
+                "it spoke again after going quiet, at {sent}"
+            );
+        }
+    }
+
+    /// Jitter is a wait before a packet goes, bounded by what was asked for,
+    /// and never negative: a packet is late or on time, never early.
+    #[test]
+    fn jitter_is_bounded_and_never_early() {
+        let none = with(Faults::default());
+        let mut rng = rand::thread_rng();
+        assert_eq!(lateness(&none, &mut rng), Duration::ZERO);
+
+        let jittery = with(Faults {
+            jitter_ms: 20,
+            ..Faults::default()
+        });
+        for _ in 0..200 {
+            let late = lateness(&jittery, &mut rng);
+            assert!(
+                late <= Duration::from_millis(20),
+                "{late:?} is later than the 20ms asked for"
+            );
+        }
+    }
+
+    /// A request is ignored or answered, and at the ends of the percentage it
+    /// is certain which.
+    #[test]
+    fn an_ignored_request_is_one_the_payload_does_not_answer() {
+        let mut rng = rand::thread_rng();
+
+        let answers = with(Faults::default());
+        assert!(!ignore_this_request(&answers, &mut rng));
+
+        let deaf = with(Faults {
+            ignore_trigger_percent: 100,
+            ..Faults::default()
+        });
+        for _ in 0..20 {
+            assert!(ignore_this_request(&deaf, &mut rng));
+        }
+    }
+
+    /// Hanging up happens on the packet it was asked for and not before.
+    #[test]
+    fn a_payload_hangs_up_on_the_packet_it_was_told_to() {
+        let never = with(Faults::default());
+        assert!(!hangs_up(&never, 1000), "a payload with no fault hung up");
+
+        let hangs = with(Faults {
+            close_after: 5,
+            ..Faults::default()
+        });
+        for sent in 0..5 {
+            assert!(!hangs_up(&hangs, sent), "it hung up after {sent}");
+        }
+        assert!(hangs_up(&hangs, 5));
+    }
+
     #[test]
     fn a_packet_is_cut_into_segments_of_the_size_asked_for() {
         let packet: Vec<u8> = (0..12).collect();
@@ -544,6 +881,7 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 5000,
             bus_address: 0,
+            faults: Default::default(),
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),

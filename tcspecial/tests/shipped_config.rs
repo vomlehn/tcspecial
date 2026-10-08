@@ -150,8 +150,9 @@ fn the_shipped_payload_configs_load() {
 
 #[test]
 fn the_shipped_files_have_distinct_data_handler_ids() {
-    // A duplicate id parses cleanly and then has one handler shadow another,
-    // which is the kind of thing only a test of the real file catches.
+    // The loader refuses a duplicate id now, so this says the shipped files
+    // get past that rule rather than being the only thing that enforces it,
+    // which is what it was before the rule existed.
     for path in shipped_payload_files() {
         let handlers = load_dh_configs(&path).unwrap();
         let mut ids: Vec<_> = handlers.iter().map(|dh| dh.dh_id).collect();

@@ -17,10 +17,18 @@
 //!
 //! simulated_payloads:
 //!   - name: DH0
+//!     type: network
+//!     protocol: udp
 //!     group: steady_1hz
 //!   - name: DH3
+//!     type: network
+//!     protocol: tcp
 //!     packet_interval_ms: 500
 //! ```
+//!
+//! The kind and the transport are the payload configuration's, not this
+//! file's: they are stated here only so that a simulator file paired with the
+//! wrong payload file is an error rather than a run that produces nothing.
 //!
 //! A group carries what several simulated payloads have in common; a payload
 //! overrides any of it for itself. The format is chosen from the file extension
@@ -31,8 +39,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
 
+use serde::de::IgnoredAny;
 use serde::Deserialize;
-use tcslibgs::{load_config_file, DHConfig, EndpointConfig, NetworkProtocol, TcsResult};
+use tcslibgs::{load_config_file, DHConfig, DHType, EndpointConfig, NetworkProtocol, TcsResult};
 
 /// What can be wrong with a simulator configuration, once it has parsed.
 ///
@@ -71,6 +80,38 @@ pub enum SimConfigError {
         payload: String,
         fault: &'static str,
         why: &'static str,
+    },
+    /// A simulated payload that does not say what kind of payload it is.
+    NoKind { payload: String, actually: DHType },
+    /// A word that names no kind of payload.
+    NoSuchKind { payload: String, given: String },
+    /// The two files disagree about what kind of payload this is.
+    KindMismatch {
+        payload: String,
+        in_payload_file: DHType,
+        in_sim_file: DHType,
+    },
+    /// A network payload that does not say which transport.
+    NoProtocol {
+        payload: String,
+        actually: NetworkProtocol,
+    },
+    /// A word that names no transport.
+    NoSuchProtocol { payload: String, given: String },
+    /// The two files disagree about the transport.
+    ProtocolMismatch {
+        payload: String,
+        in_payload_file: NetworkProtocol,
+        in_sim_file: NetworkProtocol,
+    },
+    /// A protocol stated for a kind of payload that has none.
+    ProtocolForWhatHasNone { payload: String, kind: DHType },
+    /// A word that is not a setting at all, which is what a misspelled
+    /// setting looks like.
+    NoSuchSetting {
+        what: &'static str,
+        name: String,
+        given: String,
     },
 }
 
@@ -124,6 +165,86 @@ impl fmt::Display for SimConfigError {
                 "simulated payload \"{}\" asks for {}, which it cannot have: {}",
                 payload, fault, why
             ),
+            SimConfigError::NoSuchSetting { what, name, given } => write!(
+                f,
+                "{} \"{}\" states \"{}\", which is not a setting. A word this file \
+                 does not know is refused rather than ignored: a misspelled \
+                 setting that was ignored would have the simulator do something \
+                 other than what the file asked for, and say nothing",
+                what, name, given
+            ),
+            SimConfigError::NoKind { payload, actually } => write!(
+                f,
+                "simulated payload \"{}\" does not say what kind of payload it \
+                 stands in for: state type: {}, as the payload configuration \
+                 does. It is stated in both files so that the two can be \
+                 checked against each other, which is the only thing that \
+                 catches a simulator file paired with the wrong payload file",
+                payload,
+                actually.spelling()
+            ),
+            SimConfigError::NoSuchKind { payload, given } => write!(
+                f,
+                "simulated payload \"{}\" is a \"{}\" payload, which is not a kind: \
+                 expected {}",
+                payload,
+                given,
+                DHType::spellings()
+            ),
+            SimConfigError::KindMismatch {
+                payload,
+                in_payload_file,
+                in_sim_file,
+            } => write!(
+                f,
+                "simulated payload \"{}\" is a {} payload here and a {} payload in \
+                 the payload configuration. Both files describe the one payload, so \
+                 they cannot disagree about its kind: either this is not the \
+                 payload file these settings were written for, or one of the two \
+                 has been changed and the other has not",
+                payload,
+                in_sim_file.spelling(),
+                in_payload_file.spelling()
+            ),
+            SimConfigError::NoProtocol { payload, actually } => write!(
+                f,
+                "simulated payload \"{}\" is a network payload and does not say \
+                 which transport: state protocol: {}, as the payload configuration \
+                 does. Which transport it is decides what the payload can be made \
+                 to do -- only a stream can be hung up on, and only a stream can \
+                 be triggered -- so a network payload states it in both files",
+                payload,
+                actually.spelling()
+            ),
+            SimConfigError::NoSuchProtocol { payload, given } => write!(
+                f,
+                "simulated payload \"{}\" speaks \"{}\", which is not a protocol: \
+                 expected {}",
+                payload,
+                given,
+                NetworkProtocol::spellings()
+            ),
+            SimConfigError::ProtocolMismatch {
+                payload,
+                in_payload_file,
+                in_sim_file,
+            } => write!(
+                f,
+                "simulated payload \"{}\" speaks {} here and {} in the payload \
+                 configuration. The transport decides how the payload is reached \
+                 and what it can be asked to do, so the two files cannot disagree \
+                 about it",
+                payload,
+                in_sim_file.spelling(),
+                in_payload_file.spelling()
+            ),
+            SimConfigError::ProtocolForWhatHasNone { payload, kind } => write!(
+                f,
+                "simulated payload \"{}\" is a {} payload and states a protocol, \
+                 which only a network payload has",
+                payload,
+                kind.spelling()
+            ),
             SimConfigError::IntervalForATriggeredPayload { payload } => write!(
                 f,
                 "simulated payload \"{}\" is triggered, so it sends when tcspecial \
@@ -171,12 +292,119 @@ fn has_a_connection(endpoint: &EndpointConfig) -> bool {
     )
 }
 
+/// Refuse a word that is not a setting.
+///
+/// The settings are flattened into the group and the payload that carry them,
+/// and serde cannot refuse an unknown field of a flattened structure, so what
+/// is left over is collected and reported here instead.
+fn nothing_unknown(
+    what: &'static str,
+    name: &str,
+    unknown: &BTreeMap<String, IgnoredAny>,
+) -> Result<(), SimConfigError> {
+    match unknown.keys().next() {
+        Some(given) => Err(SimConfigError::NoSuchSetting {
+            what,
+            name: name.to_string(),
+            given: given.clone(),
+        }),
+        None => Ok(()),
+    }
+}
+
+/// Check this entry against the payload it names.
+///
+/// The kind always, and the transport for a network payload. Everything else
+/// in a simulator file is a property of the simulation and so is this file's
+/// to decide; these two are the payload's own and are stated here only to be
+/// compared, which is why a disagreement is an error rather than an override.
+fn what_it_is(
+    name: &str,
+    settings: &SimSettings,
+    endpoint: &EndpointConfig,
+) -> Result<(), SimConfigError> {
+    let actually = endpoint.kind();
+
+    let stated = match settings.dh_type.as_deref() {
+        Some(text) => DHType::from_spelling(text).ok_or_else(|| SimConfigError::NoSuchKind {
+            payload: name.to_string(),
+            given: text.to_string(),
+        })?,
+        None => {
+            return Err(SimConfigError::NoKind {
+                payload: name.to_string(),
+                actually,
+            })
+        }
+    };
+
+    if stated != actually {
+        return Err(SimConfigError::KindMismatch {
+            payload: name.to_string(),
+            in_payload_file: actually,
+            in_sim_file: stated,
+        });
+    }
+
+    // A transport belongs to a network payload and to no other kind, so for
+    // every other kind the question is whether one was stated at all.
+    let EndpointConfig::Network(network) = endpoint else {
+        return match settings.protocol {
+            Some(_) => Err(SimConfigError::ProtocolForWhatHasNone {
+                payload: name.to_string(),
+                kind: actually,
+            }),
+            None => Ok(()),
+        };
+    };
+
+    let stated = match settings.protocol.as_deref() {
+        Some(text) => {
+            NetworkProtocol::from_spelling(text).ok_or_else(|| SimConfigError::NoSuchProtocol {
+                payload: name.to_string(),
+                given: text.to_string(),
+            })?
+        }
+        None => {
+            return Err(SimConfigError::NoProtocol {
+                payload: name.to_string(),
+                actually: network.protocol,
+            })
+        }
+    };
+
+    if stated != network.protocol {
+        return Err(SimConfigError::ProtocolMismatch {
+            payload: name.to_string(),
+            in_payload_file: network.protocol,
+            in_sim_file: stated,
+        });
+    }
+
+    Ok(())
+}
+
 /// Settings a group or a simulated payload may state.
 ///
 /// Every one is optional in the file: a payload states what it does not take
 /// from its group, and a group states what its payloads share.
 #[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 pub struct SimSettings {
+    // What payload this is, said again. Neither of these is a setting of the
+    // simulation: the payload configuration decides both, and a simulator
+    // file that disagreed with it would be simulating something else. They
+    // are stated here so that the disagreement can be found -- the two files
+    // are joined by name alone, and a name is exactly what a payload set
+    // copied from another one keeps.
+    /// What kind of payload this is, in the payload configuration's own word
+    /// for it: network, device, serial, i2c, or spi.
+    #[serde(rename = "type", default)]
+    pub dh_type: Option<String>,
+    /// Which transport, for a network payload, and refused for every other
+    /// kind.
+    #[serde(default)]
+    pub protocol: Option<String>,
+
     /// Milliseconds between packets. 0 is as fast as the payload can be driven.
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
@@ -238,6 +466,8 @@ impl SimSettings {
     /// state. Used to lay a simulated payload over the group it names.
     fn over(&self, base: &SimSettings) -> SimSettings {
         SimSettings {
+            dh_type: self.dh_type.clone().or_else(|| base.dh_type.clone()),
+            protocol: self.protocol.clone().or_else(|| base.protocol.clone()),
             packet_interval_ms: self.packet_interval_ms.or(base.packet_interval_ms),
             segment_interval_ms: self.segment_interval_ms.or(base.segment_interval_ms),
             segment_size: self.segment_size.or(base.segment_size),
@@ -260,6 +490,15 @@ pub struct SimGroup {
     pub name: String,
     #[serde(flatten)]
     pub settings: SimSettings,
+    /// Whatever the file wrote here that is not a setting.
+    ///
+    /// Kept by name rather than discarded so that it can be reported. A
+    /// misspelled setting is otherwise the worst kind of silence: the file
+    /// says what was wanted, nothing complains, and the run does something
+    /// else -- a payload asked to drop a tenth of its packets drops none, and
+    /// looks exactly like one that was never asked.
+    #[serde(flatten)]
+    pub unknown: BTreeMap<String, IgnoredAny>,
 }
 
 /// One simulated payload: the data handler it stands in for, the group it takes
@@ -273,10 +512,15 @@ pub struct SimPayload {
     pub group: Option<String>,
     #[serde(flatten)]
     pub settings: SimSettings,
+    /// Whatever the file wrote here that is not a setting; see
+    /// [`SimGroup::unknown`].
+    #[serde(flatten)]
+    pub unknown: BTreeMap<String, IgnoredAny>,
 }
 
 /// A simulator configuration file, as it parses.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SimConfigFile {
     #[serde(default)]
     pub version: Option<String>,
@@ -356,6 +600,7 @@ impl SimConfigFile {
     ) -> Result<Vec<ResolvedSim>, SimConfigError> {
         let mut groups: BTreeMap<&str, &SimSettings> = BTreeMap::new();
         for group in &self.simulated_payload_groups {
+            nothing_unknown("simulated payload group", &group.name, &group.unknown)?;
             if groups.insert(group.name.as_str(), &group.settings).is_some() {
                 return Err(SimConfigError::Duplicate {
                     what: "simulated payload group",
@@ -366,6 +611,7 @@ impl SimConfigFile {
 
         let mut payloads: BTreeMap<&str, &SimPayload> = BTreeMap::new();
         for payload in &self.simulated_payloads {
+            nothing_unknown("simulated payload", &payload.name, &payload.unknown)?;
             if payloads.insert(payload.name.as_str(), payload).is_some() {
                 return Err(SimConfigError::Duplicate {
                     what: "simulated payload",
@@ -405,6 +651,13 @@ impl SimConfigFile {
                     }
                     None => payload.settings.clone(),
                 };
+
+                // What payload this is, before anything this entry says
+                // about it is believed. The files are joined by name, and a
+                // payload set copied from another keeps the names -- so the
+                // kind is what tells a simulator file paired with the wrong
+                // payload file from one paired with the right one.
+                what_it_is(&payload.name, &settings, &dh.endpoint)?;
 
                 // Which kind of payload this is was settled by the payload
                 // configuration, and decides whether an interval here means
@@ -554,6 +807,8 @@ simulated_payload_groups:
     segment_interval_ms: 250
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     group: steady_1hz
 ",
         );
@@ -582,6 +837,8 @@ simulated_payload_groups:
     segment_interval_ms: 1000
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     group: steady_1hz
     packet_interval_ms: 500
     segment_size: 4
@@ -601,6 +858,8 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     packet_interval_ms: 500
 ",
         );
@@ -617,8 +876,12 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH1
+    type: network
+    protocol: udp
     packet_interval_ms: 1
   - name: DH0
+    type: network
+    protocol: udp
     packet_interval_ms: 0
 ",
         );
@@ -637,6 +900,8 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     packet_interval_ms: 0
 ",
         );
@@ -655,8 +920,12 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     packet_interval_ms: 0
   - name: DH7
+    type: network
+    protocol: udp
     packet_interval_ms: 0
 ",
         );
@@ -675,6 +944,8 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     group: nonesuch
 ",
         );
@@ -688,6 +959,201 @@ simulated_payloads:
         );
     }
 
+    /// A device handler, for the tests that need a kind that is not network.
+    fn device(name: &str) -> DHConfig {
+        let mut dh = handler(name, 4);
+        dh.endpoint = EndpointConfig::Device(DeviceConfig {
+            path: "/dev/urandom".to_string(),
+        });
+        dh
+    }
+
+    /// A misspelled setting is refused, not ignored.
+    ///
+    /// The worst silence in either file: it says what was wanted, nothing
+    /// complains, and the run does something else. A payload asked to drop a
+    /// tenth of its packets through a misspelling drops none, and looks
+    /// exactly like one that was never asked.
+    #[test]
+    fn a_word_that_is_not_a_setting_is_refused() {
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+             protocol: udp\n    packet_interval_ms: 100\n    drop_percnt: 10\n",
+        );
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("drop_percnt") && said.contains("not a setting"),
+            "the error should name the word it does not know: {said}"
+        );
+
+        // A group's settings are read the same way, and a group is where a
+        // misspelling hides best: it is read once and applies to every
+        // payload that names it.
+        let file = parse(
+            "simulated_payload_groups:\n  - name: slow\n    packet_intervl_ms: 100\n\
+             simulated_payloads:\n  - name: DH0\n    type: network\n    \
+             protocol: udp\n    group: slow\n",
+        );
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("packet_intervl_ms") && said.contains("slow"),
+            "the error should name the group and the word: {said}"
+        );
+    }
+
+    /// And the sections of the file itself, for the same reason.
+    #[test]
+    fn a_section_that_is_not_a_section_is_refused() {
+        let text = "simulated_payload:\n  - name: DH0\n    packet_interval_ms: 100\n";
+        let e = tcslibgs::ConfigFormat::Yaml
+            .parse::<SimConfigFile>(text)
+            .expect_err("a file whose one section is misspelled describes nothing");
+        let said = format!("{e}");
+        assert!(
+            said.contains("simulated_payload"),
+            "the error should name the section: {said}"
+        );
+    }
+
+    /// A simulator file paired with the wrong payload file is caught.
+    ///
+    /// This is what the kind and the transport are stated twice for. Two
+    /// payload sets that differ only in how their payload is reached have the
+    /// same handler names -- one is commonly a copy of the other -- and the
+    /// two files are joined by name alone, so nothing else in either file
+    /// would notice the mismatch. The simulator would bind a datagram socket
+    /// for a handler that is going to connect to a stream, and the run would
+    /// look like a payload that never sends.
+    #[test]
+    fn a_simulator_file_paired_with_the_wrong_payload_file_is_caught() {
+        // The simulator file of the datagram set, against the payload file of
+        // the stream set.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+             protocol: udp\n    packet_interval_ms: 1000\n",
+        );
+
+        let mut stream = handler("DH0", 4);
+        stream.endpoint = EndpointConfig::Network(NetworkConfig {
+            protocol: NetworkProtocol::Tcp,
+            address: "localhost".to_string(),
+            port: 5000,
+        });
+
+        let said = format!("{}", file.resolve(&[stream]).unwrap_err());
+        assert!(
+            said.contains("udp") && said.contains("tcp") && said.contains("DH0"),
+            "the error should name the payload and both transports: {said}"
+        );
+
+        // And the same file against the payload it was written for.
+        let datagram = handler("DH0", 4);
+        file.resolve(&[datagram])
+            .expect("the file its payload file was written for");
+    }
+
+    /// A disagreement about the kind itself, which is the same mistake one
+    /// step larger.
+    #[test]
+    fn the_two_files_cannot_disagree_about_the_kind() {
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: device\n    \
+             packet_interval_ms: 1000\n",
+        );
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("device") && said.contains("network"),
+            "the error should name the kind each file gives: {said}"
+        );
+    }
+
+    /// Saying nothing is not agreement.
+    ///
+    /// A payload that stated no kind could not be checked against anything,
+    /// so it is refused -- and told which kind the payload file makes it,
+    /// since that is the one thing an error here always knows.
+    #[test]
+    fn a_simulated_payload_says_what_it_stands_in_for() {
+        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 1000\n");
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("type: network"),
+            "the error should say what to write: {said}"
+        );
+
+        // A network payload says which transport, too, for the same reason:
+        // the kind alone would not have caught the pairing above.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+             packet_interval_ms: 1000\n",
+        );
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("protocol: udp"),
+            "the error should say which transport to write: {said}"
+        );
+    }
+
+    /// A transport belongs to a network payload and to no other kind.
+    #[test]
+    fn only_a_network_payload_has_a_transport() {
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: device\n    \
+             protocol: udp\n    packet_interval_ms: 0\n",
+        );
+        let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
+        assert!(
+            said.contains("device") && said.contains("protocol"),
+            "{said}"
+        );
+
+        // And a device that states none resolves, which is the whole of what
+        // a device has to say about how it is reached.
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: device\n    packet_interval_ms: 0\n",
+        );
+        file.resolve(&[device("DH0")]).expect("a device needs no transport");
+    }
+
+    /// A word that names no kind, or no transport, is refused with the words
+    /// that would have worked.
+    #[test]
+    fn a_kind_or_a_transport_that_is_neither_is_refused() {
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: netwrok\n    \
+             packet_interval_ms: 1000\n",
+        );
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("netwrok") && said.contains("network") && said.contains("i2c"),
+            "the error should list the kinds: {said}"
+        );
+
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+             protocol: udb\n    packet_interval_ms: 1000\n",
+        );
+        let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
+        assert!(
+            said.contains("udb") && said.contains("unix_dgram"),
+            "the error should list the transports: {said}"
+        );
+    }
+
+    /// What a payload stands in for may come from its group, like everything
+    /// else a payload does not state.
+    #[test]
+    fn a_group_may_carry_what_its_payloads_stand_in_for() {
+        let file = parse(
+            "simulated_payload_groups:\n  - name: datagrams\n    type: network\n    \
+             protocol: udp\n    packet_interval_ms: 1000\n\
+             simulated_payloads:\n  - name: DH0\n    group: datagrams\n  \
+             - name: DH1\n    group: datagrams\n",
+        );
+        file.resolve(&[handler("DH0", 4), handler("DH1", 4)])
+            .expect("a group of payloads reached the same way");
+    }
+
     /// The faults are the simulator's alone, and are checked for being
     /// possible before a run is started on them.
     #[test]
@@ -695,7 +1161,7 @@ simulated_payloads:
         // A percentage is nought to a hundred. Anything else is a
         // misunderstanding rather than a severe fault.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n    \
              drop_percent: 150\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -708,7 +1174,7 @@ simulated_payloads:
         // A payload that sends on its own is never asked for anything, so it
         // has no request to ignore.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n    \
              ignore_trigger_percent: 50\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -721,7 +1187,7 @@ simulated_payloads:
         // And hanging up needs a link to hang up. handler() makes a UDP
         // payload, which has none.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n    \
              close_after: 10\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -752,7 +1218,7 @@ simulated_payloads:
         let file = parse(
             "simulated_payload_groups:\n  - name: flaky\n    packet_interval_ms: 100\n    \
              drop_percent: 10\n    jitter_ms: 25\n\
-             simulated_payloads:\n  - name: DH0\n    group: flaky\n    \
+             simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    group: flaky\n    \
              close_after: 7\n",
         );
 
@@ -775,7 +1241,7 @@ simulated_payloads:
     /// existed asked for.
     #[test]
     fn a_file_with_no_faults_asks_for_a_payload_that_works() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 100\n");
+        let file = parse("simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n");
         let resolved = file.resolve(&[handler("DH0", 4)]).expect("resolves");
         assert_eq!(resolved[0].faults, Faults::default());
         assert!(!resolved[0].faults.any());
@@ -808,7 +1274,7 @@ simulated_payloads:
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 1000\n",
+            "simulated_payloads:\n  - name: DH0\n    type: device\n    packet_interval_ms: 1000\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
@@ -821,7 +1287,7 @@ simulated_payloads:
         // the segment settings still apply, since how a payload divides an
         // answer is its own business.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    segment_size: 2\n",
+            "simulated_payloads:\n  - name: DH0\n    type: device\n    segment_size: 2\n",
         );
         let resolved = file
             .resolve(&[triggered("DH0")])
@@ -840,6 +1306,8 @@ simulated_payload_groups:
     segment_size: 4
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     group: sizes_only
 ",
         );
@@ -863,6 +1331,8 @@ simulated_payload_groups:
     packet_interval_ms: 0
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     group: steady_1hz
 ",
         );
@@ -886,6 +1356,8 @@ simulated_payload_groups:
     packet_interval_ms: 1000
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     group: steady_1hx
 ",
         );
@@ -910,6 +1382,8 @@ simulated_payload_groups:
     packet_interval_ms: 2
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     group: g
 ",
         );
@@ -925,8 +1399,12 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DH0
+    type: network
+    protocol: udp
     packet_interval_ms: 1
   - name: DH0
+    type: network
+    protocol: udp
     packet_interval_ms: 2
 ",
         );
@@ -945,6 +1423,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DEV
+    type: device
     packet_interval_ms: 0
 ",
         );

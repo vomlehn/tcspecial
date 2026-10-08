@@ -12,7 +12,7 @@
 version: "1.0"
 description: TCSpecial payload set 2
 
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     oc_address: 127.0.0.1

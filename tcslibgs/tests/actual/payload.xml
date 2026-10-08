@@ -6,29 +6,29 @@
      YAML, and XML all agree on:
        - every value is a child element, never an attribute
        - a sequence is repeated sibling elements named for the field
-         (<data_handlers> here), and the repeats must be contiguous
+         (<payloads> here), and the repeats must be contiguous
        - an absent optional field is simply an omitted element -->
 <payload>
     <version>1.0</version>
     <description>Two data handlers, one of each endpoint kind</description>
-    <data_handler_groups>
+    <payload_groups>
         <name>udp_localhost</name>
         <type>network</type>
         <protocol>udp</protocol>
         <address>localhost</address>
         <packet_size>12</packet_size>
-    </data_handler_groups>
-    <data_handlers>
+    </payload_groups>
+    <payloads>
         <dh_id>0</dh_id>
         <name>DH0</name>
         <group>udp_localhost</group>
         <port>5000</port>
-    </data_handlers>
-    <data_handlers>
+    </payloads>
+    <payloads>
         <dh_id>1</dh_id>
         <name>DH1</name>
         <type>device</type>
         <path>/dev/ttyS0</path>
         <packet_size>64</packet_size>
-    </data_handlers>
+    </payloads>
 </payload>

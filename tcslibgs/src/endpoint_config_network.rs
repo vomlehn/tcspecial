@@ -27,19 +27,22 @@ pub struct NetworkParams {
 
 
 /// Which transport a file's spelling names.
+///
+/// The spellings themselves are [`NetworkProtocol`]'s, so this file and a
+/// payload file cannot come to name the same transport differently. Hyphens
+/// are accepted here, where every attribute name accepts them too.
 fn parse_protocol(group: &str, text: &str) -> EndpointConfigResult<NetworkProtocol> {
-    match text.trim().to_ascii_lowercase().as_str() {
-        "tcp" => Ok(NetworkProtocol::Tcp),
-        "udp" => Ok(NetworkProtocol::Udp),
-        "unix_stream" | "unix-stream" => Ok(NetworkProtocol::UnixStream),
-        "unix_dgram" | "unix-dgram" => Ok(NetworkProtocol::UnixDgram),
-        other => Err(bad(
+    let written = text.trim().to_ascii_lowercase().replace('-', "_");
+    NetworkProtocol::from_spelling(&written).ok_or_else(|| {
+        bad(
             group,
             &format!(
-                "protocol: \"{other}\" is not one of tcp, udp, unix_stream, or unix_dgram"
+                "protocol: \"{}\" is not one of {}",
+                text.trim(),
+                NetworkProtocol::spellings()
             ),
-        )),
-    }
+        )
+    })
 }
 
 /// Whether one read of this protocol needs a rule for where it ends.

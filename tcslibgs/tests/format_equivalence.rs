@@ -64,7 +64,7 @@ fn payload_actual_file_has_expected_contents() {
         "the payload actual file has no ci_config"
     );
 
-    assert_eq!(config.data_handler_groups.len(), 1);
+    assert_eq!(config.payload_groups.len(), 1);
     let group = config.group("udp_localhost").expect("the group is defined");
     assert_eq!(group.dh_type.as_deref(), Some("network"));
     assert_eq!(group.protocol.as_deref(), Some("udp"));
@@ -72,7 +72,7 @@ fn payload_actual_file_has_expected_contents() {
     assert_eq!(group.port, None, "a port tells one handler of a group from another");
 
     // A handler in the group states only what the group does not carry.
-    let network = &config.data_handlers[0];
+    let network = &config.payloads[0];
     assert_eq!(network.dh_id, 0);
     assert_eq!(network.group.as_deref(), Some("udp_localhost"));
     assert_eq!(network.dh_type, None);
@@ -81,7 +81,7 @@ fn payload_actual_file_has_expected_contents() {
     assert_eq!(network.path, None);
 
     // A handler in no group states everything itself.
-    let device = &config.data_handlers[1];
+    let device = &config.payloads[1];
     assert_eq!(device.group, None);
     assert_eq!(device.dh_type.as_deref(), Some("device"));
     assert_eq!(device.path.as_deref(), Some("/dev/ttyS0"));
@@ -123,7 +123,7 @@ fn a_handler_naming_an_undefined_group_is_rejected() {
         .parse(
             "version: \"1.0\"
 description: one handler naming a group that is not there
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     group: nonesuch
@@ -146,7 +146,7 @@ fn a_group_defined_twice_is_rejected() {
         .parse(
             "version: \"1.0\"
 description: two groups of one name
-data_handler_groups:
+payload_groups:
   - name: dup
     type: network
     protocol: udp
@@ -154,7 +154,7 @@ data_handler_groups:
   - name: dup
     type: device
     path: /dev/null
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     group: dup

@@ -478,6 +478,43 @@ mod tests {
         }
     }
 
+    /// No shipped simulator file fits another set's payload file.
+    ///
+    /// Two sets of the repository differ only in how their one payload is
+    /// reached -- one by datagram, one by stream -- and the files of a set are
+    /// joined by handler name alone, which a copied set keeps. So the wrong
+    /// pairing is a mistake that can actually be made, by passing the wrong
+    /// path or by copying a set and editing one of its two files. It is caught
+    /// because each simulated payload states the kind of payload it stands in
+    /// for, and nothing else in either file would notice.
+    ///
+    /// Every crossed pairing being refused also says the sets are really
+    /// different from one another: two that were the same but for their names
+    /// would be one set shipped twice.
+    #[test]
+    fn a_simulator_file_does_not_fit_another_sets_payload_file() {
+        let sets = shipped_sets();
+        assert!(sets.len() > 1, "one set cannot be paired with another");
+
+        for (payload_path, _) in &sets {
+            let dh_configs = load_dh_configs(payload_path).expect("the payload file loads");
+
+            for (other_payload, sim_path) in &sets {
+                if other_payload == payload_path {
+                    continue;
+                }
+
+                let sim_file = SimConfigFile::load(sim_path).expect("the simulator file loads");
+                assert!(
+                    sim_file.resolve(&dh_configs).is_err(),
+                    "{} is accepted for {}, which it was not written for",
+                    sim_path.display(),
+                    payload_path.display()
+                );
+            }
+        }
+    }
+
     /// Every shipped set has to describe payloads the simulator can simulate,
     /// and its two files have to agree with each other.
     ///

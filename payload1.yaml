@@ -16,7 +16,7 @@
 version: "1.0"
 description: TCSpecial payload set 1
 
-data_handler_groups:
+payload_groups:
   # DH1 and DH3 are reached the same way: a UDP socket on this host. What
   # tells them apart is their port and packet size, so those stay with the
   # handlers and everything they share is here.
@@ -25,7 +25,7 @@ data_handler_groups:
     protocol: udp
     address: localhost
 
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     oc_address: 127.0.0.1

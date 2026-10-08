@@ -143,6 +143,8 @@ mod tests {
             port: 0,
             bus_address: 0,
             faults: Default::default(),
+            own_address: None,
+            own_port: None,
             packet_size: Arc::new(AtomicU32::new(packet)),
             segment_size: Arc::new(AtomicU32::new(segment)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),

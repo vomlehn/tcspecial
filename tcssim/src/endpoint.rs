@@ -108,6 +108,11 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         bus_address,
         triggered: dh.mode.polling().is_some(),
         faults: sim.faults,
+        // The socket this payload answers from, where the simulator file
+        // states one. Refused there for the kinds that have none to bind, so
+        // what arrives here is for a kind that has.
+        own_address: sim.payload_address.clone(),
+        own_port: sim.payload_port,
         _id: dh.dh_id.0,
         protocol,
         address,
@@ -164,6 +169,8 @@ mod tests {
             segment_size,
             triggered: false,
             faults: Default::default(),
+            payload_address: None,
+            payload_port: None,
         }
     }
 

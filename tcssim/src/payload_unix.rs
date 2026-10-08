@@ -219,7 +219,14 @@ pub fn run_unix_dgram_payload(
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
     let handler = PathBuf::from(&config.address);
-    let mine = a_path_of_its_own(&config.address);
+    // The path this end answers from: the one the simulator file asked for,
+    // or one beside the handler's. A file that says nothing gets the second,
+    // which is what every simulator file asked for before this could be
+    // stated.
+    let mine = match config.own_address.as_deref() {
+        Some(path) => PathBuf::from(path),
+        None => a_path_of_its_own(&config.address),
+    };
 
     if let Err(e) = clear_a_dead_socket(&mine) {
         eprintln!("Failed to stand in for the Unix datagram payload: {}", e);
@@ -322,6 +329,8 @@ mod tests {
             port: 0,
             bus_address: 0,
             faults: Default::default(),
+            own_address: None,
+            own_port: None,
             packet_size: Arc::new(AtomicU32::new(12)),
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),

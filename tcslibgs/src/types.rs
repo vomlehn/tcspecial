@@ -291,6 +291,24 @@ pub enum EndpointConfig {
     Spi(SpiConfig),
 }
 
+impl EndpointConfig {
+    /// Which kind of data handler this endpoint makes.
+    ///
+    /// The one mapping from an endpoint to a kind, so that the ground asking
+    /// for a handler and the spacecraft checking what was asked for cannot
+    /// read the same configuration differently. START_DH carries the kind,
+    /// and tcspecial refuses one that is not this.
+    pub fn kind(&self) -> DHType {
+        match self {
+            EndpointConfig::Network(_) => DHType::Network,
+            EndpointConfig::Device(_) => DHType::Device,
+            EndpointConfig::Serial(_) => DHType::Serial,
+            EndpointConfig::I2c(_) => DHType::I2c,
+            EndpointConfig::Spi(_) => DHType::Spi,
+        }
+    }
+}
+
 /// Data handler configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DHConfig {
@@ -634,6 +652,55 @@ impl CommandStatus {
 
 #[cfg(test)]
 mod tests {
+    /// Every kind of endpoint makes its own kind of handler.
+    ///
+    /// Written out one by one rather than derived, because this is the
+    /// agreement between the ground and the spacecraft about what a START_DH
+    /// may say: a kind added here and nowhere else would have the ground
+    /// asking for something tcspecial would refuse.
+    #[test]
+    fn an_endpoint_makes_the_kind_of_handler_it_is() {
+        use super::*;
+
+        let network = EndpointConfig::Network(NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: 5000,
+        });
+        assert_eq!(network.kind(), DHType::Network);
+
+        let device = EndpointConfig::Device(DeviceConfig {
+            path: "/dev/urandom".to_string(),
+        });
+        assert_eq!(device.kind(), DHType::Device);
+
+        let serial = EndpointConfig::Serial(SerialConfig {
+            path: "/dev/ttyS0".to_string(),
+            datarate: 9600,
+            stop_bits: StopBits::One,
+            byte_length: 8,
+        });
+        assert_eq!(serial.kind(), DHType::Serial);
+
+        let i2c = EndpointConfig::I2c(I2cConfig {
+            bus: "/dev/i2c-1".to_string(),
+            address: 0x48,
+            ten_bit: false,
+            pec: false,
+        });
+        assert_eq!(i2c.kind(), DHType::I2c);
+
+        let spi = EndpointConfig::Spi(SpiConfig {
+            path: "/dev/spidev0.0".to_string(),
+            max_speed: 1_000_000,
+            mode: SpiMode::Mode0,
+            bits_per_word: 8,
+            bit_order: BitOrder::MsbFirst,
+            cs_active: CsActive::Low,
+        });
+        assert_eq!(spi.kind(), DHType::Spi);
+    }
+
     use super::*;
 
     #[test]

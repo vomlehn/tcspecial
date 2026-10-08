@@ -18,7 +18,7 @@ use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, NOT_CONNECTED};
-use crate::endpoint::{dh_type_of, endpoint_description};
+use crate::endpoint::endpoint_description;
 use crate::config::constants::BEACON_INDICATOR;
 
 slint::include_modules!();
@@ -985,7 +985,7 @@ fn start_dh_handler(
 
         let mut guard = link.lock().unwrap();
         let sent = match guard.client() {
-            Some(client) => client.start_dh(dh.dh_id, dh_type_of(&dh.endpoint), dh.name.clone()),
+            Some(client) => client.start_dh(dh.dh_id, dh.endpoint.kind(), dh.name.clone()),
             None => {
                 ui.set_last_response(SharedString::from(NOT_CONNECTED));
                 return;

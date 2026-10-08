@@ -2364,11 +2364,50 @@ Requirement
     create.
 
 Requirement
-    An I2C or SPI endpoint is refused, naming the handler and where it is.
-    Standing in for either means being a device that answers an address on a
-    bus, or one that is clocked by a controller, and there is no pseudo-device
-    for that. Refusing is better than simulating something else at that
-    address, which is what treating them as plain devices amounted to.
+    A simulated payload of an I2C endpoint is a chip of the kernel's
+    ``i2c-stub``. That adapter's chips are a bank of registers in memory and
+    every master on the bus reads and writes the same bank, so the bank is the
+    payload: the simulator writes packets into it and the handler reads them
+    out.
+
+Nothing in user space can answer an address on a bus, which is why this is the
+one kind of simulated payload that is not the far end of anything. It has two
+consequences worth stating.
+
+The first is that a bus is a register and not a stream. Bytes do not queue: a
+handler reads whatever is in the register now, so it may read one packet twice
+or miss one altogether, depending on how its reading falls against the packet
+interval. That is also true of a real sensor read over a bus, and is why a
+payload link over a bus is a different thing from one over a line.
+
+The second is that the simulator does not create the bus. ``i2c-stub`` is a
+kernel module, loading it needs root, and the addresses its chips answer at are
+fixed when it is loaded.
+
+Requirement
+    The simulator finds a stub bus by name among the kernel's adapters, since
+    their numbers are assigned as they are found and a payload file cannot know
+    which number the stub will have. With none loaded, or with no chip at the
+    configured address, what is reported is the command that would put it
+    there.
+
+Requirement
+    A handler asks the adapter behind its bus what transfers it can do, and
+    uses raw I2C where that is offered and SMBus block transfers to a single
+    register where it is not. ``i2c-stub`` has no raw transfer at all -- a
+    plain read of it fails -- so a handler that assumed raw transfers could
+    talk to real hardware and never to a simulated bus.
+
+A block transfer carries at most thirty-two bytes, so a segment of a packet on
+a bus is capped at that: the packet size is a property of the payload and the
+thirty-two is a property of SMBus, and the smaller of the two wins without the
+file being refused.
+
+Requirement
+    A SPI endpoint is refused, naming the handler and where it is. A peripheral
+    has to be clocked by a controller, and there is no pseudo-device for that.
+    Refusing is better than simulating something else at that address, which is
+    what treating it as a plain device amounted to.
 
 The window is built from the two files. Nothing in the GUI names a payload or
 fixes how many there are, so a payload added to or removed from the files adds

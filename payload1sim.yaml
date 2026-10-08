@@ -9,6 +9,13 @@
 #
 # A payload takes its settings from the group it names, and may then override
 # any of them for itself.
+#
+# Each payload states the kind of payload it is, and a network payload the
+# transport as well, in the same words the payload file uses. Those are not
+# settings of the simulation -- the payload file decides them -- and they are
+# stated again here only so that the two files can be checked against each
+# other: the files are joined by name alone, and a payload set copied from
+# another one keeps the names.
 version: "1.0"
 description: Simulator settings for the payloads of payload1.yaml
 
@@ -25,17 +32,28 @@ simulated_payload_groups:
     segment_interval_ms: 0
 
 simulated_payloads:
+  # DH0 and DH1 are driven alike and so share a group, but they are not
+  # reached alike: one is a stream and the other a datagram socket. That is
+  # why the transport stays with the payload rather than going in the group.
   - name: DH0
+    type: network
+    protocol: tcp
     group: steady_1hz
 
   - name: DH1
+    type: network
+    protocol: udp
     group: steady_1hz
 
+  # A device has no transport: it is opened and read.
   - name: DH2
+    type: device
     group: continuous
 
   # Twice a second rather than once, so this one states its own intervals
   # instead of naming a group.
   - name: DH3
+    type: network
+    protocol: udp
     packet_interval_ms: 500
     segment_interval_ms: 500

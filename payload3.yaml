@@ -4,15 +4,15 @@
 # tcspecial reaches each one, and how big its packets are. It deliberately says
 # nothing about how fast a simulated payload produces them or how the simulator
 # divides a packet into segments; those are properties of the simulation rather
-# than of the payload, and live in payload2sim.yaml.
+# than of the payload, and live in payload3sim.yaml.
 #
 # This set has one data handler, so it has no data handler groups: a group
 # carries what several handlers share, and a group no handler names is an
 # error rather than a section with no effect.
 version: "1.0"
-description: TCSpecial payload set 2
+description: TCSpecial payload set 3
 
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     oc_address: 127.0.0.1

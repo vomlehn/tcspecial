@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::endpoint_config_serial::StopBits;
 use crate::endpoint_config_spi::{BitOrder, CsActive, SpiMode};
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Timestamp type for spacecraft time
@@ -59,6 +59,71 @@ pub enum DHType {
     I2c,
     /// A handler whose payload is a SPI peripheral.
     Spi,
+}
+
+impl DHType {
+    /// The word a configuration file uses for this kind.
+    ///
+    /// One table, read in both directions and from both files, so that the
+    /// payload file and the simulator file cannot disagree about what a kind
+    /// is called. The spellings are also what an error says, which is how a
+    /// file is told what it could have written instead.
+    pub fn spelling(&self) -> &'static str {
+        match self {
+            DHType::Network => "network",
+            DHType::Device => "device",
+            DHType::Serial => "serial",
+            DHType::I2c => "i2c",
+            DHType::Spi => "spi",
+        }
+    }
+
+    /// Which kind a file's word names, if it names one.
+    pub fn from_spelling(text: &str) -> Option<DHType> {
+        [
+            DHType::Network,
+            DHType::Device,
+            DHType::Serial,
+            DHType::I2c,
+            DHType::Spi,
+        ]
+        .into_iter()
+        .find(|kind| kind.spelling() == text)
+    }
+
+    /// Every kind, as a file would write them, for an error to list.
+    pub fn spellings() -> String {
+        "network, device, serial, i2c, or spi".to_string()
+    }
+}
+
+impl NetworkProtocol {
+    /// The word a configuration file uses for this transport.
+    pub fn spelling(&self) -> &'static str {
+        match self {
+            NetworkProtocol::Tcp => "tcp",
+            NetworkProtocol::Udp => "udp",
+            NetworkProtocol::UnixStream => "unix_stream",
+            NetworkProtocol::UnixDgram => "unix_dgram",
+        }
+    }
+
+    /// Which transport a file's word names, if it names one.
+    pub fn from_spelling(text: &str) -> Option<NetworkProtocol> {
+        [
+            NetworkProtocol::Tcp,
+            NetworkProtocol::Udp,
+            NetworkProtocol::UnixStream,
+            NetworkProtocol::UnixDgram,
+        ]
+        .into_iter()
+        .find(|protocol| protocol.spelling() == text)
+    }
+
+    /// Every transport, as a file would write them, for an error to list.
+    pub fn spellings() -> String {
+        "tcp, udp, unix_stream, or unix_dgram".to_string()
+    }
 }
 
 /// Data handler name
@@ -405,16 +470,17 @@ pub struct DHConfig {
 /// configuration file. A file that still states one parses, with the interval
 /// ignored, the same way one still carrying a `ci_config` section does.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct PayloadConfig {
     pub version: String,
     pub description: String,
-    /// Named groups of attributes that several data handlers share.
+    /// Named groups of attributes that several payloads share.
     ///
-    /// Optional: a file whose handlers have nothing in common, or that prefers
+    /// Optional: a file whose payloads have nothing in common, or that prefers
     /// to spell every one of them out, has no groups.
     #[serde(default)]
-    pub data_handler_groups: Vec<DHGroupJson>,
-    pub data_handlers: Vec<DHConfigJson>,
+    pub payload_groups: Vec<DHGroupJson>,
+    pub payloads: Vec<DHConfigJson>,
     /// Retained so a payload file that still carries a CI section parses,
     /// but unused: the CI reads its own configuration from tcspecial.yaml.
     #[serde(default)]
@@ -423,12 +489,12 @@ pub struct PayloadConfig {
 
 impl PayloadConfig {
     pub fn len(&self) -> usize {
-        self.data_handlers.len()
+        self.payloads.len()
     }
 
     /// Look up a data handler group by name.
     pub fn group(&self, name: &str) -> Option<&DHGroupJson> {
-        self.data_handler_groups.iter().find(|g| g.name == name)
+        self.payload_groups.iter().find(|g| g.name == name)
     }
 
     /// Settle every data handler into its runtime configuration.
@@ -440,17 +506,41 @@ impl PayloadConfig {
     /// attributes or none at all.
     pub fn to_dh_configs(&self) -> Result<Vec<DHConfig>, String> {
         let mut seen: BTreeSet<&str> = BTreeSet::new();
-        for group in &self.data_handler_groups {
+        for group in &self.payload_groups {
             if !seen.insert(group.name.as_str()) {
                 return Err(format!(
-                    "data handler group \"{}\" is defined more than once",
+                    "payload group \"{}\" is defined more than once",
                     group.name
                 ));
             }
         }
 
+        // A payload is addressed by its id and found by its name, and both
+        // have to pick out one payload. A repeat of either parses cleanly and
+        // then loses a payload: tcspecial keeps its handlers by id, so a
+        // repeated id has one silently replace the other, and a simulator
+        // file is joined to this one by name, so a repeated name has one
+        // entry drive two payloads. Worded as the endpoint configuration
+        // format words the same rule, which has had these checks all along.
+        let mut by_id: BTreeMap<u32, &str> = BTreeMap::new();
+        let mut by_name: BTreeSet<&str> = BTreeSet::new();
+        for payload in &self.payloads {
+            if let Some(first) = by_id.insert(payload.dh_id, payload.name.as_str()) {
+                return Err(format!(
+                    "payloads \"{}\" and \"{}\" share dh_id {}",
+                    first, payload.name, payload.dh_id
+                ));
+            }
+            if !by_name.insert(payload.name.as_str()) {
+                return Err(format!(
+                    "payload \"{}\" is defined more than once",
+                    payload.name
+                ));
+            }
+        }
+
         let configs: Vec<DHConfig> = self
-            .data_handlers
+            .payloads
             .iter()
             .map(|dh| {
                 let group = match &dh.group {
@@ -471,12 +561,12 @@ impl PayloadConfig {
         // Checked after the handlers, so that the misspelling is reported from
         // the handler's end, where the name actually is.
         let named: BTreeSet<&str> = self
-            .data_handlers
+            .payloads
             .iter()
             .filter_map(|dh| dh.group.as_deref())
             .collect();
         if let Some(unused) = self
-            .data_handler_groups
+            .payload_groups
             .iter()
             .find(|group| !named.contains(group.name.as_str()))
         {
@@ -501,6 +591,7 @@ impl PayloadConfig {
 /// `dh_id` or a `name`: those are what tell one handler of a group from
 /// another, and so belong to the handler.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct DHGroupJson {
     /// Name data handlers use to refer to this group.
     pub name: String,
@@ -529,6 +620,13 @@ pub struct DHGroupJson {
     /// How often to send it. Triggered only.
     #[serde(default)]
     pub trigger_interval_ms: Option<u32>,
+    /// Accepted and ignored, as it was before an unknown attribute became an
+    /// error: how fast a simulated payload sends is a property of the
+    /// simulation and belongs in the simulator configuration. A file that
+    /// still states one here is read the way it always was rather than
+    /// refused for a word this language used to let pass.
+    #[serde(default)]
+    pub packet_interval_ms: Option<u32>,
 }
 
 /// JSON representation of DH config
@@ -536,6 +634,7 @@ pub struct DHGroupJson {
 /// Every attribute but `dh_id` and `name` is optional, because a handler
 /// naming a group need only state what it does not take from that group.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct DHConfigJson {
     pub dh_id: u32,
     pub name: String,
@@ -572,6 +671,9 @@ pub struct DHConfigJson {
     /// How often to send it. Triggered only.
     #[serde(default)]
     pub trigger_interval_ms: Option<u32>,
+    /// Accepted and ignored; see [`DHGroupJson::packet_interval_ms`].
+    #[serde(default)]
+    pub packet_interval_ms: Option<u32>,
 }
 
 impl DHConfigJson {
@@ -625,14 +727,56 @@ impl DHConfigJson {
             .trigger_interval_ms
             .or_else(|| group.and_then(|g| g.trigger_interval_ms));
 
-        let endpoint = match dh_type {
-            Some("network") => {
+        let kind = match dh_type {
+            Some(text) => DHType::from_spelling(text).ok_or_else(|| {
+                format!("{text} is not a kind of payload: expected {}", DHType::spellings())
+            })?,
+            None => return Err("Missing type".to_string()),
+        };
+
+        // An attribute of another kind is an error rather than something
+        // ignored, which is the rule the endpoint configuration format has
+        // for its own groups and is worded the same way here. Ignoring one
+        // is how a device payload comes to carry a port nothing reads, and
+        // how a network payload carrying a path looks configured and is not.
+        // Checked after the group has been laid under the payload, because an
+        // attribute inherited from a group reaches the handler exactly as one
+        // the payload states does.
+        // Each entry is the attribute, whether this payload stated it, and
+        // whether it is there at all once the group is under it.
+        let foreign: &[(&str, bool, bool)] = match kind {
+            DHType::Network => &[("path", self.path.is_some(), path.is_some())],
+            _ => &[
+                ("protocol", self.protocol.is_some(), protocol.is_some()),
+                ("address", self.address.is_some(), address.is_some()),
+                ("port", self.port.is_some(), port.is_some()),
+            ],
+        };
+        if let Some((field, stated, _)) = foreign.iter().find(|(_, _, present)| *present) {
+            // Where it came from, because the two are fixed differently: one
+            // line is deleted from the payload, and the other means a payload
+            // is in a group that was not written for it.
+            let whence = match (stated, group) {
+                (false, Some(group)) => format!(", which it takes from group \"{}\"", group.name),
+                _ => String::new(),
+            };
+            return Err(format!(
+                "payload \"{}\" is a {} payload, so {field}{whence} does not apply to it",
+                self.name,
+                kind.spelling()
+            ));
+        }
+
+        let endpoint = match kind {
+            DHType::Network => {
                 let protocol = match protocol {
-                    Some("tcp") => NetworkProtocol::Tcp,
-                    Some("udp") => NetworkProtocol::Udp,
-                    Some("unix_stream") => NetworkProtocol::UnixStream,
-                    Some("unix_dgram") => NetworkProtocol::UnixDgram,
-                    _ => return Err("Invalid or missing protocol".to_string()),
+                    Some(text) => NetworkProtocol::from_spelling(text).ok_or_else(|| {
+                        format!(
+                            "{text} is not a protocol: expected {}",
+                            NetworkProtocol::spellings()
+                        )
+                    })?,
+                    None => return Err("Invalid or missing protocol".to_string()),
                 };
                 EndpointConfig::Network(NetworkConfig {
                     protocol,
@@ -640,11 +784,22 @@ impl DHConfigJson {
                     port: port.ok_or("Missing port")?,
                 })
             }
-            Some("device") => EndpointConfig::Device(DeviceConfig {
+            DHType::Device => EndpointConfig::Device(DeviceConfig {
                 path: path.ok_or("Missing path")?.to_string(),
             }),
-            Some(other) => return Err(format!("Invalid DH type: {}", other)),
-            None => return Err("Missing type".to_string()),
+            // A line, a bus and a peripheral carry attributes this file has
+            // no words for -- a baud rate, a slave address, a clock mode --
+            // so they are described in an endpoint configuration file and
+            // named here only by a simulator file checking what it is
+            // simulating.
+            other => {
+                return Err(format!(
+                    "a payload file describes a network or device payload, not a {} \
+                     one: a {} payload is described in an endpoint configuration file",
+                    other.spelling(),
+                    other.spelling()
+                ))
+            }
         };
 
         // Half an OC address is a mistake rather than a configuration: a
@@ -833,6 +988,7 @@ mod tests {
             mode: None,
             trigger: None,
             trigger_interval_ms: None,
+            packet_interval_ms: None,
         };
 
         assert_eq!(dh.to_dh_config().expect("converts").mode, DHMode::Periodic);
@@ -861,6 +1017,7 @@ mod tests {
             // carriage return the payload's interface asks for.
             trigger: Some("READ\r".to_string()),
             trigger_interval_ms: Some(500),
+            packet_interval_ms: None,
         };
 
         let config = dh.to_dh_config().expect("converts");
@@ -896,6 +1053,7 @@ mod tests {
                 mode: mode.map(str::to_string),
                 trigger: trigger.map(str::to_string),
                 trigger_interval_ms: interval,
+                packet_interval_ms: None,
             }
         };
 
@@ -948,6 +1106,7 @@ mod tests {
                 mode: Some("triggered".to_string()),
                 trigger: Some("READ".to_string()),
                 trigger_interval_ms: Some(500),
+                packet_interval_ms: None,
             };
 
             let e = dh.to_dh_config().unwrap_err();
@@ -1093,12 +1252,12 @@ mod tests {
             "
 version: \"1.0\"
 description: one group, two handlers in it
-data_handler_groups:
+payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
     address: localhost
-data_handlers:
+payloads:
   - dh_id: 1
     name: DH1
     group: udp_localhost
@@ -1142,13 +1301,13 @@ data_handlers:
             "
 version: \"1.0\"
 description: a handler differing from the group it is in
-data_handler_groups:
+payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
     address: localhost
     packet_size: 11
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     group: udp_localhost
@@ -1178,7 +1337,7 @@ data_handlers:
             "
 version: \"1.0\"
 description: a handler stating everything for itself
-data_handlers:
+payloads:
   - dh_id: 2
     name: DH2
     type: device
@@ -1202,13 +1361,13 @@ data_handlers:
             "
 version: \"1.0\"
 description: an OC address shared, a port each
-data_handler_groups:
+payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
     address: localhost
     oc_address: 127.0.0.1
-data_handlers:
+payloads:
   - dh_id: 1
     name: DH1
     group: udp_localhost
@@ -1238,7 +1397,7 @@ data_handlers:
             "
 version: \"1.0\"
 description: no OC side at all
-data_handlers:
+payloads:
   - dh_id: 2
     name: DH2
     type: device
@@ -1259,7 +1418,7 @@ data_handlers:
                 "
 version: \"1.0\"
 description: half an OC address
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     {line}
@@ -1287,12 +1446,12 @@ data_handlers:
             "
 version: \"1.0\"
 description: a group nothing is in
-data_handler_groups:
+payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
     address: localhost
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     type: network
@@ -1310,6 +1469,222 @@ data_handlers:
         );
     }
 
+    /// A name and an id each pick out one payload.
+    ///
+    /// Both repeat silently otherwise, and each loses a payload in its own
+    /// way: tcspecial keeps its handlers by id, so a repeated id has one
+    /// replace the other, and a simulator file is joined to this one by name,
+    /// so a repeated name has one entry drive two payloads.
+    #[test]
+    fn a_payload_name_and_a_payload_id_are_each_defined_once() {
+        let two = |second: &str| {
+            format!(
+                "
+version: \"1.0\"
+description: two payloads
+payloads:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: udp
+    address: localhost
+    port: 5000
+    packet_size: 12
+{second}
+"
+            )
+        };
+
+        let same_id = payload(&two(
+            "  - dh_id: 0\n    name: DH1\n    type: network\n    protocol: udp\n    \
+             address: localhost\n    port: 5001\n    packet_size: 12",
+        ));
+        let said = same_id.to_dh_configs().expect_err("two payloads, one id");
+        assert!(
+            said.contains("DH0") && said.contains("DH1") && said.contains("dh_id 0"),
+            "the error should name both payloads and the id: {said}"
+        );
+
+        let same_name = payload(&two(
+            "  - dh_id: 1\n    name: DH0\n    type: network\n    protocol: udp\n    \
+             address: localhost\n    port: 5001\n    packet_size: 12",
+        ));
+        let said = same_name.to_dh_configs().expect_err("two payloads, one name");
+        assert!(
+            said.contains("DH0") && said.contains("more than once"),
+            "the error should name the payload: {said}"
+        );
+
+        // And two payloads that differ in both are fine, which is what the
+        // checks must not get in the way of.
+        let distinct = payload(&two(
+            "  - dh_id: 1\n    name: DH1\n    type: network\n    protocol: udp\n    \
+             address: localhost\n    port: 5001\n    packet_size: 12",
+        ));
+        assert_eq!(distinct.to_dh_configs().expect("both convert").len(), 2);
+    }
+
+    /// An attribute of another kind of payload is refused.
+    ///
+    /// Ignoring one is how a device payload comes to carry a port nothing
+    /// reads, and how a network payload carrying a path looks configured and
+    /// is not. The endpoint configuration format has had this rule for its
+    /// own groups all along.
+    #[test]
+    fn an_attribute_of_another_kind_does_not_apply() {
+        let device = payload(
+            "
+version: \"1.0\"
+description: a device stating network attributes
+payloads:
+  - dh_id: 0
+    name: DH0
+    type: device
+    path: /dev/urandom
+    protocol: udp
+    address: localhost
+    port: 5000
+    packet_size: 1
+",
+        );
+        let said = device.to_dh_configs().expect_err("a device has no protocol");
+        assert!(
+            said.contains("device") && said.contains("protocol") && !said.contains("group"),
+            "an attribute the payload states itself is not blamed on a group: {said}"
+        );
+
+        let network = payload(
+            "
+version: \"1.0\"
+description: a network payload stating a path
+payloads:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: udp
+    address: localhost
+    port: 5000
+    path: /dev/urandom
+    packet_size: 12
+",
+        );
+        let said = network.to_dh_configs().expect_err("a network payload has no path");
+        assert!(said.contains("network") && said.contains("path"), "{said}");
+
+        // An attribute inherited from a group applies to a payload exactly as
+        // one it states itself, so it is refused exactly as one would be.
+        // This is the case worth catching: the group is written for the
+        // payloads that are reached that way, and a payload of another kind
+        // joining it takes attributes nobody wrote for it.
+        let inherited = payload(
+            "
+version: \"1.0\"
+description: a device in a group of network payloads
+payload_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+payloads:
+  - dh_id: 0
+    name: DH0
+    group: udp_localhost
+    type: device
+    path: /dev/urandom
+    packet_size: 1
+",
+        );
+        let said = inherited
+            .to_dh_configs()
+            .expect_err("a device takes no address from a group");
+        assert!(said.contains("device") && said.contains("group"), "{said}");
+    }
+
+    /// An attribute this language does not know is refused.
+    ///
+    /// A misspelled attribute is otherwise ignored, which is silence about
+    /// something the file plainly meant: an `oc_prot` is a payload with
+    /// nowhere to send its data, and nothing says so.
+    #[test]
+    fn a_word_that_is_not_an_attribute_is_refused() {
+        for text in [
+            // On a payload.
+            "
+version: \"1.0\"
+description: a misspelled attribute
+payloads:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: udp
+    address: localhost
+    port: 5000
+    packet_size: 12
+    oc_adress: 127.0.0.1
+",
+            // On a group.
+            "
+version: \"1.0\"
+description: a misspelled group attribute
+payload_groups:
+  - name: g
+    type: network
+    protocl: udp
+payloads:
+  - dh_id: 0
+    name: DH0
+    group: g
+    protocol: udp
+    address: localhost
+    port: 5000
+    packet_size: 12
+",
+            // And on the file.
+            "
+version: \"1.0\"
+description: a misspelled section
+payload:
+  - dh_id: 0
+    name: DH0
+",
+        ] {
+            let e = crate::ConfigFormat::Yaml
+                .parse::<PayloadConfig>(text)
+                .expect_err("a word this language does not know is refused");
+            let said = format!("{e}");
+            assert!(
+                said.contains("unknown field"),
+                "the error should say the word is unknown: {said}"
+            );
+        }
+    }
+
+    /// The interval a payload file may still carry is still ignored.
+    ///
+    /// It was accepted and ignored before an unknown attribute became an
+    /// error -- how fast a simulated payload sends is a property of the
+    /// simulation -- and a file carrying one is still read the way it always
+    /// was, rather than refused for a word this language used to let pass.
+    #[test]
+    fn a_payload_file_still_carrying_an_interval_still_parses() {
+        let config = payload(
+            "
+version: \"1.0\"
+description: a file with an interval left in it
+payloads:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: udp
+    address: localhost
+    port: 5000
+    packet_size: 12
+    packet_interval_ms: 250
+",
+        );
+        assert_eq!(config.to_dh_configs().expect("parses and converts").len(), 1);
+    }
+
     #[test]
     fn a_misspelled_group_is_reported_from_the_handler_not_the_group() {
         // A typo leaves the group unnamed and the name undefined at once. The
@@ -1319,12 +1694,12 @@ data_handlers:
             "
 version: \"1.0\"
 description: a handler misspelling the one group
-data_handler_groups:
+payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
     address: localhost
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     group: udp_localhst
@@ -1348,12 +1723,12 @@ data_handlers:
             "
 version: \"1.0\"
 description: a handler nothing gives a packet size
-data_handler_groups:
+payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
     address: localhost
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     group: udp_localhost

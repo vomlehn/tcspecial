@@ -1,7 +1,7 @@
 {
     "version": "1.0",
     "description": "Two data handlers, one of each endpoint kind",
-    "data_handler_groups": [
+    "payload_groups": [
         {
             "name": "udp_localhost",
             "type": "network",
@@ -10,7 +10,7 @@
             "packet_size": 12
         }
     ],
-    "data_handlers": [
+    "payloads": [
         {
             "dh_id": 0,
             "name": "DH0",

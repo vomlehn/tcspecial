@@ -1233,14 +1233,21 @@ File Structure
 A payload configuration file has a version, a description, and two sections,
 one of them optional.
 
-data handler groups
-    Named groups of attributes. A group carries what several data handlers have
-    in common. Optional: a file whose handlers share nothing, or that prefers
+``payload_groups``
+    Named groups of attributes. A group carries what several payloads have
+    in common. Optional: a file whose payloads share nothing, or that prefers
     to spell every one of them out, has no groups.
 
-data handlers
-    The data handlers themselves. Each has an id and a name, may name a group,
+``payloads``
+    The payloads themselves. Each has an id and a name, may name a group,
     and states whatever attributes it does not take from that group.
+
+Requirement
+    The sections are ``payloads`` and ``payload_groups``. They were
+    ``data_handlers`` and ``data_handler_groups``, and a file still naming
+    either is refused with the names they have now rather than read as a file
+    describing no payloads -- which is what it would otherwise look like,
+    since a section this does not recognise is a section it does not see.
 
 **Attributes**
 
@@ -1382,6 +1389,36 @@ Requirement
     than one silently shadowing the other.
 
 Requirement
+    A payload name and a ``dh_id`` are each defined once. Both pick out one
+    payload, and a repeat of either parses cleanly and then loses a payload:
+    tcspecial keeps its handlers by id, so a repeated id has one silently
+    replace the other, and a simulator configuration is joined to this file by
+    name, so a repeated name has one entry drive two payloads. Reported in the
+    words the endpoint configuration format uses for the same rule, which has
+    always had it.
+
+Requirement
+    An attribute of another kind of payload is an error. A device payload
+    stating a protocol, an address or a port, or a network payload stating a
+    path, has written something nothing will read -- and a payload that looks
+    configured and is not is worse than one that is refused. The rule is the
+    one the endpoint configuration format applies to its own groups.
+
+Requirement
+    The check is made after a group has been laid under a payload, because an
+    attribute inherited from a group reaches the payload exactly as one it
+    states itself does. A payload of one kind joining a group written for
+    another is the case this catches.
+
+Requirement
+    A word that is not an attribute is an error. A misspelled attribute is
+    otherwise ignored, which is silence about something the file plainly
+    meant: a payload whose ``oc_address`` is misspelled has nowhere to send
+    its data and nothing says so. The one word kept out of this is
+    ``packet_interval_ms``, which is accepted and ignored as it was before the
+    rule existed.
+
+Requirement
     A group is named by a data handler. A group no handler names is an error
     rather than a section with no effect, because that is also what a group
     whose name a handler misspelled looks like.
@@ -1402,13 +1439,13 @@ state every attribute for themselves.
    version: "1.0"
    description: TCSpecial payload set 1
 
-   data_handler_groups:
+   payload_groups:
      - name: udp_localhost
        type: network
        protocol: udp
        address: localhost
 
-   data_handlers:
+   payloads:
      - dh_id: 0
        name: DH0
        oc_address: 127.0.0.1
@@ -1488,6 +1525,21 @@ simulated payloads
 |                     |        | packet, whose size the payload file gives   |
 +---------------------+--------+---------------------------------------------+
 
+**What it stands in for.** Neither of these is a setting of the simulation.
+The payload configuration decides both, and they are stated here again only so
+that the two files can be checked against each other.
+
++---------------------+--------+---------------------------------------------+
+| Attribute           | Type   | Meaning                                     |
++=====================+========+=============================================+
+| type                | string | The kind of payload this stands in for, in  |
+|                     |        | the payload file's own word: ``network``,   |
+|                     |        | ``device``, ``serial``, ``i2c``, or ``spi`` |
++---------------------+--------+---------------------------------------------+
+| protocol            | string | Which transport, for a network payload.     |
+|                     |        | Refused for every other kind                |
++---------------------+--------+---------------------------------------------+
+
 **Fault injection settings**, each defaulting to no fault at all:
 
 +------------------------+--------+------------------------------------------+
@@ -1543,6 +1595,46 @@ Requirement
     which a second master on the bus cannot see. A payload that answered
     nothing would look exactly like a handler whose polling had stopped
     working.
+
+What a Simulated Payload Stands In For
+--------------------------------------
+The two files are joined by handler name and by nothing else, and a name is
+exactly what survives a payload set copied from another one. Two sets that
+differ only in how their payload is reached -- one a datagram socket, one a
+stream -- therefore have simulator files that each parse perfectly well
+against the other's payload file, and the run that follows looks like a
+payload that never sends. So each simulated payload says what it stands in
+for, and the statement is compared rather than used.
+
+Requirement
+    A simulated payload states the kind of payload it stands in for, and a
+    network payload the transport as well. Neither is taken from this file:
+    the payload configuration decides both, and a payload that stated neither
+    could not be checked against anything.
+
+Requirement
+    The two files cannot disagree about a payload's kind or its transport. A
+    disagreement is an error naming the payload and what each file says of it,
+    rather than one file overriding the other: both describe the one payload,
+    so a disagreement means one of them is not the file that was meant.
+
+Requirement
+    A transport is stated by a network payload and refused for every other
+    kind. A line, a bus or a peripheral is not reached by a transport, so one
+    stated for it would govern nothing.
+
+Requirement
+    The kind and the transport are written in the same words the payload
+    configuration uses, and the error that refuses a word that is neither
+    lists the words that would have worked. The spellings are one table read
+    from both files, so the two cannot come to disagree about what a kind is
+    called.
+
+Requirement
+    A group may carry the kind and the transport, like every other setting a
+    payload does not state. A group whose payloads are not all reached the
+    same way leaves them with the payloads: the shipped ``payload1sim.yaml``
+    has two payloads sharing a rate that do not share a transport.
 
 Fault Injection
 ---------------
@@ -1630,6 +1722,15 @@ Requirement
     is an error rather than one silently shadowing the other.
 
 Requirement
+    A word that is not a setting is an error, in a payload, in a group, and in
+    the file's own sections. A misspelled setting that was ignored would have
+    the simulator do something other than what the file asked for and say
+    nothing: a payload asked through a misspelling to drop a tenth of its
+    packets drops none, and looks exactly like one that was never asked. A
+    group is where such a word hides best, being read once and applying to
+    every payload that names it.
+
+Requirement
     A group is named by a simulated payload. A group no payload names is an
     error rather than a group with no effect, for the same reason a payload
     configuration's unnamed group is: it is also what a misspelled group name
@@ -1657,15 +1758,22 @@ states its own rate instead.
 
    simulated_payloads:
      - name: DH0
+       type: network
+       protocol: tcp
        group: steady_1hz
 
      - name: DH1
+       type: network
+       protocol: udp
        group: steady_1hz
 
      - name: DH2
+       type: device
        group: continuous
 
      - name: DH3
+       type: network
+       protocol: udp
        packet_interval_ms: 500
        segment_interval_ms: 500
 
@@ -2123,7 +2231,7 @@ mechanism exists to keep true. Tcsmoc passes the file it was given to the
 programs it starts, so one argument names the set for all three.
 
 Requirement
-    A file's kind is read from the sections it carries -- ``data_handlers``
+    A file's kind is read from the sections it carries -- ``payloads``
     for a payload configuration, ``endpoints`` or the groups of them for an
     endpoint configuration -- and not from its name. A file's extension says
     how it is spelled, YAML or JSON or XML, and both kinds can be written in

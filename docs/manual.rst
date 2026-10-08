@@ -68,7 +68,7 @@ an endpoint configuration file
 
 Every one of them may be written in any of the three formats, and a payload
 file and an endpoint file are told apart by what is in them rather than by
-their names: a file naming ``data_handlers`` is the first, and one naming
+their names: a file naming ``payloads`` is the first, and one naming
 ``endpoints`` is the second.
 
 Payload Configuration Files
@@ -83,11 +83,11 @@ share.
    version        "1.0"
    description    free text
 
-   data_handler_groups             optional
-     name         the name handlers refer to
+   payload_groups                  optional
+     name         the name payloads refer to
      ...          any of the attributes below
 
-   data_handlers
+   payloads
      dh_id        the handler's number, which commands name it by
      name         the handler's name, which the panels show
      group        the group to take unstated attributes from, if any
@@ -135,7 +135,7 @@ file states no interval for such a payload at all.
 
 .. code-block:: yaml
 
-   data_handlers:
+   payloads:
      # Sends on its own: nothing here about timing.
      - dh_id: 0
        name: DH0
@@ -183,6 +183,31 @@ line, an I\ :superscript:`2`\ C bus or a SPI peripheral has terms this format
 has nowhere to put, and is described in an endpoint configuration file
 instead.
 
+**What the file will not let pass**
+
+Four mistakes are refused rather than ignored, because each of them otherwise
+produces a payload that looks configured and is not:
+
+* A **repeated name or ``dh_id``**. Both pick out one payload: tcspecial keeps
+  its handlers by id, so a repeated id has one silently replace the other, and
+  a simulator configuration is joined to this file by name, so a repeated name
+  has one entry drive two payloads.
+* An **attribute of another kind** -- a device payload stating ``protocol``,
+  ``address`` or ``port``, or a network payload stating ``path``. The check is
+  made after the group has been laid under the payload, since an attribute
+  inherited from a group reaches the payload just as one it states itself
+  does: a payload of one kind joining a group written for another is what this
+  catches, and the error names the group when the group is where the attribute
+  came from.
+* A **word that is not an attribute**. A misspelled ``oc_address`` is a
+  payload with nowhere to send its data, and ignoring the word says nothing
+  about it. The lone exception is ``packet_interval_ms``, still accepted and
+  ignored so that a file predating the split between the two files reads as it
+  always did.
+* A **misspelled section**, for the same reason: ``payload`` is not
+  ``payloads``, and a file whose only section is misspelled describes no
+  payloads at all.
+
 This is the shipped ``payload1.yaml``. DH1 and DH3 are reached the same way,
 so what they share is a group; DH0 and DH2 share nothing and state everything
 for themselves.
@@ -192,13 +217,13 @@ for themselves.
    version: "1.0"
    description: TCSpecial payload set 1
 
-   data_handler_groups:
+   payload_groups:
      - name: udp_localhost
        type: network
        protocol: udp
        address: localhost
 
-   data_handlers:
+   payloads:
      - dh_id: 0
        name: DH0
        oc_address: 127.0.0.1
@@ -246,9 +271,41 @@ reads this.
      ...                  any of the settings below
 
    simulated_payloads
-     name                 the data handler this payload stands in for
+     name                 the payload this one stands in for
+     type                 the kind of payload it is, as the payload file says
+     protocol             which transport, for a network payload
      group                the group to take unstated settings from, if any
      ...                  any of the settings below
+
+**What it stands in for**
+
+Two of the attributes describe the payload rather than the simulation, and are
+required for that reason. The two files are joined by handler name and by
+nothing else -- and a name is what a payload set copied from another one keeps
+-- so a simulator file written for one set parses happily against another
+set's payload file, and the run that follows looks like a payload that never
+sends. Stating the kind here makes that pairing an error instead.
+
+.. code-block:: text
+
+   type                   the kind of payload this stands in for, in the
+                          payload file's own word: network, device, serial,
+                          i2c, or spi. Must be what the payload file says
+   protocol               which transport, for a network payload, and refused
+                          for any other kind. Must be what the payload file
+                          says
+
+A word that is not a setting is refused here too -- in a payload, in a group,
+and in the file's own sections. A misspelled setting that was ignored would
+have the simulator do something other than what the file asked for and say
+nothing: a payload asked through a misspelling to drop a tenth of its packets
+drops none, and looks exactly like one that was never asked.
+
+Neither is taken from this file: the payload file decides both, and a
+disagreement about either is an error naming the payload and what each file
+says of it. A group may carry them, like any other setting -- though payloads
+that share a rate need not share a transport, which is why the shipped
+``payload1sim.yaml`` leaves them with the payloads.
 
 **Settings**
 
@@ -309,6 +366,8 @@ run is not left to be guessed at afterwards.
 
    simulated_payloads:
      - name: DH0
+       type: network
+       protocol: udp
        packet_interval_ms: 500
        drop_percent: 10        # one packet in ten never arrives
        jitter_ms: 50           # and the rest are up to 50ms late
@@ -344,15 +403,22 @@ This is the shipped ``payload1sim.yaml``.
 
    simulated_payloads:
      - name: DH0
+       type: network
+       protocol: tcp
        group: steady_1hz
 
      - name: DH1
+       type: network
+       protocol: udp
        group: steady_1hz
 
      - name: DH2
+       type: device
        group: continuous
 
      - name: DH3
+       type: network
+       protocol: udp
        packet_interval_ms: 500
        segment_interval_ms: 500
 

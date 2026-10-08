@@ -109,7 +109,17 @@ pub enum HandlerSource {
 #[derive(Deserialize)]
 struct Sections {
     #[serde(default)]
+    payloads: Option<IgnoredAny>,
+    /// What the payload section used to be called.
+    ///
+    /// Asked about only so that a file written to the old spelling is told
+    /// the new one. Without this it would name no section this knows and be
+    /// reported as describing no payloads at all, which is true and useless.
+    #[serde(default)]
     data_handlers: Option<IgnoredAny>,
+    /// What a group of them used to be called, for the same reason.
+    #[serde(default)]
+    data_handler_groups: Option<IgnoredAny>,
     #[serde(default, alias = "endpoint-groups")]
     endpoint_groups: Option<IgnoredAny>,
     #[serde(default)]
@@ -123,14 +133,24 @@ fn handler_source_of(text: &str, format: ConfigFormat) -> TcsResult<HandlerSourc
     // A payload file is recognised by its own section, so a file carrying both
     // -- which neither format describes -- is read as a payload file rather
     // than rejected. There is nothing a caller could do about it either way.
-    if sections.data_handlers.is_some() {
+    if sections.payloads.is_some() {
         Ok(HandlerSource::Payload)
     } else if sections.endpoints.is_some() || sections.endpoint_groups.is_some() {
         Ok(HandlerSource::Endpoints)
+    } else if sections.data_handlers.is_some() || sections.data_handler_groups.is_some() {
+        // The old spelling, named rather than ignored. A file keeping it would
+        // otherwise be read as naming no section at all, and the honest
+        // report of that -- it describes no payloads -- would say nothing
+        // about the one word that has to change.
+        Err(TcsError::Config(
+            "names data_handlers, which is what the payload section was called \
+             before: payloads is the section now, and payload_groups a group of \
+             them"
+                .to_string(),
+        ))
     } else {
         Err(TcsError::Config(
-            "names neither data_handlers nor endpoints, so it describes no data \
-             handlers"
+            "names neither payloads nor endpoints, so it describes no payloads"
                 .to_string(),
         ))
     }
@@ -175,7 +195,7 @@ mod tests {
     const PAYLOAD: &str = "
 version: \"1.0\"
 description: a payload file
-data_handlers:
+payloads:
   - dh_id: 0
     name: DH0
     oc_address: 127.0.0.1
@@ -268,6 +288,29 @@ endpoints:
         );
     }
 
+    /// A file written to the old section name is told the new one.
+    ///
+    /// The sections were data_handlers and data_handler_groups, and a file
+    /// that still names them describes payloads perfectly well -- it names
+    /// them in a word this no longer reads. Saying it describes no payloads
+    /// would be true and would not help.
+    #[test]
+    fn a_file_naming_the_old_payload_section_is_told_the_new_name() {
+        for old in ["data_handlers:\n  - dh_id: 0\n", "data_handler_groups:\n  - name: g\n"] {
+            let text = format!("version: \"1.0\"\n{old}");
+            let message = handler_source_of(&text, ConfigFormat::Yaml)
+                .expect_err("the old spelling must be rejected")
+                .to_string();
+            assert!(
+                message.contains("data_handlers")
+                    && message.contains("payloads")
+                    && message.contains("payload_groups"),
+                "the error should name the old section and both new ones, but \
+                 said: {message}"
+            );
+        }
+    }
+
     #[test]
     fn a_file_naming_neither_section_is_rejected() {
         // Not read as an endpoint configuration with no endpoints, which is
@@ -276,7 +319,7 @@ endpoints:
             .expect_err("must be rejected")
             .to_string();
         assert!(
-            message.contains("data_handlers") && message.contains("endpoints"),
+            message.contains("payloads") && message.contains("endpoints"),
             "the error should name both sections, but said: {message}"
         );
     }

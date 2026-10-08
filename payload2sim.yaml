@@ -9,7 +9,7 @@
 #
 # A payload takes its settings from the group it names, and may then override
 # any of them for itself. A group no payload names is an error rather than a
-# group with no effect, so this file defines only the one its payload uses.
+# group with no effect, so this file defines only the one its payloads use.
 #
 # Each payload states the kind of payload it is, and a network payload the
 # transport as well, in the same words the payload file uses. Those are not
@@ -24,10 +24,17 @@ simulated_payload_groups:
   # One packet a second, sent whole.
   - name: steady_1hz
     packet_interval_ms: 1000
-    segment_interval_ms: 1000
 
 simulated_payloads:
-  - name: DH0
+  - name: auto-send
     type: network
     protocol: udp
     group: steady_1hz
+
+  # Nothing about timing, and so no group: this payload answers requests, and
+  # the rate it is asked at is payload2.yaml's packet interval. A group that
+  # states a rate is refused for such a payload whether it states the rate
+  # itself or inherits it, which is why it names none.
+  - name: triggered-send
+    type: network
+    protocol: tcp

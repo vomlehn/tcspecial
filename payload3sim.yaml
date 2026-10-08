@@ -1,0 +1,24 @@
+# How tcssim simulates the payloads of payload2.yaml.
+#
+# Nothing here describes a payload: payload2.yaml does that, and this file adds
+# only what simulating one needs. The two are joined by name. Every data
+# handler of the payload file needs settings here, and a name here that no data
+# handler has is an error rather than a line with no effect, because a typo is
+# otherwise indistinguishable from a payload that was meant not to be
+# simulated.
+#
+# A payload takes its settings from the group it names, and may then override
+# any of them for itself. A group no payload names is an error rather than a
+# group with no effect, so this file defines only the one its payload uses.
+version: "1.0"
+description: Simulator settings for the payloads of payload2.yaml
+
+simulated_payload_groups:
+  # One packet a second, sent whole.
+  - name: steady_1hz
+    packet_interval_ms: 1000
+    segment_interval_ms: 1000
+
+simulated_payloads:
+  - name: DH0
+    group: steady_1hz

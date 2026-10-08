@@ -1,0 +1,24 @@
+# The payloads tcsmoc controls and tcssim simulates.
+#
+# This file describes the payloads themselves: which data handlers exist, how
+# tcspecial reaches each one, and how big its packets are. It deliberately says
+# nothing about how fast a simulated payload produces them or how the simulator
+# divides a packet into segments; those are properties of the simulation rather
+# than of the payload, and live in payload2sim.yaml.
+#
+# This set has one data handler, so it has no data handler groups: a group
+# carries what several handlers share, and a group no handler names is an
+# error rather than a section with no effect.
+version: "1.0"
+description: TCSpecial payload set 2
+
+data_handlers:
+  - dh_id: 0
+    name: DH0
+    oc_address: 127.0.0.1
+    oc_port: 6000
+    type: network
+    protocol: tcp
+    address: localhost
+    port: 5000
+    packet_size: 12

@@ -12,6 +12,10 @@ export struct PayloadInfo {
     name: string,
     config: string,
     packet-size: int,
+    // Everything both files said about this payload, as Rust read them. Held
+    // ready rather than fetched when asked: the files are read once, at
+    // startup, and nothing can change them while the window is up.
+    parameters: string,
     // From the simulator configuration file, and editable here afterwards
     segment-size: int,
     packet-interval: int,
@@ -40,6 +44,7 @@ component PayloadPanel inherits Rectangle {
     in property <string> last-recv-data: "";
     in property <int> packets-sent: 0;
     in property <int> packets-recv: 0;
+    in property <string> parameters: "";
 
     callback start-clicked();
     callback stop-clicked();
@@ -58,6 +63,45 @@ component PayloadPanel inherits Rectangle {
     VerticalLayout {
         padding: 4px;
         spacing: 2px;
+        parameters-popup := PopupWindow {
+            x: 4px;
+            y: 4px;
+            width: 300px;
+            height: 240px;
+
+            Rectangle {
+                background: white;
+                border-color: #808080;
+                border-width: 1px;
+
+                VerticalLayout {
+                    padding: 6px;
+                    spacing: 4px;
+
+                    Text {
+                        text: payload-name + " parameters";
+                        font-weight: 700;
+                        font-size: 11px;
+                    }
+
+                    // Scrolled rather than sized to the text: how many lines
+                    // there are depends on the kind of payload and on how
+                    // many faults were asked for, and a popup tall enough for
+                    // the longest of them would be taller than the window.
+                    ScrollView {
+                        parameters-text := Text {
+                            // The lines are columns of name and value, so
+                            // they only line up in a font whose characters
+                            // are one width.
+                            font-family: "monospace";
+                            font-size: 10px;
+                            text: parameters;
+                        }
+                    }
+                }
+            }
+        }
+
 
         // Header row - combine name and status
         HorizontalLayout {
@@ -130,6 +174,20 @@ component PayloadPanel inherits Rectangle {
         HorizontalLayout {
             height: 24px;
             spacing: 2px;
+            // What the two files said about this payload. On the same row as
+            // the controls, so the panel is no taller for it: a row of its
+            // own would cost every panel a row's height and the window a row
+            // of panels.
+            //
+            // First in the row rather than last because Slint's testing
+            // backend does not report the final child of a layout, and the
+            // test that opens this popup has to find the button that opens
+            // it. Nothing invisible will stand in for it at the end: a
+            // Rectangle or an empty Text there is not reported either.
+            Button {
+                text: "Params";
+                clicked => { parameters-popup.show(); }
+            }
             Button {
                 text: "Start";
                 clicked => { start-clicked(); }
@@ -223,6 +281,7 @@ export component MainWindow inherits Window {
                     last-recv-data: p.last-recv-data;
                     packets-sent: p.packets-sent;
                     packets-recv: p.packets-recv;
+                    parameters: p.parameters;
 
                     start-clicked => { start-payload(i); }
                     stop-clicked => { stop-payload(i); }

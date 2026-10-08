@@ -275,11 +275,32 @@ for themselves.
        port: 5003
        packet_size: 15
 
+Seeing what was read
+====================
+Each payload's panel, in both programs, has a ``Params`` button. It shows
+every parameter read from the two configuration files for that payload: what
+the payload file said about the payload and how it is reached, and what the
+simulator file said about how a stand-in for it behaves, each under the name
+of the file it came from.
+
+It shows nothing but what the files said. What a payload has actually done is
+on the panel itself, and only the attributes of that payload's own kind appear
+-- a device has no protocol and a bus no port -- along with only the faults
+that were asked for. Where a file stated nothing, the line says what the
+program will use instead rather than passing it off as a statement: a handler
+with no OC address is shown as one that cannot be started.
+
+In tcsmoc the simulator half is shown when that file can be read. The MOC
+simulates nothing, so a simulator file that is missing or written for a
+different payload file costs it that half and nothing else; the panel says so
+in place of the settings.
+
 Simulator Configuration Files
 =============================
 What simulating a payload takes, which is not a property of the payload: how
 often it produces a packet, and how it divides one into segments. Only tcssim
-reads this.
+acts on it; tcsmoc reads it too, to show what the tcssim it started is
+simulating, and does without it if it is not there.
 
 .. code-block:: text
 
@@ -624,9 +645,12 @@ reading a different one would serve or simulate payloads the panels do not
 describe.
 
 ``PAYLOAD_YAML`` is the payload file, which reaches every program as a command
-line argument. ``PAYLOAD_SIM_YAML`` is the simulator file, which only tcssim
-reads and which reaches it through the environment. Both default to the
-``payload2`` set.
+line argument. ``PAYLOAD_SIM_YAML`` is the simulator file, which reaches
+tcssim through the environment -- and tcsmoc too, which it inherits the same
+way: tcsmoc acts on none of it, and reads it only so a panel can show what the
+tcssim it started is simulating. Failing the variable, each looks for the file
+beside the payload file and named for it. Both default to the ``payload2``
+set.
 
 Everything at once
 ------------------

@@ -7,7 +7,8 @@
 //! reaches each one, and how big its packets are. The simulator file adds what
 //! simulating one takes and the payload file has no business knowing: how fast
 //! a payload produces packets, and how a packet is divided into segments. The
-//! two are joined by the data handler's name; see [`sim_config`].
+//! two are joined by the data handler's name; see
+//! [`tcslibgs::sim_config`].
 
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::env;
@@ -16,7 +17,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use tcslibgs::config::{load_dh_configs, payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
-use tcslibgs::DHConfig;
+use tcslibgs::{payload_parameters, DHConfig, DHSample, NO_TRANSFER_TIME};
 
 mod endpoint;
 mod grid;
@@ -29,11 +30,10 @@ mod payload_tcp;
 mod payload_unix;
 mod pty;
 mod payload_udp;
-mod sim_config;
 
 use endpoint::{endpoint_description, payload_config_from};
-use payload::{PayloadConfig, SimulatedPayload};
-use sim_config::{ResolvedSim, SimConfigFile};
+use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
+use tcslibgs::{ResolvedSim, SimConfigFile};
 
 slint::include_modules!();
 
@@ -42,6 +42,32 @@ slint::include_modules!();
 /// what is read when that variable is unset.
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
 const DEFAULT_SIM_CONFIG_PATH: &str = "payload1sim.yaml";
+
+/// The two strings a panel shows for one sample: when, and what.
+///
+/// The formatting is [`DHSample::panel_lines`], which tcsmoc's panels use
+/// too: the two show the one transfer from opposite ends of a link and are
+/// read side by side, so a byte or a time that read differently in the two
+/// would look like a difference in the data.
+fn sample_lines(sample: &DHSample) -> (SharedString, SharedString) {
+    let (time, data) = sample.panel_lines();
+    (SharedString::from(time), SharedString::from(data))
+}
+
+/// Put a payload's traffic into its panel.
+///
+/// The times are what the panel is for: a count tells how much has moved
+/// since the payload started, and the time tells whether any of it is moving
+/// now. A payload stopped ten minutes ago and one sending every second have
+/// the same count a moment after they are looked at. The bytes beside each
+/// time are the head of that packet, which is what says the traffic is the
+/// traffic that was expected rather than merely traffic.
+fn show_traffic(info: &mut PayloadInfo, stats: &PayloadStats) {
+    info.packets_sent = i32::try_from(stats.packets_sent).unwrap_or(i32::MAX);
+    info.packets_recv = i32::try_from(stats.packets_recv).unwrap_or(i32::MAX);
+    (info.last_sent_time, info.last_sent_data) = sample_lines(&stats.last_sent);
+    (info.last_recv_time, info.last_recv_data) = sample_lines(&stats.last_recv);
+}
 
 /// Turn a data handler and its settled simulator settings into the panel the
 /// window shows for it.
@@ -54,12 +80,16 @@ fn payload_info_from(dh: &DHConfig, sim: &ResolvedSim) -> PayloadInfo {
         packet_interval: sim.packet_interval_ms as i32,
         segment_interval: sim.segment_interval_ms as i32,
         status: SharedString::from("Stopped"),
-        last_sent_time: SharedString::from("--:--:--"),
+        last_sent_time: SharedString::from(NO_TRANSFER_TIME),
         last_sent_data: SharedString::new(),
-        last_recv_time: SharedString::from("--:--:--"),
+        last_recv_time: SharedString::from(NO_TRANSFER_TIME),
         last_recv_data: SharedString::new(),
         packets_sent: 0,
         packets_recv: 0,
+        // Both files, as they were read. Tcssim has both in hand, so its
+        // panels can show the whole of what a payload set says about a
+        // payload.
+        parameters: SharedString::from(payload_parameters(dh, Some(sim))),
     }
 }
 
@@ -259,10 +289,7 @@ fn main() {
             let guard = payloads.lock().unwrap();
             for (row, payload) in guard.iter().enumerate() {
                 let stats = payload.stats();
-                update_row(&model, row, |info| {
-                    info.packets_sent = stats.packets_sent as i32;
-                    info.packets_recv = stats.packets_recv as i32;
-                });
+                update_row(&model, row, |info| show_traffic(info, &stats));
             }
         });
 
@@ -281,6 +308,80 @@ mod tests {
 
     fn repo_file(name: &str) -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
+    }
+
+    /// A sample of a transfer, as the stats hold it.
+    fn sample_of(seconds: u64, data: &[u8]) -> DHSample {
+        let mut sample = DHSample::new();
+        sample.record(data);
+        sample.time = Some(tcslibgs::Timestamp {
+            seconds,
+            nanoseconds: 0,
+        });
+        sample
+    }
+
+    /// A panel shows when the last packet went each way and what it was, and
+    /// says plainly when there has not been one.
+    ///
+    /// The time is the point of the two rows: a count says how much has moved
+    /// since the payload started, and only a time says whether any of it is
+    /// moving now -- a payload stopped ten minutes ago and one sending every
+    /// second look identical by their counts. The bytes beside it are what
+    /// say the traffic is the traffic that was expected rather than merely
+    /// traffic.
+    #[test]
+    fn a_panel_shows_when_the_last_packet_went_and_what_it_was() {
+        let mut info = payload_info_from(&handler("DH0"), &sim(1000, 1000, 12));
+        assert_eq!(info.last_sent_time, NO_TRANSFER_TIME);
+        assert_eq!(info.last_recv_time, NO_TRANSFER_TIME);
+
+        // Nothing has moved yet, so neither row shows a time or any bytes: a
+        // count of nought with a time beside it would be a transfer that
+        // never happened.
+        show_traffic(&mut info, &PayloadStats::default());
+        assert_eq!(info.last_sent_time, NO_TRANSFER_TIME);
+        assert_eq!(info.last_sent_data, "");
+        assert_eq!(info.last_recv_time, NO_TRANSFER_TIME);
+        assert_eq!(info.last_recv_data, "");
+
+        // One each way, an hour apart, as the panel shows them.
+        show_traffic(
+            &mut info,
+            &PayloadStats {
+                packets_sent: 7,
+                packets_recv: 2,
+                last_sent: sample_of(3661, &[0x01, 0xAB, 0xFF]),
+                last_recv: sample_of(7322, b"READ\r"),
+                ..PayloadStats::default()
+            },
+        );
+        assert_eq!(info.last_sent_time, "01:01:01");
+        assert_eq!(info.last_sent_data, "01 AB FF");
+        assert_eq!(info.last_recv_time, "02:02:02");
+        assert_eq!(info.last_recv_data, "52 45 41 44 0D");
+        assert_eq!((info.packets_sent, info.packets_recv), (7, 2));
+
+        // A packet longer than the sample keeps shows a head and says so,
+        // which is how a panel of eight bytes talks about a packet of twelve.
+        show_traffic(
+            &mut info,
+            &PayloadStats {
+                packets_sent: 8,
+                last_sent: sample_of(86_399, &[0x11; 12]),
+                ..PayloadStats::default()
+            },
+        );
+        assert_eq!(info.last_sent_time, "23:59:59");
+        assert_eq!(info.last_sent_data, "11 11 11 11 11 11 11 11...");
+
+        // And one direction without the other: a payload that sends and is
+        // never spoken to is the commonest kind there is.
+        assert_eq!(
+            (info.last_recv_time.as_str(), info.last_recv_data.as_str()),
+            (NO_TRANSFER_TIME, ""),
+            "a payload nobody has spoken to has no received line to show"
+        );
     }
 
     /// Every panel, and each of the three rows of data it ends with, is
@@ -327,6 +428,14 @@ mod tests {
             "sixteen payloads".to_string(),
             std::iter::repeat_with(|| one.clone()).take(16).collect(),
         ));
+
+        // A case of panels filled with the longest lines they can show was
+        // tried here and taken out again: Slint clips a line too long for its
+        // panel rather than widening anything, and the testing backend
+        // reports a Text's laid-out width rather than the width it wanted, so
+        // such a case measures exactly what an empty one does. What the rows
+        // hold is checked by the tests of show_traffic instead, and how much
+        // room they have by the heights below.
 
         for (set, rows) in cases {
             let panels = rows.len();
@@ -418,6 +527,11 @@ mod tests {
                 }
             }
         }
+
+        // The backend is up and this thread owns its windows, so the other
+        // checks that need one run from here.
+        the_panel_shows_the_time_and_bytes_it_was_given();
+        the_params_button_shows_what_both_files_said();
     }
 
     /// Every shipped payload set: a payload file and the simulator file beside
@@ -466,6 +580,22 @@ mod tests {
             root.display()
         );
         sets
+    }
+
+    /// A data handler, for the tests that only need one to exist.
+    fn handler(name: &str) -> DHConfig {
+        DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new(name),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "localhost".to_string(),
+                port: 5000,
+            }),
+            packet_size: 12,
+            oc: None,
+            mode: Default::default(),
+        }
     }
 
     fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
@@ -607,6 +737,134 @@ mod tests {
                 payload_path.display()
             );
         }
+    }
+
+    /// The panel on screen shows the time and bytes Rust put in the model.
+    ///
+    /// The rest of the chain is checked a piece at a time -- the payload
+    /// records a sample, the refresh puts it in the row -- and none of that
+    /// shows anything if the window does not read the field it was put in.
+    /// A panel declares a property per value and the grid passes each one
+    /// across by name, so a field the grid forgets is a panel that shows its
+    /// own default for ever, with every test of the Rust side still passing.
+    /// This reads the text the window actually laid out.
+    ///
+    /// Not a test of its own: the testing backend is started once per test
+    /// binary and its windows belong to the thread that made them, so the
+    /// checks that need a window are all reached from the one test below.
+    fn the_panel_shows_the_time_and_bytes_it_was_given() {
+        use i_slint_backend_testing::ElementHandle;
+
+        /// Every line of a panel that begins with `start`, as laid out.
+        fn lines_from(ui: &MainWindow, start: &str) -> Vec<String> {
+            ElementHandle::find_by_element_type_name(ui, "Text")
+                .filter_map(|e| e.accessible_label())
+                .map(|label| label.to_string())
+                .filter(|label| label.starts_with(start))
+                .collect()
+        }
+
+        let shown = |info: PayloadInfo| {
+            let ui = MainWindow::new().unwrap();
+            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![info]))));
+            ui.set_columns(1);
+            ui.show().unwrap();
+            (lines_from(&ui, "Sent: "), lines_from(&ui, "Recv: "))
+        };
+
+        // A payload built from the files alone has moved nothing, and says so
+        // in both directions.
+        let quiet = payload_info_from(&handler("DH0"), &sim(1000, 1000, 12));
+        let (sent, recv) = shown(quiet.clone());
+        assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
+        assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME} ")]);
+
+        // And one that has sent and been spoken to shows when each happened
+        // and the head of what moved.
+        let mut moving = quiet;
+        show_traffic(
+            &mut moving,
+            &PayloadStats {
+                packets_sent: 3,
+                packets_recv: 1,
+                last_sent: sample_of(3661, &[0xDE, 0xAD]),
+                last_recv: sample_of(7322, b"ASK"),
+                ..PayloadStats::default()
+            },
+        );
+        let (sent, recv) = shown(moving);
+        assert_eq!(
+            sent,
+            vec!["Sent: 01:01:01 DE AD".to_string()],
+            "the panel does not show the time and bytes of the last packet sent"
+        );
+        assert_eq!(
+            recv,
+            vec!["Recv: 02:02:02 41 53 4B".to_string()],
+            "the panel does not show the time and bytes of the last packet received"
+        );
+    }
+
+    /// Pressing a panel's Params button shows what both files said about
+    /// that payload.
+    ///
+    /// Everything up to the window is checked elsewhere -- the text itself by
+    /// `tcslibgs::payload_parameters`, and that a panel carries it by the
+    /// model -- and none of that puts anything on screen if the button is not
+    /// wired to the popup or the popup not to the text. This presses the
+    /// button and reads what the window then laid out.
+    ///
+    /// Not a test of its own, for the reason given above: one test per binary
+    /// may start the backend.
+    fn the_params_button_shows_what_both_files_said() {
+        use i_slint_backend_testing::ElementHandle;
+
+        let dh = handler("DH0");
+        let sim = sim(1000, 1000, 12);
+        let ui = MainWindow::new().unwrap();
+        ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
+            payload_info_from(&dh, &sim),
+        ]))));
+        ui.set_columns(1);
+        ui.show().unwrap();
+
+        // Every line of text the window has laid out.
+        let on_screen = |ui: &MainWindow| -> Vec<String> {
+            ElementHandle::find_by_element_type_name(ui, "Text")
+                .filter_map(|e| e.accessible_label())
+                .map(|label| label.to_string())
+                .collect()
+        };
+
+        // Nothing of the parameters is on screen until the button is pressed:
+        // a panel is a dozen lines tall and the parameters are thirty.
+        assert!(
+            !on_screen(&ui).iter().any(|line| line.contains("dh_id")),
+            "the parameters are shown before anyone asked for them"
+        );
+
+        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Params").collect();
+        assert_eq!(
+            button.len(),
+            1,
+            "the panel has no Params button to press"
+        );
+        button[0].invoke_accessible_default_action();
+
+        let shown = on_screen(&ui);
+        assert!(
+            shown.iter().any(|line| line == "DH0 parameters"),
+            "the popup does not say which payload it is describing: {shown:?}"
+        );
+
+        // And what it shows is what the two files said, which is the one
+        // description both programs use.
+        let wanted = payload_parameters(&dh, Some(&sim));
+        assert!(
+            shown.contains(&wanted),
+            "the popup shows something other than the parameters of this \
+             payload:\n{shown:?}"
+        );
     }
 
     /// A panel shows the data handler's packet size and the simulator file's

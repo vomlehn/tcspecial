@@ -61,7 +61,7 @@ pub fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
                 if n > 0 {
                     asked = n;
                     let mut guard = stats.lock().unwrap();
-                    guard.packets_recv += 1;
+                    guard.a_packet_has_come(&buf[..n]);
                     guard.bytes_recv += n as u64;
                 }
             }
@@ -90,7 +90,7 @@ pub fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
                     let mut guard = stats.lock().unwrap();
                     guard.bytes_sent += bytes;
                     if whole {
-                        guard.packets_sent += 1;
+                        guard.a_packet_has_gone(&packet);
                         sent += 1;
                     }
                 }
@@ -115,7 +115,7 @@ pub fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use crate::sim_config::Faults;
+    use tcslibgs::Faults;
     use std::net::TcpStream;
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;

@@ -41,7 +41,7 @@ use std::path::Path;
 
 use serde::de::IgnoredAny;
 use serde::Deserialize;
-use tcslibgs::{
+use crate::{
     load_config_file, one_host, DHConfig, DHType, EndpointConfig, NetworkProtocol, TcsResult,
 };
 
@@ -948,7 +948,7 @@ impl SimConfigFile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::{
+    use crate::{
         DHId, DHMode, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol,
     };
 
@@ -970,7 +970,7 @@ mod tests {
     /// Parse YAML the way a loaded file is parsed, so these tests exercise
     /// the same deserialization a real file goes through.
     fn parse(text: &str) -> SimConfigFile {
-        tcslibgs::ConfigFormat::Yaml.parse(text).expect("parses")
+        crate::ConfigFormat::Yaml.parse(text).expect("parses")
     }
 
     #[test]
@@ -1334,7 +1334,7 @@ simulated_payloads:
     #[test]
     fn a_section_that_is_not_a_section_is_refused() {
         let text = "simulated_payload:\n  - name: DH0\n    packet_interval_ms: 100\n";
-        let e = tcslibgs::ConfigFormat::Yaml
+        let e = crate::ConfigFormat::Yaml
             .parse::<SimConfigFile>(text)
             .expect_err("a file whose one section is misspelled describes nothing");
         let said = format!("{e}");

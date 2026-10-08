@@ -13,7 +13,10 @@ use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::config::{load_dh_configs, payload_path_from_args};
-use tcslibgs::{ArmKey, CommandStatus, DHConfig, DHSample, DH_SAMPLE_BYTES};
+use tcslibgs::{
+    payload_parameters, ArmKey, CommandStatus, DHConfig, DHSample, ResolvedSim, SimConfigFile,
+    NO_TRANSFER_TIME,
+};
 use tcspecial::config::constants::BEACON_NETADDR;
 
 use crate::beacon_receive::BeaconReceive;
@@ -23,7 +26,6 @@ use crate::config::constants::BEACON_INDICATOR;
 
 slint::include_modules!();
 
-mod app;
 mod beacon_receive;
 mod ci_link;
 mod config;
@@ -43,11 +45,18 @@ const CONNECTED_STATUS: &str = "Connected";
 const DISCONNECTED_STATUS: &str = "Disconnected";
 const ERROR_STATUS: &str = "Error";
 
-/// Shown for the time of a transfer that has not happened.
+/// What a panel's status says of a handler that is moving data, and of one
+/// that is not.
 ///
-/// The same text `ui/main.slint` defaults its two time lines to, so a panel
-/// reads alike before any query and after one that found nothing moved.
-const NO_TRANSFER_TIME: &str = "--:--:--";
+/// `ui/main.slint` labels the panel's one button from these, and
+/// `handle_transfer_button` reads the same status back to decide which
+/// command a press sends, so the label and the command cannot disagree.
+///
+/// What the button actually says each way is in `ui/main.slint`: the window
+/// owns its own labels, and the two words appear in Rust only in the test
+/// that holds the window to the rule a press is decided by.
+const ACTIVE_STATUS: &str = "Active";
+const STOPPED_STATUS: &str = "Stopped";
 
 /// How long the MOC waits for an answer when asking whether a tcspecial is
 /// already there.
@@ -91,6 +100,14 @@ fn tcspecial_already_running(address: &str) -> bool {
 /// `PAYLOAD_SIM_YAML`, inherited from the MOC's environment like any other
 /// variable.
 const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
+
+/// Which environment variable names the simulator configuration, and what is
+/// read when the variable is unset and no file is beside the payload file.
+///
+/// The same variable tcssim reads, which is the point: the MOC shows what the
+/// tcssim it starts is simulating, so the two have to be looking at one file.
+const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
+const DEFAULT_SIM_CONFIG_PATH: &str = "payload1sim.yaml";
 
 /// A panel's nominal size, and the height of everything above and below the
 /// grid of them.
@@ -231,7 +248,7 @@ fn grid_shape(panels: usize) -> GridShape {
 /// no packet interval among them: how often a payload produces a packet is a
 /// property of a simulation rather than of a payload, so it is stated in the
 /// simulator's own file and tcssim is what shows it.
-fn dh_info_from(dh: &DHConfig) -> DHInfo {
+fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
     DHInfo {
         name: SharedString::from(dh.name.0.clone()),
         config: SharedString::from(endpoint_description(&dh.endpoint)),
@@ -243,6 +260,57 @@ fn dh_info_from(dh: &DHConfig) -> DHInfo {
         last_recv: SharedString::new(),
         bytes_sent: 0,
         bytes_recv: 0,
+        // What both files said about this payload, ready for the panel's
+        // Params button. `sim` is absent when the simulator file could not be
+        // read, which is not an error here: the MOC controls payloads and
+        // does not simulate them.
+        parameters: SharedString::from(payload_parameters(dh, sim)),
+    }
+}
+
+/// What the simulator configuration settles for each handler, if it can be
+/// read.
+///
+/// Read so that a panel can show the whole of what a payload set says, and
+/// read loosely for the same reason it is read at all: the MOC does not
+/// simulate anything, so a simulator file that is missing, unreadable, or
+/// written for a different payload file must not stop the MOC from
+/// controlling payloads. Each of those is said once on the way past and the
+/// panels then say, where the parameters are shown, that this half was not
+/// read.
+fn simulator_settings(payload_path: &str, dh_configs: &[DHConfig]) -> Option<Vec<ResolvedSim>> {
+    let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
+        // Beside the payload file and named for it, which is the convention
+        // the whole payload set mechanism rests on.
+        payload_path
+            .strip_suffix(".yaml")
+            .map(|stem| format!("{stem}sim.yaml"))
+            .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
+    });
+
+    let file = match SimConfigFile::load(&sim_path) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!(
+                "Not showing simulator settings: {} could not be read: {}",
+                sim_path, e
+            );
+            return None;
+        }
+    };
+
+    match file.resolve(dh_configs) {
+        Ok(sims) => {
+            eprintln!("Loaded simulator settings from: {}", sim_path);
+            Some(sims)
+        }
+        Err(e) => {
+            eprintln!(
+                "Not showing simulator settings: {} does not fit {}: {}",
+                sim_path, payload_path, e
+            );
+            None
+        }
     }
 }
 
@@ -334,25 +402,8 @@ fn apply_panel_update(dh_model: &Rc<VecModel<DHInfo>>, update: &PanelUpdate) {
 /// not the same as having carried no bytes; it shows the placeholder rather
 /// than a time, and no data.
 fn sample_lines(sample: &DHSample) -> (SharedString, SharedString) {
-    match sample.time {
-        Some(time) => {
-            // The sample truncated the transfer, so bytes_to_hex is never the
-            // one doing it here; the ellipsis comes from the length the sample
-            // kept of the whole.
-            let mut data = app::bytes_to_hex(sample.data(), DH_SAMPLE_BYTES);
-            if sample.was_truncated() {
-                data.push_str("...");
-            }
-            (
-                SharedString::from(app::format_timestamp(time.seconds, time.nanoseconds)),
-                SharedString::from(data),
-            )
-        }
-        None => (
-            SharedString::from(NO_TRANSFER_TIME),
-            SharedString::new(),
-        ),
-    }
+    let (time, data) = sample.panel_lines();
+    (SharedString::from(time), SharedString::from(data))
 }
 
 /// Change one panel's contents, leaving the rest of it alone.
@@ -489,9 +540,19 @@ fn main() {
     let ui = MainWindow::new().unwrap();
     let ui_weak = ui.as_weak();
 
+    // And the simulator file beside it, for the panels to show. Loosely: the
+    // MOC simulates nothing, so a file it cannot read costs it the simulator
+    // half of what a panel can show and nothing else.
+    let sims = simulator_settings(&payload_path, &dh_configs);
+
     // One panel per configured data handler.
-    let dh_model: Rc<VecModel<DHInfo>> =
-        Rc::new(VecModel::from(dh_configs.iter().map(dh_info_from).collect::<Vec<_>>()));
+    let dh_model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(
+        dh_configs
+            .iter()
+            .enumerate()
+            .map(|(row, dh)| dh_info_from(dh, sims.as_ref().and_then(|sims| sims.get(row))))
+            .collect::<Vec<_>>(),
+    ));
     ui.set_dh_model(ModelRc::from(dh_model.clone()));
 
     // Shape the grid, and open the window at the size that shape wants. The
@@ -572,8 +633,7 @@ fn main() {
     handle_main_menu(&ui, ui_weak.clone(), link.clone());
     query_dh_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
     poll_panels(link.clone(), dh_configs.clone(), dh_model.clone());
-    start_dh_handler(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
-    stop_dh_handler(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
+    handle_transfer_button(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
 /*
     // Menu action handler
     {
@@ -963,19 +1023,48 @@ fn poll_pass(
     gathered
 }
 
-// Start DH handler
-//
-// The panel passes its own row; the identity, name, and type of the handler
-// that row stands for come from the configuration file rather than from the
-// row number.
-fn start_dh_handler(
+/// Which way a press of a panel's one button goes.
+///
+/// Decided by what the button offered, read back from the status its label
+/// comes from -- not by what the handler turns out to be doing. The two
+/// cannot disagree by any path through the window, and if they ever did,
+/// doing what the label said is the honest answer: a handler is told to start
+/// by a button that offered to start it.
+///
+/// Anything that is not the running status offers to transmit. A handler
+/// whose last command failed shows `Error`, and the useful thing to offer
+/// then is the start that failed, not a stop of something that never began.
+fn transfer_wanted(status: &str) -> Transfer {
+    if status == ACTIVE_STATUS {
+        Transfer::Discard
+    } else {
+        Transfer::Transmit
+    }
+}
+
+/// What a press of a panel's button asks tcspecial for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Transfer {
+    /// Start the handler, so its payload's data reaches the MOC.
+    Transmit,
+    /// Stop it, so what the payload sends is dropped on the spacecraft.
+    Discard,
+}
+
+/// The one button that starts and stops a handler.
+///
+/// There were two, Start and Stop, and either was pressable whatever the
+/// handler was already doing: a Stop on a stopped handler asks tcspecial to
+/// stop something that is not running and reads as though it had done
+/// something. One button offers the one thing worth doing next.
+fn handle_transfer_button(
     ui: &MainWindow,
     ui_weak: slint::Weak<MainWindow>,
     link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
 ) {
-    ui.on_start_dh(move |row| {
+    ui.on_transfer_dh(move |row| {
         let ui = ui_weak.unwrap();
         let row = row as usize;
         let dh = match dh_configs.get(row) {
@@ -983,81 +1072,96 @@ fn start_dh_handler(
             None => return,
         };
 
-        let mut guard = link.lock().unwrap();
-        let sent = match guard.client() {
-            Some(client) => client.start_dh(dh.dh_id, dh.endpoint.kind(), dh.name.clone()),
-            None => {
-                ui.set_last_response(SharedString::from(NOT_CONNECTED));
-                return;
-            }
+        // The status the button's label came from, so the command sent is the
+        // one the label offered.
+        let showing = match dh_model.row_data(row) {
+            Some(info) => info.status.to_string(),
+            None => return,
         };
-        match sent {
-            Ok(status) => {
-                let status_str = if status == CommandStatus::Success {
-                    "Active"
-                } else {
-                    "Error"
-                };
-                update_row(&dh_model, row, |info| {
-                    info.status = SharedString::from(status_str);
-                });
-                ui.set_last_response(SharedString::from(format!(
-                    "START_DH {} - {:?}",
-                    dh.name.0, status
-                )));
-            }
-            Err(e) => {
-                ui.set_last_response(SharedString::from(format!(
-                    "START_DH {} failed: {}",
-                    dh.name.0, e
-                )));
-            }
+
+        match transfer_wanted(&showing) {
+            Transfer::Transmit => transmit(&ui, &link, dh, &dh_model, row),
+            Transfer::Discard => discard(&ui, &link, dh, &dh_model, row),
         }
     });
 }
 
-// Stop DH handler
-fn stop_dh_handler(
+/// Start the handler: what the payload sends begins reaching the MOC.
+///
+/// The identity, name, and kind of the handler come from the configuration
+/// file rather than from the row number; the panel passes only its own row.
+fn transmit(
     ui: &MainWindow,
-    ui_weak: slint::Weak<MainWindow>,
-    link: Arc<Mutex<CiLink>>,
-    dh_configs: Arc<Vec<DHConfig>>,
-    dh_model: Rc<VecModel<DHInfo>>,
+    link: &Mutex<CiLink>,
+    dh: &DHConfig,
+    dh_model: &Rc<VecModel<DHInfo>>,
+    row: usize,
 ) {
-    ui.on_stop_dh(move |row| {
-        let ui = ui_weak.unwrap();
-        let row = row as usize;
-        let dh = match dh_configs.get(row) {
-            Some(dh) => dh,
-            None => return,
-        };
-
-        let mut guard = link.lock().unwrap();
-        let sent = match guard.client() {
-            Some(client) => client.stop_dh(dh.dh_id),
-            None => {
-                ui.set_last_response(SharedString::from(NOT_CONNECTED));
-                return;
-            }
-        };
-        match sent {
-            Ok(status) => {
-                update_row(&dh_model, row, |info| {
-                    info.status = SharedString::from("Stopped");
-                });
-                ui.set_last_response(SharedString::from(format!(
-                    "STOP_DH {} - {:?}",
-                    dh.name.0, status
-                )));
-            }
-            Err(e) => {
-                ui.set_last_response(SharedString::from(format!(
-                    "STOP_DH {} failed: {}",
-                    dh.name.0, e
-                )));
-            }
+    let mut guard = link.lock().unwrap();
+    let sent = match guard.client() {
+        Some(client) => client.start_dh(dh.dh_id, dh.endpoint.kind(), dh.name.clone()),
+        None => {
+            ui.set_last_response(SharedString::from(NOT_CONNECTED));
+            return;
         }
-    });
+    };
+    match sent {
+        Ok(status) => {
+            let showing = if status == CommandStatus::Success {
+                ACTIVE_STATUS
+            } else {
+                ERROR_STATUS
+            };
+            update_row(dh_model, row, |info| {
+                info.status = SharedString::from(showing);
+            });
+            ui.set_last_response(SharedString::from(format!(
+                "START_DH {} - {:?}",
+                dh.name.0, status
+            )));
+        }
+        Err(e) => {
+            ui.set_last_response(SharedString::from(format!(
+                "START_DH {} failed: {}",
+                dh.name.0, e
+            )));
+        }
+    }
+}
+
+/// Stop it: what the payload sends is dropped on the spacecraft instead.
+fn discard(
+    ui: &MainWindow,
+    link: &Mutex<CiLink>,
+    dh: &DHConfig,
+    dh_model: &Rc<VecModel<DHInfo>>,
+    row: usize,
+) {
+    let mut guard = link.lock().unwrap();
+    let sent = match guard.client() {
+        Some(client) => client.stop_dh(dh.dh_id),
+        None => {
+            ui.set_last_response(SharedString::from(NOT_CONNECTED));
+            return;
+        }
+    };
+    match sent {
+        Ok(status) => {
+            update_row(dh_model, row, |info| {
+                info.status = SharedString::from(STOPPED_STATUS);
+            });
+            ui.set_last_response(SharedString::from(format!(
+                "STOP_DH {} - {:?}",
+                dh.name.0, status
+            )));
+        }
+        Err(e) => {
+            ui.set_last_response(SharedString::from(format!(
+                "STOP_DH {} failed: {}",
+                dh.name.0, e
+            )));
+        }
+    }
 }
 
 // Quit button handler
@@ -1239,7 +1343,7 @@ mod tests {
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
         let dh_configs = load_dh_configs(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
-        let shipped: Vec<DHInfo> = dh_configs.iter().map(dh_info_from).collect();
+        let shipped: Vec<DHInfo> = dh_configs.iter().map(|dh| dh_info_from(dh, None)).collect();
 
         // More handlers than the three-row floor covers, as well as the
         // shipped file. Both are needed: the floor leaves the shipped four
@@ -1344,6 +1448,101 @@ mod tests {
                 }
             }
         }
+
+        // The backend is up and this thread owns its windows, so the other
+        // check that needs one runs from here.
+        the_params_button_shows_what_both_files_said();
+    }
+
+    /// The simulator file beside a payload file is found and read.
+    ///
+    /// The MOC shows what the tcssim it starts is simulating, so the two have
+    /// to be looking at one file: the convention is that it sits beside the
+    /// payload file and is named for it.
+    #[test]
+    fn the_simulator_file_beside_a_payload_file_is_read() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let payload_path = root.join(DEFAULT_PAYLOAD_CONFIG_PATH);
+        let dh_configs = load_dh_configs(&payload_path).expect("the shipped payload file loads");
+
+        // Named from the payload file, since nothing in this test's
+        // environment says otherwise.
+        let sims = simulator_settings(payload_path.to_str().unwrap(), &dh_configs)
+            .expect("the simulator file beside the shipped payload file");
+        assert_eq!(
+            sims.len(),
+            dh_configs.len(),
+            "one settings entry per handler"
+        );
+
+        // And a payload file with no simulator file beside it costs the MOC
+        // that half and nothing else: it controls payloads, it does not
+        // simulate them.
+        assert!(
+            simulator_settings("no_such_payload_set.yaml", &dh_configs).is_none(),
+            "a missing simulator file must not stop the MOC"
+        );
+    }
+
+    /// Pressing a panel's Params button shows what both configuration files
+    /// said about that handler.
+    ///
+    /// Everything up to the window is checked elsewhere -- the text itself by
+    /// `tcslibgs::payload_parameters` -- and none of it puts anything on
+    /// screen if the button is not wired to the popup or the popup not to the
+    /// text. This presses the button and reads what the window then laid out.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them.
+    fn the_params_button_shows_what_both_files_said() {
+        use i_slint_backend_testing::ElementHandle;
+
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(DEFAULT_PAYLOAD_CONFIG_PATH);
+        let dh_configs = load_dh_configs(&path).expect("the shipped payload file loads");
+        let dh = &dh_configs[0];
+
+        // Without the simulator file, which is the case this program has to
+        // handle: it controls payloads and does not simulate them.
+        let ui = MainWindow::new().unwrap();
+        ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(vec![dh_info_from(dh, None)]))));
+        ui.set_columns(1);
+        ui.show().unwrap();
+
+        let on_screen = |ui: &MainWindow| -> Vec<String> {
+            ElementHandle::find_by_element_type_name(ui, "Text")
+                .filter_map(|e| e.accessible_label())
+                .map(|label| label.to_string())
+                .collect()
+        };
+
+        // Nothing of it is on screen until the button is pressed.
+        assert!(
+            !on_screen(&ui).iter().any(|line| line.contains("dh_id")),
+            "the parameters are shown before anyone asked for them"
+        );
+
+        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Params").collect();
+        assert_eq!(button.len(), 1, "the panel has no Params button to press");
+        button[0].invoke_accessible_default_action();
+
+        let shown = on_screen(&ui);
+        assert!(
+            shown.iter().any(|line| *line == format!("{} parameters", dh.name.0)),
+            "the popup does not say which handler it is describing: {shown:?}"
+        );
+        assert!(
+            shown.iter().any(|line| *line == payload_parameters(dh, None)),
+            "the popup shows something other than this handler's parameters:\n{shown:?}"
+        );
+        assert!(
+            shown
+                .iter()
+                .any(|line| line.contains("not read by this program")),
+            "a program without the simulator file must say so rather than \
+             leaving that half unexplained:\n{shown:?}"
+        );
     }
 
     /// The sizes in the window and the ones Rust works them out from.
@@ -1416,6 +1615,78 @@ mod tests {
         );
     }
 
+    /// What the window's one panel button says each way.
+    ///
+    /// Here rather than beside the statuses because the window owns its
+    /// labels: Slint builds the string, and these are how the test below
+    /// holds it to the same rule Rust decides a press by.
+    const DISCARD_LABEL: &str = "Discard";
+    const TRANSMIT_LABEL: &str = "Transmit";
+
+    impl Transfer {
+        /// The label a button offering this carries.
+        fn label(&self) -> &'static str {
+            match self {
+                Transfer::Transmit => TRANSMIT_LABEL,
+                Transfer::Discard => DISCARD_LABEL,
+            }
+        }
+    }
+
+    /// A panel's one button offers what pressing it will do, and Rust sends
+    /// what the label offered.
+    ///
+    /// There were two buttons, Start and Stop, and either was pressable
+    /// whatever the handler was doing: a Stop on a stopped handler asks
+    /// tcspecial to stop something that is not running, and reads as though
+    /// it had done something. One button offers the one thing worth doing
+    /// next -- and because Slint decides the label and Rust decides the
+    /// command, both from the same status, the two have to be checked against
+    /// each other or they drift into offering one thing and doing the other.
+    #[test]
+    fn the_transfer_button_sends_what_its_label_offers() {
+        // A handler that is moving data offers to stop it, and one that is
+        // not offers to start it. Anything that is not the running status
+        // offers to transmit: a handler whose last command failed shows
+        // Error, and the useful thing to offer then is the start that failed.
+        assert_eq!(transfer_wanted(ACTIVE_STATUS), Transfer::Discard);
+        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Transmit);
+        assert_eq!(transfer_wanted(ERROR_STATUS), Transfer::Transmit);
+        assert_eq!(transfer_wanted(""), Transfer::Transmit);
+
+        assert_eq!(Transfer::Discard.label(), DISCARD_LABEL);
+        assert_eq!(Transfer::Transmit.label(), TRANSMIT_LABEL);
+
+        // And the window labels it by the same rule, which is the half Rust
+        // cannot fail on: the label is a Slint expression, so a drift between
+        // the two files is a button that offers Transmit and stops the
+        // handler.
+        let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
+        let source = std::fs::read_to_string(&window).unwrap();
+        let offered = format!(
+            "dh-status == \"{}\" ? \"{}\" : \"{}\"",
+            ACTIVE_STATUS,
+            transfer_wanted(ACTIVE_STATUS).label(),
+            transfer_wanted(STOPPED_STATUS).label()
+        );
+        assert!(
+            source.contains(&offered),
+            "{} does not label its transfer button {:?}",
+            window.display(),
+            offered
+        );
+
+        // One button, not two: the pair they replaced took the same room and
+        // left a press available that said nothing.
+        for gone in ["text: \"Start\"", "text: \"Stop\""] {
+            assert!(
+                !source.contains(gone),
+                "{} still has a panel button saying {gone}",
+                window.display()
+            );
+        }
+    }
+
     /// A panel's two lines, from the sample telemetry that feeds them.
     /// A gathered update reaches the panel it names, and only that one.
     #[test]
@@ -1432,8 +1703,8 @@ mod tests {
         };
 
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
-            dh_info_from(&dh),
-            dh_info_from(&dh),
+            dh_info_from(&dh, None),
+            dh_info_from(&dh, None),
         ]));
 
         apply_panel_update(
@@ -1489,7 +1760,7 @@ mod tests {
                     mode: Default::default(),
         };
 
-        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![dh_info_from(&dh)]));
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![dh_info_from(&dh, None)]));
         apply_panel_update(&model, &previous);
 
         // What panel_update_for does when the sample query fails: carry the
@@ -1552,7 +1823,7 @@ mod tests {
                     mode: Default::default(),
         };
 
-        let info = dh_info_from(&dh);
+        let info = dh_info_from(&dh, None);
         let (time, data) = sample_lines(&DHSample::new());
         assert_eq!(info.last_sent_time, time);
         assert_eq!(info.last_recv_time, time);
@@ -1711,7 +1982,7 @@ mod tests {
 
         assert!(!dh_configs.is_empty(), "no data handlers to show");
 
-        for (dh, info) in dh_configs.iter().zip(dh_configs.iter().map(dh_info_from)) {
+        for (dh, info) in dh_configs.iter().zip(dh_configs.iter().map(|dh| dh_info_from(dh, None))) {
             assert_eq!(info.name, SharedString::from(dh.name.0.clone()));
             assert!(!info.config.is_empty(), "{} has no endpoint to show", dh.name.0);
             // A panel showing a saturated size would be showing a number the
@@ -1749,7 +2020,7 @@ mod tests {
             },
         ];
 
-        let model: Vec<DHInfo> = dh_configs.iter().map(dh_info_from).collect();
+        let model: Vec<DHInfo> = dh_configs.iter().map(|dh| dh_info_from(dh, None)).collect();
 
         assert_eq!(model.len(), dh_configs.len());
         // Row 1 is DH9, whose id is neither 1 nor its row number.

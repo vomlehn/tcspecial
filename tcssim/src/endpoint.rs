@@ -19,7 +19,7 @@ use std::sync::Arc;
 use tcslibgs::{DHConfig, EndpointConfig, NetworkProtocol};
 
 use crate::payload::{PayloadConfig, PayloadProtocol};
-use crate::sim_config::ResolvedSim;
+use tcslibgs::ResolvedSim;
 
 /// Turn a data handler and its simulator settings into the simulator's own
 /// configuration.
@@ -150,7 +150,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sim_config::ResolvedSim;
+    use tcslibgs::ResolvedSim;
     use std::sync::atomic::Ordering;
     use tcslibgs::{
         BitOrder, CsActive, DHId, DHMode, DHName, DeviceConfig, I2cConfig, NetworkConfig,

@@ -28,6 +28,27 @@ impl Timestamp {
             nanoseconds: duration.subsec_nanos(),
         }
     }
+
+    /// The time of day this names, as a panel shows it.
+    ///
+    /// UTC, and the date dropped: a panel has room for a time and wants it to
+    /// be read at a glance, and every program here shows it the same way --
+    /// tcsmoc's panels and tcssim's are read side by side while a link is
+    /// being watched, so one of them showing local time would make a transfer
+    /// look an hour old.
+    ///
+    /// The nanoseconds are deliberately unused. A panel refreshed twice a
+    /// second cannot show them, and a time that changed in its last digits
+    /// between two looks would read as traffic that had not happened.
+    pub fn time_of_day(&self) -> String {
+        let within_a_day = self.seconds % 86_400;
+        format!(
+            "{:02}:{:02}:{:02}",
+            within_a_day / 3600,
+            (within_a_day % 3600) / 60,
+            within_a_day % 60
+        )
+    }
 }
 
 /// Data handler identifier
@@ -309,6 +330,28 @@ impl Statistics {
 /// direction per handler, so only the head is kept, and only this much of it.
 pub const DH_SAMPLE_BYTES: usize = 8;
 
+/// What a panel shows where a time would go before there is one.
+///
+/// A direction that has carried nothing has no time to show, and showing one
+/// anyway -- the hour the window opened, or midnight -- would read as a
+/// transfer that never happened. One constant, because tcsmoc's panels and
+/// tcssim's are read side by side and have to say it the same way.
+pub const NO_TRANSFER_TIME: &str = "--:--:--";
+
+/// Bytes as a panel shows them: hex pairs, and an ellipsis if there were
+/// more than `max_len` of them.
+pub fn bytes_to_hex(bytes: &[u8], max_len: usize) -> String {
+    let shown = &bytes[..bytes.len().min(max_len)];
+    let hex: Vec<String> = shown.iter().map(|b| format!("{:02X}", b)).collect();
+    let mut result = hex.join(" ");
+
+    if bytes.len() > max_len {
+        result.push_str("...");
+    }
+
+    result
+}
+
 /// The time and the first few bytes of one transfer.
 ///
 /// Fixed size and `Copy`, so that recording one costs no allocation on the
@@ -372,6 +415,29 @@ impl DHSample {
     /// Whether any transfer has been recorded.
     pub fn is_empty(&self) -> bool {
         self.time.is_none()
+    }
+
+    /// The two strings a panel shows for this sample: when, and what.
+    ///
+    /// Both programs' panels have a line of this shape, and they show the
+    /// same transfer from opposite ends of it, so there is one description of
+    /// how it reads. A sample with no time is a direction that has carried
+    /// nothing, which is not the same as one that carried no bytes: it shows
+    /// [`NO_TRANSFER_TIME`] and no data.
+    pub fn panel_lines(&self) -> (String, String) {
+        match self.time {
+            Some(time) => {
+                // The sample truncated the transfer when it was recorded, so
+                // bytes_to_hex is never the one doing it here; the ellipsis
+                // comes from how much of the whole the sample kept.
+                let mut data = bytes_to_hex(self.data(), DH_SAMPLE_BYTES);
+                if self.was_truncated() {
+                    data.push_str("...");
+                }
+                (time.time_of_day(), data)
+            }
+            None => (NO_TRANSFER_TIME.to_string(), String::new()),
+        }
     }
 
     /// Whether the transfer was longer than the bytes kept from it.
@@ -1311,6 +1377,90 @@ mod tests {
     fn test_timestamp_now() {
         let ts = Timestamp::now();
         assert!(ts.seconds > 0);
+    }
+
+    /// Bytes read as hex pairs, and a transfer longer than what is kept
+    /// says so.
+    #[test]
+    fn bytes_read_as_hex_pairs() {
+        assert_eq!(bytes_to_hex(&[0x01, 0x02, 0x03], 10), "01 02 03");
+        assert_eq!(bytes_to_hex(&[0x01, 0x02, 0x03, 0x04, 0x05], 3), "01 02 03...");
+        assert_eq!(bytes_to_hex(&[], 8), "", "nothing reads as nothing");
+    }
+
+    /// A sample reads as a time and the head of what moved.
+    ///
+    /// Both programs' panels show it this way: the one at the spacecraft's
+    /// end of a link and the one at the payload's end are read side by side,
+    /// so a byte that read differently in the two would look like a
+    /// difference in the data.
+    #[test]
+    fn a_sample_reads_as_a_time_and_the_head_of_the_transfer() {
+        // Nothing recorded: the placeholder, and no bytes. A direction that
+        // has carried nothing is not a direction that carried no bytes.
+        let (time, data) = DHSample::new().panel_lines();
+        assert_eq!(time, NO_TRANSFER_TIME);
+        assert_eq!(data, "");
+
+        let mut sample = DHSample::new();
+        sample.record(&[0x52, 0x45, 0x41, 0x44, 0x0D]);
+        sample.time = Some(Timestamp {
+            seconds: 3661,
+            nanoseconds: 0,
+        });
+        assert_eq!(sample.panel_lines(), ("01:01:01".to_string(), "52 45 41 44 0D".to_string()));
+
+        // And a transfer longer than the sample keeps shows a head and says
+        // so: without the ellipsis a packet of twelve bytes and one of eight
+        // read alike.
+        let mut sample = DHSample::new();
+        sample.record(&[0xAB; 12]);
+        sample.time = Some(Timestamp {
+            seconds: 0,
+            nanoseconds: 0,
+        });
+        let (_, data) = sample.panel_lines();
+        assert_eq!(data, "AB AB AB AB AB AB AB AB...");
+    }
+
+    /// A timestamp reads as the time of day it names.
+    ///
+    /// Including the part that matters and is easiest to leave out: a real
+    /// timestamp is tens of thousands of days past the epoch, so the day has
+    /// to be taken off it. A panel showing 472222:13:20 would be a panel
+    /// showing the epoch.
+    #[test]
+    fn a_timestamp_reads_as_a_time_of_day() {
+        let at = |seconds| {
+            Timestamp {
+                seconds,
+                nanoseconds: 0,
+            }
+            .time_of_day()
+        };
+
+        assert_eq!(at(0), "00:00:00");
+        assert_eq!(at(3661), "01:01:01");
+        assert_eq!(at(86_399), "23:59:59", "the last second of a day");
+        assert_eq!(at(86_400), "00:00:00", "and the first of the next");
+        assert_eq!(
+            at(1_700_000_000),
+            "22:13:20",
+            "a timestamp of the kind a clock actually gives"
+        );
+
+        // The nanoseconds are not shown, so two times within one second read
+        // alike: a panel refreshed twice a second cannot show them, and a
+        // time whose last digits changed between two looks would read as
+        // traffic that had not happened.
+        assert_eq!(
+            Timestamp {
+                seconds: 1_700_000_000,
+                nanoseconds: 999_999_999,
+            }
+            .time_of_day(),
+            at(1_700_000_000)
+        );
     }
 
     #[test]

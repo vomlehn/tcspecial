@@ -1527,8 +1527,14 @@ A payload configuration file describes payloads. Simulating one takes more than
 that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
 choices about a simulation. They are stated in a separate file, which only
-tcssim reads. The shipped pair is payload1.yaml and payload1sim.yaml; the parser
-is ``tcssim::sim_config``.
+tcssim acts on. The shipped pair is payload1.yaml and payload1sim.yaml; the
+parser is ``tcslibgs::sim_config``.
+
+Requirement
+    The parser lives with the other three configuration languages rather than
+    inside tcssim. Both GUIs read this file now -- one to simulate payloads
+    and one to show what a payload set says about them -- and a configuration
+    language read by two programs cannot live inside one of them.
 
 The format is chosen from the extension exactly as every other configuration
 file's is, so a simulator configuration may be written in YAML, JSON, or XML.
@@ -2871,11 +2877,97 @@ fixes how many there are, so a payload added to or removed from the files adds
 or removes a panel.
 
 Each payload occupies a portion of the window, displaying its name, configuration,
-and statistics. It also displays the most recent packets sent and received.
+and statistics. It also displays when a packet last went each way.
+
+Requirement
+    A panel shows the time of the last packet sent and the time of the last
+    packet received, and the head of each. A count says how much has moved
+    since the payload started, and only a time says whether any of it is
+    moving now: a payload stopped ten minutes ago and one sending every
+    second look identical by their counts a moment after either is looked at.
+    The bytes are what say the traffic is the traffic that was expected
+    rather than merely traffic.
+
+Requirement
+    The time is taken when the packet moves, not when the window next looks.
+    A time stamped by the refresh would creep forward on a payload that had
+    stopped sending, which is the fault tcsmoc's samples avoid for the same
+    reason.
+
+Requirement
+    A payload counts a packet and times it in one operation, so a count
+    cannot move without the time moving with it.
+
+Requirement
+    A direction nothing has gone in shows ``--:--:--``, as tcsmoc's panels do.
+    A payload that has sent nothing has no time to show, which is a different
+    thing from one that sent something at midnight.
+
+Requirement
+    A payload keeps the same sample of a transfer that a data handler keeps:
+    the time, the head of the data, and the whole length. The two programs
+    show the one transfer from opposite ends of a link, so a payload keeping
+    something else would have the two panels disagree about what moved.
+
+Requirement
+    Both programs show a time and a sample the same way: the time of day, in
+    UTC, with the date and the fraction of a second dropped, and the bytes as
+    hex pairs with an ellipsis where the transfer was longer than the sample.
+    Tcsmoc's panels and tcssim's are read side by side while a link is being
+    watched, so one of them showing local time would make a transfer look an
+    hour old, and a byte written differently would look like a difference in
+    the data. The formatting is one function both call.
 
 The packet size and interval can be changed, as can the segment size and
 interval. Each starts at what the files gave it: the packet size from the
 payload file, the rest from the simulator file.
+
+A ``Params`` button shows the whole of what the two files said about that
+payload.
+
+Requirement
+    Each panel has a button that shows every parameter read from the two
+    configuration files for that payload, in both programs. What a panel has
+    room for is a name, a size and what has moved; a payload set says a good
+    deal more than that -- a trigger, a line rate, a slave address, a clock
+    mode, a fault -- and until this there was nowhere to see it but the files
+    themselves, which is no use for telling what the program actually read.
+
+Requirement
+    Both halves are shown and each is said to come from the file it came from.
+    One is flight configuration, which tcspecial serves and the ground
+    controls; the other is how a stand-in behaves and reaches no spacecraft at
+    all. A list that mixed them would have someone reading a drop percentage
+    as something a payload does.
+
+Requirement
+    Nothing shown is a measurement. What a payload has done is on the panel
+    itself, and a list that mixed the two would leave no way to tell a
+    configured value from an observed one.
+
+Requirement
+    Only the attributes of the payload's own kind are shown, and only the
+    faults that were asked for. A device has no protocol and a bus no port;
+    six faults of nought say less about a payload than the one that was set.
+
+Requirement
+    A value the files did not state is shown as what the program will use
+    instead, said to be that rather than passed off as a statement. A handler
+    with no OC address says it cannot be started, since that is what the
+    absence means.
+
+Requirement
+    Both programs describe a payload with one function. They show the same
+    payload set from opposite ends of a link, so two descriptions would be two
+    things to keep in step and a difference between them would read as a
+    difference in the configuration.
+
+Requirement
+    Tcsmoc reads the simulator configuration to show it, and does not require
+    it. The MOC controls payloads and simulates nothing, so a simulator file
+    that is missing, unreadable, or written for another payload file costs it
+    that half of what a panel can show and nothing else; it says so once on
+    the way past, and the panel says so where the parameters are shown.
 
 The panels are laid out in a grid whose shape follows from how many there are.
 The window is kept wider than it is tall, and among the shapes that satisfy
@@ -3036,6 +3128,28 @@ data longer than a sample is shown as a head followed by an ellipsis.
 A handler whose conduits have carried nothing in a direction shows
 ``--:--:--`` and no data for it, which is also what a panel shows before it
 has been queried at all.
+
+Each panel has one button, which starts and stops the handler.
+
+Requirement
+    The button is labelled with what pressing it will do. A handler that is
+    moving data offers ``Discard``, which stops it; a handler that is not
+    offers ``Transmit``, which starts it. There were two buttons, Start and
+    Stop, and either was pressable whatever the handler was doing: a Stop on
+    a stopped handler asks tcspecial to stop something that is not running
+    and reads as though it had done something.
+
+Requirement
+    Which command a press sends is decided by the status the label was made
+    from, not by what the handler turns out to be doing. The window builds the
+    label and the program decides the command, so the two are checked against
+    each other: a button that offered one thing and did the other would be
+    worse than either button alone.
+
+Requirement
+    A handler whose last command failed offers ``Transmit``. Its status is
+    neither started nor stopped, and the useful thing to offer is the start
+    that failed rather than a stop of something that never began.
 
 Requirement
     The panels are refreshed without being asked. A handler moving data must

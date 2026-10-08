@@ -594,11 +594,13 @@ pub enum DHMode {
     Periodic,
     /// The payload answers a request, which tcspecial sends at an interval.
     Triggered {
-        /// What to send. Its bytes go out as they are, so a trigger ending in
-        /// a carriage return is written with one -- in YAML or JSON, inside
-        /// double quotes, where `\r` and `\n` are escapes.
-        trigger: String,
-        /// How often to send it, in milliseconds.
+        /// What to send, as bytes: a trigger is what a payload's interface
+        /// document asks for, which is as likely to be `0x55AA` as `READ\r`.
+        /// A file may write it either way; see [`crate::trigger`].
+        trigger: Vec<u8>,
+        /// How often to send it, in milliseconds. The payload file's
+        /// `packet_interval_ms`: tcspecial does the sending, so the rate is
+        /// flight behaviour.
         interval_ms: u32,
     },
 }
@@ -613,7 +615,7 @@ impl Default for DHMode {
 
 impl DHMode {
     /// What to send and how often, for a handler that has to ask.
-    pub fn polling(&self) -> Option<(&str, u32)> {
+    pub fn polling(&self) -> Option<(&[u8], u32)> {
         match self {
             DHMode::Periodic => None,
             DHMode::Triggered {
@@ -921,6 +923,11 @@ impl DHConfigJson {
         let trigger_interval_ms = self
             .trigger_interval_ms
             .or_else(|| group.and_then(|g| g.trigger_interval_ms));
+        // The rate a triggered payload's trigger goes out at, which is the
+        // one interval this file states.
+        let packet_interval_ms = self
+            .packet_interval_ms
+            .or_else(|| group.and_then(|g| g.packet_interval_ms));
 
         let kind = match dh_type {
             Some(text) => DHType::from_spelling(text).ok_or_else(|| {
@@ -1011,18 +1018,14 @@ impl DHConfigJson {
             (None, Some(_)) => return Err("oc_port without oc_address".to_string()),
         };
 
-        // An interval here is the same mistake the mode rules refuse, and
-        // was tolerated for longer: it says something about the payload's
-        // timing, which this file does not decide. Reported in terms of where
-        // it belongs, since the file plainly meant it somewhere.
-        if self.packet_interval_ms.is_some()
-            || group.is_some_and(|g| g.packet_interval_ms.is_some())
-        {
+        // What the trigger's rate used to be called. Named so that a file
+        // using it is told the name it has now rather than told the word is
+        // unknown.
+        if trigger_interval_ms.is_some() {
             return Err(format!(
-                "payload \"{}\" states a packet interval, which belongs in the \
-                 simulator configuration file: how fast a payload sends is a \
-                 property of the simulation, and a payload file that states one \
-                 is describing a simulation",
+                "payload \"{}\" states trigger_interval_ms, which is \
+                 packet_interval_ms now: a triggered payload's rate is the rate its \
+                 trigger goes out at, and it is the only interval this file states",
                 self.name
             ));
         }
@@ -1035,10 +1038,10 @@ impl DHConfigJson {
         // for.
         let mode = match mode {
             None | Some("periodic") => {
-                if trigger.is_some() || trigger_interval_ms.is_some() {
+                if trigger.is_some() || packet_interval_ms.is_some() {
                     return Err(
                         "a periodic payload sends on its own, so it takes no trigger \
-                         and no trigger interval: how fast a simulated one sends \
+                         and no packet interval here: how fast a simulated one sends \
                          belongs in the simulator configuration"
                             .to_string(),
                     );
@@ -1064,21 +1067,26 @@ impl DHConfigJson {
                     }
                 }
 
-                let trigger = trigger.ok_or(
+                let written = trigger.ok_or(
                     "a triggered payload answers a request, so it states the trigger \
                      to send",
                 )?;
-                let interval_ms = trigger_interval_ms.ok_or(
-                    "a triggered payload states how often its trigger is sent: \
-                     tcspecial does the sending, so the interval is flight behaviour \
-                     and not a simulation setting",
+                // Either notation, hexadecimal or a C string; see
+                // crate::trigger. The error says which was being read.
+                let trigger = crate::trigger::trigger_bytes(written)?;
+
+                let interval_ms = packet_interval_ms.ok_or(
+                    "a triggered payload states how often its trigger is sent, as \
+                     packet_interval_ms: tcspecial does the sending, so the rate is \
+                     flight behaviour and not a simulation setting",
                 )?;
                 if interval_ms == 0 {
-                    return Err("a trigger interval of zero would send without pause"
+                    return Err("a packet interval of zero would send triggers without \
+                                pause"
                         .to_string());
                 }
                 DHMode::Triggered {
-                    trigger: trigger.to_string(),
+                    trigger,
                     interval_ms,
                 }
             }
@@ -1227,19 +1235,19 @@ mod tests {
             // As a file writes it: double quotes, where the escape is the
             // carriage return the payload's interface asks for.
             trigger: Some("READ\r".to_string()),
-            trigger_interval_ms: Some(500),
-            packet_interval_ms: None,
+            trigger_interval_ms: None,
+            packet_interval_ms: Some(500),
         };
 
         let config = dh.to_dh_config().expect("converts");
         assert_eq!(
             config.mode,
             DHMode::Triggered {
-                trigger: "READ\r".to_string(),
+                trigger: b"READ\r".to_vec(),
                 interval_ms: 500,
             }
         );
-        assert_eq!(config.mode.polling(), Some(("READ\r", 500)));
+        assert_eq!(config.mode.polling(), Some((b"READ\r".as_slice(), 500)));
     }
 
     /// The two kinds do not mix, in either direction, and the complaint says
@@ -1263,8 +1271,8 @@ mod tests {
                 oc_port: None,
                 mode: mode.map(str::to_string),
                 trigger: trigger.map(str::to_string),
-                trigger_interval_ms: interval,
-                packet_interval_ms: None,
+                trigger_interval_ms: None,
+                packet_interval_ms: interval,
             }
         };
 
@@ -1316,8 +1324,8 @@ mod tests {
                 oc_port: None,
                 mode: Some("triggered".to_string()),
                 trigger: Some("READ".to_string()),
-                trigger_interval_ms: Some(500),
-                packet_interval_ms: None,
+                trigger_interval_ms: None,
+                packet_interval_ms: Some(500),
             };
 
             let e = dh.to_dh_config().unwrap_err();
@@ -2148,69 +2156,161 @@ payload:
         }
     }
 
-    /// An interval in a payload file is refused, and told where it belongs.
+    /// A trigger of bytes is written without quotes, and a trigger of text
+    /// with them.
     ///
-    /// It was ignored for a while, which was the same silence the mode rules
-    /// exist to prevent: a file stating an interval has said something about
-    /// the payload's timing, and reading it as though it had not is reading a
-    /// different file than the one that was written. The error names the file
-    /// it belongs in, because the line plainly meant something.
+    /// Which is a convention for writing the file rather than something the
+    /// parser can enforce: every format hands over the same string whichever
+    /// way the value was written, so the quotes are invisible here. What
+    /// matters is that the unquoted form works -- YAML's core schema does not
+    /// read `0x55AA` as a number, so the digits arrive intact, leading zeros
+    /// and all, which is what makes the quote-free spelling safe to
+    /// recommend.
     #[test]
-    fn a_payload_file_may_not_state_an_interval() {
-        let with_interval = |where_: &str| {
-            format!(
+    fn a_trigger_of_bytes_needs_no_quotes() {
+        let with = |trigger: &str| {
+            payload(&format!(
                 "
 version: \"1.0\"
-description: a file with an interval in it
-payload_groups:
-  - name: g
-    type: network
-    protocol: udp
-    address: localhost
-{group}
+description: a trigger, written one way
 payloads:
   - dh_id: 0
     name: DH0
-    group: g
+    type: network
+    protocol: tcp
+    address: localhost
     port: 5000
     packet_size: 12
-{payload}
-",
-                group = if where_ == "group" {
-                    "    packet_interval_ms: 250"
-                } else {
-                    ""
-                },
-                payload = if where_ == "payload" {
-                    "    packet_interval_ms: 250"
-                } else {
-                    ""
-                },
+    mode: triggered
+    packet_interval_ms: 500
+    trigger: {trigger}
+"
+            ))
+            .to_dh_configs()
+            .map(|c| match &c[0].mode {
+                DHMode::Triggered { trigger, .. } => trigger.clone(),
+                DHMode::Periodic => panic!("this payload is triggered"),
+            })
+        };
+
+        // Unquoted, which is how a series of bytes is written.
+        assert_eq!(with("0x55AA").unwrap(), vec![0x55, 0xAA]);
+        assert_eq!(
+            with("0x0D0A").unwrap(),
+            vec![0x0D, 0x0A],
+            "a leading zero survives, which is why the unquoted form is safe"
+        );
+        assert_eq!(with("0x55 AA 0F").unwrap(), vec![0x55, 0xAA, 0x0F]);
+
+        // Quoted, which the parser cannot tell from the above: the quotes
+        // belong to the format and are gone before this sees the value.
+        assert_eq!(with("\"0x55AA\"").unwrap(), with("0x55AA").unwrap());
+
+        // And a trigger of text, written with quotes because its escapes are
+        // what the quotes are for.
+        assert_eq!(with("\"READ\\r\"").unwrap(), b"READ\r".to_vec());
+        assert_eq!(with("0x52 45 41 44 0D").unwrap(), with("\"READ\\r\"").unwrap());
+    }
+
+    /// Which file an interval belongs in follows from the kind of payload.
+    ///
+    /// A periodic payload sends on its own, so how fast a simulated one sends
+    /// is the simulator's business and an interval here is refused. A
+    /// triggered payload sends nothing until it is asked, and the asking is
+    /// tcspecial's: the rate the trigger goes out at is flight behaviour, so
+    /// it is stated here and nowhere else. One name, `packet_interval_ms`, in
+    /// whichever file the payload's kind puts it.
+    #[test]
+    fn which_file_states_an_interval_follows_from_the_kind() {
+        let payload_file = |extra: &str| {
+            format!(
+                "
+version: \"1.0\"
+description: a payload and an interval
+payloads:
+  - dh_id: 0
+    name: DH0
+    type: network
+    protocol: tcp
+    address: localhost
+    port: 5000
+    packet_size: 12
+{extra}
+"
             )
         };
 
-        // Stated by the payload, and stated by its group: a group's interval
-        // reaches the payload exactly as its own would.
-        for where_ in ["payload", "group"] {
-            let said = payload(&with_interval(where_))
+        // Periodic, which is what a file states by saying nothing: the
+        // interval is refused and told which file it belongs in.
+        for stated in [
+            "    packet_interval_ms: 250",
+            "    mode: periodic\n    packet_interval_ms: 250",
+        ] {
+            let said = payload(&payload_file(stated))
                 .to_dh_configs()
-                .map(|c| format!("{} payloads", c.len()))
-                .expect_err(&format!(
-                    "an interval stated by the {where_} must be refused"
-                ));
+                .expect_err("a periodic payload's rate is the simulator's");
             assert!(
-                said.contains("simulator configuration file") && said.contains("DH0"),
-                "the error should name the payload and the file it belongs in: {said}"
+                said.contains("simulator configuration") && said.contains("no packet interval"),
+                "{said}"
             );
         }
 
-        // And a file that states none converts, which is every payload file
-        // that was written after the two were split.
-        let without = with_interval("neither");
+        // Triggered: the interval is this file's, and required.
+        let handlers = payload(&payload_file(
+            "    mode: triggered\n    trigger: \"READ\\r\"\n    packet_interval_ms: 500",
+        ))
+        .to_dh_configs()
+        .expect("a triggered payload states its trigger's rate here");
         assert_eq!(
-            payload(&without).to_dh_configs().expect("converts").len(),
-            1
+            handlers[0].mode,
+            DHMode::Triggered {
+                trigger: b"READ\r".to_vec(),
+                interval_ms: 500,
+            }
         );
+
+        let said = payload(&payload_file(
+            "    mode: triggered\n    trigger: \"READ\\r\"",
+        ))
+        .to_dh_configs()
+        .expect_err("a triggered payload with no rate for its trigger");
+        assert!(said.contains("packet_interval_ms"), "{said}");
+
+        // And the name that rate used to have is told the name it has now.
+        let said = payload(&payload_file(
+            "    mode: triggered\n    trigger: \"READ\\r\"\n    trigger_interval_ms: 500",
+        ))
+        .to_dh_configs()
+        .expect_err("trigger_interval_ms is not a word this file knows");
+        assert!(
+            said.contains("trigger_interval_ms") && said.contains("packet_interval_ms now"),
+            "{said}"
+        );
+
+        // A group's interval reaches the payload exactly as its own would.
+        let grouped = "
+version: \"1.0\"
+description: a group with the rate in it
+payload_groups:
+  - name: asked
+    type: network
+    protocol: tcp
+    address: localhost
+    mode: triggered
+    trigger: \"READ\\r\"
+    packet_interval_ms: 500
+payloads:
+  - dh_id: 0
+    name: DH0
+    group: asked
+    port: 5000
+    packet_size: 12
+";
+        let handlers = payload(grouped).to_dh_configs().expect("the group states it");
+        assert!(matches!(
+            handlers[0].mode,
+            DHMode::Triggered { interval_ms: 500, .. }
+        ));
     }
 
     #[test]

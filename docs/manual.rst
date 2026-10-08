@@ -109,9 +109,11 @@ share.
                   OC on, which is always UDP
    oc_port        the port it does so on
    mode           periodic | triggered; absent is periodic
-   trigger        what to send to make the payload answer     triggered only
-   trigger_interval_ms
-                  how often to send it                        triggered only
+   trigger        what to send to make the payload answer:    triggered only
+                  bytes, as unquoted hexadecimal after 0x,
+                  or text, as a quoted C string
+   packet_interval_ms
+                  how often the trigger is sent               triggered only
 
 ``dh_id`` and ``name`` belong to a handler and never to a group: they are what
 tell one handler of a group from another. An OC address and an OC port are
@@ -125,13 +127,46 @@ decides where its timing is written down.
 
 **periodic** -- the payload sends and tcspecial reads. Nothing here says when:
 how fast a simulated one produces data is a property of the simulation, so the
-interval is in the simulator file. A periodic payload takes no ``trigger`` and
-no ``trigger_interval_ms``.
+intervals are in the simulator file. A periodic payload takes no ``trigger``
+and no ``packet_interval_ms`` here.
 
 **triggered** -- tcspecial sends a request and the payload answers. Both the
 request and how often it goes out are here, because tcspecial does the sending
-and what to send comes from the payload's interface document. The simulator
-file states no interval for such a payload at all.
+and what to send comes from the payload's interface document. Its entry in the
+simulator file states no interval at all, packet or segment: such a payload
+sends when it is asked, so a rate there would govern nothing.
+
+The interval is ``packet_interval_ms`` in whichever file states it -- one name,
+in the file the payload's kind puts it in. It was ``trigger_interval_ms`` here;
+a file still using that name is told the name it has now.
+
+**The trigger itself** is bytes, not text, since an interface document asks
+for what it asks for. A series of bytes is written in hexadecimal after
+``0x``, two digits to a byte, in either case, with spaces or underscores
+allowed between bytes -- and **without quotes**, a series of bytes being no
+more a string than a port number is::
+
+   trigger: 0x55AA
+   trigger: 0x55 AA 0F
+   trigger: 0x0D0A
+
+A trigger that is text is written as a string in C's notation, in quotes,
+which is what its escapes need -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
+``\t`` ``\0`` ``\a`` ``\b`` ``\f`` ``\v`` and ``\xNN``::
+
+   trigger: "READ\r"
+
+Which of the two a value is in follows from its first two characters and
+nothing else: ``52 45`` is a plausible pair of bytes and a plausible pair of
+digits, so the ``0x`` is what says which. The quotes themselves are a
+convention for writing the file and not a rule the programs enforce -- every
+format hands the same string over whichever way it was written, so a quoted
+``"0x55AA"`` is read as the same two bytes.
+
+An escape C does not have is refused rather than passed through, and a trigger
+of no bytes at all is refused: a payload that answers requests has to be asked
+something. Writing the escapes yourself is also how an XML payload file states
+a trigger that a YAML or JSON one states with the format's own escapes.
 
 .. code-block:: yaml
 
@@ -147,10 +182,8 @@ file states no interval for such a payload at all.
        port: 5000
        packet_size: 12
 
-     # Answers a request: both halves of the request are here. The trigger's
-     # bytes go out as written, so the carriage return its interface asks for
-     # is written as one -- in double quotes, where \r is the character it
-     # names.
+     # Answers a request: both halves of the request are here, and the rate
+     # is the rate the trigger goes out at.
      - dh_id: 1
        name: DH1
        oc_address: 127.0.0.1
@@ -161,13 +194,13 @@ file states no interval for such a payload at all.
        port: 5001
        packet_size: 12
        mode: triggered
-       trigger: "READ\r"
-       trigger_interval_ms: 500
+       trigger: "READ\r"        # or 0x52 45 41 44 0D, the same bytes
+       packet_interval_ms: 500
 
 A file that mixes the two is refused rather than run, in either direction: a
-periodic payload carrying a trigger, or a triggered one with no interval, has
-not said which kind of payload it describes, and either guess would operate it
-in a way nobody asked for.
+periodic payload carrying a trigger or an interval, or a triggered one with no
+interval, has not said which kind of payload it describes, and either guess
+would operate it in a way nobody asked for.
 
 A datagram payload -- ``udp`` or ``unix_dgram`` -- cannot be triggered. Its
 handler learns where to send from the payload's first packet, so there is

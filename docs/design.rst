@@ -1279,10 +1279,14 @@ Requirement
 | mode                | string | ``periodic`` or ``triggered``. Absent is    |
 |                     |        | periodic                                    |
 +---------------------+--------+---------------------------------------------+
-| trigger             | string | What to send to make the payload answer.    |
+| trigger             | bytes  | What to send to make the payload answer:    |
+|                     | or     | bytes, as unquoted hexadecimal after        |
+|                     | string | ``0x``, or text, as a quoted C string.      |
 |                     |        | Triggered only                              |
 +---------------------+--------+---------------------------------------------+
-| trigger_interval_ms | number | How often to send it. Triggered only        |
+| packet_interval_ms  | number | How often the trigger is sent. Triggered    |
+|                     |        | only: a periodic payload's rate is the      |
+|                     |        | simulator configuration's                   |
 +---------------------+--------+---------------------------------------------+
 
 A group states any of these; a data handler states any of these plus its
@@ -1316,15 +1320,27 @@ Requirement
 
 Requirement
     A periodic payload sends of its own accord and tcspecial reads what
-    arrives. It states no trigger and no trigger interval: there is nothing to
-    send it, and how fast a simulated one produces data is a property of the
-    simulation, stated in the simulator configuration file.
+    arrives. It states no trigger and no interval in the payload
+    configuration: there is nothing to send it, and how fast a simulated one
+    produces data is a property of the simulation, stated in the simulator
+    configuration file.
 
 Requirement
     A triggered payload answers a request. It states the trigger to send and
-    how often to send it, both of which are flight behaviour: tcspecial does
-    the sending, and what to send comes from the payload's interface document.
-    Its simulator configuration states no interval at all.
+    the interval it is sent at, both of which are flight behaviour: tcspecial
+    does the sending, and what to send comes from the payload's interface
+    document. Its simulator configuration states no interval at all, packet
+    or segment: it sends when it is asked, so a rate there would govern
+    nothing and the segments of one answer go as fast as they can.
+
+Requirement
+    The interval is ``packet_interval_ms`` in whichever file states it. One
+    name, in the file the payload's kind puts it in: the rate a triggered
+    payload is asked at is the rate its packets come back at, so calling it
+    something else in one file would be two names for one thing. It was
+    ``trigger_interval_ms`` in the payload configuration, and a file still
+    using that name is told the name it has now rather than told the word is
+    unknown.
 
 The two sets of attributes are exclusive in both directions, and a file giving
 the wrong one is reported rather than run: either guess about what was meant
@@ -1339,10 +1355,49 @@ Requirement
     until the payload has spoken -- which a triggered payload does not do. A
     file asking for it is refused rather than left to fail as silence.
 
+A trigger is bytes rather than text: a payload's interface document asks for
+what it asks for, and that is as likely to be ``0x55AA`` as ``READ\r``.
+
 Requirement
-    A trigger's bytes go out as the file wrote them. A trigger ending in a
-    carriage return is written with one, in double quotes, where YAML and
-    JSON read ``\r`` and ``\n`` as the characters they name.
+    A trigger is written in hexadecimal after ``0x``, or as a string in C's
+    notation. Two digits to a byte, in either case of a-f, with spaces or
+    underscores allowed between bytes so that a long trigger can be compared
+    against an interface document without counting digits.
+
+Requirement
+    A series of bytes is written without quotes, and a trigger that is text
+    with them: a series of bytes is no more a string than a port number is,
+    and the quotes a C string needs are what its escapes are written inside.
+    This is a convention for writing the file rather than a rule a program
+    enforces -- every format hands the same string over whichever way the
+    value was written, so the quotes are not there to be read. What makes the
+    quote-free spelling safe is that YAML's core schema does not read
+    ``0x55AA`` as a number: the digits arrive as written, leading zeros and
+    all, so ``0x0D0A`` is two bytes rather than a number that has forgotten
+    one of them.
+
+Requirement
+    Which notation a value is in follows from its first two characters and
+    nothing else. ``52 45`` is a plausible pair of bytes and a plausible pair
+    of digits, so a file that meant one and got the other would send something
+    nobody asked for; the ``0x`` says which.
+
+Requirement
+    A C string's escapes are C's own -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
+    ``\t`` ``\0`` ``\a`` ``\b`` ``\f`` ``\v`` and ``\xNN`` -- and an escape
+    C does not have is refused rather than passed through. A file that wrote
+    ``\q`` meant something, and a backslash and a q is unlikely to be it. This
+    is also what lets an XML payload file state a trigger that a YAML or JSON
+    one states with the format's own escapes.
+
+Requirement
+    A trigger is one byte or more. A payload that answers requests has to be
+    asked something, and nought bytes asks nothing.
+
+Requirement
+    A trigger's bytes go out as the file wrote them, and are shown as a file
+    could have written them: hexadecimal, with the text beside it where the
+    bytes are text.
 
 Requirement
     Tcspecial sends a trigger on the conduit that writes the payload, and

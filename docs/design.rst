@@ -117,7 +117,11 @@ Features
 
     * tcslib: ground software library providing simple integration with mission control software
 
-    * tcslibgs: sofware library containing command, telemetry, and any other definitions shared between tcspecial and tcslib
+    * tcslibgs: software library containing the commands, the telemetry, and
+      the configuration languages -- what tcspecial and tcslib share, and what
+      the two GUIs share with them: every configuration file format is parsed
+      here, including the simulator's, and a time or a sample of a transfer is
+      formatted here so that both windows show it the same way
 
     * payload1.yaml: Configuration information for the payloads tcspecial
       serves, tcsmoc controls, and tcssim simulates
@@ -2922,8 +2926,64 @@ The packet size and interval can be changed, as can the segment size and
 interval. Each starts at what the files gave it: the packet size from the
 payload file, the rest from the simulator file.
 
-A ``Params`` button shows the whole of what the two files said about that
-payload.
+Requirement
+    A segment is a piece of a packet, so a segment larger than the packet is
+    refused. Equal is the ordinary case -- a packet sent in one segment, which
+    is what a simulator file stating no segment size asks for -- so only a
+    segment strictly larger than the packet is wrong.
+
+Requirement
+    A pair of sizes that cannot be sent is said at once and the button that
+    would start the payload is taken away until they can be. Either alone
+    would be worse: a message with the button still there invites a press that
+    does something nobody asked for, and a button that had quietly stopped
+    working would leave someone pressing it and wondering.
+
+Requirement
+    What is said names both sizes and both ways out of it. The two spin boxes
+    are side by side and either can be the one that was meant to change, so a
+    message naming only one of them answers half the question.
+
+Requirement
+    The message is taken back by the edit that makes the sizes sendable
+    again. An open popup still saying the sizes cannot be sent, after they
+    can, is the wrong answer left on the screen.
+
+Requirement
+    The two sizes are checked when the files are read, not only when a spin
+    box is touched. A simulator file may state a segment larger than the
+    payload file's packet, and a panel that said nothing until it was edited
+    would have the payload refuse to start for no stated reason.
+
+Requirement
+    The window decides neither. It asks for the two sizes to be judged and
+    obeys the answer -- showing what it says and disabling the button while
+    it says anything -- so there is one rule rather than one in each place
+    that acts on it.
+
+Each panel has two buttons: one that starts and stops the payload, and one
+that shows the whole of what the two files said about it.
+
+Requirement
+    The button that starts and stops a payload is labelled with what pressing
+    it will do. A payload that is sending offers ``Silent``, which stops it; a
+    payload that is not offers ``Transmit``, which starts it. There were two
+    buttons, Start and Stop, and either was pressable whatever the payload was
+    doing: a Stop on a payload that was not sending did nothing and read as
+    though it had. Tcsmoc's panels carry the same rule in their own words,
+    ``Discard`` and ``Transmit``, which are what starting and stopping a
+    handler mean from the ground.
+
+Requirement
+    Which way a press goes is decided by the status the label was made from.
+    The window builds the label and the program decides what to do, so the two
+    are checked against each other: a button that offered one thing and did
+    the other would be worse than either button alone.
+
+Requirement
+    A payload that failed to start offers ``Transmit`` again. It is not
+    sending, which is what its status says, and the useful thing to offer is
+    the start that failed rather than a stop of something that never began.
 
 Requirement
     Each panel has a button that shows every parameter read from the two
@@ -2972,9 +3032,11 @@ Requirement
 The panels are laid out in a grid whose shape follows from how many there are.
 The window is kept wider than it is tall, and among the shapes that satisfy
 that, the one nearest square is chosen; tcssim opens the window at the size that
-shape asks for. The four payloads of the shipped files give a two-by-two grid in
-a 640x496 window. The rule is the one tcsmoc follows, applied to the sizes of
-tcssim's own panels.
+shape asks for. The four payloads of payload1.yaml give a two-by-two grid in a
+664x722 window. The rule is the one tcsmoc follows, applied to the sizes of
+tcssim's own panels; the size is the one ``window_size`` gives, which a test
+reads out of this document so that the number here cannot quietly stop being
+the one the program opens at.
 
 
 
@@ -2996,6 +3058,28 @@ Requirement
     Tcsmoc accepts one payload configuration file. A second path is an error
     rather than an argument with no effect, because it is more likely a mistake
     about which file is being read than something meant to be ignored.
+
+The beacon box carries the indicator and, beside it, the time the last beacon
+arrived.
+
+Requirement
+    The time the last beacon arrived is shown, and is the time it arrived at
+    the MOC rather than the spacecraft time the beacon carries. The line is
+    read to find out whether beacons are still coming, so a spacecraft whose
+    clock had stopped must not look as though its beacons had. It is shown the
+    way every other time in the window is, by the one function that shows them.
+
+Requirement
+    The time survives the passes that receive nothing, and a socket error as
+    well. The colour beside it is what ages; the beacon arrived when it
+    arrived, and blanking the line on a timeout would say that none ever had.
+
+Requirement
+    Until a beacon has arrived the line says so, in the words a panel uses for
+    a direction that has carried nothing. It was this and nothing else for the
+    life of the program before the time was ever set: the window declared the
+    line, the receiver set the colour beside it, and the line itself said no
+    beacon had arrived while the colour said they were arriving steadily.
 
 Every program is pointed at its payload file the same way: as a command line
 argument, failing that the program's own environment variable --
@@ -3054,9 +3138,10 @@ open windows and bind fixed ports, which makes running them a poor way to test
 anything.
 
 The one file tcsmoc does not pass on is tcssim's simulator configuration.
-Tcsmoc never reads it and so has nothing to say about which one is right;
-tcssim takes it from ``PAYLOAD_SIM_YAML``, inherited from tcsmoc's environment
-like any other variable.
+Tcssim takes it from ``PAYLOAD_SIM_YAML``, inherited from tcsmoc's environment
+like any other variable, and so is already looking at the file tcsmoc was
+pointed at. Tcsmoc reads that file as well, but only to show what it says; it
+acts on none of it and so has nothing to say about which one is right.
 
 The Makefile names a set once for this reason. ``PAYLOAD_YAML`` reaches every
 program as its argument and ``PAYLOAD_SIM_YAML`` reaches tcssim in the
@@ -3109,16 +3194,20 @@ The rectangles are laid out in a grid whose shape follows from how many there
 are. The window is kept wider than it is tall, and among the shapes that
 satisfy that, the one nearest square is chosen; tcsmoc opens the window at the
 size that shape asks for. The four data handlers of the shipped payload1.yaml
-give a two-by-two grid in a 640x630 window.
+give a two-by-two grid in a 700x852 window -- the width is the floor the
+command interpreter's controls need rather than what two panels come to. As in
+tcssim, a test reads that size out of this document and checks it against the
+one the program opens at.
 
 The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.
 Below that are as many rectangles as there are data handlers.
-The rectangle is blank if the DH has
-not been started or has been stopped after having been started. Otherwise, it
-displays the DH name, configuration information, and packet size. It shows no
-packet interval: that is a simulator setting, stated in payload1sim.yaml and
-shown by tcssim.
+Each displays the DH name, its status, configuration information, and packet
+size, whether or not it has been started: what the panels are for is comparing
+a handler against the file that describes it, and a panel that showed nothing
+until it was started would say nothing about the set that had been loaded. It
+shows no packet interval: that is a simulator setting, stated in
+payload1sim.yaml and shown by tcssim.
 Below that it displays the time and the data most recently sent. Underneath
 that is the time and data most recently received. Both come from
 `QUERY_DH_SAMPLE`_ telemetry, which tcsmoc asks for alongside the statistics;
@@ -3129,12 +3218,14 @@ A handler whose conduits have carried nothing in a direction shows
 ``--:--:--`` and no data for it, which is also what a panel shows before it
 has been queried at all.
 
-Each panel has one button, which starts and stops the handler.
+Each panel has two buttons: one that starts and stops the handler, and a
+``Configuration`` button that shows what the configuration files said about
+it, described under `tcssim`_ where the same button is.
 
 Requirement
-    The button is labelled with what pressing it will do. A handler that is
-    moving data offers ``Discard``, which stops it; a handler that is not
-    offers ``Transmit``, which starts it. There were two buttons, Start and
+    The button that starts and stops a handler is labelled with what pressing
+    it will do. A handler that is moving data offers ``Discard``, which stops
+    it; a handler that is not offers ``Transmit``, which starts it. There were two buttons, Start and
     Stop, and either was pressable whatever the handler was doing: a Stop on
     a stopped handler asks tcspecial to stop something that is not running
     and reads as though it had done something.

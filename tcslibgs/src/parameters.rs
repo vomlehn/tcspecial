@@ -167,14 +167,19 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
     }
 
     let _ = writeln!(out, "  segment_interval {} ms", sim.segment_interval_ms);
+    // A segment is a piece of a packet: equal to the packet is one piece, and
+    // larger than the packet is a pair that cannot be sent -- which tcssim
+    // will not start, so it is said here rather than left to be found by a
+    // button that does nothing.
     let _ = writeln!(
         out,
         "  segment_size     {} bytes{}",
         sim.segment_size,
-        if sim.segment_size as usize >= dh.packet_size {
-            ", so a packet goes whole"
-        } else {
-            ""
+        match (sim.segment_size as usize).cmp(&dh.packet_size) {
+            std::cmp::Ordering::Equal => ", so a packet goes whole",
+            std::cmp::Ordering::Greater =>
+                ", which is larger than the packet and so cannot be sent",
+            std::cmp::Ordering::Less => "",
         }
     );
 

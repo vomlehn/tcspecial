@@ -95,10 +95,12 @@ fn tcspecial_already_running(address: &str) -> bool {
 /// name that reaches further than intended, and all three programs now read
 /// their file the same way.
 ///
-/// Tcssim's simulator configuration is not here: the MOC never reads it and so
-/// has nothing to say about which one is right, and tcssim takes it from
+/// Tcssim's simulator configuration is not passed on: tcssim takes it from
 /// `PAYLOAD_SIM_YAML`, inherited from the MOC's environment like any other
-/// variable.
+/// variable, and so is already looking at the file the MOC was pointed at.
+/// The MOC reads that file itself, but only to show it -- see
+/// `simulator_settings` -- and acts on none of it, so it has nothing to say
+/// about which one is right.
 const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 
 /// Which environment variable names the simulator configuration, and what is
@@ -261,7 +263,7 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         bytes_sent: 0,
         bytes_recv: 0,
         // What both files said about this payload, ready for the panel's
-        // Params button. `sim` is absent when the simulator file could not be
+        // Configuration button. `sim` is absent when the simulator file could not be
         // read, which is not an error here: the MOC controls payloads and
         // does not simulate them.
         parameters: SharedString::from(payload_parameters(dh, sim)),
@@ -1368,7 +1370,23 @@ mod tests {
             ui.window().set_size(window_size(&shape, panels));
             ui.show().unwrap();
 
-            let window_height = ui.window().size().to_logical(1.0).height;
+            let window = ui.window().size().to_logical(1.0);
+            let window_height = window.height;
+
+            // Every button is inside the window across, which is what keeps a
+            // label from running off the side of its panel: a Button reports
+            // the width it was given, where a Text that does not fit is
+            // clipped and reports the width it had.
+            for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
+                let right = button.absolute_position().x + button.size().width;
+                assert!(
+                    right <= window.width,
+                    "{what}: the {:?} button reaches {right}, past the {} the \
+                     window is wide",
+                    button.accessible_label(),
+                    window.width
+                );
+            }
 
             // The grid sits at the top of the area it is given and fits
             // inside it. Both halves matter: a grid shorter than its area is
@@ -1450,8 +1468,9 @@ mod tests {
         }
 
         // The backend is up and this thread owns its windows, so the other
-        // check that needs one runs from here.
+        // checks that need one run from here.
         the_params_button_shows_what_both_files_said();
+        the_window_shows_when_the_last_beacon_arrived();
     }
 
     /// The simulator file beside a payload file is found and read.
@@ -1484,7 +1503,52 @@ mod tests {
         );
     }
 
-    /// Pressing a panel's Params button shows what both configuration files
+    /// The window shows the beacon's last-received time where it says it
+    /// does, and says the same thing about nothing received as the panels do.
+    ///
+    /// The line existed and nothing ever set it. Checking the formatting
+    /// alone would not have caught that, and would not catch the next way of
+    /// losing it either: the property is set by a background thread through
+    /// the event loop, so nothing in Rust fails if the window stops showing
+    /// it.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them.
+    fn the_window_shows_when_the_last_beacon_arrived() {
+        use i_slint_backend_testing::ElementHandle;
+
+        let ui = MainWindow::new().unwrap();
+        ui.show().unwrap();
+
+        let on_screen = |ui: &MainWindow| -> Vec<String> {
+            ElementHandle::find_by_element_type_name(ui, "Text")
+                .filter_map(|e| e.accessible_label())
+                .map(|label| label.to_string())
+                .collect()
+        };
+
+        // Before a beacon: the placeholder every other time line uses, so the
+        // window says one thing about having received nothing.
+        assert!(
+            on_screen(&ui).iter().any(|line| line == NO_TRANSFER_TIME),
+            "the beacon box does not say that nothing has arrived: {:?}",
+            on_screen(&ui)
+        );
+
+        // And after one, the time it arrived.
+        beacon_receive::show_beacon(
+            &ui,
+            Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
+            slint::Color::from_rgb_u8(0, 255, 0),
+        );
+        let shown = on_screen(&ui);
+        assert!(
+            shown.iter().any(|line| line == "02:02:02"),
+            "the beacon's arrival time is not on screen: {shown:?}"
+        );
+    }
+
+    /// Pressing a panel's Configuration button shows what both configuration files
     /// said about that handler.
     ///
     /// Everything up to the window is checked elsewhere -- the text itself by
@@ -1523,8 +1587,8 @@ mod tests {
             "the parameters are shown before anyone asked for them"
         );
 
-        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Params").collect();
-        assert_eq!(button.len(), 1, "the panel has no Params button to press");
+        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Configuration").collect();
+        assert_eq!(button.len(), 1, "the panel has no Configuration button to press");
         button[0].invoke_accessible_default_action();
 
         let shown = on_screen(&ui);
@@ -1542,6 +1606,37 @@ mod tests {
                 .any(|line| line.contains("not read by this program")),
             "a program without the simulator file must say so rather than \
              leaving that half unexplained:\n{shown:?}"
+        );
+    }
+
+    /// The window size the design document states is the one the rule gives.
+    ///
+    /// It said 640x630 against the 700x852 the program opens at: the number
+    /// went stale when the window gained its three-row floor and the width
+    /// floor the command interpreter's controls need, and nothing noticed
+    /// because nothing read it.
+    #[test]
+    fn the_design_document_states_the_size_the_window_opens_at() {
+        let doc = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("docs/design.rst");
+        let text = std::fs::read_to_string(&doc).unwrap();
+
+        // The four handlers of payload1.yaml, which is the set the document
+        // describes.
+        let shape = grid_shape(4);
+        let size = window_size(&shape, 4);
+        let said = format!("{}x{}", size.width, size.height);
+
+        assert_eq!(
+            (shape.columns, shape.rows),
+            (2, 2),
+            "the document describes a two-by-two grid"
+        );
+        assert!(
+            text.contains(&said),
+            "{} does not say the window opens at {said}",
+            doc.display()
         );
     }
 

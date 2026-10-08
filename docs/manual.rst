@@ -275,9 +275,23 @@ for themselves.
        port: 5003
        packet_size: 15
 
+Starting and stopping a payload
+===============================
+Each panel has one button for it, labelled with what pressing it will do. In
+tcssim a payload that is sending offers ``Silent`` and one that is not offers
+``Transmit``; in tcsmoc, where the same two things are a handler carrying data
+to the ground or dropping it on the spacecraft, they are ``Discard`` and
+``Transmit``. Each panel also shows its own status beside the name, which is
+where the label comes from.
+
+There were two buttons in each, Start and Stop, and either was pressable
+whatever the payload was doing: a Stop on something that was not sending did
+nothing and read as though it had. A payload that fails to start offers to
+start again, since that is what has not happened yet.
+
 Seeing what was read
 ====================
-Each payload's panel, in both programs, has a ``Params`` button. It shows
+Each payload's panel, in both programs, has a ``Configuration`` button. It shows
 every parameter read from the two configuration files for that payload: what
 the payload file said about the payload and how it is reached, and what the
 simulator file said about how a stand-in for it behaves, each under the name
@@ -725,24 +739,64 @@ Testing is done with two programs:
 tcsmoc
 ------
 
+The tcsmoc window
+^^^^^^^^^^^^^^^^^
+Across the top, from the left:
+
+the ``tcspecial link`` box
+  The address of the command interpreter and one button, which reads
+  ``Connect`` while the link is down and ``Disconnect`` while it is up. The
+  status beside it says which, and is green when connected. Editing the
+  address and pressing ``Connect`` is how the MOC is pointed at a different
+  tcspecial; the MOC opens the link itself at startup, so the status normally
+  reads connected before anything is pressed.
+
+the beacon box
+  The indicator, whose colours are listed under `Beaconing`_, and the time the
+  last beacon arrived.
+
+the ``Command`` menu
+  The commands below.
+
+``Last Response``
+  What the last command answered, under the two boxes.
+
+Below that is one panel per data handler, and a ``Quit`` button at the foot of
+the window, which stops the tcspecial and tcssim the MOC started.
+
+Each panel shows its handler's name and status, how it is reached, and its
+packet size; then the time and first few bytes of the last transfer each way,
+and the byte counts. The two lines come from the spacecraft, so their times are
+when the data moved rather than when it was asked about. The panels refresh
+themselves about once a second; nothing has to be pressed to see traffic.
+
+Each panel has two buttons. One starts and stops the handler, and is described
+under `Starting and stopping a payload`_. The other, ``Configuration``, shows
+what the files said about that handler: see `Seeing what was read`_.
+
 Commands
 ^^^^^^^^
-Tcsmoc supports the following commands:
+From the ``Command`` menu. Three of the seven items send a command:
 
-PING
-  Send a PING message and wait for receipt.
+Ping
+  Sends a PING and waits for the answer. ``Last Response`` says that one was
+  sent, then what came back, and if nothing came back within the client's
+  timeout it says when it stopped waiting.
 
-PING
-""""
-Click on the Command menu, then click on the Ping menu item. The status
-box will indicate a PING message has been sent. When received, the status
-box will change to indicate a response has been received. If a response
-wasn't received within the command timeout window, the status box will
-indicate the time it stopped waiting.
+ARM Restart
+  Arms a restart, which a restart will not happen without.
+
+Restart
+  Restarts the spacecraft software, which only an armed restart does.
+
+The remaining four -- ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH`` --
+answer in ``Last Response`` and send nothing. Starting and stopping a handler
+is done from its own panel, and the panels show what a query would ask for
+without anyone asking.
 
 Beaconing
 ^^^^^^^^^
-TCSpecial sends a beacon at a configurable interval. Tcmoc displays the
+TCSpecial sends a beacon at a configurable interval. Tcsmoc displays the
 following beacon colors:
 
 steady grey
@@ -761,3 +815,75 @@ blinking yellow
 
 blinking red
   The number of lost beacon messages indicates a likely issue.
+
+Beside the indicator is the time the last beacon arrived, shown the way every
+other time in the window is. It is the time the beacon reached the MOC rather
+than the time the spacecraft stamped on it: the line is read to find out
+whether beacons are still coming, and a spacecraft whose clock had stopped
+would otherwise look as though its beacons had.
+
+Until a beacon has arrived the line shows ``--:--:--``, as a panel does for a
+direction that has carried nothing. Once one has, the time stays: a pass that
+finds nothing ages the colour beside it and leaves the time alone, because the
+beacon did arrive when it arrived.
+
+tcssim
+------
+
+The tcssim window
+^^^^^^^^^^^^^^^^^
+One panel per simulated payload, in a grid, and a ``Quit All`` button at the
+foot of the window. Nothing in the window names a payload or fixes how many
+there are: the two configuration files decide that, so a payload added to or
+removed from them adds or removes a panel.
+
+Each panel shows, from the top:
+
+the name and status
+  The status is red while the payload is not sending and black while it is.
+
+how the payload is reached
+  The same description tcsmoc's panels carry for the handler at the other end
+  of the link.
+
+``Pkt`` and ``Seg``
+  The packet size, from the payload file, and the segment size, from the
+  simulator file.
+
+``Pkt Int`` and ``Seg Int``
+  The interval between packets and between the segments of one packet, both
+  from the simulator file.
+
+Those four can be changed while a payload is running, and take effect on the
+next packet: that is what the simulator is for, and it is quicker than editing
+a file and starting again. Nothing is written back to the files, so the next
+run starts from what they say.
+
+A segment is a piece of a packet, so the segment size may not be larger than
+the packet size. Equal is the ordinary case -- a packet sent in one segment.
+Make them disagree and a message says so at once, naming both sizes and
+either way out of it, and the button that starts the payload is taken away
+until they agree again; the edit that fixes them takes the message back. The
+sizes are checked when the files are read as well, so a set whose simulator
+file states a segment larger than the payload file's packet says so before
+anything is touched.
+
+Below them are the two buttons -- one to start and stop the payload, described
+under `Starting and stopping a payload`_, and ``Configuration``, described
+under `Seeing what was read`_ -- and then three lines:
+
+``Sent``
+  When the last packet went, and the first few bytes of it.
+
+``Recv``
+  When the last packet arrived, and the first few bytes of it. A payload
+  nothing speaks to shows ``--:--:--`` here for the whole run, which is what a
+  payload that sends on its own looks like.
+
+``Pkts``
+  How many packets have gone and arrived since the payload started.
+
+The times and bytes are the simulator's own account of what it did, where
+tcsmoc's panels show the same transfers as the spacecraft reported them. Two
+panels disagreeing about one transfer is worth knowing about, which is why
+both are shown the same way.

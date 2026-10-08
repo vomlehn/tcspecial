@@ -86,7 +86,12 @@ enum Claim {
 /// Only the names that are certainly this host. Two names for some other host
 /// -- a hostname and the address it resolves to -- are left as written, since
 /// resolving them is a question for the network and not for a file.
-fn one_host(address: &str) -> String {
+///
+/// Public because two files naming one host differently is the same question
+/// as two handlers doing so: a simulator configuration stating `localhost`
+/// for a payload the payload file put at `127.0.0.1` has not disagreed with
+/// it.
+pub fn one_host(address: &str) -> String {
     match address {
         "localhost" | "127.0.0.1" | "::1" => "localhost".to_string(),
         other => other.to_string(),

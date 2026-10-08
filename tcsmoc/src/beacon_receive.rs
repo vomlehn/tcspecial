@@ -9,7 +9,8 @@ use std::time::{Duration, SystemTime};
 use slint::{Color, Weak};
 
 use crate::MainWindow;
-use tcslibgs::TcsResult;
+use slint::SharedString;
+use tcslibgs::{TcsResult, Timestamp, NO_TRANSFER_TIME};
 
 const DEBUG_BEACON: bool = false;
 
@@ -179,6 +180,72 @@ pub struct BeaconReceive {
     indicator_states:   IndicatorStates,
 }
 
+/// What a pass of the receive loop found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Arrived {
+    /// A beacon, now.
+    Beacon,
+    /// Nothing, for as long as the pass waited.
+    Nothing,
+    /// The socket failed, which says nothing about the spacecraft.
+    Broken,
+}
+
+/// What the window should show after a pass, and when the last beacon was.
+///
+/// Separate from the loop so that it can be exercised without a socket. The
+/// time it returns is the point: a pass that found nothing still has the time
+/// of the beacon before it to show, and a pass whose socket broke has it too
+/// -- the spacecraft has said nothing about having stopped, and blanking the
+/// line would say it had.
+pub(crate) fn after_a_pass(
+    states: &IndicatorStates,
+    last: &CondPair<Option<SystemTime>>,
+    arrived: Arrived,
+    now: SystemTime,
+) -> (Color, Option<SystemTime>) {
+    match arrived {
+        Arrived::Beacon => {
+            let mut guard = last.lock.lock().unwrap();
+            *guard = Some(now);
+            last.cvar.notify_all();
+            let at = *guard;
+            drop(guard);
+            (states.delay_and_color(&at).1, at)
+        }
+        Arrived::Nothing => {
+            let at = *last.lock.lock().unwrap();
+            (states.delay_and_color(&at).1, at)
+        }
+        Arrived::Broken => (states.unset_color(), *last.lock.lock().unwrap()),
+    }
+}
+
+/// When the last beacon arrived, as the window shows it.
+///
+/// The time it arrived here, not a time the spacecraft put in it: the line is
+/// labelled received, and what it is read for is whether beacons are still
+/// coming -- a spacecraft whose clock had stopped would otherwise look as
+/// though its beacons had. Shown the way every other time in the window is,
+/// by the one function that shows them.
+fn beacon_last_received(at: Option<SystemTime>) -> String {
+    match at {
+        Some(at) => Timestamp::at(at).time_of_day(),
+        None => NO_TRANSFER_TIME.to_string(),
+    }
+}
+
+/// Put the beacon's state in the window: the indicator's colour, and when the
+/// last beacon arrived.
+///
+/// Both at once, from the one reading of when the last beacon was: a colour
+/// that said beacons were arriving beside a time that said none had would be
+/// two answers to one question.
+pub(crate) fn show_beacon(ui: &MainWindow, at: Option<SystemTime>, color: Color) {
+    ui.set_indicator_color(color);
+    ui.set_beacon_last_recv(SharedString::from(beacon_last_received(at)));
+}
+
 impl BeaconReceive {
     pub fn new(
         ui_weak:            Weak<MainWindow>,
@@ -217,69 +284,44 @@ impl BeaconReceive {
         let mut buf = [0u8; 65535];
 
         loop {
-            // Get current color and timeout duration
-            let last_beacon_guard = self.last_beacon.lock.lock().unwrap();
-            let last_beacon_value = *last_beacon_guard;
-            drop(last_beacon_guard);
-
-            let (timeout, color) = self.indicator_states.delay_and_color(&last_beacon_value);
-if DEBUG_BEACON {
-eprintln!("First: timeout {:?} color {:?}", timeout, color);
-}
-
-            // Set socket timeout
+            // How long to wait: until the colour would change by itself, so
+            // that a blinking indicator blinks whether or not anything
+            // arrives.
+            let (timeout, _) = self
+                .indicator_states
+                .delay_and_color(&self.last_beacon.lock.lock().unwrap());
+            if DEBUG_BEACON {
+                eprintln!("waiting {:?}", timeout);
+            }
             socket.set_read_timeout(timeout)?;
 
-            // Receive beacon data from socket (or timeout)
-            let status = socket.recv_from(&mut buf);
-            
-            let new_color = match status {
-                Ok((_size, _addr)) => {
-//eprintln!("beacon received {} bytes from {}", _size, _addr);
-                    // Update last beacon time
-                    let mut last_beacon_guard = self.last_beacon.lock.lock().unwrap();
-                    *last_beacon_guard = Some(SystemTime::now());
-                    self.last_beacon.cvar.notify_all();
-                    let last_beacon_value = *last_beacon_guard;
-                    drop(last_beacon_guard);
-
-                    // Recalculate color after receiving
-                    let (_, color) = self.indicator_states.delay_and_color(&last_beacon_value);
-if DEBUG_BEACON {
-eprintln!("Msg rcvd: timeout {:?} color {:?}", timeout, color);
-}
-                    Some(color)
-                }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
-                    || e.kind() == std::io::ErrorKind::TimedOut =>
+            let arrived = match socket.recv_from(&mut buf) {
+                Ok((_size, _addr)) => Arrived::Beacon,
+                Err(ref e)
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut =>
                 {
-                    // Timeout - update the color
-//eprintln!("beacon timeout");
-                    let last_beacon_guard = self.last_beacon.lock.lock().unwrap();
-                    let last_beacon_value = *last_beacon_guard;
-                    drop(last_beacon_guard);
-                    let (_, color) = self.indicator_states.delay_and_color(&last_beacon_value);
-if DEBUG_BEACON {
-eprintln!("Timedout: timeout {:?} color {:?}", timeout, color);
-}
-                    Some(color)
+                    Arrived::Nothing
                 }
-                Err(_e) => {
-                    // I/O error
-//panic!("receive_beacon: error receiving: {}", _e);
-                    Some(self.indicator_states.unset_color())
-                }
+                Err(_) => Arrived::Broken,
             };
 
-            // Set the indicator color
-            if let Some(color) = new_color {
-                let ui_weak = self.ui_weak.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = ui_weak.upgrade() {
-                        ui.set_indicator_color(color);
-                    }
-                });
+            let (color, at) = after_a_pass(
+                &self.indicator_states,
+                &self.last_beacon,
+                arrived,
+                SystemTime::now(),
+            );
+            if DEBUG_BEACON {
+                eprintln!("{:?}: colour {:?}, last beacon {:?}", arrived, color, at);
             }
+
+            let ui_weak = self.ui_weak.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = ui_weak.upgrade() {
+                    show_beacon(&ui, at, color);
+                }
+            });
         }
     }
 
@@ -351,7 +393,100 @@ use crate::config::constants::BEACON_INDICATOR; // Adjust path as needed
 
 type ArcCondPair<T> = Arc<CondPair<T>>;
 
-struct CondPair<T> {
+pub(crate) struct CondPair<T> {
     lock: Mutex<T>,
     cvar: Condvar,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn no_beacon_yet() -> CondPair<Option<SystemTime>> {
+        CondPair {
+            lock: Mutex::new(None),
+            cvar: Condvar::new(),
+        }
+    }
+
+    /// A green indicator and the colours either side of it, so a test can
+    /// tell a fresh beacon from a stale one by the colour alone.
+    fn states() -> IndicatorStates {
+        IndicatorStates::new(
+            Color::from_rgb_u8(0xC0, 0xC0, 0xC0),
+            vec![
+                IndicatorState::Steady(Duration::from_millis(4000), Color::from_rgb_u8(0, 255, 0)),
+                IndicatorState::Steady(Duration::MAX, Color::from_rgb_u8(255, 0, 0)),
+            ],
+        )
+    }
+
+    /// Every pass of the loop says when the last beacon arrived, not only the
+    /// pass that received one.
+    ///
+    /// This is what the window was missing: the time of the last beacon has
+    /// to survive the passes that find nothing, or the line would be filled
+    /// in for an instant and emptied by the next timeout. A pass whose socket
+    /// broke keeps it too -- the spacecraft has said nothing about having
+    /// stopped, and blanking the line would say that it had.
+    ///
+    /// The colour is asserted only where it does not depend on how long ago
+    /// the beacon was: `delay_and_color` ages it against the system clock,
+    /// which a test cannot wind on. What the colour does with age is the
+    /// indicator's own business and is tested where that lives.
+    #[test]
+    fn every_pass_says_when_the_last_beacon_arrived() {
+        let states = states();
+        let last = no_beacon_yet();
+
+        // Nothing has arrived yet, so there is nothing to show and the
+        // indicator is at the colour of never having heard anything.
+        let (color, at) = after_a_pass(&states, &last, Arrived::Nothing, SystemTime::now());
+        assert_eq!(at, None);
+        assert_eq!(color, states.unset_color());
+
+        // A beacon: the time is the time of this pass.
+        let arrival = SystemTime::now();
+        let (fresh, at) = after_a_pass(&states, &last, Arrived::Beacon, arrival);
+        assert_eq!(at, Some(arrival), "a pass that received a beacon must say when");
+        assert_ne!(
+            fresh,
+            states.unset_color(),
+            "a beacon that has just arrived is not nothing heard from"
+        );
+
+        // A later pass that finds nothing keeps that time: the beacon did
+        // arrive when it arrived, whatever the passes after it find.
+        let (_, at) = after_a_pass(&states, &last, Arrived::Nothing, SystemTime::now());
+        assert_eq!(at, Some(arrival), "the time of the last beacon was lost");
+
+        // And a broken socket says nothing about the spacecraft: the time
+        // stands, and the indicator goes to the colour of not knowing.
+        let (unknown, at) = after_a_pass(&states, &last, Arrived::Broken, SystemTime::now());
+        assert_eq!(at, Some(arrival));
+        assert_eq!(unknown, states.unset_color());
+    }
+
+    /// A beacon that has arrived is shown by the time it arrived, and one
+    /// that has not is said not to have.
+    ///
+    /// The line was never set at all: the window declared it, Rust set the
+    /// indicator's colour beside it and nothing else, so it said no beacon
+    /// had ever arrived for as long as the MOC ran. That is worse than saying
+    /// nothing, because the colour next to it was green.
+    #[test]
+    fn a_beacon_is_shown_by_when_it_arrived() {
+        assert_eq!(beacon_last_received(None), NO_TRANSFER_TIME);
+
+        // The time of day it arrived, as every other time in the window is
+        // shown: one function formats them all.
+        let at = std::time::UNIX_EPOCH + Duration::from_secs(3661);
+        assert_eq!(beacon_last_received(Some(at)), "01:01:01");
+
+        // A clock reading before the epoch cannot be formatted and must not
+        // panic: a window that fell over because the system clock was being
+        // set would be a worse fault than a wrong time.
+        let before = std::time::UNIX_EPOCH - Duration::from_secs(1);
+        assert_eq!(beacon_last_received(Some(before)), "00:00:00");
+    }
 }

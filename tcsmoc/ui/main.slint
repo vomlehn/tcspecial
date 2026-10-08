@@ -96,7 +96,7 @@ component DHPanel inherits Rectangle {
             // test that opens this popup has to find the button that opens
             // it.
             Button {
-                text: "Params";
+                text: "Configuration";
                 clicked => { parameters-popup.show(); }
             }
 
@@ -209,7 +209,6 @@ export component MainWindow inherits Window {
     in-out property <string> ci-status: "Disconnected";
     in-out property <string> ci-address: "127.0.0.1:4000";
     in-out property <string> last-response: "";
-    in-out property <string> beacon-time: "--:--:--";
     in-out property <color> indicator-color: #c0c0c0;
 
     // The data handlers, read from the payload configuration file by Rust.
@@ -238,7 +237,10 @@ export component MainWindow inherits Window {
     // Rows follow from the panel count and the column count.
     property <int> grid-rows: Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
 
-    in-out property <string> beacon-last-recv: "--- --:--.-";
+    // When the last beacon arrived, and the placeholder until one has. The
+    // same text the panels' time lines come up with, so the window says one
+    // thing about having received nothing.
+    in-out property <string> beacon-last-recv: "--:--:--";
 
     callback link-clicked();
     callback ping-clicked();

@@ -29,6 +29,19 @@ impl Timestamp {
         }
     }
 
+    /// When a system clock reading happened, as a timestamp.
+    ///
+    /// For the times a program takes from its own clock rather than from
+    /// telemetry -- a beacon's arrival, say -- so that they are shown by the
+    /// one function that shows every other time here.
+    pub fn at(time: SystemTime) -> Self {
+        let duration = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+        Self {
+            seconds: duration.as_secs(),
+            nanoseconds: duration.subsec_nanos(),
+        }
+    }
+
     /// The time of day this names, as a panel shows it.
     ///
     /// UTC, and the date dropped: a panel has room for a time and wants it to

@@ -16,6 +16,11 @@ export struct PayloadInfo {
     // ready rather than fetched when asked: the files are read once, at
     // startup, and nothing can change them while the window is up.
     parameters: string,
+    // What is wrong with the packet and segment sizes together, and empty
+    // when they agree. Rust decides it -- once at startup and again on every
+    // edit -- so the panel has an answer to obey rather than a rule to
+    // apply.
+    sizes-problem: string,
     // From the simulator configuration file, and editable here afterwards
     segment-size: int,
     packet-interval: int,
@@ -45,9 +50,9 @@ component PayloadPanel inherits Rectangle {
     in property <int> packets-sent: 0;
     in property <int> packets-recv: 0;
     in property <string> parameters: "";
+    in property <string> sizes-problem: "";
 
-    callback start-clicked();
-    callback stop-clicked();
+    callback transfer-clicked();
     // One callback per spin box, each carrying the value just set. The panel
     // holds no state of its own: what a spin box shows is what the model says,
     // so an edit has to go back to the model to be seen.
@@ -63,6 +68,36 @@ component PayloadPanel inherits Rectangle {
     VerticalLayout {
         padding: 4px;
         spacing: 2px;
+        sizes-popup := PopupWindow {
+            x: 4px;
+            y: 4px;
+            width: 290px;
+            height: 100px;
+
+            Rectangle {
+                background: white;
+                border-color: #c00000;
+                border-width: 1px;
+
+                VerticalLayout {
+                    padding: 6px;
+                    spacing: 4px;
+
+                    Text {
+                        text: payload-name + ": these sizes cannot be sent";
+                        font-weight: 700;
+                        font-size: 11px;
+                        color: #c00000;
+                    }
+                    Text {
+                        text: sizes-problem;
+                        font-size: 10px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+
         parameters-popup := PopupWindow {
             x: 4px;
             y: 4px;
@@ -141,14 +176,36 @@ component PayloadPanel inherits Rectangle {
                 value: packet-size;
                 minimum: 1;
                 maximum: 32;
-                edited(v) => { packet-size-edited(v); }
+                edited(v) => {
+                    packet-size-edited(v);
+                    // Said at once, and taken back at once: an open popup
+                    // still saying these sizes cannot be sent, after the edit
+                    // that made them sendable, would be the wrong answer left
+                    // on the screen.
+                    if (sizes-problem != "") {
+                        sizes-popup.show();
+                    } else {
+                        sizes-popup.close();
+                    }
+                }
             }
             Text { text: "Seg:"; vertical-alignment: top; font-size: 9px; }
             SpinBox {
                 value: segment-size;
                 minimum: 1;
                 maximum: 32;
-                edited(v) => { segment-size-edited(v); }
+                edited(v) => {
+                    segment-size-edited(v);
+                    // Said at once, and taken back at once: an open popup
+                    // still saying these sizes cannot be sent, after the edit
+                    // that made them sendable, would be the wrong answer left
+                    // on the screen.
+                    if (sizes-problem != "") {
+                        sizes-popup.show();
+                    } else {
+                        sizes-popup.close();
+                    }
+                }
             }
         }
 
@@ -185,17 +242,30 @@ component PayloadPanel inherits Rectangle {
             // it. Nothing invisible will stand in for it at the end: a
             // Rectangle or an empty Text there is not reported either.
             Button {
-                text: "Params";
+                text: "Configuration";
                 clicked => { parameters-popup.show(); }
             }
+            // One button, labelled with what pressing it will do. There were
+            // two, Start and Stop, and either was pressable whatever the
+            // payload was already doing: a Stop on a payload that was not
+            // sending did nothing and read as though it had.
+            //
+            // The label comes from the status this panel already shows, and
+            // Rust reads the same status back to decide which way a press
+            // goes, so the button and what it does cannot disagree.
             Button {
-                text: "Start";
-                clicked => { start-clicked(); }
+                text: payload-status == "Running" ? "Silent" : "Transmit";
+                // Nothing to press while the two sizes describe something
+                // that cannot be sent: a segment is a piece of a packet, and
+                // a piece larger than the whole is not a thing to start.
+                enabled: sizes-problem == "";
+                clicked => { transfer-clicked(); }
             }
-            Button {
-                text: "Stop";
-                clicked => { stop-clicked(); }
-            }
+            // The row's spare room, so the buttons are the width of their own
+            // labels rather than stretched across the panel. It is also what
+            // lets a test see them: Slint's testing backend does not report
+            // the last child of a layout, and this is now the last child.
+            Rectangle { }
         }
 
         // The three rows of data the panel ends with.
@@ -234,8 +304,9 @@ export component MainWindow inherits Window {
     in property <length> cell-width: 320px;
     in property <length> cell-height: 210px;
 
-    callback start-payload(int);
-    callback stop-payload(int);
+    // One callback for the one button a panel has. Which way a press goes is
+    // Rust's to decide, from the status the button's own label comes from.
+    callback transfer-payload(int);
     callback config-payload(int, int, int, int, int);
     callback quit-clicked();
 
@@ -282,9 +353,9 @@ export component MainWindow inherits Window {
                     packets-sent: p.packets-sent;
                     packets-recv: p.packets-recv;
                     parameters: p.parameters;
+                    sizes-problem: p.sizes-problem;
 
-                    start-clicked => { start-payload(i); }
-                    stop-clicked => { stop-payload(i); }
+                    transfer-clicked => { transfer-payload(i); }
 
                     // An edit changes the model, so the spin box keeps showing
                     // it, and then tells Rust the whole set for this payload.

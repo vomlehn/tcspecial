@@ -1,7 +1,15 @@
 //! TCSpecial Ground/Space Library (tcslibgs)
 //!
-//! This library contains definitions shared between the ground portion of the
-//! software (tcslib) and the space portion (tcspecial).
+//! What the ground portion of the software (tcslib) and the space portion
+//! (tcspecial) share: the commands, the telemetry, and the types a data
+//! handler is described in.
+//!
+//! The two GUIs share it as well, which is why more than the link's own
+//! definitions live here. Every configuration file format is parsed in this
+//! library, the simulator's included, so that no program reads a file in a
+//! way of its own; and a time or a sample of a transfer is formatted here, so
+//! that a panel in tcsmoc and a panel in tcssim show the one transfer the
+//! same way.
 
 pub mod commands;
 pub mod config;

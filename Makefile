@@ -28,7 +28,7 @@ RUST = .
 # runsim passes both for a different reason: run on its own, tcssim needs the
 # payload file as well as the simulation file, and the two must describe the
 # same set or the names will not match.
-PAYLOAD_FILE=tcspecial2
+PAYLOAD_FILE=tests/manual/tcspecial2
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload

@@ -3,7 +3,6 @@
 use std::path::Path;
 
 use tcslibgs::endpoint_config::{self, EndpointConfigDoc};
-use tcslibgs::config::command_address_parts;
 use tcslibgs::{load_config_file, CIConfig, TcsError, TcsResult};
 use tcslibgs::CIConfigJson;
 
@@ -18,24 +17,6 @@ pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
         .map_err(|e| TcsError::Config(e))?;
 
     Ok(tcspecial_config)
-}
-
-/// Where commands are taken: what the command line said, or failing that what
-/// the configuration file said.
-///
-/// The command line wins, and that is the whole point of it. Tcsmoc decides
-/// the address it will send commands to and starts tcspecial with it, so the
-/// one that matters is the one the ground chose; a tcspecial that preferred
-/// its own file could be listening somewhere nobody was talking to, and the
-/// only sign of it was every command timing out.
-///
-/// With no argument nothing changes: a tcspecial run on its own -- `make run`,
-/// or under a debugger -- is still placed by its configuration file.
-pub fn command_address(config: &CIConfig, given: Option<&str>) -> Result<(String, u16), String> {
-    match given {
-        Some(address) => command_address_parts(address),
-        None => Ok((config.address.clone(), config.port)),
-    }
 }
 
 /// Load an endpoint configuration file in YAML or XML.
@@ -54,9 +35,6 @@ pub mod constants {
     use std::time::Duration;
 
     pub const BEACON_DEFAULT_MS: Duration = Duration::new(20, 0);
-
-    // FIXME: use getaddrinfo()
-    pub const BEACON_NETADDR: &str = "0.0.0.0:5550";
 
     /// Initial delay for endpoint retry
     pub const ENDPOINT_DELAY_INIT: Duration = Duration::from_millis(100);
@@ -138,37 +116,50 @@ mod tests {
         }
     }
 
-    /// The command line says where commands are taken, and the configuration
-    /// file says it only when the command line did not.
+    /// The beacon address is read from the file, and defaults when absent.
     ///
-    /// Tcsmoc starts tcspecial with the address it is about to send to, so the
-    /// argument has to win. Before it existed, the MOC sent to its own default
-    /// and tcspecial bound what its file said; the two agreed because someone
-    /// kept them equal by hand, and when they stopped agreeing every command
-    /// timed out with nothing on either end to say why.
+    /// It was a constant in tcspecial that tcsmoc imported, so a mission that
+    /// wanted beacons anywhere else had to rebuild both programs. The default
+    /// is that same constant, so a file written before the attribute existed
+    /// still sends them where it always did.
     #[test]
-    fn the_command_line_places_the_command_interpreter() {
+    fn the_beacon_address_comes_from_the_file_or_the_default() {
         let config = load_from(".yaml", YAML).expect("the configuration loads");
-        assert_eq!((config.address.clone(), config.port), ("0.0.0.0".to_string(), 4000));
-
-        // Nothing given: the file is still what places it.
         assert_eq!(
-            command_address(&config, None).unwrap(),
-            ("0.0.0.0".to_string(), 4000)
+            config.beacon_address.to_string(),
+            tcslibgs::DEFAULT_BEACON_ADDRESS,
+            "a file that says nothing gets the default"
         );
 
-        // Given: the argument, down to the port, which is the half most
-        // likely to differ and the half a bind cannot do without.
-        assert_eq!(
-            command_address(&config, Some("127.0.0.1:4100")).unwrap(),
-            ("127.0.0.1".to_string(), 4100)
+        let stated = YAML.replace(
+            "beacon_interval_ms: 5000",
+            "beacon_interval_ms: 5000\nbeacon_address: 127.0.0.1:6550",
         );
+        let config = load_from(".yaml", &stated).expect("the configuration loads");
+        assert_eq!(config.beacon_address.to_string(), "127.0.0.1:6550");
+    }
 
-        // And an argument that is not an address does not quietly leave the
-        // file's one in place: a tcspecial listening somewhere other than
-        // where it was told is the fault this exists to prevent.
-        let e = command_address(&config, Some("127.0.0.1")).expect_err("no port");
-        assert!(e.contains("127.0.0.1"), "{e}");
+    /// A beacon address that is not one is refused where the file is read.
+    ///
+    /// Not where the beacon is sent: a beacon goes out on a timer with nobody
+    /// to report to, so an address that cannot be parsed has to be caught
+    /// while someone is still reading errors. It used to be a constant parsed
+    /// with `unwrap`, which could only ever have panicked.
+    #[test]
+    fn a_beacon_address_that_is_not_one_is_refused() {
+        for bad in ["0.0.0.0", "nowhere:5550", "0.0.0.0:not-a-port", ""] {
+            let text = YAML.replace(
+                "beacon_interval_ms: 5000",
+                &format!("beacon_interval_ms: 5000\nbeacon_address: \"{bad}\""),
+            );
+            let said = load_from(".yaml", &text)
+                .expect_err(bad)
+                .to_string();
+            assert!(
+                said.contains("beacon_address"),
+                "{bad}: the refusal does not name the attribute: {said}"
+            );
+        }
     }
 
     /// An extension this does not read is refused rather than guessed at.

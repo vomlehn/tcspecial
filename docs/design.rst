@@ -509,8 +509,8 @@ tcspecial
 ---------
 Tcspecial reads two configuration files. Its own is
 ``tcspecial/src/tcspecial.yaml``, named by ``TCSPECIAL_CONFIG_PATH`` when that
-is set, and holds the address the command interpreter listens on, the beacon
-interval, and where the telemetry log goes. The other describes the payloads
+is set, and holds the address the command interpreter listens on, where
+beacons are sent, the beacon interval, and where the telemetry log goes. The other describes the payloads
 and is named on the command line; see `Payload Configuration Files`_.
 
 Both choose their parser from their extension, as every configuration file in
@@ -527,15 +527,16 @@ This is the shipped ``tcspecial/src/tcspecial.yaml``:
    port: 4000
    protocol: udp
    beacon_interval_ms: 5000
+   beacon_address: "0.0.0.0:5550"
    log_dir: telemetry
    log_segment_bytes: 65536
 
 The address and port are where the command interpreter binds, which is where
-the ground sends commands -- unless tcspecial was given an address on its
-command line, which beats this file and is how tcsmoc places a tcspecial it
-starts. The quotes on the address are deliberate: unquoted,
-``0.0.0.0`` is a string in YAML only because it happens not to be a number,
-which is a thin reason to rely on. ``log_dir`` holds the telemetry log's
+the ground sends commands, and ``beacon_address`` is where beacons are sent.
+Every address tcspecial uses is in this file and nowhere else: see
+`Where the Addresses Are`_. The quotes on the addresses are deliberate:
+unquoted, ``0.0.0.0`` is a string in YAML only because it happens not to be a
+number, which is a thin reason to rely on. ``log_dir`` holds the telemetry log's
 segment files and must already exist; logging is off when it is absent.
 ``log_segment_bytes`` is the payload bytes in one segment file, the header
 being added on top of that.
@@ -3490,43 +3491,49 @@ Requirement
     the program it is given to.
 
 Requirement
-    One payload file is named. A further argument is an error rather than one
-    with no effect, because it is more likely a mistake about which file is
-    being read than something meant to be ignored. Tcspecial takes one more,
-    which is the rule below rather than an exception to this one.
+    One payload file is named, and nothing else. A further argument is an
+    error rather than one with no effect, because it is more likely a mistake
+    about which file is being read than something meant to be ignored.
+
+Where the Addresses Are
+^^^^^^^^^^^^^^^^^^^^^^^
+Requirement
+    Every address tcspecial uses is in its own configuration file: the address
+    and port the command interpreter binds, and ``beacon_address``, where
+    beacons go. Neither appears on the command line.
 
 Requirement
-    Tcspecial takes the address it serves commands on as its second argument,
-    written ``address:port``, and that argument beats what its configuration
-    file says. With no such argument the configuration file places it, so a
-    tcspecial run on its own is unaffected.
+    ``beacon_address`` is optional, and defaults to the address beacons always
+    went to. A file written before the attribute existed sends them where it
+    always did.
 
 Requirement
-    Tcsmoc starts tcspecial on the address tcsmoc will send commands to.
+    A ``beacon_address`` that is not an address and a port is refused where
+    the file is read, naming the attribute.
 
-The two used to settle this separately: tcspecial bound what
-``tcspecial.yaml`` said and tcsmoc sent to a default of its own, and the two
-agreeing was a coincidence kept up by hand. Disagreeing is not an error either
-end can see -- a command interpreter listening where nobody is talking answers
-nothing, and a UDP datagram sent where nobody is listening is not refused --
-so what it looks like is every command timing out for no stated reason. One end
-chooses now, and it is the end that will be doing the sending.
+Refused there rather than where a beacon is sent, because a beacon goes out on
+a timer with nobody to report to: the address used to be a constant parsed with
+``unwrap``, which could only ever have panicked, and a configured one has to be
+caught while someone is still reading errors.
 
-The port is required with the address. It is the half most likely to differ,
-and the half a bind cannot do without; defaulting it would be the same
-coincidence in a smaller place. An address is split at its last colon rather
-than parsed as a socket address, so that ``localhost:4000`` is as good as
-``127.0.0.1:4000`` -- resolving a name is the bind's business -- and a
-bracketed IPv6 address splits correctly for the same reason.
+The command address was an argument for a while, and tcsmoc passed the address
+it was about to send to, so that the end that listens and the end that sends
+could not differ. One address in one place is the simpler rule, and it is the
+rule now; what it gives up is that agreement. The MOC and a tcspecial it starts
+agree about the command address by reading the same default, and about the
+beacon address the same way, so a ``tcspecial.yaml`` that moves either moves it
+for tcspecial alone -- commands then go to a port nothing is bound to, which no
+error on either end reports, since a UDP datagram sent where nobody is
+listening is not refused. What the two ends do check on connecting is each
+other's *configuration*; see `What Each End Read`_.
 
 Requirement
-    Tcspecial says the address it takes commands on as it starts, on stderr,
-    whether or not anything was asked of the log. It says where that address
-    came from as well: the command line, or the configuration file by name.
+    Tcspecial says both addresses as it starts, on stderr, whether or not
+    anything was asked of the log, and names the file they came from.
 
 Said on the way past rather than only when something fails, and said before
-the bind, so that a failure to bind follows the address it was trying to bind.
-It is the one address that has to match what the ground is sending to, and
+either socket is made, so that a failure to bind follows the address it was
+trying to bind. They are the addresses the ground has to be pointed at, and
 until this was printed, finding out what a running tcspecial had bound meant
 asking the operating system.
 

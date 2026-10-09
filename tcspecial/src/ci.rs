@@ -18,7 +18,7 @@ use tcslibgs::{
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
-use crate::config::constants::{BEACON_NETADDR, RESTART_ARM_TIMEOUT};
+use crate::config::constants::RESTART_ARM_TIMEOUT;
 use crate::dh::{DHState, DataHandler};
 use crate::endpoint::bind_endpoint_pair;
 use crate::telemetry_log::TelemetryLog;
@@ -29,6 +29,8 @@ pub struct CommandInterpreter {
     /// Config command can retime it.
     beacon: Option<BeaconSend>,
     beacon_interval: BeaconTime,
+    /// Where beacons go, as the configuration file said.
+    beacon_address: std::net::SocketAddr,
     _config: CIConfig,
     socket: UdpSocket,
     data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
@@ -190,6 +192,7 @@ impl CommandInterpreter {
 
         Ok(Self {
             beacon_interval: config.beacon_interval,
+            beacon_address: config.beacon_address,
             beacon: None,
             _config: config,
             socket,
@@ -442,14 +445,14 @@ impl CommandInterpreter {
         let _last_beacon = Instant::now();
         let mut _last_client_addr: Option<std::net::SocketAddr> = None;
 
-        debug!("beacon destination {}", BEACON_NETADDR);
+        debug!("beacon destination {}", self.beacon_address);
         // Beacons go out at the configured interval, and the sender is kept
         // so that a Config command can retime it. It records into the same
         // log as the responses sent below, so the log holds everything that
         // went to the ground.
         self.beacon = BeaconSend::new(
             Duration::from_millis(self.beacon_interval.0 as u64),
-            BEACON_NETADDR.parse().unwrap(),
+            self.beacon_address,
             self.telemetry_log.clone(),
         );
 
@@ -521,6 +524,15 @@ mod tests {
         ConfigDigest([0; 16])
     }
 
+    /// Somewhere to send beacons that nothing is listening to.
+    ///
+    /// Port 0 rather than the default: these interpreters run in a test
+    /// process, several at once, and a beacon that went to the port a real
+    /// tcsmoc listens on would reach one that happened to be running.
+    fn a_beacon_address() -> std::net::SocketAddr {
+        "127.0.0.1:0".parse().expect("an address")
+    }
+
     #[test]
     fn test_ci_creation() {
         let config = CIConfig {
@@ -528,6 +540,7 @@ mod tests {
             port: 0, // Let OS assign port
             protocol: NetworkProtocol::Udp,
             beacon_interval: BeaconTime(5000),
+            beacon_address: a_beacon_address(),
             log_dir: None,
             log_segment_bytes: 65_536,
         };
@@ -553,6 +566,7 @@ mod tests {
                 port: 0,
                 protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -614,6 +628,7 @@ mod tests {
                 port: 0,
                 protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -706,6 +721,7 @@ mod tests {
                 port: 0,
                 protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -812,6 +828,7 @@ mod tests {
                 port: 0,
                 protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -889,6 +906,7 @@ mod tests {
                 port: 0,
                 protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -993,6 +1011,7 @@ mod tests {
                 port: 0,
                 protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -1050,6 +1069,7 @@ mod tests {
             port: addr.port(),
             protocol: NetworkProtocol::Udp,
             beacon_interval: BeaconTime(5000),
+            beacon_address: a_beacon_address(),
             log_dir: None,
             log_segment_bytes: 65_536,
         };
@@ -1081,6 +1101,7 @@ mod tests {
                 port: 0,
                 protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },

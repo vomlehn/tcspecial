@@ -3,9 +3,12 @@
 use std::path::Path;
 
 use tcslibgs::endpoint_config::{self, EndpointConfigDoc};
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 
-use tcslibgs::{beacon_address_of, load_config_file, CIConfig, CIConfigJson, TcsError, TcsResult};
+use tcslibgs::{
+    beacon_address_of, beacon_interface_of, load_config_file, CIConfig, CIConfigJson, TcsError,
+    TcsResult,
+};
 
 /// Load tcspecial configuration from a YAML or XML file.
 ///
@@ -20,23 +23,56 @@ pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
     Ok(tcspecial_config)
 }
 
+/// Where a beacon goes and on what interface.
+///
+/// Both ends of the link resolve this the same way, out of the same two
+/// files, which is the whole point of it being a function: tcspecial sends to
+/// the group on the interface, tcsmoc joins that group on that interface, and
+/// a pair that disagreed would lose every beacon with nothing to show for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Beacon {
+    /// The multicast group and port.
+    pub group: SocketAddr,
+    /// The local interface to send on, and to join the group on.
+    pub interface: Ipv4Addr,
+}
+
 /// Where beacons go: what the payload set said, or what the command
 /// interpreter's own file said for a set that said nothing.
 ///
 /// The set wins because the set's own ground station is what listens for its
 /// beacons. `section` is the set's `tcspecial` section, and a set either has
-/// one -- in which case it states an address, the attribute being required --
-/// or has none at all: a set written in the endpoint language has no place to
-/// put one, and that is the case this file's own address is for.
-pub fn beacon_address(
-    config: &CIConfig,
-    section: Option<&CIConfigJson>,
-) -> Result<SocketAddr, String> {
+/// one -- in which case it states both attributes, each being required -- or
+/// has none at all: a set written in the endpoint language has no place to put
+/// them, and that is the case this file's own values are for.
+pub fn beacon(config: &CIConfig, section: Option<&CIConfigJson>) -> Result<Beacon, String> {
     match section {
-        Some(section) => beacon_address_of(&section.beacon_address),
-        None => Ok(config.beacon_address),
+        Some(section) => Ok(Beacon {
+            group: beacon_address_of(&section.beacon_address)?,
+            interface: beacon_interface_of(&section.beacon_interface)?,
+        }),
+        None => Ok(Beacon {
+            group: config.beacon_address,
+            interface: config.beacon_interface,
+        }),
     }
 }
+
+/// Which file the command interpreter's own configuration is in.
+///
+/// The path `TCSPECIAL_CONFIG_PATH` names, or the shipped one. Here rather
+/// than in tcspecial's own startup because tcsmoc reads the same file for the
+/// same reason it reads the payload file: to know where the beacons it is
+/// listening for are being sent.
+pub fn tcspecial_config_path() -> String {
+    std::env::var(TCSPECIAL_CONFIG_PATH_VAR)
+        .unwrap_or_else(|_| DEFAULT_TCSPECIAL_CONFIG_PATH.to_string())
+}
+
+/// Which environment variable names the command interpreter's configuration,
+/// and what is read when it is unset.
+pub const TCSPECIAL_CONFIG_PATH_VAR: &str = "TCSPECIAL_CONFIG_PATH";
+pub const DEFAULT_TCSPECIAL_CONFIG_PATH: &str = "tcspecial/src/tcspecial.yaml";
 
 /// Load an endpoint configuration file in YAML or XML.
 ///
@@ -111,14 +147,16 @@ mod tests {
     }
 
     const YAML: &str = "address: 0.0.0.0\nport: 4000\nprotocol: udp\n\
-                        beacon_interval_ms: 5000\nbeacon_address: 0.0.0.0:5550\n";
+                        beacon_interval_ms: 5000\nbeacon_address: 239.255.0.1:5550\n\
+                        beacon_interface: 127.0.0.1\n";
 
     const XML: &str = "<tcspecial>\
         <address>0.0.0.0</address>\
         <port>4000</port>\
         <protocol>udp</protocol>\
         <beacon_interval_ms>5000</beacon_interval_ms>\
-        <beacon_address>0.0.0.0:5550</beacon_address>\
+        <beacon_address>239.255.0.1:5550</beacon_address>\
+        <beacon_interface>127.0.0.1</beacon_interface>\
         </tcspecial>";
 
     #[test]
@@ -147,10 +185,11 @@ mod tests {
     #[test]
     fn the_beacon_address_and_interval_are_required() {
         let config = load_from(".yaml", YAML).expect("the configuration loads");
-        assert_eq!(config.beacon_address.to_string(), "0.0.0.0:5550");
+        assert_eq!(config.beacon_address.to_string(), "239.255.0.1:5550");
+        assert_eq!(config.beacon_interface.to_string(), "127.0.0.1");
         assert_eq!(config.beacon_interval.0, 5000);
 
-        for missing in ["beacon_address: 0.0.0.0:5550\n", "beacon_interval_ms: 5000\n"] {
+        for missing in ["beacon_address: 239.255.0.1:5550\nbeacon_interface: 127.0.0.1\n", "beacon_interval_ms: 5000\n"] {
             let without = YAML.replace(missing, "");
             assert_ne!(without, YAML, "the test removed nothing");
             assert!(
@@ -170,10 +209,10 @@ mod tests {
     fn a_payload_set_says_where_its_beacons_go() {
         let from_the_file = load_from(
             ".yaml",
-            &YAML.replace("beacon_address: 0.0.0.0:5550", "beacon_address: 10.0.0.1:5550"),
+            &YAML.replace("beacon_address: 239.255.0.1:5550", "beacon_address: 239.255.0.9:5550"),
         )
         .expect("the configuration loads");
-        assert_eq!(from_the_file.beacon_address.to_string(), "10.0.0.1:5550");
+        assert_eq!(from_the_file.beacon_address.to_string(), "239.255.0.9:5550");
 
         let section = |beacon: &str| CIConfigJson {
             address: "0.0.0.0".to_string(),
@@ -181,6 +220,7 @@ mod tests {
             protocol: "udp".to_string(),
             beacon_interval_ms: 5000,
             beacon_address: beacon.to_string(),
+            beacon_interface: "127.0.0.1".to_string(),
             log_dir: None,
             log_segment_bytes: 65_536,
         };
@@ -188,24 +228,26 @@ mod tests {
         // A set with a section: the set wins. It always states an address,
         // the attribute being required of a section as of a file.
         assert_eq!(
-            beacon_address(&from_the_file, Some(&section("127.0.0.1:7550")))
+            beacon(&from_the_file, Some(&section("239.255.0.7:7550")))
                 .expect("it resolves")
+                .group
                 .to_string(),
-            "127.0.0.1:7550"
+            "239.255.0.7:7550"
         );
 
         // No section at all -- a set written in the endpoint language, which
         // has no place to state one. This file's own address is for that set.
         assert_eq!(
-            beacon_address(&from_the_file, None)
+            beacon(&from_the_file, None)
                 .expect("it resolves")
+                .group
                 .to_string(),
-            "10.0.0.1:5550"
+            "239.255.0.9:5550"
         );
 
         // And a set stating something that is not an address is refused
         // rather than quietly leaving the file's in place.
-        let said = beacon_address(&from_the_file, Some(&section("nowhere")))
+        let said = beacon(&from_the_file, Some(&section("nowhere")))
             .expect_err("not an address")
             .to_string();
         assert!(said.contains("beacon_address"), "{said}");
@@ -220,9 +262,17 @@ mod tests {
     /// with `unwrap`, which could only ever have panicked.
     #[test]
     fn a_beacon_address_that_is_not_one_is_refused() {
-        for bad in ["0.0.0.0", "nowhere:5550", "0.0.0.0:not-a-port", ""] {
+        for bad in [
+            "239.255.0.1",
+            "nowhere:5550",
+            "239.255.0.1:not-a-port",
+            "",
+            // Parses, and is not a group: a beacon is sent to one.
+            "127.0.0.1:5550",
+            "0.0.0.0:5550",
+        ] {
             let text = YAML.replace(
-                "beacon_address: 0.0.0.0:5550",
+                "beacon_address: 239.255.0.1:5550",
                 &format!("beacon_address: \"{bad}\""),
             );
             let said = load_from(".yaml", &text)

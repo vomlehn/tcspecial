@@ -1,6 +1,6 @@
 //! Type definitions shared between ground and space software
 
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 
 use serde::{Deserialize, Serialize};
 
@@ -1200,20 +1200,42 @@ fn default_log_segment_bytes() -> u32 {
     65_536
 }
 
-/// Where tcsmoc listens for beacons.
+/// The multicast group beacons are sent to, as a configuration states it.
 ///
-/// Not a default: every configuration states where beacons go, and none of
-/// them is read by tcsmoc. This is the address the MOC binds, and the one the
-/// shipped configurations state, which is the whole of why the two ends meet
-/// -- a configuration that moves the beacon elsewhere moves it for tcspecial
-/// alone.
-pub const BEACON_ADDRESS: &str = "0.0.0.0:5550";
-
-/// Where beacons go, as a configuration states it.
+/// A beacon is an announcement to whoever is listening: the spacecraft does
+/// not know how many ground stations there are, and a port can be bound once,
+/// so a unicast beacon can reach exactly one listener chosen in advance.
+/// Multicast is the primitive for that -- any number of stations join the
+/// group, and neither end needs the other's address -- and it is a UDP-only
+/// facility, which a beacon already was.
 pub fn beacon_address_of(stated: &str) -> Result<SocketAddr, String> {
-    stated
+    let address: SocketAddr = stated
         .parse()
-        .map_err(|e| format!("beacon_address \"{stated}\" is not an address and port: {e}"))
+        .map_err(|e| format!("beacon_address \"{stated}\" is not an address and port: {e}"))?;
+
+    if !address.ip().is_multicast() {
+        return Err(format!(
+            "beacon_address \"{stated}\" is not a multicast group: beacons are sent to \
+             one, so the address is in 224.0.0.0/4 -- 239.0.0.0/8 for a group of local \
+             scope, which is what a mission network wants"
+        ));
+    }
+
+    Ok(address)
+}
+
+/// The local interface beacons are sent on and listened for on.
+///
+/// Both ends have to name the same one, and on a host with more than one
+/// interface neither can be left to choose: a sender that does not say sends
+/// out the default route, a listener that does not say joins the group on the
+/// default route, and on a machine where those differ -- a laptop with a
+/// wireless interface and a tunnel, say -- not one beacon arrives. Both ends
+/// read this from the same file, which is how they come to agree.
+pub fn beacon_interface_of(stated: &str) -> Result<Ipv4Addr, String> {
+    stated.parse().map_err(|e| {
+        format!("beacon_interface \"{stated}\" is not the address of a local interface: {e}")
+    })
 }
 
 /// The file-level form of the command interpreter's configuration
@@ -1231,7 +1253,7 @@ pub struct CIConfigJson {
     /// this, so it is the space available for telemetry records.
     #[serde(default = "default_log_segment_bytes")]
     pub log_segment_bytes: u32,
-    /// Where beacons are sent, as `address:port`.
+    /// The multicast group beacons are sent to, as `address:port`.
     ///
     /// Required, like the interval beside it. Beacons are how the ground
     /// knows the spacecraft is alive, so where they go and how often is not
@@ -1241,6 +1263,11 @@ pub struct CIConfigJson {
     /// the command interpreter's own file states it for a set that has no
     /// section.
     pub beacon_address: String,
+    /// The local interface beacons are sent on and listened for on.
+    ///
+    /// Required for the reason the two above are, and one more: a wrong
+    /// interface loses every beacon silently. See [`beacon_interface_of`].
+    pub beacon_interface: String,
 }
 
 /// Command interpreter configuration
@@ -1250,13 +1277,15 @@ pub struct CIConfig {
     pub port: u16,
     pub protocol: NetworkProtocol,
     pub beacon_interval: BeaconTime,
-    /// Where beacons are sent.
+    /// The multicast group beacons are sent to.
     ///
     /// Settled when the file is read rather than where the beacon is sent,
     /// because a beacon goes out on a timer with nobody to report to: an
-    /// address that is not one has to be refused while there is still someone
-    /// reading the error. It used to be a constant parsed with `unwrap`.
+    /// address that is not one, or not a multicast group, has to be refused
+    /// while there is still someone reading the error.
     pub beacon_address: SocketAddr,
+    /// The local interface beacons are sent on and listened for on.
+    pub beacon_interface: Ipv4Addr,
     /// Directory holding the telemetry log's segment files, or `None` to
     /// run without a telemetry log.
     pub log_dir: Option<String>,
@@ -1273,6 +1302,7 @@ impl CIConfigJson {
         };
 
         let beacon_address = beacon_address_of(&self.beacon_address)?;
+        let beacon_interface = beacon_interface_of(&self.beacon_interface)?;
 
         Ok(CIConfig {
             address: self.address.clone(),
@@ -1280,6 +1310,7 @@ impl CIConfigJson {
             protocol,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
             beacon_address,
+            beacon_interface,
             log_dir: self.log_dir.clone(),
             log_segment_bytes: self.log_segment_bytes,
         })

@@ -24,7 +24,15 @@ protocol: udp
 # A payload set's section states them for that set and wins over these. These
 # are what place a set that has no such section -- one written in the endpoint
 # configuration language, which has no place to put them.
+#
+# The address is a multicast group, which is what a beacon wants: any number of
+# ground stations join it, and neither end needs the other's address. The
+# interface is the local one both ends use -- 127.0.0.1 because tcsmoc and
+# tcspecial are run on one machine here. Both read it from this file, which is
+# how they come to name the same one; a sender and a listener on different
+# interfaces lose every beacon with nothing to say so.
 beacon_interval_ms: 5000
-beacon_address: "0.0.0.0:5550"
+beacon_address: "239.255.0.1:5550"
+beacon_interface: "127.0.0.1"
 log_dir: telemetry
 log_segment_bytes: 65536

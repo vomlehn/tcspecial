@@ -6,7 +6,7 @@ use std::env;
 use std::process;
 
 use log::{error, info, trace};
-use tcspecial::config::{beacon_address, load_endpoint_config, load_tcspecial_config};
+use tcspecial::config::{beacon, load_endpoint_config, load_tcspecial_config, tcspecial_config_path};
 use tcspecial::CommandInterpreter;
 use tcslibgs::config::{
     load_dh_configs, load_tcspecial_section, payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR,
@@ -26,8 +26,8 @@ fn main() {
 
     info!("TCSpecial starting...");
 
-    let config_path = env::var("TCSPECIAL_CONFIG_PATH").
-        unwrap_or_else(|_| "tcspecial/src/tcspecial.yaml".to_string());
+    // The same call tcsmoc makes, so the two read one file.
+    let config_path = tcspecial_config_path();
     info!("Loading tcspecial configuration from: {}", config_path);
 
     // Load configuration
@@ -64,24 +64,28 @@ fn main() {
             process::exit(1);
         }
     };
-    match beacon_address(&tcspecial_config, section.as_ref()) {
-        Ok(address) => tcspecial_config.beacon_address = address,
+    let beacon = match beacon(&tcspecial_config, section.as_ref()) {
+        Ok(beacon) => beacon,
         Err(e) => {
             error!("{}: {}", payload_path, e);
             process::exit(1);
         }
-    }
+    };
+    tcspecial_config.beacon_address = beacon.group;
+    tcspecial_config.beacon_interface = beacon.interface;
 
     // On stderr rather than through the log, and before the bind: these are
     // the addresses the ground has to be pointed at, so they are said whether
     // or not anyone set RUST_LOG, and said above whatever a failure to bind
     // one then says.
     eprintln!(
-        "Commands are taken on {}:{} as {} asked, and beacons go to {}",
+        "Commands are taken on {}:{} as {} asked, and beacons go to the group {} \
+         on interface {}",
         tcspecial_config.address,
         tcspecial_config.port,
         config_path,
-        tcspecial_config.beacon_address
+        beacon.group,
+        beacon.interface
     );
 
     // Load configuration

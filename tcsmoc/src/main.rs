@@ -18,7 +18,7 @@ use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
     ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
 };
-use tcslibgs::DEFAULT_BEACON_ADDRESS;
+use tcslibgs::BEACON_ADDRESS;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, NOT_CONNECTED};
@@ -797,13 +797,14 @@ fn main() {
     ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
 
     // Start receiving beacon data
-    // Where tcspecial sends beacons unless its own configuration file moves
-    // them. The MOC does not read that file, so a tcspecial told to send them
-    // somewhere else is a tcspecial whose beacons this will not see -- the
-    // indicator says nothing is arriving, which is true of this address.
-    let beacon_addr: std::net::SocketAddr = DEFAULT_BEACON_ADDRESS
+    // Where the MOC listens for beacons. Every tcspecial configuration states
+    // where it sends them and this program reads none of those files, so a
+    // tcspecial told to send them elsewhere is a tcspecial whose beacons this
+    // will not see -- the indicator says nothing is arriving, which is true
+    // of this address.
+    let beacon_addr: std::net::SocketAddr = BEACON_ADDRESS
         .parse()
-        .expect("the default beacon address is an address");
+        .expect("the beacon address this listens on is an address");
     let beacon_ui_weak = ui_weak.clone();
     let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 

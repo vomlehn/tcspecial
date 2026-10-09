@@ -15,6 +15,7 @@ tcspecial:
   port: 4000
   protocol: udp
   beacon_interval_ms: 5000
+  beacon_address: "127.0.0.1:6550"
   log_dir: /var/log/tcspecial
   log_segment_bytes: 65536
 

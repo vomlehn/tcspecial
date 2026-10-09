@@ -6,9 +6,11 @@ use std::env;
 use std::process;
 
 use log::{error, info, trace};
-use tcspecial::config::{load_endpoint_config, load_tcspecial_config};
+use tcspecial::config::{beacon_address, load_endpoint_config, load_tcspecial_config};
 use tcspecial::CommandInterpreter;
-use tcslibgs::config::{load_dh_configs, payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
+use tcslibgs::config::{
+    load_dh_configs, load_tcspecial_section, payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR,
+};
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 
 fn main() {
@@ -29,7 +31,7 @@ fn main() {
     info!("Loading tcspecial configuration from: {}", config_path);
 
     // Load configuration
-    let tcspecial_config = match load_tcspecial_config(&config_path) {
+    let mut tcspecial_config = match load_tcspecial_config(&config_path) {
         Ok(config) => config,
         Err(e) => {
             error!("Error loading tcspecial configuration: {}", e);
@@ -51,16 +53,35 @@ fn main() {
     };
     info!("Loading payload configuration from: {}", payload_path);
 
+    // Where beacons go belongs to the payload set: it is the set's ground
+    // station that listens for them, so the set's own file is where it is
+    // said, and this file is the fallback for a set that does not say. A set
+    // written in the endpoint language has no such section and so never does.
+    let section = match load_tcspecial_section(&payload_path) {
+        Ok(section) => section,
+        Err(e) => {
+            error!("{}: cannot read its tcspecial section: {}", payload_path, e);
+            process::exit(1);
+        }
+    };
+    match beacon_address(&tcspecial_config, section.as_ref()) {
+        Ok(address) => tcspecial_config.beacon_address = address,
+        Err(e) => {
+            error!("{}: {}", payload_path, e);
+            process::exit(1);
+        }
+    }
+
     // On stderr rather than through the log, and before the bind: these are
     // the addresses the ground has to be pointed at, so they are said whether
     // or not anyone set RUST_LOG, and said above whatever a failure to bind
     // one then says.
     eprintln!(
-        "Commands are taken on {}:{} and beacons go to {}, as {} asked",
+        "Commands are taken on {}:{} as {} asked, and beacons go to {}",
         tcspecial_config.address,
         tcspecial_config.port,
-        tcspecial_config.beacon_address,
-        config_path
+        config_path,
+        tcspecial_config.beacon_address
     );
 
     // Load configuration

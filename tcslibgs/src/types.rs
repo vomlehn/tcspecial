@@ -696,11 +696,12 @@ pub struct PayloadConfig {
     /// First of the sections, in the files and here, because it is about the
     /// set as a whole where the two below are about the payloads in it.
     ///
-    /// Optional, and read by nothing yet: tcspecial still takes its own
-    /// configuration from the file `TCSPECIAL_CONFIG_PATH` names, and the
-    /// address it serves commands on from its command line before that. What
-    /// this does now is carry the section and refuse a malformed one, so a
-    /// file that states it is checked rather than ignored.
+    /// Optional. `beacon_address` is read from here -- where a set's beacons
+    /// go is the set's own business, its ground station being what listens
+    /// for them -- and the rest is carried and checked and not yet read,
+    /// tcspecial taking the rest of its configuration from the file
+    /// `TCSPECIAL_CONFIG_PATH` names. A malformed section is refused either
+    /// way, so a file that states one is checked rather than ignored.
     #[serde(default)]
     pub tcspecial: Option<CIConfigJson>,
     /// Named groups of attributes that several payloads share.
@@ -785,7 +786,8 @@ impl PayloadConfig {
 
         no_two_handlers_claim_one_thing(&configs)?;
 
-        // The tcspecial section is checked here though nothing reads it yet.
+        // The tcspecial section is checked here whether or not anything reads
+        // the attribute in question.
         // A section a file states is a section its author meant, and one that
         // could never be used -- a protocol that is not a protocol, say -- is
         // better refused by whoever loads the file than discovered by whoever
@@ -1198,16 +1200,20 @@ fn default_log_segment_bytes() -> u32 {
     65_536
 }
 
-/// Where beacons go when a configuration does not say.
+/// Where tcsmoc listens for beacons.
 ///
-/// Every interface, on the port tcsmoc listens on. It was a constant in
-/// tcspecial that tcsmoc imported, which is what made the two ends agree
-/// about it; it is the default of a configured value now, so they still agree
-/// out of the box and a file that moves it moves only where tcspecial sends.
-pub const DEFAULT_BEACON_ADDRESS: &str = "0.0.0.0:5550";
+/// Not a default: every configuration states where beacons go, and none of
+/// them is read by tcsmoc. This is the address the MOC binds, and the one the
+/// shipped configurations state, which is the whole of why the two ends meet
+/// -- a configuration that moves the beacon elsewhere moves it for tcspecial
+/// alone.
+pub const BEACON_ADDRESS: &str = "0.0.0.0:5550";
 
-fn default_beacon_address() -> String {
-    DEFAULT_BEACON_ADDRESS.to_string()
+/// Where beacons go, as a configuration states it.
+pub fn beacon_address_of(stated: &str) -> Result<SocketAddr, String> {
+    stated
+        .parse()
+        .map_err(|e| format!("beacon_address \"{stated}\" is not an address and port: {e}"))
 }
 
 /// The file-level form of the command interpreter's configuration
@@ -1227,8 +1233,13 @@ pub struct CIConfigJson {
     pub log_segment_bytes: u32,
     /// Where beacons are sent, as `address:port`.
     ///
-    /// Optional; [`DEFAULT_BEACON_ADDRESS`] when a file does not say.
-    #[serde(default = "default_beacon_address")]
+    /// Required, like the interval beside it. Beacons are how the ground
+    /// knows the spacecraft is alive, so where they go and how often is not
+    /// something to be left to a default that a file silently takes: a
+    /// configuration that has not been asked the question has not answered
+    /// it. A payload set's `tcspecial` section states this for the set, and
+    /// the command interpreter's own file states it for a set that has no
+    /// section.
     pub beacon_address: String,
 }
 
@@ -1261,12 +1272,7 @@ impl CIConfigJson {
             _ => return Err(format!("Invalid protocol: {}", self.protocol)),
         };
 
-        let beacon_address = self.beacon_address.parse().map_err(|e| {
-            format!(
-                "beacon_address \"{}\" is not an address and port: {e}",
-                self.beacon_address
-            )
-        })?;
+        let beacon_address = beacon_address_of(&self.beacon_address)?;
 
         Ok(CIConfig {
             address: self.address.clone(),

@@ -1255,6 +1255,86 @@ There is no packet interval here. How often a payload produces a packet is a
 property of a simulation rather than of the payload, so it is stated in a
 simulator configuration file; see `Simulator Configuration Files`_.
 
+What Each End Read
+------------------
+Requirement
+    A link begins with each end saying what it read. The ground sends a
+    ``CONNECT`` carrying its software version and a digest of its
+    configuration, and the spacecraft answers with its own two.
+
+Requirement
+    The version is three bytes -- major, minor and patch, each in binary --
+    and the digest is an MD5.
+
+Requirement
+    The ground compares and the spacecraft says. Tcsmoc is the end that knows
+    which file it read and can name it, so it reports the difference; tcspecial
+    answers with what it read and logs a disagreement it can see.
+
+Nothing else in the protocol makes the two ends prove they are talking about
+the same payload set, and when they were not, the only sign was a command
+answered ``NotFound`` for a payload the operator could see on the screen: a
+tcspecial left running from an earlier set, which tcsmoc attaches to rather
+than replacing. The two ends also say what they read on their own consoles as
+they start, so the question can be answered without a link at all.
+
+Requirement
+    The digest is of what a file says, not of its bytes. Two ends reading
+    different spellings of one payload set have read the same set and must
+    agree, so the three formats a set is written in digest alike, and so do
+    two files differing only in comments, indentation, the order of their
+    sections or the order of one payload's attributes.
+
+Requirement
+    The order of the payloads does change the digest. Ids will be assigned in
+    the order the payloads appear, so that order is configuration rather than
+    spelling.
+
+Requirement
+    Each payload is given a sequence number as the file is read: the first is
+    0. A file may not state it -- the number is what this program read, not
+    something a file gets to assert.
+
+Requirement
+    The digest takes the payloads in order of their sequence numbers. Two ends
+    that read the same file then agree about which payload came first whatever
+    either has since done with its own list.
+
+The numbering rests on one assumption: that a parser hands entries to the code
+above it in the order the file gave them. Every format here does, and a format
+that did not would be unusable for a language whose payload order means
+something.
+
+Carried by the data rather than left to the order a list happens to keep. The
+order used to live only in that, so anything sorting the payloads -- for a
+lookup, for a display -- would have changed what the configuration said about
+which payload came first, and the only thing in the way was that nothing did
+it yet. The two halves of the check are then independent: walking by sequence
+number is what makes a list in some other order digest the same, and hashing
+the numbers themselves is what makes a *file* in some other order digest
+differently.
+
+A sequence number and not a line number. A line is not something these parsers
+hand to the code that builds a document, and it would be a different number in
+each of the three formats one set is written in, where the sequence number is
+the same in all three -- which is what lets them digest alike.
+
+How it is reached: a file is parsed into the document it describes and that
+document is written back out as a tree of values, which is where the format
+stops showing through -- a number is a number rather than the text that spelled
+it, a list is a list rather than XML's repeated sibling elements, and an
+attribute nobody stated is absent rather than missing. The tree is then written
+to bytes with every map's keys in order and every list in the order it was
+given, and those bytes are what the MD5 is of.
+
+A map's keys are put in order twice over, deliberately. The document is a set
+of Rust structs, and a struct writes its fields in the order it declares them
+however the file gave them, so the order a file used is already gone; sorting
+is what keeps the rule true of anything that is a map rather than a struct.
+What a file's own order does reach the digest through is the sequence number
+each payload was given as it was read, which is the one ordering that means
+something.
+
 Payload Configuration Files
 ===========================
 A payload configuration file describes the payloads themselves: which data
@@ -3473,36 +3553,43 @@ like any other variable, and so is already looking at the file tcsmoc was
 pointed at. Tcsmoc reads that file as well, but only to show what it says; it
 acts on none of it and so has nothing to say about which one is right.
 
-The Makefile names a set once for this reason. ``PAYLOAD_YAML`` reaches every
-program as its argument and ``PAYLOAD_SIM_YAML`` reaches tcssim in the
-environment, so one target runs a whole set. Its last letter is the spelling of
-the payload configuration the MOC reads -- ``runmocy`` the YAML, ``runmocx`` the
-XML, ``runmocj`` the JSON -- all three taking the name in ``PAYLOAD_YAML``
-without its suffix, so they are one set read three ways:
+The Makefile names a set once for this reason, and names it as a stem:
+``PAYLOAD_FILE`` is the set, ``$(PAYLOAD_FILE).yaml`` the payload file that
+reaches every program as its argument, and ``$(PAYLOAD_FILE)sim.yaml`` the
+simulator file that reaches tcssim in the environment. One target then runs a
+whole set, and its last letter is the spelling of the payload configuration the
+MOC reads -- ``runmocy`` the YAML, ``runmocx`` the XML, ``runmocj`` the JSON --
+all three adding the suffix to the same stem, so they are one set read three
+ways:
 
 .. code-block:: console
 
    $ make runmocy
-   $ make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
-   $ make runmocy PAYLOAD_YAML=tcspecial2.yaml PAYLOAD_SIM_YAML=tcspecial2sim.yaml
+   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
 
-Both are named because the two files are a pair: tcsmoc passes the payload file
-on to its children and never reads the simulator file, so naming one of a pair
-is how the two come to describe different sets. That is reported rather than
-run -- every data handler of the payload file must have a simulated payload
-naming it -- but it is reported by tcssim, after tcsmoc has already come up,
-which makes it a confusing way to find out.
+Requirement
+    The two files of a set are named by one variable rather than two. Naming
+    one of a pair is how the two come to describe different sets, which is
+    reported rather than run -- every data handler of the payload file must
+    have a simulated payload naming it -- but it is reported by tcssim, after
+    tcsmoc has already come up, which makes it a confusing way to find out.
 
-``make run`` takes ``PAYLOAD_YAML`` for tcspecial alone, and ``make runsim``
-takes both for the simulator alone -- both, because tcssim run by itself needs
-the payload file as well as the simulator file, and the two must describe the
-same set or their names will not match:
+The sets live under ``tests/manual`` rather than at the repository root
+because running one is something a person does at a terminal: each opens
+sockets or device nodes, so none of them belongs in a test that runs on every
+build. The tests that read them only parse them.
+
+``make run`` runs tcspecial alone and ``make runsim`` the simulator alone, both
+from the same stem -- tcssim run by itself needs the payload file as well as
+the simulator file, and one variable is what keeps the two from being given for
+different sets:
 
 .. code-block:: console
 
-   $ make run PAYLOAD_YAML=tcspecial1.yaml
-   $ make runsim PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
-   $ make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
+   $ make run PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make runsim PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
 
 Started in that order, the three run as separately as they can: tcsmoc finds
 the tcspecial already there, attaches to it rather than starting a second, and
@@ -3514,7 +3601,7 @@ is for -- a debugger on the one being worked on, and the others left alone.
 .. code-block:: console
 
    $ make runmocy RUST_LOG=debug
-   $ make run PAYLOAD_YAML=tcspecial1.yaml RUST_LOG=tcspecial::ci=trace
+   $ make run PAYLOAD_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
 
 The manual says the same thing from the other end -- what to type to run a
 set -- under "Running the Programs".

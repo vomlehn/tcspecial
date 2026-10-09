@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tcslibgs::{
     ArmKey, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
+    ConfigDigest, ConfigVersion, ConnectTelemetry,
     DHConfig, DHId, DHName, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
@@ -38,6 +39,14 @@ pub struct CommandInterpreter {
     _global_stats: Statistics,
     /// Telemetry log, shared with every other sender of telemetry.
     telemetry_log: TelemetryLog,
+    /// What this build is and what it read, answered to a CONNECT.
+    ///
+    /// Settled at startup rather than when a CONNECT arrives: the digest is of
+    /// the file this process read, which is the file it read *then*, and a
+    /// file edited since would otherwise have the spacecraft claiming a
+    /// configuration it is not serving.
+    version: ConfigVersion,
+    digest: ConfigDigest,
 }
 
 /// Say what could not be bound, and what that usually means.
@@ -167,7 +176,11 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
 
 impl CommandInterpreter {
     /// Create a new command interpreter
-    pub fn new(config: CIConfig, payload_config: Vec<DHConfig>) -> TcsResult<Self> {
+    pub fn new(
+        config: CIConfig,
+        payload_config: Vec<DHConfig>,
+        digest: ConfigDigest,
+    ) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
         let socket = UdpSocket::bind(&addr).map_err(|e| bind_failed("command interpreter", &addr, e))?;
         socket.set_nonblocking(false)?;
@@ -187,6 +200,8 @@ impl CommandInterpreter {
             running: false,
             _global_stats: Statistics::new(),
             telemetry_log,
+            version: ConfigVersion::of_this_build(),
+            digest,
         })
     }
 
@@ -227,6 +242,22 @@ impl CommandInterpreter {
                     CommandStatus::NotArmed
                 };
                 Telemetry::Restart(RestartTelemetry::new(cmd.header.sequence, status))
+            }
+            Command::Connect(cmd) => {
+                // Said rather than judged. The ground is the end that knows
+                // what it put on the screen, so it compares; this end answers
+                // with what it read and logs the disagreement it can see.
+                if cmd.version != self.version || cmd.digest != self.digest {
+                    error!(
+                        "CONNECT from a ground reading {} {} -- this tcspecial has {} {}",
+                        cmd.version, cmd.digest, self.version, self.digest
+                    );
+                }
+                Telemetry::Connect(ConnectTelemetry::new(
+                    cmd.header.sequence,
+                    self.version,
+                    self.digest,
+                ))
             }
             Command::StartDH(cmd) => {
                 let status = {
@@ -485,6 +516,11 @@ mod tests {
     use super::*;
     use tcslibgs::{ConfigDHCommand, NetworkProtocol};
 
+    /// A digest for an interpreter whose digest is not what is being tested.
+    fn a_digest() -> ConfigDigest {
+        ConfigDigest([0; 16])
+    }
+
     #[test]
     fn test_ci_creation() {
         let config = CIConfig {
@@ -496,8 +532,55 @@ mod tests {
             log_segment_bytes: 65_536,
         };
 
-        let ci = CommandInterpreter::new(config, vec![]);
+        let ci = CommandInterpreter::new(config, vec![], a_digest());
         assert!(ci.is_ok());
+    }
+
+    /// A CONNECT is answered with what this end read.
+    ///
+    /// The ground compares; this end says. What it says has to be its own
+    /// version and its own digest even when the ground's differ, because a
+    /// spacecraft that echoed the ground's would turn the one check there is
+    /// into a check of nothing.
+    #[test]
+    fn a_connect_is_answered_with_what_this_end_read() {
+        use tcslibgs::ConnectCommand;
+
+        let mine = ConfigDigest([0xAB; 16]);
+        let mut ci = CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![],
+            mine,
+        )
+        .expect("an interpreter");
+
+        // A ground reading something else entirely.
+        let theirs = ConfigDigest([0x11; 16]);
+        let older = ConfigVersion {
+            major: 0,
+            minor: 0,
+            patch: 1,
+        };
+
+        match ci.process_command(Command::Connect(ConnectCommand::new(7, older, theirs))) {
+            Telemetry::Connect(tm) => {
+                assert_eq!(tm.header.sequence, 7, "the answer is to that command");
+                assert_eq!(tm.digest, mine, "it echoed the ground's digest");
+                assert_eq!(
+                    tm.version,
+                    ConfigVersion::of_this_build(),
+                    "it echoed the ground's version"
+                );
+            }
+            other => panic!("expected CONNECT telemetry, got {other:?}"),
+        }
     }
 
     /// A START_DH for a handler this process does not have says so, and says
@@ -535,6 +618,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_digest(),
         )
         .expect("an interpreter");
         ci.initialize_handlers().expect("handlers are made at startup");
@@ -626,6 +710,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_digest(),
         )
         .expect("an interpreter");
         ci.initialize_handlers().expect("handlers are made at startup");
@@ -731,6 +816,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_digest(),
         )
         .expect("an interpreter");
         ci.initialize_handlers().expect("handlers are made at startup");
@@ -807,6 +893,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_digest(),
         )
         .expect("an interpreter");
 
@@ -910,6 +997,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_digest(),
         )
         .expect("an interpreter");
         ci.initialize_handlers().unwrap();
@@ -966,7 +1054,7 @@ mod tests {
             log_segment_bytes: 65_536,
         };
 
-        let message = CommandInterpreter::new(config, vec![])
+        let message = CommandInterpreter::new(config, vec![], a_digest())
             .err()
             .expect("binding a held port must fail")
             .to_string();
@@ -997,6 +1085,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![],
+            a_digest(),
         )
         .expect("an interpreter")
     }

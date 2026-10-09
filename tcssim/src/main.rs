@@ -53,7 +53,7 @@ const STOPPED_STATUS: &str = "Stopped";
 /// Which environment variable names the payload simulation configuration, and
 /// what is read when that variable is unset.
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
-const DEFAULT_SIM_CONFIG_PATH: &str = "tcspecial1sim.yaml";
+const DEFAULT_SIM_CONFIG_PATH: &str = "tests/manual/tcspecial1sim.yaml";
 
 /// The two strings a panel shows for one sample: when, and what.
 ///
@@ -894,7 +894,7 @@ mod tests {
     /// simulator file beside it fails here: tcssim needs both, so half a set
     /// is a set that cannot be run.
     fn shipped_sets() -> Vec<(std::path::PathBuf, std::path::PathBuf)> {
-        let root = repo_file(".");
+        let root = repo_file("tests/manual");
         let mut sets = Vec::new();
 
         for entry in std::fs::read_dir(&root).expect("the repository root is readable") {
@@ -914,7 +914,7 @@ mod tests {
                 _ => continue,
             };
 
-            let sim_path = repo_file(&format!("tcspecial{}sim.yaml", stem));
+            let sim_path = repo_file(&format!("tests/manual/tcspecial{}sim.yaml", stem));
             assert!(
                 sim_path.exists(),
                 "{} has no {} beside it, so the set cannot be simulated",

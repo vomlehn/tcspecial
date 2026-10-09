@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::config::{load_dh_configs, payload_path_from_args};
+use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
     ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
@@ -109,7 +110,7 @@ const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 /// The same variable tcssim reads, which is the point: the MOC shows what the
 /// tcssim it starts is simulating, so the two have to be looking at one file.
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
-const DEFAULT_SIM_CONFIG_PATH: &str = "tcspecial1sim.yaml";
+const DEFAULT_SIM_CONFIG_PATH: &str = "tests/manual/tcspecial1sim.yaml";
 
 /// A panel's nominal size, and the height of everything above and below the
 /// grid of them.
@@ -765,9 +766,10 @@ fn main() {
         exit(1);
     }
     eprintln!("Connected to {}", DEFAULT_CI_ADDRESS);
+    let link: Arc<Mutex<CiLink>> = Arc::new(Mutex::new(link));
+    say_what_each_end_read(&ui, &link, &payload_path);
     ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
     ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
-    let link: Arc<Mutex<CiLink>> = Arc::new(Mutex::new(link));
 
     // Start receiving beacon data
     let beacon_addr: std::net::SocketAddr = BEACON_NETADDR.parse().unwrap();
@@ -1177,6 +1179,69 @@ fn poll_pass(
         }
     }
     gathered
+}
+
+/// Say what this MOC read, and hear what the spacecraft read.
+///
+/// Sent when a link comes up. The two ends each read a payload set -- the MOC
+/// to build its panels, tcspecial to serve the handlers -- and nothing made
+/// them prove it was the same set. When it was not, the only sign was a
+/// command answered `NotFound` for a payload the operator could see: a
+/// tcspecial left running from an earlier set, attached to rather than
+/// replaced, since the MOC attaches to whatever answers a ping.
+///
+/// Said on the console before it is sent and again as it is answered, so that
+/// the two digests can be read against each other whether or not anything is
+/// wrong, and `Last Response` carries the verdict for the operator.
+fn say_what_each_end_read(ui: &MainWindow, link: &Mutex<CiLink>, payload_path: &str) {
+    let version = ConfigVersion::of_this_build();
+
+    let digest = match digest_of_file(payload_path) {
+        Ok(digest) => digest,
+        Err(e) => {
+            eprintln!("cannot digest {payload_path}: {e}");
+            ui.set_last_response(SharedString::from(format!(
+                "cannot digest {payload_path}: {e}"
+            )));
+            return;
+        }
+    };
+
+    eprintln!("Version {version}, configuration {payload_path} md5 {digest}");
+
+    let mut guard = link.lock().unwrap();
+    let answer = match guard.client() {
+        Some(client) => client.connect(version, digest),
+        None => {
+            ui.set_last_response(SharedString::from(NOT_CONNECTED));
+            return;
+        }
+    };
+
+    match answer {
+        Ok((their_version, their_digest)) => {
+            eprintln!("tcspecial answers version {their_version}, md5 {their_digest}");
+
+            let said = if their_version != version {
+                format!("tcspecial is version {their_version}, this is {version}")
+            } else if their_digest != digest {
+                format!(
+                    "tcspecial is serving a different configuration: md5 {their_digest}, \
+                     not {digest}"
+                )
+            } else {
+                format!("tcspecial agrees: version {version}, md5 {digest}")
+            };
+            if their_version != version || their_digest != digest {
+                eprintln!("{said}");
+            }
+            ui.set_last_response(SharedString::from(said));
+        }
+        Err(e) => {
+            eprintln!("CONNECT did not get through: {e}");
+            ui.set_last_response(SharedString::from(format!("CONNECT failed: {e}")));
+        }
+    }
 }
 
 /// Which way a press of a panel's one button goes.

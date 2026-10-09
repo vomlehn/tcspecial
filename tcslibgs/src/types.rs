@@ -707,6 +707,8 @@ pub struct PayloadConfig {
     /// to spell every one of them out, has no groups.
     #[serde(default)]
     pub payload_groups: Vec<DHGroupJson>,
+    /// The payloads, each knowing which one of the file it is.
+    #[serde(deserialize_with = "payloads_in_file_order")]
     pub payloads: Vec<DHConfigJson>,
 }
 
@@ -912,6 +914,45 @@ pub struct DHConfigJson {
     /// Named here only to be refused; see [`DHGroupJson::packet_interval_ms`].
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
+    /// Which payload of the file this is: the first is 0.
+    ///
+    /// Numbered as the list is read -- see `payloads_in_file_order` -- on the
+    /// assumption that a parser hands entries over in the order the file gave
+    /// them, which every format here does.
+    ///
+    /// It is here because that order is configuration rather than spelling:
+    /// ids will be assigned in the order the payloads appear. Recording it
+    /// means the order is carried by the data instead of living in whatever
+    /// order a `Vec` happens to keep, so the configuration digest can walk
+    /// the payloads by sequence number and two ends that read the same file
+    /// agree about which payload came first -- whatever either of them has
+    /// since done with its own list.
+    ///
+    /// A sequence number and not a line number. A line is not something these
+    /// parsers hand to a `Deserialize`, and it would be a different number in
+    /// each of the three formats one payload set is written in, where the
+    /// sequence number is the same in all three.
+    ///
+    /// Written out when this struct is, and never read in: a file that stated
+    /// it would be refused as naming an attribute that does not exist.
+    #[serde(default, skip_deserializing)]
+    pub sequence: usize,
+}
+
+/// Deserialize the payloads, numbering each as it is read.
+///
+/// Here rather than in a pass afterwards, so that nothing can hold a
+/// `PayloadConfig` whose payloads do not know which ones they are. Every
+/// format arrives through this one function.
+fn payloads_in_file_order<'de, D>(d: D) -> Result<Vec<DHConfigJson>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut payloads = Vec::<DHConfigJson>::deserialize(d)?;
+    for (sequence, payload) in payloads.iter_mut().enumerate() {
+        payload.sequence = sequence;
+    }
+    Ok(payloads)
 }
 
 impl DHConfigJson {
@@ -1226,6 +1267,8 @@ impl CommandStatus {
 
 #[cfg(test)]
 mod tests {
+    use crate::ConfigFormat;
+
     /// A payload file that says nothing about the mode describes the kind of
     /// payload that sends on its own, which is what every file written before
     /// there was a mode describes.
@@ -1249,6 +1292,7 @@ mod tests {
             trigger: None,
             trigger_interval_ms: None,
             packet_interval_ms: None,
+            sequence: 0,
         };
 
         assert_eq!(dh.to_dh_config().expect("converts").mode, DHMode::Periodic);
@@ -1278,6 +1322,7 @@ mod tests {
             trigger: Some("READ\r".to_string()),
             trigger_interval_ms: None,
             packet_interval_ms: Some(500),
+            sequence: 0,
         };
 
         let config = dh.to_dh_config().expect("converts");
@@ -1314,6 +1359,7 @@ mod tests {
                 trigger: trigger.map(str::to_string),
                 trigger_interval_ms: None,
                 packet_interval_ms: interval,
+                sequence: 0,
             }
         };
 
@@ -1367,6 +1413,7 @@ mod tests {
                 trigger: Some("READ".to_string()),
                 trigger_interval_ms: None,
                 packet_interval_ms: Some(500),
+                sequence: 0,
             };
 
             let e = dh.to_dh_config().unwrap_err();
@@ -1786,6 +1833,97 @@ payloads:
                 "the error should name the attributes, but said: {message}"
             );
         }
+    }
+
+    /// Two payloads, written in each of the three formats.
+    fn two_payloads() -> [(ConfigFormat, String); 3] {
+        [
+            (
+                ConfigFormat::Yaml,
+                "version: \"1.0\"\ndescription: two\npayloads:\n  \
+                 - dh_id: 0\n    name: first\n    type: device\n    path: /dev/null\n    \
+                 packet_size: 1\n  \
+                 - dh_id: 1\n    name: second\n    type: device\n    path: /dev/zero\n    \
+                 packet_size: 2\n"
+                    .to_string(),
+            ),
+            (
+                ConfigFormat::Json,
+                r#"{"version":"1.0","description":"two","payloads":[
+                   {"dh_id":0,"name":"first","type":"device","path":"/dev/null","packet_size":1},
+                   {"dh_id":1,"name":"second","type":"device","path":"/dev/zero","packet_size":2}]}"#
+                    .to_string(),
+            ),
+            (
+                ConfigFormat::Xml,
+                "<payload><version>1.0</version><description>two</description>\
+                 <payloads><dh_id>0</dh_id><name>first</name><type>device</type>\
+                 <path>/dev/null</path><packet_size>1</packet_size></payloads>\
+                 <payloads><dh_id>1</dh_id><name>second</name><type>device</type>\
+                 <path>/dev/zero</path><packet_size>2</packet_size></payloads></payload>"
+                    .to_string(),
+            ),
+        ]
+    }
+
+    /// A payload knows where in the file it stood, in every format.
+    ///
+    /// The position is recorded as the list is read, so it is the same number
+    /// in all three spellings of one set -- which a line number could not be,
+    /// and which is what lets the three digest alike.
+    #[test]
+    fn a_payload_knows_where_in_the_file_it_stood() {
+        for (format, text) in two_payloads() {
+            let config: PayloadConfig = format.parse(&text).expect("it parses");
+
+            assert_eq!(config.payloads[0].name, "first", "{format:?}");
+            assert_eq!(config.payloads[0].sequence, 0, "{format:?}");
+            assert_eq!(config.payloads[1].name, "second", "{format:?}");
+            assert_eq!(config.payloads[1].sequence, 1, "{format:?}");
+        }
+    }
+
+    /// The file order survives the list being reordered.
+    ///
+    /// This is the whole point of recording it. The order used to live only in
+    /// the order a `Vec` happened to keep, so anything that sorted the
+    /// payloads -- for a lookup, for a display -- would have silently changed
+    /// what the configuration said about which payload came first, and the
+    /// only thing standing in the way was that nothing did it yet.
+    #[test]
+    fn the_file_order_survives_a_reordered_list() {
+        let (format, text) = &two_payloads()[0];
+        let mut config: PayloadConfig = format.parse(text).expect("it parses");
+
+        config.payloads.sort_by(|a, b| a.name.cmp(&b.name));
+        assert_eq!(config.payloads[0].name, "first", "the sort did nothing");
+
+        config.payloads.reverse();
+        assert_eq!(config.payloads[0].name, "second");
+        // And it still knows it was second.
+        assert_eq!(config.payloads[0].sequence, 1);
+        assert_eq!(config.payloads[1].sequence, 0);
+    }
+
+    /// A file stating a position of its own is refused.
+    ///
+    /// The position is this program's record of what it read, not something a
+    /// file gets to assert: one that could would be able to say its payloads
+    /// came in an order they did not.
+    #[test]
+    fn a_file_may_not_state_a_position() {
+        let text = "version: \"1.0\"\ndescription: one\npayloads:\n  \
+                    - dh_id: 0\n    name: first\n    type: device\n    path: /dev/null\n    \
+                    packet_size: 1\n    sequence: 7\n";
+
+        let message = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(text)
+            .expect_err("sequence is not an attribute")
+            .to_string();
+        assert!(
+            message.contains("sequence"),
+            "the refusal does not name it: {message}"
+        );
     }
 
     #[test]

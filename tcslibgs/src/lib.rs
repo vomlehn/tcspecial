@@ -13,6 +13,7 @@
 
 pub mod commands;
 pub mod config;
+pub mod config_digest;
 pub mod endpoint_config;
 pub mod endpoint_config_i2c;
 pub mod endpoint_config_network;
@@ -49,5 +50,6 @@ pub use parameters::*;
 pub use protocol::*;
 pub use sim_config::*;
 pub use telemetry::*;
+pub use config_digest::*;
 pub use trigger::*;
 pub use types::*;

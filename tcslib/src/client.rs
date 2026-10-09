@@ -15,6 +15,7 @@ use std::time::Duration;
 use tcslibgs::{
     ArmKey, BeaconTime, Command, CommandStatus, ConfigCommand, DHId, DHName, DHSample, DHType,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
+    ConfigDigest, ConfigVersion, ConnectCommand,
     StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
 };
 
@@ -78,6 +79,28 @@ impl TcsClient {
 
         match response {
             Telemetry::RestartArm(tm) => Ok(tm.header.status),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+        }
+    }
+
+    /// Say what this end read, and hear what the other end read.
+    ///
+    /// Sent when a link is opened. What comes back is the spacecraft's own
+    /// version and the digest of the configuration it is serving, for the
+    /// caller to hold against the two it sent: this returns both rather than
+    /// a verdict, because the caller is the end that knows which file it read
+    /// and can say so.
+    pub fn connect(
+        &mut self,
+        version: ConfigVersion,
+        digest: ConfigDigest,
+    ) -> TcsResult<(ConfigVersion, ConfigDigest)> {
+        let seq = self.next_sequence();
+        let cmd = Command::Connect(ConnectCommand::new(seq, version, digest));
+        let response = self.send_command(cmd)?;
+
+        match response {
+            Telemetry::Connect(tm) => Ok((tm.version, tm.digest)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }

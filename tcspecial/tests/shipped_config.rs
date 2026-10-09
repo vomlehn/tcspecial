@@ -38,7 +38,7 @@ fn shipped_payload_files() -> Vec<PathBuf> {
         .filter(|path| {
             path.file_name()
                 .and_then(|n| n.to_str())
-                .and_then(|name| name.strip_prefix("payload"))
+                .and_then(|name| name.strip_prefix("tcspecial"))
                 .and_then(|rest| rest.strip_suffix(".yaml"))
                 .is_some_and(|stem| !stem.ends_with("sim"))
         })
@@ -75,6 +75,44 @@ fn the_shipped_tcspecial_config_loads() {
     );
     assert_ne!(config.beacon_interval.0, 0, "no beacon interval");
     assert_ne!(config.log_segment_bytes, 0, "no log segment size");
+}
+
+/// Every shipped payload set is written in all three formats, and the three
+/// describe the same data handlers.
+///
+/// The formats are three spellings of one configuration, which is a claim
+/// nothing in the code enforces: each is parsed by its own parser, and a set
+/// transcribed into another format by hand can differ in a port or lose an
+/// attribute without either file becoming invalid. `make runmocx` and
+/// `make runmocj` run the XML and the JSON of a set, so a difference between
+/// them is a difference in what the programs are given.
+#[test]
+fn every_shipped_set_reads_the_same_in_all_three_formats() {
+    for yaml in shipped_payload_files() {
+        let from_yaml = load_dh_configs(&yaml)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", yaml.display()));
+
+        for ext in ["xml", "json"] {
+            let other = yaml.with_extension(ext);
+            assert!(
+                other.exists(),
+                "{} has no {} beside it: a set is written in all three formats",
+                yaml.display(),
+                other.display()
+            );
+
+            let from_other = load_dh_configs(&other)
+                .unwrap_or_else(|e| panic!("{} failed to load: {e}", other.display()));
+
+            assert_eq!(
+                from_other,
+                from_yaml,
+                "{} and {} describe different data handlers",
+                other.display(),
+                yaml.display()
+            );
+        }
+    }
 }
 
 #[test]

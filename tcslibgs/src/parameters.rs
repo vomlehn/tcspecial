@@ -109,7 +109,53 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             let _ = writeln!(out, "  path             {}", serial.path);
             let _ = writeln!(out, "  datarate         {} bit/s", serial.datarate);
             let _ = writeln!(out, "  byte_length      {} data bits", serial.byte_length);
-            let _ = writeln!(out, "  stop_bits        {}", serial.stop_bits);
+            // Which kind of line, and the stop bits only where there are any
+            // to have: a synchronous line carries its bits on a clock, so a
+            // line about stop bits would be a line about nothing.
+            let _ = writeln!(
+                out,
+                "  asynchronous     {}",
+                if serial.asynchronous {
+                    "yes, so each byte is start-stop framed"
+                } else {
+                    "no, so the bits are carried on a clock"
+                }
+            );
+            if let Some(stop_bits) = serial.stop_bits {
+                let _ = writeln!(out, "  stop_bits        {stop_bits}");
+            }
+            if let Some(parity) = serial.parity {
+                let _ = writeln!(out, "  parity           {parity}");
+            }
+
+            // What a synchronous line says instead, each of which the kernel's
+            // generic HDLC can be told and none of which a handler reading a
+            // device file sets: recorded so the link a file describes can be
+            // checked against the equipment.
+            if let Some(clock_type) = serial.clock_type {
+                let _ = writeln!(
+                    out,
+                    "  clock_type       {clock_type}, so the data rate above is {}",
+                    if clock_type.is_ours() {
+                        "the rate this end generates"
+                    } else {
+                        "the rate the far end is expected to clock"
+                    }
+                );
+            }
+            if let Some(encoding) = serial.encoding {
+                let _ = writeln!(out, "  encoding         {encoding}");
+            }
+            if let Some(frame_check) = serial.frame_check {
+                let _ = writeln!(out, "  parity           {frame_check}, the frame check");
+            }
+            if let Some(loopback) = serial.loopback {
+                let _ = writeln!(
+                    out,
+                    "  loopback         {}",
+                    if loopback { "yes" } else { "no" }
+                );
+            }
         }
         EndpointConfig::I2c(i2c) => {
             let _ = writeln!(out, "  bus              {}", i2c.bus);

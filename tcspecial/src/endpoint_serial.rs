@@ -20,12 +20,45 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{SerialConfig, StopBits, TcsError, TcsResult};
+use tcslibgs::{Parity, SerialConfig, StopBits, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
 };
+
+/// The flags that ask a port for this parity.
+///
+/// Mark and space are the two that need CMSPAR: they send a constant bit
+/// rather than one computed from the data, which is a protocol marking a
+/// frame rather than checking one, and the flag that asks for it is Linux's
+/// own. The two differ only in which constant, which is PARODD.
+///
+/// Paired with [`parity_of`], which reads the same flags back: no port
+/// available to a test will take a parity at all -- a pseudo-terminal is the
+/// only line a test has -- so the two being inverses is what can be checked.
+fn parity_flags(parity: Parity) -> libc::tcflag_t {
+    match parity {
+        Parity::None => 0,
+        Parity::Even => libc::PARENB,
+        Parity::Odd => libc::PARENB | libc::PARODD,
+        Parity::Mark => libc::PARENB | libc::CMSPAR | libc::PARODD,
+        Parity::Space => libc::PARENB | libc::CMSPAR,
+    }
+}
+
+/// Which parity a port's flags say it has.
+fn parity_of(flags: libc::tcflag_t) -> Parity {
+    if flags & libc::PARENB == 0 {
+        return Parity::None;
+    }
+    match (flags & libc::CMSPAR != 0, flags & libc::PARODD != 0) {
+        (true, true) => Parity::Mark,
+        (true, false) => Parity::Space,
+        (false, true) => Parity::Odd,
+        (false, false) => Parity::Even,
+    }
+}
 
 /// A serial line, and the terms it was set to.
 pub struct SerialEndpoint {
@@ -35,7 +68,7 @@ pub struct SerialEndpoint {
 
 impl SerialEndpoint {
     /// Open the line and set it to what the configuration says.
-    pub fn new(config: &SerialConfig) -> TcsResult<Self> {
+    pub fn new(what: &str, config: &SerialConfig) -> TcsResult<Self> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -48,7 +81,7 @@ impl SerialEndpoint {
             .custom_flags(libc::O_NOCTTY)
             .open(&config.path)?;
 
-        apply_line_terms(&file, config)?;
+        apply_line_terms(what, &file, config)?;
 
         Ok(Self {
             file,
@@ -80,7 +113,7 @@ impl SerialEndpoint {
 ///
 /// A rate the platform cannot express is reported with the rate in hand,
 /// because the alternative is a line running at a rate nobody chose.
-fn apply_line_terms(file: &File, config: &SerialConfig) -> TcsResult<()> {
+fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult<()> {
     let fd = file.as_raw_fd();
     let speed = baud_of(config.datarate)?;
 
@@ -88,18 +121,32 @@ fn apply_line_terms(file: &File, config: &SerialConfig) -> TcsResult<()> {
     // left as it was rather than zeroed.
     let mut terms: libc::termios = unsafe { std::mem::zeroed() };
     if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
-        return Err(not_a_line(&config.path, "cannot be read as a serial port"));
+        return Err(not_a_line(
+            what,
+            &config.path, "cannot be read as a serial port"));
     }
 
     unsafe { libc::cfmakeraw(&mut terms) };
 
-    terms.c_cflag &= !(libc::CSIZE | libc::CSTOPB | libc::PARENB | libc::PARODD);
+    terms.c_cflag &= !(libc::CSIZE | libc::CSTOPB | libc::PARENB | libc::PARODD | libc::CMSPAR);
     terms.c_cflag |= byte_length_of(config.byte_length)?;
+    // Stop bits, where the line has any: a synchronous line carries its bits
+    // on a clock and has none, so there is nothing to set. Nothing else here
+    // changes with it -- termios has no synchronous framing to ask for, and a
+    // line that needs one is driven by a driver of its own rather than by
+    // these terms.
     match config.stop_bits {
-        StopBits::One => {}
-        StopBits::Two => terms.c_cflag |= libc::CSTOPB,
-        StopBits::OnePointFive => return Err(stop_bits_unsupported(&config.path)),
+        None => {}
+        Some(StopBits::One) => {}
+        Some(StopBits::Two) => terms.c_cflag |= libc::CSTOPB,
+        Some(StopBits::OnePointFive) => return Err(stop_bits_unsupported(what, &config.path)),
     }
+
+    // And the parity, which termios computes per character. Mark and space
+    // are the two that need CMSPAR: they send a constant bit rather than one
+    // computed from the data, which is a protocol marking a frame rather than
+    // checking one, and the flag that asks for it is Linux's own.
+    terms.c_cflag |= parity_flags(config.parity.unwrap_or(Parity::None));
     // Read and write both: a payload link is two-way, and a port that is not
     // CLOCAL waits on carrier a payload link does not have.
     terms.c_cflag |= libc::CREAD | libc::CLOCAL;
@@ -108,13 +155,66 @@ fn apply_line_terms(file: &File, config: &SerialConfig) -> TcsResult<()> {
         || unsafe { libc::cfsetospeed(&mut terms, speed) } != 0
     {
         return Err(not_a_line(
+            what,
             &config.path,
             &format!("cannot be set to {} bits per second", config.datarate),
         ));
     }
 
     if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &terms) } != 0 {
-        return Err(not_a_line(&config.path, "cannot be set to those terms"));
+        // What was asked for, because which of the terms the port would not
+        // take is the whole of what the reader needs. A pty, which is what a
+        // simulated line is, takes no parity but none -- so a line set to
+        // even against the simulator fails here, and the message has to say
+        // that rather than leave a configuration to be bisected.
+        return Err(not_a_line(
+            what,
+            &config.path,
+            &format!(
+                "cannot be set to those terms: {} bits per second, {} data bits, {}, \
+                 {} parity",
+                config.datarate,
+                config.byte_length,
+                match config.stop_bits {
+                    Some(stop_bits) => format!("{stop_bits} stop bits"),
+                    None => "synchronous".to_string(),
+                },
+                match config.parity {
+                    Some(parity) => parity.to_string(),
+                    None => "no".to_string(),
+                }
+            ),
+        ));
+    }
+
+    // And read back what the port really has, because a port may take the
+    // call and keep less than it was given. A pty does exactly that with
+    // parity: it refuses even outright and quietly drops the rest, so a
+    // handler that did not look would be checking nothing while its
+    // configuration said it was checking every character.
+    //
+    // Only the parity is read back. It is the term whose absence is silent --
+    // a rate or a byte length the port would not take shows up as data that
+    // makes no sense, where a missing parity bit shows up as nothing at all
+    // until a corrupted byte is believed.
+    let wanted = config.parity.unwrap_or(Parity::None);
+    let mut got: libc::termios = unsafe { std::mem::zeroed() };
+    if unsafe { libc::tcgetattr(fd, &mut got) } != 0 {
+        return Err(not_a_line(
+            what,
+            &config.path, "cannot be read back after setting"));
+    }
+    if parity_of(got.c_cflag) != wanted {
+        return Err(not_a_line(
+            what,
+            &config.path,
+            &format!(
+                "will not take {wanted} parity: it reports {} after being set to it, \
+                 and a handler cannot check what the port is not checking. A \
+                 simulated line is a pseudo-terminal, which takes no parity but none",
+                parity_of(got.c_cflag)
+            ),
+        ));
     }
 
     Ok(())
@@ -125,8 +225,9 @@ fn apply_line_terms(file: &File, config: &SerialConfig) -> TcsResult<()> {
 /// A UART that offers it does so for five-bit bytes, and `termios` has one
 /// bit for stop bits: one, or two. A configuration asking for it is told so
 /// rather than quietly given two.
-fn stop_bits_unsupported(path: &str) -> TcsError {
+fn stop_bits_unsupported(what: &str, path: &str) -> TcsError {
     not_a_line(
+        what,
         path,
         "cannot be set to one and a half stop bits: a serial port offers one or two",
     )
@@ -187,8 +288,8 @@ fn byte_length_of(bits: u8) -> TcsResult<libc::tcflag_t> {
     }
 }
 
-fn not_a_line(path: &str, trouble: &str) -> TcsError {
-    TcsError::Endpoint(format!("{path} {trouble}"))
+fn not_a_line(what: &str, path: &str, trouble: &str) -> TcsError {
+    TcsError::Endpoint(format!("{what}: {path} {trouble}"))
 }
 
 impl EndpointWaitable for SerialEndpoint {
@@ -216,6 +317,125 @@ impl EndpointWritable for SerialEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The flags that ask for a parity and the flags that report one are
+    /// inverses, and each is the combination termios documents.
+    ///
+    /// The only check there can be of the mapping itself: no line a test can
+    /// open will take a parity -- a pseudo-terminal is all there is, and it
+    /// takes none -- so a wrong flag would otherwise reach a real port
+    /// unnoticed, where mark instead of space is a line checking the opposite
+    /// of what the file asked for.
+    #[test]
+    fn asking_for_a_parity_and_reading_one_back_are_inverses() {
+        for parity in [
+            Parity::None,
+            Parity::Even,
+            Parity::Odd,
+            Parity::Mark,
+            Parity::Space,
+        ] {
+            assert_eq!(parity_of(parity_flags(parity)), parity, "{parity}");
+        }
+
+        // Anchored, so that the two being inverses is not two matching
+        // mistakes: these are the combinations termios defines.
+        assert_eq!(parity_flags(Parity::None), 0);
+        assert_eq!(parity_flags(Parity::Even), libc::PARENB);
+        assert_eq!(parity_flags(Parity::Odd) & libc::PARODD, libc::PARODD);
+        assert_eq!(parity_flags(Parity::Odd) & libc::CMSPAR, 0);
+        assert_eq!(parity_flags(Parity::Mark) & libc::CMSPAR, libc::CMSPAR);
+        assert_eq!(
+            parity_flags(Parity::Mark) & libc::PARODD,
+            libc::PARODD,
+            "mark sends a one, which is PARODD with CMSPAR"
+        );
+        assert_eq!(parity_flags(Parity::Space) & libc::CMSPAR, libc::CMSPAR);
+        assert_eq!(
+            parity_flags(Parity::Space) & libc::PARODD,
+            0,
+            "space sends a zero, which is CMSPAR without PARODD"
+        );
+    }
+
+    /// A line is opened with the parity its configuration asks for, and a
+    /// line that will not take one says so.
+    ///
+    /// Termios computes a parity bit per character, which is the whole of
+    /// what a start-stop line does about checking. The five values are what a
+    /// UART offers; a pty is the one line that will take none of them but
+    /// `none`, which is a property of the stand-in rather than of the
+    /// configuration -- and since a simulated line is a pty, the handler has
+    /// to say which term was refused rather than leave a file to be bisected.
+    #[test]
+    fn a_line_is_set_to_the_parity_it_was_given() {
+        use std::os::unix::io::FromRawFd;
+
+        let master_fd = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+        assert!(master_fd >= 0, "no pty: {}", std::io::Error::last_os_error());
+        let _master = unsafe { File::from_raw_fd(master_fd) };
+        assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
+        assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
+
+        let mut name = [0 as libc::c_char; 128];
+        assert_eq!(
+            unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
+            0
+        );
+        let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
+
+        let line = |parity: Parity| SerialConfig {
+            path: slave.clone(),
+            datarate: 9600,
+            asynchronous: true,
+            parity: Some(parity),
+            clock_type: None,
+            encoding: None,
+            frame_check: None,
+            loopback: None,
+            stop_bits: Some(StopBits::One),
+            byte_length: 8,
+        };
+
+        // No parity, which is what a payload link commonly runs and what a
+        // pty will take: the port comes back with the bit disabled.
+        let endpoint =
+            SerialEndpoint::new("telemetry", &line(Parity::None)).expect("a pty takes none");
+        let mut terms: libc::termios = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            unsafe { libc::tcgetattr(endpoint.file.as_raw_fd(), &mut terms) },
+            0
+        );
+        assert_eq!(
+            terms.c_cflag & libc::PARENB,
+            0,
+            "no parity was asked for and one was set"
+        );
+        drop(endpoint);
+
+        // And a parity a pty will not take is reported, with the terms that
+        // were asked for: a handler that quietly ran without the parity its
+        // configuration gave would be checking nothing and saying nothing.
+        for parity in [Parity::Even, Parity::Odd, Parity::Mark, Parity::Space] {
+            let said = match SerialEndpoint::new("telemetry", &line(parity)) {
+                Err(e) => format!("{e}"),
+                Ok(_) => panic!(
+                    "{parity}: a pseudo-terminal cannot check parity, and the \
+                     handler said it had set it"
+                ),
+            };
+            // Named either way: a pty refuses even outright and quietly
+            // drops the other three, so one of the two messages says so and
+            // both name the parity that was asked for.
+            assert!(
+                said.contains(parity.as_str())
+                    && (said.contains("cannot be set") || said.contains("will not take")),
+                "{parity}: {said}"
+            );
+        }
+    }
 
     /// A rate no port offers is named rather than rounded to one that is.
     #[test]
@@ -270,10 +490,16 @@ mod tests {
         let config = SerialConfig {
             path: slave.clone(),
             datarate: 9600,
-            stop_bits: StopBits::One,
+            asynchronous: true,
+            parity: Some(Parity::None),
+            clock_type: None,
+            encoding: None,
+            frame_check: None,
+            loopback: None,
+            stop_bits: Some(StopBits::One),
             byte_length: 8,
         };
-        let mut endpoint = SerialEndpoint::new(&config)
+        let mut endpoint = SerialEndpoint::new("telemetry", &config)
             .unwrap_or_else(|e| panic!("{slave} would not open as a line: {e}"));
 
         // What the payload's end writes, the handler's end reads. Raw terms
@@ -308,11 +534,17 @@ mod tests {
         let config = SerialConfig {
             path: file.path().display().to_string(),
             datarate: 9600,
-            stop_bits: StopBits::One,
+            asynchronous: true,
+            parity: Some(Parity::None),
+            clock_type: None,
+            encoding: None,
+            frame_check: None,
+            loopback: None,
+            stop_bits: Some(StopBits::One),
             byte_length: 8,
         };
 
-        let e = match SerialEndpoint::new(&config) {
+        let e = match SerialEndpoint::new("telemetry", &config) {
             Ok(_) => panic!("a plain file was taken for a serial port"),
             Err(e) => e,
         };

@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tcslibgs::{
     ArmKey, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
-    DHConfig, DHId, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
+    DHConfig, DHId, DHName, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
@@ -58,6 +58,40 @@ pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
     }
 }
 
+/// Why a START_DH found no handler, in the words of the command.
+///
+/// Said with the name the command carries rather than with anything read
+/// here: the whole of a NotFound is that this process has no entry to take a
+/// name from, and the name in the command is the one on the button the
+/// operator pressed.
+///
+/// What it usually means is that the two ends are reading different payload
+/// configurations. A tcsmoc attaches to a tcspecial that is already listening
+/// rather than starting a second one, so a tcspecial left running from an
+/// earlier payload set serves that set's handlers while the panels in front of
+/// the operator are the new set's -- and the only sign of it was a status with
+/// no explanation. So this says what this process does serve, which is the
+/// fact that identifies the stale end.
+fn no_such_handler(name: &DHName, dh_id: DHId, configs: &[DHConfig]) -> String {
+    let served = if configs.is_empty() {
+        "no handlers at all".to_string()
+    } else {
+        configs
+            .iter()
+            .map(|c| format!("{} ({})", c.dh_id.0, c.name.0))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+
+    format!(
+        "{}: START_DH names dh_id {}, which this tcspecial does not have; it \
+         serves {}. The ground and this process are reading different payload \
+         configurations -- most often a tcspecial left running from an earlier \
+         payload set, which a tcsmoc attaches to rather than replacing",
+        name.0, dh_id.0, served
+    )
+}
+
 /// Start a data handler moving data.
 ///
 /// The handler already exists -- initialize_handlers made one for every entry
@@ -78,7 +112,8 @@ fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
             config.name.0
         ))
     })?;
-    let (oc_reader, oc_writer) = bind_endpoint_pair(&EndpointConfig::Network(oc.clone()))?;
+    let (oc_reader, oc_writer) =
+        bind_endpoint_pair(&config.name.0, &EndpointConfig::Network(oc.clone()))?;
     dh.start(oc_reader, oc_writer)?;
 
     // Said on the way out, not only on the way wrong. Until this was here
@@ -108,8 +143,14 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
         }
         EndpointConfig::Device(dev) => format!("device {}", dev.path),
         EndpointConfig::Serial(serial) => format!(
-            "serial {} at {} baud, {} data bits, {} stop",
-            serial.path, serial.datarate, serial.byte_length, serial.stop_bits
+            "serial {} at {} baud, {} data bits, {}",
+            serial.path,
+            serial.datarate,
+            serial.byte_length,
+            match serial.stop_bits {
+                Some(stop_bits) => format!("{stop_bits} stop"),
+                None => "synchronous".to_string(),
+            }
         ),
         EndpointConfig::I2c(i2c) => format!(
             "I2C device {:#04X} on bus {}{}",
@@ -204,7 +245,10 @@ impl CommandInterpreter {
                         .find(|c| c.dh_id == cmd.dh_id);
 
                     match (handlers.get_mut(&cmd.dh_id), config) {
-                        (None, _) | (_, None) => CommandStatus::NotFound,
+                        (None, _) | (_, None) => {
+                            error!("{}", no_such_handler(&cmd.name, cmd.dh_id, &self.payload_config));
+                            CommandStatus::NotFound
+                        }
 
                         // The kind the command names has to be the kind the
                         // handler is. Both ends read the same configuration
@@ -456,9 +500,202 @@ mod tests {
         assert!(ci.is_ok());
     }
 
-    /// StartDH actually starts a handler that then moves data.
+    /// A START_DH for a handler this process does not have says so, and says
+    /// enough to find out why.
     ///
-    /// Written because START_DH answered Success in a running tcsmoc session
+    /// What this was written for: a tcsmoc showing payload set 2's two panels
+    /// pressed Transmit on the second and was answered `NotFound` with the
+    /// payload's name in it, which reads as a name that was looked up and
+    /// missed. Nothing is looked up by name -- the id is what addresses a
+    /// handler -- and the real cause was a tcspecial left running from before
+    /// that payload set had a second payload, which the panels had attached
+    /// to. The status alone could not say that, so the log now does.
+    #[test]
+    fn a_start_dh_for_a_handler_that_is_not_here_says_what_is_here() {
+        use tcslibgs::{DHConfig, DHName, DHType, DeviceConfig, EndpointConfig, StartDHCommand};
+
+        let handler = DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new("auto-send"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 1,
+            oc: None,
+            mode: Default::default(),
+        };
+
+        let mut ci = CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![handler],
+        )
+        .expect("an interpreter");
+        ci.initialize_handlers().expect("handlers are made at startup");
+
+        // The one this process has not got, named as the ground names it.
+        match ci.process_command(Command::StartDH(StartDHCommand::new(
+            1,
+            DHId(1),
+            DHType::Network,
+            DHName::new("triggered-send"),
+        ))) {
+            Telemetry::StartDH(tm) => {
+                assert_eq!(tm.header.status, CommandStatus::NotFound)
+            }
+            other => panic!("expected START_DH telemetry, got {other:?}"),
+        }
+
+        // And the message says which payload was asked for, which id it came
+        // in as, and what this process does serve -- the three facts that tell
+        // an operator the two ends are reading different files.
+        let said = no_such_handler(&DHName::new("triggered-send"), DHId(1), &ci.payload_config);
+        assert!(said.contains("triggered-send"), "no payload named: {said}");
+        assert!(said.contains("dh_id 1"), "no id said: {said}");
+        assert!(
+            said.contains("0 (auto-send)"),
+            "it does not say what is served: {said}"
+        );
+        assert!(
+            said.contains("different payload configurations"),
+            "it does not say what that usually means: {said}"
+        );
+    }
+
+    /// A START_DH that does find its handler starts the asking.
+    ///
+    /// The other half of the session above: once the two ends were reading the
+    /// same payload file, the command the button sends had to do what the
+    /// panel says it does. A triggered handler moves nothing until it has
+    /// asked, so what Success has to mean here is a trigger on its way to the
+    /// payload at the configured interval, sent of the handler's own accord
+    /// with the ground having said nothing.
+    #[test]
+    fn start_dh_on_a_triggered_handler_starts_the_asking() {
+        use std::io::Read;
+        use std::net::{TcpListener, UdpSocket};
+        use std::time::{Duration, Instant};
+        use tcslibgs::{
+            DHConfig, DHMode, DHName, DHType, EndpointConfig, NetworkConfig, StartDHCommand,
+        };
+
+        // TCP, as tcspecial2.yaml's triggered payload is: a handler connects to
+        // a stream payload, so it knows where to send before anything has
+        // been heard, where a datagram payload would have to speak first --
+        // which is the one thing a triggered payload does not do.
+        let payload = TcpListener::bind("127.0.0.1:0").expect("the payload listens");
+        let payload_addr = payload.local_addr().expect("its address");
+
+        let oc = UdpSocket::bind("127.0.0.1:0").expect("a free OC port");
+        let oc_addr = oc.local_addr().expect("its address");
+        drop(oc);
+
+        let handler = DHConfig {
+            dh_id: DHId(1),
+            name: DHName::new("triggered-send"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: payload_addr.ip().to_string(),
+                port: payload_addr.port(),
+            }),
+            packet_size: 12,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+            mode: DHMode::Triggered {
+                trigger: b"go".to_vec(),
+                interval_ms: 50,
+            },
+        };
+
+        let mut ci = CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![handler],
+        )
+        .expect("an interpreter");
+        ci.initialize_handlers().expect("handlers are made at startup");
+
+        match ci.process_command(Command::StartDH(StartDHCommand::new(
+            1,
+            DHId(1),
+            DHType::Network,
+            DHName::new("triggered-send"),
+        ))) {
+            Telemetry::StartDH(tm) => assert!(
+                tm.header.status.is_success(),
+                "START_DH said {:?}",
+                tm.header.status
+            ),
+            other => panic!("expected START_DH telemetry, got {other:?}"),
+        }
+
+        let (mut asked, _) = payload.accept().expect("the handler connects");
+
+        // Unprompted, and at an interval: counted over a measured window
+        // rather than timed between two reads, for the reason given in
+        // dh.rs's a_triggered_handler_asks_its_payload_and_carries_the_answer
+        // -- the interval runs from when the handler sent, and a read can
+        // return long after that.
+        let window = Duration::from_millis(300);
+        let expected = window.as_millis() as u64 / 50;
+        asked
+            .set_read_timeout(Some(Duration::from_millis(50)))
+            .unwrap();
+
+        let until = Instant::now() + window;
+        let mut came = Vec::new();
+        while Instant::now() < until {
+            let mut buffer = [0u8; 256];
+            match asked.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => came.extend_from_slice(&buffer[..n]),
+                Err(_) => {}
+            }
+        }
+
+        assert!(
+            !came.is_empty() && came.chunks(2).all(|chunk| chunk == b"go"),
+            "what came down the line was not triggers: {came:?}"
+        );
+        let triggers = came.len() as u64 / 2;
+        assert!(
+            triggers > 1,
+            "{triggers} trigger(s) in {window:?}: it is sent once, not at an interval"
+        );
+        assert!(
+            triggers <= expected * 3,
+            "{triggers} triggers in {window:?}, where an interval of 50ms allows \
+             about {expected}: there is no interval between them"
+        );
+    }
+
+    /// With nothing configured at all the message still reads as a sentence.
+    #[test]
+    fn a_tcspecial_serving_nothing_says_so() {
+        use tcslibgs::DHName;
+
+        let said = no_such_handler(&DHName::new("auto-send"), DHId(0), &[]);
+        assert!(
+            said.contains("no handlers at all"),
+            "an empty configuration is not said: {said}"
+        );
+    }
+
     /// A START_DH that names the wrong kind is refused, and starts nothing.
     ///
     /// The kind travelled in the command and nothing compared it with the
@@ -528,6 +765,9 @@ mod tests {
         );
     }
 
+    /// StartDH actually starts a handler that then moves data.
+    ///
+    /// Written because START_DH answered Success in a running tcsmoc session
     /// while the handler's OC port was never bound and every counter stayed
     /// at zero.
     #[test]

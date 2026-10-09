@@ -17,25 +17,24 @@ RUST = .
 # payload configuration or as an endpoint configuration; every program takes it
 # as a command line argument. PAYLOAD_SIM_YAML names the simulator settings,
 # which only tcssim reads and which it takes from the environment. So:
-#   make run    PAYLOAD_YAML=payload2.yaml
-#   make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
-#   make runsim PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+#   make run    PAYLOAD_YAML=tcspecial2.yaml
+#   make runmocy PAYLOAD_YAML=tcspecial2.yaml PAYLOAD_SIM_YAML=tcspecial2sim.yaml
+#   make runsim PAYLOAD_YAML=tcspecial2.yaml PAYLOAD_SIM_YAML=tcspecial2sim.yaml
 #
-# runmoc passes both because tcsmoc hands its own payload file to the tcspecial
+# runmocy passes both because tcsmoc hands its own payload file to the tcspecial
 # and tcssim it starts, but never reads the simulation file, so that one
 # reaches tcssim by being in tcsmoc's environment.
 #
 # runsim passes both for a different reason: run on its own, tcssim needs the
 # payload file as well as the simulation file, and the two must describe the
 # same set or the names will not match.
-PAYLOAD_YAML = payload2.yaml
-PAYLOAD_SIM_YAML = payload2sim.yaml
+PAYLOAD_FILE=tcspecial2
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
 # set is:
-#   make runmoc RUST_LOG=debug
-#   make run PAYLOAD_YAML=payload1.yaml RUST_LOG=tcspecial::ci=trace
+#   make runmocy RUST_LOG=debug
+#   make run PAYLOAD_YAML=tcspecial1.yaml RUST_LOG=tcspecial::ci=trace
 RUST_LOG = info
 
 RELEASE = --release
@@ -55,7 +54,9 @@ help:
 	@echo "  make buildsim    - Build tcssim"
 	@echo "  make test        - Run all tests"
 	@echo "  make run         - Run tcspecial"
-	@echo "  make runmoc      - Run tcsmoc, which starts tcspecial and tcssim"
+	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and tcssim"
+	@echo "  make runmocx     - As runmocy, on the XML payload configuration"
+	@echo "  make runmocj     - As runmocy, on the JSON payload configuration"
 	@echo "  make runsim      - Run tcssim alone"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
@@ -64,8 +65,8 @@ help:
 	@echo "  make distclean   - Remove everything that can be rebuilt"
 	@echo "  make install     - Install tcspecial globally"
 	@echo ""
-	@echo "Payload set: make runmoc PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml"
-	@echo "Logging:     make runmoc RUST_LOG=debug"
+	@echo "Payload set: make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml"
+	@echo "Logging:     make runmocy RUST_LOG=debug"
 
 # Build the project
 .PHONY: build
@@ -116,14 +117,40 @@ run:
 		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run --bin tcspecial -- $(PAYLOAD_YAML) \
 	)
 
-# Run the MOC application
-.PHONY: runmoc
-runmoc:
+# Running tcsmoc on one spelling of its payload configuration file.
+#
+# $(1) is that spelling -- yaml, json or xml. A payload configuration may be
+# written in any of the three and they describe the same payloads, so which one
+# a run reads is a choice, and a run that always read the YAML could not
+# exercise the other two at all.
+#
+# Only the suffix is given here. The stem comes from PAYLOAD_YAML, so a payload
+# set is still chosen the way every other target chooses it, and the simulator
+# file is untouched: it is tcssim's, and tcsmoc only passes it on.
+define runmoc_on
 	( \
 		set -eu; \
-		echo "Running $(MOC_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcsmoc -- $(PAYLOAD_YAML) \
+		echo "Running $(MOC_NAME) on $(basename $(PAYLOAD_FILE)).$(1)..."; \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run --bin tcsmoc -- $(basename $(PAYLOAD_FILE).$(1)).$(1) \
 	)
+endef
+
+# Run the MOC application, on each spelling of the payload configuration.
+#
+# One target per spelling rather than one target and a variable, so that a
+# spelling is asked for the way everything else here is asked for -- by name,
+# with nothing to remember about which variable selects it.
+.PHONY: runmocy
+runmocy:
+	$(call runmoc_on,yaml)
+
+.PHONY: runmocx
+runmocx:
+	$(call runmoc_on,xml)
+
+.PHONY: runmocj
+runmocj:
+	$(call runmoc_on,json)
 
 # Run the simulation application
 .PHONY: runsim
@@ -180,7 +207,7 @@ distclean: clean
 # tcsmoc and tcssim are test software and are not installed. Either can be,
 # with cargo install --path tcsmoc, if that is wanted.
 #
-# Note that tcspecial finds its configuration by relative path -- payload1.yaml
+# Note that tcspecial finds its configuration by relative path -- tcspecial1.yaml
 # and tcspecial/src/tcspecial.yaml -- so an installed copy run from elsewhere
 # needs PAYLOAD_CONFIG_PATH and TCSPECIAL_CONFIG_PATH set, or a working
 # directory that has those files.

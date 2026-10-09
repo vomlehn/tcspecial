@@ -1,6 +1,6 @@
-# How tcssim simulates the payloads of payload2.yaml.
+# How tcssim simulates the payloads of tcspecial3.yaml.
 #
-# Nothing here describes a payload: payload2.yaml does that, and this file adds
+# Nothing here describes a payload: tcspecial3.yaml does that, and this file adds
 # only what simulating one needs. The two are joined by name. Every data
 # handler of the payload file needs settings here, and a name here that no data
 # handler has is an error rather than a line with no effect, because a typo is
@@ -9,7 +9,7 @@
 #
 # A payload takes its settings from the group it names, and may then override
 # any of them for itself. A group no payload names is an error rather than a
-# group with no effect, so this file defines only the one its payloads use.
+# group with no effect, so this file defines only the one its payload uses.
 #
 # Each payload states the kind of payload it is, and a network payload the
 # transport as well, in the same words the payload file uses. Those are not
@@ -18,7 +18,7 @@
 # other: the files are joined by name alone, and a payload set copied from
 # another one keeps the names.
 version: "1.0"
-description: Simulator settings for the payloads of payload2.yaml
+description: Simulator settings for the payloads of tcspecial3.yaml
 
 simulated_payload_groups:
   # One packet a second, sent whole.
@@ -26,15 +26,7 @@ simulated_payload_groups:
     packet_interval_ms: 1000
 
 simulated_payloads:
-  - name: auto-send
-    type: network
-    protocol: udp
-    group: steady_1hz
-
-  # Nothing about timing, and so no group: this payload answers requests, and
-  # the rate it is asked at is payload2.yaml's packet interval. A group that
-  # states a rate is refused for such a payload whether it states the rate
-  # itself or inherits it, which is why it names none.
-  - name: triggered-send
+  - name: DH0
     type: network
     protocol: tcp
+    group: steady_1hz

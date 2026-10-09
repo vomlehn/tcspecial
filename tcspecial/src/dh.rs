@@ -64,8 +64,29 @@ fn command_pipe() -> TcsResult<(RawFd, RawFd)> {
 impl DataHandler {
     /// Create a new data handler
     pub fn new(config: DHConfig) -> TcsResult<Self> {
-        // One per conduit; see cmd_pipes. The first is closed if the second
-        // cannot be made, so a failure here leaks no descriptors.
+        Ok(Self {
+            id: config.dh_id,
+            name: config.name.clone(),
+            config,
+            state: DHState::Created,
+            ground_to_payload: None,
+            payload_to_ground: None,
+            stats: Statistics::new(),
+            samples: Arc::new(Mutex::new(DHSamples::default())),
+            running: Arc::new(AtomicBool::new(false)),
+            // Made when the handler starts and closed when it stops, which
+            // is what lets it start again: they used to be made here, and
+            // stop() closed them, so a handler could be started once and
+            // never again for the life of the process.
+            cmd_pipes: None,
+        })
+    }
+
+    /// A pipe for each conduit, for the run that is about to begin.
+    ///
+    /// The first is closed if the second cannot be made, so a failure here
+    /// leaks no descriptors.
+    fn open_command_pipes() -> TcsResult<[(RawFd, RawFd); 2]> {
         let g2p = command_pipe()?;
         let p2g = match command_pipe() {
             Ok(pipe) => pipe,
@@ -77,19 +98,7 @@ impl DataHandler {
                 return Err(e);
             }
         };
-
-        Ok(Self {
-            id: config.dh_id,
-            name: config.name.clone(),
-            config,
-            state: DHState::Created,
-            ground_to_payload: None,
-            payload_to_ground: None,
-            stats: Statistics::new(),
-            samples: Arc::new(Mutex::new(DHSamples::default())),
-            running: Arc::new(AtomicBool::new(false)),
-            cmd_pipes: Some([g2p, p2g]),
-        })
+        Ok([g2p, p2g])
     }
 
     /// Get the data handler ID
@@ -173,19 +182,53 @@ impl DataHandler {
     /// The payload endpoint is opened here, once, and both conduits share it:
     /// see [`connect_endpoint_pair`].
     pub fn start(&mut self, oc_reader: Box<dyn EndpointReadable + Send>, oc_writer: Box<dyn EndpointWritable + Send>) -> TcsResult<()> {
-        if self.state != DHState::Created {
-            return Err(TcsError::DataHandler("Invalid state for start".to_string()));
+        // Created or stopped: a handler that has been stopped is a handler
+        // that can be started again, which is what a panel's one button
+        // offers in both windows. Only a running one is refused, and the
+        // command interpreter answers that as success before reaching here.
+        if self.state == DHState::Active {
+            return Err(TcsError::DataHandler(
+                "already started: stop it before starting it again".to_string(),
+            ));
         }
 
-        let pipes = self
-            .cmd_pipes
-            .ok_or_else(|| TcsError::DataHandler("No command pipe".to_string()))?;
+        // A pipe for each conduit, for this run. Stopping closes them, so a
+        // run gets its own rather than inheriting a closed one -- and a start
+        // that fails closes them too, by way of the helper below: a handler
+        // whose payload was not there yet keeps no descriptors from the
+        // attempt, and the next start opens its own.
+        let pipes = Self::open_command_pipes()?;
+        self.cmd_pipes = Some(pipes);
 
+        match self.start_conduits(pipes, oc_reader, oc_writer) {
+            Ok(()) => {
+                self.state = DHState::Active;
+                self.running.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+            Err(e) => {
+                self.close_command_pipes();
+                Err(e)
+            }
+        }
+    }
+
+    /// Open the payload link and set both conduits running on it.
+    ///
+    /// Separate from [`DataHandler::start`] so that everything which can fail
+    /// after the command pipes are made has one place to be cleaned up after.
+    fn start_conduits(
+        &mut self,
+        pipes: [(RawFd, RawFd); 2],
+        oc_reader: Box<dyn EndpointReadable + Send>,
+        oc_writer: Box<dyn EndpointWritable + Send>,
+    ) -> TcsResult<()> {
         // Which end of the payload link waits at the configured address
         // depends on the protocol and on which end can speak first; see
         // connect_endpoint_pair. Opened once either way, because a socket
         // cannot be opened twice and the two conduits share it.
-        let (payload_reader, payload_writer) = connect_endpoint_pair(&self.config.endpoint)?;
+        let (payload_reader, payload_writer) =
+            connect_endpoint_pair(&self.config.name.0, &self.config.endpoint)?;
 
         // Create conduits
         let mut g2p_conduit =
@@ -233,13 +276,22 @@ impl DataHandler {
             return Err(e);
         }
 
-        self.state = DHState::Active;
-        self.running.store(true, Ordering::SeqCst);
-
         self.ground_to_payload = Some(g2p_conduit);
         self.payload_to_ground = Some(p2g_conduit);
 
         Ok(())
+    }
+
+    /// Close this run's command pipes, if it has any.
+    fn close_command_pipes(&mut self) {
+        if let Some(pipes) = self.cmd_pipes.take() {
+            for (read_fd, write_fd) in pipes {
+                unsafe {
+                    libc::close(read_fd);
+                    libc::close(write_fd);
+                }
+            }
+        }
     }
 
     /// Stop the data handler
@@ -270,15 +322,8 @@ impl DataHandler {
 
         self.state = DHState::Stopped;
 
-        // Close command pipes
-        if let Some(pipes) = self.cmd_pipes.take() {
-            for (read_fd, write_fd) in pipes {
-                unsafe {
-                    libc::close(read_fd);
-                    libc::close(write_fd);
-                }
-            }
-        }
+        // This run's pipes go with it. The next start makes its own.
+        self.close_command_pipes();
 
         Ok(())
     }
@@ -354,6 +399,7 @@ mod tests {
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
         let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            &config.name.0,
             &EndpointConfig::Network(config.oc.clone().unwrap()),
         )
         .unwrap();
@@ -478,6 +524,7 @@ mod tests {
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
         let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            &config.name.0,
             &EndpointConfig::Network(config.oc.clone().unwrap()),
         )
         .unwrap();
@@ -489,21 +536,45 @@ mod tests {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
 
-        // The trigger arrives without the ground having said anything.
-        let mut buffer = [0u8; 64];
-        let n = asked.read(&mut buffer).expect("a trigger");
-        assert_eq!(&buffer[..n], b"READ\r");
+        // The trigger arrives without the ground having said anything, and
+        // goes on arriving: counted over a measured window rather than timed
+        // between two reads. An interval runs from when the handler sent, and
+        // a read can return long after that under load -- which failed this
+        // test for reasons that had nothing to do with the handler.
+        let window = Duration::from_millis(300);
+        let expected = window.as_millis() as u64 / 50;
+        asked
+            .set_read_timeout(Some(Duration::from_millis(50)))
+            .unwrap();
 
-        // And again, because it is sent at an interval rather than once.
-        let since = Instant::now();
-        let n = asked.read(&mut buffer).expect("a second trigger");
-        assert_eq!(&buffer[..n], b"READ\r");
+        let until = Instant::now() + window;
+        let mut came = Vec::new();
+        while Instant::now() < until {
+            let mut buffer = [0u8; 256];
+            match asked.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => came.extend_from_slice(&buffer[..n]),
+                // The quiet part of an interval.
+                Err(_) => {}
+            }
+        }
+
         assert!(
-            since.elapsed() >= Duration::from_millis(40),
-            "the second trigger came {:?} after the first, which is no interval \
-             at all",
-            since.elapsed()
+            !came.is_empty() && came.chunks(5).all(|chunk| chunk == b"READ\r"),
+            "what came down the line was not triggers: {came:?}"
         );
+        let triggers = came.len() as u64 / 5;
+        assert!(
+            triggers > 1,
+            "{triggers} trigger(s) in {window:?}: it is sent once, not at an interval"
+        );
+        assert!(
+            triggers <= expected * 3,
+            "{triggers} triggers in {window:?}, where an interval of 50ms allows \
+             about {expected}: there is no interval between them"
+        );
+
+        let mut buffer = [0u8; 64];
 
         // The ground has to speak once before an answer can reach it; see
         // the OC's learnt address.
@@ -587,9 +658,10 @@ mod tests {
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
         let (oc_reader, oc_writer) =
-            crate::endpoint::bind_endpoint_pair(&EndpointConfig::Network(
-                config.oc.clone().unwrap(),
-            ))
+            crate::endpoint::bind_endpoint_pair(
+                &config.name.0,
+                &EndpointConfig::Network(config.oc.clone().unwrap()),
+            )
             .unwrap();
         dh.start(oc_reader, oc_writer).unwrap();
         assert_eq!(dh.state(), DHState::Active);
@@ -628,6 +700,115 @@ mod tests {
             stopped.bytes_sent
         );
         assert_eq!(stopped.bytes_received, running.bytes_received);
+    }
+
+    /// A handler that has been stopped can be started again.
+    ///
+    /// It could not, and the error said so in terms of nothing anyone had
+    /// written: `START_DH` answered Failure with "Invalid state for start"
+    /// for the rest of the process, because the state machine allowed only
+    /// Created to start and stopping left a handler Stopped -- and stopping
+    /// closed the command pipes a start needs, so even allowing the state
+    /// would have failed on the next line. Both windows offer one button that
+    /// stops and starts a payload, so this was two clicks away.
+    #[test]
+    fn a_stopped_handler_starts_again() {
+        use std::net::UdpSocket;
+        use tcslibgs::{NetworkConfig, NetworkProtocol};
+
+        // A port for each end, found by binding and letting go.
+        let free_port = || {
+            let probe = UdpSocket::bind("127.0.0.1:0").expect("a free port");
+            let at = probe.local_addr().expect("its address");
+            drop(probe);
+            at
+        };
+        let payload_side = free_port();
+        let oc_addr = free_port();
+
+        let config = DHConfig {
+            dh_id: DHId(2),
+            name: DHName::new("Restarted"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: payload_side.ip().to_string(),
+                port: payload_side.port(),
+            }),
+            packet_size: 64,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+            mode: Default::default(),
+        };
+
+        let mut dh = DataHandler::new(config.clone()).expect("the handler is made");
+        assert_eq!(dh.state(), DHState::Created);
+
+        // Three runs, because the second is what was broken and the third
+        // says it was the lifecycle rather than one spare set of pipes.
+        for run in 1..=3 {
+            let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+                &config.name.0,
+                &EndpointConfig::Network(config.oc.clone().unwrap()),
+            )
+            .unwrap_or_else(|e| panic!("run {run}: the OC address is free again: {e}"));
+
+            dh.start(oc_reader, oc_writer)
+                .unwrap_or_else(|e| panic!("run {run}: {e}"));
+            assert_eq!(dh.state(), DHState::Active, "run {run}");
+            assert!(dh.is_running(), "run {run}");
+
+            assert!(
+                dh.cmd_pipes.is_some(),
+                "run {run}: a running handler has pipes for its conduits"
+            );
+
+            dh.stop().unwrap_or_else(|e| panic!("run {run}: {e}"));
+            assert_eq!(dh.state(), DHState::Stopped, "run {run}");
+            assert!(!dh.is_running(), "run {run}");
+
+            // And a stopped one has given them up. Counted this way rather
+            // than by looking at what the process has open: these tests run
+            // beside each other in one process, so a descriptor count is
+            // everyone's and not this handler's. Four a cycle would leak
+            // quietly and work perfectly well until a spacecraft that had
+            // been up for months ran out.
+            assert!(
+                dh.cmd_pipes.is_none(),
+                "run {run} kept its command pipes, so the next run leaks them"
+            );
+        }
+
+        // And a running handler still refuses to be started twice, which is
+        // the one state that cannot: the command interpreter answers that as
+        // success without reaching here, so this is the backstop.
+        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            &config.name.0,
+            &EndpointConfig::Network(config.oc.clone().unwrap()),
+        )
+        .unwrap();
+        dh.start(oc_reader, oc_writer).expect("a fourth run");
+
+        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            &config.name.0,
+            &EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "127.0.0.1".to_string(),
+                port: free_port().port(),
+            }),
+        )
+        .unwrap();
+        let e = dh
+            .start(oc_reader, oc_writer)
+            .expect_err("a running handler cannot be started again");
+        assert!(
+            format!("{e}").contains("already started"),
+            "the error should say what is wrong: {e}"
+        );
+
+        dh.stop().unwrap();
     }
 
     #[test]

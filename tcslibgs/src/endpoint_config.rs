@@ -346,7 +346,13 @@ fn endpoint_config_of(
             GroupKind::Serial(serial) => Ok(EndpointConfig::Serial(SerialConfig {
                 path: path.clone(),
                 datarate: serial.datarate,
+                asynchronous: serial.asynchronous,
                 stop_bits: serial.stop_bits,
+                parity: serial.parity,
+                clock_type: serial.clock_type,
+                encoding: serial.encoding,
+                frame_check: serial.frame_check,
+                loopback: serial.loopback,
                 byte_length: serial.byte_length.bits(),
             })),
             GroupKind::Spi(spi) => Ok(EndpointConfig::Spi(SpiConfig {
@@ -585,6 +591,18 @@ pub(crate) struct GroupWire {
     pub(crate) datarate: Option<Scalar>,
     #[serde(default, alias = "@stop_bits", alias = "stop-bits", alias = "@stop-bits")]
     pub(crate) stop_bits: Option<Scalar>,
+    #[serde(default, alias = "@asynchronous")]
+    pub(crate) asynchronous: Option<Scalar>,
+    /// A parity per character on an asynchronous line, and the frame check on
+    /// a synchronous one: the kernel calls both a line's parity.
+    #[serde(default, alias = "@parity")]
+    pub(crate) parity: Option<Scalar>,
+    #[serde(default, alias = "@clock_type", alias = "clock-type", alias = "@clock-type")]
+    pub(crate) clock_type: Option<Scalar>,
+    #[serde(default, alias = "@encoding")]
+    pub(crate) encoding: Option<Scalar>,
+    #[serde(default, alias = "@loopback")]
+    pub(crate) loopback: Option<Scalar>,
     #[serde(
         default,
         alias = "@byte_length",
@@ -1248,11 +1266,16 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &GroupWire) -> [(&'static str, bool); 14] {
+fn type_specific_fields(g: &GroupWire) -> [(&'static str, bool); 19] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
         ("stop_bits", g.stop_bits.is_some()),
+        ("asynchronous", g.asynchronous.is_some()),
+        ("parity", g.parity.is_some()),
+        ("clock_type", g.clock_type.is_some()),
+        ("encoding", g.encoding.is_some()),
+        ("loopback", g.loopback.is_some()),
         ("byte_length", g.byte_length.is_some()),
         // Network.
         ("protocol", g.protocol.is_some()),
@@ -1415,6 +1438,7 @@ general:
 endpoint_groups:
   - name: payload_serial
     type: serial
+    asynchronous: true
     datarate: 115200
     stop_bits: 1
     byte_length: 8
@@ -1455,7 +1479,7 @@ endpoints:
   <general version="1.0" description="Payload endpoints"/>
 
   <endpoint-groups>
-    <group name="payload_serial" type="serial"
+    <group name="payload_serial" type="serial" asynchronous="true"
            datarate="115200" stop_bits="1" byte_length="8">
       <stream max_length="1024" timeout="500ms" terminators="0x0D,0x0A"/>
     </group>
@@ -1496,7 +1520,7 @@ endpoints:
         match &g.kind {
             GroupKind::Serial(s) => {
                 assert_eq!(s.datarate, 115_200);
-                assert_eq!(s.stop_bits, StopBits::One);
+                assert_eq!(s.stop_bits, Some(StopBits::One));
                 assert_eq!(s.byte_length.bits(), 8);
                 assert_eq!(s.stream.max_length, 1024);
                 assert_eq!(s.stream.timeout, Some(Duration::from_millis(500)));
@@ -1566,7 +1590,7 @@ endpoints:
         from_yaml_str(&format!(
             "endpoint_groups:\n  \
              - name: g\n    \
-               type: serial\n    \
+               type: serial\n    asynchronous: true\n    \
                datarate: 9600\n    \
                stop_bits: 1\n    \
                byte_length: 8\n    \
@@ -1663,8 +1687,9 @@ endpoints:
     fn group_of_type(kind: &str, extra: &str) -> EndpointConfigResult<EndpointConfigDoc> {
         let body = match kind {
             "serial" => {
-                "    datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n\
-                 \x20   stream:\n      max_length: 8\n      timeout: none\n"
+                "    asynchronous: true\n    datarate: 9600\n    stop_bits: 1\n\
+                 \x20   byte_length: 8\n    stream:\n      max_length: 8\n\
+                 \x20     timeout: none\n"
             }
             "network" => "    protocol: udp\n",
             "i2c" => "",
@@ -1689,6 +1714,127 @@ endpoints:
                 .unwrap_or_else(|e| panic!("{kind}: {e}"));
             assert_eq!(doc.group("g").unwrap().packet_size, Some(128), "{kind}");
         }
+    }
+
+    /// A serial group says which kind of line it is, and stop bits belong to
+    /// only one of them.
+    ///
+    /// The two are read differently all the way down -- a start-stop line
+    /// delimits every byte for itself, a synchronous one carries its bits on
+    /// a clock -- so a group that did not say would be guessed at, and a line
+    /// read as the wrong one of the two is a line read as noise.
+    #[test]
+    fn a_serial_group_says_whether_the_line_is_start_stop() {
+        let line = |extra: &str| {
+            from_yaml_str(&format!(
+                "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n\
+                 \x20   byte_length: 8\n    stream:\n      max_length: 8\n      \
+                 timeout: none\n{extra}{DEVICE_ENDPOINT}"
+            ))
+        };
+
+        // Saying nothing is refused: this is not a thing to default.
+        let e = line("    stop_bits: 1\n").unwrap_err();
+        assert!(
+            format!("{e}").contains("no asynchronous"),
+            "a serial group must say which kind of line it is: {e}"
+        );
+
+        // A start-stop line has stop bits, and must state them.
+        let doc = line("    asynchronous: true\n    stop_bits: 2\n").expect("a start-stop line");
+        match &doc.group("g").unwrap().kind {
+            GroupKind::Serial(serial) => {
+                assert!(serial.asynchronous);
+                assert_eq!(serial.stop_bits, Some(StopBits::Two));
+            }
+            other => panic!("{other:?}"),
+        }
+        let e = line("    asynchronous: true\n").unwrap_err();
+        assert!(format!("{e}").contains("stop_bits"), "{e}");
+
+        // A synchronous line has none, and stating them is refused: a stop
+        // bit is what start-stop framing uses in place of a clock, so a line
+        // whose bits are on a clock has nothing for one to delimit.
+        let doc = line("    asynchronous: false\n    clock_type: external\n")
+            .expect("a synchronous line");
+        match &doc.group("g").unwrap().kind {
+            GroupKind::Serial(serial) => {
+                assert!(!serial.asynchronous);
+                assert_eq!(serial.stop_bits, None);
+            }
+            other => panic!("{other:?}"),
+        }
+
+        let e = line("    asynchronous: false\n    clock_type: external\n    stop_bits: 1\n")
+            .unwrap_err();
+        let said = format!("{e}");
+        assert!(
+            said.contains("stop_bits") && said.contains("in place of a clock"),
+            "{said}"
+        );
+
+        // And it is true or false, not a word that looks like one.
+        let e = line("    asynchronous: sometimes\n").unwrap_err();
+        assert!(format!("{e}").contains("is not true or false"), "{e}");
+
+        // What each kind may say is the other half of the rule: a start-stop
+        // line shares no clock, so the settings of one are refused for it.
+        for stated in [
+            "    clock_type: external\n",
+            "    encoding: nrzi\n",
+            "    loopback: true\n",
+        ] {
+            let e = line(&format!("    asynchronous: true\n    stop_bits: 1\n{stated}"))
+                .unwrap_err();
+            let said = format!("{e}");
+            let named = stated.trim().split(':').next().unwrap();
+            assert!(
+                said.contains(named) && said.contains("shares no clock"),
+                "{stated}: {said}"
+            );
+        }
+
+        // And a synchronous line takes each of them, with the clock required
+        // and the rest defaulted.
+        let doc = line(
+            "    asynchronous: false\n    clock_type: internal\n    encoding: nrzi\n\
+             \x20   parity: crc32_pr1_ccitt\n    loopback: true\n",
+        )
+        .expect("a synchronous line");
+        match &doc.group("g").unwrap().kind {
+            GroupKind::Serial(serial) => {
+                assert_eq!(serial.clock_type, Some(crate::ClockType::Internal));
+                assert!(serial.clock_type.unwrap().is_ours(), "this end clocks it");
+                assert_eq!(serial.encoding, Some(crate::Encoding::Nrzi));
+                assert_eq!(serial.frame_check, Some(crate::FrameCheck::Crc32Pr1Ccitt));
+                assert_eq!(serial.loopback, Some(true));
+                assert_eq!(serial.parity, None, "a synchronous line has no per-character parity");
+            }
+            other => panic!("{other:?}"),
+        }
+
+        // The unstated ones are the driver's own defaults.
+        let doc = line("    asynchronous: false\n    clock_type: external\n")
+            .expect("a synchronous line");
+        match &doc.group("g").unwrap().kind {
+            GroupKind::Serial(serial) => {
+                assert_eq!(serial.encoding, Some(crate::Encoding::Nrz));
+                assert_eq!(serial.frame_check, Some(crate::FrameCheck::None));
+                assert_eq!(serial.loopback, Some(false));
+            }
+            other => panic!("{other:?}"),
+        }
+
+        // A value that is not one of a kind's is refused with the ones that
+        // are, and each kind has its own list: a CRC is not a parity a
+        // character can have, and even is not a frame check.
+        let e = line("    asynchronous: true\n    stop_bits: 1\n    parity: crc16_pr1\n")
+            .unwrap_err();
+        assert!(format!("{e}").contains("none, even, odd, mark, or space"), "{e}");
+
+        let e = line("    asynchronous: false\n    clock_type: external\n    parity: even\n")
+            .unwrap_err();
+        assert!(format!("{e}").contains("is not a frame check"), "{e}");
     }
 
     #[test]
@@ -1756,13 +1902,13 @@ endpoints:
             ("2", StopBits::Two),
         ] {
             let yaml = format!(
-                "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+                "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
                  stop_bits: {text}\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
                  timeout: none\n{DEVICE_ENDPOINT}"
             );
             let doc = from_yaml_str(&yaml).unwrap();
             match &doc.group("g").unwrap().kind {
-                GroupKind::Serial(s) => assert_eq!(s.stop_bits, want, "for {text}"),
+                GroupKind::Serial(s) => assert_eq!(s.stop_bits, Some(want), "for {text}"),
                 other => panic!("expected serial, got {other:?}"),
             }
         }
@@ -1770,7 +1916,7 @@ endpoints:
 
     #[test]
     fn a_byte_length_no_uart_offers_is_rejected() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
                     stop_bits: 1\n    byte_length: 9\n    stream:\n      max_length: 8\n      \
                     timeout: none\n";
         let e = from_yaml_str(yaml).unwrap_err();
@@ -1834,7 +1980,7 @@ endpoints:
                timeout: none\n  \
              - name: payload_unix\n    type: network\n    protocol: unix_dgram\n    \
                packet_size: 64\n  \
-             - name: rs422\n    type: serial\n    datarate: 9600\n    stop_bits: 1\n    \
+             - name: rs422\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    stop_bits: 1\n    \
                byte_length: 8\n    packet_size: 512\n    stream:\n      \
                max_length: 512\n      timeout: none\n\
              endpoints:\n  \
@@ -1881,7 +2027,13 @@ endpoints:
             EndpointConfig::Serial(SerialConfig {
                 path: "/dev/ttyS0".to_string(),
                 datarate: 9600,
-                stop_bits: StopBits::One,
+                asynchronous: true,
+                parity: Some(crate::Parity::None),
+                clock_type: None,
+                encoding: None,
+                frame_check: None,
+                loopback: None,
+                stop_bits: Some(StopBits::One),
                 byte_length: 8,
             })
         );
@@ -1991,7 +2143,7 @@ endpoints:
     #[test]
     fn two_endpoints_wanting_one_line_are_rejected() {
         let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+            "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
              byte_length: 8\n    stop_bits: 1\n    packet_size: 8\n    stream:\n      \
              max_length: 8\n      timeout: none\n\
              endpoints:\n  - name: first\n    group: g\n    dh_id: 0\n    \
@@ -2012,7 +2164,7 @@ endpoints:
 
         // Two lines, two handlers, which is the ordinary case.
         let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+            "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
              byte_length: 8\n    stop_bits: 1\n    packet_size: 8\n    stream:\n      \
              max_length: 8\n      timeout: none\n\
              endpoints:\n  - name: first\n    group: g\n    dh_id: 0\n    \
@@ -2093,7 +2245,7 @@ endpoints:
 
     #[test]
     fn a_serial_endpoint_given_an_address_is_rejected() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
                     stop_bits: 1\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
                     timeout: none\n\
                     endpoints:\n  - name: e\n    group: g\n    address: 10.0.0.1\n    port: 1\n";
@@ -2106,7 +2258,7 @@ endpoints:
 
     #[test]
     fn a_serial_group_given_a_protocol_is_rejected() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    protocol: tcp\n    \
+        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    protocol: tcp\n    \
                     datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n    stream:\n      \
                     max_length: 8\n      timeout: none\n";
         let e = from_yaml_str(yaml).unwrap_err();
@@ -2439,7 +2591,7 @@ endpoints:
             ("    type: spi\n    max_speed: 1\n    mode: 0\n", "    protocol: tcp\n"),
             ("    type: network\n    protocol: udp\n", "    bus_speed: 100000\n"),
             (
-                "    type: serial\n    datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n    \
+                "    type: serial\n    asynchronous: true\n    datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n    \
                  stream:\n      max_length: 8\n      timeout: none\n",
                 "    cs_active: low\n",
             ),
@@ -2479,13 +2631,13 @@ endpoints:
     #[test]
     fn hyphenated_and_underscored_spellings_both_work() {
         let a = from_yaml_str(&format!(
-            "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+            "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
              stop_bits: 1\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
              timeout: none\n{DEVICE_ENDPOINT}"
         ))
         .unwrap();
         let b = from_yaml_str(&format!(
-            "endpoint-groups:\n  - name: g\n    type: serial\n    datarate: 9600\n    \
+            "endpoint-groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
              stop-bits: 1\n    byte-length: 8\n    stream:\n      max-length: 8\n      \
              timeout: none\n{DEVICE_ENDPOINT}"
         ))

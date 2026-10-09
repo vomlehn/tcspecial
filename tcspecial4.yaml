@@ -1,0 +1,53 @@
+# The payloads tcsmoc controls and tcssim simulates: a serial line.
+#
+# This set is written in the endpoint configuration language rather than the
+# payload language the other sets use, and it has to be: a line has terms a
+# payload file has no words for -- a data rate, a byte length, stop bits, and
+# the rule for where one read ends -- so a payload file cannot describe one at
+# all. Both languages produce the same data handlers, and every program reads
+# whichever kind it is given; see "Payload Configuration Files" and "Endpoint
+# Configuration Files" in the design document.
+#
+# The division the endpoint language is built around shows even in a set of
+# one: the group carries everything about the line, and the endpoint carries
+# the one thing that tells one endpoint of a group from another -- the device.
+general:
+  version: "1.0"
+  description: TCSpecial payload set 4
+
+endpoint_groups:
+  # A line that hands over a packet's worth of bytes at a time. Saying
+  # "timeout: none" is how a file asks for that; leaving the timeout out
+  # would be an error, because then nothing would say where a read ends.
+  #
+  # The data rate is recorded and set on the port, and a simulated line
+  # ignores it: a pty takes a rate and then moves bytes at memory speed. It is
+  # here because a handler sets what its configuration says, and that is worth
+  # exercising even where nothing downstream of it is slower for it.
+  - name: payload_line
+    type: serial
+    asynchronous: true
+    datarate: 115200
+    byte_length: 8
+    stop_bits: 1
+    # No parity, which is what a payload link commonly runs -- and the only
+    # parity a simulated line can have: a pseudo-terminal will not take one,
+    # so a handler set to even against tcssim says so and stops.
+    parity: none
+    packet_size: 12
+    stream:
+      max_length: 12
+      timeout: none
+
+endpoints:
+  # The device is a path under /tmp rather than /dev/ttyS0 because this set is
+  # meant to be run: tcssim stands in for a line with a pty and makes this
+  # path a link to the pty's slave while the payload runs, which it can do
+  # here and could not do in /dev. A flight configuration names the port
+  # itself.
+  - name: serial-line
+    group: payload_line
+    device: /tmp/tcspecial4-line
+    dh_id: 0
+    oc_address: 127.0.0.1
+    oc_port: 6400

@@ -1,6 +1,6 @@
-# How tcssim simulates the payloads of payload1.yaml.
+# How tcssim simulates the payloads of tcspecial1.yaml.
 #
-# Nothing here describes a payload: payload1.yaml does that, and this file adds
+# Nothing here describes a payload: tcspecial1.yaml does that, and this file adds
 # only what simulating one needs. The two are joined by name. Every data
 # handler of the payload file needs settings here, and a name here that no data
 # handler has is an error rather than a line with no effect, because a typo is
@@ -17,7 +17,7 @@
 # other: the files are joined by name alone, and a payload set copied from
 # another one keeps the names.
 version: "1.0"
-description: Simulator settings for the payloads of payload1.yaml
+description: Simulator settings for the payloads of tcspecial1.yaml
 
 simulated_payload_groups:
   # One packet a second, sent whole.

@@ -26,6 +26,10 @@ use crate::endpoint::{
 
 /// UDP endpoint for network communication
 pub struct UdpEndpoint {
+    /// The handler this endpoint belongs to, as the payload configuration
+    /// names it, so that what this endpoint says of itself says which handler
+    /// it is for.
+    what: String,
     socket: UdpSocket,
     /// Where the other end of this link last spoke from.
     ///
@@ -41,13 +45,14 @@ pub struct UdpEndpoint {
 }
 
 impl UdpEndpoint {
-    pub fn new(config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn new(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let socket =
-            UdpSocket::bind(&addr).map_err(|e| bind_failed("UDP endpoint", &addr, e))?;
+        let socket = UdpSocket::bind(&addr)
+            .map_err(|e| bind_failed(&format!("{what} UDP endpoint"), &addr, e))?;
         socket.set_nonblocking(true)?;
 
         Ok(Self {
+            what: what.to_string(),
             socket,
             peer: Arc::new(Mutex::new(None)),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
@@ -65,6 +70,7 @@ impl UdpEndpoint {
     /// endpoint shares the socket rather than binding it twice.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
+            what: self.what.clone(),
             socket: self.socket.try_clone()?,
             // Shared, not copied: the point of the duplicate is that one
             // conduit reads this socket while another writes it, and only the
@@ -114,11 +120,11 @@ impl EndpointWritable for UdpEndpoint {
         // counted as a write of no bytes, because the data is dropped and a
         // write that moved nothing is not a write that succeeded.
         let peer = self.peer().ok_or_else(|| {
-            TcsError::Endpoint(
-                "nothing has been received on this socket yet, so there is no \
-                 address to send to"
-                    .to_string(),
-            )
+            TcsError::Endpoint(format!(
+                "{}: nothing has been received on this socket yet, so there is no \
+                 address to send to",
+                self.what
+            ))
         })?;
 
         match self.socket.send_to(data, peer) {
@@ -156,7 +162,7 @@ mod tests {
             port: addr.port(),
         };
 
-        let mut reader = UdpEndpoint::new(&config).unwrap();
+        let mut reader = UdpEndpoint::new("beacon", &config).unwrap();
         let mut writer = reader.try_clone().unwrap();
 
         // Nothing has arrived, so there is nowhere to answer.

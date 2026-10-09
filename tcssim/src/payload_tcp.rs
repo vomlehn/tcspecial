@@ -27,7 +27,7 @@ pub fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Failed to bind TCP listener: {}", e);
+            eprintln!("{}: failed to bind the TCP listener: {}", config.name, e);
             return;
         }
     };
@@ -101,7 +101,7 @@ pub fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
             // next pass listens again, so a payload that hung up is one that
             // can be reconnected to rather than one that has gone for good.
             if hangs_up(&config, sent) {
-                eprintln!("the payload is hanging up after {sent} packets");
+                eprintln!("{}: hanging up after {sent} packets", config.name);
                 connection = None;
                 sent = 0;
             }
@@ -132,6 +132,7 @@ mod tests {
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Tcp,
             address: "127.0.0.1".to_string(),
             port,

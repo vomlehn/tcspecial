@@ -53,7 +53,7 @@ const STOPPED_STATUS: &str = "Stopped";
 /// Which environment variable names the payload simulation configuration, and
 /// what is read when that variable is unset.
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
-const DEFAULT_SIM_CONFIG_PATH: &str = "payload1sim.yaml";
+const DEFAULT_SIM_CONFIG_PATH: &str = "tcspecial1sim.yaml";
 
 /// The two strings a panel shows for one sample: when, and what.
 ///
@@ -187,6 +187,9 @@ fn payload_info_from(dh: &DHConfig, sim: &ResolvedSim) -> PayloadInfo {
         // may state a segment larger than the payload file's packet, and a
         // panel that said nothing about it until a spin box was touched would
         // have the payload refuse to start for no stated reason.
+        // Whether anything is ever sent to this payload, which decides
+        // whether its panel has a received line at all.
+        triggered: sim.triggered,
         sizes_problem: SharedString::from(sizes_problem(
             i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
             sim.segment_size as i32,
@@ -339,8 +342,10 @@ fn main() {
                     }),
                     // The panel keeps saying it is not sending, which is
                     // true: a payload that could not be started has not
-                    // started.
-                    Err(e) => eprintln!("Failed to start payload {}: {}", row, e),
+                    // started. Named as the payload configuration names it,
+                    // because a row number is this window's business and not
+                    // the reader's.
+                    Err(e) => eprintln!("{}: cannot start: {}", payload.name(), e),
                 },
                 Transfer::Silent => {
                     payload.stop();
@@ -426,7 +431,7 @@ mod tests {
             .join("docs/design.rst");
         let text = std::fs::read_to_string(&doc).unwrap();
 
-        // The four payloads of payload1.yaml, which is the set the document
+        // The four payloads of tcspecial1.yaml, which is the set the document
         // describes.
         let shape = grid::grid_shape(4);
         let size = grid::window_size(&shape, 4);
@@ -902,14 +907,14 @@ mod tests {
             // The simulator files are found through their payload file, not on
             // their own, so that one with no payload file is noticed too.
             let stem = match name
-                .strip_prefix("payload")
+                .strip_prefix("tcspecial")
                 .and_then(|rest| rest.strip_suffix(".yaml"))
             {
                 Some(stem) if !stem.ends_with("sim") => stem,
                 _ => continue,
             };
 
-            let sim_path = repo_file(&format!("payload{}sim.yaml", stem));
+            let sim_path = repo_file(&format!("tcspecial{}sim.yaml", stem));
             assert!(
                 sim_path.exists(),
                 "{} has no {} beside it, so the set cannot be simulated",
@@ -1146,16 +1151,31 @@ mod tests {
             (lines_from(&ui, "Sent: "), lines_from(&ui, "Recv: "))
         };
 
-        // A payload built from the files alone has moved nothing, and says so
-        // in both directions.
+        // A payload that sends on its own and has moved nothing: it says so
+        // in the direction it can move in, and has no received line at all --
+        // nothing is ever sent to such a payload, so a line for it would read
+        // the same from the first packet to the last.
         let quiet = payload_info_from(&handler("DH0"), &sim(1000, 1000, 12));
         let (sent, recv) = shown(quiet.clone());
+        assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
+        assert!(
+            recv.is_empty(),
+            "a payload that sends on its own has a received line: {recv:?}"
+        );
+
+        // One that answers requests has both, and says the same thing in
+        // each before anything has moved.
+        let mut asked = sim(1000, 1000, 12);
+        asked.triggered = true;
+        asked.packet_interval_ms = 0;
+        asked.segment_interval_ms = 0;
+        let (sent, recv) = shown(payload_info_from(&handler("DH0"), &asked));
         assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
         assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME} ")]);
 
         // And one that has sent and been spoken to shows when each happened
         // and the head of what moved.
-        let mut moving = quiet;
+        let mut moving = payload_info_from(&handler("DH0"), &asked);
         show_traffic(
             &mut moving,
             &PayloadStats {

@@ -116,20 +116,20 @@ pub fn run_unix_stream_payload(
 ) {
     let path = PathBuf::from(&config.address);
     if let Err(e) = clear_a_dead_socket(&path) {
-        eprintln!("Failed to stand in for the Unix stream payload: {}", e);
+        eprintln!("{}: failed to stand in for a Unix stream payload: {}", config.name, e);
         return;
     }
 
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
         Err(e) => {
-            eprintln!("Failed to listen at {}: {}", path.display(), e);
+            eprintln!("{}: failed to listen at {}: {}", config.name, path.display(), e);
             return;
         }
     };
     let _bound = BoundPath { path: path.clone() };
     listener.set_nonblocking(true).ok();
-    eprintln!("a Unix stream payload is listening at {}", path.display());
+    eprintln!("{}: a Unix stream payload is listening at {}", config.name, path.display());
 
     let mut connection: Option<UnixStream> = None;
     let mut rng = rand::thread_rng();
@@ -197,7 +197,7 @@ pub fn run_unix_stream_payload(
             // next pass listens again, so a payload that hung up is one that
             // can be reconnected to rather than one that has gone for good.
             if hangs_up(&config, sent) {
-                eprintln!("the payload is hanging up after {sent} packets");
+                eprintln!("{}: hanging up after {sent} packets", config.name);
                 connection = None;
                 sent = 0;
             }
@@ -229,21 +229,22 @@ pub fn run_unix_dgram_payload(
     };
 
     if let Err(e) = clear_a_dead_socket(&mine) {
-        eprintln!("Failed to stand in for the Unix datagram payload: {}", e);
+        eprintln!("{}: failed to stand in for a Unix datagram payload: {}", config.name, e);
         return;
     }
 
     let socket = match UnixDatagram::bind(&mine) {
         Ok(socket) => socket,
         Err(e) => {
-            eprintln!("Failed to bind {}: {}", mine.display(), e);
+            eprintln!("{}: failed to bind {}: {}", config.name, mine.display(), e);
             return;
         }
     };
     let _bound = BoundPath { path: mine.clone() };
     socket.set_nonblocking(true).ok();
     eprintln!(
-        "a Unix datagram payload at {} is sending to {}",
+        "{}: a Unix datagram payload at {} is sending to {}",
+        config.name,
         mine.display(),
         handler.display()
     );
@@ -324,6 +325,7 @@ mod tests {
     fn payload_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol,
             address: path.display().to_string(),
             port: 0,

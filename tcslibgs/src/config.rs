@@ -33,7 +33,7 @@ pub const PAYLOAD_CONFIG_PATH_VAR: &str = "PAYLOAD_CONFIG_PATH";
 pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 
 /// The payload configuration read when nothing names one.
-pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "payload1.yaml";
+pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tcspecial1.yaml";
 
 /// Load payload configuration from a JSON, YAML, or XML file.
 ///
@@ -86,6 +86,86 @@ pub fn payload_path_from_args<I: Iterator<Item = String>>(
         .unwrap_or_else(|| DEFAULT_PAYLOAD_CONFIG_PATH.to_string()))
 }
 
+/// The payload configuration file and the address to serve commands on.
+///
+/// For a program that answers the ground rather than only reading a payload
+/// set: a command line of `[payload configuration file [command address]]`.
+/// The payload path is settled exactly as [`payload_path_from_args`] settles
+/// it, and the address is given back as it was written, for the caller to
+/// take apart with [`command_address_parts`] -- nothing here knows what a
+/// program's configuration file would otherwise have said.
+///
+/// The address is an argument rather than only a configuration file entry
+/// because two programs have to agree on it: tcsmoc decides where it will
+/// send commands and starts tcspecial, so it can hand over the address it
+/// chose instead of both ends reading their own file and hoping. An argument
+/// is also the one way a child can be told something tcsmoc's own
+/// environment will not pass on to whatever that child starts in turn.
+///
+/// Positional, and in that order, so the file a program reads is named the
+/// same way in every program here. An address cannot be given on its own; a
+/// program told only an address would be reading a payload file nobody named.
+pub fn payload_path_and_command_address<I: Iterator<Item = String>>(
+    mut args: I,
+    var: Option<&str>,
+) -> Result<(String, Option<String>), String> {
+    let program = args.next().unwrap_or_else(|| "program".to_string());
+    let usage = format!(
+        "usage: {} [payload configuration file [command address]]",
+        program
+    );
+
+    let from_args = args.next();
+    let address = args.next();
+    if let Some(extra) = args.next() {
+        return Err(format!("unexpected argument \"{}\"\n{}", extra, usage));
+    }
+
+    let path = match from_args {
+        Some(path) => path,
+        None => var
+            .and_then(|var| std::env::var(var).ok())
+            .unwrap_or_else(|| DEFAULT_PAYLOAD_CONFIG_PATH.to_string()),
+    };
+
+    Ok((path, address))
+}
+
+/// An `address:port` split into the two a socket is bound from.
+///
+/// Split at the last colon rather than parsed as a socket address, so that a
+/// name is as good as a number: `localhost:4000` is what someone types, and
+/// resolving it is the bind's business. The last colon is what makes an IPv6
+/// address in brackets work as well.
+///
+/// A port is required. An address without one is not a thing to default,
+/// because the whole reason the address is given is that two programs have to
+/// agree on it -- and they agree on the port or not at all.
+pub fn command_address_parts(address: &str) -> Result<(String, u16), String> {
+    let (host, port) = address.rsplit_once(':').ok_or_else(|| {
+        format!(
+            "command address \"{}\" has no port: give it as address:port",
+            address
+        )
+    })?;
+
+    if host.is_empty() {
+        return Err(format!(
+            "command address \"{}\" has no address: give it as address:port",
+            address
+        ));
+    }
+
+    let port: u16 = port.parse().map_err(|_| {
+        format!(
+            "command address \"{}\" has \"{}\" where its port should be",
+            address, port
+        )
+    })?;
+
+    Ok((host.to_string(), port))
+}
+
 /// Which kind of configuration a file holds.
 ///
 /// A file's extension says how it is spelled -- YAML, JSON or XML -- and not
@@ -106,24 +186,31 @@ pub enum HandlerSource {
 /// nothing about their contents, so a file with an error inside a section is
 /// still recognised and then reported by the real parser, which can say what
 /// is wrong with it.
+///
+/// Each is a list rather than one ignored value, for XML's sake: a sequence
+/// there is repeated sibling elements, so a file with two payloads presents
+/// `payloads` twice and a single field is a duplicate-field error. That read
+/// every XML payload file of more than one payload as unrecognisable -- and
+/// said `duplicate field`, which is a complaint about this struct rather than
+/// about the file.
 #[derive(Deserialize)]
 struct Sections {
     #[serde(default)]
-    payloads: Option<IgnoredAny>,
+    payloads: Vec<IgnoredAny>,
     /// What the payload section used to be called.
     ///
     /// Asked about only so that a file written to the old spelling is told
     /// the new one. Without this it would name no section this knows and be
     /// reported as describing no payloads at all, which is true and useless.
     #[serde(default)]
-    data_handlers: Option<IgnoredAny>,
+    data_handlers: Vec<IgnoredAny>,
     /// What a group of them used to be called, for the same reason.
     #[serde(default)]
-    data_handler_groups: Option<IgnoredAny>,
+    data_handler_groups: Vec<IgnoredAny>,
     #[serde(default, alias = "endpoint-groups")]
-    endpoint_groups: Option<IgnoredAny>,
+    endpoint_groups: Vec<IgnoredAny>,
     #[serde(default)]
-    endpoints: Option<IgnoredAny>,
+    endpoints: Vec<IgnoredAny>,
 }
 
 /// Which kind of configuration `text` holds.
@@ -133,11 +220,11 @@ fn handler_source_of(text: &str, format: ConfigFormat) -> TcsResult<HandlerSourc
     // A payload file is recognised by its own section, so a file carrying both
     // -- which neither format describes -- is read as a payload file rather
     // than rejected. There is nothing a caller could do about it either way.
-    if sections.payloads.is_some() {
+    if !sections.payloads.is_empty() {
         Ok(HandlerSource::Payload)
-    } else if sections.endpoints.is_some() || sections.endpoint_groups.is_some() {
+    } else if !sections.endpoints.is_empty() || !sections.endpoint_groups.is_empty() {
         Ok(HandlerSource::Endpoints)
-    } else if sections.data_handlers.is_some() || sections.data_handler_groups.is_some() {
+    } else if !sections.data_handlers.is_empty() || !sections.data_handler_groups.is_empty() {
         // The old spelling, named rather than ignored. A file keeping it would
         // otherwise be read as naming no section at all, and the honest
         // report of that -- it describes no payloads -- would say nothing
@@ -233,9 +320,79 @@ endpoints:
     #[test]
     fn an_argument_names_the_payload_file() {
         assert_eq!(
-            payload_path_from_args(args(&["payload2.yaml"]), None).unwrap(),
-            "payload2.yaml"
+            payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap(),
+            "tcspecial2.yaml"
         );
+    }
+
+    /// A second argument is the address commands are taken on.
+    #[test]
+    fn a_second_argument_is_the_command_address() {
+        assert_eq!(
+            payload_path_and_command_address(args(&["tcspecial2.yaml", "127.0.0.1:4000"]), None)
+                .unwrap(),
+            ("tcspecial2.yaml".to_string(), Some("127.0.0.1:4000".to_string()))
+        );
+    }
+
+    /// With no second argument there is no address, and the caller is left to
+    /// whatever its own configuration said.
+    #[test]
+    fn with_no_second_argument_there_is_no_command_address() {
+        assert_eq!(
+            payload_path_and_command_address(args(&["tcspecial2.yaml"]), None).unwrap(),
+            ("tcspecial2.yaml".to_string(), None)
+        );
+        assert_eq!(
+            payload_path_and_command_address(args(&[]), None).unwrap(),
+            (DEFAULT_PAYLOAD_CONFIG_PATH.to_string(), None)
+        );
+    }
+
+    /// A third argument is refused, and the refusal says what the two are.
+    #[test]
+    fn a_third_argument_is_refused() {
+        let e = payload_path_and_command_address(
+            args(&["tcspecial2.yaml", "127.0.0.1:4000", "extra"]),
+            None,
+        )
+        .expect_err("three arguments");
+        assert!(e.contains("extra"), "the refusal does not say which: {e}");
+        assert!(
+            e.contains("payload configuration file") && e.contains("command address"),
+            "the usage does not say what is expected: {e}"
+        );
+    }
+
+    /// An address is split where a socket needs it split, and a name is as
+    /// good as a number.
+    #[test]
+    fn a_command_address_is_an_address_and_a_port() {
+        assert_eq!(
+            command_address_parts("0.0.0.0:4000").unwrap(),
+            ("0.0.0.0".to_string(), 4000)
+        );
+        assert_eq!(
+            command_address_parts("localhost:4000").unwrap(),
+            ("localhost".to_string(), 4000)
+        );
+        // The last colon, which is what makes a bracketed IPv6 address work.
+        assert_eq!(
+            command_address_parts("[::1]:4000").unwrap(),
+            ("[::1]".to_string(), 4000)
+        );
+    }
+
+    /// An address that is not one is refused rather than defaulted.
+    ///
+    /// The address exists so that two programs agree on where commands go, and
+    /// a default is exactly the disagreement it is there to prevent.
+    #[test]
+    fn an_address_that_is_not_one_is_refused() {
+        for bad in ["127.0.0.1", "127.0.0.1:", ":4000", "127.0.0.1:no", "127.0.0.1:99999"] {
+            let e = command_address_parts(bad).expect_err(bad);
+            assert!(e.contains(bad), "{bad}: the complaint does not say it: {e}");
+        }
     }
 
     #[test]
@@ -273,6 +430,54 @@ endpoints:
         assert!(
             message.contains("two.yaml"),
             "the error should name the extra argument, but said: {message}"
+        );
+    }
+
+    /// An XML file of several payloads is recognised as a payload file.
+    ///
+    /// A sequence in XML is repeated sibling elements, so a file of two
+    /// payloads names `payloads` twice. Asking about the section with a single
+    /// field made the second one a duplicate-field error, and every XML
+    /// payload file of more than one payload was refused -- with a complaint
+    /// about a duplicate field, which says nothing about the file and is not
+    /// even true of it.
+    #[test]
+    fn an_xml_file_of_several_payloads_is_recognised() {
+        let xml = "<payload>\
+             <version>1.0</version>\
+             <description>two of them</description>\
+             <payloads><dh_id>0</dh_id><name>DH0</name><type>device</type>\
+               <path>/dev/null</path><packet_size>1</packet_size></payloads>\
+             <payloads><dh_id>1</dh_id><name>DH1</name><type>device</type>\
+               <path>/dev/zero</path><packet_size>1</packet_size></payloads>\
+             </payload>";
+
+        assert_eq!(
+            handler_source_of(xml, ConfigFormat::Xml).expect("an XML payload file"),
+            HandlerSource::Payload
+        );
+
+        // And the whole file still loads, which is the thing the sniffer was
+        // standing in the way of.
+        let config: PayloadConfig = ConfigFormat::Xml.parse(xml).expect("it parses");
+        assert_eq!(config.payloads.len(), 2);
+    }
+
+    /// The same of an endpoint file, whose sections are wrappers rather than
+    /// repeats: both shapes have to reach the same answer.
+    #[test]
+    fn an_xml_endpoint_file_is_recognised() {
+        let xml = "<endpoint-configuration>\
+             <general version=\"1.0\"/>\
+             <endpoint-groups><group name=\"g\" type=\"network\" protocol=\"udp\"/>\
+               </endpoint-groups>\
+             <endpoints><endpoint name=\"e\" group=\"g\" address=\"localhost\" \
+               port=\"5000\"/></endpoints>\
+             </endpoint-configuration>";
+
+        assert_eq!(
+            handler_source_of(xml, ConfigFormat::Xml).expect("an XML endpoint file"),
+            HandlerSource::Endpoints
         );
     }
 

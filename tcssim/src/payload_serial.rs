@@ -44,10 +44,10 @@ pub fn run_serial_payload(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let mut line = match SimulatedNode::open("a serial line", &config.address) {
+    let mut line = match SimulatedNode::open(&format!("{}: a serial line", config.name), &config.address) {
         Ok(line) => line,
         Err(e) => {
-            eprintln!("Failed to stand in for the serial line: {}", e);
+            eprintln!("{}: failed to stand in for a serial line: {}", config.name, e);
             return;
         }
     };
@@ -138,6 +138,7 @@ mod tests {
     fn payload_at(path: &Path, packet: u32, segment: u32) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Serial,
             address: path.display().to_string(),
             port: 0,

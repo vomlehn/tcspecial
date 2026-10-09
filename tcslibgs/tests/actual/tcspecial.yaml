@@ -1,7 +1,39 @@
-# Equivalent to tcspecial.json and tcspecial.xml.
-address: 0.0.0.0
-port: 4000
-protocol: udp
-beacon_interval_ms: 5000
-log_dir: /var/log/tcspecial
-log_segment_bytes: 65536
+# Equivalent to tcspecial.json and tcspecial.xml. All three must deserialize
+# into an identical PayloadConfig; tests/format_equivalence.rs enforces it.
+#
+# Note the quotes on version: unquoted 1.0 is a YAML float, not a string.
+version: "1.0"
+description: Two data handlers, one of each endpoint kind
+
+# What tcspecial itself is configured with for this payload set -- the same
+# section a tcspecial.yaml holds. First, because it is about the set as a
+# whole rather than about any payload in it. Read by nothing yet: tcspecial
+# still takes its own configuration from the file TCSPECIAL_CONFIG_PATH names,
+# and the address it serves commands on from its command line before that.
+tcspecial:
+  address: 0.0.0.0
+  port: 4000
+  protocol: udp
+  beacon_interval_ms: 5000
+  log_dir: /var/log/tcspecial
+  log_segment_bytes: 65536
+
+payload_groups:
+  - name: udp_localhost
+    type: network
+    protocol: udp
+    address: localhost
+    packet_size: 12
+payloads:
+  # Takes everything but its port from the group it names, so this is also
+  # the proof that an attribute stated only by a group reaches the handler.
+  - dh_id: 0
+    name: DH0
+    group: udp_localhost
+    port: 5000
+  # States every attribute for itself, naming no group.
+  - dh_id: 1
+    name: DH1
+    type: device
+    path: /dev/ttyS0
+    packet_size: 64

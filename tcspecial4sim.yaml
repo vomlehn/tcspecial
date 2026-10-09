@@ -1,0 +1,30 @@
+# How tcssim simulates the payloads of tcspecial4.yaml.
+#
+# Nothing here describes a payload: tcspecial4.yaml does that, and this file adds
+# only what simulating one needs. The two are joined by name. Every data
+# handler of the payload file needs settings here, and a name here that no data
+# handler has is an error rather than a line with no effect, because a typo is
+# otherwise indistinguishable from a payload that was meant not to be
+# simulated.
+#
+# The payload states the kind of payload it is, in the same word its own file
+# uses. That is not a setting of the simulation -- the payload file decides it
+# -- and it is stated again here only so that the two files can be checked
+# against each other: the files are joined by name alone, and a payload set
+# copied from another one keeps the names.
+#
+# A serial payload takes no protocol and no address of its own: a line is
+# reached by its device and by nothing else.
+version: "1.0"
+description: Simulator settings for the payloads of tcspecial4.yaml
+
+simulated_payloads:
+  # Twice a second, in segments of four bytes a tenth of a second apart, so
+  # that a packet arriving in pieces is what the panels show rather than
+  # something to be imagined. A line delivers bytes rather than datagrams, so
+  # the segments are where a handler's reading is exercised.
+  - name: serial-line
+    type: serial
+    packet_interval_ms: 500
+    segment_size: 4
+    segment_interval_ms: 100

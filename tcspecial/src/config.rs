@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use tcslibgs::endpoint_config::{self, EndpointConfigDoc};
+use tcslibgs::config::command_address_parts;
 use tcslibgs::{load_config_file, CIConfig, TcsError, TcsResult};
 use tcslibgs::CIConfigJson;
 
@@ -17,6 +18,24 @@ pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
         .map_err(|e| TcsError::Config(e))?;
 
     Ok(tcspecial_config)
+}
+
+/// Where commands are taken: what the command line said, or failing that what
+/// the configuration file said.
+///
+/// The command line wins, and that is the whole point of it. Tcsmoc decides
+/// the address it will send commands to and starts tcspecial with it, so the
+/// one that matters is the one the ground chose; a tcspecial that preferred
+/// its own file could be listening somewhere nobody was talking to, and the
+/// only sign of it was every command timing out.
+///
+/// With no argument nothing changes: a tcspecial run on its own -- `make run`,
+/// or under a debugger -- is still placed by its configuration file.
+pub fn command_address(config: &CIConfig, given: Option<&str>) -> Result<(String, u16), String> {
+    match given {
+        Some(address) => command_address_parts(address),
+        None => Ok((config.address.clone(), config.port)),
+    }
 }
 
 /// Load an endpoint configuration file in JSON, YAML, or XML.
@@ -124,6 +143,39 @@ mod tests {
             assert_eq!(config.log_dir, None, "{ext}");
             assert_eq!(config.log_segment_bytes, 65_536, "{ext}");
         }
+    }
+
+    /// The command line says where commands are taken, and the configuration
+    /// file says it only when the command line did not.
+    ///
+    /// Tcsmoc starts tcspecial with the address it is about to send to, so the
+    /// argument has to win. Before it existed, the MOC sent to its own default
+    /// and tcspecial bound what its file said; the two agreed because someone
+    /// kept them equal by hand, and when they stopped agreeing every command
+    /// timed out with nothing on either end to say why.
+    #[test]
+    fn the_command_line_places_the_command_interpreter() {
+        let config = load_from(".yaml", YAML).expect("the configuration loads");
+        assert_eq!((config.address.clone(), config.port), ("0.0.0.0".to_string(), 4000));
+
+        // Nothing given: the file is still what places it.
+        assert_eq!(
+            command_address(&config, None).unwrap(),
+            ("0.0.0.0".to_string(), 4000)
+        );
+
+        // Given: the argument, down to the port, which is the half most
+        // likely to differ and the half a bind cannot do without.
+        assert_eq!(
+            command_address(&config, Some("127.0.0.1:4100")).unwrap(),
+            ("127.0.0.1".to_string(), 4100)
+        );
+
+        // And an argument that is not an address does not quietly leave the
+        // file's one in place: a tcspecial listening somewhere other than
+        // where it was told is the fault this exists to prevent.
+        let e = command_address(&config, Some("127.0.0.1")).expect_err("no port");
+        assert!(e.contains("127.0.0.1"), "{e}");
     }
 
     #[test]

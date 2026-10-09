@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::endpoint_config_serial::StopBits;
+use crate::endpoint_config_serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
 use crate::endpoint_config_spi::{BitOrder, CsActive, SpiMode};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
@@ -494,7 +494,25 @@ pub struct SerialConfig {
     pub path: String,
     /// Line rate in bits per second.
     pub datarate: u32,
-    pub stop_bits: StopBits,
+    /// Whether the line is start-stop framed or synchronous.
+    pub asynchronous: bool,
+    /// Stop bits following each byte, for a start-stop line. `None` for a
+    /// synchronous one, which has no use for them: a stop bit is what
+    /// start-stop framing uses in place of a clock.
+    pub stop_bits: Option<StopBits>,
+    /// Parity per character, for a start-stop line, which is what termios
+    /// sets. `None` for a synchronous one.
+    pub parity: Option<Parity>,
+    /// What a synchronous line's clock, coding and frame check are, and
+    /// `None` for a start-stop line. Recorded rather than applied: the kernel
+    /// drives such a line through a network interface of its own rather than
+    /// through the terms of a device file, so a handler reading a path cannot
+    /// set them -- and a link whose configuration says what it expects can be
+    /// checked against the equipment and reported plainly.
+    pub clock_type: Option<ClockType>,
+    pub encoding: Option<Encoding>,
+    pub frame_check: Option<FrameCheck>,
+    pub loopback: Option<bool>,
     /// Data bits per byte. A count rather than a `ByteLength`, which is the
     /// configuration language's checked form: by the time a handler is
     /// started the count has been checked, and this is the number the line
@@ -627,7 +645,11 @@ impl DHMode {
 }
 
 /// Data handler configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Compared as a value so that one file's handlers can be held against
+/// another's: a payload set written in YAML, JSON and XML must produce the
+/// same handlers, and that is a comparison rather than an inspection.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DHConfig {
     pub dh_id: DHId,
     pub name: DHName,
@@ -665,6 +687,20 @@ pub struct DHConfig {
 pub struct PayloadConfig {
     pub version: String,
     pub description: String,
+    /// What tcspecial itself is configured with for this payload set: the
+    /// same section a `tcspecial.yaml` holds, carried here so that one file
+    /// can describe a whole set, the command interpreter included.
+    ///
+    /// First of the sections, in the files and here, because it is about the
+    /// set as a whole where the two below are about the payloads in it.
+    ///
+    /// Optional, and read by nothing yet: tcspecial still takes its own
+    /// configuration from the file `TCSPECIAL_CONFIG_PATH` names, and the
+    /// address it serves commands on from its command line before that. What
+    /// this does now is carry the section and refuse a malformed one, so a
+    /// file that states it is checked rather than ignored.
+    #[serde(default)]
+    pub tcspecial: Option<CIConfigJson>,
     /// Named groups of attributes that several payloads share.
     ///
     /// Optional: a file whose payloads have nothing in common, or that prefers
@@ -672,10 +708,6 @@ pub struct PayloadConfig {
     #[serde(default)]
     pub payload_groups: Vec<DHGroupJson>,
     pub payloads: Vec<DHConfigJson>,
-    /// Retained so a payload file that still carries a CI section parses,
-    /// but unused: the CI reads its own configuration from tcspecial.yaml.
-    #[serde(default)]
-    pub ci_config: Option<CIConfigJson>,
 }
 
 impl PayloadConfig {
@@ -748,6 +780,15 @@ impl PayloadConfig {
             .collect::<Result<_, String>>()?;
 
         no_two_handlers_claim_one_thing(&configs)?;
+
+        // The tcspecial section is checked here though nothing reads it yet.
+        // A section a file states is a section its author meant, and one that
+        // could never be used -- a protocol that is not a protocol, say -- is
+        // better refused by whoever loads the file than discovered by whoever
+        // first tries to use it.
+        if let Some(ci) = &self.tcspecial {
+            ci.to_ci_config().map_err(|e| format!("tcspecial: {e}"))?;
+        }
 
         // A group no handler names has no effect on the configuration, which
         // is exactly what a group whose name a handler misspelled looks like.
@@ -1361,7 +1402,13 @@ mod tests {
         let serial = EndpointConfig::Serial(SerialConfig {
             path: "/dev/ttyS0".to_string(),
             datarate: 9600,
-            stop_bits: StopBits::One,
+            asynchronous: true,
+            parity: Some(Parity::None),
+            clock_type: None,
+            encoding: None,
+            frame_check: None,
+            loopback: None,
+            stop_bits: Some(StopBits::One),
             byte_length: 8,
         });
         assert_eq!(serial.kind(), DHType::Serial);

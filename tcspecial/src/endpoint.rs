@@ -97,29 +97,6 @@ pub(crate) fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, ti
     }
 }
 
-/// Factory for creating endpoints from configuration
-pub fn create_reader_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn EndpointReadable + Send>> {
-    match config {
-        EndpointConfig::Network(net_config) => {
-            match net_config.protocol {
-                NetworkProtocol::Udp => {
-                    Ok(Box::new(UdpEndpoint::new(net_config)?))
-                }
-                NetworkProtocol::Tcp => {
-                    Ok(Box::new(TcpEndpoint::new_server(net_config)?))
-                }
-                _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
-            }
-        }
-        EndpointConfig::Device(dev_config) => Ok(Box::new(DeviceEndpoint::new(dev_config)?)),
-        EndpointConfig::Serial(serial_config) => {
-            Ok(Box::new(SerialEndpoint::new(serial_config)?))
-        }
-        EndpointConfig::I2c(i2c_config) => Ok(Box::new(I2cEndpoint::new(i2c_config)?)),
-        EndpointConfig::Spi(spi_config) => Ok(Box::new(SpiEndpoint::new(spi_config)?)),
-    }
-}
-
 /// A reader and a writer that wait at one endpoint, opened once.
 ///
 /// For the OC side of a data handler, which the ground sends to at an address
@@ -133,24 +110,25 @@ pub fn create_reader_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn Endp
 /// second time -- so the endpoint is opened once here and the second handle is
 /// a duplicate of the first.
 pub fn bind_endpoint_pair(
+    what: &str,
     config: &EndpointConfig,
 ) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
     match config {
         EndpointConfig::Network(net_config) => match net_config.protocol {
             NetworkProtocol::Udp => {
-                let reader = UdpEndpoint::new(net_config)?;
+                let reader = UdpEndpoint::new(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
             NetworkProtocol::Tcp => {
-                let reader = TcpEndpoint::new_server(net_config)?;
+                let reader = TcpEndpoint::new_server(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
             _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
         },
         EndpointConfig::Device(dev_config) => {
-            let reader = DeviceEndpoint::new(dev_config)?;
+            let reader = DeviceEndpoint::new(what, dev_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
@@ -158,17 +136,17 @@ pub fn bind_endpoint_pair(
         // it is opened: see the file for the kind. The duplicate carries what
         // was set rather than setting it again.
         EndpointConfig::Serial(serial_config) => {
-            let reader = SerialEndpoint::new(serial_config)?;
+            let reader = SerialEndpoint::new(what, serial_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
         EndpointConfig::I2c(i2c_config) => {
-            let reader = I2cEndpoint::new(i2c_config)?;
+            let reader = I2cEndpoint::new(what, i2c_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
         EndpointConfig::Spi(spi_config) => {
-            let reader = SpiEndpoint::new(spi_config)?;
+            let reader = SpiEndpoint::new(what, spi_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
@@ -196,6 +174,7 @@ pub fn bind_endpoint_pair(
 /// are fine where two binds of a socket are not, which is why the device
 /// handler was the only one that ever worked.
 pub fn connect_endpoint_pair(
+    what: &str,
     config: &EndpointConfig,
 ) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
     match config {
@@ -203,12 +182,12 @@ pub fn connect_endpoint_pair(
             // Bound, not connected: the payload is the end that speaks first
             // over UDP, so this is the end that has to be findable.
             NetworkProtocol::Udp => {
-                let reader = UdpEndpoint::new(net_config)?;
+                let reader = UdpEndpoint::new(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
             NetworkProtocol::Tcp => {
-                let reader = TcpEndpoint::connect_retrying(net_config)?;
+                let reader = TcpEndpoint::connect_retrying(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
@@ -216,18 +195,18 @@ pub fn connect_endpoint_pair(
             // reason: a stream is accepted and a datagram is not. The
             // difference is only that both are named by a path.
             NetworkProtocol::UnixStream => {
-                let reader = UnixStreamEndpoint::connect_retrying(net_config)?;
+                let reader = UnixStreamEndpoint::connect_retrying(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
             NetworkProtocol::UnixDgram => {
-                let reader = UnixDatagramEndpoint::bind(net_config)?;
+                let reader = UnixDatagramEndpoint::bind(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
         },
         EndpointConfig::Device(dev_config) => {
-            let reader = DeviceEndpoint::new(dev_config)?;
+            let reader = DeviceEndpoint::new(what, dev_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
@@ -235,43 +214,20 @@ pub fn connect_endpoint_pair(
         // it is opened: see the file for the kind. The duplicate carries what
         // was set rather than setting it again.
         EndpointConfig::Serial(serial_config) => {
-            let reader = SerialEndpoint::new(serial_config)?;
+            let reader = SerialEndpoint::new(what, serial_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
         EndpointConfig::I2c(i2c_config) => {
-            let reader = I2cEndpoint::new(i2c_config)?;
+            let reader = I2cEndpoint::new(what, i2c_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
         EndpointConfig::Spi(spi_config) => {
-            let reader = SpiEndpoint::new(spi_config)?;
+            let reader = SpiEndpoint::new(what, spi_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
-    }
-}
-
-/// Factory for creating endpoints from configuration
-pub fn create_writer_endpoint(config: &EndpointConfig) -> TcsResult<Box<dyn EndpointWritable + Send>> {
-    match config {
-        EndpointConfig::Network(net_config) => {
-            match net_config.protocol {
-                NetworkProtocol::Udp => {
-                    Ok(Box::new(UdpEndpoint::new(net_config)?))
-                }
-                NetworkProtocol::Tcp => {
-                    Ok(Box::new(TcpEndpoint::new_server(net_config)?))
-                }
-                _ => Err(TcsError::Config("Unsupported network protocol".to_string())),
-            }
-        }
-        EndpointConfig::Device(dev_config) => Ok(Box::new(DeviceEndpoint::new(dev_config)?)),
-        EndpointConfig::Serial(serial_config) => {
-            Ok(Box::new(SerialEndpoint::new(serial_config)?))
-        }
-        EndpointConfig::I2c(i2c_config) => Ok(Box::new(I2cEndpoint::new(i2c_config)?)),
-        EndpointConfig::Spi(spi_config) => Ok(Box::new(SpiEndpoint::new(spi_config)?)),
     }
 }
 

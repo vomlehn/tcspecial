@@ -14,8 +14,8 @@ use std::time::Duration;
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::config::{load_dh_configs, payload_path_from_args};
 use tcslibgs::{
-    payload_parameters, ArmKey, CommandStatus, DHConfig, DHSample, ResolvedSim, SimConfigFile,
-    NO_TRANSFER_TIME,
+    payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
+    ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
 };
 use tcspecial::config::constants::BEACON_NETADDR;
 
@@ -109,7 +109,7 @@ const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 /// The same variable tcssim reads, which is the point: the MOC shows what the
 /// tcssim it starts is simulating, so the two have to be looking at one file.
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
-const DEFAULT_SIM_CONFIG_PATH: &str = "payload1sim.yaml";
+const DEFAULT_SIM_CONFIG_PATH: &str = "tcspecial1sim.yaml";
 
 /// A panel's nominal size, and the height of everything above and below the
 /// grid of them.
@@ -267,6 +267,9 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         // read, which is not an error here: the MOC controls payloads and
         // does not simulate them.
         parameters: SharedString::from(payload_parameters(dh, sim)),
+        // Whether this handler's payload answers requests, which decides
+        // whether its panel shows a sent line.
+        triggered: dh.mode.polling().is_some(),
     }
 }
 
@@ -341,17 +344,131 @@ struct PanelUpdate {
 /// but not the samples keeps the sample lines it had: the last thing seen is
 /// better than nothing seen, and a blank line reads as no data rather than no
 /// answer.
+/// One line about a payload that has to be asked for its data, or nothing at
+/// all about one that does not.
+///
+/// A triggered payload is the one worth watching this closely. It sends
+/// nothing until tcspecial asks it to, so when a panel shows no data the
+/// question is always what the MOC sent and what came back -- and neither of
+/// those appears anywhere: the window shows a payload's state and not the
+/// traffic that settled it.
+///
+/// Said on stderr, as the startup messages in `main` are, so it appears on the
+/// console of whoever started the MOC whether or not they set `RUST_LOG`.
+fn triggered_note(dh: &DHConfig, what: &str) -> Option<String> {
+    dh.mode.polling()?;
+    Some(format!("triggered payload {}: {}", dh.name.0, what))
+}
+
+/// Say it, if this is a payload there is anything to say about.
+///
+/// For the things that happen once: a button pressed, an answer to it. Two
+/// presses are two lines even when they say the same thing, because they are
+/// two presses.
+fn note_triggered(dh: &DHConfig, what: String) {
+    if let Some(line) = triggered_note(dh, &what) {
+        eprintln!("{line}");
+    }
+}
+
+/// Say it only if it is not what was last said about this payload.
+///
+/// For the things that are said over and over: the panels refresh about once a
+/// second whether or not anything is happening, so a note on every pass buried
+/// what moved under a hundred identical lines. `said` is what was last said
+/// about this payload, kept by the caller -- one per panel -- so a line appears
+/// when something behind it changed and not again until it changes once more.
+///
+/// Returns whether anything was said, which is what makes the rule testable: a
+/// console is not somewhere a test can read.
+fn note_triggered_if_new(dh: &DHConfig, what: String, said: &mut Option<String>) -> bool {
+    let line = match triggered_note(dh, &what) {
+        Some(line) => line,
+        // Nothing to say, and nothing to remember either: `said` belongs to
+        // the payload, and a payload nothing is said about has no last line.
+        None => return false,
+    };
+
+    if said.as_deref() == Some(line.as_str()) {
+        return false;
+    }
+
+    eprintln!("{line}");
+    *said = Some(line);
+    true
+}
+
+/// What the MOC starts out believing about a triggered payload.
+///
+/// The whole of what it will address the payload by and ask it with: the id
+/// every command carries, where the payload and the OC side are, and the
+/// trigger and interval that are tcspecial's to send. A panel shows the first
+/// of those and none of the rest, so a session where the MOC and tcspecial
+/// disagreed about a payload had nothing on the console to compare.
+fn triggered_startup(dh: &DHConfig, status: &str) -> Option<String> {
+    let (trigger, interval_ms) = dh.mode.polling()?;
+    triggered_note(
+        dh,
+        &format!(
+            "dh_id {}, {}, trigger {} every {} ms, OC {}, status {}",
+            dh.dh_id.0,
+            endpoint_description(&dh.endpoint),
+            trigger_as_written(trigger),
+            interval_ms,
+            oc_of(dh),
+            status
+        ),
+    )
+}
+
+/// Where a handler's OC side is, or that it has not got one.
+fn oc_of(dh: &DHConfig) -> String {
+    match &dh.oc {
+        Some(oc) => format!("{}:{}", oc.address, oc.port),
+        None => "none".to_string(),
+    }
+}
+
 fn panel_update_for(
     client: &mut TcsClient,
     row: usize,
     dh: &DHConfig,
     previous: Option<&PanelUpdate>,
+    said: &mut Option<String>,
 ) -> Option<PanelUpdate> {
-    let (_, stats) = client.query_dh(dh.dh_id).ok()?;
+    let (status, stats) = match client.query_dh(dh.dh_id) {
+        Ok(answer) => answer,
+        Err(e) => {
+            note_triggered_if_new(dh, format!("QUERY_DH got no answer: {e}"), said);
+            return None;
+        }
+    };
 
     // A second command, because the statistics every poll asks for do not
     // carry payload bytes.
     let samples = client.query_dh_sample(dh.dh_id).ok();
+
+    // The status each answer carried, which nothing else looks at: a handler
+    // tcspecial has not got answers NotFound, and a panel showing zeroes
+    // looks exactly like one whose payload is quiet. Triggers are said too,
+    // since they are what a triggered handler is for and appear in no other
+    // counter.
+    note_triggered_if_new(
+        dh,
+        format!(
+            "QUERY_DH {:?}: {} triggers sent, {} bytes to the ground, {} from it; \
+             QUERY_DH_SAMPLE {}",
+            status,
+            stats.triggers_sent,
+            stats.bytes_sent,
+            stats.bytes_received,
+            match &samples {
+                Some((status, _, _)) => format!("{status:?}"),
+                None => "no answer".to_string(),
+            }
+        ),
+        said,
+    );
 
     let (last_sent_time, last_sent, last_recv_time, last_recv) = match samples {
         Some((_, sent, received)) => {
@@ -428,13 +545,23 @@ fn update_row(model: &Rc<VecModel<DHInfo>>, row: usize, f: impl FnOnce(&mut DHIn
 /// the child would have taken from the environment, so for the run of a
 /// payload set the MOC's own file is the one that counts.
 ///
+/// `command_address` is where that child is to take commands, for the one
+/// child that takes any. The MOC decides the address it will be sending to and
+/// hands it over, rather than leaving tcspecial to read its own configuration
+/// file and the MOC to hope they agree: a tcspecial bound somewhere the MOC is
+/// not talking to answers nothing, and nothing on either end says why. Passed
+/// as `None` for a child that serves no commands, which is tcssim.
+///
 /// The command is built rather than run so that a test can read what a child
 /// would be started with, without starting it. The children open windows and
 /// bind fixed ports, so a test that spawned them would not be a test anyone
 /// could run twice at once, or alongside a real session.
-fn child_command(name: &str, payload_path: &str) -> Command {
+fn child_command(name: &str, payload_path: &str, command_address: Option<&str>) -> Command {
     let mut command = Command::new("cargo");
     command.args(["run", "--bin", name, "--", payload_path]);
+    if let Some(address) = command_address {
+        command.arg(address);
+    }
     command
 }
 
@@ -453,8 +580,8 @@ impl ProcessManager {
     }
 
     /// Starts a child in a background thread and exits when it completes.
-    fn start_child(&self, name: &str, payload_path: &str) {
-        let child = child_command(name, payload_path)
+    fn start_child(&self, name: &str, payload_path: &str, command_address: Option<&str>) {
+        let child = child_command(name, payload_path, command_address)
             .spawn()
             .expect(&format!("Failed to start {}", name));
 
@@ -557,6 +684,20 @@ fn main() {
     ));
     ui.set_dh_model(ModelRc::from(dh_model.clone()));
 
+    // And on the console, what the MOC believes about each payload that has
+    // to be asked for its data: see triggered_startup. Said before tcspecial
+    // is started or attached to, so that what the MOC read is on the console
+    // above whatever the spacecraft then says about the same payload.
+    for (row, dh) in dh_configs.iter().enumerate() {
+        let status = dh_model
+            .row_data(row)
+            .map(|info| info.status.to_string())
+            .unwrap_or_default();
+        if let Some(line) = triggered_startup(dh, &status) {
+            eprintln!("{line}");
+        }
+    }
+
     // Shape the grid, and open the window at the size that shape wants. The
     // window cannot work this out for itself: it would need the panel count
     // before the model is set.
@@ -600,12 +741,14 @@ fn main() {
         )));
     } else {
         let manager = Arc::new(ProcessManager::new());
-        manager.start_child(tcspecial, &payload_path);
+        // Started on the address the MOC is about to open its link at, so the
+        // end that listens and the end that sends cannot differ.
+        manager.start_child(tcspecial, &payload_path, Some(DEFAULT_CI_ADDRESS));
         process_manager_tcspecial = Some(manager);
     }
 
     let process_manager_tcssim = Arc::new(ProcessManager::new());
-    process_manager_tcssim.start_child(tcssim, &payload_path);
+    process_manager_tcssim.start_child(tcssim, &payload_path, None);
 
     eprintln!("sleeping to let the subprocesses initialize");
     thread::sleep(Duration::new(2, 0));
@@ -875,7 +1018,7 @@ fn query_dh_buttons(
         let mut results = Vec::new();
 
         for (row, dh) in dh_configs.iter().enumerate() {
-            match panel_update_for(client, row, dh, None) {
+            match panel_update_for(client, row, dh, None, &mut None) {
                 Some(update) => {
                     results.push(format!(
                         "{}: sent={} recv={}",
@@ -931,13 +1074,18 @@ fn poll_panels(
             // statistics but not the samples keeps its sample lines.
             let mut last: Vec<Option<PanelUpdate>> = vec![None; dh_configs.len()];
 
+            // And what was last said about each on the console, so a pass
+            // that found nothing new says nothing.
+            let mut said: Vec<Option<String>> = vec![None; dh_configs.len()];
+
             // The poller's own link, kept wherever the window's link is.
             let mut poll_link = CiLink::down();
 
             loop {
                 thread::sleep(PANEL_POLL_INTERVAL);
 
-                let gathered = poll_pass(&link, &mut poll_link, &dh_configs, &mut last);
+                let gathered =
+                    poll_pass(&link, &mut poll_link, &dh_configs, &mut last, &mut said);
 
                 if let Ok(mut queue) = pending.lock() {
                     *queue = gathered;
@@ -988,11 +1136,16 @@ fn poll_panels(
 /// `last` is what each panel last showed, carried in and out so a handler
 /// that answers the statistics but not the samples keeps its sample lines.
 /// It is left alone for a handler that did not answer at all.
+///
+/// `said` is what was last said on the console about each payload, carried the
+/// same way and for the same kind of reason: a pass happens every second
+/// whether or not anything moved, and what is worth saying is what changed.
 fn poll_pass(
     link: &Mutex<CiLink>,
     poll_link: &mut CiLink,
     dh_configs: &[DHConfig],
     last: &mut [Option<PanelUpdate>],
+    said: &mut [Option<String>],
 ) -> Vec<PanelUpdate> {
     // Where the buttons have the link now. A poisoned lock leaves the poller
     // where it was rather than taking the panels down with it.
@@ -1017,7 +1170,8 @@ fn poll_pass(
 
     let mut gathered = Vec::with_capacity(dh_configs.len());
     for (row, dh) in dh_configs.iter().enumerate() {
-        if let Some(update) = panel_update_for(client, row, dh, last[row].as_ref()) {
+        if let Some(update) = panel_update_for(client, row, dh, last[row].as_ref(), &mut said[row])
+        {
             last[row] = Some(update.clone());
             gathered.push(update);
         }
@@ -1099,10 +1253,20 @@ fn transmit(
     dh_model: &Rc<VecModel<DHInfo>>,
     row: usize,
 ) {
+    note_triggered(
+        dh,
+        format!(
+            "Transmit pressed: sending START_DH for dh_id {} as a {:?} handler",
+            dh.dh_id.0,
+            dh.endpoint.kind()
+        ),
+    );
+
     let mut guard = link.lock().unwrap();
     let sent = match guard.client() {
         Some(client) => client.start_dh(dh.dh_id, dh.endpoint.kind(), dh.name.clone()),
         None => {
+            note_triggered(dh, format!("START_DH not sent: {NOT_CONNECTED}"));
             ui.set_last_response(SharedString::from(NOT_CONNECTED));
             return;
         }
@@ -1114,6 +1278,10 @@ fn transmit(
             } else {
                 ERROR_STATUS
             };
+            note_triggered(
+                dh,
+                format!("START_DH answered {status:?}, so the panel now says {showing}"),
+            );
             update_row(dh_model, row, |info| {
                 info.status = SharedString::from(showing);
             });
@@ -1123,6 +1291,7 @@ fn transmit(
             )));
         }
         Err(e) => {
+            note_triggered(dh, format!("START_DH did not get through: {e}"));
             ui.set_last_response(SharedString::from(format!(
                 "START_DH {} failed: {}",
                 dh.name.0, e
@@ -1139,16 +1308,26 @@ fn discard(
     dh_model: &Rc<VecModel<DHInfo>>,
     row: usize,
 ) {
+    note_triggered(
+        dh,
+        format!("Discard pressed: sending STOP_DH for dh_id {}", dh.dh_id.0),
+    );
+
     let mut guard = link.lock().unwrap();
     let sent = match guard.client() {
         Some(client) => client.stop_dh(dh.dh_id),
         None => {
+            note_triggered(dh, format!("STOP_DH not sent: {NOT_CONNECTED}"));
             ui.set_last_response(SharedString::from(NOT_CONNECTED));
             return;
         }
     };
     match sent {
         Ok(status) => {
+            note_triggered(
+                dh,
+                format!("STOP_DH answered {status:?}, so the panel now says {STOPPED_STATUS}"),
+            );
             update_row(dh_model, row, |info| {
                 info.status = SharedString::from(STOPPED_STATUS);
             });
@@ -1158,6 +1337,7 @@ fn discard(
             )));
         }
         Err(e) => {
+            note_triggered(dh, format!("STOP_DH did not get through: {e}"));
             ui.set_last_response(SharedString::from(format!(
                 "STOP_DH {} failed: {}",
                 dh.name.0, e
@@ -1260,9 +1440,11 @@ mod tests {
                 let dh_configs = vec![a_dh()];
                 let mut poll_link = CiLink::down();
                 let mut last = vec![None];
+                let mut said = vec![None];
 
                 let started = Instant::now();
-                let gathered = poll_pass(&link, &mut poll_link, &dh_configs, &mut last);
+                let gathered =
+                    poll_pass(&link, &mut poll_link, &dh_configs, &mut last, &mut said);
                 (gathered, started.elapsed())
             })
         };
@@ -1471,6 +1653,142 @@ mod tests {
         // checks that need one run from here.
         the_params_button_shows_what_both_files_said();
         the_window_shows_when_the_last_beacon_arrived();
+        only_a_triggered_payloads_panel_shows_a_sent_line();
+    }
+
+    /// Only a payload that has to be asked is talked about on the console.
+    ///
+    /// The console carries the traffic of one payload per line per poll, so a
+    /// payload that sends on its own would double the lines and say nothing a
+    /// panel does not already show. The one being watched is the one whose
+    /// data depends on what the MOC and tcspecial said to each other.
+    #[test]
+    fn only_a_triggered_payload_is_talked_about() {
+        let mut dh = a_dh();
+
+        assert_eq!(
+            triggered_note(&dh, "START_DH answered Success"),
+            None,
+            "a payload that sends on its own is talked about"
+        );
+
+        dh.mode = tcslibgs::DHMode::Triggered {
+            trigger: b"go".to_vec(),
+            interval_ms: 1000,
+        };
+        let said = triggered_note(&dh, "START_DH answered Success")
+            .expect("a triggered payload is talked about");
+        assert!(said.contains("DH1"), "the payload is not named: {said}");
+        assert!(
+            said.contains("START_DH answered Success"),
+            "what happened is not said: {said}"
+        );
+    }
+
+    /// A refreshed line is said when it changes and not again until it
+    /// changes once more.
+    ///
+    /// The panels poll every handler once a second from the moment the link
+    /// is up, started or not, so saying the poll's answer every pass meant a
+    /// line a second about a payload sitting still -- and the lines that
+    /// mattered, a trigger count moving or a status turning into NotFound,
+    /// went past in the middle of a hundred identical ones.
+    #[test]
+    fn a_refreshed_line_is_said_only_when_it_changes() {
+        let mut dh = a_dh();
+        dh.mode = tcslibgs::DHMode::Triggered {
+            trigger: b"go".to_vec(),
+            interval_ms: 1000,
+        };
+
+        let mut said = None;
+        let quiet = "QUERY_DH Success: 0 triggers sent".to_string();
+
+        // The first pass has something to say, and the next pass with the
+        // same answer has not.
+        assert!(
+            note_triggered_if_new(&dh, quiet.clone(), &mut said),
+            "the first line was not said"
+        );
+        assert!(
+            !note_triggered_if_new(&dh, quiet, &mut said),
+            "the same line was said twice"
+        );
+
+        // And the pass where something moved says so.
+        assert!(
+            note_triggered_if_new(
+                &dh,
+                "QUERY_DH Success: 5 triggers sent".to_string(),
+                &mut said
+            ),
+            "a line that changed was not said"
+        );
+
+        // A payload that sends on its own is still said nothing about, and
+        // leaves no mark on what was said about one that does not: the memory
+        // belongs to the payload it is kept for.
+        let was = said.clone();
+        assert!(!note_triggered_if_new(
+            &a_dh(),
+            "anything".to_string(),
+            &mut said
+        ));
+        assert_eq!(
+            said, was,
+            "a payload nothing is said about changed the memory"
+        );
+    }
+
+    /// The startup line says the whole of what the payload will be addressed
+    /// by and asked with.
+    ///
+    /// Every one of these is a thing the two ends can disagree about, and a
+    /// panel shows only the first: the id addresses the handler, the OC
+    /// address is where its data comes back to, and the trigger and interval
+    /// are what tcspecial will be sending while the panel just says Active.
+    #[test]
+    fn the_startup_line_says_what_the_payload_will_be_asked_with() {
+        let dh = DHConfig {
+            dh_id: DHId(1),
+            name: DHName::new("triggered-send"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: "localhost".to_string(),
+                port: 5003,
+            }),
+            packet_size: 12,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "127.0.0.1".to_string(),
+                port: 6003,
+            }),
+            mode: tcslibgs::DHMode::Triggered {
+                trigger: b"go".to_vec(),
+                interval_ms: 1000,
+            },
+        };
+
+        let said = triggered_startup(&dh, STOPPED_STATUS).expect("a triggered payload");
+        for wanted in [
+            "triggered-send",
+            "dh_id 1",
+            // As the payload file writes it, so that the console and the file
+            // can be read against each other.
+            &trigger_as_written(b"go"),
+            "1000 ms",
+            "127.0.0.1:6003",
+            STOPPED_STATUS,
+        ] {
+            assert!(said.contains(wanted), "{wanted:?} is not said: {said}");
+        }
+
+        // And a handler with no OC address says so rather than saying nothing:
+        // it is the one fault that stops a start, and it is in this file.
+        let mut without = dh.clone();
+        without.oc = None;
+        let said = triggered_startup(&without, STOPPED_STATUS).expect("a triggered payload");
+        assert!(said.contains("OC none"), "a missing OC is not said: {said}");
     }
 
     /// The simulator file beside a payload file is found and read.
@@ -1501,6 +1819,65 @@ mod tests {
             simulator_settings("no_such_payload_set.yaml", &dh_configs).is_none(),
             "a missing simulator file must not stop the MOC"
         );
+    }
+
+    /// A panel shows a sent line only where its payload answers requests.
+    ///
+    /// The row stays and its contents go, so every panel is the same shape
+    /// and the rows below do not move from one panel to the next.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them.
+    fn only_a_triggered_payloads_panel_shows_a_sent_line() {
+        use i_slint_backend_testing::ElementHandle;
+
+        let shown = |info: DHInfo| {
+            let ui = MainWindow::new().unwrap();
+            ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(vec![info]))));
+            ui.set_columns(1);
+            ui.show().unwrap();
+            ElementHandle::find_by_element_type_name(&ui, "Text")
+                .filter_map(|e| e.accessible_label())
+                .map(|label| label.to_string())
+                .collect::<Vec<_>>()
+        };
+
+        let mut dh = DHConfig {
+            dh_id: DHId(0),
+            name: DHName::new("DH0"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: "localhost".to_string(),
+                port: 5000,
+            }),
+            packet_size: 12,
+            oc: None,
+            mode: tcslibgs::DHMode::Periodic,
+        };
+
+        // A payload that sends on its own: the received line is there and the
+        // sent line is empty.
+        let lines = shown(dh_info_from(&dh, None));
+        assert!(
+            lines.iter().any(|line| line == "Last rcvd:"),
+            "the received line went missing: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|line| line == "Last sent:"),
+            "a payload that sends on its own has a sent line: {lines:?}"
+        );
+
+        // And one that answers requests has both.
+        dh.mode = tcslibgs::DHMode::Triggered {
+            trigger: b"READ\r".to_vec(),
+            interval_ms: 500,
+        };
+        let lines = shown(dh_info_from(&dh, None));
+        assert!(
+            lines.iter().any(|line| line == "Last sent:"),
+            "a payload that answers requests has no sent line: {lines:?}"
+        );
+        assert!(lines.iter().any(|line| line == "Last rcvd:"), "{lines:?}");
     }
 
     /// The window shows the beacon's last-received time where it says it
@@ -1622,7 +1999,7 @@ mod tests {
             .join("docs/design.rst");
         let text = std::fs::read_to_string(&doc).unwrap();
 
-        // The four handlers of payload1.yaml, which is the set the document
+        // The four handlers of tcspecial1.yaml, which is the set the document
         // describes.
         let shape = grid_shape(4);
         let size = window_size(&shape, 4);
@@ -1999,13 +2376,13 @@ mod tests {
     #[test]
     fn each_child_is_started_on_the_mocs_payload_file() {
         for name in CHILDREN {
-            let command = child_command(name, "payload2.yaml");
+            let command = child_command(name, "tcspecial2.yaml", None);
 
             assert_eq!(command.get_program(), "cargo", "{name}");
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args,
-                ["run", "--bin", name, "--", "payload2.yaml"],
+                ["run", "--bin", name, "--", "tcspecial2.yaml"],
                 "{name}"
             );
 
@@ -2021,14 +2398,14 @@ mod tests {
     /// command line.
     #[test]
     fn the_children_get_the_file_the_command_line_named() {
-        let payload_path = payload_path_from_args(args(&["payload2.yaml"]), None).unwrap();
+        let payload_path = payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap();
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path);
+            let command = child_command(name, &payload_path, None);
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
-                Some(&OsStr::new("payload2.yaml")),
+                Some(&OsStr::new("tcspecial2.yaml")),
                 "{name} was not given the file the command line named"
             );
         }
@@ -2042,7 +2419,7 @@ mod tests {
         assert_eq!(payload_path, DEFAULT_PAYLOAD_CONFIG_PATH);
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path);
+            let command = child_command(name, &payload_path, None);
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -2050,6 +2427,58 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    /// Tcspecial is started on the address the MOC will send commands to, and
+    /// tcssim is given no address at all.
+    ///
+    /// Both ends used to read their own configuration: tcspecial bound what
+    /// its file said and the MOC sent where its own default said, and the two
+    /// agreeing was a coincidence maintained by hand. The MOC chooses now, and
+    /// hands the choice over on the command line.
+    ///
+    /// The shape is checked by tcspecial's own parser rather than by a second
+    /// opinion about what the arguments mean: what the MOC writes and what
+    /// tcspecial reads is one agreement, and this is the place it can be read
+    /// in one test.
+    #[test]
+    fn tcspecial_is_started_on_the_address_the_moc_will_send_to() {
+        use tcslibgs::config::payload_path_and_command_address;
+
+        let command = child_command("tcspecial", "tcspecial2.yaml", Some(DEFAULT_CI_ADDRESS));
+        let passed: Vec<&OsStr> = command.get_args().collect();
+        assert_eq!(
+            passed,
+            [
+                "run",
+                "--bin",
+                "tcspecial",
+                "--",
+                "tcspecial2.yaml",
+                DEFAULT_CI_ADDRESS
+            ]
+        );
+
+        // What tcspecial makes of what it was handed: everything after the
+        // `--` is its own command line, with its name in front of it.
+        let mine: Vec<String> = std::iter::once("tcspecial".to_string())
+            .chain(
+                passed
+                    .iter()
+                    .skip(4)
+                    .map(|arg| arg.to_string_lossy().to_string()),
+            )
+            .collect();
+        let (payload_path, address) =
+            payload_path_and_command_address(mine.into_iter(), None).expect("tcspecial reads it");
+        assert_eq!(payload_path, "tcspecial2.yaml");
+        assert_eq!(address.as_deref(), Some(DEFAULT_CI_ADDRESS));
+
+        // And the simulator, which answers no commands, is given none to
+        // answer them on.
+        let command = child_command("tcssim", "tcspecial2.yaml", None);
+        let passed: Vec<&OsStr> = command.get_args().collect();
+        assert_eq!(passed, ["run", "--bin", "tcssim", "--", "tcspecial2.yaml"]);
     }
 
     /// The MOC starts the two programs it is meant to.

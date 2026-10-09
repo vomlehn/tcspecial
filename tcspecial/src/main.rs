@@ -11,6 +11,7 @@ use tcspecial::CommandInterpreter;
 use tcslibgs::config::{
     load_dh_configs, payload_path_and_command_address, PAYLOAD_CONFIG_PATH_VAR,
 };
+use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 
 fn main() {
     // Default to info so that the startup messages below, which used to
@@ -92,6 +93,28 @@ fn main() {
 
     info!("Loaded {} data handler configurations", payload_config.len());
 
+    // What this process read, said as it read it. On stderr, as the command
+    // address is and for the same reason: it is one of the two facts a ground
+    // station checks against its own, so it has to appear whether or not
+    // anyone set RUST_LOG.
+    //
+    // Of the file rather than of the handlers it produced: what the two ends
+    // compare is the configuration, and a digest of the file is the thing a
+    // person can recompute.
+    let digest = match digest_of_file(&payload_path) {
+        Ok(digest) => digest,
+        Err(e) => {
+            error!("cannot digest {}: {}", payload_path, e);
+            process::exit(1);
+        }
+    };
+    eprintln!(
+        "Version {}, configuration {} md5 {}",
+        ConfigVersion::of_this_build(),
+        payload_path,
+        digest
+    );
+
     // An endpoint configuration file is read when one is named. Its endpoints
     // can become data handlers -- EndpointConfigDoc::to_dh_configs does it --
     // but nothing here calls that yet, and the file is read only so that a
@@ -122,7 +145,7 @@ fn main() {
     }
 
     // Create command interpreter
-    let mut ci = match CommandInterpreter::new(tcspecial_config, payload_config) {
+    let mut ci = match CommandInterpreter::new(tcspecial_config, payload_config, digest) {
         Ok(ci) => ci,
         Err(e) => {
             error!("Error creating command interpreter: {}", e);

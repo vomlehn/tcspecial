@@ -11,30 +11,33 @@ DOCS_DIR := docs
 DESIGN=$(DOCS_DIR)/design.rst
 RUST = .
 
-# The payload set to run.
+# The payload set to run, named without a suffix.
 #
-# PAYLOAD_YAML names the file defining the payloads, which may be written as a
-# payload configuration or as an endpoint configuration; every program takes it
-# as a command line argument. PAYLOAD_SIM_YAML names the simulator settings,
-# which only tcssim reads and which it takes from the environment. So:
-#   make run    PAYLOAD_YAML=tcspecial2.yaml
-#   make runmocy PAYLOAD_YAML=tcspecial2.yaml PAYLOAD_SIM_YAML=tcspecial2sim.yaml
-#   make runsim PAYLOAD_YAML=tcspecial2.yaml PAYLOAD_SIM_YAML=tcspecial2sim.yaml
+# One variable rather than two, because the two files of a set are named for
+# each other: PAYLOAD_FILE is the stem, `$(PAYLOAD_FILE).yaml` the payload
+# file -- which may be written as a payload configuration or as an endpoint
+# configuration, and in YAML, XML or JSON -- and `$(PAYLOAD_FILE)sim.yaml` the
+# simulator settings beside it. So:
+#   make run     PAYLOAD_FILE=tests/manual/tcspecial2
+#   make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
+#   make runsim  PAYLOAD_FILE=tests/manual/tcspecial2
 #
-# runmocy passes both because tcsmoc hands its own payload file to the tcspecial
-# and tcssim it starts, but never reads the simulation file, so that one
-# reaches tcssim by being in tcsmoc's environment.
+# Every program takes the payload file as a command line argument. The
+# simulator file reaches tcssim through the environment: runmocy passes it
+# because tcsmoc hands its own payload file to the tcspecial and tcssim it
+# starts but never reads the simulation file, and runsim passes it because
+# tcssim run on its own needs both, and the two must describe the same set or
+# the names will not match.
 #
-# runsim passes both for a different reason: run on its own, tcssim needs the
-# payload file as well as the simulation file, and the two must describe the
-# same set or the names will not match.
+# The sets live under tests/manual because running one is something a person
+# does at a terminal: each opens sockets or device nodes.
 PAYLOAD_FILE=tests/manual/tcspecial2
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
 # set is:
 #   make runmocy RUST_LOG=debug
-#   make run PAYLOAD_YAML=tcspecial1.yaml RUST_LOG=tcspecial::ci=trace
+#   make run PAYLOAD_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
 RUST_LOG = info
 
 RELEASE = --release
@@ -65,7 +68,7 @@ help:
 	@echo "  make distclean   - Remove everything that can be rebuilt"
 	@echo "  make install     - Install tcspecial globally"
 	@echo ""
-	@echo "Payload set: make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml"
+	@echo "Payload set: make runmocy PAYLOAD_FILE=tests/manual/tcspecial1"
 	@echo "Logging:     make runmocy RUST_LOG=debug"
 
 # Build the project
@@ -114,7 +117,7 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run --bin tcspecial -- $(PAYLOAD_YAML) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run --bin tcspecial -- $(PAYLOAD_FILE).yaml \
 	)
 
 # Running tcsmoc on one spelling of its payload configuration file.
@@ -124,7 +127,7 @@ run:
 # a run reads is a choice, and a run that always read the YAML could not
 # exercise the other two at all.
 #
-# Only the suffix is given here. The stem comes from PAYLOAD_YAML, so a payload
+# Only the suffix is given here. The stem comes from PAYLOAD_FILE, so a payload
 # set is still chosen the way every other target chooses it, and the simulator
 # file is untouched: it is tcssim's, and tcsmoc only passes it on.
 define runmoc_on
@@ -158,7 +161,7 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_SIM_YAML) cargo run --bin tcssim -- $(PAYLOAD_YAML) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run --bin tcssim -- $(PAYLOAD_FILE).yaml \
 	)
 
 # Clean build artifacts

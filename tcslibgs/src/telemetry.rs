@@ -3,6 +3,8 @@
 //! Telemetry is sent from space to ground.
 
 use serde::{Deserialize, Serialize};
+
+use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::types::{CommandStatus, DHId, DHSample, Statistics, Timestamp};
 
 /// Telemetry message header
@@ -20,6 +22,7 @@ pub struct TelemetryHeader {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TelemetryType {
     Ping,
+    Connect,
     RestartArm,
     Restart,
     StartDH,
@@ -35,6 +38,7 @@ impl TelemetryType {
     pub fn to_u8(&self) -> u8 {
         match self {
             TelemetryType::Ping => 0x81,
+            TelemetryType::Connect => 0x84,
             TelemetryType::RestartArm => 0x82,
             TelemetryType::Restart => 0x83,
             TelemetryType::StartDH => 0x90,
@@ -50,6 +54,7 @@ impl TelemetryType {
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x81 => Some(TelemetryType::Ping),
+            0x84 => Some(TelemetryType::Connect),
             0x82 => Some(TelemetryType::RestartArm),
             0x83 => Some(TelemetryType::Restart),
             0x90 => Some(TelemetryType::StartDH),
@@ -121,6 +126,28 @@ impl RestartTelemetry {
 }
 
 /// START_DH telemetry response
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ConnectTelemetry {
+    pub header: TelemetryHeader,
+    pub version: ConfigVersion,
+    pub digest: ConfigDigest,
+}
+
+impl ConnectTelemetry {
+    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
+        Self {
+            header: TelemetryHeader {
+                sequence,
+                tm_type: TelemetryType::Connect,
+                status: CommandStatus::Success,
+            },
+            version,
+            digest,
+        }
+    }
+}
+
+/// START_DH telemetry
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StartDHTelemetry {
     pub header: TelemetryHeader,
@@ -279,6 +306,7 @@ impl Default for BeaconTelemetry {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Telemetry {
     Ping(PingTelemetry),
+    Connect(ConnectTelemetry),
     RestartArm(RestartArmTelemetry),
     Restart(RestartTelemetry),
     StartDH(StartDHTelemetry),
@@ -294,6 +322,7 @@ impl Telemetry {
     pub fn sequence(&self) -> u32 {
         match self {
             Telemetry::Ping(tm) => tm.header.sequence,
+            Telemetry::Connect(tm) => tm.header.sequence,
             Telemetry::RestartArm(tm) => tm.header.sequence,
             Telemetry::Restart(tm) => tm.header.sequence,
             Telemetry::StartDH(tm) => tm.header.sequence,
@@ -309,6 +338,7 @@ impl Telemetry {
     pub fn tm_type(&self) -> TelemetryType {
         match self {
             Telemetry::Ping(tm) => tm.header.tm_type,
+            Telemetry::Connect(tm) => tm.header.tm_type,
             Telemetry::RestartArm(tm) => tm.header.tm_type,
             Telemetry::Restart(tm) => tm.header.tm_type,
             Telemetry::StartDH(tm) => tm.header.tm_type,
@@ -324,6 +354,7 @@ impl Telemetry {
     pub fn status(&self) -> CommandStatus {
         match self {
             Telemetry::Ping(tm) => tm.header.status,
+            Telemetry::Connect(tm) => tm.header.status,
             Telemetry::RestartArm(tm) => tm.header.status,
             Telemetry::Restart(tm) => tm.header.status,
             Telemetry::StartDH(tm) => tm.header.status,

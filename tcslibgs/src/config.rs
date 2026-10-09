@@ -33,7 +33,7 @@ pub const PAYLOAD_CONFIG_PATH_VAR: &str = "PAYLOAD_CONFIG_PATH";
 pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 
 /// The payload configuration read when nothing names one.
-pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tcspecial1.yaml";
+pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/tcspecial1.yaml";
 
 /// Load payload configuration from a JSON, YAML, or XML file.
 ///
@@ -214,6 +214,10 @@ struct Sections {
 }
 
 /// Which kind of configuration `text` holds.
+///
+/// Public under a longer name as well -- see [`handler_source_of_text`] --
+/// because the digest of a configuration has to ask the same question before
+/// it can parse one.
 fn handler_source_of(text: &str, format: ConfigFormat) -> TcsResult<HandlerSource> {
     let sections: Sections = format.parse(text)?;
 
@@ -241,6 +245,11 @@ fn handler_source_of(text: &str, format: ConfigFormat) -> TcsResult<HandlerSourc
                 .to_string(),
         ))
     }
+}
+
+/// Which kind of configuration `text` holds, for a caller that has the text.
+pub fn handler_source_of_text(text: &str, format: ConfigFormat) -> TcsResult<HandlerSource> {
+    handler_source_of(text, format)
 }
 
 /// Which kind of configuration the file at `path` holds.

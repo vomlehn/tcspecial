@@ -15,7 +15,8 @@ use std::thread;
 use std::time::Duration;
 
 use tcslibgs::{
-    ArmKey, BeaconTime, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry, DHId, DHName,
+    ArmKey, BeaconTime, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
+    ConfigDigest, ConfigVersion, ConnectTelemetry, DHId, DHName,
     DHSample, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry, RestartArmTelemetry,
     RestartTelemetry, StartDHTelemetry, Statistics, StopDHTelemetry, Telemetry,
 };
@@ -66,6 +67,11 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
             let answer = match command {
                 Command::Ping(_) => {
                     Telemetry::Ping(PingTelemetry::new(seq, CommandStatus::Success))
+                }
+                // The stub answers with the ground's own two, which is a
+                // spacecraft reading the same configuration.
+                Command::Connect(cmd) => {
+                    Telemetry::Connect(ConnectTelemetry::new(seq, cmd.version, cmd.digest))
                 }
                 Command::RestartArm(_) => {
                     Telemetry::RestartArm(RestartArmTelemetry::new(seq, CommandStatus::Success))
@@ -119,10 +125,17 @@ fn client_to(addr: &str) -> TcsClient {
 
 #[test]
 fn every_operation_reaches_the_spacecraft_and_comes_back() {
-    let (addr, stub) = stub_spacecraft(8);
+    let (addr, stub) = stub_spacecraft(9);
     let mut client = client_to(&addr);
 
     assert!(client.ping().unwrap().header.status.is_success());
+
+    // What each end read, which is the first thing a link says. Both come
+    // back, so that the caller can tell a version difference from a
+    // configuration difference rather than being handed a verdict.
+    let version = ConfigVersion::of_this_build();
+    let digest = ConfigDigest([0x5A; 16]);
+    assert_eq!(client.connect(version, digest).unwrap(), (version, digest));
     assert_eq!(
         client.restart_arm(ArmKey(0x1234)).unwrap(),
         CommandStatus::Success

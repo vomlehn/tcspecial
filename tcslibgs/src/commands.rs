@@ -3,6 +3,8 @@
 //! Commands are sent from ground to space and are idempotent.
 
 use serde::{Deserialize, Serialize};
+
+use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::types::{ArmKey, BeaconTime, DHId, DHName, DHType};
 
 /// Command message header
@@ -18,6 +20,8 @@ pub struct CommandHeader {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CommandType {
     Ping,
+    /// What each end reads, said at the start of a link.
+    Connect,
     RestartArm,
     Restart,
     StartDH,
@@ -32,6 +36,7 @@ impl CommandType {
     pub fn to_u8(&self) -> u8 {
         match self {
             CommandType::Ping => 0x01,
+            CommandType::Connect => 0x04,
             CommandType::RestartArm => 0x02,
             CommandType::Restart => 0x03,
             CommandType::StartDH => 0x10,
@@ -46,6 +51,7 @@ impl CommandType {
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x01 => Some(CommandType::Ping),
+            0x04 => Some(CommandType::Connect),
             0x02 => Some(CommandType::RestartArm),
             0x03 => Some(CommandType::Restart),
             0x10 => Some(CommandType::StartDH),
@@ -110,6 +116,34 @@ impl RestartCommand {
                 cmd_type: CommandType::Restart,
             },
             arm_key,
+        }
+    }
+}
+
+/// CONNECT command - say what the ground read before anything else
+///
+/// Sent when a link is opened. It carries the version of the software at the
+/// ground end and a digest of the configuration it read, and the answer
+/// carries the same two from the spacecraft: nothing else in the protocol
+/// makes the two ends prove they are talking about the same payload set, and
+/// when they were not, the only sign was a command answered `NotFound` for a
+/// payload the operator could see on the screen.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ConnectCommand {
+    pub header: CommandHeader,
+    pub version: ConfigVersion,
+    pub digest: ConfigDigest,
+}
+
+impl ConnectCommand {
+    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
+        Self {
+            header: CommandHeader {
+                sequence,
+                cmd_type: CommandType::Connect,
+            },
+            version,
+            digest,
         }
     }
 }
@@ -242,6 +276,7 @@ impl ConfigDHCommand {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Command {
     Ping(PingCommand),
+    Connect(ConnectCommand),
     RestartArm(RestartArmCommand),
     Restart(RestartCommand),
     StartDH(StartDHCommand),
@@ -256,6 +291,7 @@ impl Command {
     pub fn sequence(&self) -> u32 {
         match self {
             Command::Ping(cmd) => cmd.header.sequence,
+            Command::Connect(cmd) => cmd.header.sequence,
             Command::RestartArm(cmd) => cmd.header.sequence,
             Command::Restart(cmd) => cmd.header.sequence,
             Command::StartDH(cmd) => cmd.header.sequence,
@@ -270,6 +306,7 @@ impl Command {
     pub fn cmd_type(&self) -> CommandType {
         match self {
             Command::Ping(cmd) => cmd.header.cmd_type,
+            Command::Connect(cmd) => cmd.header.cmd_type,
             Command::RestartArm(cmd) => cmd.header.cmd_type,
             Command::Restart(cmd) => cmd.header.cmd_type,
             Command::StartDH(cmd) => cmd.header.cmd_type,

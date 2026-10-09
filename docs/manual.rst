@@ -50,7 +50,8 @@ Four kinds of configuration file, each read by the programs that need it.
 a payload configuration file
     Which data handlers exist, how tcspecial reaches each one, and how large
     its packets are. Named on the command line of every program that reads it;
-    ``tcspecial1.yaml`` when nothing names one. Four sets are shipped,
+    ``tests/manual/tcspecial1.yaml`` when nothing names one. Four sets are
+    shipped,
     ``tcspecial1`` to ``tcspecial4``, each in all three formats; see
     `The shipped payload sets`_.
 
@@ -58,7 +59,8 @@ a simulator configuration file
     How a simulated payload behaves: how often it produces a packet and how it
     divides one into segments. Read only by tcssim, which takes it from
     ``PAYLOAD_SIM_YAML``. Named for the payload file it goes with:
-    ``tcspecial1sim.yaml`` beside ``tcspecial1.yaml``.
+    ``tcspecial1sim.yaml`` beside ``tcspecial1.yaml``, both under
+    ``tests/manual``.
 
 an endpoint configuration file
     The richer description of what is at the end of each link: groups of
@@ -371,7 +373,7 @@ a test holds the three to describing the same data handlers. The YAML is the
 one to read: it carries the comments, which JSON has no way to hold. Which
 spelling a run reads is the last letter of the MOC's target, ``runmocy`` /
 ``runmocx`` / ``runmocj``; every other target takes the file named in
-``PAYLOAD_YAML``. The simulator files are YAML alone: nothing asked for them
+``PAYLOAD_FILE``. The simulator files are YAML alone: nothing asked for them
 in three spellings, and the pairing convention names them from the payload
 file's stem.
 
@@ -774,13 +776,17 @@ hands that same file to the tcspecial and tcssim it starts, so a program
 reading a different one would serve or simulate payloads the panels do not
 describe.
 
-``PAYLOAD_YAML`` is the payload file, which reaches every program as a command
-line argument. ``PAYLOAD_SIM_YAML`` is the simulator file, which reaches
-tcssim through the environment -- and tcsmoc too, which it inherits the same
-way: tcsmoc acts on none of it, and reads it only so a panel can show what the
-tcssim it started is simulating. Failing the variable, each looks for the file
-beside the payload file and named for it. Both default to the ``tcspecial2``
-set.
+``PAYLOAD_FILE`` is the set, named without a suffix:
+``$(PAYLOAD_FILE).yaml`` is the payload file, which reaches every program as a
+command line argument, and ``$(PAYLOAD_FILE)sim.yaml`` the simulator file,
+which reaches tcssim through the environment -- and tcsmoc too, which it
+inherits the same way: tcsmoc acts on none of it, and reads it only so a panel
+can show what the tcssim it started is simulating. It defaults to
+``tests/manual/tcspecial2``.
+
+The sets live under ``tests/manual`` because running one is something a person
+does at a terminal: each opens sockets or device nodes, so none of them belongs
+in a test that runs on every build.
 
 Everything at once
 ------------------
@@ -789,13 +795,13 @@ Everything at once
 .. code-block:: console
 
    $ make runmocy
-   $ make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
-   $ make runmocy PAYLOAD_YAML=tcspecial2.yaml PAYLOAD_SIM_YAML=tcspecial2sim.yaml
-   $ make runmocy PAYLOAD_YAML=tcspecial4.yaml PAYLOAD_SIM_YAML=tcspecial4sim.yaml
+   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
+   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial4
 
 The last letter is the spelling of the payload configuration file it reads:
 ``runmocy`` the YAML, ``runmocx`` the XML, ``runmocj`` the JSON. All three take
-the same ``PAYLOAD_YAML``, and use its name without its suffix, so the three
+the same ``PAYLOAD_FILE``, and add the suffix themselves, so the three
 are one payload set read three ways rather than three sets. The simulator file
 is not spelled by it: only tcssim reads that one, and tcsmoc merely passes it
 on.
@@ -824,13 +830,14 @@ disturbing the others, or watched with its own logging.
 
 .. code-block:: console
 
-   $ make run PAYLOAD_YAML=tcspecial1.yaml
-   $ make runsim PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
-   $ make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
+   $ make run PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make runsim PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
 
-``make run`` takes only the payload file: tcspecial does not simulate
-anything. ``make runsim`` takes both, because tcssim run on its own needs the
-payload file as well as the simulator file -- the names in the two must match.
+``make run`` passes only the payload file: tcspecial does not simulate
+anything. ``make runsim`` passes both, because tcssim run on its own needs the
+payload file as well as the simulator file -- and one variable names both, so
+they cannot be given for different sets.
 Started in that order, tcsmoc finds the tcspecial already running and attaches
 to it.
 
@@ -838,9 +845,11 @@ What the programs take without the Makefile
 -------------------------------------------
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- tcspecial1.yaml
-   $ PAYLOAD_SIM_YAML=tcspecial1sim.yaml cargo run --bin tcssim -- tcspecial1.yaml
-   $ PAYLOAD_SIM_YAML=tcspecial1sim.yaml cargo run --bin tcsmoc -- tcspecial1.yaml
+   $ cargo run --bin tcspecial -- tests/manual/tcspecial1.yaml
+   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
+       cargo run --bin tcssim -- tests/manual/tcspecial1.yaml
+   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
+       cargo run --bin tcsmoc -- tests/manual/tcspecial1.yaml
 
 An argument naming the payload file beats any environment variable naming one.
 Failing an argument, tcspecial reads ``PAYLOAD_CONFIG_PATH`` and tcssim reads
@@ -854,7 +863,7 @@ serves commands on.
 
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- tcspecial1.yaml 127.0.0.1:4000
+   $ cargo run --bin tcspecial -- tests/manual/tcspecial1.yaml 127.0.0.1:4000
 
 It beats what ``tcspecial/src/tcspecial.yaml`` says, and the port must be given
 with the address. With no such argument the configuration file places it, which
@@ -875,7 +884,8 @@ whatever ``RUST_LOG`` is set to:
 .. code-block:: console
 
    $ make runmocy RUST_LOG=debug
-   $ RUST_LOG=tcspecial::ci=trace cargo run --bin tcspecial -- tcspecial1.yaml
+   $ RUST_LOG=tcspecial::ci=trace \
+       cargo run --bin tcspecial -- tests/manual/tcspecial1.yaml
 
 Testing
 =======
@@ -910,7 +920,9 @@ the ``Command`` menu
   The commands below.
 
 ``Last Response``
-  What the last command answered, under the two boxes.
+  What the last command answered, under the two boxes. The first thing it says
+  in a session is whether tcspecial read the same configuration this MOC did:
+  see `What each end read`_.
 
 Below that is one panel per data handler, and a ``Quit`` button at the foot of
 the window, which stops the tcspecial and tcssim the MOC started.
@@ -966,6 +978,30 @@ an earlier payload set, which tcsmoc attaches to rather than replacing. The
 trigger count is the one number that says the asking is happening at all; it
 appears in no other counter, because a trigger is a write with no read behind
 it.
+
+What each end read
+^^^^^^^^^^^^^^^^^^
+When a link comes up, tcsmoc sends its software version and an MD5 of the
+payload configuration it read, and tcspecial answers with its own two. Both
+print theirs on the terminal they were started from:
+
+.. code-block:: console
+
+   Version 0.1.0, configuration tests/manual/tcspecial2.yaml md5 bd48126fe0faae6686398a4d23545d33
+   tcspecial answers version 0.1.0, md5 bd48126fe0faae6686398a4d23545d33
+
+and ``Last Response`` says whether the two agree. They are the same payload
+set if the digests match: the digest is of what a file says rather than of its
+bytes, so the YAML, XML and JSON of one set digest alike, and so do two files
+differing only in comments, spacing, the order of their sections or the order
+of one payload's attributes. The order of the payloads does count -- ids follow
+it -- so each payload is given a sequence number as the file is read, the
+digest takes them in that order, and a file may not state a number of its own.
+
+A difference means the two ends are not serving the same set. The usual cause
+is a tcspecial left running from an earlier one, which tcsmoc attaches to
+rather than replacing; stopping it and letting tcsmoc start a fresh one is the
+fix.
 
 Commands
 ^^^^^^^^

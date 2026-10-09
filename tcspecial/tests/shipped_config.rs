@@ -15,8 +15,16 @@
 use std::path::{Path, PathBuf};
 
 use tcslibgs::config::load_dh_configs;
+use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::{EndpointConfig, NetworkProtocol};
 use tcspecial::config::load_tcspecial_config;
+
+/// Where the shipped payload sets live.
+///
+/// They are there rather than at the repository root because they are run by
+/// hand: every one of them opens sockets or device nodes that only a person
+/// at a terminal should be opening.
+const MANUAL_SETS: &str = "tests/manual";
 
 /// A path relative to the repository root.
 fn repo_file(relative: &str) -> PathBuf {
@@ -31,7 +39,7 @@ fn repo_file(relative: &str) -> PathBuf {
 /// covered by these tests without anyone having to remember to name it here.
 /// The simulator files beside them are tcssim's business, not tcspecial's.
 fn shipped_payload_files() -> Vec<PathBuf> {
-    let root = repo_file(".");
+    let root = repo_file(MANUAL_SETS);
     let mut files: Vec<PathBuf> = std::fs::read_dir(&root)
         .expect("the repository root is readable")
         .map(|entry| entry.expect("a readable directory entry").path())
@@ -108,6 +116,18 @@ fn every_shipped_set_reads_the_same_in_all_three_formats() {
                 from_other,
                 from_yaml,
                 "{} and {} describe different data handlers",
+                other.display(),
+                yaml.display()
+            );
+
+            // And they digest the same, which is the claim the two ends of a
+            // link make to each other: a tcsmoc reading the JSON of a set and
+            // a tcspecial reading its XML have read the same set, and a digest
+            // that said otherwise would make the check worse than none.
+            assert_eq!(
+                digest_of_file(&other).unwrap_or_else(|e| panic!("{}: {e}", other.display())),
+                digest_of_file(&yaml).unwrap_or_else(|e| panic!("{}: {e}", yaml.display())),
+                "{} and {} digest differently",
                 other.display(),
                 yaml.display()
             );

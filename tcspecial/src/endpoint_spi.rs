@@ -73,11 +73,11 @@ enum Clocking {
 /// terms the configuration gives, and here there are no terms -- it is only
 /// the discipline that would otherwise sit between the two ends of a link
 /// carrying payload data.
-fn make_raw(fd: RawFd, path: &str) -> TcsResult<()> {
+fn make_raw(fd: RawFd, on: &str) -> TcsResult<()> {
     let mut terms: libc::termios = unsafe { std::mem::zeroed() };
     if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
         return Err(TcsError::Endpoint(format!(
-            "{path} is a terminal whose terms cannot be read: {}",
+            "{on} is a terminal whose terms cannot be read: {}",
             std::io::Error::last_os_error()
         )));
     }
@@ -86,7 +86,7 @@ fn make_raw(fd: RawFd, path: &str) -> TcsResult<()> {
 
     if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &terms) } != 0 {
         return Err(TcsError::Endpoint(format!(
-            "{path} is a terminal that cannot be set raw: {}",
+            "{on} is a terminal that cannot be set raw: {}",
             std::io::Error::last_os_error()
         )));
     }
@@ -111,7 +111,13 @@ pub struct SpiEndpoint {
 
 impl SpiEndpoint {
     /// Open the device and set the controller to the configured terms.
-    pub fn new(config: &SpiConfig) -> TcsResult<Self> {
+    pub fn new(what: &str, config: &SpiConfig) -> TcsResult<Self> {
+        // The handler's name and its node together, because every complaint
+        // below is about both: which payload could not be reached, and the
+        // node it was to be reached over. One label, built once, so that the
+        // name cannot be left off one message and put on the next.
+        let on = format!("{what}: {}", config.path);
+
         let device = OpenOptions::new()
             .read(true)
             .write(true)
@@ -122,7 +128,8 @@ impl SpiEndpoint {
             // and a hangup raises SIGHUP: a handler stopped or killed for
             // reasons that have nothing to do with its payload.
             .custom_flags(libc::O_NOCTTY)
-            .open(&config.path)?;
+            .open(&config.path)
+            .map_err(|e| TcsError::Endpoint(format!("{on} cannot be opened: {e}")))?;
 
         let fd = device.as_raw_fd();
 
@@ -130,7 +137,7 @@ impl SpiEndpoint {
         // that refuses it is not a spidev: a terminal is a stand-in to carry
         // bytes on, and anything else is a configuration naming the wrong
         // path.
-        match set_u8(fd, SPI_IOC_WR_MODE, mode_bits(config), &config.path, "its mode") {
+        match set_u8(fd, SPI_IOC_WR_MODE, mode_bits(config), &on, "its mode") {
             Ok(()) => {}
             Err(_) if is_a_terminal(fd) => {
                 // The one term that means anything on a terminal: take the
@@ -139,13 +146,13 @@ impl SpiEndpoint {
                 // payload data has no lines in it -- so a handler would sit on
                 // a read that never returned while the bytes it wanted were
                 // being edited on its behalf.
-                make_raw(fd, &config.path)?;
+                make_raw(fd, &on)?;
 
                 info!(
                     "{} is a terminal standing in for a SPI peripheral: it will carry \
                      bytes raw, and the mode, clock rate and word width in the \
                      configuration are not applied to anything",
-                    config.path
+                    on
                 );
                 return Ok(Self {
                     device,
@@ -159,21 +166,21 @@ impl SpiEndpoint {
             fd,
             SPI_IOC_WR_BITS_PER_WORD,
             config.bits_per_word,
-            &config.path,
+            &on,
             &format!("{} bits per word", config.bits_per_word),
         )?;
         set_u8(
             fd,
             SPI_IOC_WR_LSB_FIRST,
             u8::from(matches!(config.bit_order, BitOrder::LsbFirst)),
-            &config.path,
+            &on,
             "its bit order",
         )?;
         set_u32(
             fd,
             SPI_IOC_WR_MAX_SPEED_HZ,
             config.max_speed,
-            &config.path,
+            &on,
             &format!("{} Hz", config.max_speed),
         )?;
 
@@ -211,12 +218,12 @@ fn mode_bits(config: &SpiConfig) -> u8 {
     bits
 }
 
-fn set_u8(fd: RawFd, request: libc::c_ulong, value: u8, path: &str, what: &str) -> TcsResult<()> {
-    set(fd, request, &value as *const u8 as *const libc::c_void, path, what)
+fn set_u8(fd: RawFd, request: libc::c_ulong, value: u8, on: &str, wanted: &str) -> TcsResult<()> {
+    set(fd, request, &value as *const u8 as *const libc::c_void, on, wanted)
 }
 
-fn set_u32(fd: RawFd, request: libc::c_ulong, value: u32, path: &str, what: &str) -> TcsResult<()> {
-    set(fd, request, &value as *const u32 as *const libc::c_void, path, what)
+fn set_u32(fd: RawFd, request: libc::c_ulong, value: u32, on: &str, wanted: &str) -> TcsResult<()> {
+    set(fd, request, &value as *const u32 as *const libc::c_void, on, wanted)
 }
 
 /// Make one request of the open device, saying what was being set if it fails.
@@ -227,15 +234,15 @@ fn set(
     fd: RawFd,
     request: libc::c_ulong,
     value: *const libc::c_void,
-    path: &str,
-    what: &str,
+    on: &str,
+    wanted: &str,
 ) -> TcsResult<()> {
     // SAFETY: fd is open for the lifetime of the borrow, and the pointer is
     // to a live value of the width the request's number encodes.
     if unsafe { libc::ioctl(fd, request, value) } < 0 {
         let why = std::io::Error::last_os_error();
         return Err(TcsError::Endpoint(format!(
-            "{path} would not take {what}: {why}"
+            "{on} would not take {wanted}: {why}"
         )));
     }
     Ok(())
@@ -330,7 +337,7 @@ mod tests {
             bit_order: BitOrder::MsbFirst,
             cs_active: CsActive::Low,
         };
-        let mut endpoint = SpiEndpoint::new(&config)
+        let mut endpoint = SpiEndpoint::new("instrument", &config)
             .unwrap_or_else(|e| panic!("{slave} was not taken as a stand-in: {e}"));
         assert_eq!(
             endpoint.clocking,
@@ -370,7 +377,7 @@ mod tests {
             cs_active: CsActive::Low,
         };
 
-        let e = match SpiEndpoint::new(&config) {
+        let e = match SpiEndpoint::new("instrument", &config) {
             Ok(_) => panic!("a plain file was taken for a SPI device"),
             Err(e) => e,
         };
@@ -378,6 +385,11 @@ mod tests {
         assert!(
             said.contains(&config.path) && said.contains("mode"),
             "the complaint names neither the device nor what was being set: {said}"
+        );
+        // And which handler it was for, as the payload configuration names it.
+        assert!(
+            said.contains("instrument"),
+            "the complaint does not say which handler: {said}"
         );
         // Narrowly: a terminal is a stand-in and a plain file is not. A
         // handler that accepted anything would open the wrong path

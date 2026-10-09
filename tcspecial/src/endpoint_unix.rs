@@ -47,9 +47,9 @@ impl UnixStreamEndpoint {
     /// [`connect_retrying`]. A path with no socket at all is a different
     /// matter and is not waited out: it will not become one by being asked
     /// again.
-    pub fn connect_retrying(config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn connect_retrying(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let path = config.address.clone();
-        let stream = connect_retrying(&path, || UnixStream::connect(&path))?;
+        let stream = connect_retrying(what, &path, || UnixStream::connect(&path))?;
         stream.set_nonblocking(true)?;
 
         Ok(Self {
@@ -103,6 +103,9 @@ impl EndpointWritable for UnixStreamEndpoint {
 /// datagram's sender is the only statement of where it came from. A payload's
 /// own path is its own business, so nothing here knows it until it writes.
 pub struct UnixDatagramEndpoint {
+    /// The handler this endpoint belongs to, as the payload configuration
+    /// names it.
+    what: String,
     socket: UnixDatagram,
     /// Where the far end last wrote from, if it has.
     ///
@@ -114,15 +117,18 @@ pub struct UnixDatagramEndpoint {
 
 impl UnixDatagramEndpoint {
     /// Bind the configured path, replacing a socket nothing answers.
-    pub fn bind(config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn bind(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let path = config.address.clone();
-        clear_a_dead_socket(Path::new(&path))?;
+        clear_a_dead_socket(what, Path::new(&path))?;
 
         let socket =
-            UnixDatagram::bind(&path).map_err(|e| bind_failed("Unix datagram endpoint", &path, e))?;
+            UnixDatagram::bind(&path).map_err(|e| {
+                bind_failed(&format!("{what} Unix datagram endpoint"), &path, e)
+            })?;
         socket.set_nonblocking(true)?;
 
         Ok(Self {
+            what: what.to_string(),
             socket,
             peer: std::sync::Arc::new(std::sync::Mutex::new(None)),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
@@ -132,6 +138,7 @@ impl UnixDatagramEndpoint {
     /// A second endpoint on the same socket, sharing what it learns.
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
+            what: self.what.clone(),
             socket: self.socket.try_clone()?,
             peer: self.peer.clone(),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
@@ -173,22 +180,22 @@ impl EndpointWritable for UnixDatagramEndpoint {
             .ok()
             .and_then(|guard| guard.clone())
             .ok_or_else(|| {
-                TcsError::Endpoint(
-                    "nothing has been received on this socket yet, so there is no \
-                     path to send to"
-                        .to_string(),
-                )
+                TcsError::Endpoint(format!(
+                    "{}: nothing has been received on this socket yet, so there is \
+                     no path to send to",
+                    self.what
+                ))
             })?;
 
         // An unnamed sender has no path to be answered at. A payload that
         // never bound one cannot be written to, which is worth saying rather
         // than failing as though the write itself had gone wrong.
         let path = peer.as_pathname().ok_or_else(|| {
-            TcsError::Endpoint(
-                "the far end of this socket has no path of its own, so it cannot be \
-                 sent to: a datagram payload binds a path in order to be answered"
-                    .to_string(),
-            )
+            TcsError::Endpoint(format!(
+                "{}: the far end of this socket has no path of its own, so it cannot \
+                 be sent to: a datagram payload binds a path in order to be answered",
+                self.what
+            ))
         })?;
 
         match self.socket.send_to(data, path) {
@@ -211,7 +218,7 @@ impl EndpointWritable for UnixDatagramEndpoint {
 /// socket that answers nothing is dead and is removed. Anything else at that
 /// path is not a socket and is left for the bind to refuse, which says so
 /// better than this could.
-fn clear_a_dead_socket(path: &Path) -> TcsResult<()> {
+fn clear_a_dead_socket(what: &str, path: &Path) -> TcsResult<()> {
     let found = match std::fs::symlink_metadata(path) {
         Ok(found) => found,
         // Nothing there, which is the ordinary case.
@@ -234,8 +241,8 @@ fn clear_a_dead_socket(path: &Path) -> TcsResult<()> {
         ))),
         Err(_) => {
             info!(
-                "{} is a socket nothing answers, left by a handler that was killed \
-                 rather than stopped; replacing it",
+                "{what}: {} is a socket nothing answers, left by a handler that was \
+                 killed rather than stopped; replacing it",
                 path.display()
             );
             std::fs::remove_file(path).map_err(TcsError::Io)
@@ -281,9 +288,11 @@ mod tests {
         // Standing in for tcssim: the payload listens at its path.
         let payload = UnixListener::bind(&path).expect("the payload listens");
 
-        let mut endpoint =
-            UnixStreamEndpoint::connect_retrying(&config_at(&path, NetworkProtocol::UnixStream))
-                .expect("the handler connects");
+        let mut endpoint = UnixStreamEndpoint::connect_retrying(
+            "beacon",
+            &config_at(&path, NetworkProtocol::UnixStream),
+        )
+        .expect("the handler connects");
 
         let (mut accepted, _) = payload.accept().expect("the payload accepts");
 
@@ -316,9 +325,11 @@ mod tests {
         std::fs::remove_file(&handler_path).ok();
         std::fs::remove_file(&payload_path).ok();
 
-        let mut endpoint =
-            UnixDatagramEndpoint::bind(&config_at(&handler_path, NetworkProtocol::UnixDgram))
-                .expect("the handler binds");
+        let mut endpoint = UnixDatagramEndpoint::bind(
+            "beacon",
+            &config_at(&handler_path, NetworkProtocol::UnixDgram),
+        )
+        .expect("the handler binds");
 
         // Nothing has been heard, so there is nowhere to write.
         assert!(
@@ -367,7 +378,7 @@ mod tests {
         assert!(path.exists(), "the file should outlive the socket");
 
         let endpoint =
-            UnixDatagramEndpoint::bind(&config_at(&path, NetworkProtocol::UnixDgram))
+            UnixDatagramEndpoint::bind("beacon", &config_at(&path, NetworkProtocol::UnixDgram))
                 .expect("a dead socket is not a reason to refuse");
         drop(endpoint);
 
@@ -383,7 +394,10 @@ mod tests {
 
         let live = UnixDatagram::bind(&path).expect("a socket that is listening");
 
-        let e = match UnixDatagramEndpoint::bind(&config_at(&path, NetworkProtocol::UnixDgram)) {
+        let e = match UnixDatagramEndpoint::bind(
+            "beacon",
+            &config_at(&path, NetworkProtocol::UnixDgram),
+        ) {
             Ok(_) => panic!("it took the path of a live socket"),
             Err(e) => format!("{e}"),
         };

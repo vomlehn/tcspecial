@@ -35,10 +35,10 @@ pub struct TcpEndpoint {
 }
 
 impl TcpEndpoint {
-    pub fn new_server(config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn new_server(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let listener =
-            TcpListener::bind(&addr).map_err(|e| bind_failed("TCP endpoint", &addr, e))?;
+        let listener = TcpListener::bind(&addr)
+            .map_err(|e| bind_failed(&format!("{what} TCP endpoint"), &addr, e))?;
         listener.set_nonblocking(true)?;
 
         Ok(Self {
@@ -67,9 +67,10 @@ impl TcpEndpoint {
         })
     }
 
-    pub fn new_client(config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn new_client(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let stream = TcpStream::connect(&addr)?;
+        let stream = TcpStream::connect(&addr)
+            .map_err(|e| TcsError::Config(format!("{what}: cannot reach {addr}: {e}")))?;
         stream.set_nonblocking(true)?;
 
         Ok(Self {
@@ -85,9 +86,9 @@ impl TcpEndpoint {
     /// See [`connect_retrying`]. A handler may be started before the payload
     /// it reaches, and a payload that is not listening yet refuses rather than
     /// failing in any way that waiting cannot fix.
-    pub fn connect_retrying(config: &NetworkConfig) -> TcsResult<Self> {
+    pub fn connect_retrying(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
-        let stream = connect_retrying(&addr, || TcpStream::connect(&addr))?;
+        let stream = connect_retrying(what, &addr, || TcpStream::connect(&addr))?;
         stream.set_nonblocking(true)?;
 
         Ok(Self {
@@ -174,7 +175,13 @@ impl EndpointWritable for TcpEndpoint {
 /// Only a refusal is retried. An address that cannot be resolved, or a network
 /// that cannot be reached, will not become right by being asked again, and
 /// repeating those would turn a clear fault into a slow one.
+///
+/// `what` is the handler this is being done for, as the payload configuration
+/// names it: several handlers wait for several payloads at once, and an
+/// address on its own leaves the log saying which address was refused without
+/// saying whose payload is missing.
 pub(crate) fn connect_retrying<T>(
+    what: &str,
     addr: &str,
     mut attempt: impl FnMut() -> io::Result<T>,
 ) -> TcsResult<T> {
@@ -187,8 +194,8 @@ pub(crate) fn connect_retrying<T>(
             Ok(opened) => {
                 if refusals > 0 {
                     info!(
-                        "reached {addr} after {refusals} refusal(s): the far end was \
-                         not listening yet"
+                        "{what}: reached {addr} after {refusals} refusal(s): the far \
+                         end was not listening yet"
                     );
                 }
                 return Ok(opened);
@@ -198,16 +205,18 @@ pub(crate) fn connect_retrying<T>(
                 let left = deadline.saturating_duration_since(Instant::now());
                 if left.is_zero() {
                     return Err(TcsError::Config(format!(
-                        "cannot reach {addr}: connection refused for {:?}. Nothing is \
-                         listening there -- a simulated payload has to be started \
-                         before the handler that reaches it",
+                        "{what}: cannot reach {addr}: connection refused for {:?}. \
+                         Nothing is listening there -- a simulated payload has to be \
+                         started before the handler that reaches it",
                         ENDPOINT_CONNECT_BUDGET
                     )));
                 }
                 thread::sleep(delay.min(left));
                 delay = (delay * 2).min(ENDPOINT_DELAY_MAX);
             }
-            Err(e) => return Err(TcsError::Config(format!("cannot reach {addr}: {e}"))),
+            Err(e) => {
+                return Err(TcsError::Config(format!("{what}: cannot reach {addr}: {e}")))
+            }
         }
     }
 }
@@ -246,7 +255,7 @@ mod tests {
         };
 
         let started = Instant::now();
-        let endpoint = TcpEndpoint::connect_retrying(&config)
+        let endpoint = TcpEndpoint::connect_retrying("imager", &config)
             .expect("a refusal should be waited out, not reported");
         let waited = started.elapsed();
 
@@ -284,7 +293,7 @@ mod tests {
         };
 
         let started = Instant::now();
-        let message = match TcpEndpoint::connect_retrying(&config) {
+        let message = match TcpEndpoint::connect_retrying("imager", &config) {
             Ok(_) => panic!("nothing is listening, so this must fail"),
             Err(e) => e.to_string(),
         };
@@ -293,6 +302,12 @@ mod tests {
         assert!(
             message.contains("refused") && message.contains("started before"),
             "the error should say what to do about it, but said: {message}"
+        );
+        // And which handler gave up: several wait for several payloads at
+        // once, so an address alone does not say whose payload is missing.
+        assert!(
+            message.contains("imager"),
+            "the error does not say which handler: {message}"
         );
         assert!(
             waited < ENDPOINT_CONNECT_BUDGET * 2,

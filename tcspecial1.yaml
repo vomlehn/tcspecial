@@ -4,7 +4,7 @@
 # tcspecial reaches each one, and how big its packets are. It deliberately says
 # nothing about how fast a simulated payload produces them or how the simulator
 # divides a packet into segments; those are properties of the simulation rather
-# than of the payload, and live in payload1sim.yaml.
+# than of the payload, and live in tcspecial1sim.yaml.
 #
 # A data handler takes its attributes from the group it names, and may then
 # override any of them for itself.
@@ -15,6 +15,19 @@
 # numbered to match its dh_id.
 version: "1.0"
 description: TCSpecial payload set 1
+
+# What tcspecial itself is configured with for this payload set -- the same
+# section a tcspecial.yaml holds. First, because it is about the set as a
+# whole rather than about any payload in it. Read by nothing yet: tcspecial
+# still takes its own configuration from the file TCSPECIAL_CONFIG_PATH names,
+# and the address it serves commands on from its command line before that.
+tcspecial:
+  address: 0.0.0.0
+  port: 4000
+  protocol: udp
+  beacon_interval_ms: 5000
+  log_dir: /var/log/tcspecial
+  log_segment_bytes: 65536
 
 payload_groups:
   # DH1 and DH3 are reached the same way: a UDP socket on this host. What

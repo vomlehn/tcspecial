@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TCSpecial payload set 4, in the endpoint configuration language.
+
+     Equivalent to tcspecial4.yaml and tcspecial4.json. The YAML is the one
+     to read: it carries the comments, which JSON has no way to hold.
+
+     The endpoint language writes a value as an attribute, as its example in
+     the design document does, and a nested section -- a group's stream rule
+     -- as a child element. -->
+<endpoint-configuration>
+  <general version="1.0" description="TCSpecial payload set 4"/>
+
+  <endpoint-groups>
+    <group name="payload_line" type="serial" asynchronous="true"
+           datarate="115200" byte_length="8" stop_bits="1" parity="none"
+           packet_size="12">
+      <stream max_length="12" timeout="none"/>
+    </group>
+  </endpoint-groups>
+
+  <endpoints>
+    <endpoint name="serial-line" group="payload_line"
+              device="/tmp/tcspecial4-line" dh_id="0"
+              oc_address="127.0.0.1" oc_port="6400"/>
+  </endpoints>
+</endpoint-configuration>

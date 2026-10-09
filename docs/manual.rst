@@ -50,14 +50,15 @@ Four kinds of configuration file, each read by the programs that need it.
 a payload configuration file
     Which data handlers exist, how tcspecial reaches each one, and how large
     its packets are. Named on the command line of every program that reads it;
-    ``payload1.yaml`` when nothing names one. The shipped sets are
-    ``payload1.yaml`` and ``payload2.yaml``.
+    ``tcspecial1.yaml`` when nothing names one. Four sets are shipped,
+    ``tcspecial1`` to ``tcspecial4``, each in all three formats; see
+    `The shipped payload sets`_.
 
 a simulator configuration file
     How a simulated payload behaves: how often it produces a packet and how it
     divides one into segments. Read only by tcssim, which takes it from
     ``PAYLOAD_SIM_YAML``. Named for the payload file it goes with:
-    ``payload1sim.yaml`` beside ``payload1.yaml``.
+    ``tcspecial1sim.yaml`` beside ``tcspecial1.yaml``.
 
 an endpoint configuration file
     The richer description of what is at the end of each link: groups of
@@ -73,7 +74,8 @@ their names: a file naming ``payloads`` is the first, and one naming
 
 Payload Configuration Files
 ===========================
-A payload configuration has a version, a description, an optional section of
+A payload configuration has a version, a description, an optional section
+saying what tcspecial is configured with for this set, an optional section of
 groups, and the data handlers themselves. A handler takes every attribute it
 does not state from the group it names, so a group holds what several handlers
 share.
@@ -82,6 +84,9 @@ share.
 
    version        "1.0"
    description    free text
+
+   tcspecial                       optional
+     ...          the same attributes a tcspecial.yaml holds
 
    payload_groups                  optional
      name         the name payloads refer to
@@ -92,6 +97,13 @@ share.
      name         the handler's name, which the panels show
      group        the group to take unstated attributes from, if any
      ...          any of the attributes below
+
+The shipped sets each carry a ``tcspecial`` section, first in the file, so one
+file says what the set is and where its command interpreter belongs. Nothing
+reads it yet: tcspecial is still placed by the file ``TCSPECIAL_CONFIG_PATH``
+names, and by the address on its command line before that. It is checked when
+the file is loaded all the same -- a section that could never place a command
+interpreter is refused where the file is read.
 
 **Attributes**
 
@@ -264,7 +276,7 @@ otherwise produces a payload that looks configured and is not:
 The same collision rule applies to an endpoint configuration file, which is
 the only one that can describe a serial line, a bus or a peripheral at all.
 
-This is the shipped ``payload1.yaml``. DH1 and DH3 are reached the same way,
+This is the shipped ``tcspecial1.yaml``. DH1 and DH3 are reached the same way,
 so what they share is a group; DH0 and DH2 share nothing and state everything
 for themselves.
 
@@ -347,6 +359,41 @@ In tcsmoc the simulator half is shown when that file can be read. The MOC
 simulates nothing, so a simulator file that is missing or written for a
 different payload file costs it that half and nothing else; the panel says so
 in place of the settings.
+
+The shipped payload sets
+========================
+Each is a pair: the payload file and the simulator file beside it, named for
+it. A set added by that convention needs no change anywhere to be run.
+
+Each payload file is shipped in all three formats -- ``tcspecial2.yaml``,
+``tcspecial2.xml`` and ``tcspecial2.json`` are one set written three ways, and
+a test holds the three to describing the same data handlers. The YAML is the
+one to read: it carries the comments, which JSON has no way to hold. Which
+spelling a run reads is the last letter of the MOC's target, ``runmocy`` /
+``runmocx`` / ``runmocj``; every other target takes the file named in
+``PAYLOAD_YAML``. The simulator files are YAML alone: nothing asked for them
+in three spellings, and the pairing convention names them from the payload
+file's stem.
+
+``tcspecial1.yaml``
+  Four payloads of three kinds, which is what exercises the panels and the
+  grid. Every program falls back to this set when nothing names a file.
+
+``tcspecial2.yaml``
+  Two payloads, one of each kind: one that sends of its own accord and one
+  that answers a request. The Makefile defaults to this set.
+
+``tcspecial3.yaml``
+  One payload, reached over a stream. It differs from set 2's first payload
+  only in the transport, which is what makes it the set to debug a single link
+  against -- and what the kind and transport in a simulator file are there to
+  tell apart.
+
+``tcspecial4.yaml``
+  One payload on a serial line, written in the endpoint configuration language
+  because a line has terms a payload file has no words for. Running it needs
+  nothing special: tcssim stands in for the line with a pty and makes the
+  device the file names a link to it while the payload runs.
 
 Simulator Configuration Files
 =============================
@@ -432,7 +479,7 @@ Neither is taken from this file: the payload file decides both, and a
 disagreement about either is an error naming the payload and what each file
 says of it. A group may carry them, like any other setting -- though payloads
 that share a rate need not share a transport, which is why the shipped
-``payload1sim.yaml`` leaves them with the payloads.
+``tcspecial1sim.yaml`` leaves them with the payloads.
 
 **Settings**
 
@@ -512,12 +559,12 @@ refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
-This is the shipped ``payload1sim.yaml``.
+This is the shipped ``tcspecial1sim.yaml``.
 
 .. code-block:: yaml
 
    version: "1.0"
-   description: Simulator settings for the payloads of payload1.yaml
+   description: Simulator settings for the payloads of tcspecial1.yaml
 
    simulated_payload_groups:
      - name: steady_1hz
@@ -590,12 +637,46 @@ written as attributes of the element.
 
 .. code-block:: text
 
+   asynchronous   true | false -- true for a start-stop line, false for a
+                  synchronous one, whose bits are carried on a clock
    datarate       bits per second
-   stop_bits      1 | 1.5 | 2
    byte_length    5 | 6 | 7 | 8
    stream         where a read ends; see below
 
-There is no parity. The format does not carry one, and a line is set to none.
+   stop_bits      1 | 1.5 | 2 -- asynchronous lines only, and required for
+                  them; a synchronous line has no stop bits to state, a stop
+                  bit being what start-stop framing uses in place of a clock
+   parity         asynchronous: none | even | odd | mark | space, default
+                  none. synchronous: the frame check -- none | crc16_pr0 |
+                  crc16_pr1 | crc16_pr0_ccitt | crc16_pr1_ccitt |
+                  crc32_pr0_ccitt | crc32_pr1_ccitt, default none
+   clock_type     external | internal | tx_internal | tx_from_rx --
+                  synchronous lines only, and required for them
+   encoding       nrz | nrzi | fm_mark | fm_space | manchester, default nrz --
+                  synchronous lines only
+   loopback       true | false, default false -- synchronous lines only
+
+What each kind of line may say is what the Linux driver for such a line can be
+told, and nothing else: termios sets a parity per character on a start-stop
+line, and the kernel's generic HDLC takes a clock, a coding, a frame check and
+a loopback for a synchronous one. A group stating the other kind's attributes
+is refused.
+
+Both kinds write the frame check as ``parity``, which is what Linux calls both
+of them; the values say which is meant.
+
+Two things are worth knowing before setting a parity. A line is read back
+after it is set, and a parity the port did not take is an error rather than a
+handler quietly checking nothing. And a simulated line is a pseudo-terminal,
+which will not take a parity at all -- it rejects ``even`` outright and drops
+the others silently -- so a set meant to be run against tcssim states
+``parity: none``, which is what a payload link commonly runs anyway.
+
+A synchronous line's attributes are recorded rather than applied: the kernel
+drives such a line through a network interface of its own rather than through
+the terms of a device file, so a handler that opens a path cannot set them.
+They are kept so that the link a file describes can be checked against the
+equipment, as an I\ :superscript:`2`\ C group's bus speed is.
 
 **A network group**
 
@@ -665,14 +746,12 @@ Neither bus kind takes a stream section. A master clocks exactly as many bytes
 as it asks for, so a transfer is already bounded and needs no rule for where a
 read ends.
 
-A worked example of every kind at once is shipped, in all three formats, as
-``tcslibgs/tests/actual/endpoints.yaml`` and its ``.json`` and ``.xml``
-companions. A test parses each of them on every build, so an example there
-cannot quietly stop being valid. None of its endpoints gives a ``dh_id``,
-which is what makes it an endpoint configuration rather than a set of data
-handlers: an endpoint becomes a handler only when it is given a number for
-commands to name it by, and an OC address for the handler to reach the ground
-at.
+A worked example of every kind at once, in YAML and in XML, is at the end of
+"Endpoint Configuration Files" in ``docs/design.rst``. None of its endpoints
+gives a ``dh_id``, which is what makes it an endpoint configuration rather than
+a set of data handlers: an endpoint becomes a handler only when it is given a
+number for commands to name it by, and an OC address for the handler to reach
+the ground at.
 
 Not Yet Read
 ------------
@@ -681,7 +760,6 @@ parser. A file giving one is refused rather than quietly running without it.
 
 .. code-block:: text
 
-   parity                  on a serial line
    length-prefixed framing a read whose length is in its first one or two
                            bytes
    max_interbyte_interval  a read ended by a gap between bytes
@@ -701,18 +779,26 @@ line argument. ``PAYLOAD_SIM_YAML`` is the simulator file, which reaches
 tcssim through the environment -- and tcsmoc too, which it inherits the same
 way: tcsmoc acts on none of it, and reads it only so a panel can show what the
 tcssim it started is simulating. Failing the variable, each looks for the file
-beside the payload file and named for it. Both default to the ``payload2``
+beside the payload file and named for it. Both default to the ``tcspecial2``
 set.
 
 Everything at once
 ------------------
-``make runmoc`` runs tcsmoc, which starts a tcspecial and a tcssim of its own:
+``make runmocy`` runs tcsmoc, which starts a tcspecial and a tcssim of its own:
 
 .. code-block:: console
 
-   $ make runmoc
-   $ make runmoc PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml
-   $ make runmoc PAYLOAD_YAML=payload2.yaml PAYLOAD_SIM_YAML=payload2sim.yaml
+   $ make runmocy
+   $ make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
+   $ make runmocy PAYLOAD_YAML=tcspecial2.yaml PAYLOAD_SIM_YAML=tcspecial2sim.yaml
+   $ make runmocy PAYLOAD_YAML=tcspecial4.yaml PAYLOAD_SIM_YAML=tcspecial4sim.yaml
+
+The last letter is the spelling of the payload configuration file it reads:
+``runmocy`` the YAML, ``runmocx`` the XML, ``runmocj`` the JSON. All three take
+the same ``PAYLOAD_YAML``, and use its name without its suffix, so the three
+are one payload set read three ways rather than three sets. The simulator file
+is not spelled by it: only tcssim reads that one, and tcsmoc merely passes it
+on.
 
 Both files are named because tcsmoc passes the payload file on to its children
 and never reads the simulator file, which reaches tcssim by being in tcsmoc's
@@ -722,8 +808,14 @@ payload file must have a simulated payload naming it.
 
 If a tcspecial is already running, tcsmoc attaches to it instead of starting a
 second -- it asks by PING -- and leaves it running when the window is closed.
+One it starts itself is started on the address it will send commands to, so
+that half of the question never arises.
 Starting a second never worked: the command interpreter's address can be bound
-once.
+once. What it is serving, though, is the payload file it was started with: one
+left over from an earlier payload set goes on serving that set's handlers,
+and a payload the new file plainly contains is then answered ``NotFound``.
+Stopping it and letting tcsmoc start a fresh one is the fix; tcspecial's log
+says which handlers it does serve.
 
 One program at a time
 ---------------------
@@ -732,9 +824,9 @@ disturbing the others, or watched with its own logging.
 
 .. code-block:: console
 
-   $ make run PAYLOAD_YAML=payload1.yaml
-   $ make runsim PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml
-   $ make runmoc PAYLOAD_YAML=payload1.yaml PAYLOAD_SIM_YAML=payload1sim.yaml
+   $ make run PAYLOAD_YAML=tcspecial1.yaml
+   $ make runsim PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
+   $ make runmocy PAYLOAD_YAML=tcspecial1.yaml PAYLOAD_SIM_YAML=tcspecial1sim.yaml
 
 ``make run`` takes only the payload file: tcspecial does not simulate
 anything. ``make runsim`` takes both, because tcssim run on its own needs the
@@ -746,23 +838,44 @@ What the programs take without the Makefile
 -------------------------------------------
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- payload1.yaml
-   $ PAYLOAD_SIM_YAML=payload1sim.yaml cargo run --bin tcssim -- payload1.yaml
-   $ PAYLOAD_SIM_YAML=payload1sim.yaml cargo run --bin tcsmoc -- payload1.yaml
+   $ cargo run --bin tcspecial -- tcspecial1.yaml
+   $ PAYLOAD_SIM_YAML=tcspecial1sim.yaml cargo run --bin tcssim -- tcspecial1.yaml
+   $ PAYLOAD_SIM_YAML=tcspecial1sim.yaml cargo run --bin tcsmoc -- tcspecial1.yaml
 
 An argument naming the payload file beats any environment variable naming one.
 Failing an argument, tcspecial reads ``PAYLOAD_CONFIG_PATH`` and tcssim reads
 ``SIM_PAYLOAD_CONFIG_PATH``; failing that, every program reads
-``payload1.yaml``. Tcsmoc has no variable of its own, because the programs it
+``tcspecial1.yaml``. Tcsmoc has no variable of its own, because the programs it
 starts inherit its environment: a variable naming tcsmoc's file would name
 theirs as well.
+
+Tcspecial takes one more argument, after the payload file: the address it
+serves commands on.
+
+.. code-block:: console
+
+   $ cargo run --bin tcspecial -- tcspecial1.yaml 127.0.0.1:4000
+
+It beats what ``tcspecial/src/tcspecial.yaml`` says, and the port must be given
+with the address. With no such argument the configuration file places it, which
+is what ``make run`` relies on. Tcsmoc supplies it when it starts a tcspecial
+of its own, passing the address its own ``tcspecial link`` box will be opened
+at, so the end that listens and the end that sends cannot differ.
+
+Either way tcspecial says where it ended up as it starts, on the terminal and
+whatever ``RUST_LOG`` is set to:
+
+.. code-block:: console
+
+   Commands are taken on 127.0.0.1:4000, as the command line asked
+   Commands are taken on 0.0.0.0:4000, as tcspecial/src/tcspecial.yaml asked
 
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``.
 
 .. code-block:: console
 
-   $ make runmoc RUST_LOG=debug
-   $ RUST_LOG=tcspecial::ci=trace cargo run --bin tcspecial -- payload1.yaml
+   $ make runmocy RUST_LOG=debug
+   $ RUST_LOG=tcspecial::ci=trace cargo run --bin tcspecial -- tcspecial1.yaml
 
 Testing
 =======
@@ -811,6 +924,48 @@ themselves about once a second; nothing has to be pressed to see traffic.
 Each panel has two buttons. One starts and stops the handler, and is described
 under `Starting and stopping a payload`_. The other, ``Configuration``, shows
 what the files said about that handler: see `Seeing what was read`_.
+
+A triggered payload on the console
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A payload that answers requests sends nothing until tcspecial asks it to, so
+when such a panel shows no data the question is what the MOC sent and what came
+back -- and a panel shows neither. For those payloads, and only those, tcsmoc
+says both on the terminal it was started from.
+
+At startup, once per triggered payload, the whole of what it will be addressed
+by and asked with:
+
+.. code-block:: console
+
+   triggered payload triggered-send: dh_id 1, TCP localhost:5003, trigger 0x67 6F ("go") every 1000 ms, OC 127.0.0.1:6003, status Stopped
+
+Then one line for every command sent about it. A press of its button:
+
+.. code-block:: console
+
+   triggered payload triggered-send: Transmit pressed: sending START_DH for dh_id 1 as a Network handler
+   triggered payload triggered-send: START_DH answered Success, so the panel now says Active
+
+and one from the refresh, carrying the status each answer came back with and
+the trigger count:
+
+.. code-block:: console
+
+   triggered payload triggered-send: QUERY_DH Success: 5 triggers sent, 0 bytes to the ground, 0 from it; QUERY_DH_SAMPLE Success
+
+That one is said when it changes and not again until it changes once more. The
+panels poll every handler about once a second from the moment the link is up,
+started or not, so a line per pass meant a line a second about a payload
+sitting still; what is worth reading is the pass where something moved. A
+payload that is not transmitting therefore says this once and then nothing.
+
+``NotFound`` there is worth knowing: the panel shows zeroes either way, but it
+means the tcspecial being talked to has no such handler, which usually means it
+was started from a different payload file -- most often one left running from
+an earlier payload set, which tcsmoc attaches to rather than replacing. The
+trigger count is the one number that says the asking is happening at all; it
+appears in no other counter, because a trigger is a write with no read behind
+it.
 
 Commands
 ^^^^^^^^
@@ -914,9 +1069,15 @@ under `Seeing what was read`_ -- and then three lines:
   When the last packet went, and the first few bytes of it.
 
 ``Recv``
-  When the last packet arrived, and the first few bytes of it. A payload
-  nothing speaks to shows ``--:--:--`` here for the whole run, which is what a
-  payload that sends on its own looks like.
+  When the last packet arrived, and the first few bytes of it -- for a payload
+  that answers requests. A payload that sends of its own accord is never
+  spoken to, so this line is left blank for it rather than showing
+  ``--:--:--`` for the whole run. The line stays so that every panel is the
+  same shape; it is the two items on it that go.
+
+  Tcsmoc's panels do the same thing in the other direction: a handler whose
+  payload sends of its own accord is never asked anything, so its ``Last
+  sent`` line is blank.
 
 ``Pkts``
   How many packets have gone and arrived since the payload started.

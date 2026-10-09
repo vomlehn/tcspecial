@@ -37,6 +37,13 @@ use tcslibgs::Faults;
 #[derive(Clone)]
 pub struct PayloadConfig {
     pub _id: u32,
+    /// The payload's name, as the payload configuration file gives it.
+    ///
+    /// Carried so that everything a payload says of itself says which payload
+    /// it is. A run of four payloads whose messages said only "the payload is
+    /// hanging up" left the reader to work out which one from the order they
+    /// came in.
+    pub name: String,
     pub protocol: PayloadProtocol,
     /// Where the payload is, in the terms its kind is located by: a host for
     /// a network payload, a path for every other kind.
@@ -162,7 +169,10 @@ impl SimulatedPayload {
         // payload was dropping a tenth of its packets should not have to be
         // guessed at from the counters afterwards.
         if self.config.faults.any() {
-            eprintln!("injecting faults: {:?}", self.config.faults);
+            eprintln!(
+                "{}: injecting faults: {:?}",
+                self.config.name, self.config.faults
+            );
         }
 
         self.running.store(true, Ordering::SeqCst);
@@ -213,6 +223,11 @@ impl SimulatedPayload {
     }
 
     /// Get the current statistics
+    /// This payload's name, as the payload configuration file gives it.
+    pub fn name(&self) -> &str {
+        &self.config.name
+    }
+
     pub fn stats(&self) -> PayloadStats {
         let guard = self.stats.lock().unwrap();
         PayloadStats {
@@ -565,6 +580,7 @@ mod tests {
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,
@@ -921,6 +937,7 @@ mod tests {
     fn test_payload_config() {
         let config = PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
             port: 5000,

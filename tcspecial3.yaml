@@ -4,13 +4,26 @@
 # tcspecial reaches each one, and how big its packets are. It deliberately says
 # nothing about how fast a simulated payload produces them or how the simulator
 # divides a packet into segments; those are properties of the simulation rather
-# than of the payload, and live in payload3sim.yaml.
+# than of the payload, and live in tcspecial3sim.yaml.
 #
 # This set has one data handler, so it has no data handler groups: a group
 # carries what several handlers share, and a group no handler names is an
 # error rather than a section with no effect.
 version: "1.0"
 description: TCSpecial payload set 3
+
+# What tcspecial itself is configured with for this payload set -- the same
+# section a tcspecial.yaml holds. First, because it is about the set as a
+# whole rather than about any payload in it. Read by nothing yet: tcspecial
+# still takes its own configuration from the file TCSPECIAL_CONFIG_PATH names,
+# and the address it serves commands on from its command line before that.
+tcspecial:
+  address: 0.0.0.0
+  port: 4000
+  protocol: udp
+  beacon_interval_ms: 5000
+  log_dir: /var/log/tcspecial
+  log_segment_bytes: 65536
 
 payloads:
   - dh_id: 0

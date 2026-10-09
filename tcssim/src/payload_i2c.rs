@@ -81,7 +81,10 @@ struct SimulatedBus {
 
 impl SimulatedBus {
     /// Find a stub bus, point `path` at it, and address the chip.
-    fn open(path: &str, address: u16) -> Result<Self, String> {
+    ///
+    /// `what` is the payload's name, so that what the stand-in says of itself
+    /// says which payload it belongs to.
+    fn open(what: &str, path: &str, address: u16) -> Result<Self, String> {
         let stub = find_stub(Path::new(I2C_ADAPTERS))?;
         let named = PathBuf::from(path);
 
@@ -119,7 +122,7 @@ impl SimulatedBus {
         simulated.prove_a_chip_answers(&stub, address)?;
 
         eprintln!(
-            "simulated I2C device {address:#04X} on {stub}{}",
+            "{what}: a simulated I2C device at {address:#04X} on {stub}{}",
             if simulated.linked {
                 format!(", reached as {}", simulated.named.display())
             } else {
@@ -230,10 +233,10 @@ pub fn run_i2c_payload(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let bus = match SimulatedBus::open(&config.address, config.bus_address) {
+    let bus = match SimulatedBus::open(&config.name, &config.address, config.bus_address) {
         Ok(bus) => bus,
         Err(e) => {
-            eprintln!("Failed to stand in for the I2C device: {}", e);
+            eprintln!("{}: failed to stand in for an I2C device: {}", config.name, e);
             return;
         }
     };

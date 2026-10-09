@@ -27,7 +27,7 @@ pub struct DeviceEndpoint {
 }
 
 impl DeviceEndpoint {
-    pub fn new(config: &DeviceConfig) -> TcsResult<Self> {
+    pub fn new(what: &str, config: &DeviceConfig) -> TcsResult<Self> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -38,7 +38,12 @@ impl DeviceEndpoint {
             // and a hangup raises SIGHUP: a handler stopped or killed for
             // reasons that have nothing to do with its payload.
             .custom_flags(libc::O_NOCTTY)
-            .open(&config.path)?;
+            // Named, because a bare `No such file or directory` says neither
+            // which handler could not start nor what it was reaching for.
+            .open(&config.path)
+            .map_err(|e| {
+                TcsError::Endpoint(format!("{what}: {} cannot be opened: {e}", config.path))
+            })?;
 
         Ok(Self {
             file,

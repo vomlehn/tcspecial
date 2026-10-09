@@ -42,10 +42,10 @@ pub fn run_spi_payload(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    let mut node = match SimulatedNode::open("a SPI peripheral", &config.address) {
+    let mut node = match SimulatedNode::open(&format!("{}: a SPI peripheral", config.name), &config.address) {
         Ok(node) => node,
         Err(e) => {
-            eprintln!("Failed to stand in for the SPI peripheral: {}", e);
+            eprintln!("{}: failed to stand in for a SPI peripheral: {}", config.name, e);
             return;
         }
     };
@@ -138,6 +138,7 @@ mod tests {
         let path = a_path();
         let mut payload = SimulatedPayload::new(PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Spi,
             address: path.display().to_string(),
             port: 0,

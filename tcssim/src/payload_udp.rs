@@ -53,12 +53,12 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
     let socket = match UdpSocket::bind(&mine) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Failed to bind the UDP payload at {}: {}", mine, e);
+            eprintln!("{}: failed to bind the UDP payload at {}: {}", config.name, mine, e);
             return;
         }
     };
     if let Err(e) = socket.connect(&handler) {
-        eprintln!("Failed to reach the handler at {}: {}", handler, e);
+        eprintln!("{}: failed to reach the handler at {}: {}", config.name, handler, e);
         return;
     }
 
@@ -156,6 +156,7 @@ mod tests {
 
         let mut payload = SimulatedPayload::new(PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),
@@ -225,6 +226,7 @@ mod tests {
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),
@@ -246,6 +248,48 @@ mod tests {
         let at = handler.local_addr().expect("its address");
         handler.set_read_timeout(Some(wait)).expect("a read timeout");
         (handler, at)
+    }
+
+    /// What a payload says of itself says which payload it is.
+    ///
+    /// A run of four payloads whose messages said only "failed to reach the
+    /// handler" left the reader to work out which from the order they came
+    /// in. The name is the payload configuration's, which is the name every
+    /// other part of the system uses for it -- a panel, a log line of
+    /// tcspecial's, and the list a panel's Configuration button shows.
+    #[test]
+    fn a_payload_says_which_payload_it_is() {
+        // Nothing is listening at this address and nothing will be, so the
+        // payload cannot reach a handler and says so.
+        let nowhere = UdpSocket::bind("127.0.0.1:0").expect("a port to take and give back");
+        let at = nowhere.local_addr().expect("its address");
+        drop(nowhere);
+
+        let config = PayloadConfig {
+            _id: 7,
+            name: "serial-line".to_string(),
+            protocol: PayloadProtocol::Udp,
+            address: at.ip().to_string(),
+            port: at.port(),
+            bus_address: 0,
+            triggered: false,
+            faults: Faults::default(),
+            own_address: None,
+            own_port: None,
+            packet_size: Arc::new(AtomicU32::new(12)),
+            segment_size: Arc::new(AtomicU32::new(12)),
+            packet_interval_ms: Arc::new(AtomicU32::new(20)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+        };
+
+        // The name reaches the thread that does the talking, which is the
+        // thing this is about: the configuration a payload is run from
+        // carries it, so every message in that thread can say it.
+        assert_eq!(config.name, "serial-line");
+        let mut payload = SimulatedPayload::new(config);
+        assert_eq!(payload.name(), "serial-line");
+        payload.start().expect("the payload starts");
+        payload.stop();
     }
 
     /// A payload told which socket to answer from answers from it.
@@ -510,6 +554,7 @@ mod tests {
 
         let mut payload = SimulatedPayload::new(PayloadConfig {
             _id: 0,
+            name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
             port: at.port(),

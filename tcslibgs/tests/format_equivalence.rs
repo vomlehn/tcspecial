@@ -4,7 +4,9 @@
 //! configuration data; JSON, YAML, and XML are three spellings of it. Nothing
 //! in the code guarantees the three spellings stay interchangeable, so these
 //! tests do: for each file in `tests/actual`, every format must deserialize to
-//! an *identical* value.
+//! an *identical* value. The command interpreter's own configuration is part
+//! of that file now, as the `tcspecial` section, rather than an actual file of
+//! its own.
 //!
 //! When you add a field, add it to all three actual files. These tests fail
 //! if you forget one.
@@ -42,27 +44,32 @@ where
 }
 
 #[test]
-fn payload_config_is_format_independent() {
-    assert_all_formats_agree::<PayloadConfig>("payload");
+fn the_actual_file_is_format_independent() {
+    assert_all_formats_agree::<PayloadConfig>("tcspecial");
 }
 
 #[test]
-fn ci_config_is_format_independent() {
-    assert_all_formats_agree::<CIConfigJson>("tcspecial");
-}
-
-#[test]
-fn payload_actual_file_has_expected_contents() {
+fn the_actual_file_has_expected_contents() {
     // Guards against the equivalence test passing because all three formats
     // are identically wrong (for instance, every field silently defaulting).
-    let config: PayloadConfig = load_config_file(actual("payload.yaml")).unwrap();
+    let config: PayloadConfig = load_config_file(actual("tcspecial.yaml")).unwrap();
 
     assert_eq!(config.version, "1.0");
     assert_eq!(config.len(), 2);
-    assert!(
-        config.ci_config.is_none(),
-        "the payload actual file has no ci_config"
-    );
+    // The section that says what tcspecial itself is configured with for this
+    // set. Checked field by field rather than only for being present, because
+    // every format has to carry a nested section and not merely accept the
+    // name of one.
+    let ci = config
+        .tcspecial
+        .as_ref()
+        .expect("the payload actual file carries a tcspecial section");
+    assert_eq!(ci.address, "0.0.0.0");
+    assert_eq!(ci.port, 4000);
+    assert_eq!(ci.protocol, "udp");
+    assert_eq!(ci.beacon_interval_ms, 5000);
+    assert_eq!(ci.log_dir.as_deref(), Some("/var/log/tcspecial"));
+    assert_eq!(ci.log_segment_bytes, 65_536);
 
     assert_eq!(config.payload_groups.len(), 1);
     let group = config.group("udp_localhost").expect("the group is defined");
@@ -93,24 +100,24 @@ fn a_grouped_handler_resolves_the_same_from_every_format() {
     // The group is only useful if what a handler inherits from it survives
     // every format, so resolve the whole file rather than inspecting fields.
     for ext in ["json", "yaml", "xml"] {
-        let config: PayloadConfig = load_config_file(actual(&format!("payload.{ext}"))).unwrap();
+        let config: PayloadConfig = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
         let handlers = config
             .to_dh_configs()
-            .unwrap_or_else(|e| panic!("payload.{ext} failed to resolve: {e}"));
+            .unwrap_or_else(|e| panic!("tcspecial.{ext} failed to resolve: {e}"));
 
         match &handlers[0].endpoint {
             EndpointConfig::Network(net) => {
                 // All three from the group.
-                assert_eq!(net.protocol, NetworkProtocol::Udp, "payload.{ext}");
-                assert_eq!(net.address, "localhost", "payload.{ext}");
+                assert_eq!(net.protocol, NetworkProtocol::Udp, "tcspecial.{ext}");
+                assert_eq!(net.address, "localhost", "tcspecial.{ext}");
                 // The handler's own.
-                assert_eq!(net.port, 5000, "payload.{ext}");
+                assert_eq!(net.port, 5000, "tcspecial.{ext}");
             }
-            other => panic!("payload.{ext}: DH0 resolved to {other:?}"),
+            other => panic!("tcspecial.{ext}: DH0 resolved to {other:?}"),
         }
         // Stated by the group alone, so this is what proves an attribute no
         // handler mentions still reaches it.
-        assert_eq!(handlers[0].packet_size, 12, "payload.{ext}");
+        assert_eq!(handlers[0].packet_size, 12, "tcspecial.{ext}");
     }
 }
 
@@ -176,15 +183,74 @@ fn every_format_converts_to_runtime_types() {
     // Equivalence at the file layer is only useful if the conversion into the
     // real runtime types also succeeds from every format.
     for ext in ["json", "yaml", "xml"] {
-        let config: PayloadConfig = load_config_file(actual(&format!("payload.{ext}"))).unwrap();
+        let config: PayloadConfig = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
         config
             .to_dh_configs()
-            .unwrap_or_else(|e| panic!("payload.{ext} failed conversion: {e}"));
-
-        let ci: CIConfigJson = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
-        ci.to_ci_config()
             .unwrap_or_else(|e| panic!("tcspecial.{ext} failed conversion: {e}"));
+
     }
+}
+
+#[test]
+fn the_tcspecial_section_is_a_command_interpreter_configuration() {
+    // The section is what a tcspecial.yaml holds, so it has to convert into
+    // the runtime configuration a command interpreter is placed by --
+    // otherwise it is a look-alike, and a file carrying it would be
+    // describing something no program could ever be placed by.
+    //
+    // It is also the one place the three spellings of a command interpreter
+    // configuration are still compared: the_actual_file_is_format_independent
+    // holds the whole file identical across the formats, and this section is
+    // part of that file.
+    for ext in ["json", "yaml", "xml"] {
+        let config: PayloadConfig = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
+        let carried = config
+            .tcspecial
+            .as_ref()
+            .unwrap_or_else(|| panic!("tcspecial.{ext} carries no tcspecial section"));
+
+        let ci = carried
+            .to_ci_config()
+            .unwrap_or_else(|e| panic!("tcspecial.{ext}'s section does not convert: {e}"));
+
+        // Enough of the result to show the conversion carried the values
+        // rather than succeeding on defaults.
+        assert_eq!(ci.address, "0.0.0.0", "tcspecial.{ext}");
+        assert_eq!(ci.port, 4000, "tcspecial.{ext}");
+        assert_eq!(ci.protocol, NetworkProtocol::Udp, "tcspecial.{ext}");
+    }
+}
+
+#[test]
+fn a_tcspecial_section_that_could_never_be_used_is_refused() {
+    // Read by nothing yet, and still checked: a file states the section
+    // because its author meant it, so a section that could not place a
+    // command interpreter is an error where the file is loaded rather than a
+    // surprise for the first program to look at it.
+    let config: PayloadConfig = ConfigFormat::Yaml
+        .parse(
+            "version: \"1.0\"
+description: a set whose tcspecial section is wrong
+payloads:
+  - dh_id: 0
+    name: DH0
+    type: device
+    path: /dev/null
+    packet_size: 1
+tcspecial:
+  address: 0.0.0.0
+  port: 4000
+  protocol: carrier-pigeon
+  beacon_interval_ms: 5000
+",
+        )
+        .expect("parses: a protocol that is not one is not a syntax error");
+
+    let message = config.to_dh_configs().expect_err("must be rejected");
+    assert!(
+        message.contains("tcspecial") && message.contains("carrier-pigeon"),
+        "the error should name the section and the value, but said: {message}"
+    );
 }
 
 #[test]

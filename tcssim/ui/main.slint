@@ -21,6 +21,11 @@ export struct PayloadInfo {
     // edit -- so the panel has an answer to obey rather than a rule to
     // apply.
     sizes-problem: string,
+    // Whether this payload answers requests. The payload configuration
+    // decides it, and the panel shows a received line only for such a
+    // payload: nothing is ever sent to one that sends on its own, so the line
+    // would say the same thing for the whole run.
+    triggered: bool,
     // From the simulator configuration file, and editable here afterwards
     segment-size: int,
     packet-interval: int,
@@ -51,6 +56,7 @@ component PayloadPanel inherits Rectangle {
     in property <int> packets-recv: 0;
     in property <string> parameters: "";
     in property <string> sizes-problem: "";
+    in property <bool> triggered: false;
 
     callback transfer-clicked();
     // One callback per spin box, each carrying the value just set. The panel
@@ -273,9 +279,18 @@ component PayloadPanel inherits Rectangle {
             height: 14px;
             Text { text: "Sent: " + last-sent-time + " " + last-sent-data; font-size: 9px; }
         }
+        // The line stays and its contents go, for a payload that is never
+        // spoken to: a payload that sends on its own would read
+        // "Recv: --:--:--" from the first packet to the last, which is a row
+        // spent saying that nothing can happen here. The row itself is kept
+        // so that every panel is the same shape and the rows below it do not
+        // move from one panel to the next.
         recv-row := HorizontalLayout {
             height: 14px;
-            Text { text: "Recv: " + last-recv-time + " " + last-recv-data; font-size: 9px; }
+            if triggered : Text {
+                text: "Recv: " + last-recv-time + " " + last-recv-data;
+                font-size: 9px;
+            }
         }
         packets-row := HorizontalLayout {
             height: 14px;
@@ -354,6 +369,7 @@ export component MainWindow inherits Window {
                     packets-recv: p.packets-recv;
                     parameters: p.parameters;
                     sizes-problem: p.sizes-problem;
+                    triggered: p.triggered;
 
                     transfer-clicked => { transfer-payload(i); }
 

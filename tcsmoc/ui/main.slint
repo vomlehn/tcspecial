@@ -27,6 +27,10 @@ export struct DHInfo {
     // nothing can change the files while the window is up, and this is not
     // telemetry -- no part of it is asked of the spacecraft.
     parameters: string,
+    // Whether this handler's payload answers requests. The payload
+    // configuration decides it, and the panel shows a sent line only for such
+    // a payload.
+    triggered: bool,
 }
 
 component DHPanel inherits Rectangle {
@@ -41,6 +45,7 @@ component DHPanel inherits Rectangle {
     in property <int> bytes-sent: 0;
     in property <int> bytes-recv: 0;
     in property <string> parameters: "";
+    in property <bool> triggered: false;
 
     callback transfer-clicked();
 
@@ -166,12 +171,27 @@ component DHPanel inherits Rectangle {
         // three rows of panels then wanted a window taller than a 1080 line
         // screen. The same two readings, named the same way, in a quarter of
         // the room.
+        // The line stays and its contents go, for a handler whose payload
+        // sends on its own. The row is kept so that every panel is the same
+        // shape and the rows below it do not move from one panel to the next.
         last-sent-row := HorizontalLayout {
             spacing: 4px;
             min-height: 14px;
-            Text { text: "Last sent:"; font-size: 10px; vertical-alignment: center; }
-            Text { text: last-sent-time; font-size: 10px; vertical-alignment: center; }
-            Text { text: last-sent-data; font-size: 10px; vertical-alignment: center; }
+            if triggered : Text {
+                text: "Last sent:";
+                font-size: 10px;
+                vertical-alignment: center;
+            }
+            if triggered : Text {
+                text: last-sent-time;
+                font-size: 10px;
+                vertical-alignment: center;
+            }
+            if triggered : Text {
+                text: last-sent-data;
+                font-size: 10px;
+                vertical-alignment: center;
+            }
         }
 
         last-recv-row := HorizontalLayout {
@@ -499,6 +519,7 @@ export component MainWindow inherits Window {
                         bytes-sent: dh.bytes-sent;
                         bytes-recv: dh.bytes-recv;
                         parameters: dh.parameters;
+                        triggered: dh.triggered;
                         transfer-clicked => { transfer-dh(i); }
                     }
                 }

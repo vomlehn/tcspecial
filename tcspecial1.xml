@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TCSpecial payload set 1, in the payload configuration language.
+
+     Equivalent to tcspecial1.yaml and tcspecial1.json. The YAML is the one
+     to read: it carries the comments, which JSON has no way to hold.
+
+     Conventions, which are the subset JSON, YAML and XML all agree on:
+       - every value is a child element, never an attribute
+       - a sequence is repeated sibling elements named for the field,
+         and the repeats must be contiguous
+       - an absent optional field is simply an omitted element -->
+<payload>
+    <version>1.0</version>
+    <description>TCSpecial payload set 1</description>
+    <tcspecial>
+        <address>0.0.0.0</address>
+        <port>4000</port>
+        <protocol>udp</protocol>
+        <beacon_interval_ms>5000</beacon_interval_ms>
+        <log_dir>/var/log/tcspecial</log_dir>
+        <log_segment_bytes>65536</log_segment_bytes>
+    </tcspecial>
+    <payload_groups>
+        <name>udp_localhost</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>localhost</address>
+    </payload_groups>
+    <payloads>
+        <dh_id>0</dh_id>
+        <name>DH0</name>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6000</oc_port>
+        <type>network</type>
+        <protocol>tcp</protocol>
+        <address>localhost</address>
+        <port>5000</port>
+        <packet_size>12</packet_size>
+    </payloads>
+    <payloads>
+        <dh_id>1</dh_id>
+        <name>DH1</name>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6001</oc_port>
+        <group>udp_localhost</group>
+        <port>5001</port>
+        <packet_size>11</packet_size>
+    </payloads>
+    <payloads>
+        <dh_id>2</dh_id>
+        <name>DH2</name>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6002</oc_port>
+        <type>device</type>
+        <path>/dev/urandom</path>
+        <packet_size>1</packet_size>
+    </payloads>
+    <payloads>
+        <dh_id>3</dh_id>
+        <name>DH3</name>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6003</oc_port>
+        <group>udp_localhost</group>
+        <port>5003</port>
+        <packet_size>15</packet_size>
+    </payloads>
+</payload>

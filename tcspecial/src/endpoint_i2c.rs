@@ -84,9 +84,12 @@ enum Transfers {
 impl Transfers {
     /// What an adapter advertising `funcs` can do, or why it is of no use.
     ///
+    /// `on` is the handler and its bus, as [`I2cEndpoint::new`] builds it, and
+    /// is only ever said back in the complaint.
+    ///
     /// Raw is preferred where it is offered: it is what a real device expects,
     /// and it carries a packet of any length in one transfer.
-    fn of(funcs: libc::c_ulong, bus: &str) -> TcsResult<Self> {
+    fn of(funcs: libc::c_ulong, on: &str) -> TcsResult<Self> {
         if funcs & I2C_FUNC_I2C != 0 {
             return Ok(Transfers::Raw);
         }
@@ -97,7 +100,7 @@ impl Transfers {
         }
 
         Err(TcsError::Endpoint(format!(
-            "{bus} can do neither raw I2C transfers nor SMBus block transfers \
+            "{on} can do neither raw I2C transfers nor SMBus block transfers \
              (its adapter offers {funcs:#010X}), so there is no way to carry \
              payload data over it"
         )))
@@ -139,26 +142,33 @@ impl I2cEndpoint {
     /// configuration carries has already been checked against what the
     /// specification reserves -- see `endpoint_config_i2c` -- so what can
     /// still go wrong here is the bus, not the number.
-    pub fn new(config: &I2cConfig) -> TcsResult<Self> {
+    pub fn new(what: &str, config: &I2cConfig) -> TcsResult<Self> {
+        // The handler's name and its bus together, because every complaint
+        // below is about both: which payload could not be reached, and the
+        // node it was to be reached over. One label, built once, so that the
+        // name cannot be left off one message and put on the next.
+        let on = format!("{what}: {}", config.bus);
+
         let bus = OpenOptions::new()
             .read(true)
             .write(true)
-            .open(&config.bus)?;
+            .open(&config.bus)
+            .map_err(|e| TcsError::Endpoint(format!("{on} cannot be opened: {e}")))?;
 
         let fd = bus.as_raw_fd();
 
         if config.ten_bit {
-            request(fd, I2C_TENBIT, 1, &config.bus, "ten-bit addressing")?;
+            request(fd, I2C_TENBIT, 1, &on, "ten-bit addressing")?;
         }
         request(
             fd,
             I2C_SLAVE,
             config.address as libc::c_int,
-            &config.bus,
+            &on,
             &format!("the address {:#04X}", config.address),
         )?;
         if config.pec {
-            request(fd, I2C_PEC, 1, &config.bus, "the packet error check")?;
+            request(fd, I2C_PEC, 1, &on, "the packet error check")?;
         }
 
         // What this adapter can do decides how every transfer below is
@@ -167,16 +177,16 @@ impl I2cEndpoint {
         if unsafe { libc::ioctl(fd, I2C_FUNCS, &mut funcs) } < 0 {
             return Err(TcsError::Endpoint(format!(
                 "{} will not say what it can do: {}",
-                config.bus,
+                on,
                 std::io::Error::last_os_error()
             )));
         }
-        let transfers = Transfers::of(funcs, &config.bus)?;
+        let transfers = Transfers::of(funcs, &on)?;
 
         Ok(Self {
             bus,
             transfers,
-            at: format!("{} at {:#04X}", config.bus, config.address),
+            at: format!("{on} at {:#04X}", config.address),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -228,15 +238,15 @@ fn request(
     fd: RawFd,
     request: libc::c_ulong,
     value: libc::c_int,
-    bus: &str,
-    what: &str,
+    on: &str,
+    wanted: &str,
 ) -> TcsResult<()> {
     // SAFETY: fd is open for the lifetime of the borrow, and every request
     // here takes an integer by value.
     if unsafe { libc::ioctl(fd, request, value) } < 0 {
         let why = std::io::Error::last_os_error();
         return Err(TcsError::Endpoint(format!(
-            "{bus} would not take {what}: {why}"
+            "{on} would not take {wanted}: {why}"
         )));
     }
     Ok(())
@@ -369,7 +379,7 @@ mod tests {
             pec: false,
         };
 
-        let e = match I2cEndpoint::new(&config) {
+        let e = match I2cEndpoint::new("instrument", &config) {
             Ok(_) => panic!("a plain file was taken for a bus"),
             Err(e) => e,
         };
@@ -377,6 +387,12 @@ mod tests {
         assert!(
             said.contains(&config.bus) && said.contains("0x48"),
             "the complaint names neither the bus nor the address: {said}"
+        );
+        // And which handler it was for: a bus is shared, and an error naming
+        // only the node leaves the operator to work out whose payload it was.
+        assert!(
+            said.contains("instrument"),
+            "the complaint does not say which handler: {said}"
         );
     }
 }

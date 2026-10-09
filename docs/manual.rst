@@ -43,10 +43,11 @@ Four kinds of configuration file, each read by the programs that need it.
 
 ``tcspecial.yaml``
     The command interpreter's own settings: the address it listens on, where
-    beacons go, the beacon interval, and where the telemetry log goes. Every
-    address tcspecial uses is here and nowhere else. Read by tcspecial at
-    startup, from the path ``TCSPECIAL_CONFIG_PATH`` names when that is set.
-    Nothing about the payloads is in it.
+    beacons go and how often, and where the telemetry log goes. A payload
+    set's ``tcspecial`` section states the beacon settings for that set and
+    wins over these. Read by tcspecial at startup, from the path
+    ``TCSPECIAL_CONFIG_PATH`` names when that is set. Nothing about the
+    payloads is in it.
 
 a payload configuration file
     Which data handlers exist, how tcspecial reaches each one, and how large
@@ -89,7 +90,8 @@ share.
    description    free text
 
    tcspecial                       optional
-     ...          the same attributes a tcspecial.yaml holds
+     ...          the same attributes a tcspecial.yaml holds, of which
+                  beacon_address is read
 
    payload_groups                  optional
      name         the name payloads refer to
@@ -102,11 +104,12 @@ share.
      ...          any of the attributes below
 
 The shipped sets each carry a ``tcspecial`` section, first in the file, so one
-file says what the set is and where its command interpreter belongs. Nothing
-reads it yet: tcspecial is still placed by the file ``TCSPECIAL_CONFIG_PATH``
-names, and by the address on its command line before that. It is checked when
-the file is loaded all the same -- a section that could never place a command
-interpreter is refused where the file is read.
+file says what the set is and where its command interpreter belongs.
+``beacon_address`` is read from it, since where a set's beacons go is the set's
+own business; the rest is not yet, tcspecial being placed by the file
+``TCSPECIAL_CONFIG_PATH`` names. It is all checked when the file is loaded --
+a section that could never place a command interpreter is refused where the
+file is read.
 
 **Attributes**
 
@@ -859,29 +862,44 @@ starts inherit its environment: a variable naming tcsmoc's file would name
 theirs as well.
 
 The payload file is the only argument tcspecial takes. Where it serves
-commands and where it sends beacons are both in ``tcspecial.yaml``:
+commands is in ``tcspecial.yaml``:
 
 .. code-block:: yaml
 
    address: "0.0.0.0"
    port: 4000
-   beacon_address: "0.0.0.0:5550"
 
-``beacon_address`` may be left out, and then beacons go to ``0.0.0.0:5550``,
-which is where they have always gone and where tcsmoc listens for them. Moving
-it moves only where tcspecial sends: tcsmoc does not read this file, so its
-beacon indicator would then say nothing is arriving, which would be true of the
-address it is listening on. The same goes for the command address -- the two
-ends agree about it by reading the same default, so a file that moves it leaves
-the MOC sending where nothing is bound, and no error on either end reports
-that.
+Where it sends beacons, and how often, belong to the payload set -- a set's
+ground station being what listens for its beacons -- and are stated in the
+``tcspecial`` section of the set's own payload configuration file:
+
+.. code-block:: yaml
+
+   tcspecial:
+     beacon_interval_ms: 5000
+     beacon_address: "0.0.0.0:5550"
+
+Both are required of every command interpreter configuration, with no
+defaults: beacons are how the ground knows the spacecraft is alive, and a
+configuration that has not been asked where to send them has not answered.
+``tcspecial.yaml`` states them too, and a set's section wins over it; the
+file's are what place a set with no section, which is what a set written in the
+endpoint configuration language is. ``0.0.0.0:5550`` is where tcsmoc listens,
+which is why every shipped configuration states it.
+
+Moving the beacon address moves only where tcspecial sends: tcsmoc does not
+read either file, so its beacon indicator would then say nothing is arriving,
+which would be true of the address it is listening on. The same goes for the
+command address -- the two ends agree about it by reading the same default, so
+a file that moves it leaves the MOC sending where nothing is bound, and no
+error on either end reports that.
 
 Tcspecial says both as it starts, on the terminal and whatever ``RUST_LOG`` is
 set to:
 
 .. code-block:: console
 
-   Commands are taken on 0.0.0.0:4000 and beacons go to 0.0.0.0:5550, as tcspecial/src/tcspecial.yaml asked
+   Commands are taken on 0.0.0.0:4000 as tcspecial/src/tcspecial.yaml asked, and beacons go to 0.0.0.0:5550
 
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``.
 
@@ -1033,9 +1051,10 @@ without anyone asking.
 
 Beaconing
 ^^^^^^^^^
-TCSpecial sends a beacon at a configurable interval, to the address
-``beacon_address`` names in ``tcspecial.yaml``; tcsmoc listens on the default
-one. Tcsmoc displays the following beacon colors:
+TCSpecial sends a beacon at the interval its configuration states, to the
+address the payload set's ``tcspecial`` section names, or ``tcspecial.yaml``'s
+for a set with no section; tcsmoc listens on ``0.0.0.0:5550``. Tcsmoc displays
+the following beacon colors:
 
 steady grey
   Either no beacon message has been received yet or the system time has

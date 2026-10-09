@@ -245,6 +245,7 @@ tcspecial:
   port: 4000
   protocol: carrier-pigeon
   beacon_interval_ms: 5000
+  beacon_address: 0.0.0.0:5550
 ",
         )
         .expect("parses: a protocol that is not one is not a syntax error");

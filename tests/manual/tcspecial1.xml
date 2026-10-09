@@ -17,6 +17,7 @@
         <port>4000</port>
         <protocol>udp</protocol>
         <beacon_interval_ms>5000</beacon_interval_ms>
+        <beacon_address>0.0.0.0:5550</beacon_address>
         <log_dir>/var/log/tcspecial</log_dir>
         <log_segment_bytes>65536</log_segment_bytes>
     </tcspecial>

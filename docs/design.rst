@@ -1426,11 +1426,12 @@ two of them optional. They are given below in the order the files carry them.
 
 ``tcspecial``
     What tcspecial itself is configured with for this payload set: the same
-    section a ``tcspecial.yaml`` holds, with the same attributes. Optional,
-    and read by nothing yet -- tcspecial is still placed by the file
-    ``TCSPECIAL_CONFIG_PATH`` names, and by its command line before that. It
-    is here so that one file can describe a whole payload set, the command
-    interpreter included.
+    section a ``tcspecial.yaml`` holds, with the same attributes. Optional.
+    ``beacon_address`` is read from here -- see `Where the Addresses Are`_ --
+    and the rest is carried and checked and not yet read, tcspecial being
+    placed by the file ``TCSPECIAL_CONFIG_PATH`` names. The section is here so
+    that one file can describe a whole payload set, the command interpreter
+    included.
 
 ``payload_groups``
     Named groups of attributes. A group carries what several payloads have
@@ -1449,9 +1450,9 @@ Requirement
 
 Requirement
     A ``tcspecial`` section a file states is checked when the file is loaded,
-    though nothing reads it. A section stating a protocol that is not a
-    protocol is refused where the file is read, rather than left for whichever
-    program first tries to be placed by it.
+    whether or not anything reads the attribute in question. A section stating
+    a protocol that is not a protocol is refused where the file is read,
+    rather than left for whichever program first tries to be placed by it.
 
 The section was ``ci_config``, and named for the command interpreter rather
 than for the program whose configuration it is. No shipped file carried one,
@@ -3498,18 +3499,34 @@ Requirement
 Where the Addresses Are
 ^^^^^^^^^^^^^^^^^^^^^^^
 Requirement
-    Every address tcspecial uses is in its own configuration file: the address
-    and port the command interpreter binds, and ``beacon_address``, where
-    beacons go. Neither appears on the command line.
+    No address appears on tcspecial's command line. The payload file is its
+    only argument.
 
 Requirement
-    ``beacon_address`` is optional, and defaults to the address beacons always
-    went to. A file written before the attribute existed sends them where it
-    always did.
+    The address and port the command interpreter binds are in its own
+    configuration file.
 
 Requirement
-    A ``beacon_address`` that is not an address and a port is refused where
-    the file is read, naming the attribute.
+    Every command interpreter configuration states where beacons go and how
+    often: ``beacon_address`` and ``beacon_interval_ms``. Neither has a
+    default and neither may be left out, in the command interpreter's own file
+    or in a payload set's ``tcspecial`` section.
+
+Beacons are how the ground knows the spacecraft is alive. A configuration that
+has not been asked where to send them has not answered, and a default is a way
+of finding that out later -- by the beacons arriving somewhere nobody is
+listening, which looks from the ground exactly like a spacecraft that has
+stopped.
+
+Requirement
+    A payload set's section wins over the command interpreter's own file. A
+    set's own ground station is what listens for its beacons, so the set is
+    where it is said; the file's is what places a set with no section, which a
+    set written in the endpoint language has no way to have.
+
+Requirement
+    A ``beacon_address`` that is not an address and a port is refused where it
+    is read, naming the attribute.
 
 Refused there rather than where a beacon is sent, because a beacon goes out on
 a timer with nobody to report to: the address used to be a constant parsed with

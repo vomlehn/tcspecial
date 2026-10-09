@@ -7,7 +7,8 @@ use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 use crate::{
-    endpoint_config, load_config_file, ConfigFormat, DHConfig, PayloadConfig, TcsError, TcsResult,
+    endpoint_config, load_config_file, CIConfigJson, ConfigFormat, DHConfig, PayloadConfig,
+    TcsError, TcsResult,
 };
 
 /// Which environment variable names each program's payload configuration, and
@@ -179,6 +180,31 @@ pub fn handler_source<P: AsRef<Path>>(path: P) -> TcsResult<HandlerSource> {
     handler_source_of(&text, ConfigFormat::of_file(path)?)
 }
 
+/// What a payload set says about the command interpreter, if it says anything.
+///
+/// The `tcspecial` section of a payload configuration file. `None` for a file
+/// that has no such section, and for an endpoint configuration file, which has
+/// no section to have: either way the command interpreter is placed by its own
+/// file alone.
+///
+/// Here rather than in `load_dh_configs` because the two answer different
+/// questions and most callers want only the handlers -- tcsmoc and tcssim have
+/// no use for a command interpreter's configuration. The file is read twice by
+/// the one program that wants both, which is a file read twice at startup.
+pub fn load_tcspecial_section<P: AsRef<Path>>(path: P) -> TcsResult<Option<CIConfigJson>> {
+    let path = path.as_ref();
+    let format = ConfigFormat::of_file(path)?;
+    let text = fs::read_to_string(path)?;
+
+    match handler_source_of(&text, format)? {
+        HandlerSource::Payload => {
+            let config: PayloadConfig = format.parse(&text)?;
+            Ok(config.tcspecial)
+        }
+        HandlerSource::Endpoints => Ok(None),
+    }
+}
+
 /// Load data handlers from a payload or an endpoint configuration file.
 ///
 /// Every program that needs data handlers reads them through this, so that any
@@ -238,6 +264,16 @@ endpoints:
     address: localhost
     port: 5000
 ";
+
+    /// `text` in a temporary file with `ext`, so the loaders choose their
+    /// parser from the name as they do for a real one.
+    fn write_temp(ext: &str, text: &str) -> tempfile::NamedTempFile {
+        use std::io::Write;
+        let mut file = tempfile::Builder::new().suffix(ext).tempfile().unwrap();
+        file.write_all(text.as_bytes()).unwrap();
+        file.flush().unwrap();
+        file
+    }
 
     /// Arguments as a program really receives them, its own name first.
     fn args(rest: &[&str]) -> std::vec::IntoIter<String> {
@@ -338,6 +374,72 @@ endpoints:
             handler_source_of(xml, ConfigFormat::Xml).expect("an XML endpoint file"),
             HandlerSource::Endpoints
         );
+    }
+
+    /// A payload set's tcspecial section is read, and an endpoint set has
+    /// none to read.
+    ///
+    /// The section used to be carried and checked and nothing more. The
+    /// beacon address is read from it now, so a set states where its own
+    /// ground station listens.
+    #[test]
+    fn a_payload_sets_tcspecial_section_is_read() {
+        let stated = "version: \"1.0\"\ndescription: a set\n\
+                      tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  protocol: udp\n  \
+                      beacon_interval_ms: 5000\n  beacon_address: 127.0.0.1:7550\n\
+                      payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
+                      path: /dev/null\n    packet_size: 1\n";
+        let file = write_temp(".yaml", stated);
+        let section = load_tcspecial_section(file.path())
+            .expect("it loads")
+            .expect("the set states a section");
+        assert_eq!(section.beacon_address, "127.0.0.1:7550");
+
+        // A payload set with no section at all.
+        let bare = "version: \"1.0\"\ndescription: a set\n\
+                    payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
+                    path: /dev/null\n    packet_size: 1\n";
+        let file = write_temp(".yaml", bare);
+        assert!(load_tcspecial_section(file.path()).expect("it loads").is_none());
+
+        // And an endpoint configuration, which has no section to have.
+        let endpoints = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+                         endpoints:\n  - name: e\n    group: g\n    address: localhost\n    \
+                         port: 5000\n";
+        let file = write_temp(".yaml", endpoints);
+        assert!(load_tcspecial_section(file.path()).expect("it loads").is_none());
+    }
+
+    /// A tcspecial section states where beacons go and how often, or it is
+    /// refused.
+    ///
+    /// Neither has a default. Beacons are how the ground knows the spacecraft
+    /// is alive, so a section that has not been asked the question has not
+    /// answered it, and a section is not the place to find that out by the
+    /// beacons going somewhere nobody is listening.
+    #[test]
+    fn a_tcspecial_section_states_both_beacon_attributes() {
+        let whole = "version: \"1.0\"\ndescription: a set\n\
+                     tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  protocol: udp\n  \
+                     beacon_interval_ms: 5000\n  beacon_address: 0.0.0.0:5550\n\
+                     payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
+                     path: /dev/null\n    packet_size: 1\n";
+        let file = write_temp(".yaml", whole);
+        let section = load_tcspecial_section(file.path())
+            .expect("it loads")
+            .expect("a section");
+        assert_eq!(section.beacon_interval_ms, 5000);
+        assert_eq!(section.beacon_address, "0.0.0.0:5550");
+
+        for missing in ["  beacon_interval_ms: 5000\n", "  beacon_address: 0.0.0.0:5550\n"] {
+            let without = whole.replace(missing, "");
+            assert_ne!(without, whole, "the test removed nothing");
+            let file = write_temp(".yaml", &without);
+            assert!(
+                load_tcspecial_section(file.path()).is_err(),
+                "a section with no {missing:?} was accepted"
+            );
+        }
     }
 
     #[test]

@@ -14,10 +14,17 @@
 address: "0.0.0.0"
 port: 4000
 protocol: udp
-beacon_interval_ms: 5000
 
-# Where beacons go. The one address tcsmoc binds rather than sends to, so
-# moving it means moving tcsmoc's too: the MOC does not read this file.
+# How often beacons go out and where they go. Both are required of every
+# command interpreter configuration, here and in the tcspecial section of a
+# payload configuration file: beacons are how the ground knows the spacecraft
+# is alive, so neither is a question to leave to a default that a file
+# silently takes.
+#
+# A payload set's section states them for that set and wins over these. These
+# are what place a set that has no such section -- one written in the endpoint
+# configuration language, which has no place to put them.
+beacon_interval_ms: 5000
 beacon_address: "0.0.0.0:5550"
 log_dir: telemetry
 log_segment_bytes: 65536

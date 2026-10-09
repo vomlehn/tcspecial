@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::config::{load_dh_configs, payload_path_from_args};
-use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
+use tcslibgs::config_digest::{digest_of_file, ConfigDigest, ConfigVersion};
 use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
     ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
@@ -754,6 +754,22 @@ fn main() {
     eprintln!("sleeping to let the subprocesses initialize");
     thread::sleep(Duration::new(2, 0));
 
+    // What this MOC read, said before there is any link to say it over. A
+    // socket that cannot be made, or a tcspecial that is not answering, takes
+    // the exchange below with it -- and that is exactly when an operator wants
+    // to know which configuration each end was holding.
+    let version = ConfigVersion::of_this_build();
+    let digest = match digest_of_file(&payload_path) {
+        Ok(digest) => {
+            eprintln!("Version {version}, configuration {payload_path} md5 {digest}");
+            Some(digest)
+        }
+        Err(e) => {
+            eprintln!("Version {version}, configuration {payload_path} cannot be digested: {e}");
+            None
+        }
+    };
+
     // Open the link to the command interpreter on startup, by the same call
     // the Connect button makes, so the link the window comes up with is the
     // one that button would have given it.
@@ -767,7 +783,9 @@ fn main() {
     }
     eprintln!("Connected to {}", DEFAULT_CI_ADDRESS);
     let link: Arc<Mutex<CiLink>> = Arc::new(Mutex::new(link));
-    say_what_each_end_read(&ui, &link, &payload_path);
+    if let Some(digest) = digest {
+        hear_what_tcspecial_read(&ui, &link, version, digest);
+    }
     ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
     ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
 
@@ -1181,34 +1199,25 @@ fn poll_pass(
     gathered
 }
 
-/// Say what this MOC read, and hear what the spacecraft read.
+/// Send what this MOC read, and hear what the spacecraft read.
 ///
-/// Sent when a link comes up. The two ends each read a payload set -- the MOC
-/// to build its panels, tcspecial to serve the handlers -- and nothing made
-/// them prove it was the same set. When it was not, the only sign was a
-/// command answered `NotFound` for a payload the operator could see: a
-/// tcspecial left running from an earlier set, attached to rather than
-/// replaced, since the MOC attaches to whatever answers a ping.
+/// The two ends each read a payload set -- the MOC to build its panels,
+/// tcspecial to serve the handlers -- and nothing made them prove it was the
+/// same set. When it was not, the only sign was a command answered `NotFound`
+/// for a payload the operator could see: a tcspecial left running from an
+/// earlier set, attached to rather than replaced, since the MOC attaches to
+/// whatever answers a ping.
 ///
-/// Said on the console before it is sent and again as it is answered, so that
-/// the two digests can be read against each other whether or not anything is
-/// wrong, and `Last Response` carries the verdict for the operator.
-fn say_what_each_end_read(ui: &MainWindow, link: &Mutex<CiLink>, payload_path: &str) {
-    let version = ConfigVersion::of_this_build();
-
-    let digest = match digest_of_file(payload_path) {
-        Ok(digest) => digest,
-        Err(e) => {
-            eprintln!("cannot digest {payload_path}: {e}");
-            ui.set_last_response(SharedString::from(format!(
-                "cannot digest {payload_path}: {e}"
-            )));
-            return;
-        }
-    };
-
-    eprintln!("Version {version}, configuration {payload_path} md5 {digest}");
-
+/// `version` and `digest` are this end's, said on the console before the
+/// socket was made; what this adds is the other end's, so the two can be read
+/// against each other whether or not anything is wrong, with `Last Response`
+/// carrying the verdict for the operator.
+fn hear_what_tcspecial_read(
+    ui: &MainWindow,
+    link: &Mutex<CiLink>,
+    version: ConfigVersion,
+    digest: ConfigDigest,
+) {
     let mut guard = link.lock().unwrap();
     let answer = match guard.client() {
         Some(client) => client.connect(version, digest),

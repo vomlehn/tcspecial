@@ -1271,6 +1271,13 @@ Requirement
     which file it read and can name it, so it reports the difference; tcspecial
     answers with what it read and logs a disagreement it can see.
 
+Requirement
+    Each end says its own version and digest before it makes the socket the
+    link runs over. A socket that cannot be made, or a far end that is not
+    answering, takes the exchange with it -- and that is exactly when the two
+    facts are wanted. In tcspecial this also puts an address already in use
+    under the configuration it was going to serve rather than instead of it.
+
 Nothing else in the protocol makes the two ends prove they are talking about
 the same payload set, and when they were not, the only sign was a command
 answered ``NotFound`` for a payload the operator could see on the screen: a

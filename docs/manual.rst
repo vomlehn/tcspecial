@@ -42,8 +42,9 @@ Which Files There Are
 Four kinds of configuration file, each read by the programs that need it.
 
 ``tcspecial.yaml``
-    The command interpreter's own settings: the address it listens on, the
-    beacon interval, and where the telemetry log goes. Read by tcspecial at
+    The command interpreter's own settings: the address it listens on, where
+    beacons go, the beacon interval, and where the telemetry log goes. Every
+    address tcspecial uses is here and nowhere else. Read by tcspecial at
     startup, from the path ``TCSPECIAL_CONFIG_PATH`` names when that is set.
     Nothing about the payloads is in it.
 
@@ -857,26 +858,30 @@ Failing an argument, tcspecial reads ``PAYLOAD_CONFIG_PATH`` and tcssim reads
 starts inherit its environment: a variable naming tcsmoc's file would name
 theirs as well.
 
-Tcspecial takes one more argument, after the payload file: the address it
-serves commands on.
+The payload file is the only argument tcspecial takes. Where it serves
+commands and where it sends beacons are both in ``tcspecial.yaml``:
+
+.. code-block:: yaml
+
+   address: "0.0.0.0"
+   port: 4000
+   beacon_address: "0.0.0.0:5550"
+
+``beacon_address`` may be left out, and then beacons go to ``0.0.0.0:5550``,
+which is where they have always gone and where tcsmoc listens for them. Moving
+it moves only where tcspecial sends: tcsmoc does not read this file, so its
+beacon indicator would then say nothing is arriving, which would be true of the
+address it is listening on. The same goes for the command address -- the two
+ends agree about it by reading the same default, so a file that moves it leaves
+the MOC sending where nothing is bound, and no error on either end reports
+that.
+
+Tcspecial says both as it starts, on the terminal and whatever ``RUST_LOG`` is
+set to:
 
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- tests/manual/tcspecial1.yaml 127.0.0.1:4000
-
-It beats what ``tcspecial/src/tcspecial.yaml`` says, and the port must be given
-with the address. With no such argument the configuration file places it, which
-is what ``make run`` relies on. Tcsmoc supplies it when it starts a tcspecial
-of its own, passing the address its own ``tcspecial link`` box will be opened
-at, so the end that listens and the end that sends cannot differ.
-
-Either way tcspecial says where it ended up as it starts, on the terminal and
-whatever ``RUST_LOG`` is set to:
-
-.. code-block:: console
-
-   Commands are taken on 127.0.0.1:4000, as the command line asked
-   Commands are taken on 0.0.0.0:4000, as tcspecial/src/tcspecial.yaml asked
+   Commands are taken on 0.0.0.0:4000 and beacons go to 0.0.0.0:5550, as tcspecial/src/tcspecial.yaml asked
 
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``.
 
@@ -1028,8 +1033,9 @@ without anyone asking.
 
 Beaconing
 ^^^^^^^^^
-TCSpecial sends a beacon at a configurable interval. Tcsmoc displays the
-following beacon colors:
+TCSpecial sends a beacon at a configurable interval, to the address
+``beacon_address`` names in ``tcspecial.yaml``; tcsmoc listens on the default
+one. Tcsmoc displays the following beacon colors:
 
 steady grey
   Either no beacon message has been received yet or the system time has

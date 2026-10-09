@@ -18,7 +18,7 @@ use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
     ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
 };
-use tcspecial::config::constants::BEACON_NETADDR;
+use tcslibgs::DEFAULT_BEACON_ADDRESS;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, NOT_CONNECTED};
@@ -557,23 +557,21 @@ fn update_row(model: &Rc<VecModel<DHInfo>>, row: usize, f: impl FnOnce(&mut DHIn
 /// the child would have taken from the environment, so for the run of a
 /// payload set the MOC's own file is the one that counts.
 ///
-/// `command_address` is where that child is to take commands, for the one
-/// child that takes any. The MOC decides the address it will be sending to and
-/// hands it over, rather than leaving tcspecial to read its own configuration
-/// file and the MOC to hope they agree: a tcspecial bound somewhere the MOC is
-/// not talking to answers nothing, and nothing on either end says why. Passed
-/// as `None` for a child that serves no commands, which is tcssim.
+/// The payload file is the whole of what a child is told. Where tcspecial
+/// takes commands and where it sends beacons are both in its own
+/// configuration file, so neither is the MOC's to hand over -- which means the
+/// MOC and a tcspecial it starts agree about the command address only by
+/// reading the same default, and a tcspecial whose file moves it is one this
+/// MOC will not reach. The exchange on connecting is what reports a mismatch
+/// of configuration; an address is not part of it.
 ///
 /// The command is built rather than run so that a test can read what a child
 /// would be started with, without starting it. The children open windows and
 /// bind fixed ports, so a test that spawned them would not be a test anyone
 /// could run twice at once, or alongside a real session.
-fn child_command(name: &str, payload_path: &str, command_address: Option<&str>) -> Command {
+fn child_command(name: &str, payload_path: &str) -> Command {
     let mut command = Command::new("cargo");
     command.args(["run", "--bin", name, "--", payload_path]);
-    if let Some(address) = command_address {
-        command.arg(address);
-    }
     command
 }
 
@@ -592,8 +590,8 @@ impl ProcessManager {
     }
 
     /// Starts a child in a background thread and exits when it completes.
-    fn start_child(&self, name: &str, payload_path: &str, command_address: Option<&str>) {
-        let child = child_command(name, payload_path, command_address)
+    fn start_child(&self, name: &str, payload_path: &str) {
+        let child = child_command(name, payload_path)
             .spawn()
             .expect(&format!("Failed to start {}", name));
 
@@ -753,14 +751,12 @@ fn main() {
         )));
     } else {
         let manager = Arc::new(ProcessManager::new());
-        // Started on the address the MOC is about to open its link at, so the
-        // end that listens and the end that sends cannot differ.
-        manager.start_child(tcspecial, &payload_path, Some(DEFAULT_CI_ADDRESS));
+        manager.start_child(tcspecial, &payload_path);
         process_manager_tcspecial = Some(manager);
     }
 
     let process_manager_tcssim = Arc::new(ProcessManager::new());
-    process_manager_tcssim.start_child(tcssim, &payload_path, None);
+    process_manager_tcssim.start_child(tcssim, &payload_path);
 
     eprintln!("sleeping to let the subprocesses initialize");
     thread::sleep(Duration::new(2, 0));
@@ -801,7 +797,13 @@ fn main() {
     ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
 
     // Start receiving beacon data
-    let beacon_addr: std::net::SocketAddr = BEACON_NETADDR.parse().unwrap();
+    // Where tcspecial sends beacons unless its own configuration file moves
+    // them. The MOC does not read that file, so a tcspecial told to send them
+    // somewhere else is a tcspecial whose beacons this will not see -- the
+    // indicator says nothing is arriving, which is true of this address.
+    let beacon_addr: std::net::SocketAddr = DEFAULT_BEACON_ADDRESS
+        .parse()
+        .expect("the default beacon address is an address");
     let beacon_ui_weak = ui_weak.clone();
     let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
 
@@ -2612,7 +2614,7 @@ mod tests {
     #[test]
     fn each_child_is_started_on_the_mocs_payload_file() {
         for name in CHILDREN {
-            let command = child_command(name, "tcspecial2.yaml", None);
+            let command = child_command(name, "tcspecial2.yaml");
 
             assert_eq!(command.get_program(), "cargo", "{name}");
             let args: Vec<&OsStr> = command.get_args().collect();
@@ -2637,7 +2639,7 @@ mod tests {
         let payload_path = payload_path_from_args(args(&["tcspecial2.yaml"]), None).unwrap();
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path, None);
+            let command = child_command(name, &payload_path);
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -2655,7 +2657,7 @@ mod tests {
         assert_eq!(payload_path, DEFAULT_PAYLOAD_CONFIG_PATH);
 
         for name in CHILDREN {
-            let command = child_command(name, &payload_path, None);
+            let command = child_command(name, &payload_path);
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -2663,58 +2665,6 @@ mod tests {
                 "{name}"
             );
         }
-    }
-
-    /// Tcspecial is started on the address the MOC will send commands to, and
-    /// tcssim is given no address at all.
-    ///
-    /// Both ends used to read their own configuration: tcspecial bound what
-    /// its file said and the MOC sent where its own default said, and the two
-    /// agreeing was a coincidence maintained by hand. The MOC chooses now, and
-    /// hands the choice over on the command line.
-    ///
-    /// The shape is checked by tcspecial's own parser rather than by a second
-    /// opinion about what the arguments mean: what the MOC writes and what
-    /// tcspecial reads is one agreement, and this is the place it can be read
-    /// in one test.
-    #[test]
-    fn tcspecial_is_started_on_the_address_the_moc_will_send_to() {
-        use tcslibgs::config::payload_path_and_command_address;
-
-        let command = child_command("tcspecial", "tcspecial2.yaml", Some(DEFAULT_CI_ADDRESS));
-        let passed: Vec<&OsStr> = command.get_args().collect();
-        assert_eq!(
-            passed,
-            [
-                "run",
-                "--bin",
-                "tcspecial",
-                "--",
-                "tcspecial2.yaml",
-                DEFAULT_CI_ADDRESS
-            ]
-        );
-
-        // What tcspecial makes of what it was handed: everything after the
-        // `--` is its own command line, with its name in front of it.
-        let mine: Vec<String> = std::iter::once("tcspecial".to_string())
-            .chain(
-                passed
-                    .iter()
-                    .skip(4)
-                    .map(|arg| arg.to_string_lossy().to_string()),
-            )
-            .collect();
-        let (payload_path, address) =
-            payload_path_and_command_address(mine.into_iter(), None).expect("tcspecial reads it");
-        assert_eq!(payload_path, "tcspecial2.yaml");
-        assert_eq!(address.as_deref(), Some(DEFAULT_CI_ADDRESS));
-
-        // And the simulator, which answers no commands, is given none to
-        // answer them on.
-        let command = child_command("tcssim", "tcspecial2.yaml", None);
-        let passed: Vec<&OsStr> = command.get_args().collect();
-        assert_eq!(passed, ["run", "--bin", "tcssim", "--", "tcspecial2.yaml"]);
     }
 
     /// The MOC starts the two programs it is meant to.

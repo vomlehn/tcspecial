@@ -15,5 +15,9 @@ address: "0.0.0.0"
 port: 4000
 protocol: udp
 beacon_interval_ms: 5000
+
+# Where beacons go. The one address tcsmoc binds rather than sends to, so
+# moving it means moving tcsmoc's too: the MOC does not read this file.
+beacon_address: "0.0.0.0:5550"
 log_dir: telemetry
 log_segment_bytes: 65536

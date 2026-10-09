@@ -6,11 +6,9 @@ use std::env;
 use std::process;
 
 use log::{error, info, trace};
-use tcspecial::config::{command_address, load_endpoint_config, load_tcspecial_config};
+use tcspecial::config::{load_endpoint_config, load_tcspecial_config};
 use tcspecial::CommandInterpreter;
-use tcslibgs::config::{
-    load_dh_configs, payload_path_and_command_address, PAYLOAD_CONFIG_PATH_VAR,
-};
+use tcslibgs::config::{load_dh_configs, payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 
 fn main() {
@@ -31,7 +29,7 @@ fn main() {
     info!("Loading tcspecial configuration from: {}", config_path);
 
     // Load configuration
-    let mut tcspecial_config = match load_tcspecial_config(&config_path) {
+    let tcspecial_config = match load_tcspecial_config(&config_path) {
         Ok(config) => config,
         Err(e) => {
             error!("Error loading tcspecial configuration: {}", e);
@@ -41,15 +39,11 @@ fn main() {
 
     // Named on the command line, or by PAYLOAD_CONFIG_PATH, or the default.
     // The file may be a payload configuration or an endpoint configuration;
-    // load_dh_configs reads either.
-    //
-    // A second argument says where commands are taken, and beats what the
-    // configuration file above said: see tcspecial::config::command_address.
-    let (payload_path, address_given) = match payload_path_and_command_address(
-        env::args(),
-        Some(PAYLOAD_CONFIG_PATH_VAR),
-    ) {
-        Ok(both) => both,
+    // load_dh_configs reads either. It is the one thing the command line
+    // says: where commands are taken and where beacons go are both the
+    // configuration file's, so each address is written in one place.
+    let payload_path = match payload_path_from_args(env::args(), Some(PAYLOAD_CONFIG_PATH_VAR)) {
+        Ok(payload_path) => payload_path,
         Err(e) => {
             error!("{}", e);
             process::exit(1);
@@ -57,29 +51,16 @@ fn main() {
     };
     info!("Loading payload configuration from: {}", payload_path);
 
-    match command_address(&tcspecial_config, address_given.as_deref()) {
-        Ok((address, port)) => {
-            tcspecial_config.address = address;
-            tcspecial_config.port = port;
-        }
-        Err(e) => {
-            error!("{}", e);
-            process::exit(1);
-        }
-    }
-
-    // On stderr rather than through the log, and before the bind: this is the
-    // one address that has to match what the ground is sending to, so it is
-    // said whether or not anyone set RUST_LOG, and said above whatever a
-    // failure to bind it then says.
+    // On stderr rather than through the log, and before the bind: these are
+    // the addresses the ground has to be pointed at, so they are said whether
+    // or not anyone set RUST_LOG, and said above whatever a failure to bind
+    // one then says.
     eprintln!(
-        "Commands are taken on {}:{}, {}",
+        "Commands are taken on {}:{} and beacons go to {}, as {} asked",
         tcspecial_config.address,
         tcspecial_config.port,
-        match &address_given {
-            Some(_) => "as the command line asked".to_string(),
-            None => format!("as {} asked", config_path),
-        }
+        tcspecial_config.beacon_address,
+        config_path
     );
 
     // Load configuration

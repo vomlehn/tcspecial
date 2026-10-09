@@ -1,5 +1,7 @@
 //! Type definitions shared between ground and space software
 
+use std::net::SocketAddr;
+
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config_serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
@@ -1196,6 +1198,18 @@ fn default_log_segment_bytes() -> u32 {
     65_536
 }
 
+/// Where beacons go when a configuration does not say.
+///
+/// Every interface, on the port tcsmoc listens on. It was a constant in
+/// tcspecial that tcsmoc imported, which is what made the two ends agree
+/// about it; it is the default of a configured value now, so they still agree
+/// out of the box and a file that moves it moves only where tcspecial sends.
+pub const DEFAULT_BEACON_ADDRESS: &str = "0.0.0.0:5550";
+
+fn default_beacon_address() -> String {
+    DEFAULT_BEACON_ADDRESS.to_string()
+}
+
 /// The file-level form of the command interpreter's configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
@@ -1211,6 +1225,11 @@ pub struct CIConfigJson {
     /// this, so it is the space available for telemetry records.
     #[serde(default = "default_log_segment_bytes")]
     pub log_segment_bytes: u32,
+    /// Where beacons are sent, as `address:port`.
+    ///
+    /// Optional; [`DEFAULT_BEACON_ADDRESS`] when a file does not say.
+    #[serde(default = "default_beacon_address")]
+    pub beacon_address: String,
 }
 
 /// Command interpreter configuration
@@ -1220,6 +1239,13 @@ pub struct CIConfig {
     pub port: u16,
     pub protocol: NetworkProtocol,
     pub beacon_interval: BeaconTime,
+    /// Where beacons are sent.
+    ///
+    /// Settled when the file is read rather than where the beacon is sent,
+    /// because a beacon goes out on a timer with nobody to report to: an
+    /// address that is not one has to be refused while there is still someone
+    /// reading the error. It used to be a constant parsed with `unwrap`.
+    pub beacon_address: SocketAddr,
     /// Directory holding the telemetry log's segment files, or `None` to
     /// run without a telemetry log.
     pub log_dir: Option<String>,
@@ -1235,11 +1261,19 @@ impl CIConfigJson {
             _ => return Err(format!("Invalid protocol: {}", self.protocol)),
         };
 
+        let beacon_address = self.beacon_address.parse().map_err(|e| {
+            format!(
+                "beacon_address \"{}\" is not an address and port: {e}",
+                self.beacon_address
+            )
+        })?;
+
         Ok(CIConfig {
             address: self.address.clone(),
             port: self.port,
             protocol,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
+            beacon_address,
             log_dir: self.log_dir.clone(),
             log_segment_bytes: self.log_segment_bytes,
         })

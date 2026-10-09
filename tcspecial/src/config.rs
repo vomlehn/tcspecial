@@ -7,7 +7,7 @@ use tcslibgs::config::command_address_parts;
 use tcslibgs::{load_config_file, CIConfig, TcsError, TcsResult};
 use tcslibgs::CIConfigJson;
 
-/// Load tcspecial configuration from a JSON, YAML, or XML file.
+/// Load tcspecial configuration from a YAML or XML file.
 ///
 /// The format is chosen from the file extension; see
 /// `tcslibgs::format::ConfigFormat`.
@@ -38,7 +38,7 @@ pub fn command_address(config: &CIConfig, given: Option<&str>) -> Result<(String
     }
 }
 
-/// Load an endpoint configuration file in JSON, YAML, or XML.
+/// Load an endpoint configuration file in YAML or XML.
 ///
 /// The format is chosen from the file extension, as it is for every other
 /// configuration file here. What comes back is the groups and the endpoints
@@ -113,13 +113,6 @@ mod tests {
         load_tcspecial_config(file.path())
     }
 
-    const JSON: &str = r#"{
-        "address": "0.0.0.0",
-        "port": 4000,
-        "protocol": "udp",
-        "beacon_interval_ms": 5000
-    }"#;
-
     const YAML: &str = "address: 0.0.0.0\nport: 4000\nprotocol: udp\nbeacon_interval_ms: 5000\n";
 
     const XML: &str = "<tcspecial>\
@@ -131,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_load_tcspecial_config_every_format() {
-        for (ext, text) in [(".json", JSON), (".yaml", YAML), (".xml", XML)] {
+        for (ext, text) in [(".yaml", YAML), (".xml", XML)] {
             let config = load_from(ext, text)
                 .unwrap_or_else(|e| panic!("{ext} failed to load: {e}"));
 
@@ -178,10 +171,20 @@ mod tests {
         assert!(e.contains("127.0.0.1"), "{e}");
     }
 
+    /// An extension this does not read is refused rather than guessed at.
+    ///
+    /// It used to be read as JSON, which is how a file whose extension was
+    /// misspelled became a file that would not parse for reasons that said
+    /// nothing about its name.
     #[test]
-    fn test_unknown_extension_is_parsed_as_json() {
-        let config = load_from(".conf", JSON).unwrap();
-        assert_eq!(config.port, 4000);
+    fn an_unknown_extension_is_refused() {
+        let said = load_from(".conf", YAML)
+            .expect_err("a .conf file is not a configuration file")
+            .to_string();
+        assert!(
+            said.contains(".yaml") && said.contains(".xml"),
+            "the refusal does not say what is read: {said}"
+        );
     }
 
     #[test]
@@ -230,25 +233,9 @@ endpoints:
   </endpoints>
 </endpoint-configuration>"#;
 
-    const ENDPOINTS_JSON: &str = r#"{
-        "endpoint_groups": [
-            { "name": "bus", "type": "i2c", "pec": true },
-            { "name": "chip", "type": "spi", "max_speed": 1000000, "mode": 0 }
-        ],
-        "endpoints": [
-            { "name": "thermal", "group": "bus",
-              "device": "/dev/i2c-1", "address": "0x48" },
-            { "name": "imu", "group": "chip", "device": "/dev/spidev0.0" }
-        ]
-    }"#;
-
     #[test]
     fn test_load_endpoint_config_every_format() {
-        for (ext, text) in [
-            (".yaml", ENDPOINTS_YAML),
-            (".xml", ENDPOINTS_XML),
-            (".json", ENDPOINTS_JSON),
-        ] {
+        for (ext, text) in [(".yaml", ENDPOINTS_YAML), (".xml", ENDPOINTS_XML)] {
             let doc = load_endpoints_from(ext, text)
                 .unwrap_or_else(|e| panic!("{ext} failed to load: {e}"));
 
@@ -263,9 +250,7 @@ endpoints:
     fn test_endpoint_formats_agree() {
         let yaml = load_endpoints_from(".yaml", ENDPOINTS_YAML).unwrap();
         let xml = load_endpoints_from(".xml", ENDPOINTS_XML).unwrap();
-        let json = load_endpoints_from(".json", ENDPOINTS_JSON).unwrap();
         assert_eq!(yaml, xml);
-        assert_eq!(yaml, json);
     }
 
     #[test]

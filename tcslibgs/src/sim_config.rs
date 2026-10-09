@@ -33,7 +33,7 @@
 //! A group carries what several simulated payloads have in common; a payload
 //! overrides any of it for itself. The format is chosen from the file extension
 //! by [`tcslibgs::load_config_file`], so the same configuration can be written
-//! in YAML, JSON, or XML.
+//! in YAML or XML.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

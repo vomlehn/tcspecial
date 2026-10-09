@@ -85,53 +85,51 @@ fn the_shipped_tcspecial_config_loads() {
     assert_ne!(config.log_segment_bytes, 0, "no log segment size");
 }
 
-/// Every shipped payload set is written in all three formats, and the three
-/// describe the same data handlers.
+/// Every shipped payload set is written in both formats, and the two describe
+/// the same data handlers.
 ///
-/// The formats are three spellings of one configuration, which is a claim
+/// The formats are two spellings of one configuration, which is a claim
 /// nothing in the code enforces: each is parsed by its own parser, and a set
-/// transcribed into another format by hand can differ in a port or lose an
-/// attribute without either file becoming invalid. `make runmocx` and
-/// `make runmocj` run the XML and the JSON of a set, so a difference between
-/// them is a difference in what the programs are given.
+/// transcribed into the other by hand can differ in a port or lose an
+/// attribute without either file becoming invalid. `make runmocx` runs the XML
+/// of a set, so a difference between them is a difference in what the programs
+/// are given.
 #[test]
-fn every_shipped_set_reads_the_same_in_all_three_formats() {
+fn every_shipped_set_reads_the_same_in_both_formats() {
     for yaml in shipped_payload_files() {
         let from_yaml = load_dh_configs(&yaml)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", yaml.display()));
 
-        for ext in ["xml", "json"] {
-            let other = yaml.with_extension(ext);
-            assert!(
-                other.exists(),
-                "{} has no {} beside it: a set is written in all three formats",
-                yaml.display(),
-                other.display()
-            );
+        let xml = yaml.with_extension("xml");
+        assert!(
+            xml.exists(),
+            "{} has no {} beside it: a set is written in both formats",
+            yaml.display(),
+            xml.display()
+        );
 
-            let from_other = load_dh_configs(&other)
-                .unwrap_or_else(|e| panic!("{} failed to load: {e}", other.display()));
+        let from_xml = load_dh_configs(&xml)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", xml.display()));
 
-            assert_eq!(
-                from_other,
-                from_yaml,
-                "{} and {} describe different data handlers",
-                other.display(),
-                yaml.display()
-            );
+        assert_eq!(
+            from_xml,
+            from_yaml,
+            "{} and {} describe different data handlers",
+            xml.display(),
+            yaml.display()
+        );
 
-            // And they digest the same, which is the claim the two ends of a
-            // link make to each other: a tcsmoc reading the JSON of a set and
-            // a tcspecial reading its XML have read the same set, and a digest
-            // that said otherwise would make the check worse than none.
-            assert_eq!(
-                digest_of_file(&other).unwrap_or_else(|e| panic!("{}: {e}", other.display())),
-                digest_of_file(&yaml).unwrap_or_else(|e| panic!("{}: {e}", yaml.display())),
-                "{} and {} digest differently",
-                other.display(),
-                yaml.display()
-            );
-        }
+        // And they digest the same, which is the claim the two ends of a link
+        // make to each other: a tcsmoc reading the XML of a set and a
+        // tcspecial reading its YAML have read the same set, and a digest that
+        // said otherwise would make the check worse than none.
+        assert_eq!(
+            digest_of_file(&xml).unwrap_or_else(|e| panic!("{}: {e}", xml.display())),
+            digest_of_file(&yaml).unwrap_or_else(|e| panic!("{}: {e}", yaml.display())),
+            "{} and {} digest differently",
+            xml.display(),
+            yaml.display()
+        );
     }
 }
 

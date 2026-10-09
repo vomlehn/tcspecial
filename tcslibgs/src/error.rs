@@ -8,6 +8,8 @@ pub enum TcsError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// The command link, which carries JSON between the ground and the
+    /// spacecraft. No configuration file is JSON: see [`crate::format`].
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 

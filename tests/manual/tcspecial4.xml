@@ -1,26 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- TCSpecial payload set 4, in the endpoint configuration language.
+<!-- TCSpecial payload set 4, a serial line, in the payload configuration
+     language.
 
-     Equivalent to tcspecial4.yaml and tcspecial4.json. The YAML is the one
-     to read: it carries the comments, which JSON has no way to hold.
+     Equivalent to tcspecial4.yaml. The YAML is the one to read: it carries
+     the comments.
 
-     The endpoint language writes a value as an attribute, as its example in
-     the design document does, and a nested section -- a group's stream rule
-     -- as a child element. -->
-<endpoint-configuration>
-  <general version="1.0" description="TCSpecial payload set 4"/>
-
-  <endpoint-groups>
-    <group name="payload_line" type="serial" asynchronous="true"
-           datarate="115200" byte_length="8" stop_bits="1" parity="none"
-           packet_size="12">
-      <stream max_length="12" timeout="none"/>
-    </group>
-  </endpoint-groups>
-
-  <endpoints>
-    <endpoint name="serial-line" group="payload_line"
-              device="/tmp/tcspecial4-line" dh_id="0"
-              oc_address="127.0.0.1" oc_port="6400"/>
-  </endpoints>
-</endpoint-configuration>
+     Conventions, which are the subset YAML and XML both agree on:
+       - every value is a child element, never an attribute
+       - a sequence is repeated sibling elements named for the field,
+         and the repeats must be contiguous
+       - an absent optional field is simply an omitted element
+       - a nested section is a child element, as <stream> is here -->
+<payload>
+    <version>1.0</version>
+    <description>TCSpecial payload set 4</description>
+    <tcspecial>
+        <address>0.0.0.0</address>
+        <port>4000</port>
+        <protocol>udp</protocol>
+        <beacon_interval_ms>5000</beacon_interval_ms>
+        <beacon_address>239.255.0.1:5550</beacon_address>
+        <beacon_interface>127.0.0.1</beacon_interface>
+        <log_dir>/var/log/tcspecial</log_dir>
+        <log_segment_bytes>65536</log_segment_bytes>
+    </tcspecial>
+    <payload_groups>
+        <name>payload_line</name>
+        <type>serial</type>
+        <asynchronous>true</asynchronous>
+        <datarate>115200</datarate>
+        <byte_length>8</byte_length>
+        <stop_bits>1</stop_bits>
+        <parity>none</parity>
+        <packet_size>12</packet_size>
+        <stream>
+            <max_length>12</max_length>
+            <timeout>none</timeout>
+        </stream>
+    </payload_groups>
+    <payloads>
+        <dh_id>0</dh_id>
+        <name>serial-line</name>
+        <group>payload_line</group>
+        <path>/tmp/tcspecial4-line</path>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6400</oc_port>
+    </payloads>
+</payload>

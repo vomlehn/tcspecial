@@ -293,8 +293,24 @@ fn endpoint_config_of(
     endpoint: &EndpointDef,
     group: &EndpointGroup,
 ) -> EndpointConfigResult<EndpointConfig> {
-    match &endpoint.location {
-        EndpointLocation::I2c { bus, address } => match &group.kind {
+    endpoint_of(&endpoint.name, &endpoint.location, &group.kind)
+        .map_err(|e| bad(&group.name, &e))
+}
+
+/// What tcspecial opens to reach a payload, from where it is and what kind of
+/// link it is on.
+///
+/// The same two facts whichever language described the payload: a payload
+/// configuration states them as attributes of one payload, and an endpoint
+/// configuration splits them between an endpoint and its group. `what` is the
+/// payload's name, for the complaints.
+pub(crate) fn endpoint_of(
+    what: &str,
+    location: &EndpointLocation,
+    kind: &GroupKind,
+) -> Result<EndpointConfig, String> {
+    match location {
+        EndpointLocation::I2c { bus, address } => match kind {
             GroupKind::I2c(i2c) => Ok(EndpointConfig::I2c(I2cConfig {
                 bus: bus.clone(),
                 address: *address,
@@ -304,16 +320,12 @@ fn endpoint_config_of(
             // Only an I2C group gives an endpoint a bus and an address, so
             // this is unreachable through the parser; an error rather than a
             // panic, because a library should not bring a caller down.
-            _ => Err(bad(
-                &group.name,
-                &format!(
-                    "endpoint \"{}\" is on a bus, which a {} group does not put it on",
-                    endpoint.name,
-                    group.kind.type_name()
-                ),
+            _ => Err(format!(
+                "\"{what}\" is on a bus, which a {} link does not put it on",
+                kind.type_name()
             )),
         },
-        EndpointLocation::Network { address, port } => match &group.kind {
+        EndpointLocation::Network { address, port } => match kind {
             GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
                 protocol: net.protocol,
                 address: address.clone(),
@@ -322,13 +334,9 @@ fn endpoint_config_of(
             // Only a network group gives an endpoint a host and a port, so
             // this is unreachable through the parser; it is an error rather
             // than a panic because a library should not bring a caller down.
-            _ => Err(bad(
-                &group.name,
-                &format!(
-                    "endpoint \"{}\" has a network address, which a {} group does not give it",
-                    endpoint.name,
-                    group.kind.type_name()
-                ),
+            _ => Err(format!(
+                "\"{what}\" has a network address, which a {} link does not give it",
+                kind.type_name()
             )),
         },
         // Every kind but a network address is located by a device node, and
@@ -337,7 +345,7 @@ fn endpoint_config_of(
         // to it as though it had no terms of its own: a serial line at
         // whatever rate the port was last left at, a SPI peripheral at
         // whatever mode.
-        EndpointLocation::Path { path } => match &group.kind {
+        EndpointLocation::Path { path } => match kind {
             GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
                 protocol: net.protocol,
                 address: path.clone(),
@@ -366,13 +374,9 @@ fn endpoint_config_of(
             // An I2C group's endpoints carry a bus and an address, which the
             // parser requires of them, so a device node alone in one is a
             // shape it cannot produce.
-            GroupKind::I2c(_) => Err(bad(
-                &group.name,
-                &format!(
-                    "endpoint \"{}\" names a device alone, but a device on an I2C bus \
-                     needs the bus and the address on it",
-                    endpoint.name
-                ),
+            GroupKind::I2c(_) => Err(format!(
+                "\"{what}\" names a device alone, but a device on an I2C bus needs the \
+                 bus and the address on it"
             )),
         },
     }
@@ -808,11 +812,31 @@ enum OneOrMany<T> {
 /// Both are kept as text and parsed by the rule for that field, which gives
 /// one spelling of each rule and one wording of each error.
 #[derive(Debug, Clone)]
-pub(crate) struct Scalar(String);
+pub struct Scalar(String);
 
 impl Scalar {
     pub(crate) fn as_str(&self) -> &str {
         self.0.trim()
+    }
+}
+
+/// Compared and written out as the text it holds, trimmed.
+///
+/// A payload configuration carries these, and a payload configuration is
+/// compared against another spelling of itself and written back out for the
+/// configuration digest. Two files that spell one number differently --
+/// `0x1E` and `30` -- are two different texts here and so digest
+/// differently, which is the price of a rule that reads a value by the rule
+/// for its own field rather than by its syntax.
+impl PartialEq for Scalar {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Serialize for Scalar {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.as_str())
     }
 }
 
@@ -829,6 +853,24 @@ impl<'de> Deserialize<'de> for Scalar {
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Scalar, E> {
                 Ok(Scalar(v.to_string()))
+            }
+
+            /// An XML element with text in it.
+            ///
+            /// A value given as an XML attribute arrives as a string, and one
+            /// given as a child element arrives as a map of one entry whose
+            /// value is the text -- `$text`, as quick-xml spells it. The
+            /// payload configuration language writes every value as a child
+            /// element, so this is the form it comes in there; the endpoint
+            /// language wrote them as attributes, which is why this was not
+            /// needed before.
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Scalar, A::Error> {
+                let mut text: Option<String> = None;
+                while let Some((_, value)) = map.next_entry::<String, String>()? {
+                    text = Some(value);
+                }
+                text.map(Scalar)
+                    .ok_or_else(|| de::Error::custom("an element with no value in it"))
             }
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<Scalar, E> {
                 Ok(Scalar(v.to_string()))
@@ -858,7 +900,21 @@ impl<'de> Deserialize<'de> for Scalar {
 /// `<terminator>` children work too, by way of [`Section`]-like flattening
 /// in the untagged enum below.
 #[derive(Debug, Clone)]
-pub(crate) struct ByteList(Vec<String>);
+pub struct ByteList(Vec<String>);
+
+/// Compared and written out as the values it holds, for the reason
+/// [`Scalar`] is.
+impl PartialEq for ByteList {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Serialize for ByteList {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(s)
+    }
+}
 
 impl<'de> Deserialize<'de> for ByteList {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -873,6 +929,16 @@ impl<'de> Deserialize<'de> for ByteList {
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<ByteList, E> {
                 Ok(ByteList(split_list(v)))
+            }
+
+            /// An XML element with text in it; see [`Scalar`]'s.
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<ByteList, A::Error> {
+                let mut text: Option<String> = None;
+                while let Some((_, value)) = map.next_entry::<String, String>()? {
+                    text = Some(value);
+                }
+                text.map(|t| ByteList(split_list(&t)))
+                    .ok_or_else(|| de::Error::custom("an element with no value in it"))
             }
 
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<ByteList, E> {

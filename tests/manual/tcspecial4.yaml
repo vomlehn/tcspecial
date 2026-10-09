@@ -1,21 +1,29 @@
 # The payloads tcsmoc controls and tcssim simulates: a serial line.
 #
-# This set is written in the endpoint configuration language rather than the
-# payload language the other sets use, and it has to be: a line has terms a
-# payload file has no words for -- a data rate, a byte length, stop bits, and
-# the rule for where one read ends -- so a payload file cannot describe one at
-# all. Both languages produce the same data handlers, and every program reads
-# whichever kind it is given; see "Payload Configuration Files" and "Endpoint
-# Configuration Files" in the design document.
+# This set is what the payload language gained a serial type for. A line has
+# terms the other sets' payloads do not -- a data rate, a byte length, stop
+# bits, a parity, and the rule for where one read ends -- and until the
+# language had words for them, a set like this one had to be written in a
+# second configuration language of its own.
 #
-# The division the endpoint language is built around shows even in a set of
-# one: the group carries everything about the line, and the endpoint carries
-# the one thing that tells one endpoint of a group from another -- the device.
-general:
-  version: "1.0"
-  description: TCSpecial payload set 4
+# The division that language was built around survives as the division this
+# file already had: the group carries everything about the line, and the
+# payload carries the one thing that tells one payload of a group from
+# another, which for a line is the device.
+version: "1.0"
+description: TCSpecial payload set 4
 
-endpoint_groups:
+tcspecial:
+  address: 0.0.0.0
+  port: 4000
+  protocol: udp
+  beacon_interval_ms: 5000
+  beacon_address: "239.255.0.1:5550"
+  beacon_interface: "127.0.0.1"
+  log_dir: /var/log/tcspecial
+  log_segment_bytes: 65536
+
+payload_groups:
   # A line that hands over a packet's worth of bytes at a time. Saying
   # "timeout: none" is how a file asks for that; leaving the timeout out
   # would be an error, because then nothing would say where a read ends.
@@ -39,15 +47,15 @@ endpoint_groups:
       max_length: 12
       timeout: none
 
-endpoints:
+payloads:
   # The device is a path under /tmp rather than /dev/ttyS0 because this set is
   # meant to be run: tcssim stands in for a line with a pty and makes this
   # path a link to the pty's slave while the payload runs, which it can do
   # here and could not do in /dev. A flight configuration names the port
   # itself.
-  - name: serial-line
+  - dh_id: 0
+    name: serial-line
     group: payload_line
-    device: /tmp/tcspecial4-line
-    dh_id: 0
+    path: /tmp/tcspecial4-line
     oc_address: 127.0.0.1
     oc_port: 6400

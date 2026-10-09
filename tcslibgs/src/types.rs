@@ -2,6 +2,8 @@
 
 use std::net::{Ipv4Addr, SocketAddr};
 
+use crate::endpoint_config::{ByteList, Scalar};
+
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config_serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
@@ -236,6 +238,17 @@ impl DHType {
         ]
         .into_iter()
         .find(|kind| kind.spelling() == text)
+    }
+
+    /// "a" or "an", for a sentence naming this kind.
+    ///
+    /// `i2c` is the reason this exists: "a i2c payload" is not a thing anyone
+    /// writes, and these words appear in errors people read.
+    pub fn article(&self) -> &'static str {
+        match self {
+            DHType::I2c => "an",
+            _ => "a",
+        }
     }
 
     /// Every kind, as a file would write them, for an error to list.
@@ -678,6 +691,112 @@ pub struct DHConfig {
     pub mode: DHMode,
 }
 
+/// What tcspecial opens to reach a payload on a line, a bus or a peripheral.
+///
+/// These three kinds carry attributes a network or device payload has no use
+/// for -- a data rate, a slave address, a clock mode -- and every rule about
+/// them already exists: which attributes a kind requires, which it refuses,
+/// what each value may be, and what the whole becomes at run time. This
+/// assembles what those rules expect out of a payload and its group and calls
+/// them, so there is one statement of each rule rather than one per language.
+///
+/// The rules used to be reachable only from an endpoint configuration file,
+/// which is why a payload file could describe a network or a device payload
+/// and nothing else.
+fn link_of(
+    name: &str,
+    kind: DHType,
+    stated: &DHConfigJson,
+    group: Option<&DHGroupJson>,
+) -> Result<EndpointConfig, String> {
+    // Each attribute as the payload states it, or as the group it names does.
+    // The same inheritance every other attribute of a payload gets.
+    macro_rules! inherited {
+        ($field:ident) => {
+            stated
+                .$field
+                .clone()
+                .or_else(|| group.and_then(|g| g.$field.clone()))
+        };
+    }
+
+    let wire = crate::endpoint_config::GroupWire {
+        name: name.to_string(),
+        kind: kind.spelling().to_string(),
+        datarate: inherited!(datarate),
+        stop_bits: inherited!(stop_bits),
+        asynchronous: inherited!(asynchronous),
+        parity: inherited!(parity),
+        clock_type: inherited!(clock_type),
+        encoding: inherited!(encoding),
+        loopback: inherited!(loopback),
+        byte_length: inherited!(byte_length),
+        protocol: inherited!(protocol),
+        ten_bit: inherited!(ten_bit),
+        pec: inherited!(pec),
+        retries: inherited!(retries),
+        timeout: inherited!(timeout),
+        bus_speed: inherited!(bus_speed),
+        max_speed: inherited!(max_speed),
+        mode: inherited!(spi_mode),
+        bits_per_word: inherited!(bits_per_word),
+        bit_order: inherited!(bit_order),
+        cs_active: inherited!(cs_active),
+        packet_size: None,
+        stream: inherited!(stream).map(|s| crate::endpoint_config::StreamWire {
+            max_length: s.max_length,
+            timeout: s.timeout,
+            terminators: s.terminators,
+        }),
+    };
+
+    let ten_bit = wire
+        .ten_bit
+        .as_ref()
+        .map(|t| t.as_str() == "true")
+        .unwrap_or(false);
+
+    let kind_params = match kind {
+        DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
+        DHType::I2c => crate::endpoint_config_i2c::group_kind_of(name, wire),
+        DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
+        other => {
+            return Err(format!(
+                "{} is not a kind of link this describes",
+                other.spelling()
+            ))
+        }
+    }
+    .map_err(|e| format!("{e}"))?;
+
+    // Where it is. A line and a peripheral are a device node; a device on a
+    // bus is the bus and the address on it, which is what tells one device on
+    // a bus from another.
+    let path = inherited!(path).ok_or_else(|| {
+        format!(
+            "payload \"{name}\" is a {} payload, so it needs the device it is reached \
+             through",
+            kind.spelling()
+        )
+    })?;
+
+    let location = match kind {
+        DHType::I2c => {
+            let address = inherited!(address).ok_or_else(|| {
+                format!("payload \"{name}\" is on an I2C bus, so it needs an address on it")
+            })?;
+            crate::endpoint_config::EndpointLocation::I2c {
+                bus: path,
+                address: crate::endpoint_config_i2c::parse_i2c_address(name, &address, ten_bit)
+                    .map_err(|e| format!("{e}"))?,
+            }
+        }
+        _ => crate::endpoint_config::EndpointLocation::Path { path },
+    };
+
+    crate::endpoint_config::endpoint_of(name, &location, &kind_params)
+}
+
 /// Payload configuration file structure
 ///
 /// A payload file describes payloads and nothing else. It carries no packet
@@ -871,13 +990,98 @@ pub struct DHGroupJson {
     /// than left unknown so that the error can name the file it belongs in.
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
+    /// How fast a serial line runs. Serial payloads only.
+    #[serde(default)]
+    pub datarate: Option<Scalar>,
+    /// Whether a serial line is asynchronous. Serial payloads only.
+    #[serde(default)]
+    pub asynchronous: Option<Scalar>,
+    /// Stop bits per character, on an asynchronous line.
+    #[serde(default)]
+    pub stop_bits: Option<Scalar>,
+    /// The parity of an asynchronous line, or the frame check of a
+    /// synchronous one: the kernel calls both a line's parity.
+    #[serde(default)]
+    pub parity: Option<Scalar>,
+    /// Where a synchronous line's clock comes from.
+    #[serde(default)]
+    pub clock_type: Option<Scalar>,
+    /// How a synchronous line encodes bits on the wire.
+    #[serde(default)]
+    pub encoding: Option<Scalar>,
+    /// Whether a synchronous line is looped back.
+    #[serde(default)]
+    pub loopback: Option<Scalar>,
+    /// Bits in a character on a serial line, or in a word on a SPI bus.
+    #[serde(default)]
+    pub byte_length: Option<Scalar>,
+    /// Whether an I2C bus addresses its devices with ten bits.
+    #[serde(default)]
+    pub ten_bit: Option<Scalar>,
+    /// Whether an I2C bus checks packets. I2C payloads only.
+    #[serde(default)]
+    pub pec: Option<Scalar>,
+    /// How many times an I2C transfer is retried.
+    #[serde(default)]
+    pub retries: Option<Scalar>,
+    /// How long an I2C transfer waits.
+    #[serde(default)]
+    pub timeout: Option<Scalar>,
+    /// The clock rate of an I2C bus, recorded rather than set: the platform
+    /// is what sets it.
+    #[serde(default)]
+    pub bus_speed: Option<Scalar>,
+    /// The fastest a SPI peripheral may be clocked. SPI payloads only.
+    #[serde(default)]
+    pub max_speed: Option<Scalar>,
+    /// Which of the four SPI clock modes a peripheral expects.
+    ///
+    /// `spi_mode` rather than `mode`, which in this language says whether a
+    /// payload sends of its own accord or answers requests.
+    #[serde(default)]
+    pub spi_mode: Option<Scalar>,
+    /// Bits in one SPI word.
+    #[serde(default)]
+    pub bits_per_word: Option<Scalar>,
+    /// Which end of a SPI word goes first.
+    #[serde(default)]
+    pub bit_order: Option<Scalar>,
+    /// Whether a SPI chip select is active high or low.
+    #[serde(default)]
+    pub cs_active: Option<Scalar>,
+    /// Where one read of a stream ends. Stream links only.
+    #[serde(default)]
+    pub stream: Option<StreamJson>,
+}
+
+/// The rule for where one read of a stream ends.
+///
+/// A nested section rather than flattened attributes, because that is what it
+/// is: three settings that only mean anything together, and only for a link
+/// that carries a stream. XML nests it as a child element, as it does the
+/// `tcspecial` section.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct StreamJson {
+    /// The most bytes one read returns.
+    #[serde(default)]
+    pub max_length: Option<Scalar>,
+    /// How long a read waits, or `none` for one that does not.
+    #[serde(default)]
+    pub timeout: Option<Scalar>,
+    /// Bytes that end a read wherever they appear.
+    ///
+    /// A sequence -- `[0x0D, 0x0A]` -- or one string of them, which is the
+    /// form XML has to use.
+    #[serde(default)]
+    pub terminators: Option<ByteList>,
 }
 
 /// The file-level form of a data handler's configuration
 ///
 /// Every attribute but `dh_id` and `name` is optional, because a handler
 /// naming a group need only state what it does not take from that group.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct DHConfigJson {
     pub dh_id: u32,
@@ -918,6 +1122,68 @@ pub struct DHConfigJson {
     /// Named here only to be refused; see [`DHGroupJson::packet_interval_ms`].
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
+    /// How fast a serial line runs. Serial payloads only.
+    #[serde(default)]
+    pub datarate: Option<Scalar>,
+    /// Whether a serial line is asynchronous. Serial payloads only.
+    #[serde(default)]
+    pub asynchronous: Option<Scalar>,
+    /// Stop bits per character, on an asynchronous line.
+    #[serde(default)]
+    pub stop_bits: Option<Scalar>,
+    /// The parity of an asynchronous line, or the frame check of a
+    /// synchronous one: the kernel calls both a line's parity.
+    #[serde(default)]
+    pub parity: Option<Scalar>,
+    /// Where a synchronous line's clock comes from.
+    #[serde(default)]
+    pub clock_type: Option<Scalar>,
+    /// How a synchronous line encodes bits on the wire.
+    #[serde(default)]
+    pub encoding: Option<Scalar>,
+    /// Whether a synchronous line is looped back.
+    #[serde(default)]
+    pub loopback: Option<Scalar>,
+    /// Bits in a character on a serial line, or in a word on a SPI bus.
+    #[serde(default)]
+    pub byte_length: Option<Scalar>,
+    /// Whether an I2C bus addresses its devices with ten bits.
+    #[serde(default)]
+    pub ten_bit: Option<Scalar>,
+    /// Whether an I2C bus checks packets. I2C payloads only.
+    #[serde(default)]
+    pub pec: Option<Scalar>,
+    /// How many times an I2C transfer is retried.
+    #[serde(default)]
+    pub retries: Option<Scalar>,
+    /// How long an I2C transfer waits.
+    #[serde(default)]
+    pub timeout: Option<Scalar>,
+    /// The clock rate of an I2C bus, recorded rather than set: the platform
+    /// is what sets it.
+    #[serde(default)]
+    pub bus_speed: Option<Scalar>,
+    /// The fastest a SPI peripheral may be clocked. SPI payloads only.
+    #[serde(default)]
+    pub max_speed: Option<Scalar>,
+    /// Which of the four SPI clock modes a peripheral expects.
+    ///
+    /// `spi_mode` rather than `mode`, which in this language says whether a
+    /// payload sends of its own accord or answers requests.
+    #[serde(default)]
+    pub spi_mode: Option<Scalar>,
+    /// Bits in one SPI word.
+    #[serde(default)]
+    pub bits_per_word: Option<Scalar>,
+    /// Which end of a SPI word goes first.
+    #[serde(default)]
+    pub bit_order: Option<Scalar>,
+    /// Whether a SPI chip select is active high or low.
+    #[serde(default)]
+    pub cs_active: Option<Scalar>,
+    /// Where one read of a stream ends. Stream links only.
+    #[serde(default)]
+    pub stream: Option<StreamJson>,
     /// Which payload of the file this is: the first is 0.
     ///
     /// Numbered as the list is read -- see `payloads_in_file_order` -- on the
@@ -1032,8 +1298,19 @@ impl DHConfigJson {
         // the payload states does.
         // Each entry is the attribute, whether this payload stated it, and
         // whether it is there at all once the group is under it.
+        // What locates a payload differs by kind, so what does not apply to
+        // it does too. A network payload is a host and a port; everything
+        // else is a device node -- and a device on an I2C bus is that node
+        // and an address on it, which is the one other kind that has an
+        // address at all. The attributes of a *link* -- a data rate, a clock
+        // mode -- are refused by the rules for each kind instead; see
+        // `link_of`.
         let foreign: &[(&str, bool, bool)] = match kind {
             DHType::Network => &[("path", self.path.is_some(), path.is_some())],
+            DHType::I2c => &[
+                ("protocol", self.protocol.is_some(), protocol.is_some()),
+                ("port", self.port.is_some(), port.is_some()),
+            ],
             _ => &[
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
                 ("address", self.address.is_some(), address.is_some()),
@@ -1049,8 +1326,9 @@ impl DHConfigJson {
                 _ => String::new(),
             };
             return Err(format!(
-                "payload \"{}\" is a {} payload, so {field}{whence} does not apply to it",
+                "payload \"{}\" is {} {} payload, so {field}{whence} does not apply to it",
                 self.name,
+                kind.article(),
                 kind.spelling()
             ));
         }
@@ -1075,18 +1353,11 @@ impl DHConfigJson {
             DHType::Device => EndpointConfig::Device(DeviceConfig {
                 path: path.ok_or("Missing path")?.to_string(),
             }),
-            // A line, a bus and a peripheral carry attributes this file has
-            // no words for -- a baud rate, a slave address, a clock mode --
-            // so they are described in an endpoint configuration file and
-            // named here only by a simulator file checking what it is
-            // simulating.
-            other => {
-                return Err(format!(
-                    "a payload file describes a network or device payload, not a {} \
-                     one: a {} payload is described in an endpoint configuration file",
-                    other.spelling(),
-                    other.spelling()
-                ))
+            // A line, a bus and a peripheral, each of which carries
+            // attributes of its own: a data rate, a slave address, a clock
+            // mode. See link_of, which is where every rule about them lives.
+            kind @ (DHType::Serial | DHType::I2c | DHType::Spi) => {
+                link_of(&self.name, kind, self, group)?
             }
         };
 
@@ -1363,7 +1634,7 @@ mod tests {
             trigger: None,
             trigger_interval_ms: None,
             packet_interval_ms: None,
-            sequence: 0,
+            ..Default::default()
         };
 
         assert_eq!(dh.to_dh_config().expect("converts").mode, DHMode::Periodic);
@@ -1393,7 +1664,7 @@ mod tests {
             trigger: Some("READ\r".to_string()),
             trigger_interval_ms: None,
             packet_interval_ms: Some(500),
-            sequence: 0,
+            ..Default::default()
         };
 
         let config = dh.to_dh_config().expect("converts");
@@ -1430,7 +1701,7 @@ mod tests {
                 trigger: trigger.map(str::to_string),
                 trigger_interval_ms: None,
                 packet_interval_ms: interval,
-                sequence: 0,
+                ..Default::default()
             }
         };
 
@@ -1484,7 +1755,7 @@ mod tests {
                 trigger: Some("READ".to_string()),
                 trigger_interval_ms: None,
                 packet_interval_ms: Some(500),
-                sequence: 0,
+                ..Default::default()
             };
 
             let e = dh.to_dh_config().unwrap_err();
@@ -1904,6 +2175,114 @@ payloads:
                 "the error should name the attributes, but said: {message}"
             );
         }
+    }
+
+    /// A payload file describes a serial payload, with every term a line has.
+    ///
+    /// The language could describe a network or a device payload and nothing
+    /// else: a line, a bus and a peripheral carry attributes it had no words
+    /// for, so a set like those had to be written in a second configuration
+    /// language. The words are here now, and the rules behind them are the
+    /// ones that language used -- see `link_of`.
+    #[test]
+    fn a_payload_file_describes_a_serial_payload() {
+        let yaml = "version: \"1.0\"\ndescription: a line\n\
+                    payloads:\n  - dh_id: 0\n    name: line\n    type: serial\n    \
+                    path: /dev/ttyS0\n    datarate: 115200\n    asynchronous: true\n    \
+                    stop_bits: 1\n    parity: none\n    byte_length: 8\n    \
+                    packet_size: 12\n    stream:\n      max_length: 12\n      \
+                    timeout: none\n";
+        let config: PayloadConfig = ConfigFormat::Yaml.parse(yaml).expect("it parses");
+        let handlers = config.to_dh_configs().expect("it resolves");
+
+        match &handlers[0].endpoint {
+            crate::EndpointConfig::Serial(line) => {
+                assert_eq!(line.path, "/dev/ttyS0");
+                assert_eq!(line.datarate, 115_200);
+                assert!(line.asynchronous);
+                assert_eq!(line.byte_length, 8);
+                assert!(line.stop_bits.is_some(), "an asynchronous line has stop bits");
+                assert!(line.parity.is_some());
+                // Synchronous terms are not a thing an asynchronous line has.
+                assert!(line.clock_type.is_none());
+            }
+            other => panic!("a serial payload resolved to {other:?}"),
+        }
+    }
+
+    /// And a payload on an I2C bus, and a SPI peripheral.
+    #[test]
+    fn a_payload_file_describes_a_bus_and_a_peripheral() {
+        let i2c = "version: \"1.0\"\ndescription: a bus\n\
+                   payloads:\n  - dh_id: 0\n    name: sensor\n    type: i2c\n    \
+                   path: /dev/i2c-1\n    address: 0x48\n    pec: true\n    \
+                   packet_size: 8\n";
+        let config: PayloadConfig = ConfigFormat::Yaml.parse(i2c).expect("it parses");
+        match &config.to_dh_configs().expect("it resolves")[0].endpoint {
+            crate::EndpointConfig::I2c(bus) => {
+                assert_eq!(bus.bus, "/dev/i2c-1");
+                assert_eq!(bus.address, 0x48);
+                assert!(bus.pec);
+            }
+            other => panic!("an I2C payload resolved to {other:?}"),
+        }
+
+        let spi = "version: \"1.0\"\ndescription: a peripheral\n\
+                   payloads:\n  - dh_id: 0\n    name: imu\n    type: spi\n    \
+                   path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 3\n    \
+                   bits_per_word: 8\n    packet_size: 8\n";
+        let config: PayloadConfig = ConfigFormat::Yaml.parse(spi).expect("it parses");
+        match &config.to_dh_configs().expect("it resolves")[0].endpoint {
+            crate::EndpointConfig::Spi(chip) => {
+                assert_eq!(chip.path, "/dev/spidev0.0");
+                assert_eq!(chip.max_speed, 1_000_000);
+                assert_eq!(chip.bits_per_word, 8);
+            }
+            other => panic!("a SPI payload resolved to {other:?}"),
+        }
+    }
+
+    /// The rules each kind had are the rules it still has.
+    ///
+    /// Three of them, one per kind, checked through the payload language: an
+    /// asynchronous line may not state a synchronous line's clock, a SPI
+    /// peripheral must say which clock mode it expects, and an I2C address
+    /// the specification reserves is refused.
+    #[test]
+    fn a_links_own_rules_survived_the_move() {
+        let serial = "version: \"1.0\"\ndescription: a line\n\
+                      payloads:\n  - dh_id: 0\n    name: line\n    type: serial\n    \
+                      path: /dev/ttyS0\n    datarate: 9600\n    asynchronous: true\n    \
+                      stop_bits: 1\n    byte_length: 8\n    clock_type: txint\n    \
+                      packet_size: 1\n    stream:\n      max_length: 1\n      \
+                      timeout: none\n";
+        let said = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(serial)
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("an asynchronous line has no clock to state");
+        assert!(said.contains("clock_type"), "{said}");
+
+        let spi = "version: \"1.0\"\ndescription: a peripheral\n\
+                   payloads:\n  - dh_id: 0\n    name: imu\n    type: spi\n    \
+                   path: /dev/spidev0.0\n    max_speed: 1000000\n    \
+                   bits_per_word: 8\n    packet_size: 8\n";
+        let said = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(spi)
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("a peripheral states its mode");
+        assert!(said.contains("mode"), "{said}");
+
+        let reserved = "version: \"1.0\"\ndescription: a bus\n\
+                        payloads:\n  - dh_id: 0\n    name: sensor\n    type: i2c\n    \
+                        path: /dev/i2c-1\n    address: 0x00\n    packet_size: 8\n";
+        let said = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(reserved)
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("0x00 is reserved");
+        assert!(said.contains("reserved"), "{said}");
     }
 
     /// Two payloads, written in each format.

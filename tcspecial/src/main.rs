@@ -93,10 +93,13 @@ fn main() {
 
     info!("Loaded {} data handler configurations", payload_config.len());
 
-    // What this process read, said as it read it. On stderr, as the command
-    // address is and for the same reason: it is one of the two facts a ground
-    // station checks against its own, so it has to appear whether or not
-    // anyone set RUST_LOG.
+    // What this process read, said as it read it and before the command
+    // interpreter's socket is bound below. On stderr, as the command address
+    // is and for the same reason: it is one of the two facts a ground station
+    // checks against its own, so it has to appear whether or not anyone set
+    // RUST_LOG -- and before the bind, so that an address already in use is
+    // reported under the configuration it was going to serve rather than
+    // instead of it.
     //
     // Of the file rather than of the handlers it produced: what the two ends
     // compare is the configuration, and a digest of the file is the thing a

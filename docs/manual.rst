@@ -982,8 +982,9 @@ it.
 What each end read
 ^^^^^^^^^^^^^^^^^^
 When a link comes up, tcsmoc sends its software version and an MD5 of the
-payload configuration it read, and tcspecial answers with its own two. Both
-print theirs on the terminal they were started from:
+payload configuration it read, and tcspecial answers with its own two. Each
+prints its own on the terminal it was started from before it makes the socket,
+so the two are there to read even when the link never comes up:
 
 .. code-block:: console
 

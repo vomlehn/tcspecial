@@ -112,14 +112,21 @@ const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
 const DEFAULT_SIM_CONFIG_PATH: &str = "tests/manual/tcspecial1sim.yaml";
 
-/// A panel's nominal size, and the height of everything above and below the
-/// grid of them.
+/// What one column of the grid takes, and the height of everything above and
+/// below the grid.
 ///
-/// These are used only to choose how many columns the grid has and how large
-/// the window opens; the layout itself stretches panels to fit. They have to
-/// agree with `ui/main.slint`, which sizes the grid with the same panel
-/// height.
-const PANEL_WIDTH: f32 = 320.0;
+/// These are used only to choose how large the window opens; the grid itself
+/// lays the panels out at the width they ask for. They have to agree with
+/// `ui/main.slint`, which sizes the grid with the same panel height.
+///
+/// A panel measures 196 wide with `GRID_SPACING` beside it, which is what the
+/// testing backend reports in `every_panels_data_is_inside_the_window`. This
+/// was 320 -- a nominal figure, with a comment claiming the panels stretched
+/// to fill whatever it gave them, which they do not. Three columns of the real
+/// width fit the window floor the command interpreter's controls already set,
+/// where three of 320 would have asked for 960 and left a third of the window
+/// empty to the right of the panels.
+const PANEL_WIDTH: f32 = 206.0;
 /// What a panel's contents come to: the sum of the floors its rows declare,
 /// measured through Slint's testing backend rather than guessed, by
 /// `every_panels_data_is_inside_the_window`. This was 210 against the 259 the
@@ -187,9 +194,11 @@ fn window_size(shape: &GridShape, panels: usize) -> LogicalSize {
 /// stand 680 tall, and a window that may be narrower than that is taller
 /// than wide, which puts the shape out of the running altogether --
 /// `grid_shape` does not consider such shapes at all, so four panels would
-/// open in a 3x2 grid with two cells empty and two panels would go side by
-/// side instead of stacked. At 700 every panel count keeps the shape it has
-/// always had. Anything that changes the panel or chrome heights has to be
+/// open in a 3x2 grid with two cells empty. At 700 every panel count keeps the
+/// shape it has. (Two panels used to be the other half of this argument: they
+/// stacked, and a narrower window would have put them side by side. They are
+/// side by side at any width now -- a grid is never taller in panels than it
+/// is wide -- so the four-panel case is what the floor holds up.) Anything that changes the panel or chrome heights has to be
 /// weighed the same way, against
 /// `the_shipped_payload_config_opens_a_nearly_square_window`.
 const MIN_WINDOW_WIDTH: f32 = 700.0;
@@ -204,43 +213,45 @@ struct GridShape {
     height: f32,
 }
 
-impl GridShape {
-    /// Width over height. 1.0 is square, above it is wider than tall.
-    fn aspect(&self) -> f32 {
-        self.width / self.height
-    }
-}
+/// The most panels tcsmoc puts in a row.
+///
+/// Three of them is 960 pixels of panel, which is a window most screens have
+/// the width for and a row an eye can take in at once. A fourth column would
+/// widen the window past 1280 before the grid had earned it.
+const MAX_COLUMNS: usize = 3;
 
 /// Choose the grid shape for `panels` data handlers.
 ///
-/// The window should be wider than tall but no wider than it has to be, so of
-/// the shapes that are at least square the squarest one wins. Taller-than-wide
-/// shapes are not candidates at all, which is what makes the bias a rule
-/// rather than a tendency.
+/// A row is filled before another is started under it, up to [`MAX_COLUMNS`]
+/// across. So the shape is settled by the count alone: three panels go in one
+/// row of three, four in a row of three and a row of one.
+///
+/// This replaced a rule that chose the shape nearest square among those at
+/// least as wide as they were tall. That rule read well and laid the panels
+/// out badly: two panels came out as one column of two, because a 700x680
+/// window is squarer than a 700x508 one, so the set the Makefile runs went
+/// down the window instead of across it. Squareness was never the thing
+/// wanted -- it was a proxy for a window that fits a screen, and a column
+/// count says that directly.
+///
+/// The window is no longer always wider than it is tall: ten panels or more
+/// are four rows of a three-wide grid, which is taller than 960. They scroll,
+/// as too many panels always have.
 fn grid_shape(panels: usize) -> GridShape {
     // An empty configuration still has to produce a window.
     let panels = panels.max(1);
+    let columns = panels.min(MAX_COLUMNS);
+    let rows = panels.div_ceil(columns);
 
-    let shape_for = |columns: usize| {
-        let rows = panels.div_ceil(columns);
-        GridShape {
-            columns,
-            rows,
-            width: (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH),
-            height: height_for_rows(rows),
-        }
-    };
-
-    // One column per panel is always at least square -- a single row is only
-    // CHROME_HEIGHT + PANEL_HEIGHT tall, with no gap between rows to allow
-    // for, and at least MIN_WINDOW_WIDTH wide --
-    // so there is always a candidate, and the fallback is unreachable unless
-    // those constants change.
-    (1..=panels)
-        .map(shape_for)
-        .filter(|shape| shape.width >= shape.height)
-        .min_by(|a, b| a.aspect().total_cmp(&b.aspect()))
-        .unwrap_or_else(|| shape_for(panels))
+    GridShape {
+        columns,
+        rows,
+        // MIN_WINDOW_WIDTH is a floor rather than the width of one column:
+        // what the command interpreter's controls need is wider than a single
+        // panel, so one and two panels both open at it.
+        width: (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH),
+        height: height_for_rows(rows),
+    }
 }
 
 /// Turn a data handler from the payload configuration file into the panel the
@@ -1589,6 +1600,154 @@ mod tests {
     /// font metrics, so what this measures is what the window does. A panel
     /// that is scrolled out of sight is not merely off-screen, it is never
     /// built, so the count of panels found is itself part of the check.
+    /// Every panel of a row is the same width, whatever its payload is.
+    ///
+    /// Measured, because it was not: the three texts of the sent line used to
+    /// be behind `if triggered`, a layout whose children come and go is
+    /// measured differently from one whose children are always there, and the
+    /// two payloads of set 2 came out 196 and 458 wide -- the triggered one
+    /// taking every pixel of slack in the row. The widths are the one thing a
+    /// panel's kind must not change.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them.
+    fn every_panel_in_a_row_is_the_same_width() {
+        use i_slint_backend_testing::ElementHandle;
+
+        // One of each kind, which is the case that showed it, and then both
+        // kinds alone: a rule about widths has to hold for a row of one kind
+        // as much as for a mixed one.
+        let mut periodic = a_dh();
+        periodic.name = DHName::new("auto-send");
+        let mut triggered = a_dh();
+        triggered.name = DHName::new("triggered-send");
+        triggered.mode = tcslibgs::DHMode::Triggered {
+            trigger: b"go".to_vec(),
+            interval_ms: 1000,
+        };
+
+        for (what, dhs) in [
+            ("one of each", vec![&periodic, &triggered]),
+            ("both periodic", vec![&periodic, &periodic]),
+            ("both triggered", vec![&triggered, &triggered]),
+        ] {
+            let rows: Vec<DHInfo> = dhs.iter().map(|dh| dh_info_from(dh, None)).collect();
+            let panels = rows.len();
+
+            let ui = MainWindow::new().unwrap();
+            ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(rows))));
+            let shape = grid_shape(panels);
+            ui.set_columns(i32::try_from(shape.columns).unwrap());
+            ui.window().set_size(window_size(&shape, panels));
+            ui.show().unwrap();
+
+            let widths: Vec<f32> = ElementHandle::find_by_element_type_name(&ui, "DHPanel")
+                .map(|panel| panel.size().width)
+                .collect();
+            assert_eq!(widths.len(), panels, "{what}: {} panels found", widths.len());
+            assert!(
+                widths.iter().all(|w| *w == widths[0]),
+                "{what}: the panels are {widths:?} wide"
+            );
+        }
+    }
+
+    /// The panels are laid out across the window before they are laid out
+    /// down it.
+    ///
+    /// Measured in a real layout rather than read off the grid arithmetic,
+    /// because the arithmetic was never the part that was wrong: the row and
+    /// column each panel is given have always been row-major, and what sent
+    /// two panels down the window instead of across it was the shape chosen
+    /// for them -- one column of two, because that is the squarer window.
+    /// Only a laid-out window shows the two together.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them.
+    fn panels_fill_left_to_right() {
+        use i_slint_backend_testing::ElementHandle;
+
+        for panels in [2usize, 3, 4, 5] {
+            let rows: Vec<DHInfo> = (0..panels)
+                .map(|i| {
+                    let mut dh = a_dh();
+                    dh.name = DHName::new(format!("DH{i}"));
+                    dh_info_from(&dh, None)
+                })
+                .collect();
+
+            let ui = MainWindow::new().unwrap();
+            ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(rows))));
+            let shape = grid_shape(panels);
+            ui.set_columns(i32::try_from(shape.columns).unwrap());
+            ui.window().set_size(window_size(&shape, panels));
+            ui.show().unwrap();
+
+            // One per panel, in the model's order: the name is the first text
+            // of each panel and nothing else shows it.
+            let mut placed: Vec<(String, f32, f32)> = Vec::new();
+            for i in 0..panels {
+                let name = format!("DH{i}");
+                let handle = ElementHandle::find_by_accessible_label(&ui, &name)
+                    .next()
+                    .unwrap_or_else(|| panic!("{panels} panels: no panel labelled {name}"));
+                let at = handle.absolute_position();
+                placed.push((name, at.x, at.y));
+            }
+
+            // The second panel is beside the first and never under it,
+            // which is the complaint this was written for. True of every
+            // count: a grid with no more rows than columns and room for two
+            // panels has at least two columns.
+            assert!(
+                placed[1].1 > placed[0].1 && placed[1].2 == placed[0].2,
+                "{panels} panels in a {}x{} grid: {} at ({}, {}) is not beside \
+                 {} at ({}, {})",
+                shape.columns,
+                shape.rows,
+                placed[1].0,
+                placed[1].1,
+                placed[1].2,
+                placed[0].0,
+                placed[0].1,
+                placed[0].2
+            );
+
+            // Across first: each panel but the first of a row is to the
+            // right of the one before it and level with it, and each panel
+            // that starts a row is back at the first column and below.
+            for i in 1..panels {
+                let (name, x, y) = &placed[i];
+                let (before, before_x, before_y) = &placed[i - 1];
+                let placement = format!(
+                    "{panels} panels in a {}x{} grid: {name} at ({x}, {y}) \
+                     after {before} at ({before_x}, {before_y})",
+                    shape.columns, shape.rows
+                );
+
+                if i % shape.columns == 0 {
+                    assert_eq!(*x, placed[0].1, "{placement}: a new row starts over");
+                    assert!(y > before_y, "{placement}: a new row is below");
+                } else {
+                    assert!(x > before_x, "{placement}: the next panel is to the right");
+                    assert_eq!(y, before_y, "{placement}: the same row is level");
+                }
+            }
+
+            // And the first row is filled before there is a second at all.
+            assert_eq!(
+                shape.columns.min(panels),
+                placed
+                    .iter()
+                    .filter(|(_, _, y)| *y == placed[0].2)
+                    .count(),
+                "{panels} panels in a {}x{} grid: the first row is not full",
+                shape.columns,
+                shape.rows
+            );
+        }
+    }
+
     #[test]
     fn every_panels_data_is_inside_the_window() {
         use i_slint_backend_testing as testing;
@@ -1728,6 +1887,8 @@ mod tests {
         the_params_button_shows_what_both_files_said();
         the_window_shows_when_the_last_beacon_arrived();
         only_a_triggered_payloads_panel_shows_a_sent_line();
+        panels_fill_left_to_right();
+        every_panel_in_a_row_is_the_same_width();
     }
 
     /// Only a payload that has to be asked is talked about on the console.
@@ -2062,10 +2223,11 @@ mod tests {
 
     /// The window size the design document states is the one the rule gives.
     ///
-    /// It said 640x630 against the 700x852 the program opens at: the number
+    /// It once said 640x630 while the program opened at 700x852: the number
     /// went stale when the window gained its three-row floor and the width
     /// floor the command interpreter's controls need, and nothing noticed
-    /// because nothing read it.
+    /// because nothing read it. What the program opens at now is whatever the
+    /// rule gives, and this is what makes the document say the same.
     #[test]
     fn the_design_document_states_the_size_the_window_opens_at() {
         let doc = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2081,8 +2243,8 @@ mod tests {
 
         assert_eq!(
             (shape.columns, shape.rows),
-            (2, 2),
-            "the document describes a two-by-two grid"
+            (3, 2),
+            "the document describes a three-by-two grid"
         );
         assert!(
             text.contains(&said),
@@ -2631,14 +2793,42 @@ mod tests {
     /// counts does not pass.
     const COUNTS: usize = 64;
 
-    /// The window is never taller than it is wide.
+    /// A row holds up to three panels, and the next row starts under it.
     ///
-    /// This is the bias, and it has to hold for every panel count rather than
-    /// for the shipped one: a handler added to the configuration file must not
-    /// turn the window into a column.
+    /// Checked for every panel count rather than for the shipped one: a
+    /// handler added to the configuration file must not change the shape of
+    /// the rows above it.
     #[test]
-    fn the_window_is_always_at_least_square() {
+    fn a_row_holds_up_to_three_panels() {
         for panels in 1..=COUNTS {
+            let shape = grid_shape(panels);
+
+            assert_eq!(
+                shape.columns,
+                panels.min(MAX_COLUMNS),
+                "{panels} panels went into {} columns",
+                shape.columns
+            );
+            assert_eq!(
+                shape.rows,
+                panels.div_ceil(shape.columns),
+                "{panels} panels in {} columns went into {} rows",
+                shape.columns,
+                shape.rows
+            );
+        }
+    }
+
+    /// The grid is wider than it is tall while it fits two rows.
+    ///
+    /// Six panels, which is every shipped set and then some. A third row is
+    /// 852 against a 700-wide window, so past six the grid is taller than wide
+    /// and the panels scroll -- as too many panels always have. The window the
+    /// MOC *opens* has been taller than wide since it gained its three-row
+    /// floor, which is a different thing: the floor is room to grow into.
+    #[test]
+    fn the_grid_is_wider_than_tall_while_it_fits_two_rows() {
+        for panels in 1..=(MAX_COLUMNS * 2) {
             let shape = grid_shape(panels);
             assert!(
                 shape.width >= shape.height,
@@ -2646,38 +2836,6 @@ mod tests {
                 shape.width,
                 shape.height
             );
-        }
-    }
-
-    /// Of the shapes that are at least square, the chosen one is the squarest.
-    ///
-    /// Checked against every column count rather than against a remembered
-    /// answer, so the rule is what is tested, not the arithmetic of one case.
-    #[test]
-    fn no_other_column_count_is_nearer_square() {
-        for panels in 1..=COUNTS {
-            let chosen = grid_shape(panels);
-
-            for columns in 1..=panels {
-                let rows = panels.div_ceil(columns);
-                let width = (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH);
-                let height = height_for_rows(rows);
-
-                // A taller-than-wide shape is not a candidate, however square.
-                if width < height {
-                    continue;
-                }
-
-                assert!(
-                    chosen.aspect() <= width / height,
-                    "{panels} panels chose {} columns (aspect {}), but {} columns \
-                     is nearer square (aspect {})",
-                    chosen.columns,
-                    chosen.aspect(),
-                    columns,
-                    width / height
-                );
-            }
         }
     }
 
@@ -2701,28 +2859,36 @@ mod tests {
         }
     }
 
-    /// The shipped configuration opens a window that is nearly square.
+    /// The shipped configuration opens a row of three and a row of one.
     ///
     /// The other tests fix the rules; this one records what the rules actually
     /// produce for the file the MOC ships with, so a change to the panel
-    /// constants that ruins the shipped case cannot pass quietly.
+    /// constants or the column count that ruins the shipped case cannot pass
+    /// quietly.
     #[test]
-    fn the_shipped_payload_config_opens_a_nearly_square_window() {
+    fn the_shipped_payload_config_fills_a_row_of_three() {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
         let dh_configs = load_dh_configs(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
+        assert_eq!(dh_configs.len(), 4, "{} has moved on", path.display());
 
         let shape = grid_shape(dh_configs.len());
+        assert_eq!(
+            (shape.columns, shape.rows),
+            (3, 2),
+            "{} opens a {}x{} grid",
+            path.display(),
+            shape.columns,
+            shape.rows
+        );
         assert!(
-            shape.aspect() < 1.1,
-            "{} opens a {}x{} window, aspect {}, further from square than it \
-             should be",
+            shape.width >= shape.height,
+            "{} opens a {}x{} window, taller than wide",
             path.display(),
             shape.width,
-            shape.height,
-            shape.aspect()
+            shape.height
         );
     }
 

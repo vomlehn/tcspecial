@@ -924,8 +924,9 @@ the ``Command`` menu
   in a session is whether tcspecial read the same configuration this MOC did:
   see `What each end read`_.
 
-Below that is one panel per data handler, and a ``Quit`` button at the foot of
-the window, which stops the tcspecial and tcssim the MOC started.
+Below that is one panel per data handler, filled across the window before
+another row is started under it, and a ``Quit`` button at the foot of the
+window, which stops the tcspecial and tcssim the MOC started.
 
 Each panel shows its handler's name and status, how it is reached, and its
 packet size; then the time and first few bytes of the last transfer each way,

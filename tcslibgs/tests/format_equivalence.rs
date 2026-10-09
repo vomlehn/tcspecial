@@ -1,15 +1,19 @@
 //! Cross-format equivalence tests.
 //!
 //! The Rust structs in `tcslibgs::types` are the single description of the
-//! configuration data; JSON, YAML, and XML are three spellings of it. Nothing
-//! in the code guarantees the three spellings stay interchangeable, so these
-//! tests do: for each file in `tests/actual`, every format must deserialize to
-//! an *identical* value. The command interpreter's own configuration is part
-//! of that file now, as the `tcspecial` section, rather than an actual file of
-//! its own.
+//! configuration data; YAML and XML are two spellings of it. Nothing in the
+//! code guarantees the two spellings stay interchangeable, so these tests do:
+//! for each file in `tests/actual`, both formats must deserialize to an
+//! *identical* value. The command interpreter's own configuration is part of
+//! that file, as the `tcspecial` section, rather than an actual file of its
+//! own.
 //!
-//! When you add a field, add it to all three actual files. These tests fail
-//! if you forget one.
+//! There were three spellings. JSON is no longer read -- see
+//! `tcslibgs::format` -- so there is one fewer file and one fewer parser to
+//! keep in step.
+//!
+//! When you add a field, add it to both actual files. These tests fail if you
+//! forget one.
 
 use std::path::{Path, PathBuf};
 
@@ -24,23 +28,22 @@ fn actual(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Load the same logical configuration from all three formats and require
-/// that every format produced the same value as JSON.
+/// Load the same logical configuration from both formats and require that
+/// they produced the same value.
 fn assert_all_formats_agree<T>(stem: &str)
 where
     T: DeserializeOwned + PartialEq + std::fmt::Debug,
 {
-    let json: T = load_config_file(actual(&format!("{stem}.json")))
-        .unwrap_or_else(|e| panic!("{stem}.json failed to parse: {e}"));
+    let yaml: T = load_config_file(actual(&format!("{stem}.yaml")))
+        .unwrap_or_else(|e| panic!("{stem}.yaml failed to parse: {e}"));
 
-    for ext in ["yaml", "xml"] {
-        let other: T = load_config_file(actual(&format!("{stem}.{ext}")))
-            .unwrap_or_else(|e| panic!("{stem}.{ext} failed to parse: {e}"));
-        assert_eq!(
-            json, other,
-            "{stem}.{ext} disagrees with {stem}.json -- the actual files have drifted"
-        );
-    }
+    let xml: T = load_config_file(actual(&format!("{stem}.xml")))
+        .unwrap_or_else(|e| panic!("{stem}.xml failed to parse: {e}"));
+
+    assert_eq!(
+        yaml, xml,
+        "{stem}.xml disagrees with {stem}.yaml -- the actual files have drifted"
+    );
 }
 
 #[test]
@@ -99,7 +102,7 @@ fn the_actual_file_has_expected_contents() {
 fn a_grouped_handler_resolves_the_same_from_every_format() {
     // The group is only useful if what a handler inherits from it survives
     // every format, so resolve the whole file rather than inspecting fields.
-    for ext in ["json", "yaml", "xml"] {
+    for ext in ["yaml", "xml"] {
         let config: PayloadConfig = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
         let handlers = config
             .to_dh_configs()
@@ -182,7 +185,7 @@ payloads:
 fn every_format_converts_to_runtime_types() {
     // Equivalence at the file layer is only useful if the conversion into the
     // real runtime types also succeeds from every format.
-    for ext in ["json", "yaml", "xml"] {
+    for ext in ["yaml", "xml"] {
         let config: PayloadConfig = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
         config
             .to_dh_configs()
@@ -202,7 +205,7 @@ fn the_tcspecial_section_is_a_command_interpreter_configuration() {
     // configuration are still compared: the_actual_file_is_format_independent
     // holds the whole file identical across the formats, and this section is
     // part of that file.
-    for ext in ["json", "yaml", "xml"] {
+    for ext in ["yaml", "xml"] {
         let config: PayloadConfig = load_config_file(actual(&format!("tcspecial.{ext}"))).unwrap();
         let carried = config
             .tcspecial
@@ -257,14 +260,10 @@ tcspecial:
 fn malformed_input_is_rejected_in_every_format() {
     // Negative cases: without these, a parser that accepts anything would
     // still pass the tests above.
-    assert!(ConfigFormat::Json.parse::<PayloadConfig>("{ not json").is_err());
     assert!(ConfigFormat::Yaml.parse::<PayloadConfig>("version: [").is_err());
     assert!(ConfigFormat::Xml.parse::<PayloadConfig>("<payload><version>").is_err());
 
     // A required field is missing in each format, so each must refuse it.
-    assert!(ConfigFormat::Json
-        .parse::<CIConfigJson>(r#"{"address":"0.0.0.0","port":1}"#)
-        .is_err());
     assert!(ConfigFormat::Yaml
         .parse::<CIConfigJson>("address: 0.0.0.0\nport: 1\n")
         .is_err());

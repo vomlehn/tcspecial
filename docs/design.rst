@@ -514,9 +514,10 @@ interval, and where the telemetry log goes. The other describes the payloads
 and is named on the command line; see `Payload Configuration Files`_.
 
 Both choose their parser from their extension, as every configuration file in
-the project does, so either may be written in YAML, JSON or XML. The shipped
-one is YAML because that is what the rest of the project's configuration is
-written in; it was JSON when JSON was the only format the project read.
+the project does, so either may be written in YAML or XML. The shipped one is
+YAML because that is what the rest of the project's configuration is written
+in; it was JSON when JSON was the only format the project read, which is no
+longer a format it reads at all.
 
 This is the shipped ``tcspecial/src/tcspecial.yaml``:
 
@@ -1303,14 +1304,28 @@ Requirement
     something a file gets to assert.
 
 Requirement
-    The digest takes the payloads in order of their sequence numbers. Two ends
-    that read the same file then agree about which payload came first whatever
-    either has since done with its own list.
+    An endpoint configuration's endpoints are numbered the same way, and for
+    the same reason: a payload set may be written in either language, so a rule
+    about the order payloads are read in has to hold in both.
+
+Requirement
+    The digest takes the payloads, or the endpoints, in order of their
+    sequence numbers. Two ends that read the same file then agree about which
+    came first whatever either has since done with its own list.
 
 The numbering rests on one assumption: that a parser hands entries to the code
 above it in the order the file gave them. Every format here does, and a format
 that did not would be unusable for a language whose payload order means
 something.
+
+Where the number is given differs between the two languages, and only because
+the shape of each makes one place the right one. A payload file's payloads are
+numbered as the list is deserialized, which is the one place every format
+arrives through. An endpoint file's endpoints are numbered as the validated
+document is built, which is the one place an endpoint is made. Either way
+nothing can hold a configuration whose entries do not know which ones they are.
+The endpoint language has no field for a file to state a number in, where the
+payload language refuses one by name.
 
 Carried by the data rather than left to the order a list happens to keep. The
 order used to live only in that, so anything sorting the payloads -- for a
@@ -1381,28 +1396,27 @@ of the pair is written in, every program reads it the same way, and the
 simulator file beside it is the same language in either case.
 
 The format is chosen from the extension exactly as every other configuration
-file's is, so a payload configuration may be written in YAML, JSON, or XML.
+file's is, so a payload configuration may be written in YAML or XML.
 
 Requirement
-    Every shipped set is written in all three formats, and the three describe
-    the same data handlers. ``tcspecial2.yaml``, ``tcspecial2.xml`` and
-    ``tcspecial2.json`` are one set written three ways.
+    Every shipped set is written in both formats, and the two describe the
+    same data handlers. ``tcspecial2.yaml`` and ``tcspecial2.xml`` are one set
+    written two ways.
 
 The formats are three spellings of one configuration, which nothing in the
 code enforces: each is parsed by its own parser, and a set transcribed by hand
 can differ in a port or lose an attribute without either file becoming invalid.
 So a test loads all three of every set and compares the handlers they produce.
 Shipping all three also means each parser is exercised by a file someone runs
-rather than only by a fixture -- ``make runmocx`` and ``make runmocj`` run the
-XML and the JSON of a set -- which is what turned up the one bug this found:
+rather than only by a fixture -- ``make runmocx`` runs the XML of a set --
+which is what turned up the one bug this found:
 the check that decides which language a file is written in asked for the
 ``payloads`` section with a single field, and a sequence in XML is repeated
 sibling elements, so every XML payload file of more than one payload was
 refused as a duplicate field.
 
-The YAML of a set is the one to read: it carries the comments, and JSON has no
-way to hold them. The simulator files are YAML alone, nothing having asked for
-them in three spellings.
+The YAML of a set is the one to read: it carries the comments. The simulator
+files are YAML alone, nothing having asked for them in both spellings.
 
 File Structure
 --------------
@@ -1592,8 +1606,8 @@ Requirement
     ``\t`` ``\0`` ``\a`` ``\b`` ``\f`` ``\v`` and ``\xNN`` -- and an escape
     C does not have is refused rather than passed through. A file that wrote
     ``\q`` meant something, and a backslash and a q is unlikely to be it. This
-    is also what lets an XML payload file state a trigger that a YAML or JSON
-    one states with the format's own escapes.
+    is also what lets an XML payload file state a trigger that a YAML one
+    states with the format's own escapes.
 
 Requirement
     A trigger is one byte or more. A payload that answers requests has to be
@@ -1811,7 +1825,7 @@ Requirement
     language read by two programs cannot live inside one of them.
 
 The format is chosen from the extension exactly as every other configuration
-file's is, so a simulator configuration may be written in YAML, JSON, or XML.
+file's is, so a simulator configuration may be written in YAML or XML.
 
 File Structure
 --------------
@@ -2148,21 +2162,24 @@ states its own rate instead.
 
 Endpoint Configuration Files
 ============================
-Endpoints may be configured from a file in YAML, XML, or JSON. The three
-formats describe exactly the same thing and are parsed into exactly the same
-Rust types, so which one a mission uses is a matter of local preference and
-tooling, never of capability. The parser is ``tcslibgs::endpoint_config``, and
-the examples at the end of this section are written against it.
+Endpoints may be configured from a file in YAML or XML. The two formats
+describe exactly the same thing and are parsed into exactly the same Rust
+types, so which one a mission uses is a matter of local preference and tooling,
+never of capability. The parser is ``tcslibgs::endpoint_config``, and the
+examples at the end of this section are written against it.
 
 Requirement
     The format of a configuration file is chosen from its extension. ``.yaml``
-    and ``.yml`` are YAML, ``.xml`` is XML, and any other extension, or none
-    at all, is JSON.
+    and ``.yml`` are YAML and ``.xml`` is XML. Any other extension, or none at
+    all, is refused.
 
-The fallback to JSON is deliberate rather than arbitrary: it is the format
-every configuration file in the project used before the others were accepted,
-so a file that predates them, or that carries no extension, keeps being read
-the way it always was.
+JSON was read as well, and was what any other extension was taken to be: it
+was the format every configuration file used before the others were accepted,
+so a file that predated them kept being read the way it always was. What that
+cost was the refusal above -- a misspelled extension was not an error but a
+file parsed as the wrong language -- and nothing was written in JSON that was
+not also written in YAML. The command link still carries JSON, which is no part
+of configuration.
 
 File Structure
 --------------
@@ -2674,7 +2691,7 @@ Requirement
     A file's kind is read from the sections it carries -- ``payloads``
     for a payload configuration, ``endpoints`` or the groups of them for an
     endpoint configuration -- and not from its name. A file's extension says
-    how it is spelled, YAML or JSON or XML, and both kinds can be written in
+    how it is spelled, YAML or XML, and both kinds can be written in
     any of the three.
 
 Requirement
@@ -2733,7 +2750,7 @@ each.
 
 Value Syntax
 ------------
-XML carries every attribute value as text, while YAML and JSON distinguish
+XML carries every attribute value as text, while YAML distinguishes
 numbers from strings. Both are accepted everywhere a value is expected, so the
 same value may be written ``8`` or ``"8"`` without changing its meaning.
 
@@ -2767,9 +2784,9 @@ Requirement
     ``none``.
 
 Requirement
-    A hexadecimal value is written as a string in JSON, which has no
-    hexadecimal number syntax of its own: ``"0x48"``, not ``0x48``. YAML and
-    XML accept either spelling, and all three mean the same value.
+    A hexadecimal value may be written as a number or as a string: ``0x48`` or
+    ``"0x48"``. Both formats accept either spelling and both mean the same
+    value.
 
 Attribute names may be spelled with either underscores or hyphens, so
 ``max_length`` and ``max-length`` are the same attribute.
@@ -2797,12 +2814,6 @@ The formats differ only in how the common structure is spelled.
 .. note::
    XML names the repeated children of the two list sections ``<group>`` and
    ``<endpoint>``, the singular of the section that contains them.
-
-.. note::
-   JSON spells structure the way YAML does, a section being an object and a
-   list an array, so the YAML column above describes JSON as well. The one
-   thing JSON cannot carry is a comment, so the remarks in the examples below
-   have no JSON equivalent.
 
 YAML Example
 ------------
@@ -3017,9 +3028,7 @@ XML Example
    </endpoint-configuration>
 
 Both listings above describe the same nine endpoints in seven groups, and parse
-into values that compare equal. The same configuration in JSON is not printed
-here, because a third listing of one configuration would show a reader of the
-first two nothing new.
+into values that compare equal.
 
 Testing
 =======
@@ -3584,9 +3593,8 @@ The Makefile names a set once for this reason, and names it as a stem:
 reaches every program as its argument, and ``$(PAYLOAD_FILE)sim.yaml`` the
 simulator file that reaches tcssim in the environment. One target then runs a
 whole set, and its last letter is the spelling of the payload configuration the
-MOC reads -- ``runmocy`` the YAML, ``runmocx`` the XML, ``runmocj`` the JSON --
-all three adding the suffix to the same stem, so they are one set read three
-ways:
+MOC reads -- ``runmocy`` the YAML and ``runmocx`` the XML -- both adding the
+suffix to the same stem, so they are one set read two ways:
 
 .. code-block:: console
 
@@ -3754,7 +3762,8 @@ These are some things that Claude doesn't seem to figure out by itself.
 
 * The crate libc must be included to Cargo.toml for all crates to get definitions of AF_UNIX and other address families.
 
-* The crate serde_json must be added to Cargo.toml for all crates to get JSON definitions.
+* The crate serde_json is in Cargo.toml for the command link, which carries
+  JSON between the ground and the spacecraft. No configuration file is JSON.
 
 * into_raw_fd() must not be used to convert TCPStream and UDPSocket types to RawFDs.
 

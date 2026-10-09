@@ -647,8 +647,8 @@ impl DHMode {
 /// Data handler configuration
 ///
 /// Compared as a value so that one file's handlers can be held against
-/// another's: a payload set written in YAML, JSON and XML must produce the
-/// same handlers, and that is a comparison rather than an inspection.
+/// another's: a payload set written in YAML and in XML must produce the same
+/// handlers, and that is a comparison rather than an inspection.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DHConfig {
     pub dh_id: DHId,
@@ -869,7 +869,7 @@ pub struct DHGroupJson {
     pub packet_interval_ms: Option<u32>,
 }
 
-/// JSON representation of DH config
+/// The file-level form of a data handler's configuration
 ///
 /// Every attribute but `dh_id` and `name` is optional, because a handler
 /// naming a group need only state what it does not take from that group.
@@ -1196,7 +1196,7 @@ fn default_log_segment_bytes() -> u32 {
     65_536
 }
 
-/// JSON representation of CI config
+/// The file-level form of the command interpreter's configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
     pub address: String,
@@ -1835,8 +1835,8 @@ payloads:
         }
     }
 
-    /// Two payloads, written in each of the three formats.
-    fn two_payloads() -> [(ConfigFormat, String); 3] {
+    /// Two payloads, written in each format.
+    fn two_payloads() -> [(ConfigFormat, String); 2] {
         [
             (
                 ConfigFormat::Yaml,
@@ -1845,13 +1845,6 @@ payloads:
                  packet_size: 1\n  \
                  - dh_id: 1\n    name: second\n    type: device\n    path: /dev/zero\n    \
                  packet_size: 2\n"
-                    .to_string(),
-            ),
-            (
-                ConfigFormat::Json,
-                r#"{"version":"1.0","description":"two","payloads":[
-                   {"dh_id":0,"name":"first","type":"device","path":"/dev/null","packet_size":1},
-                   {"dh_id":1,"name":"second","type":"device","path":"/dev/zero","packet_size":2}]}"#
                     .to_string(),
             ),
             (

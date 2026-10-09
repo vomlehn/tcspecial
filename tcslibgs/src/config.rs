@@ -35,7 +35,7 @@ pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 /// The payload configuration read when nothing names one.
 pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/tcspecial1.yaml";
 
-/// Load payload configuration from a JSON, YAML, or XML file.
+/// Load payload configuration from a YAML or XML file.
 ///
 /// The format is chosen from the file extension; see
 /// [`crate::format::ConfigFormat`]. All formats deserialize into the same
@@ -168,7 +168,7 @@ pub fn command_address_parts(address: &str) -> Result<(String, u16), String> {
 
 /// Which kind of configuration a file holds.
 ///
-/// A file's extension says how it is spelled -- YAML, JSON or XML -- and not
+/// A file's extension says how it is spelled -- YAML or XML -- and not
 /// what it describes. Both kinds of configuration can be written in any of the
 /// three, so which one a file holds is read from the sections it has rather
 /// than from its name.
@@ -256,7 +256,7 @@ pub fn handler_source_of_text(text: &str, format: ConfigFormat) -> TcsResult<Han
 pub fn handler_source<P: AsRef<Path>>(path: P) -> TcsResult<HandlerSource> {
     let path = path.as_ref();
     let text = fs::read_to_string(path)?;
-    handler_source_of(&text, ConfigFormat::from_path(path))
+    handler_source_of(&text, ConfigFormat::of_file(path)?)
 }
 
 /// Load data handlers from a payload or an endpoint configuration file.
@@ -270,7 +270,7 @@ pub fn handler_source<P: AsRef<Path>>(path: P) -> TcsResult<HandlerSource> {
 pub fn load_dh_configs<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> {
     let path = path.as_ref();
     let text = fs::read_to_string(path)?;
-    let format = ConfigFormat::from_path(path);
+    let format = ConfigFormat::of_file(path)?;
 
     match handler_source_of(&text, format)? {
         HandlerSource::Payload => {

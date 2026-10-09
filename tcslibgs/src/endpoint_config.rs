@@ -62,8 +62,8 @@ pub enum EndpointConfigError {
         source: std::io::Error,
     },
 
-    #[error("JSON parse error: {0}")]
-    Json(#[from] serde_json::Error),
+    #[error("{0}: a configuration file is named .yaml, .yml or .xml, and this is none of those")]
+    UnknownFormat(String),
 
     #[error("YAML parse error: {0}")]
     Yaml(#[from] serde_norway::Error),
@@ -492,6 +492,22 @@ pub struct EndpointDef {
     /// handler from another. Nothing but starting a handler needs it, so an
     /// endpoint configuration that only says how to reach devices has none.
     pub oc: Option<NetworkConfig>,
+    /// Which endpoint of the file this is: the first is 0.
+    ///
+    /// The same number a payload file's payloads carry, for the same reason
+    /// and on the same assumption -- that a parser hands entries over in the
+    /// order the file gave them, which every format here does. The order is
+    /// configuration rather than spelling, since ids will be assigned in it,
+    /// so it is carried by the data instead of living in whatever order a
+    /// `Vec` happens to keep: the configuration digest walks the endpoints by
+    /// this number, and two ends that read the same file agree about which
+    /// endpoint came first whatever either has since done with its own list.
+    ///
+    /// Given as the document is built rather than deserialized. That is the
+    /// one place an `EndpointDef` is made, so none exists without it, and a
+    /// file stating a number of its own has none to state -- the wire type has
+    /// no such field.
+    pub sequence: usize,
 }
 
 /// What locates one endpoint of a group, and so distinguishes it from the
@@ -525,7 +541,6 @@ pub enum EndpointLocation {
 /// Read an endpoint configuration from text in the given format.
 pub fn from_str(text: &str, format: ConfigFormat) -> EndpointConfigResult<EndpointConfigDoc> {
     let wire: DocWire = match format {
-        ConfigFormat::Json => serde_json::from_str(text)?,
         ConfigFormat::Yaml => serde_norway::from_str(text)?,
         ConfigFormat::Xml => quick_xml::de::from_str(text)?,
     };
@@ -547,8 +562,11 @@ pub fn from_xml_str(text: &str) -> EndpointConfigResult<EndpointConfigDoc> {
 /// see [`ConfigFormat::from_path`].
 pub fn load<P: AsRef<Path>>(path: P) -> EndpointConfigResult<EndpointConfigDoc> {
     let path = path.as_ref();
+    let format = ConfigFormat::from_path(path).ok_or_else(|| {
+        EndpointConfigError::UnknownFormat(path.display().to_string())
+    })?;
     let text = read_to_string(path)?;
-    from_str(&text, ConfigFormat::from_path(path))
+    from_str(&text, format)
 }
 
 fn read_to_string(path: &Path) -> EndpointConfigResult<String> {
@@ -908,7 +926,7 @@ fn validate(doc: DocWire) -> EndpointConfigResult<EndpointConfigDoc> {
     let mut seen: BTreeMap<String, ()> = BTreeMap::new();
     let mut used: BTreeSet<String> = BTreeSet::new();
 
-    for e in doc.endpoints.0 {
+    for (sequence, e) in doc.endpoints.0.into_iter().enumerate() {
         if seen.contains_key(&e.name) {
             return Err(EndpointConfigError::DuplicateEndpoint(e.name));
         }
@@ -920,7 +938,7 @@ fn validate(doc: DocWire) -> EndpointConfigResult<EndpointConfigDoc> {
             })?;
         seen.insert(e.name.clone(), ());
         used.insert(e.group.clone());
-        endpoints.push(validate_endpoint(e, &groups[idx])?);
+        endpoints.push(validate_endpoint(e, &groups[idx], sequence)?);
     }
 
     // A group no endpoint is in has no effect on the configuration, which is
@@ -1047,7 +1065,11 @@ enum LocationShape {
     I2cBusAndAddress,
 }
 
-fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigResult<EndpointDef> {
+fn validate_endpoint(
+    e: EndpointWire,
+    group: &EndpointGroup,
+    sequence: usize,
+) -> EndpointConfigResult<EndpointDef> {
     let kind = group.kind.type_name();
 
     let dh_id = match e.dh_id.as_ref() {
@@ -1149,6 +1171,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
             location: EndpointLocation::I2c { bus, address },
             dh_id,
             oc,
+            sequence,
         });
     }
 
@@ -1218,6 +1241,7 @@ fn validate_endpoint(e: EndpointWire, group: &EndpointGroup) -> EndpointConfigRe
         location,
         dh_id,
         oc,
+        sequence,
     })
 }
 
@@ -1498,6 +1522,59 @@ endpoints:
     <endpoint name="pay3" group="payload_udp" address="192.168.1.11" port="5001"/>
   </endpoints>
 </endpoint-configuration>"#;
+
+    /// An endpoint knows which one of the file it is, in every format.
+    ///
+    /// The same number a payload carries, for the same reason: the order is
+    /// configuration, since ids will be assigned in it, and the digest walks
+    /// the endpoints by it.
+    #[test]
+    fn an_endpoint_knows_which_one_of_the_file_it_is() {
+        let yaml = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+                    endpoints:\n  \
+                    - name: first\n    group: g\n    address: localhost\n    port: 5000\n  \
+                    - name: second\n    group: g\n    address: localhost\n    port: 5001\n  \
+                    - name: third\n    group: g\n    address: localhost\n    port: 5002\n";
+        let xml = "<endpoint-configuration>\
+                   <endpoint-groups><group name=\"g\" type=\"network\" protocol=\"udp\"/>\
+                   </endpoint-groups><endpoints>\
+                   <endpoint name=\"first\" group=\"g\" address=\"localhost\" port=\"5000\"/>\
+                   <endpoint name=\"second\" group=\"g\" address=\"localhost\" port=\"5001\"/>\
+                   <endpoint name=\"third\" group=\"g\" address=\"localhost\" port=\"5002\"/>\
+                   </endpoints></endpoint-configuration>";
+
+        for (what, doc) in [
+            ("yaml", from_yaml_str(yaml).expect("the YAML parses")),
+            ("xml", from_xml_str(xml).expect("the XML parses")),
+        ] {
+            let order: Vec<(&str, usize)> = doc
+                .endpoints
+                .iter()
+                .map(|e| (e.name.as_str(), e.sequence))
+                .collect();
+            assert_eq!(
+                order,
+                vec![("first", 0), ("second", 1), ("third", 2)],
+                "{what}: {order:?}"
+            );
+        }
+    }
+
+    /// The file order survives the list being reordered, which is what
+    /// carrying the number is for.
+    #[test]
+    fn an_endpoints_place_in_the_file_survives_a_reordered_list() {
+        let yaml = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+                    endpoints:\n  \
+                    - name: first\n    group: g\n    address: localhost\n    port: 5000\n  \
+                    - name: second\n    group: g\n    address: localhost\n    port: 5001\n";
+        let mut doc = from_yaml_str(yaml).expect("it parses");
+
+        doc.endpoints.reverse();
+        assert_eq!(doc.endpoints[0].name, "second");
+        assert_eq!(doc.endpoints[0].sequence, 1, "it forgot where it stood");
+        assert_eq!(doc.endpoints[1].sequence, 0);
+    }
 
     #[test]
     fn yaml_and_xml_produce_the_same_structures() {
@@ -2215,18 +2292,12 @@ endpoints:
                                    address="10.0.0.1" port="5000"/>
                        </endpoints>
                      </endpoint-configuration>"#;
-        let json = r#"{"endpoint_groups":[{"name":"g","type":"network","protocol":"udp",
-                       "packet_size":8}],
-                       "endpoints":[{"name":"e","group":"g","dh_id":42,
-                       "address":"10.0.0.1","port":5000}]}"#;
-
         // 0x2a is 42: the id accepts hex as every other number in this format
         // does.
         for (label, doc) in [
             ("yaml", from_yaml_str(yaml).unwrap()),
             ("hyphenated", from_yaml_str(&hyphen).unwrap()),
             ("xml", from_xml_str(xml).unwrap()),
-            ("json", from_str(json, ConfigFormat::Json).unwrap()),
         ] {
             assert_eq!(doc.endpoints[0].dh_id, Some(42), "{label}");
             assert_eq!(doc.to_dh_configs().unwrap()[0].dh_id, DHId(42), "{label}");

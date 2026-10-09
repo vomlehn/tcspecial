@@ -16,7 +16,7 @@ RUST = .
 # One variable rather than two, because the two files of a set are named for
 # each other: PAYLOAD_FILE is the stem, `$(PAYLOAD_FILE).yaml` the payload
 # file -- which may be written as a payload configuration or as an endpoint
-# configuration, and in YAML, XML or JSON -- and `$(PAYLOAD_FILE)sim.yaml` the
+# configuration, and in YAML or XML -- and `$(PAYLOAD_FILE)sim.yaml` the
 # simulator settings beside it. So:
 #   make run     PAYLOAD_FILE=tests/manual/tcspecial2
 #   make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
@@ -59,7 +59,6 @@ help:
 	@echo "  make run         - Run tcspecial"
 	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and tcssim"
 	@echo "  make runmocx     - As runmocy, on the XML payload configuration"
-	@echo "  make runmocj     - As runmocy, on the JSON payload configuration"
 	@echo "  make runsim      - Run tcssim alone"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
@@ -122,10 +121,10 @@ run:
 
 # Running tcsmoc on one spelling of its payload configuration file.
 #
-# $(1) is that spelling -- yaml, json or xml. A payload configuration may be
-# written in any of the three and they describe the same payloads, so which one
-# a run reads is a choice, and a run that always read the YAML could not
-# exercise the other two at all.
+# $(1) is that spelling -- yaml or xml. A payload configuration may be written
+# in either and they describe the same payloads, so which one a run reads is a
+# choice, and a run that always read the YAML could not exercise the other at
+# all.
 #
 # Only the suffix is given here. The stem comes from PAYLOAD_FILE, so a payload
 # set is still chosen the way every other target chooses it, and the simulator
@@ -150,10 +149,6 @@ runmocy:
 .PHONY: runmocx
 runmocx:
 	$(call runmoc_on,xml)
-
-.PHONY: runmocj
-runmocj:
-	$(call runmoc_on,json)
 
 # Run the simulation application
 .PHONY: runsim

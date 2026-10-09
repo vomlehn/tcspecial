@@ -16,9 +16,9 @@ Introduction
 
 Configuration File Formats
 ==========================
-A configuration file may be written in JSON, YAML, or XML. All three describe
-the same settings and are read into the same values, so the choice is one of
-local preference and tooling rather than of capability.
+A configuration file may be written in YAML or XML. Both describe the same
+settings and are read into the same values, so the choice is one of local
+preference and tooling rather than of capability.
 
 The format is taken from the file's extension:
 
@@ -26,16 +26,16 @@ The format is taken from the file's extension:
 
    .yaml, .yml     YAML
    .xml            XML
-   anything else   JSON
+   anything else   refused
 
-JSON is the fallback, so a file with no extension, or with an unfamiliar one,
-is read as JSON.
+A file whose extension is none of those is refused, naming the file and what a
+configuration file is called. JSON was read as well, and was what a file with
+no extension or an unfamiliar one was assumed to be, which made a misspelled
+extension not an error but a file parsed as the wrong language. Nothing was
+written in it that was not also written in YAML.
 
-Two differences are worth knowing when moving a file between the formats.
-JSON has no comments, so remarks in a YAML or XML file have nowhere to go in
-JSON. JSON also has no hexadecimal numbers, so a value such as an
-I\ :superscript:`2`\ C address is written there as the string ``"0x48"``
-rather than as ``0x48``; YAML and XML accept either spelling.
+(The command link carries JSON between the ground and the spacecraft. That is
+not a configuration file and is unaffected.)
 
 Which Files There Are
 =====================
@@ -184,7 +184,7 @@ format hands the same string over whichever way it was written, so a quoted
 An escape C does not have is refused rather than passed through, and a trigger
 of no bytes at all is refused: a payload that answers requests has to be asked
 something. Writing the escapes yourself is also how an XML payload file states
-a trigger that a YAML or JSON one states with the format's own escapes.
+a trigger that a YAML one states with the format's own escapes.
 
 .. code-block:: yaml
 
@@ -367,15 +367,14 @@ The shipped payload sets
 Each is a pair: the payload file and the simulator file beside it, named for
 it. A set added by that convention needs no change anywhere to be run.
 
-Each payload file is shipped in all three formats -- ``tcspecial2.yaml``,
-``tcspecial2.xml`` and ``tcspecial2.json`` are one set written three ways, and
-a test holds the three to describing the same data handlers. The YAML is the
-one to read: it carries the comments, which JSON has no way to hold. Which
-spelling a run reads is the last letter of the MOC's target, ``runmocy`` /
-``runmocx`` / ``runmocj``; every other target takes the file named in
-``PAYLOAD_FILE``. The simulator files are YAML alone: nothing asked for them
-in three spellings, and the pairing convention names them from the payload
-file's stem.
+Each payload file is shipped in both formats -- ``tcspecial2.yaml`` and
+``tcspecial2.xml`` are one set written two ways, and a test holds the two to
+describing the same data handlers. The YAML is the one to read: it carries the
+comments. Which spelling a run reads is the last letter of the MOC's target,
+``runmocy`` or ``runmocx``; every other target takes the file named in
+``PAYLOAD_FILE``. The simulator files are YAML alone: nothing asked for them in
+both spellings, and the pairing convention names them from the payload file's
+stem.
 
 ``tcspecial1.yaml``
   Four payloads of three kinds, which is what exercises the panels and the
@@ -800,9 +799,9 @@ Everything at once
    $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial4
 
 The last letter is the spelling of the payload configuration file it reads:
-``runmocy`` the YAML, ``runmocx`` the XML, ``runmocj`` the JSON. All three take
-the same ``PAYLOAD_FILE``, and add the suffix themselves, so the three
-are one payload set read three ways rather than three sets. The simulator file
+``runmocy`` the YAML and ``runmocx`` the XML. Both take the same
+``PAYLOAD_FILE``, and add the suffix themselves, so the two are one payload set
+read two ways rather than two sets. The simulator file
 is not spelled by it: only tcssim reads that one, and tcsmoc merely passes it
 on.
 
@@ -994,11 +993,13 @@ so the two are there to read even when the link never comes up:
 
 and ``Last Response`` says whether the two agree. They are the same payload
 set if the digests match: the digest is of what a file says rather than of its
-bytes, so the YAML, XML and JSON of one set digest alike, and so do two files
+bytes, so the YAML and the XML of one set digest alike, and so do two files
 differing only in comments, spacing, the order of their sections or the order
 of one payload's attributes. The order of the payloads does count -- ids follow
 it -- so each payload is given a sequence number as the file is read, the
 digest takes them in that order, and a file may not state a number of its own.
+An endpoint configuration's endpoints are numbered the same way, a set being
+writable in either language.
 
 A difference means the two ends are not serving the same set. The usual cause
 is a tcspecial left running from an earlier one, which tcsmoc attaches to

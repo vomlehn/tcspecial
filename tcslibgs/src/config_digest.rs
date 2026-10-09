@@ -10,9 +10,9 @@
 //! the same two from the other end.
 //!
 //! The digest is of what a file *says*, not of its bytes. A payload set is
-//! shipped in YAML, XML and JSON, and the three are one configuration written
-//! three ways: two ends reading different spellings of one set have read the
-//! same set and must agree. Comments, indentation, the order of the sections
+//! shipped in YAML and XML, and the two are one configuration written two
+//! ways: two ends reading different spellings of one set have read the same
+//! set and must agree. Comments, indentation, the order of the sections
 //! and the order of a payload's attributes are all spelling too.
 
 use std::path::Path;
@@ -87,7 +87,7 @@ const END_OF_ENTRY: u8 = 0x1d;
 pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
     let path = path.as_ref();
     let text = std::fs::read_to_string(path)?;
-    digest_of_text(&text, ConfigFormat::from_path(path))
+    digest_of_text(&text, ConfigFormat::of_file(path)?)
 }
 
 /// The digest of a configuration already in hand.
@@ -100,7 +100,7 @@ pub fn digest_of_text(text: &str, format: ConfigFormat) -> TcsResult<ConfigDiges
     match handler_source_of_text(text, format)? {
         HandlerSource::Payload => digest_of_payload_config(&format.parse(text)?),
         HandlerSource::Endpoints => {
-            digest_of_value(&endpoint_config::from_str(text, format)?)
+            digest_of_endpoint_config(&endpoint_config::from_str(text, format)?)
         }
     }
 }
@@ -119,6 +119,21 @@ pub fn digest_of_payload_config(config: &PayloadConfig) -> TcsResult<ConfigDiges
     // will be assigned in it.
     let mut ordered = config.clone();
     ordered.payloads.sort_by_key(|payload| payload.sequence);
+    digest_of_value(&ordered)
+}
+
+/// The digest of an endpoint configuration already parsed.
+///
+/// The endpoints are put in the order the file gave them, by the sequence
+/// number each was given as the document was built, for the reason
+/// [`digest_of_payload_config`] puts the payloads in theirs: the order is
+/// configuration, since ids will be assigned in it, and two ends must agree
+/// about it whatever either has since done with its own list.
+pub fn digest_of_endpoint_config(
+    doc: &endpoint_config::EndpointConfigDoc,
+) -> TcsResult<ConfigDigest> {
+    let mut ordered = doc.clone();
+    ordered.endpoints.sort_by_key(|endpoint| endpoint.sequence);
     digest_of_value(&ordered)
 }
 
@@ -351,6 +366,42 @@ payloads:
     packet_size: 1
 ";
         assert_ne!(digest(swapped), digest(YAML));
+    }
+
+    /// An endpoint configuration digests by sequence number too.
+    ///
+    /// The endpoint language is the other one a payload set may be written in
+    /// -- set 4 is -- so the rule has to hold there as well: a list in some
+    /// other order digests the same, and a file in some other order does not.
+    #[test]
+    fn an_endpoint_configuration_digests_by_sequence_number() {
+        let yaml = "general:\n  version: \"1.0\"\n\
+                    endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+                    endpoints:\n  \
+                    - name: first\n    group: g\n    address: localhost\n    port: 5000\n  \
+                    - name: second\n    group: g\n    address: localhost\n    port: 5001\n";
+        let swapped = "general:\n  version: \"1.0\"\n\
+                       endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
+                       endpoints:\n  \
+                       - name: second\n    group: g\n    address: localhost\n    port: 5001\n  \
+                       - name: first\n    group: g\n    address: localhost\n    port: 5000\n";
+
+        let in_file_order = digest_of_text(yaml, ConfigFormat::Yaml).expect("it digests");
+
+        // A list in another order, as code might leave it.
+        let mut doc = endpoint_config::from_str(yaml, ConfigFormat::Yaml).expect("it parses");
+        doc.endpoints.reverse();
+        assert_eq!(
+            digest_of_endpoint_config(&doc).expect("it digests"),
+            in_file_order,
+            "a list in another order digested differently"
+        );
+
+        // And a file in another order, which is a different configuration.
+        assert_ne!(
+            digest_of_text(swapped, ConfigFormat::Yaml).expect("it digests"),
+            in_file_order
+        );
     }
 
     /// A value that changed changes the digest, which is the whole job.

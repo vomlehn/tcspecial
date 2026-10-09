@@ -386,14 +386,15 @@ endpoints:
     fn a_payload_sets_tcspecial_section_is_read() {
         let stated = "version: \"1.0\"\ndescription: a set\n\
                       tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  protocol: udp\n  \
-                      beacon_interval_ms: 5000\n  beacon_address: 127.0.0.1:7550\n\
+                      beacon_interval_ms: 5000\n  beacon_address: 239.255.0.7:7550\n  beacon_interface: 127.0.0.1\n\
                       payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
                       path: /dev/null\n    packet_size: 1\n";
         let file = write_temp(".yaml", stated);
         let section = load_tcspecial_section(file.path())
             .expect("it loads")
             .expect("the set states a section");
-        assert_eq!(section.beacon_address, "127.0.0.1:7550");
+        assert_eq!(section.beacon_address, "239.255.0.7:7550");
+        assert_eq!(section.beacon_interface, "127.0.0.1");
 
         // A payload set with no section at all.
         let bare = "version: \"1.0\"\ndescription: a set\n\
@@ -421,7 +422,8 @@ endpoints:
     fn a_tcspecial_section_states_both_beacon_attributes() {
         let whole = "version: \"1.0\"\ndescription: a set\n\
                      tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  protocol: udp\n  \
-                     beacon_interval_ms: 5000\n  beacon_address: 0.0.0.0:5550\n\
+                     beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
+                     beacon_interface: 127.0.0.1\n\
                      payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
                      path: /dev/null\n    packet_size: 1\n";
         let file = write_temp(".yaml", whole);
@@ -429,9 +431,16 @@ endpoints:
             .expect("it loads")
             .expect("a section");
         assert_eq!(section.beacon_interval_ms, 5000);
-        assert_eq!(section.beacon_address, "0.0.0.0:5550");
+        assert_eq!(section.beacon_address, "239.255.0.1:5550");
+        assert_eq!(section.beacon_interface, "127.0.0.1");
 
-        for missing in ["  beacon_interval_ms: 5000\n", "  beacon_address: 0.0.0.0:5550\n"] {
+        // Each of the three in turn: a section that leaves any of them out is
+        // a section that has not said where its beacons go.
+        for missing in [
+            "  beacon_interval_ms: 5000\n",
+            "  beacon_address: 239.255.0.1:5550\n",
+            "  beacon_interface: 127.0.0.1\n",
+        ] {
             let without = whole.replace(missing, "");
             assert_ne!(without, whole, "the test removed nothing");
             let file = write_temp(".yaml", &without);

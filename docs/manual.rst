@@ -45,9 +45,9 @@ Four kinds of configuration file, each read by the programs that need it.
     The command interpreter's own settings: the address it listens on, where
     beacons go and how often, and where the telemetry log goes. A payload
     set's ``tcspecial`` section states the beacon settings for that set and
-    wins over these. Read by tcspecial at startup, from the path
-    ``TCSPECIAL_CONFIG_PATH`` names when that is set. Nothing about the
-    payloads is in it.
+    wins over these. Read at startup by tcspecial, and by tcsmoc for the
+    beacon settings, both from the path ``TCSPECIAL_CONFIG_PATH`` names when
+    that is set. Nothing about the payloads is in it.
 
 a payload configuration file
     Which data handlers exist, how tcspecial reaches each one, and how large
@@ -869,29 +869,44 @@ commands is in ``tcspecial.yaml``:
    address: "0.0.0.0"
    port: 4000
 
-Where it sends beacons, and how often, belong to the payload set -- a set's
-ground station being what listens for its beacons -- and are stated in the
-``tcspecial`` section of the set's own payload configuration file:
+Where it sends beacons, on what interface, and how often belong to the payload
+set -- a set's ground station being what listens for its beacons -- and are
+stated in the ``tcspecial`` section of the set's own payload configuration
+file:
 
 .. code-block:: yaml
 
    tcspecial:
      beacon_interval_ms: 5000
-     beacon_address: "0.0.0.0:5550"
+     beacon_address: "239.255.0.1:5550"
+     beacon_interface: "127.0.0.1"
 
-Both are required of every command interpreter configuration, with no
+All three are required of every command interpreter configuration, with no
 defaults: beacons are how the ground knows the spacecraft is alive, and a
 configuration that has not been asked where to send them has not answered.
 ``tcspecial.yaml`` states them too, and a set's section wins over it; the
 file's are what place a set with no section, which is what a set written in the
-endpoint configuration language is. ``0.0.0.0:5550`` is where tcsmoc listens,
-which is why every shipped configuration states it.
+endpoint configuration language is.
 
-Moving the beacon address moves only where tcspecial sends: tcsmoc does not
-read either file, so its beacon indicator would then say nothing is arriving,
-which would be true of the address it is listening on. The same goes for the
-command address -- the two ends agree about it by reading the same default, so
-a file that moves it leaves the MOC sending where nothing is bound, and no
+The address is a **multicast group** -- in ``224.0.0.0/4``, and
+``239.0.0.0/8`` for one of local scope, which is what a mission network wants.
+Any number of ground stations join it, which a unicast beacon cannot offer: a
+port can be bound once, so a second listener could not even start. An address
+that is not a group is refused.
+
+``beacon_interface`` is the address of a local interface, and both ends must
+name the same one -- which they do by reading the same file. It cannot be left
+out: a sender that does not say sends out the default route and a listener
+that does not say joins on the default route, and on a host where those differ
+-- one with a wireless interface and a tunnel, say -- not one beacon arrives
+and nothing says why. ``127.0.0.1`` is what the shipped files state, both
+programs being run on one machine; a real ground link names the interface
+facing it.
+
+Tcsmoc reads the beacon group and interface from the same two files, the same
+way, so moving a beacon moves both ends of it. The command address is the one
+that can still drift: the two ends agree about it by reading the same default,
+so a file that moves it leaves the MOC sending where nothing is bound, and no
 error on either end reports that.
 
 Tcspecial says both as it starts, on the terminal and whatever ``RUST_LOG`` is
@@ -1052,9 +1067,10 @@ without anyone asking.
 Beaconing
 ^^^^^^^^^
 TCSpecial sends a beacon at the interval its configuration states, to the
-address the payload set's ``tcspecial`` section names, or ``tcspecial.yaml``'s
-for a set with no section; tcsmoc listens on ``0.0.0.0:5550``. Tcsmoc displays
-the following beacon colors:
+multicast group the payload set's ``tcspecial`` section names, or
+``tcspecial.yaml``'s for a set with no section. Tcsmoc joins that same group,
+on that same interface, having read the same files. Tcsmoc displays the
+following beacon colors:
 
 steady grey
   Either no beacon message has been received yet or the system time has

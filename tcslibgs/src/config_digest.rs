@@ -208,7 +208,8 @@ tcspecial:
   port: 4000
   protocol: udp
   beacon_interval_ms: 5000
-  beacon_address: 0.0.0.0:5550
+  beacon_address: 239.255.0.1:5550
+  beacon_interface: 127.0.0.1
 payloads:
   - dh_id: 0
     name: DH0
@@ -274,7 +275,8 @@ tcspecial:
   port: 4000
   protocol: udp
   beacon_interval_ms: 5000
-  beacon_address: 0.0.0.0:5550
+  beacon_address: 239.255.0.1:5550
+  beacon_interface: 127.0.0.1
 version: \"1.0\"
 ";
         assert_eq!(digest(moved), digest(YAML));
@@ -303,7 +305,8 @@ tcspecial:
   port: 4000
   protocol: udp
   beacon_interval_ms: 5000
-  beacon_address: 0.0.0.0:5550
+  beacon_address: 239.255.0.1:5550
+  beacon_interface: 127.0.0.1
 payloads:
   - dh_id: 1
     name: DH1
@@ -356,7 +359,8 @@ tcspecial:
   port: 4000
   protocol: udp
   beacon_interval_ms: 5000
-  beacon_address: 0.0.0.0:5550
+  beacon_address: 239.255.0.1:5550
+  beacon_interface: 127.0.0.1
 payloads:
   - dh_id: 1
     name: DH1

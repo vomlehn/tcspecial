@@ -24,6 +24,8 @@ pub struct BeaconSend {
     pair:       ArcCondPair<SystemTime>,
     interval:   Arc<Mutex<Duration>>,
     dest_addr:  std::net::SocketAddr,
+    /// The local interface beacons go out on; see `beacon_send`.
+    interface:  std::net::Ipv4Addr,
     /// The telemetry log every beacon is recorded in, shared with the
     /// command interpreter so that one log holds all of the telemetry.
     log:        TelemetryLog,
@@ -33,6 +35,7 @@ impl BeaconSend {
     pub fn new(
         interval: Duration,
         dest_addr: std::net::SocketAddr,
+        interface: std::net::Ipv4Addr,
         log: TelemetryLog,
     ) -> Option<BeaconSend> {
         if interval == Duration::from_secs(0) {
@@ -49,6 +52,7 @@ impl BeaconSend {
             pair,
             interval: Arc::new(Mutex::new(interval)),
             dest_addr,
+            interface,
             log,
         };
 
@@ -63,10 +67,20 @@ impl BeaconSend {
 
     // FIXME: check result type
     fn beacon_send(&self) -> TcsResult<()> {
-        // Bind to a local address
-//        let socket = UdpSocket::bind(BEACON_NETADDR)?; // 0 = let OS pick a port
-        let socket = UdpSocket::bind("0.0.0.0:0"); // 0 = let OS pick a port
-let socket = socket?;
+        // Bound to the interface the beacon is to go out on, not to every
+        // interface. A multicast datagram from a socket bound to 0.0.0.0 goes
+        // out the default route, which on a host with a second interface or a
+        // tunnel is not the interface the ground station joined the group on
+        // -- and then not one beacon arrives, with nothing anywhere to say so.
+        // Binding the interface's own address is how std selects it; there is
+        // no set_multicast_if.
+        let socket = UdpSocket::bind((self.interface, 0))?;
+
+        // Local scope. A beacon is for the ground station on this network,
+        // and a default of 1 is what keeps it from being forwarded off it;
+        // said rather than assumed because it is the one option that decides
+        // how far the thing travels.
+        socket.set_multicast_ttl_v4(1)?;
 
 // FIXME: add check for error
         let _ = self.send_beacon(&socket, &self.dest_addr);

@@ -12,13 +12,13 @@ use std::thread;
 use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::config::{load_dh_configs, payload_path_from_args};
+use tcslibgs::config::{load_dh_configs, load_tcspecial_section, payload_path_from_args};
 use tcslibgs::config_digest::{digest_of_file, ConfigDigest, ConfigVersion};
 use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
     ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
 };
-use tcslibgs::BEACON_ADDRESS;
+use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, NOT_CONNECTED};
@@ -797,16 +797,33 @@ fn main() {
     ui.set_ci_address(SharedString::from(DEFAULT_CI_ADDRESS));
 
     // Start receiving beacon data
-    // Where the MOC listens for beacons. Every tcspecial configuration states
-    // where it sends them and this program reads none of those files, so a
-    // tcspecial told to send them elsewhere is a tcspecial whose beacons this
-    // will not see -- the indicator says nothing is arriving, which is true
-    // of this address.
-    let beacon_addr: std::net::SocketAddr = BEACON_ADDRESS
-        .parse()
-        .expect("the beacon address this listens on is an address");
+    // Where the MOC listens for beacons: the group and interface tcspecial
+    // sends them to, read out of the same two files tcspecial reads -- the
+    // command interpreter's own configuration, and the payload set's
+    // tcspecial section, which wins. Read rather than compiled in, because a
+    // listener that assumed an address would hear nothing the moment a
+    // mission moved the beacon, and say nothing about why.
+    //
+    // Loosely, as the simulator file is read: a MOC that cannot work out
+    // where the beacons are says so and runs without them, the indicator
+    // staying at "none arrived". Controlling payloads does not depend on it.
     let beacon_ui_weak = ui_weak.clone();
-    let _beacon_receive = BeaconReceive::new(beacon_ui_weak, beacon_addr, BEACON_INDICATOR.clone());
+    let _beacon_receive = match beacon_to_listen_for(&payload_path) {
+        Ok(beacon) => {
+            eprintln!(
+                "Listening for beacons on the group {} on interface {}",
+                beacon.group, beacon.interface
+            );
+            BeaconReceive::new(beacon_ui_weak, beacon, BEACON_INDICATOR.clone())
+        }
+        Err(e) => {
+            eprintln!("Not listening for beacons: {e}");
+            ui.set_last_response(SharedString::from(format!(
+                "Not listening for beacons: {e}"
+            )));
+            None
+        }
+    };
 
     handle_link_button(&ui, ui_weak.clone(), link.clone());
     handle_main_menu(&ui, ui_weak.clone(), link.clone());
@@ -1213,6 +1230,25 @@ fn poll_pass(
     gathered
 }
 
+/// Where this MOC should listen for beacons.
+///
+/// The same two configurations tcspecial resolves it from, in the same order:
+/// the payload set's `tcspecial` section if it has one, and the command
+/// interpreter's own file otherwise. Reading the same files is what makes the
+/// two ends name one group and one interface -- a listener with an address of
+/// its own would go deaf the moment a mission moved the beacon, and the only
+/// symptom would be an indicator saying nothing had arrived.
+fn beacon_to_listen_for(payload_path: &str) -> Result<Beacon, String> {
+    let config_path = tcspecial_config_path();
+    let config = load_tcspecial_config(&config_path)
+        .map_err(|e| format!("{config_path} could not be read: {e}"))?;
+
+    let section = load_tcspecial_section(payload_path)
+        .map_err(|e| format!("{payload_path} could not be read: {e}"))?;
+
+    beacon(&config, section.as_ref())
+}
+
 /// Send what this MOC read, and hear what the spacecraft read.
 ///
 /// The two ends each read a payload set -- the MOC to build its panels,
@@ -1480,6 +1516,7 @@ mod tests {
     use tcslibgs::{EndpointConfig, NetworkProtocol};
     use std::time::Instant;
     use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
+    use tcspecial::config::DEFAULT_TCSPECIAL_CONFIG_PATH;
     use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig, Timestamp};
 
     /// Arguments as the program really receives them, the program's own name
@@ -2027,6 +2064,38 @@ mod tests {
         without.oc = None;
         let said = triggered_startup(&without, STOPPED_STATUS).expect("a triggered payload");
         assert!(said.contains("OC none"), "a missing OC is not said: {said}");
+    }
+
+    /// The MOC listens where tcspecial sends, by reading the same files.
+    ///
+    /// Checked against the shipped configurations rather than a contrived
+    /// pair, because what matters is that the two programs resolve one group
+    /// and one interface out of the files as shipped. A listener that assumed
+    /// an address would go deaf the moment a mission moved the beacon, and
+    /// the only symptom would be an indicator saying nothing had arrived.
+    #[test]
+    fn the_moc_listens_where_tcspecial_sends() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let payload_path = root.join(DEFAULT_PAYLOAD_CONFIG_PATH);
+        let payload_path = payload_path.to_str().expect("a path");
+
+        // The MOC's answer, from the payload set and the command
+        // interpreter's own file.
+        let config_path = root.join(DEFAULT_TCSPECIAL_CONFIG_PATH);
+        let config = load_tcspecial_config(&config_path)
+            .unwrap_or_else(|e| panic!("{} failed to load: {e}", config_path.display()));
+        let section = load_tcspecial_section(payload_path)
+            .unwrap_or_else(|e| panic!("{payload_path} failed to load: {e}"));
+        let mine = beacon(&config, section.as_ref()).expect("it resolves");
+
+        // What the set itself says, which is what tcspecial will resolve.
+        let said = section.expect("the shipped set has a tcspecial section");
+        assert_eq!(mine.group.to_string(), said.beacon_address);
+        assert_eq!(mine.interface.to_string(), said.beacon_interface);
+
+        // And it is a group, which is what makes more than one ground station
+        // possible at all.
+        assert!(mine.group.ip().is_multicast(), "{} is not a group", mine.group);
     }
 
     /// The simulator file beside a payload file is found and read.

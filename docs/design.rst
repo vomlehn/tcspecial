@@ -3507,10 +3507,42 @@ Requirement
     configuration file.
 
 Requirement
-    Every command interpreter configuration states where beacons go and how
-    often: ``beacon_address`` and ``beacon_interval_ms``. Neither has a
-    default and neither may be left out, in the command interpreter's own file
-    or in a payload set's ``tcspecial`` section.
+    A beacon is sent to a multicast group. ``beacon_address`` is a group
+    address -- in ``224.0.0.0/4``, and ``239.0.0.0/8`` for one of local scope
+    -- and an address that is not is refused.
+
+A beacon is an announcement to whoever is listening, and the spacecraft does
+not know how many ground stations there are or where they are. A unicast
+beacon can reach exactly one listener, chosen in advance by whoever wrote the
+configuration, because a port can be bound once: a second station cannot even
+listen. Multicast is the primitive for one-to-many with no knowledge of the
+many, it is a UDP-only facility, and a beacon was UDP already -- nothing about
+it wants an acknowledgement.
+
+Requirement
+    Both ends name the local interface the beacon goes out on and is joined
+    on: ``beacon_interface``, the address of an interface on the host.
+
+Neither end can be left to choose. A sender bound to every interface sends a
+multicast datagram out the default route; a listener that joins with
+``INADDR_ANY`` joins on the default route; and on a host where those differ --
+one with a second interface, or a tunnel -- not one beacon arrives, with
+nothing anywhere to say so. Measured on a development machine with three
+interfaces: of the four combinations of naming and not naming, only naming the
+same interface at both ends delivers anything.
+
+There is no ``set_multicast_if`` in the standard library, so the sender selects
+the interface by binding that interface's address rather than every address.
+The TTL is set to 1, which keeps a beacon on the network it was sent on; it is
+stated rather than left to the default because it is the one option that
+decides how far the thing travels.
+
+Requirement
+    Every command interpreter configuration states where beacons go, on what
+    interface, and how often: ``beacon_address``, ``beacon_interface`` and
+    ``beacon_interval_ms``. None has a default and none may be left out, in
+    the command interpreter's own file or in a payload set's ``tcspecial``
+    section.
 
 Beacons are how the ground knows the spacecraft is alive. A configuration that
 has not been asked where to send them has not answered, and a default is a way
@@ -3525,8 +3557,21 @@ Requirement
     set written in the endpoint language has no way to have.
 
 Requirement
-    A ``beacon_address`` that is not an address and a port is refused where it
-    is read, naming the attribute.
+    Tcsmoc reads the beacon group and interface from the same two
+    configurations, resolved the same way. The two programs call one function
+    over the same files, so they cannot name different ones.
+
+That is what makes the earlier drift impossible rather than merely unlikely.
+The MOC used to bind a compiled-in address and read neither file, so a mission
+that moved the beacon moved it for tcspecial alone and the MOC said only that
+nothing was arriving. A MOC that cannot work out where to listen says so and
+runs without beacons, as it does without a simulator file: controlling payloads
+does not depend on it.
+
+Requirement
+    A ``beacon_address`` that is not an address and a port, or not a multicast
+    group, is refused where it is read, naming the attribute. So is a
+    ``beacon_interface`` that is not an address.
 
 Refused there rather than where a beacon is sent, because a beacon goes out on
 a timer with nobody to report to: the address used to be a constant parsed with

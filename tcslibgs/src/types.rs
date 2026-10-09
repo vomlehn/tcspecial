@@ -709,6 +709,65 @@ fn link_of(
     stated: &DHConfigJson,
     group: Option<&DHGroupJson>,
 ) -> Result<EndpointConfig, String> {
+    let kind_params = link_params_of(name, kind, stated, group)?;
+
+    // Where it is. A line and a peripheral are a device node; a device on a
+    // bus is the bus and the address on it, which is what tells one device on
+    // a bus from another.
+    let path = stated
+        .path
+        .clone()
+        .or_else(|| group.and_then(|g| g.path.clone()))
+        .ok_or_else(|| {
+            format!(
+                "payload \"{name}\" is {} {} payload, so it needs the device it is \
+                 reached through",
+                kind.article(),
+                kind.spelling()
+            )
+        })?;
+
+    let location = match kind {
+        DHType::I2c => {
+            let address = stated
+                .address
+                .clone()
+                .or_else(|| group.and_then(|g| g.address.clone()))
+                .ok_or_else(|| {
+                    format!(
+                        "payload \"{name}\" is on an I2C bus, so it needs an address on it"
+                    )
+                })?;
+            let ten_bit = stated
+                .ten_bit
+                .clone()
+                .or_else(|| group.and_then(|g| g.ten_bit.clone()))
+                .map(|t| t.as_str() == "true")
+                .unwrap_or(false);
+            crate::endpoint_config::EndpointLocation::I2c {
+                bus: path,
+                address: crate::endpoint_config_i2c::parse_i2c_address(name, &address, ten_bit)
+                    .map_err(|e| format!("{e}"))?,
+            }
+        }
+        _ => crate::endpoint_config::EndpointLocation::Path { path },
+    };
+
+    crate::endpoint_config::endpoint_of(name, &location, &kind_params)
+}
+
+/// What kind of link a payload is on, by the rules for that kind.
+///
+/// Split from [`link_of`] because the rules settle more than reaches a data
+/// handler: the stream rule says where one read ends, is checked here, and is
+/// then dropped -- no handler carries it, and none did when an endpoint
+/// configuration was what stated it. Tests of those rules reach them here.
+pub(crate) fn link_params_of(
+    name: &str,
+    kind: DHType,
+    stated: &DHConfigJson,
+    group: Option<&DHGroupJson>,
+) -> Result<crate::endpoint_config::GroupKind, String> {
     // Each attribute as the payload states it, or as the group it names does.
     // The same inheritance every other attribute of a payload gets.
     macro_rules! inherited {
@@ -738,7 +797,7 @@ fn link_of(
         timeout: inherited!(timeout),
         bus_speed: inherited!(bus_speed),
         max_speed: inherited!(max_speed),
-        mode: inherited!(spi_mode),
+        spi_mode: inherited!(spi_mode),
         bits_per_word: inherited!(bits_per_word),
         bit_order: inherited!(bit_order),
         cs_active: inherited!(cs_active),
@@ -750,13 +809,7 @@ fn link_of(
         }),
     };
 
-    let ten_bit = wire
-        .ten_bit
-        .as_ref()
-        .map(|t| t.as_str() == "true")
-        .unwrap_or(false);
-
-    let kind_params = match kind {
+    match kind {
         DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
         DHType::I2c => crate::endpoint_config_i2c::group_kind_of(name, wire),
         DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
@@ -767,34 +820,7 @@ fn link_of(
             ))
         }
     }
-    .map_err(|e| format!("{e}"))?;
-
-    // Where it is. A line and a peripheral are a device node; a device on a
-    // bus is the bus and the address on it, which is what tells one device on
-    // a bus from another.
-    let path = inherited!(path).ok_or_else(|| {
-        format!(
-            "payload \"{name}\" is a {} payload, so it needs the device it is reached \
-             through",
-            kind.spelling()
-        )
-    })?;
-
-    let location = match kind {
-        DHType::I2c => {
-            let address = inherited!(address).ok_or_else(|| {
-                format!("payload \"{name}\" is on an I2C bus, so it needs an address on it")
-            })?;
-            crate::endpoint_config::EndpointLocation::I2c {
-                bus: path,
-                address: crate::endpoint_config_i2c::parse_i2c_address(name, &address, ten_bit)
-                    .map_err(|e| format!("{e}"))?,
-            }
-        }
-        _ => crate::endpoint_config::EndpointLocation::Path { path },
-    };
-
-    crate::endpoint_config::endpoint_of(name, &location, &kind_params)
+    .map_err(|e| format!("{e}"))
 }
 
 /// Payload configuration file structure
@@ -1259,6 +1285,17 @@ impl DHConfigJson {
         let packet_size = self
             .packet_size
             .or_else(|| group.and_then(|g| g.packet_size));
+        // A packet of no bytes is not a packet, and the sizes and rates a
+        // link states refuse zero for the same reason. The rule used to be
+        // asked only of an endpoint configuration's groups, which is where a
+        // packet size was stated as text and checked as it was read; here it
+        // is a number already, so this is the only place to ask.
+        if packet_size == Some(0) {
+            return Err(format!(
+                "payload \"{}\": packet_size must be greater than zero",
+                self.name
+            ));
+        }
         let oc_address = self
             .oc_address
             .as_deref()
@@ -1609,6 +1646,8 @@ impl CommandStatus {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::ConfigFormat;
 
     /// A payload file that says nothing about the mode describes the kind of
@@ -2993,5 +3032,627 @@ payloads:
         );
 
         assert!(config.to_dh_configs().is_err());
+    }
+    // -- the rules of a link ------------------------------------------------
+    //
+    // A line, a bus and a peripheral each have rules of their own: which
+    // terms the kind takes, which it must be told, and which belong to
+    // another kind. The rules are stated once, in `endpoint_config` and its
+    // per-kind modules, and these are the tests of them. They used to read an
+    // endpoint configuration file, which was the only way to reach them;
+    // they read a payload file now, which is the only way to reach them.
+
+    /// One payload of the given kind, with `attributes` folded into it.
+    fn link(kind: &str, attributes: &str) -> Result<PayloadConfig, String> {
+        let text = format!(
+            "version: \"1.0\"\ndescription: one payload\npayloads:\n  \
+             - dh_id: 0\n    name: p\n    type: {kind}\n{attributes}"
+        );
+        ConfigFormat::Yaml
+            .parse::<PayloadConfig>(&text)
+            .map_err(|e| format!("{e}"))
+    }
+
+    /// What the rules settle for the one payload of such a file.
+    ///
+    /// A handler carries less than the rules check -- the stream rule says
+    /// where one read ends and reaches no handler, as it reached none when an
+    /// endpoint configuration was what stated it -- so a test of a rule asks
+    /// for the terms the rules settled rather than for the handler.
+    fn link_terms(kind: &str, attributes: &str) -> Result<crate::endpoint_config::GroupKind, String> {
+        let config = link(kind, attributes)?;
+        let payload = &config.payloads[0];
+        let group = payload.group.as_deref().and_then(|g| config.group(g));
+        link_params_of(
+            &payload.name,
+            DHType::from_spelling(kind).expect("a kind this knows"),
+            payload,
+            group,
+        )
+    }
+
+    /// The terms of a line, which is what the stream rule belongs to.
+    const A_LINE: &str = "    path: /dev/ttyS0\n    asynchronous: true\n    \
+                          datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n";
+
+    /// A line whose stream section is the given body.
+    fn line_stream(body: &str) -> Result<crate::endpoint_config::StreamParams, String> {
+        let terms = link_terms("serial", &format!("{A_LINE}    stream:\n{body}"))?;
+        Ok(terms.stream().expect("a line has a stream rule").clone())
+    }
+
+    #[test]
+    fn a_stream_rule_must_say_how_long_a_read_may_be() {
+        let said = line_stream("      timeout: 1s\n").expect_err("max_length is required");
+        assert!(said.contains("max_length"), "{said}");
+    }
+
+    #[test]
+    fn a_timeout_alone_ends_a_read() {
+        let stream = line_stream("      max_length: 64\n      timeout: 250ms\n").expect("accepted");
+        assert_eq!(stream.timeout, Some(Duration::from_millis(250)));
+        assert!(stream.terminators.is_empty());
+        assert!(!stream.is_fixed_length());
+    }
+
+    #[test]
+    fn terminators_alone_end_a_read() {
+        let stream = line_stream("      max_length: 64\n      terminators: [10]\n").expect("accepted");
+        assert_eq!(stream.timeout, None);
+        assert_eq!(stream.terminators, vec![10]);
+        assert!(!stream.is_fixed_length());
+    }
+
+    #[test]
+    fn a_timeout_and_terminators_may_both_end_a_read() {
+        let stream = line_stream("      max_length: 64\n      timeout: 1s\n      terminators: [0x04]\n")
+            .expect("accepted");
+        assert_eq!(stream.timeout, Some(Duration::from_secs(1)));
+        assert_eq!(stream.terminators, vec![0x04]);
+    }
+
+    #[test]
+    fn a_stream_rule_that_ends_no_read_is_refused() {
+        let said = line_stream("      max_length: 64\n").expect_err("nothing ends the read");
+        assert!(
+            said.contains("timeout") && said.contains("terminator"),
+            "{said}"
+        );
+    }
+
+    #[test]
+    fn timeout_none_is_how_a_fixed_length_read_is_asked_for() {
+        // The documented way to say "hand me max_length bytes at a time".
+        let stream = line_stream("      max_length: 12\n      timeout: none\n").expect("accepted");
+        assert_eq!(stream.max_length, 12);
+        assert_eq!(stream.timeout, None);
+        assert!(stream.terminators.is_empty());
+        assert!(stream.is_fixed_length());
+    }
+
+    #[test]
+    fn an_empty_terminator_list_is_refused() {
+        let said = line_stream("      max_length: 64\n      terminators: []\n")
+            .expect_err("an empty list is not a list");
+        assert!(said.contains("terminator list"), "{said}");
+    }
+
+    #[test]
+    fn a_timeouts_units_are_understood() {
+        for (text, want) in [
+            ("900us", Duration::from_micros(900)),
+            ("250ms", Duration::from_millis(250)),
+            ("3s", Duration::from_secs(3)),
+        ] {
+            let stream = line_stream(&format!("      max_length: 8\n      timeout: {text}\n"))
+                .unwrap_or_else(|e| panic!("{text}: {e}"));
+            assert_eq!(stream.timeout, Some(want), "for {text}");
+        }
+    }
+
+    #[test]
+    fn a_timeout_without_a_unit_is_refused() {
+        let said = line_stream("      max_length: 8\n      timeout: 250\n")
+            .expect_err("250 of what");
+        assert!(said.contains("no unit"), "{said}");
+    }
+
+    #[test]
+    fn a_zero_timeout_is_refused_in_favour_of_none() {
+        let said = line_stream("      max_length: 8\n      timeout: 0ms\n")
+            .expect_err("a read that times out at once reads nothing");
+        assert!(said.contains("say none"), "{said}");
+    }
+
+    #[test]
+    fn terminators_are_a_sequence_or_a_string_of_them() {
+        let sequence = line_stream("      max_length: 8\n      terminators: [0x0D, 0x0A]\n")
+            .expect("a sequence");
+        let text = line_stream("      max_length: 8\n      terminators: \"0x0D, 0x0A\"\n")
+            .expect("a string");
+        assert_eq!(sequence.terminators, vec![0x0D, 0x0A]);
+        assert_eq!(sequence.terminators, text.terminators);
+    }
+
+    #[test]
+    fn terminators_are_written_in_decimal_or_hexadecimal() {
+        let stream = line_stream("      max_length: 8\n      terminators: [13, 0x0A]\n")
+            .expect("either spelling");
+        assert_eq!(stream.terminators, vec![13, 10]);
+    }
+
+    #[test]
+    fn a_terminator_wider_than_a_byte_is_refused() {
+        let said = line_stream("      max_length: 8\n      terminators: [256]\n")
+            .expect_err("a line carries bytes");
+        assert!(said.contains("not a byte value"), "{said}");
+    }
+
+    /// A line says whether it is start-stop, and stop bits belong to only one
+    /// of the two.
+    ///
+    /// The two are read differently all the way down -- a start-stop line
+    /// delimits every byte for itself, a synchronous one carries its bits on
+    /// a clock -- so a line that did not say would be guessed at, and a line
+    /// read as the wrong one of the two is a line read as noise.
+    #[test]
+    fn a_line_says_whether_it_is_start_stop() {
+        let line = |extra: &str| {
+            link_terms(
+                "serial",
+                &format!(
+                    "    path: /dev/ttyS0\n    datarate: 9600\n    byte_length: 8\n    \
+                     stream:\n      max_length: 8\n      timeout: none\n{extra}"
+                ),
+            )
+        };
+        let serial = |extra: &str| match line(extra) {
+            Ok(crate::endpoint_config::GroupKind::Serial(serial)) => serial,
+            Ok(other) => panic!("{other:?}"),
+            Err(e) => panic!("{extra}: {e}"),
+        };
+
+        // Saying nothing is refused: this is not a thing to default.
+        let said = line("    stop_bits: 1\n").expect_err("which kind of line is it");
+        assert!(said.contains("no asynchronous"), "{said}");
+
+        // A start-stop line has stop bits, and must state them.
+        let start_stop = serial("    asynchronous: true\n    stop_bits: 2\n");
+        assert!(start_stop.asynchronous);
+        assert_eq!(start_stop.stop_bits, Some(crate::StopBits::Two));
+        let said = line("    asynchronous: true\n").expect_err("stop bits are required");
+        assert!(said.contains("stop_bits"), "{said}");
+
+        // A synchronous line has none, and stating them is refused: a stop
+        // bit is what start-stop framing uses in place of a clock, so a line
+        // whose bits are on a clock has nothing for one to delimit.
+        let synchronous = serial("    asynchronous: false\n    clock_type: external\n");
+        assert!(!synchronous.asynchronous);
+        assert_eq!(synchronous.stop_bits, None);
+
+        let said = line("    asynchronous: false\n    clock_type: external\n    stop_bits: 1\n")
+            .expect_err("a clocked line has no stop bits");
+        assert!(
+            said.contains("stop_bits") && said.contains("in place of a clock"),
+            "{said}"
+        );
+
+        // And it is true or false, not a word that looks like one.
+        let said = line("    asynchronous: sometimes\n").expect_err("it is one or the other");
+        assert!(said.contains("is not true or false"), "{said}");
+
+        // What each kind may say is the other half of the rule: a start-stop
+        // line shares no clock, so the settings of one are refused for it.
+        for stated in [
+            "    clock_type: external\n",
+            "    encoding: nrzi\n",
+            "    loopback: true\n",
+        ] {
+            let said = line(&format!("    asynchronous: true\n    stop_bits: 1\n{stated}"))
+                .expect_err("a start-stop line shares no clock");
+            let named = stated.trim().split(':').next().unwrap();
+            assert!(
+                said.contains(named) && said.contains("shares no clock"),
+                "{stated}: {said}"
+            );
+        }
+
+        // And a synchronous line takes each of them, with the clock required
+        // and the rest defaulted.
+        let clocked = serial(
+            "    asynchronous: false\n    clock_type: internal\n    encoding: nrzi\n    \
+             parity: crc32_pr1_ccitt\n    loopback: true\n",
+        );
+        assert_eq!(clocked.clock_type, Some(crate::ClockType::Internal));
+        assert!(clocked.clock_type.unwrap().is_ours(), "this end clocks it");
+        assert_eq!(clocked.encoding, Some(crate::Encoding::Nrzi));
+        assert_eq!(clocked.frame_check, Some(crate::FrameCheck::Crc32Pr1Ccitt));
+        assert_eq!(clocked.loopback, Some(true));
+        assert_eq!(
+            clocked.parity, None,
+            "a synchronous line has no per-character parity"
+        );
+
+        // The unstated ones are the driver's own defaults.
+        let defaulted = serial("    asynchronous: false\n    clock_type: external\n");
+        assert_eq!(defaulted.encoding, Some(crate::Encoding::Nrz));
+        assert_eq!(defaulted.frame_check, Some(crate::FrameCheck::None));
+        assert_eq!(defaulted.loopback, Some(false));
+
+        // A value that is not one of a kind's is refused with the ones that
+        // are, and each kind has its own list: a CRC is not a parity a
+        // character can have, and even is not a frame check.
+        let said = line("    asynchronous: true\n    stop_bits: 1\n    parity: crc16_pr1\n")
+            .expect_err("a character's parity is not a frame check");
+        assert!(said.contains("none, even, odd, mark, or space"), "{said}");
+
+        let said = line("    asynchronous: false\n    clock_type: external\n    parity: even\n")
+            .expect_err("a frame check is not a character's parity");
+        assert!(said.contains("is not a frame check"), "{said}");
+    }
+
+    #[test]
+    fn stop_bits_are_one_one_and_a_half_or_two() {
+        for (text, want) in [
+            ("1", crate::StopBits::One),
+            ("1.5", crate::StopBits::OnePointFive),
+            ("2", crate::StopBits::Two),
+        ] {
+            let terms = link_terms(
+                "serial",
+                &format!(
+                    "    path: /dev/ttyS0\n    asynchronous: true\n    datarate: 9600\n    \
+                     stop_bits: {text}\n    byte_length: 8\n    stream:\n      \
+                     max_length: 8\n      timeout: none\n"
+                ),
+            )
+            .unwrap_or_else(|e| panic!("{text}: {e}"));
+            match terms {
+                crate::endpoint_config::GroupKind::Serial(serial) => {
+                    assert_eq!(serial.stop_bits, Some(want), "for {text}")
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_byte_length_no_uart_offers_is_refused() {
+        let said = link_terms(
+            "serial",
+            "    path: /dev/ttyS0\n    asynchronous: true\n    datarate: 9600\n    \
+             stop_bits: 1\n    byte_length: 9\n    stream:\n      max_length: 8\n      \
+             timeout: none\n",
+        )
+        .expect_err("a UART offers five to eight bits");
+        assert!(said.contains("out of range"), "{said}");
+    }
+    #[test]
+    fn a_packet_size_of_zero_is_refused() {
+        // A packet of no bytes is not a packet. Every kind of payload is
+        // asked, because the size is one every kind states.
+        for (kind, rest) in [
+            ("device", "    path: /dev/null\n"),
+            ("network", "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n"),
+            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n"),
+            (
+                "spi",
+                "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n",
+            ),
+        ] {
+            let said = link(kind, &format!("{rest}    packet_size: 0\n"))
+                .expect("it parses")
+                .to_dh_configs()
+                .expect_err(kind);
+            assert!(said.contains("greater than zero"), "{kind}: {said}");
+        }
+    }
+
+    // -- a bus and what sits on it ------------------------------------------
+
+    /// One peripheral on a bus, with the given terms.
+    fn bus(terms: &str) -> Result<crate::endpoint_config_i2c::I2cParams, String> {
+        match link_terms("i2c", &format!("    path: /dev/i2c-1\n{terms}"))? {
+            crate::endpoint_config::GroupKind::I2c(i2c) => Ok(i2c),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// Where a payload on an I2C bus ends up, which is the bus and a place on
+    /// it rather than a device node alone.
+    fn bus_place(terms: &str) -> Result<EndpointConfig, String> {
+        let handlers = link("i2c", &format!("    packet_size: 8\n{terms}"))?.to_dh_configs()?;
+        Ok(handlers[0].endpoint.clone())
+    }
+
+    #[test]
+    fn a_bus_reads_its_terms() {
+        let i2c = bus(
+            "    ten_bit: false\n    pec: true\n    retries: 3\n    timeout: 50ms\n    \
+             bus_speed: 400000\n    address: 0x48\n",
+        )
+        .expect("every term of a bus");
+        assert!(!i2c.ten_bit);
+        assert!(i2c.pec);
+        assert_eq!(i2c.retries, 3);
+        assert_eq!(i2c.timeout, Some(Duration::from_millis(50)));
+        assert_eq!(i2c.bus_speed, Some(400_000));
+    }
+
+    #[test]
+    fn every_term_of_a_bus_has_a_default() {
+        // Nothing but the kind and where it is is required: the protocol
+        // fixes the framing, and every knob here has a quiet setting.
+        let i2c = bus("    address: 16\n").expect("a bus states little");
+        assert!(!i2c.ten_bit);
+        assert!(!i2c.pec);
+        assert_eq!(i2c.retries, 0);
+        assert_eq!(i2c.timeout, None);
+        assert_eq!(i2c.bus_speed, None);
+    }
+
+    #[test]
+    fn a_bus_timeout_is_rounded_up_to_the_drivers_resolution() {
+        let i2c = bus("    timeout: 25ms\n    address: 8\n").expect("a timeout");
+        assert_eq!(i2c.timeout, Some(Duration::from_millis(25)));
+        assert_eq!(i2c.effective_timeout(), Some(Duration::from_millis(30)));
+    }
+
+    #[test]
+    fn a_payload_on_a_bus_carries_the_bus_and_its_place_on_it() {
+        let place = bus_place("    path: /dev/i2c-2\n    address: 0x49\n").expect("a place");
+        assert_eq!(
+            place,
+            EndpointConfig::I2c(I2cConfig {
+                bus: "/dev/i2c-2".to_string(),
+                address: 0x49,
+                ten_bit: false,
+                pec: false,
+            })
+        );
+    }
+
+    #[test]
+    fn an_address_too_wide_for_the_addressing_is_refused() {
+        let said = bus_place("    path: /dev/i2c-2\n    address: 0x90\n")
+            .expect_err("0x90 needs eight bits");
+        assert!(said.contains("does not fit in 7 bits"), "{said}");
+
+        // ...and the same address is fine once the payload says so.
+        let place = bus_place("    path: /dev/i2c-2\n    address: 0x90\n    ten_bit: true\n")
+            .expect("ten bits hold it");
+        match place {
+            EndpointConfig::I2c(i2c) => {
+                assert_eq!(i2c.address, 0x90);
+                assert!(i2c.ten_bit);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_address_the_specification_reserves_is_refused() {
+        // In range, but the specification keeps these, so no device can
+        // answer to one.
+        for address in ["0x00", "0x01", "0x07", "0x78", "0x7B", "0x7F"] {
+            let said = bus_place(&format!("    path: /dev/i2c-1\n    address: {address}\n"))
+                .expect_err(address);
+            assert!(
+                said.contains("reserved by the I2C specification"),
+                "for {address}: {said}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_addresses_either_side_of_the_reserved_blocks_are_accepted() {
+        for (address, want) in [("0x08", 0x08), ("0x77", 0x77)] {
+            let place = bus_place(&format!("    path: /dev/i2c-1\n    address: {address}\n"))
+                .unwrap_or_else(|e| panic!("{address} should be usable: {e}"));
+            match place {
+                EndpointConfig::I2c(i2c) => assert_eq!(i2c.address, want, "for {address}"),
+                other => panic!("{other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn ten_bit_addressing_has_no_reserved_block() {
+        // A 10-bit transfer carries its address after the 0x78 prefix, so the
+        // whole space is available and the 7-bit reservations do not apply.
+        for address in ["0x00", "0x78", "0x3FF"] {
+            bus_place(&format!(
+                "    path: /dev/i2c-1\n    ten_bit: true\n    address: {address}\n"
+            ))
+            .unwrap_or_else(|e| panic!("{address} should be usable with ten_bit: {e}"));
+        }
+    }
+
+    #[test]
+    fn a_payload_on_a_bus_says_where_on_it_it_is() {
+        let said = bus_place("    path: /dev/i2c-1\n").expect_err("which device on the bus");
+        assert!(said.contains("address"), "{said}");
+    }
+
+    // -- a peripheral -------------------------------------------------------
+
+    /// One peripheral with the given terms.
+    fn peripheral(terms: &str) -> Result<crate::endpoint_config_spi::SpiParams, String> {
+        match link_terms("spi", &format!("    path: /dev/spidev0.0\n{terms}"))? {
+            crate::endpoint_config::GroupKind::Spi(spi) => Ok(spi),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_peripheral_reads_its_terms() {
+        let spi = peripheral(
+            "    max_speed: 10000000\n    spi_mode: 3\n    bits_per_word: 16\n    \
+             bit_order: lsb\n    cs_active: high\n",
+        )
+        .expect("every term of a peripheral");
+        assert_eq!(spi.max_speed, 10_000_000);
+        assert_eq!(spi.mode, crate::SpiMode::Mode3);
+        assert_eq!(spi.bits_per_word.bits(), 16);
+        assert_eq!(spi.bit_order, crate::BitOrder::LsbFirst);
+        assert_eq!(spi.cs_active, crate::CsActive::High);
+    }
+
+    #[test]
+    fn a_peripherals_defaults_are_eight_bit_msb_first_and_active_low() {
+        let spi = peripheral("    max_speed: 1000000\n    spi_mode: 0\n").expect("the usual");
+        assert_eq!(spi.bits_per_word.bits(), 8);
+        assert_eq!(spi.bit_order, crate::BitOrder::MsbFirst);
+        assert_eq!(spi.cs_active, crate::CsActive::Low);
+    }
+
+    #[test]
+    fn a_peripheral_says_which_mode_it_is_clocked_in() {
+        let said = peripheral("    max_speed: 1000000\n").expect_err("a mode is required");
+        assert!(said.contains("mode"), "{said}");
+
+        let said = peripheral("    max_speed: 1000000\n    spi_mode: 4\n")
+            .expect_err("there are four of them");
+        assert!(said.contains("not one of 0, 1, 2, or 3"), "{said}");
+    }
+
+    #[test]
+    fn spi_modes_carry_the_polarity_and_phase_their_numbers_mean() {
+        for (mode, cpol, cpha) in [
+            (crate::SpiMode::Mode0, false, false),
+            (crate::SpiMode::Mode1, false, true),
+            (crate::SpiMode::Mode2, true, false),
+            (crate::SpiMode::Mode3, true, true),
+        ] {
+            assert_eq!(mode.cpol(), cpol, "cpol of mode {mode}");
+            assert_eq!(mode.cpha(), cpha, "cpha of mode {mode}");
+        }
+    }
+
+    #[test]
+    fn a_peripheral_is_named_by_its_device_node_alone() {
+        // The node names the bus and the chip select, so an address is not
+        // merely unnecessary but wrong.
+        let said = link(
+            "spi",
+            "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n    \
+             packet_size: 8\n    address: 0x10\n    port: 1\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("a peripheral has no address");
+        assert!(said.contains("address"), "{said}");
+    }
+
+    #[test]
+    fn a_bus_is_given_no_stream_rule() {
+        // A master clocks exactly as many bytes as it asks for, so there is
+        // no rule to give for where a read ends.
+        for (kind, rest) in [
+            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n"),
+            (
+                "spi",
+                "    path: /dev/spidev0.0\n    max_speed: 1\n    spi_mode: 0\n",
+            ),
+        ] {
+            let said = link_terms(
+                kind,
+                &format!("{rest}    stream:\n      max_length: 8\n      timeout: none\n"),
+            )
+            .expect_err(kind);
+            assert!(
+                said.contains("stream") && said.contains("does not apply"),
+                "{kind}: {said}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_term_of_another_kind_of_link_is_refused() {
+        // The rule that a misplaced term is reported where it was written,
+        // checked across the cross-product rather than one way.
+        for (kind, rest, foreign) in [
+            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n", "    datarate: 9600\n"),
+            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n", "    spi_mode: 0\n"),
+            (
+                "spi",
+                "    path: /dev/spidev0.0\n    max_speed: 1\n    spi_mode: 0\n",
+                "    pec: true\n",
+            ),
+            (
+                "serial",
+                "    path: /dev/ttyS0\n    asynchronous: true\n    datarate: 9600\n    \
+                 stop_bits: 1\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
+                 timeout: none\n",
+                "    cs_active: low\n",
+            ),
+        ] {
+            let said = link_terms(kind, &format!("{rest}{foreign}")).expect_err(foreign);
+            let named = foreign.trim().split(':').next().unwrap();
+            assert!(
+                said.contains(named) && said.contains("does not apply"),
+                "{foreign} on {kind}: {said}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_kind_of_payload_that_is_not_one_is_refused() {
+        let said = link("rs485", "    path: /dev/ttyS0\n    packet_size: 8\n")
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("there is no such kind");
+        assert!(
+            said.contains("rs485") && said.contains("serial"),
+            "the refusal says what the kinds are: {said}"
+        );
+    }
+
+    #[test]
+    fn the_links_round_trip_between_yaml_and_xml() {
+        let yaml = "version: \"1.0\"\ndescription: a bus and a peripheral\n\
+                    payloads:\n  \
+                    - dh_id: 0\n    name: a\n    type: i2c\n    path: /dev/i2c-0\n    \
+                    address: 0x2A\n    pec: true\n    retries: 2\n    \
+                    bus_speed: 400000\n    packet_size: 8\n  \
+                    - dh_id: 1\n    name: b\n    type: spi\n    path: /dev/spidev1.0\n    \
+                    max_speed: 8000000\n    spi_mode: 1\n    bit_order: lsb\n    \
+                    packet_size: 8\n";
+        let xml = r#"<payload-configuration>
+  <version>1.0</version>
+  <description>a bus and a peripheral</description>
+  <payloads>
+    <dh_id>0</dh_id>
+    <name>a</name>
+    <type>i2c</type>
+    <path>/dev/i2c-0</path>
+    <address>0x2A</address>
+    <pec>true</pec>
+    <retries>2</retries>
+    <bus_speed>400000</bus_speed>
+    <packet_size>8</packet_size>
+  </payloads>
+  <payloads>
+    <dh_id>1</dh_id>
+    <name>b</name>
+    <type>spi</type>
+    <path>/dev/spidev1.0</path>
+    <max_speed>8000000</max_speed>
+    <spi_mode>1</spi_mode>
+    <bit_order>lsb</bit_order>
+    <packet_size>8</packet_size>
+  </payloads>
+</payload-configuration>"#;
+        let from_yaml = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(yaml)
+            .expect("the YAML parses");
+        let from_xml = ConfigFormat::Xml
+            .parse::<PayloadConfig>(xml)
+            .expect("the XML parses");
+        assert_eq!(from_yaml, from_xml);
+        assert_eq!(
+            from_yaml.to_dh_configs().expect("the handlers"),
+            from_xml.to_dh_configs().expect("the handlers")
+        );
     }
 }

@@ -659,8 +659,12 @@ pub(crate) struct GroupWire {
         alias = "@max-speed"
     )]
     pub(crate) max_speed: Option<Scalar>,
-    #[serde(default, alias = "@mode")]
-    pub(crate) mode: Option<Scalar>,
+    /// Which of the four SPI modes a peripheral is clocked in.
+    ///
+    /// Named `spi_mode` because a payload already has a `mode` -- whether it
+    /// sends on its own or on a trigger -- and one word cannot mean both.
+    #[serde(default, rename = "mode", alias = "@mode")]
+    pub(crate) spi_mode: Option<Scalar>,
     #[serde(
         default,
         alias = "@bits_per_word",
@@ -1377,7 +1381,7 @@ fn type_specific_fields(g: &GroupWire) -> [(&'static str, bool); 19] {
         ("bus_speed", g.bus_speed.is_some()),
         // SPI.
         ("max_speed", g.max_speed.is_some()),
-        ("mode", g.mode.is_some()),
+        ("spi_mode", g.spi_mode.is_some()),
         ("bits_per_word", g.bits_per_word.is_some()),
         ("bit_order", g.bit_order.is_some()),
         ("cs_active", g.cs_active.is_some()),
@@ -2657,7 +2661,7 @@ endpoints:
         )
         .unwrap_err();
         assert!(
-            matches!(e, EndpointConfigError::MissingGroupField { field: "mode", .. }),
+            matches!(e, EndpointConfigError::MissingGroupField { field: "spi_mode", .. }),
             "got {e:?}"
         );
     }

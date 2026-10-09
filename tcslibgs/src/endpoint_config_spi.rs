@@ -180,7 +180,7 @@ pub(crate) fn group_kind_of(
         name,
         "spi",
         &g,
-        &["max_speed", "mode", "bits_per_word", "bit_order", "cs_active"],
+        &["max_speed", "spi_mode", "bits_per_word", "bit_order", "cs_active"],
     )?;
     reject_stream(name, "spi", g.stream.is_some())?;
 
@@ -193,7 +193,7 @@ pub(crate) fn group_kind_of(
     // Required: no controller default is right for every peripheral,
     // and a mismatched mode fails the way a mismatched data rate
     // fails on a serial line.
-    let mode = require(name, "spi", "mode", g.mode.as_ref())?;
+    let mode = require(name, "spi", "spi_mode", g.spi_mode.as_ref())?;
     let mode = parse_spi_mode(name, mode)?;
 
     let bits_per_word = match g.bits_per_word.as_ref() {

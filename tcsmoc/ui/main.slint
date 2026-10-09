@@ -53,6 +53,7 @@ component DHPanel inherits Rectangle {
     border-color: #808080;
     border-width: 1px;
 
+
     VerticalLayout {
         padding: 8px;
         spacing: 4px;
@@ -174,21 +175,31 @@ component DHPanel inherits Rectangle {
         // The line stays and its contents go, for a handler whose payload
         // sends on its own. The row is kept so that every panel is the same
         // shape and the rows below it do not move from one panel to the next.
+        //
+        // The contents go by their text going empty rather than by `if
+        // triggered` on each of them, which is how this was written first. A
+        // layout whose children come and go is measured differently from one
+        // whose children are always there, and the panels of one payload set
+        // came out 196 and 458 wide for it: the triggered payload's panel took
+        // every pixel of slack in the row and the other sat at its minimum,
+        // which says nothing about either payload. Empty text draws nothing,
+        // so the line still shows no label and no reading, and every panel is
+        // measured the same way.
         last-sent-row := HorizontalLayout {
             spacing: 4px;
             min-height: 14px;
-            if triggered : Text {
-                text: "Last sent:";
+            Text {
+                text: triggered ? "Last sent:" : "";
                 font-size: 10px;
                 vertical-alignment: center;
             }
-            if triggered : Text {
-                text: last-sent-time;
+            Text {
+                text: triggered ? last-sent-time : "";
                 font-size: 10px;
                 vertical-alignment: center;
             }
-            if triggered : Text {
-                text: last-sent-data;
+            Text {
+                text: triggered ? last-sent-data : "";
                 font-size: 10px;
                 vertical-alignment: center;
             }

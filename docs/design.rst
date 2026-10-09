@@ -3274,6 +3274,20 @@ Requirement
     it.
 
 Requirement
+    Every panel of a row is the same width, whatever kind of payload it is
+    for.
+
+The items go by their text going empty rather than by each of them being
+conditional, and that is the whole of why. A layout whose children come and go
+is measured differently from one whose children are always there: with the
+three texts of tcsmoc's sent line behind an ``if``, the two payloads of set 2
+came out 196 and 458 pixels wide -- the triggered one taking every pixel of
+slack in the row and the other sitting at its minimum, which says nothing
+about either payload and reads as a window that has gone wrong. Empty text
+draws nothing, so the line still shows no label and no reading. A test
+measures the widths of a mixed row and of a row of each kind alone.
+
+Requirement
     A payload keeps the same sample of a transfer that a data handler keeps:
     the time, the head of the data, and the whole length. The two programs
     show the one transfer from opposite ends of a link, so a payload keeping
@@ -3397,12 +3411,17 @@ Requirement
 
 The panels are laid out in a grid whose shape follows from how many there are.
 The window is kept wider than it is tall, and among the shapes that satisfy
-that, the one nearest square is chosen; tcssim opens the window at the size that
-shape asks for. The four payloads of tcspecial1.yaml give a two-by-two grid in a
-664x722 window. The rule is the one tcsmoc follows, applied to the sizes of
-tcssim's own panels; the size is the one ``window_size`` gives, which a test
-reads out of this document so that the number here cannot quietly stop being
-the one the program opens at.
+that, the one nearest square is chosen; tcssim opens the window at the size
+that shape asks for. This is not the rule tcsmoc follows -- that one fills a
+row of three at a time, for the reasons given there -- but it comes to the same
+thing for the counts the shipped sets have, and tcssim's panels have always
+filled a row before starting another: its chrome is short enough that a column
+of two panels is taller than wide, and so was never a candidate.
+
+The four payloads of tcspecial1.yaml give a two-by-two grid in a 664x722
+window. The size is the one ``window_size`` gives, which a test reads out of
+this document so that the number here cannot quietly stop being the one the
+program opens at.
 
 
 
@@ -3617,14 +3636,43 @@ The window is built from that file. Nothing in the GUI names a data handler or
 fixes how many there are, so a handler added to or removed from tcspecial1.yaml
 adds or removes a rectangle.
 
-The rectangles are laid out in a grid whose shape follows from how many there
-are. The window is kept wider than it is tall, and among the shapes that
-satisfy that, the one nearest square is chosen; tcsmoc opens the window at the
-size that shape asks for. The four data handlers of the shipped tcspecial1.yaml
-give a two-by-two grid in a 700x852 window -- the width is the floor the
-command interpreter's controls need rather than what two panels come to. As in
-tcssim, a test reads that size out of this document and checks it against the
-one the program opens at.
+Requirement
+    Panels are laid out across the window before they are laid out down it,
+    three to a row, and a fourth starts a row under the first.
+
+Requirement
+    The window opens wide enough for the row.
+
+It already did. Three columns come to 644 pixels including the margins, and
+the window's width floor is the 700 the command interpreter's controls need, so
+a third column cost nothing. That was not obvious before the panels were
+measured: the constant the window width was worked out from said a panel was
+320 wide, with a comment claiming the layout stretched them to fill it, and
+they are 196 and do not stretch. Three columns of 320 would have opened a
+960-wide window with a third of it empty to the right of the panels.
+
+So the shape follows from the count alone: three handlers are one row of three,
+and the four of the shipped tcspecial1.yaml are a row of three and a row of
+one, in a 700x852 window. A test reads that size out of this document and
+checks it against the one the program opens at, as one does for tcssim.
+
+This replaced a rule that chose the shape nearest square among those at least
+as wide as they were tall. It read well and laid the panels out badly: two
+panels came out as one column of two, because a 700x680 window is squarer than
+a 700x508 one, so the set the Makefile runs went down the window instead of
+across it. Which row and column each panel is given was row-major all along --
+the shape was the whole of the fault. Squareness was never the thing wanted
+either; it was a proxy for a window that fits a screen, and a column count says
+that directly.
+
+What is given up is that the grid is no longer always wider than it is tall.
+Seven panels or more take a third row, which is 852 against a 700-wide window;
+they scroll, as too many panels always have. Up to six it still is, and a test
+says so. The window the MOC opens has been taller than wide since it gained its
+three-row floor, which is a different thing: the floor is room to grow into.
+
+A test measures where the panels land in a laid-out window rather than reading
+the arithmetic back, because the arithmetic was not the part that was wrong.
 
 The GUI has a section at the
 top of its single window that allows issuing of CI commands and viewing responses.

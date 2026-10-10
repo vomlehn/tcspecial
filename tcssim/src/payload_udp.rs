@@ -338,7 +338,7 @@ mod tests {
         let (handler, at) = handler_end(Duration::from_secs(5));
         let mut payload = faulty(at, Faults::default());
 
-        let before = Timestamp::now().seconds;
+        let before = Timestamp::now();
         payload.start().expect("the payload starts");
 
         let mut buf = [0u8; 64];
@@ -356,14 +356,14 @@ mod tests {
                 None => panic!("a packet arrived and nothing recorded when"),
             }
         };
-        let after = Timestamp::now().seconds;
+        let after = Timestamp::now();
         payload.stop();
 
         let went = sent.time.expect("a time, having just been matched");
         assert!(
-            (before..=after).contains(&went.seconds),
+            (before..=after).contains(&went),
             "a packet sent between {before} and {after} was timed at {}",
-            went.seconds
+            went.millis
         );
 
         // And what went: the head of the packet, and its whole length, which
@@ -391,7 +391,7 @@ mod tests {
         let (handler, at) = handler_end(Duration::from_secs(5));
         let mut payload = faulty(at, Faults::default());
 
-        let before = Timestamp::now().seconds;
+        let before = Timestamp::now();
         payload.start().expect("the payload starts");
 
         let mut buf = [0u8; 64];
@@ -409,14 +409,14 @@ mod tests {
                 None => panic!("the payload was spoken to and recorded no time"),
             }
         };
-        let after = Timestamp::now().seconds;
+        let after = Timestamp::now();
         payload.stop();
 
         let came = received.time.expect("a time, having just been matched");
         assert!(
-            (before..=after).contains(&came.seconds),
+            (before..=after).contains(&came),
             "a packet received between {before} and {after} was timed at {}",
-            came.seconds
+            came.millis
         );
         assert_eq!(
             received.data(),

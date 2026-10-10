@@ -407,12 +407,14 @@ mod tests {
     }
 
     /// A sample of a transfer, as the stats hold it.
+    ///
+    /// Taking the time in seconds, which is what these tests mean; a time is
+    /// carried in milliseconds since the epoch.
     fn sample_of(seconds: u64, data: &[u8]) -> DHSample {
         let mut sample = DHSample::new();
         sample.record(data);
         sample.time = Some(tcslibgs::Timestamp {
-            seconds,
-            nanoseconds: 0,
+            millis: seconds * 1_000,
         });
         sample
     }

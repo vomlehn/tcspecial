@@ -260,6 +260,22 @@ Commands and Response Telemetry
 Commands cause generation of one or more telemetry responses. Every response
 contains a success failure and may contain additional parameter values
 
+Every response carries a header before whatever else it says: the sequence
+number of the command it answers, which kind of response it is, the status,
+and the time the spacecraft made it. The tables below list what each kind
+adds to that.
+
+Requirement
+    A timestamp is milliseconds since the UNIX epoch: one number and one
+    unit, wherever a time is carried -- a response's header, a handler's
+    samples and statistics, a beacon. Two ends comparing times, or a log read
+    long afterwards, then have nothing to agree about beyond the epoch.
+
+It was a pair, seconds and nanoseconds within the second, which is two fields
+to carry, two to serialize and two to get wrong: arithmetic had to borrow
+across the second, and nothing ever read the nanoseconds. Milliseconds are
+finer than anything here measures, and a u64 of them is half a billion years.
+
 
 PING
 ^^^^
@@ -274,11 +290,8 @@ Verify that TLSpecial is able to process commands.
 +----------------+----------+-----------+--------------------------------------+
 | PING_TM        | Parameters                                                  |
 |                +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
-|                | timestamp  | Timestamp | Spacecraft time when response was  |
-|                |            |           | sent                               |
-+----------------+------------+-----------+------------------------------------+
+|                | None, beyond the header every response carries              |
++----------------+-------------------------------------------------------------+
 
 RESTART_ARM
 ^^^^^^^^^^^
@@ -525,9 +538,6 @@ Beacon
 |                |            |           | of beacons this process has sent,  |
 |                |            |           | from one                           |
 |                +------------+-----------+------------------------------------+
-|                | timestamp  | Timestamp | Spacecraft time at which the       |
-|                |            |           | beacon message was sent            |
-|                +------------+-----------+------------------------------------+
 |                | version    | 3 bytes   | Major, minor and patch version of  |
 |                |            |           | the tcspecial build sending it,    |
 |                |            |           | from its ``Cargo.toml``            |
@@ -539,6 +549,11 @@ Beacon
 |                | digest     | 16 bytes  | MD5 of the configuration file this |
 |                |            |           | tcspecial read                     |
 +----------------+------------+-----------+------------------------------------+
+
+Requirement
+    A beacon's time is the one in its header, which every response carries.
+    It had a second one of its own, which was the same time said twice and
+    two things to keep in step.
 
 Requirement
     A beacon carries the version and the digest a CONNECT is answered with,

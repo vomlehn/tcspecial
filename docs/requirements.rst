@@ -119,7 +119,8 @@ Each CI telemetry response to a command must contain a timestamp, command sequen
    Implemented. ``TelemetryHeader`` carries the sequence number, the
    telemetry type, the status and the time the spacecraft made the answer.
    Two responses used to carry a time of their own and the other eight
-   carried none; it is in the header for all of them now.
+   carried none; it is in the header for all of them now. A timestamp is
+   milliseconds since the UNIX epoch, wherever one is carried.
 
 CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -2723,8 +2723,7 @@ mod tests {
         sample.record(&[0x01, 0xAB, 0xFF]);
         // The time is the telemetry's, so pin it rather than reading a clock.
         sample.time = Some(Timestamp {
-            seconds: 3661,
-            nanoseconds: 0,
+            millis: 3_661_000,
         });
 
         let (time, data) = sample_lines(&sample);
@@ -2773,10 +2772,7 @@ mod tests {
     fn a_truncated_sample_says_so() {
         let mut sample = DHSample::new();
         sample.record(&(0..64).collect::<Vec<u8>>());
-        sample.time = Some(Timestamp {
-            seconds: 0,
-            nanoseconds: 0,
-        });
+        sample.time = Some(Timestamp { millis: 0 });
 
         let (_, data) = sample_lines(&sample);
         assert!(

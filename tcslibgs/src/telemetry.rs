@@ -277,14 +277,24 @@ impl ConfigDHTelemetry {
 }
 
 /// BEACON asynchronous telemetry
+///
+/// It carries what a CONNECT response carries -- the build and the digest of
+/// the configuration this process read -- because a beacon arrives whether or
+/// not anything has connected. A ground station that is only listening can
+/// then see which software is flying and which payload set it is serving,
+/// rather than having to ask before it can know.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BeaconTelemetry {
     pub header: TelemetryHeader,
     pub timestamp: Timestamp,
+    /// The version of this build, from its `Cargo.toml`.
+    pub version: ConfigVersion,
+    /// The digest of the configuration file this process read.
+    pub digest: ConfigDigest,
 }
 
 impl BeaconTelemetry {
-    pub fn new() -> Self {
+    pub fn new(version: ConfigVersion, digest: ConfigDigest) -> Self {
         Self {
             header: TelemetryHeader {
                 sequence: 0,
@@ -292,13 +302,9 @@ impl BeaconTelemetry {
                 status: CommandStatus::Success,
             },
             timestamp: Timestamp::now(),
+            version,
+            digest,
         }
-    }
-}
-
-impl Default for BeaconTelemetry {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -388,7 +394,7 @@ mod tests {
 
     #[test]
     fn test_beacon_telemetry() {
-        let tm = BeaconTelemetry::new();
+        let tm = BeaconTelemetry::new(ConfigVersion::of_this_build(), ConfigDigest([0u8; 16]));
         assert_eq!(tm.header.tm_type, TelemetryType::Beacon);
     }
 

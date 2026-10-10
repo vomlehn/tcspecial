@@ -273,6 +273,12 @@ export component MainWindow inherits Window {
     // thing about having received nothing.
     in-out property <string> beacon-last-recv: "--:--:--";
 
+    // What the last beacon said: the build flying and the digest of the
+    // configuration it read. "<none>" until one arrives, said rather than
+    // left empty so that an unfilled line reads as the spacecraft not having
+    // spoken rather than as the window not having been written.
+    in-out property <string> beacon-last-msg: "<none>";
+
     callback link-clicked();
     callback ping-clicked();
     callback query-all-clicked();
@@ -409,6 +415,20 @@ export component MainWindow inherits Window {
                                 Text { text: "Last rcvd: "; vertical-alignment: center; }
                                 Text {
                                     text: beacon-last-recv;
+                                    font-size: 10px;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // What that beacon said, under when it arrived:
+                            // the line reads as one message, received then
+                            // and saying this.
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Text { text: "Last msg: "; vertical-alignment: center; }
+                                Text {
+                                    text: beacon-last-msg;
                                     font-size: 10px;
                                     vertical-alignment: center;
                                 }

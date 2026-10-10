@@ -911,8 +911,21 @@ the ``tcspecial link`` box
   reads connected before anything is pressed.
 
 the beacon box
-  The indicator, whose colours are listed under `Beaconing`_, and the time the
-  last beacon arrived.
+  The indicator, whose colours are listed under `Beaconing`_, the time the
+  last beacon arrived, and what it said:
+
+  .. code-block:: text
+
+     Beacon:    (indicator)
+     Last rcvd: 02:02:02
+     Last msg:  version 0.1.0, md5 bd48126fe0faae6686398a4d23545d33
+
+  ``Last msg`` reads ``<none>`` until a beacon arrives. A beacon carries the
+  build flying and the digest of the configuration it read -- the two values a
+  CONNECT is answered with -- so the line says what is up there without
+  anything having to connect first. A datagram the MOC cannot read is shown as
+  what arrived, cut short, rather than left off the line: something else
+  sending to the group is worth seeing beside a green light.
 
 the ``Command`` menu
   The commands below.

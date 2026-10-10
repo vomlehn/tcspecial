@@ -461,6 +461,8 @@ impl CommandInterpreter {
             self.beacon_address,
             self.beacon_interface,
             self.telemetry_log.clone(),
+            self.version,
+            self.digest,
         );
 
         while self.running {

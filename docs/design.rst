@@ -77,11 +77,6 @@ payload configuration file
     reaches each one, and how large its packets are. ``tcspecial1.yaml`` and the
     rest.
 
-endpoint configuration file
-    The richer file describing endpoints in groups, which can state every term
-    of every kind -- a serial line's framing, a bus's addressing, a SPI
-    peripheral's clock. Its endpoints become data handlers.
-
 simulator configuration file
     The file describing how a simulated payload behaves: how often it produces
     a packet and how it divides one into segments. Properties of a simulation
@@ -1290,7 +1285,7 @@ they start, so the question can be answered without a link at all.
 Requirement
     The digest is of what a file says, not of its bytes. Two ends reading
     different spellings of one payload set have read the same set and must
-    agree, so the three formats a set is written in digest alike, and so do
+    agree, so the two formats a set is written in digest alike, and so do
     two files differing only in comments, indentation, the order of their
     sections or the order of one payload's attributes.
 
@@ -1305,28 +1300,19 @@ Requirement
     something a file gets to assert.
 
 Requirement
-    An endpoint configuration's endpoints are numbered the same way, and for
-    the same reason: a payload set may be written in either language, so a rule
-    about the order payloads are read in has to hold in both.
-
-Requirement
-    The digest takes the payloads, or the endpoints, in order of their
-    sequence numbers. Two ends that read the same file then agree about which
-    came first whatever either has since done with its own list.
+    The digest takes the payloads in order of their sequence numbers. Two ends
+    that read the same file then agree about which came first whatever either
+    has since done with its own list.
 
 The numbering rests on one assumption: that a parser hands entries to the code
-above it in the order the file gave them. Every format here does, and a format
+above it in the order the file gave them. Both formats here do, and a format
 that did not would be unusable for a language whose payload order means
 something.
 
-Where the number is given differs between the two languages, and only because
-the shape of each makes one place the right one. A payload file's payloads are
-numbered as the list is deserialized, which is the one place every format
-arrives through. An endpoint file's endpoints are numbered as the validated
-document is built, which is the one place an endpoint is made. Either way
-nothing can hold a configuration whose entries do not know which ones they are.
-The endpoint language has no field for a file to state a number in, where the
-payload language refuses one by name.
+The payloads are numbered as the list is deserialized, which is the one place
+every format arrives through, so nothing can hold a configuration whose
+payloads do not know which ones they are. A file stating a number of its own
+is refused by name.
 
 Carried by the data rather than left to the order a list happens to keep. The
 order used to live only in that, so anything sorting the payloads -- for a
@@ -1339,8 +1325,8 @@ differently.
 
 A sequence number and not a line number. A line is not something these parsers
 hand to the code that builds a document, and it would be a different number in
-each of the three formats one set is written in, where the sequence number is
-the same in all three -- which is what lets them digest alike.
+each of the two formats one set is written in, where the sequence number is
+the same in both -- which is what lets them digest alike.
 
 How it is reached: a file is parsed into the document it describes and that
 document is written back out as a tree of values, which is where the format
@@ -1368,7 +1354,7 @@ What it deliberately does not describe is how a simulated payload behaves; see
 Four sets are shipped, each with a simulator configuration beside it named
 for it -- ``tcspecial1sim.yaml`` for ``tcspecial1.yaml``, and so on -- and a set
 added by that convention needs no change anywhere to be run. Each is named
-below by its YAML, and each exists in all three formats; see the requirement
+below by its YAML, and each exists in both formats; see the requirement
 at the end of this section.
 
 ``tcspecial1.yaml``
@@ -1387,14 +1373,14 @@ at the end of this section.
     are there to tell apart.
 
 ``tcspecial4.yaml``
-    One handler on a serial line -- and written in the endpoint configuration
-    language, which it has to be: a line has terms a payload file has no words
-    for. It is the shipped set that exercises the other language and the
-    simulator's pty stand-in.
+    One handler on a serial line, which is the set that exercises a link's own
+    terms -- a data rate, a framing, a rule for where a read ends -- and the
+    simulator's pty stand-in. It was written in a second language, there being
+    no words in a payload file for a line; `Link Terms`_ are those words, and
+    the set is written here like every other.
 
-A set is a pair of files and not a kind of file: whichever language the first
-of the pair is written in, every program reads it the same way, and the
-simulator file beside it is the same language in either case.
+A set is a pair of files: the payload file and the simulator file beside it,
+each read by whichever programs need it.
 
 The format is chosen from the extension exactly as every other configuration
 file's is, so a payload configuration may be written in YAML or XML.
@@ -1404,14 +1390,14 @@ Requirement
     same data handlers. ``tcspecial2.yaml`` and ``tcspecial2.xml`` are one set
     written two ways.
 
-The formats are three spellings of one configuration, which nothing in the
+The formats are two spellings of one configuration, which nothing in the
 code enforces: each is parsed by its own parser, and a set transcribed by hand
 can differ in a port or lose an attribute without either file becoming invalid.
-So a test loads all three of every set and compares the handlers they produce.
-Shipping all three also means each parser is exercised by a file someone runs
+So a test loads both of every set and compares the handlers they produce.
+Shipping both also means each parser is exercised by a file someone runs
 rather than only by a fixture -- ``make runmocx`` runs the XML of a set --
 which is what turned up the one bug this found:
-the check that decides which language a file is written in asked for the
+the check that a file describes payloads at all asked for the
 ``payloads`` section with a single field, and a sequence in XML is repeated
 sibling elements, so every XML payload file of more than one payload was
 refused as a duplicate field.
@@ -1680,9 +1666,7 @@ Requirement
     payload:
     tcspecial keeps its handlers by id, so a repeated id has one silently
     replace the other, and a simulator configuration is joined to this file by
-    name, so a repeated name has one entry drive two payloads. Reported in the
-    words the endpoint configuration format uses for the same rule, which has
-    always had it.
+    name, so a repeated name has one entry drive two payloads.
 
 Requirement
     Each of these names is unique within its file and nowhere wider. Two
@@ -1697,8 +1681,9 @@ Requirement
     An attribute of another kind of payload is an error. A device payload
     stating a protocol, an address or a port, or a network payload stating a
     path, has written something nothing will read -- and a payload that looks
-    configured and is not is worse than one that is refused. The rule is the
-    one the endpoint configuration format applies to its own groups.
+    configured and is not is worse than one that is refused. A link's own
+    terms are refused the same way, by the rules for its kind: see
+    `Link Terms`_.
 
 Requirement
     The check is made after a group has been laid under a payload, because an
@@ -1739,10 +1724,10 @@ Requirement
     and the address together rather than on the bus device.
 
 Requirement
-    The rule is the same for both configuration formats and is applied in one
-    place. The hazard belongs to the handlers rather than to the words that
-    described them, and the endpoint configuration format is the only one that
-    can describe the kinds where it matters most.
+    The rule is applied in one place, over the handlers a file produced rather
+    than over the words that produced them. The hazard belongs to the
+    handlers: two of them opening one device file collide whatever either was
+    called in the file.
 
 Requirement
     A group is named by a data handler. A group no handler names is an error
@@ -1753,6 +1738,336 @@ A misspelled group name leaves the group unnamed and the name undefined at
 once. The handler's end is where the misspelling actually is, so that is the
 error reported.
 
+Link Terms
+----------
+Three kinds of payload are on a link of their own -- a serial line, a device
+on an I2C bus, a peripheral on a SPI bus -- and each has terms that say how
+that link is driven: a data rate, an address on a bus, the shape of a clock.
+A payload states them beside everything else it states, and may take any of
+them from its group as it takes the rest.
+
+The rules are in ``tcslibgs::endpoint_config`` and the per-kind modules beside
+it, and are asked of a payload by ``types::link_params_of``. They used to be
+reachable only from a second file format -- an endpoint configuration, which
+described the same payloads as groups of endpoints -- and that format is gone:
+a payload states what an endpoint and its group stated between them.
+
+Requirement
+    A term that belongs to another kind of link is an error rather than
+    something ignored, so that a misspelled or misplaced term is reported
+    where it was written. ``pec`` on a line, ``cs_active`` on a bus, and
+    ``datarate`` on a peripheral are each refused.
+
+Requirement
+    A term a payload does not state is taken from the group it names, exactly
+    as every other attribute of a payload is. A term reaches the link the same
+    way whichever of the two stated it, so both are checked the same way.
+
+Requirement
+    The SPI mode is written ``spi_mode``. A payload already has a ``mode`` --
+    whether it sends of its own accord or on a trigger -- and one word cannot
+    mean both. It was ``mode`` in the format that is gone, where a group of
+    endpoints had no other use for the word.
+
+Serial Payloads: a Line
+^^^^^^^^^^^^^^^^^^^^^^^
+A serial payload states which kind of line it describes, and what else it may
+say follows from that.
+
+Requirement
+    A serial payload states ``asynchronous``. The two kinds of line are read
+    differently all the way down -- a start-stop line delimits every byte for
+    itself, a synchronous one carries its bits on a clock -- so a group that
+    did not say would be guessed at, and a line read as the wrong one of the
+    two is a line read as noise.
+
+Requirement
+    Stop bits belong to a start-stop line and to no other. An asynchronous
+    group states them, and a synchronous one stating them is refused: a stop
+    bit is what start-stop framing uses in place of a clock, so a line whose
+    bits are on a clock has nothing for one to delimit.
+
+Requirement
+    What each kind of line may say beyond that is what the Linux driver for
+    such a line can be told, and nothing else. Termios sets a parity per
+    character on a start-stop line; the kernel's generic HDLC takes a clock, a
+    coding, a frame check and a loopback for a synchronous one, from
+    ``sync_serial_settings`` and ``raw_hdlc_proto`` in
+    ``linux/hdlc/ioctl.h``. A payload stating the other kind's is refused.
+
+Requirement
+    A synchronous payload states ``clock_type``. The two ends must agree about
+    whose clock the bits are on, and there is no default to fall back on:
+    guessing which end drives it would be guessing at the cable. It also
+    decides what the data rate means -- the rate this end generates, or the
+    rate the far end is expected to clock.
+
+Requirement
+    Both kinds write the frame check as ``parity``, which is the name the
+    Linux driver uses for both: per character on a start-stop line, and a CRC
+    over a frame on a synchronous one. The values say which is meant, and the
+    error that refuses a value lists the ones that kind offers.
+
+Requirement
+    A line is read back after it is set, and a parity the port did not take is
+    an error. A pseudo-terminal -- which is what a simulated line is -- rejects
+    even parity outright and quietly drops the rest, so a handler that did not
+    look would be checking nothing while its configuration said it was
+    checking every character. The message names the parity and says the port
+    is what will not have it.
+
+Requirement
+    A synchronous line's attributes are recorded and not applied. The kernel
+    drives such a line through a network interface of its own rather than
+    through the terms of a device file, so a handler that opens a path cannot
+    set them; keeping them lets the link a file describes be checked against
+    the equipment and reported plainly, as an I\ :superscript:`2`\ C group's
+    bus speed is.
+
+**A line's terms**
+
++---------------+----------+--------------------------------------------------+
+| Name          | Required | Description                                      |
++===============+==========+==================================================+
+| asynchronous  | Yes      | ``true`` for a start-stop line, ``false`` for a  |
+|               |          | synchronous one, whose bits are on a clock       |
++---------------+----------+--------------------------------------------------+
+| datarate      | Yes      | Line rate in bits per second                     |
++---------------+----------+--------------------------------------------------+
+| stop_bits     | If       | Stop bits after each byte: ``1``, ``1.5``,       |
+|               | async    | ``2``. Asynchronous lines only                   |
++---------------+----------+--------------------------------------------------+
+| parity        | No       | Asynchronous: ``none``, ``even``, ``odd``,       |
+|               |          | ``mark``, ``space``, defaulting to ``none``.     |
+|               |          | Synchronous: the frame check, ``none`` or one of |
+|               |          | the CRCs below, also defaulting to ``none``      |
++---------------+----------+--------------------------------------------------+
+| clock_type    | If sync  | Whose clock the bits are on: ``external``,       |
+|               |          | ``internal``, ``tx_internal``, ``tx_from_rx``.   |
+|               |          | Synchronous lines only                           |
++---------------+----------+--------------------------------------------------+
+| encoding      | No       | How the bits are carried: ``nrz`` (the default), |
+|               |          | ``nrzi``, ``fm_mark``, ``fm_space``,             |
+|               |          | ``manchester``. Synchronous lines only           |
++---------------+----------+--------------------------------------------------+
+| loopback      | No       | ``true`` to put the line in loopback. Default    |
+|               |          | ``false``. Synchronous lines only                |
++---------------+----------+--------------------------------------------------+
+| byte_length   | Yes      | Data bits in each byte, from 5 to 8              |
++---------------+----------+--------------------------------------------------+
+| stream        | Yes      | Stream payload protocol attributes, below        |
++---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet. Shared by every kind of     |
+|               |          | payload, and listed with the rest above          |
++---------------+----------+--------------------------------------------------+
+
+Requirement
+    A serial payload has a stream section, because a serial port is a stream and
+    so there is always a rule deciding where one read ends.
+
+I2C Payloads: a Bus
+^^^^^^^^^^^^^^^^^^^
+A serial port is configured by describing how a byte is framed on the wire.
+I2C needs none of that, because the protocol fixes it: every byte is eight
+data bits, most significant bit first, followed by an acknowledge bit. What a
+payload does carry is how the master addresses the device and how far it will go
+to complete a transfer.
+
+**A bus's terms**
+
++---------------+----------+--------------------------------------------------+
+| Name          | Required | Description                                      |
++===============+==========+==================================================+
+| ten_bit       | No       | Address the device with 10 address bits rather   |
+|               |          | than 7. Default ``false``                        |
++---------------+----------+--------------------------------------------------+
+| pec           | No       | Append an SMBus packet error check, a CRC-8, to  |
+|               |          | each transfer. Default ``false``                 |
++---------------+----------+--------------------------------------------------+
+| retries       | No       | Times a transfer is retried after a lost         |
+|               |          | arbitration or an unexpected NAK. Default ``0``  |
++---------------+----------+--------------------------------------------------+
+| timeout       | No       | How long a transfer waits before it fails        |
++---------------+----------+--------------------------------------------------+
+| bus_speed     | No       | Bus clock rate in Hz. Recorded, not applied      |
++---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet. Shared by every kind of     |
+|               |          | payload, and listed with the rest above          |
++---------------+----------+--------------------------------------------------+
+
+Requirement
+    An I2C payload specifies no byte length, parity, or stop bits, because the
+    protocol fixes the framing of a byte and leaves nothing to configure.
+
+Requirement
+    An I2C payload has no stream section, because the master clocks exactly as
+    many bytes as it asks for and a transfer is therefore already bounded.
+
+Requirement
+    With 7-bit addressing, an address names a device only in the range
+    ``0x08`` to ``0x77``. The specification keeps ``0x00`` to ``0x07`` for the
+    general call, the CBUS address, and the high-speed master code, and
+    ``0x78`` to ``0x7F`` for the 10-bit addressing prefix and for future use.
+    A payload given one of those is reported as an error rather than
+    accepted as a device that will never answer.
+
+Requirement
+    With 10-bit addressing there is no reserved block, and the whole range
+    ``0x000`` to ``0x3FF`` is available. A 10-bit transfer is introduced by
+    the ``0x78`` prefix and carries its address in the bytes that follow, so
+    the reservations that apply to a 7-bit address do not apply to it.
+
+Requirement
+    A timeout takes effect rounded up to a multiple of 10 ms, that being the
+    resolution the bus driver keeps it in. The value the file gave is kept as
+    it was written, so that what a reader of the file sees and what the bus
+    was asked for can both be reported.
+
+Requirement
+    The bus clock rate is recorded rather than applied. It belongs to the bus
+    controller, which the platform configures from the device tree or from
+    ACPI, and a program holding one open cannot change it.
+
+The last requirement is the one place where this type departs from the others,
+and it is worth saying why the attribute exists at all given that writing it
+changes nothing. A bus runs at one rate for every device on it, so the rate is
+not a payload's to choose. It is still worth stating, because a device that
+cannot keep up with the bus it has been wired to fails in ways that are hard to
+read from the symptoms. Recording the rate a payload expects lets that be checked
+against the platform at startup and reported plainly, rather than inferred later
+from corrupted transfers.
+
+SPI Payloads: a Peripheral
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+SPI is clocked and full duplex, so, as with I2C, there is no parity and there
+are no stop bits; a transfer is delimited by the chip select rather than by
+framing bits. What a payload carries is the shape of the clock and of a word.
+
+**A peripheral's terms**
+
++---------------+----------+--------------------------------------------------+
+| Name          | Required | Description                                      |
++===============+==========+==================================================+
+| max_speed     | Yes      | Greatest clock rate the peripheral accepts, in   |
+|               |          | Hz                                               |
++---------------+----------+--------------------------------------------------+
+| spi_mode      | Yes      | Clock polarity and phase: ``0``, ``1``, ``2``,   |
+|               |          | ``3``                                            |
++---------------+----------+--------------------------------------------------+
+| bits_per_word | No       | Bits in each word. Default ``8``                 |
++---------------+----------+--------------------------------------------------+
+| bit_order     | No       | Bit sent first: ``msb`` or ``lsb``. Default      |
+|               |          | ``msb``                                          |
++---------------+----------+--------------------------------------------------+
+| cs_active     | No       | Chip select asserted ``low`` or ``high``.        |
+|               |          | Default ``low``                                  |
++---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet. Shared by every kind of     |
+|               |          | payload, and listed with the rest above          |
++---------------+----------+--------------------------------------------------+
+
+Requirement
+    A SPI payload specifies ``spi_mode``, because the controller has no default that
+    is right for every peripheral and a mismatched mode fails the way a
+    mismatched data rate fails on a serial line.
+
+Requirement
+    A SPI payload has no stream section, because the master clocks exactly as
+    many words as it asks for and a transfer is therefore already bounded.
+
+Requirement
+    The clock rate is an upper bound. A controller divides its own clock down
+    and so runs at the greatest rate it can produce that does not exceed the
+    rate the payload gives.
+
+Where a Read of a Line Ends
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A stream delivers bytes with no frame boundaries of its own, so a payload
+on one needs to be told where one read ends. Three attributes say so.
+
+**Stream attributes**
+
++---------------+----------+--------------------------------------------------+
+| Name          | Required | Description                                      |
++===============+==========+==================================================+
+| max_length    | Yes      | Longest payload one read may deliver, in bytes   |
++---------------+----------+--------------------------------------------------+
+| timeout       | See      | How long a read waits, or ``none``               |
+|               | below    |                                                  |
++---------------+----------+--------------------------------------------------+
+| terminators   | See      | One or more byte values, each of which ends a    |
+|               | below    | read                                             |
++---------------+----------+--------------------------------------------------+
+
+Requirement
+    A stream section specifies the maximum data length.
+
+Requirement
+    A stream section specifies the timeout, the terminator list, or both.
+
+Requirement
+    Specifying both a timeout and a terminator list is valid. A read then ends
+    on whichever condition occurs first.
+
+Requirement
+    A terminator list contains at least one byte value. An empty list is an
+    error, because it states a terminator list without naming a terminator.
+
+Requirement
+    To read a fixed number of bytes at a time, with no timeout and no
+    terminator, a stream section specifies a timeout of ``none``.
+
+The last requirement deserves a word, because it is the one case where the
+format asks for something to be stated that could have been left implicit.
+A stream section giving only a maximum length would be ambiguous: it reads
+either as "hand me this many bytes at a time", which is a real and useful
+intent, or as a file whose author forgot to say when a read should end. These
+have different consequences on a link that goes quiet, so the format does not
+guess. Writing ``timeout: none`` says the first explicitly, and a section with
+neither attribute is reported as an error rather than being taken for it.
+
+Value Syntax
+^^^^^^^^^^^^
+XML carries every attribute value as text, while YAML distinguishes
+numbers from strings. Both are accepted everywhere a value is expected, so the
+same value may be written ``8`` or ``"8"`` without changing its meaning.
+
+**Value syntax**
+
++---------------+--------------------------------------------------------------+
+| Kind          | Syntax                                                       |
++===============+==============================================================+
+| Whole number  | Decimal, or hexadecimal with an ``0x`` prefix                |
++---------------+--------------------------------------------------------------+
+| Byte value    | Decimal or ``0x`` hexadecimal, from 0 to 255                 |
++---------------+--------------------------------------------------------------+
+| Timeout       | A whole number with a unit of ``us``, ``ms``, or ``s``, or   |
+|               | the word ``none``                                            |
++---------------+--------------------------------------------------------------+
+| Byte list     | A sequence, or one string of values separated by commas or   |
+|               | whitespace                                                   |
++---------------+--------------------------------------------------------------+
+| Flag          | ``true`` or ``false``                                        |
++---------------+--------------------------------------------------------------+
+| Bus address   | Decimal or ``0x`` hexadecimal, within the width the          |
+|               | payload's addressing allows, and not one the bus reserves    |
++---------------+--------------------------------------------------------------+
+
+Requirement
+    A timeout carries an explicit unit. A bare number is an error, so that a
+    file cannot silently mean milliseconds where seconds were intended.
+
+Requirement
+    A timeout of zero is an error. A read that is not to wait is written
+    ``none``.
+
+Requirement
+    A hexadecimal value may be written as a number or as a string: ``0x48`` or
+    ``"0x48"``. Both formats accept either spelling and both mean the same
+    value.
+
+Attribute names may be spelled with either underscores or hyphens, so
+``max_length`` and ``max-length`` are the same attribute.
 Example
 -------
 This is the shipped tcspecial1.yaml. DH1 and DH3 are reached the same way, over a
@@ -2161,876 +2476,6 @@ states its own rate instead.
        type: network
        protocol: udp
        packet_interval_ms: 500
-
-Endpoint Configuration Files
-============================
-Endpoints may be configured from a file in YAML or XML. The two formats
-describe exactly the same thing and are parsed into exactly the same Rust
-types, so which one a mission uses is a matter of local preference and tooling,
-never of capability. The parser is ``tcslibgs::endpoint_config``, and the
-examples at the end of this section are written against it.
-
-Requirement
-    The format of a configuration file is chosen from its extension. ``.yaml``
-    and ``.yml`` are YAML and ``.xml`` is XML. Any other extension, or none at
-    all, is refused.
-
-JSON was read as well, and was what any other extension was taken to be: it
-was the format every configuration file used before the others were accepted,
-so a file that predated them kept being read the way it always was. What that
-cost was the refusal above -- a misspelled extension was not an error but a
-file parsed as the wrong language -- and nothing was written in JSON that was
-not also written in YAML. The command link still carries JSON, which is no part
-of configuration.
-
-File Structure
---------------
-Every endpoint configuration file has three sections.
-
-general
-    Configuration that belongs to the file as a whole rather than to any one
-    endpoint or group.
-
-endpoint groups
-    Named groups of endpoints. A group carries every attribute shared by the
-    endpoints of one type.
-
-endpoints
-    The endpoints themselves. Each names the group it draws its attributes
-    from, and supplies the one thing the group deliberately omits.
-
-The division between the last two sections is the point of the format.
-
-Requirement
-    A group definition carries every attribute of its endpoint kind except the
-    one that locates an endpoint: its path, its network address, or, on a bus
-    that addresses its devices, the address of the device on that bus.
-
-Requirement
-    What locates an endpoint is carried by the endpoint definition.
-
-Requirement
-    An endpoint of an I2C group gives both the bus device and the address of
-    the device on that bus, because two endpoints of one group commonly sit on
-    the same bus and differ only in which device the master addresses. Both
-    reach the data handler the endpoint becomes.
-
-Requirement
-    An endpoint of a SPI group gives the device node alone. The bus and the
-    chip select are both named by it, so there is no separate address.
-
-The reason for the split is that the device name or address is precisely what
-distinguishes one endpoint of a group from another. Four RS-422 payload links
-running at the same rate, with the same framing and the same stream protocol
-rules, differ only in which ``/dev`` entry they open. Writing the shared
-attributes once, in a group, means a change to the line rate is a change in one
-place, and means two endpoints that are meant to be configured alike cannot
-drift apart.
-
-The General Section
--------------------
-**General section attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| version       | No       | Version of the configuration file format         |
-+---------------+----------+--------------------------------------------------+
-| description   | No       | Free text describing what the file configures    |
-+---------------+----------+--------------------------------------------------+
-
-.. note::
-   The general section is where settings that apply to a whole file belong.
-   Only the two above are defined so far; it exists as a named section so that
-   adding one later is not a change to the file structure.
-
-The Endpoint Groups Section
----------------------------
-Each group has a name and a type. The name is what endpoints refer to; the type
-selects which further attributes apply.
-
-Requirement
-    Each endpoint group has a name, unique within the file.
-
-Requirement
-    Each endpoint group has a type, which is one of ``serial``, ``network``,
-    ``i2c``, or ``spi``.
-
-Requirement
-    Each endpoint group has an endpoint in it. A group no endpoint names is an
-    error rather than a definition with no effect, because that is also what a
-    group whose name an endpoint misspelled looks like. A misspelled name
-    leaves the group unused and the name undefined at once; the endpoint's end
-    is where the misspelling is, so that is the error reported.
-
-    The payload and simulator configuration formats state the same rule for
-    their own groups, for the same reason.
-
-Requirement
-    An attribute that does not apply to a group's type is an error rather than
-    being ignored, so that a misspelled or misplaced attribute is reported
-    where it was written.
-
-Two attributes are shared rather than belonging to one type. The packet size,
-below, applies to every type. The stream payload protocol attributes have a
-section of their own, and apply to the types that carry a stream rather than to
-all four.
-
-**Shared group attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
-|               |          | of this group                                    |
-+---------------+----------+--------------------------------------------------+
-
-Requirement
-    Any type of group may specify a packet size. A packet has a size whether it
-    travels over a serial line, a socket, or a bus, so this is not an attribute
-    of one type.
-
-Requirement
-    The packet size belongs to the group rather than to the endpoint, because
-    endpoints of one group are configured alike in everything but where they
-    are.
-
-Requirement
-    A packet size of zero is an error. A packet of no bytes is not a packet.
-
-Requirement
-    The packet size is optional. A file describing only how to reach a device
-    need not state one; a data handler built from an endpoint does need it.
-
-.. note::
-   A stream group's ``max_length`` is a different measurement and both may be
-   given. ``max_length`` bounds what a single read of the stream may deliver,
-   which is a property of the framing; ``packet_size`` is how much data a
-   packet carries. For a group reading a fixed number of bytes at a time the
-   two commonly agree, and nothing requires them to.
-
-Serial Groups
-^^^^^^^^^^^^^
-A serial group states which kind of line it describes, and what else it may
-say follows from that.
-
-Requirement
-    A serial group states ``asynchronous``. The two kinds of line are read
-    differently all the way down -- a start-stop line delimits every byte for
-    itself, a synchronous one carries its bits on a clock -- so a group that
-    did not say would be guessed at, and a line read as the wrong one of the
-    two is a line read as noise.
-
-Requirement
-    Stop bits belong to a start-stop line and to no other. An asynchronous
-    group states them, and a synchronous one stating them is refused: a stop
-    bit is what start-stop framing uses in place of a clock, so a line whose
-    bits are on a clock has nothing for one to delimit.
-
-Requirement
-    What each kind of line may say beyond that is what the Linux driver for
-    such a line can be told, and nothing else. Termios sets a parity per
-    character on a start-stop line; the kernel's generic HDLC takes a clock, a
-    coding, a frame check and a loopback for a synchronous one, from
-    ``sync_serial_settings`` and ``raw_hdlc_proto`` in
-    ``linux/hdlc/ioctl.h``. A group stating the other kind's is refused.
-
-Requirement
-    A synchronous group states ``clock_type``. The two ends must agree about
-    whose clock the bits are on, and there is no default to fall back on:
-    guessing which end drives it would be guessing at the cable. It also
-    decides what the data rate means -- the rate this end generates, or the
-    rate the far end is expected to clock.
-
-Requirement
-    Both kinds write the frame check as ``parity``, which is the name the
-    Linux driver uses for both: per character on a start-stop line, and a CRC
-    over a frame on a synchronous one. The values say which is meant, and the
-    error that refuses a value lists the ones that kind offers.
-
-Requirement
-    A line is read back after it is set, and a parity the port did not take is
-    an error. A pseudo-terminal -- which is what a simulated line is -- rejects
-    even parity outright and quietly drops the rest, so a handler that did not
-    look would be checking nothing while its configuration said it was
-    checking every character. The message names the parity and says the port
-    is what will not have it.
-
-Requirement
-    A synchronous line's attributes are recorded and not applied. The kernel
-    drives such a line through a network interface of its own rather than
-    through the terms of a device file, so a handler that opens a path cannot
-    set them; keeping them lets the link a file describes be checked against
-    the equipment and reported plainly, as an I\ :superscript:`2`\ C group's
-    bus speed is.
-
-**Serial group attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| asynchronous  | Yes      | ``true`` for a start-stop line, ``false`` for a  |
-|               |          | synchronous one, whose bits are on a clock       |
-+---------------+----------+--------------------------------------------------+
-| datarate      | Yes      | Line rate in bits per second                     |
-+---------------+----------+--------------------------------------------------+
-| stop_bits     | If       | Stop bits after each byte: ``1``, ``1.5``,       |
-|               | async    | ``2``. Asynchronous lines only                   |
-+---------------+----------+--------------------------------------------------+
-| parity        | No       | Asynchronous: ``none``, ``even``, ``odd``,       |
-|               |          | ``mark``, ``space``, defaulting to ``none``.     |
-|               |          | Synchronous: the frame check, ``none`` or one of |
-|               |          | the CRCs below, also defaulting to ``none``      |
-+---------------+----------+--------------------------------------------------+
-| clock_type    | If sync  | Whose clock the bits are on: ``external``,       |
-|               |          | ``internal``, ``tx_internal``, ``tx_from_rx``.   |
-|               |          | Synchronous lines only                           |
-+---------------+----------+--------------------------------------------------+
-| encoding      | No       | How the bits are carried: ``nrz`` (the default), |
-|               |          | ``nrzi``, ``fm_mark``, ``fm_space``,             |
-|               |          | ``manchester``. Synchronous lines only           |
-+---------------+----------+--------------------------------------------------+
-| loopback      | No       | ``true`` to put the line in loopback. Default    |
-|               |          | ``false``. Synchronous lines only                |
-+---------------+----------+--------------------------------------------------+
-| byte_length   | Yes      | Data bits in each byte, from 5 to 8              |
-+---------------+----------+--------------------------------------------------+
-| stream        | Yes      | Stream payload protocol attributes, below        |
-+---------------+----------+--------------------------------------------------+
-| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
-|               |          | of this group. Shared by every type; see above   |
-+---------------+----------+--------------------------------------------------+
-
-Requirement
-    A serial group has a stream section, because a serial port is a stream and
-    so there is always a rule deciding where one read ends.
-
-Network Groups
-^^^^^^^^^^^^^^
-**Network group attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| protocol      | Yes      | ``tcp``, ``udp``, ``unix_stream``,               |
-|               |          | ``unix_dgram``                                   |
-+---------------+----------+--------------------------------------------------+
-| stream        | See      | Stream payload protocol attributes, below        |
-|               | below    |                                                  |
-+---------------+----------+--------------------------------------------------+
-| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
-|               |          | of this group. Shared by every type; see above   |
-+---------------+----------+--------------------------------------------------+
-
-Requirement
-    A network group using a stream protocol, ``tcp`` or ``unix_stream``, has a
-    stream section.
-
-Requirement
-    A network group using a datagram protocol, ``udp`` or ``unix_dgram``, has
-    no stream section, because a datagram is already a frame and needs no rule
-    for where it ends.
-
-I2C Groups
-^^^^^^^^^^
-A serial port is configured by describing how a byte is framed on the wire.
-I2C needs none of that, because the protocol fixes it: every byte is eight
-data bits, most significant bit first, followed by an acknowledge bit. What a
-group does carry is how the master addresses the device and how far it will go
-to complete a transfer.
-
-**I2C group attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| ten_bit       | No       | Address the device with 10 address bits rather   |
-|               |          | than 7. Default ``false``                        |
-+---------------+----------+--------------------------------------------------+
-| pec           | No       | Append an SMBus packet error check, a CRC-8, to  |
-|               |          | each transfer. Default ``false``                 |
-+---------------+----------+--------------------------------------------------+
-| retries       | No       | Times a transfer is retried after a lost         |
-|               |          | arbitration or an unexpected NAK. Default ``0``  |
-+---------------+----------+--------------------------------------------------+
-| timeout       | No       | How long a transfer waits before it fails        |
-+---------------+----------+--------------------------------------------------+
-| bus_speed     | No       | Bus clock rate in Hz. Recorded, not applied      |
-+---------------+----------+--------------------------------------------------+
-| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
-|               |          | of this group. Shared by every type; see above   |
-+---------------+----------+--------------------------------------------------+
-
-Requirement
-    An I2C group specifies no byte length, parity, or stop bits, because the
-    protocol fixes the framing of a byte and leaves nothing to configure.
-
-Requirement
-    An I2C group has no stream section, because the master clocks exactly as
-    many bytes as it asks for and a transfer is therefore already bounded.
-
-Requirement
-    With 7-bit addressing, an address names a device only in the range
-    ``0x08`` to ``0x77``. The specification keeps ``0x00`` to ``0x07`` for the
-    general call, the CBUS address, and the high-speed master code, and
-    ``0x78`` to ``0x7F`` for the 10-bit addressing prefix and for future use.
-    An endpoint given one of those is reported as an error rather than
-    accepted as a device that will never answer.
-
-Requirement
-    With 10-bit addressing there is no reserved block, and the whole range
-    ``0x000`` to ``0x3FF`` is available. A 10-bit transfer is introduced by
-    the ``0x78`` prefix and carries its address in the bytes that follow, so
-    the reservations that apply to a 7-bit address do not apply to it.
-
-Requirement
-    A timeout takes effect rounded up to a multiple of 10 ms, that being the
-    resolution the bus driver keeps it in. The value the file gave is kept as
-    it was written, so that what a reader of the file sees and what the bus
-    was asked for can both be reported.
-
-Requirement
-    The bus clock rate is recorded rather than applied. It belongs to the bus
-    controller, which the platform configures from the device tree or from
-    ACPI, and a program holding an endpoint open cannot change it.
-
-The last requirement is the one place where this type departs from the others,
-and it is worth saying why the attribute exists at all given that writing it
-changes nothing. A bus runs at one rate for every device on it, so the rate is
-not an endpoint's to choose. It is still worth stating, because a device that
-cannot keep up with the bus it has been wired to fails in ways that are hard to
-read from the symptoms. Recording the rate a group expects lets that be checked
-against the platform at startup and reported plainly, rather than inferred later
-from corrupted transfers.
-
-SPI Groups
-^^^^^^^^^^
-SPI is clocked and full duplex, so, as with I2C, there is no parity and there
-are no stop bits; a transfer is delimited by the chip select rather than by
-framing bits. What a group carries is the shape of the clock and of a word.
-
-**SPI group attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| max_speed     | Yes      | Greatest clock rate the peripheral accepts, in   |
-|               |          | Hz                                               |
-+---------------+----------+--------------------------------------------------+
-| mode          | Yes      | Clock polarity and phase: ``0``, ``1``, ``2``,   |
-|               |          | ``3``                                            |
-+---------------+----------+--------------------------------------------------+
-| bits_per_word | No       | Bits in each word. Default ``8``                 |
-+---------------+----------+--------------------------------------------------+
-| bit_order     | No       | Bit sent first: ``msb`` or ``lsb``. Default      |
-|               |          | ``msb``                                          |
-+---------------+----------+--------------------------------------------------+
-| cs_active     | No       | Chip select asserted ``low`` or ``high``.        |
-|               |          | Default ``low``                                  |
-+---------------+----------+--------------------------------------------------+
-| packet_size   | No       | Bytes in one packet exchanged with an endpoint   |
-|               |          | of this group. Shared by every type; see above   |
-+---------------+----------+--------------------------------------------------+
-
-Requirement
-    A SPI group specifies the mode, because the controller has no default that
-    is right for every peripheral and a mismatched mode fails the way a
-    mismatched data rate fails on a serial line.
-
-Requirement
-    A SPI group has no stream section, because the master clocks exactly as
-    many words as it asks for and a transfer is therefore already bounded.
-
-Requirement
-    The clock rate is an upper bound. A controller divides its own clock down
-    and so runs at the greatest rate it can produce that does not exceed the
-    rate the group gives.
-
-Stream Payload Protocol Attributes
-----------------------------------
-A stream delivers bytes with no frame boundaries of its own, so a stream
-endpoint needs to be told where one read ends. Three attributes say so.
-
-**Stream attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| max_length    | Yes      | Longest payload one read may deliver, in bytes   |
-+---------------+----------+--------------------------------------------------+
-| timeout       | See      | How long a read waits, or ``none``               |
-|               | below    |                                                  |
-+---------------+----------+--------------------------------------------------+
-| terminators   | See      | One or more byte values, each of which ends a    |
-|               | below    | read                                             |
-+---------------+----------+--------------------------------------------------+
-
-Requirement
-    A stream section specifies the maximum data length.
-
-Requirement
-    A stream section specifies the timeout, the terminator list, or both.
-
-Requirement
-    Specifying both a timeout and a terminator list is valid. A read then ends
-    on whichever condition occurs first.
-
-Requirement
-    A terminator list contains at least one byte value. An empty list is an
-    error, because it states a terminator list without naming a terminator.
-
-Requirement
-    To read a fixed number of bytes at a time, with no timeout and no
-    terminator, a stream section specifies a timeout of ``none``.
-
-The last requirement deserves a word, because it is the one case where the
-format asks for something to be stated that could have been left implicit.
-A stream section giving only a maximum length would be ambiguous: it reads
-either as "hand me this many bytes at a time", which is a real and useful
-intent, or as a file whose author forgot to say when a read should end. These
-have different consequences on a link that goes quiet, so the format does not
-guess. Writing ``timeout: none`` says the first explicitly, and a section with
-neither attribute is reported as an error rather than being taken for it.
-
-The Endpoints Section
----------------------
-An endpoint names itself, names the group it draws its attributes from, and
-gives what locates it. Which of the locating attributes apply follows from the
-type of that group, so an endpoint is short: everything else was written once,
-in the group.
-
-**Endpoint attributes**
-
-+---------------+----------+--------------------------------------------------+
-| Name          | Required | Description                                      |
-+===============+==========+==================================================+
-| name          | Yes      | Name of this endpoint, unique within the file    |
-+---------------+----------+--------------------------------------------------+
-| group         | Yes      | Name of the group supplying its attributes       |
-+---------------+----------+--------------------------------------------------+
-| device        | See      | Path of the device or socket this endpoint uses  |
-|               | below    |                                                  |
-+---------------+----------+--------------------------------------------------+
-| address       | See      | Network host, or the address of a device on a    |
-|               | below    | bus                                              |
-+---------------+----------+--------------------------------------------------+
-| port          | See      | Network port                                     |
-|               | below    |                                                  |
-+---------------+----------+--------------------------------------------------+
-| dh_id         | No       | Identifier of the data handler this endpoint     |
-|               |          | becomes; see `Endpoints as Data Handlers`_       |
-+---------------+----------+--------------------------------------------------+
-| oc_address    | No       | Host the data handler this endpoint becomes      |
-|               |          | exchanges payload data with the OC on            |
-+---------------+----------+--------------------------------------------------+
-| oc_port       | No       | Port it does so on                               |
-+---------------+----------+--------------------------------------------------+
-
-Which of ``device``, ``address`` and ``port`` apply depends on the group.
-
-**What locates an endpoint of each type**
-
-+---------------------+-----------------------------------------------------+
-| Group               | Locating attributes                                 |
-+=====================+=====================================================+
-| serial              | ``device``                                          |
-+---------------------+-----------------------------------------------------+
-| network, over a     | ``address`` and ``port``                            |
-| host and port       |                                                     |
-+---------------------+-----------------------------------------------------+
-| network, over a     | ``device``                                          |
-| Unix-domain socket  |                                                     |
-+---------------------+-----------------------------------------------------+
-| i2c                 | ``device``, the bus, and ``address``, the device on |
-|                     | it                                                  |
-+---------------------+-----------------------------------------------------+
-| spi                 | ``device``                                          |
-+---------------------+-----------------------------------------------------+
-
-Requirement
-    Each endpoint has a name, unique within the file, and names a group defined
-    in the same file. Naming a group that does not exist is an error.
-
-Requirement
-    An endpoint of a network group speaking ``tcp`` or ``udp`` gives an address
-    and a port. One speaking ``unix_stream`` or ``unix_dgram`` gives a device
-    instead, because a Unix-domain socket is named by a path.
-
-Requirement
-    A locating attribute that does not apply to the endpoint's group is an
-    error rather than being ignored, for the same reason it is in a group: a
-    misplaced attribute is reported where it was written.
-
-.. note::
-   The protocol is not an endpoint attribute. It belongs to the network group,
-   with everything else the endpoints of that group share, which is why two
-   endpoints of one group cannot be reached over different transports. The same
-   holds for the packet size.
-
-Endpoints as Data Handlers
---------------------------
-A payload configuration file says which data handlers exist and how tcspecial
-reaches each one. An endpoint configuration says how to reach a device in far
-more detail: a serial line's framing, a stream's rules for where one read
-ends, the parameters of a bus. The two therefore overlap, and the endpoint
-format is the richer description of the two.
-
-``EndpointConfigDoc::to_dh_configs`` converts endpoints into the data handler
-configurations the rest of the software already takes. The transport comes
-from the group and the address from the endpoint, which is the division the
-format is built around; the packet size comes from the group, and the id from
-the endpoint, because an id distinguishes one handler from another exactly as
-an address distinguishes one endpoint from another.
-
-All three programs read data handlers this way. Each is given a file and takes
-its handlers from it whichever kind it is, so a payload set may be written
-either way and the three stay in step: tcsmoc's panels, tcssim's payloads and
-tcspecial's handlers are the same handlers, which is what the payload set
-mechanism exists to keep true. Tcsmoc passes the file it was given to the
-programs it starts, so one argument names the set for all three.
-
-Requirement
-    A file's kind is read from the sections it carries -- ``payloads``
-    for a payload configuration, ``endpoints`` or the groups of them for an
-    endpoint configuration -- and not from its name. A file's extension says
-    how it is spelled, YAML or XML, and both kinds can be written in
-    any of the three.
-
-Requirement
-    A file carrying neither section is an error. It describes no data handlers,
-    and reading it as an endpoint configuration with no endpoints would make an
-    empty document look like a valid one.
-
-The loader is ``tcslibgs::config::load_dh_configs``, and
-``handler_source`` answers which kind a file holds without loading it.
-
-Requirement
-    An endpoint becoming a data handler has a ``dh_id``. An endpoint
-    configuration that assigns none is still valid -- describing how to reach a
-    device needs no handler ids -- so this is an error when converting rather
-    than when reading the file.
-
-Requirement
-    Two endpoints do not share a ``dh_id``. A duplicate converts cleanly and
-    then has one handler shadow another, which is what a payload file rejects
-    as well.
-
-Requirement
-    An endpoint becoming a data handler is in a group that states a packet
-    size. The attribute is optional for the same reason ``dh_id`` is, and
-    required for the same reason: a handler must know how much data a packet
-    carries.
-
-Requirement
-    An endpoint becoming a data handler that is to be started states an
-    ``oc_address`` and an ``oc_port``, or neither, exactly as a data handler of
-    a payload configuration does. They belong to the endpoint rather than its
-    group, for the reason the endpoint's own address does: they are what
-    distinguish one handler from another.
-
-Requirement
-    An endpoint of an I2C group becomes an I2C data handler, carrying the bus
-    device and the address of the device on it. Neither can be left behind: the
-    bus says which file to open and the address says which device on it
-    answers, and a handler holding only the first would talk to whichever
-    device the bus was last pointed at.
-
-It used not to become a handler at all, for want of anywhere in a handler's
-configuration to put the two together. That made an I2C bus a thing that could
-be described in a file and never run.
-
-A Unix-domain socket is the one endpoint whose shape differs between the two
-formats. Its group is a network group, but it is located by a path rather than
-by a host and a port, so it becomes a network data handler whose address is
-that path and whose port is zero -- which is how a payload file spells the
-same thing, and why tcsmoc shows no port for one.
-
-The shipped examples assign no ``dh_id``, which makes them endpoint
-configurations rather than payload definitions. A test converts each of them
-and requires the refusal, so that the examples cannot drift into being half of
-each.
-
-Value Syntax
-------------
-XML carries every attribute value as text, while YAML distinguishes
-numbers from strings. Both are accepted everywhere a value is expected, so the
-same value may be written ``8`` or ``"8"`` without changing its meaning.
-
-**Value syntax**
-
-+---------------+--------------------------------------------------------------+
-| Kind          | Syntax                                                       |
-+===============+==============================================================+
-| Whole number  | Decimal, or hexadecimal with an ``0x`` prefix                |
-+---------------+--------------------------------------------------------------+
-| Byte value    | Decimal or ``0x`` hexadecimal, from 0 to 255                 |
-+---------------+--------------------------------------------------------------+
-| Timeout       | A whole number with a unit of ``us``, ``ms``, or ``s``, or   |
-|               | the word ``none``                                            |
-+---------------+--------------------------------------------------------------+
-| Byte list     | A sequence, or one string of values separated by commas or   |
-|               | whitespace                                                   |
-+---------------+--------------------------------------------------------------+
-| Flag          | ``true`` or ``false``                                        |
-+---------------+--------------------------------------------------------------+
-| Bus address   | Decimal or ``0x`` hexadecimal, within the width the group's  |
-|               | addressing mode allows and not one the bus reserves          |
-+---------------+--------------------------------------------------------------+
-
-Requirement
-    A timeout carries an explicit unit. A bare number is an error, so that a
-    file cannot silently mean milliseconds where seconds were intended.
-
-Requirement
-    A timeout of zero is an error. A read that is not to wait is written
-    ``none``.
-
-Requirement
-    A hexadecimal value may be written as a number or as a string: ``0x48`` or
-    ``"0x48"``. Both formats accept either spelling and both mean the same
-    value.
-
-Attribute names may be spelled with either underscores or hyphens, so
-``max_length`` and ``max-length`` are the same attribute.
-
-How the Formats Correspond
---------------------------
-The formats differ only in how the common structure is spelled.
-
-**Format correspondence**
-
-+---------------------+---------------------------+--------------------------+
-| Structure           | YAML                      | XML                      |
-+=====================+===========================+==========================+
-| A section           | A mapping key             | An element               |
-+---------------------+---------------------------+--------------------------+
-| A list of entries   | A sequence                | Repeated child elements  |
-+---------------------+---------------------------+--------------------------+
-| An attribute        | A mapping key             | An XML attribute         |
-+---------------------+---------------------------+--------------------------+
-| A group's type      | ``type: serial``          | ``type="serial"``        |
-+---------------------+---------------------------+--------------------------+
-| A byte list         | ``[0x0D, 0x0A]``          | ``"0x0D,0x0A"``          |
-+---------------------+---------------------------+--------------------------+
-
-.. note::
-   XML names the repeated children of the two list sections ``<group>`` and
-   ``<endpoint>``, the singular of the section that contains them.
-
-YAML Example
-------------
-.. code-block:: yaml
-
-   # Endpoint configuration for the payload bay.
-   general:
-     version: "1.0"
-     description: Flight payload endpoints
-
-   endpoint_groups:
-     # Everything an RS-422 payload link shares. No device name appears here:
-     # that is what tells one endpoint of this group from another, so it belongs
-     # to the endpoint.
-     - name: rs422_payload
-       type: serial
-       datarate: 115200
-       stop_bits: 1
-       byte_length: 8
-       packet_size: 512
-       stream:
-         max_length: 512
-         timeout: 250ms
-         terminators: [0x0D, 0x0A]
-
-     # A reader that simply hands over 64 bytes at a time. Saying "timeout: none"
-     # is how a file asks for that; leaving the timeout out would be an error.
-     - name: rs422_blockmode
-       type: serial
-       datarate: 38400
-       stop_bits: 2
-       byte_length: 8
-       packet_size: 64
-       stream:
-         max_length: 64
-         timeout: none
-
-     # A stream protocol, so it needs a rule for where a read ends.
-     - name: payload_tcp
-       type: network
-       protocol: tcp
-       packet_size: 1024
-       stream:
-         max_length: 4096
-         timeout: 1s
-
-     # A datagram protocol: the datagram is already the frame, so no stream
-     # section applies.
-     - name: payload_udp
-       type: network
-       protocol: udp
-       packet_size: 256
-
-     # A stream protocol again, but a Unix-domain socket is named by a path
-     # rather than by a host and port, so its endpoint gives a device. This is
-     # also the one group stating no packet size: the attribute is optional, and
-     # a recorder takes whatever a read delivers.
-     - name: payload_unix
-       type: network
-       protocol: unix_stream
-       stream:
-         max_length: 1024
-         terminators: [0x0A]
-
-     # An I2C bus. There is no byte length, parity, or stop bits to give: the
-     # protocol fixes the framing of a byte. The bus speed is recorded so that
-     # it can be checked against the platform, which is what actually sets it.
-     - name: payload_i2c
-       type: i2c
-       packet_size: 32
-       pec: true
-       retries: 2
-       timeout: 50ms
-       bus_speed: 400000
-
-     # A SPI bus. The mode must be stated, because no default is right for every
-     # peripheral, and the speed is an upper bound rather than an exact rate.
-     - name: payload_spi
-       type: spi
-       packet_size: 64
-       max_speed: 10000000
-       mode: 3
-       bits_per_word: 8
-       cs_active: low
-
-   endpoints:
-     - name: magnetometer
-       group: rs422_payload
-       device: /dev/ttyS0
-
-     - name: star_tracker
-       group: rs422_payload
-       device: /dev/ttyS1
-
-     - name: spectrometer
-       group: rs422_blockmode
-       device: /dev/ttyUSB0
-
-     - name: camera
-       group: payload_tcp
-       address: 10.0.0.20
-       port: 5000
-
-     - name: housekeeping
-       group: payload_udp
-       address: 10.0.0.21
-       port: 5001
-
-     - name: recorder
-       group: payload_unix
-       device: /run/tcspecial/recorder.sock
-
-     # Two sensors on one bus, differing only in the address the master uses.
-     # That is exactly what an endpoint is for.
-     - name: thermal_a
-       group: payload_i2c
-       device: /dev/i2c-2
-       address: 0x48
-
-     - name: thermal_b
-       group: payload_i2c
-       device: /dev/i2c-2
-       address: 0x49
-
-     # A SPI device node names the bus and the chip select together, so there is
-     # no separate address to give.
-     - name: imu
-       group: payload_spi
-       device: /dev/spidev0.1
-
-XML Example
------------
-.. code-block:: xml
-
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!-- Endpoint configuration for the payload bay. -->
-   <endpoint-configuration>
-
-     <general version="1.0" description="Flight payload endpoints"/>
-
-     <endpoint-groups>
-
-       <!-- Everything an RS-422 payload link shares. No device name appears
-            here: that is what tells one endpoint of this group from another,
-            so it belongs to the endpoint. -->
-       <group name="rs422_payload" type="serial"
-              datarate="115200" stop_bits="1" byte_length="8"
-              packet_size="512">
-         <stream max_length="512" timeout="250ms" terminators="0x0D,0x0A"/>
-       </group>
-
-       <!-- A reader that simply hands over 64 bytes at a time. Saying
-            timeout="none" is how a file asks for that; leaving the timeout
-            out would be an error. -->
-       <group name="rs422_blockmode" type="serial"
-              datarate="38400" stop_bits="2" byte_length="8"
-              packet_size="64">
-         <stream max_length="64" timeout="none"/>
-       </group>
-
-       <!-- A stream protocol, so it needs a rule for where a read ends. -->
-       <group name="payload_tcp" type="network" protocol="tcp" packet_size="1024">
-         <stream max_length="4096" timeout="1s"/>
-       </group>
-
-       <!-- A datagram protocol: the datagram is already the frame, so no
-            stream section applies. -->
-       <group name="payload_udp" type="network" protocol="udp" packet_size="256"/>
-
-       <!-- A stream protocol again, but a Unix-domain socket is named by a
-            path rather than by a host and port, so its endpoint gives a
-            device. This is also the one group stating no packet size: the
-            attribute is optional, and a recorder takes whatever a read
-            delivers. -->
-       <group name="payload_unix" type="network" protocol="unix_stream">
-         <stream max_length="1024" terminators="0x0A"/>
-       </group>
-
-       <!-- An I2C bus. There is no byte length, parity, or stop bits to give:
-            the protocol fixes the framing of a byte. The bus speed is recorded
-            so that it can be checked against the platform, which is what
-            actually sets it. -->
-       <group name="payload_i2c" type="i2c" packet_size="32"
-              pec="true" retries="2" timeout="50ms" bus_speed="400000"/>
-
-       <!-- A SPI bus. The mode must be stated, because no default is right for
-            every peripheral, and the speed is an upper bound rather than an
-            exact rate. -->
-       <group name="payload_spi" type="spi" packet_size="64"
-              max_speed="10000000" mode="3" bits_per_word="8" cs_active="low"/>
-
-     </endpoint-groups>
-
-     <endpoints>
-       <endpoint name="magnetometer"  group="rs422_payload"   device="/dev/ttyS0"/>
-       <endpoint name="star_tracker"  group="rs422_payload"   device="/dev/ttyS1"/>
-       <endpoint name="spectrometer"  group="rs422_blockmode" device="/dev/ttyUSB0"/>
-       <endpoint name="camera"        group="payload_tcp"     address="10.0.0.20" port="5000"/>
-       <endpoint name="housekeeping"  group="payload_udp"     address="10.0.0.21" port="5001"/>
-       <endpoint name="recorder"      group="payload_unix"    device="/run/tcspecial/recorder.sock"/>
-
-       <!-- Two sensors on one bus, differing only in the address the master
-            uses. That is exactly what an endpoint is for. -->
-       <endpoint name="thermal_a"     group="payload_i2c"     device="/dev/i2c-2" address="0x48"/>
-       <endpoint name="thermal_b"     group="payload_i2c"     device="/dev/i2c-2" address="0x49"/>
-
-       <!-- A SPI device node names the bus and the chip select together, so
-            there is no separate address to give. -->
-       <endpoint name="imu"           group="payload_spi"     device="/dev/spidev0.1"/>
-     </endpoints>
-
-   </endpoint-configuration>
-
-Both listings above describe the same nine endpoints in seven groups, and parse
-into values that compare equal.
 
 Testing
 =======
@@ -3553,8 +2998,8 @@ stopped.
 Requirement
     A payload set's section wins over the command interpreter's own file. A
     set's own ground station is what listens for its beacons, so the set is
-    where it is said; the file's is what places a set with no section, which a
-    set written in the endpoint language has no way to have.
+    where it is said; the file's is what places a set whose payload file
+    states no section at all.
 
 Requirement
     Tcsmoc reads the beacon group and interface from the same two

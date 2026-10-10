@@ -64,17 +64,11 @@ a simulator configuration file
     ``tcspecial1sim.yaml`` beside ``tcspecial1.yaml``, both under
     ``tests/manual``.
 
-an endpoint configuration file
-    The richer description of what is at the end of each link: groups of
-    endpoints by kind, with every term a serial line, an I\ :superscript:`2`\ C
-    bus or a SPI peripheral needs. Its endpoints can become data handlers, so
-    it is an alternative to a payload configuration rather than an addition to
-    one.
-
-Every one of them may be written in any of the three formats, and a payload
-file and an endpoint file are told apart by what is in them rather than by
-their names: a file naming ``payloads`` is the first, and one naming
-``endpoints`` is the second.
+Either may be written in YAML or XML, chosen from the extension. A payload
+file is recognised by its ``payloads`` section rather than by its name; a file
+that names no payloads is refused, and so is one written in the language that
+used to be the alternative -- groups of endpoints and the endpoints in them --
+which is gone.
 
 Payload Configuration Files
 ===========================
@@ -233,10 +227,9 @@ Tcspecial counts the triggers it sends apart from the data it carries, which
 ``QUERY_DH`` reports: a handler whose triggers climb while nothing arrives is
 one whose payload is not answering.
 
-Only ``network`` and ``device`` handlers can be described this way. A serial
-line, an I\ :superscript:`2`\ C bus or a SPI peripheral has terms this format
-has nowhere to put, and is described in an endpoint configuration file
-instead.
+A serial line, an I\ :superscript:`2`\ C bus or a SPI peripheral has terms of
+its own beyond these -- a data rate, an address on a bus, the shape of a clock
+-- which the payload states beside the rest; see `Payloads on a Link`_.
 
 **What the file will not let pass**
 
@@ -279,8 +272,8 @@ otherwise produces a payload that looks configured and is not:
   bus: several devices on one I\ :superscript:`2`\ C bus is what a bus is for,
   so what is claimed there is the bus and the address together.
 
-The same collision rule applies to an endpoint configuration file, which is
-the only one that can describe a serial line, a bus or a peripheral at all.
+The rule is over the handlers a file produced rather than the words that
+produced them, so it applies to every kind of payload alike.
 
 This is the shipped ``tcspecial1.yaml``. DH1 and DH3 are reached the same way,
 so what they share is a group; DH0 and DH2 share nothing and state everything
@@ -395,10 +388,10 @@ stem.
   tell apart.
 
 ``tcspecial4.yaml``
-  One payload on a serial line, written in the endpoint configuration language
-  because a line has terms a payload file has no words for. Running it needs
-  nothing special: tcssim stands in for the line with a pty and makes the
-  device the file names a link to it while the payload runs.
+  One payload on a serial line, which is the set that exercises a link's own
+  terms. Running it needs nothing special: tcssim stands in for the line with
+  a pty and makes the device the file names a link to it while the payload
+  runs.
 
 Simulator Configuration Files
 =============================
@@ -598,47 +591,25 @@ This is the shipped ``tcspecial1sim.yaml``.
        protocol: udp
        packet_interval_ms: 500
 
-Endpoint Configuration Files
-============================
-A group carries every attribute of its kind except the one that locates an
-endpoint; the endpoint carries that, because it is what tells one endpoint of
-a group from another.
+Payloads on a Link
+==================
+Three kinds of payload are on a link of their own -- ``serial``, ``i2c`` and
+``spi`` -- and each has terms that say how the link is driven. A payload
+states them beside everything else it states, or takes them from its
+``payload_groups`` group the way it takes the rest.
 
-Underscores and hyphens are both accepted in every attribute name, so
-``stop_bits`` and ``stop-bits`` are the same attribute. In XML they are
-written as attributes of the element.
+These used to be a second kind of file: an endpoint configuration, which
+described groups of endpoints and the endpoints in them. It is gone, and a
+payload states what an endpoint and its group stated between them.
 
-.. code-block:: text
-
-   general
-     version      "1.0"
-     description  free text
-
-   endpoint_groups
-     name         the name endpoints refer to
-     type         serial | network | i2c | spi
-     packet_size  bytes in one packet
-     ...          the attributes of that kind, below
-
-   endpoints
-     name         the endpoint's name, which becomes a handler's name
-     group        the group it belongs to
-     dh_id        the handler number it becomes, if it is to become one
-     ...          what locates it, below
-     oc_address   as in a payload configuration
-     oc_port
-
-**What locates an endpoint**
+**What locates a payload on a link**
 
 .. code-block:: text
 
-   device         a path: a serial port, a SPI device node, a plain device,
-                  or a Unix-domain socket. Also spelled path
-   address, port  a host and a port, for a network endpoint
-   device,        a bus and the address of a device on it, for I2C
-   address
+   path           a serial port or a SPI device node
+   path, address  a bus and the address of a device on it, for I2C
 
-**A serial group**
+**A serial payload**
 
 .. code-block:: text
 
@@ -664,8 +635,8 @@ written as attributes of the element.
 What each kind of line may say is what the Linux driver for such a line can be
 told, and nothing else: termios sets a parity per character on a start-stop
 line, and the kernel's generic HDLC takes a clock, a coding, a frame check and
-a loopback for a synchronous one. A group stating the other kind's attributes
-is refused.
+a loopback for a synchronous one. A payload stating the other kind's
+attributes is refused.
 
 Both kinds write the frame check as ``parity``, which is what Linux calls both
 of them; the values say which is meant.
@@ -681,17 +652,9 @@ A synchronous line's attributes are recorded rather than applied: the kernel
 drives such a line through a network interface of its own rather than through
 the terms of a device file, so a handler that opens a path cannot set them.
 They are kept so that the link a file describes can be checked against the
-equipment, as an I\ :superscript:`2`\ C group's bus speed is.
+equipment, as an I\ :superscript:`2`\ C payload's bus speed is.
 
-**A network group**
-
-.. code-block:: text
-
-   protocol       tcp | udp | unix_stream | unix_dgram
-   stream         required for tcp and unix_stream, refused for the datagram
-                  protocols, where the datagram is already the frame
-
-**An I**\ :superscript:`2`\ **C group**
+**An I**\ :superscript:`2`\ **C payload**
 
 .. code-block:: text
 
@@ -703,9 +666,9 @@ equipment, as an I\ :superscript:`2`\ C group's bus speed is.
    bus_speed      recorded, not applied: the bus clock belongs to the
                   controller and is set by the platform
 
-An endpoint of such a group gives both the bus device and the address on it,
-because two endpoints of one group commonly sit on the same bus and differ
-only in which device the master addresses. With seven-bit addressing the
+A payload on a bus gives both the bus device and the address on it, because
+two payloads commonly sit on the same bus and differ only in which device the
+master addresses. With seven-bit addressing the
 usable addresses are 0x08 through 0x77: the specification reserves 0x00
 through 0x07 and 0x78 through 0x7F, so no device can answer to one of those.
 With ten-bit addressing the whole range 0x000 through 0x3FF is usable.
@@ -713,19 +676,21 @@ With ten-bit addressing the whole range 0x000 through 0x3FF is usable.
 There is no parity or byte length. I\ :superscript:`2`\ C fixes the framing at
 eight data bits, most significant first, followed by an acknowledge bit.
 
-**A SPI group**
+**A SPI payload**
 
 .. code-block:: text
 
    max_speed      the greatest clock rate the peripheral accepts, in Hz
-   mode           0 | 1 | 2 | 3, the clock polarity and phase
+   spi_mode       0 | 1 | 2 | 3, the clock polarity and phase. Named so
+                  because a payload's own mode says whether it sends of
+                  its own accord or on a trigger
    bits_per_word  commonly 8, though a controller may support other widths
    bit_order      msb | lsb
    cs_active      low | high
 
 The mode must match the peripheral; a mismatch fails the way a wrong data rate
-fails on a serial line. An endpoint of a SPI group gives the device node
-alone, which names the bus and the chip select together.
+fails on a serial line. A SPI payload gives the device node alone, which names
+the bus and the chip select together.
 
 There is no parity and there are no stop bits. SPI is clocked and full duplex,
 and a transfer is delimited by the chip select rather than by framing bits.
@@ -747,16 +712,13 @@ refused, because it would describe a read with no way to end but filling the
 buffer -- which is a real intent, but one a file states by giving
 ``timeout: none``.
 
-Neither bus kind takes a stream section. A master clocks exactly as many bytes
-as it asks for, so a transfer is already bounded and needs no rule for where a
-read ends.
+Only a line takes a stream section. A master on a bus clocks exactly as many
+bytes as it asks for, so a transfer is already bounded and needs no rule for
+where a read ends; a network payload's datagram is already a frame.
 
-A worked example of every kind at once, in YAML and in XML, is at the end of
-"Endpoint Configuration Files" in ``docs/design.rst``. None of its endpoints
-gives a ``dh_id``, which is what makes it an endpoint configuration rather than
-a set of data handlers: an endpoint becomes a handler only when it is given a
-number for commands to name it by, and an OC address for the handler to reach
-the ground at.
+``tests/manual/tcspecial4.yaml`` is a worked example of a line, with its
+group, its terms and its stream rule, and ``tcspecial4.xml`` is the same set
+in the other format.
 
 Not Yet Read
 ------------
@@ -885,8 +847,7 @@ All three are required of every command interpreter configuration, with no
 defaults: beacons are how the ground knows the spacecraft is alive, and a
 configuration that has not been asked where to send them has not answered.
 ``tcspecial.yaml`` states them too, and a set's section wins over it; the
-file's are what place a set with no section, which is what a set written in the
-endpoint configuration language is.
+file's are what place a set whose payload file states no section at all.
 
 The address is a **multicast group** -- in ``224.0.0.0/4``, and
 ``239.0.0.0/8`` for one of local scope, which is what a mission network wants.
@@ -1036,8 +997,8 @@ differing only in comments, spacing, the order of their sections or the order
 of one payload's attributes. The order of the payloads does count -- ids follow
 it -- so each payload is given a sequence number as the file is read, the
 digest takes them in that order, and a file may not state a number of its own.
-An endpoint configuration's endpoints are numbered the same way, a set being
-writable in either language.
+Both formats number them alike, which is what lets the YAML and the XML of
+one set digest the same.
 
 A difference means the two ends are not serving the same set. The usual cause
 is a tcspecial left running from an earlier one, which tcsmoc attaches to

@@ -2,7 +2,6 @@
 
 use std::path::Path;
 
-use tcslibgs::endpoint_config::{self, EndpointConfigDoc};
 use std::net::{Ipv4Addr, SocketAddr};
 
 use tcslibgs::{
@@ -43,8 +42,7 @@ pub struct Beacon {
 /// The set wins because the set's own ground station is what listens for its
 /// beacons. `section` is the set's `tcspecial` section, and a set either has
 /// one -- in which case it states both attributes, each being required -- or
-/// has none at all: a set written in the endpoint language has no place to put
-/// them, and that is the case this file's own values are for.
+/// has none at all, which is the case this file's own values are for.
 pub fn beacon(config: &CIConfig, section: Option<&CIConfigJson>) -> Result<Beacon, String> {
     match section {
         Some(section) => Ok(Beacon {
@@ -73,17 +71,6 @@ pub fn tcspecial_config_path() -> String {
 /// and what is read when it is unset.
 pub const TCSPECIAL_CONFIG_PATH_VAR: &str = "TCSPECIAL_CONFIG_PATH";
 pub const DEFAULT_TCSPECIAL_CONFIG_PATH: &str = "tcspecial/src/tcspecial.yaml";
-
-/// Load an endpoint configuration file in YAML or XML.
-///
-/// The format is chosen from the file extension, as it is for every other
-/// configuration file here. What comes back is the groups and the endpoints
-/// drawing on them, already checked against the rules in "Endpoint
-/// Configuration Files" in `docs/design.rst`: a group carries what its
-/// endpoints share, and each endpoint carries what locates it.
-pub fn load_endpoint_config<P: AsRef<Path>>(path: P) -> TcsResult<EndpointConfigDoc> {
-    endpoint_config::load(path).map_err(TcsError::from)
-}
 
 /// Configuration constants
 pub mod constants {
@@ -189,7 +176,10 @@ mod tests {
         assert_eq!(config.beacon_interface.to_string(), "127.0.0.1");
         assert_eq!(config.beacon_interval.0, 5000);
 
-        for missing in ["beacon_address: 239.255.0.1:5550\nbeacon_interface: 127.0.0.1\n", "beacon_interval_ms: 5000\n"] {
+        for missing in [
+            "beacon_address: 239.255.0.1:5550\nbeacon_interface: 127.0.0.1\n",
+            "beacon_interval_ms: 5000\n",
+        ] {
             let without = YAML.replace(missing, "");
             assert_ne!(without, YAML, "the test removed nothing");
             assert!(
@@ -209,7 +199,10 @@ mod tests {
     fn a_payload_set_says_where_its_beacons_go() {
         let from_the_file = load_from(
             ".yaml",
-            &YAML.replace("beacon_address: 239.255.0.1:5550", "beacon_address: 239.255.0.9:5550"),
+            &YAML.replace(
+                "beacon_address: 239.255.0.1:5550",
+                "beacon_address: 239.255.0.9:5550",
+            ),
         )
         .expect("the configuration loads");
         assert_eq!(from_the_file.beacon_address.to_string(), "239.255.0.9:5550");
@@ -235,8 +228,8 @@ mod tests {
             "239.255.0.7:7550"
         );
 
-        // No section at all -- a set written in the endpoint language, which
-        // has no place to state one. This file's own address is for that set.
+        // No section at all, which a payload file need not have. This
+        // file's own address is for that set.
         assert_eq!(
             beacon(&from_the_file, None)
                 .expect("it resolves")
@@ -275,9 +268,7 @@ mod tests {
                 "beacon_address: 239.255.0.1:5550",
                 &format!("beacon_address: \"{bad}\""),
             );
-            let said = load_from(".yaml", &text)
-                .expect_err(bad)
-                .to_string();
+            let said = load_from(".yaml", &text).expect_err(bad).to_string();
             assert!(
                 said.contains("beacon_address"),
                 "{bad}: the refusal does not name the attribute: {said}"
@@ -307,75 +298,88 @@ mod tests {
         assert!(load_from(".yaml", &bad).is_err());
     }
 
-    // -- endpoint configuration ---------------------------------------------
+    // -- payload files ------------------------------------------------------
 
-    /// As `load_from`, for an endpoint configuration file.
-    fn load_endpoints_from(ext: &str, text: &str) -> TcsResult<EndpointConfigDoc> {
+    /// A payload file in each format, written to a temporary file and loaded
+    /// the way tcspecial loads one.
+    fn load_payloads_from(ext: &str, text: &str) -> TcsResult<Vec<tcslibgs::DHConfig>> {
         let mut file = Builder::new().suffix(ext).tempfile().unwrap();
         file.write_all(text.as_bytes()).unwrap();
         file.flush().unwrap();
-        load_endpoint_config(file.path())
+        tcslibgs::config::load_dh_configs(file.path())
     }
 
-    const ENDPOINTS_YAML: &str = "\
-endpoint_groups:
-  - name: bus
+    const PAYLOADS_YAML: &str = "\
+version: \"1.0\"
+description: a bus and a peripheral
+payloads:
+  - dh_id: 0
+    name: thermal
     type: i2c
-    pec: true
-  - name: chip
-    type: spi
-    max_speed: 1000000
-    mode: 0
-endpoints:
-  - name: thermal
-    group: bus
-    device: /dev/i2c-1
+    path: /dev/i2c-1
     address: 0x48
-  - name: imu
-    group: chip
-    device: /dev/spidev0.0
+    pec: true
+    packet_size: 8
+  - dh_id: 1
+    name: imu
+    type: spi
+    path: /dev/spidev0.0
+    max_speed: 1000000
+    spi_mode: 0
+    packet_size: 8
 ";
 
-    const ENDPOINTS_XML: &str = r#"<endpoint-configuration>
-  <endpoint-groups>
-    <group name="bus" type="i2c" pec="true"/>
-    <group name="chip" type="spi" max_speed="1000000" mode="0"/>
-  </endpoint-groups>
-  <endpoints>
-    <endpoint name="thermal" group="bus" device="/dev/i2c-1" address="0x48"/>
-    <endpoint name="imu" group="chip" device="/dev/spidev0.0"/>
-  </endpoints>
-</endpoint-configuration>"#;
+    const PAYLOADS_XML: &str = r#"<payload-configuration>
+  <version>1.0</version>
+  <description>a bus and a peripheral</description>
+  <payloads>
+    <dh_id>0</dh_id>
+    <name>thermal</name>
+    <type>i2c</type>
+    <path>/dev/i2c-1</path>
+    <address>0x48</address>
+    <pec>true</pec>
+    <packet_size>8</packet_size>
+  </payloads>
+  <payloads>
+    <dh_id>1</dh_id>
+    <name>imu</name>
+    <type>spi</type>
+    <path>/dev/spidev0.0</path>
+    <max_speed>1000000</max_speed>
+    <spi_mode>0</spi_mode>
+    <packet_size>8</packet_size>
+  </payloads>
+</payload-configuration>"#;
 
     #[test]
-    fn test_load_endpoint_config_every_format() {
-        for (ext, text) in [(".yaml", ENDPOINTS_YAML), (".xml", ENDPOINTS_XML)] {
-            let doc = load_endpoints_from(ext, text)
-                .unwrap_or_else(|e| panic!("{ext} failed to load: {e}"));
-
-            assert_eq!(doc.groups.len(), 2, "{ext}");
-            assert_eq!(doc.endpoints.len(), 2, "{ext}");
-            assert_eq!(doc.group("bus").unwrap().kind.type_name(), "i2c", "{ext}");
-            assert_eq!(doc.group("chip").unwrap().kind.type_name(), "spi", "{ext}");
+    fn a_payload_file_loads_in_either_format() {
+        for (ext, text) in [(".yaml", PAYLOADS_YAML), (".xml", PAYLOADS_XML)] {
+            let handlers =
+                load_payloads_from(ext, text).unwrap_or_else(|e| panic!("{ext} failed: {e}"));
+            assert_eq!(handlers.len(), 2, "{ext}");
+            assert_eq!(handlers[0].name, tcslibgs::DHName::new("thermal"), "{ext}");
+            assert_eq!(handlers[1].name, tcslibgs::DHName::new("imu"), "{ext}");
         }
     }
 
     #[test]
-    fn test_endpoint_formats_agree() {
-        let yaml = load_endpoints_from(".yaml", ENDPOINTS_YAML).unwrap();
-        let xml = load_endpoints_from(".xml", ENDPOINTS_XML).unwrap();
-        assert_eq!(yaml, xml);
+    fn the_formats_agree_about_a_payload_file() {
+        assert_eq!(
+            load_payloads_from(".yaml", PAYLOADS_YAML).unwrap(),
+            load_payloads_from(".xml", PAYLOADS_XML).unwrap()
+        );
     }
 
     #[test]
-    fn test_endpoint_rule_violations_reach_the_caller() {
-        // The rules live in the parser; what this checks is that a violation
+    fn a_rule_violation_reaches_the_caller() {
+        // The rules live in the library; what this checks is that a violation
         // arrives here as an error rather than as a surprising default.
-        let reserved = ENDPOINTS_YAML.replace("address: 0x48", "address: 0x00");
-        let e = load_endpoints_from(".yaml", &reserved).unwrap_err();
+        let reserved = PAYLOADS_YAML.replace("address: 0x48", "address: 0x00");
+        let e = load_payloads_from(".yaml", &reserved).unwrap_err();
         assert!(format!("{e}").contains("reserved"), "got {e}");
 
-        let no_mode = ENDPOINTS_YAML.replace("    mode: 0\n", "");
-        assert!(load_endpoints_from(".yaml", &no_mode).is_err());
+        let no_mode = PAYLOADS_YAML.replace("    spi_mode: 0\n", "");
+        assert!(load_payloads_from(".yaml", &no_mode).is_err());
     }
 }

@@ -57,7 +57,7 @@ const I2C_SMBUS_BLOCK_MAX: usize = 32;
 /// The register a payload's data is read from and written to.
 ///
 /// SMBus transfers are addressed to a register within the device, and nothing
-/// in an endpoint configuration says which: a payload link is a stream of
+/// in a payload configuration says which: a payload link is a stream of
 /// bytes rather than a set of named values, so one register serves as the
 /// window onto it. Zero, by convention, and the simulator writes the same
 /// one.

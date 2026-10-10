@@ -678,9 +678,7 @@ pub struct DHConfig {
     ///
     /// `None` for a configuration that assigns none. A handler cannot be
     /// started without one -- it would have nowhere to send what it reads --
-    /// but a file describing payloads is complete without it, and so is a
-    /// handler converted from an endpoint configuration, which has no OC side
-    /// to give.
+    /// but a file describing payloads is complete without it.
     pub oc: Option<NetworkConfig>,
     /// How this payload is made to send; see [`DHMode`].
     ///
@@ -734,9 +732,7 @@ fn link_of(
                 .clone()
                 .or_else(|| group.and_then(|g| g.address.clone()))
                 .ok_or_else(|| {
-                    format!(
-                        "payload \"{name}\" is on an I2C bus, so it needs an address on it"
-                    )
+                    format!("payload \"{name}\" is on an I2C bus, so it needs an address on it")
                 })?;
             let ten_bit = stated
                 .ten_bit
@@ -779,9 +775,7 @@ pub(crate) fn link_params_of(
         };
     }
 
-    let wire = crate::endpoint_config::GroupWire {
-        name: name.to_string(),
-        kind: kind.spelling().to_string(),
+    let wire = crate::endpoint_config::LinkTerms {
         datarate: inherited!(datarate),
         stop_bits: inherited!(stop_bits),
         asynchronous: inherited!(asynchronous),
@@ -801,8 +795,7 @@ pub(crate) fn link_params_of(
         bits_per_word: inherited!(bits_per_word),
         bit_order: inherited!(bit_order),
         cs_active: inherited!(cs_active),
-        packet_size: None,
-        stream: inherited!(stream).map(|s| crate::endpoint_config::StreamWire {
+        stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
             timeout: s.timeout,
             terminators: s.terminators,
@@ -893,8 +886,7 @@ impl PayloadConfig {
         // then loses a payload: tcspecial keeps its handlers by id, so a
         // repeated id has one silently replace the other, and a simulator
         // file is joined to this one by name, so a repeated name has one
-        // entry drive two payloads. Worded as the endpoint configuration
-        // format words the same rule, which has had these checks all along.
+        // entry drive two payloads.
         let mut by_id: BTreeMap<u32, &str> = BTreeMap::new();
         let mut by_name: BTreeSet<&str> = BTreeSet::new();
         for payload in &self.payloads {
@@ -1326,9 +1318,8 @@ impl DHConfigJson {
         };
 
         // An attribute of another kind is an error rather than something
-        // ignored, which is the rule the endpoint configuration format has
-        // for its own groups and is worded the same way here. Ignoring one
-        // is how a device payload comes to carry a port nothing reads, and
+        // ignored. Ignoring one is how a device payload comes to carry a
+        // port nothing reads, and
         // how a network payload carrying a path looks configured and is not.
         // Checked after the group has been laid under the payload, because an
         // attribute inherited from a group reaches the handler exactly as one
@@ -1342,8 +1333,23 @@ impl DHConfigJson {
         // address at all. The attributes of a *link* -- a data rate, a clock
         // mode -- are refused by the rules for each kind instead; see
         // `link_of`.
+        //
+        // A stream rule -- where one read ends -- is a line's, and the two
+        // kinds that are not on a link at all are told so here. A bus and a
+        // peripheral are told by the rules for their kind, which have always
+        // refused one: a master clocks exactly the bytes it asks for.
+        let stream = self.stream.is_some() || group.is_some_and(|g| g.stream.is_some());
         let foreign: &[(&str, bool, bool)] = match kind {
-            DHType::Network => &[("path", self.path.is_some(), path.is_some())],
+            DHType::Network => &[
+                ("path", self.path.is_some(), path.is_some()),
+                ("stream", self.stream.is_some(), stream),
+            ],
+            DHType::Device => &[
+                ("protocol", self.protocol.is_some(), protocol.is_some()),
+                ("address", self.address.is_some(), address.is_some()),
+                ("port", self.port.is_some(), port.is_some()),
+                ("stream", self.stream.is_some(), stream),
+            ],
             DHType::I2c => &[
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
                 ("port", self.port.is_some(), port.is_some()),
@@ -1880,7 +1886,10 @@ mod tests {
     #[test]
     fn bytes_read_as_hex_pairs() {
         assert_eq!(bytes_to_hex(&[0x01, 0x02, 0x03], 10), "01 02 03");
-        assert_eq!(bytes_to_hex(&[0x01, 0x02, 0x03, 0x04, 0x05], 3), "01 02 03...");
+        assert_eq!(
+            bytes_to_hex(&[0x01, 0x02, 0x03, 0x04, 0x05], 3),
+            "01 02 03..."
+        );
         assert_eq!(bytes_to_hex(&[], 8), "", "nothing reads as nothing");
     }
 
@@ -1904,7 +1913,10 @@ mod tests {
             seconds: 3661,
             nanoseconds: 0,
         });
-        assert_eq!(sample.panel_lines(), ("01:01:01".to_string(), "52 45 41 44 0D".to_string()));
+        assert_eq!(
+            sample.panel_lines(),
+            ("01:01:01".to_string(), "52 45 41 44 0D".to_string())
+        );
 
         // And a transfer longer than the sample keeps shows a head and says
         // so: without the ellipsis a packet of twelve bytes and one of eight
@@ -2191,7 +2203,10 @@ payloads:
     fn half_an_oc_address_is_an_error() {
         // A port with no address, or an address with no port, reaches nothing
         // and says nothing about which was meant.
-        for (what, line) in [("port", "oc_address: 127.0.0.1"), ("address", "oc_port: 6000")] {
+        for (what, line) in [
+            ("port", "oc_address: 127.0.0.1"),
+            ("address", "oc_port: 6000"),
+        ] {
             let config = payload(&format!(
                 "
 version: \"1.0\"
@@ -2240,7 +2255,10 @@ payloads:
                 assert_eq!(line.datarate, 115_200);
                 assert!(line.asynchronous);
                 assert_eq!(line.byte_length, 8);
-                assert!(line.stop_bits.is_some(), "an asynchronous line has stop bits");
+                assert!(
+                    line.stop_bits.is_some(),
+                    "an asynchronous line has stop bits"
+                );
                 assert!(line.parity.is_some());
                 // Synchronous terms are not a thing an asynchronous line has.
                 assert!(line.clock_type.is_none());
@@ -2479,7 +2497,9 @@ payloads:
             "  - dh_id: 1\n    name: DH0\n    type: network\n    protocol: udp\n    \
              address: localhost\n    port: 5001\n    packet_size: 12",
         ));
-        let said = same_name.to_dh_configs().expect_err("two payloads, one name");
+        let said = same_name
+            .to_dh_configs()
+            .expect_err("two payloads, one name");
         assert!(
             said.contains("DH0") && said.contains("more than once"),
             "the error should name the payload: {said}"
@@ -2522,16 +2542,21 @@ payloads:
         };
 
         let udp = |port: u16| {
-            format!("    type: network\n    protocol: udp\n    address: localhost\n    port: {port}")
+            format!(
+                "    type: network\n    protocol: udp\n    address: localhost\n    port: {port}"
+            )
         };
         let device = |path: &str| format!("    type: device\n    path: {path}");
 
         // The same host and port, written two ways: localhost and 127.0.0.1
         // are one host, so naming it differently does not make it a different
         // port.
-        let said = payload(&pair(&udp(5000), "    type: network\n    protocol: udp\n    address: 127.0.0.1\n    port: 5000"))
-            .to_dh_configs()
-            .expect_err("two payloads at one port");
+        let said = payload(&pair(
+            &udp(5000),
+            "    type: network\n    protocol: udp\n    address: 127.0.0.1\n    port: 5000",
+        ))
+        .to_dh_configs()
+        .expect_err("two payloads at one port");
         assert!(
             said.contains("DH0") && said.contains("DH1") && said.contains("5000"),
             "the error should name both handlers and what they want: {said}"
@@ -2599,11 +2624,9 @@ payloads:
         no_two_handlers_claim_one_thing(&[on_bus(0, "DH0", 0x48), on_bus(1, "DH1", 0x49)])
             .expect("two devices on one bus is what a bus is for");
 
-        let said = no_two_handlers_claim_one_thing(&[
-            on_bus(0, "DH0", 0x48),
-            on_bus(1, "DH1", 0x48),
-        ])
-        .expect_err("two devices at one address on one bus");
+        let said =
+            no_two_handlers_claim_one_thing(&[on_bus(0, "DH0", 0x48), on_bus(1, "DH1", 0x48)])
+                .expect_err("two devices at one address on one bus");
         assert!(
             said.contains("0x48") && said.contains("/dev/i2c-1"),
             "the error should name the address and the bus: {said}"
@@ -2677,8 +2700,12 @@ payloads:
 
         // The same payload name, the same group name, and the same id, in two
         // files that know nothing of each other.
-        let first = payload(&one_set(5000, 12)).to_dh_configs().expect("the first set");
-        let second = payload(&one_set(6000, 8)).to_dh_configs().expect("the second set");
+        let first = payload(&one_set(5000, 12))
+            .to_dh_configs()
+            .expect("the first set");
+        let second = payload(&one_set(6000, 8))
+            .to_dh_configs()
+            .expect("the second set");
 
         assert_eq!(first[0].name.0, second[0].name.0);
         assert_eq!(first[0].dh_id, second[0].dh_id);
@@ -2692,8 +2719,7 @@ payloads:
     ///
     /// Ignoring one is how a device payload comes to carry a port nothing
     /// reads, and how a network payload carrying a path looks configured and
-    /// is not. The endpoint configuration format has had this rule for its
-    /// own groups all along.
+    /// is not.
     #[test]
     fn an_attribute_of_another_kind_does_not_apply() {
         let device = payload(
@@ -2711,7 +2737,9 @@ payloads:
     packet_size: 1
 ",
         );
-        let said = device.to_dh_configs().expect_err("a device has no protocol");
+        let said = device
+            .to_dh_configs()
+            .expect_err("a device has no protocol");
         assert!(
             said.contains("device") && said.contains("protocol") && !said.contains("group"),
             "an attribute the payload states itself is not blamed on a group: {said}"
@@ -2732,7 +2760,9 @@ payloads:
     packet_size: 12
 ",
         );
-        let said = network.to_dh_configs().expect_err("a network payload has no path");
+        let said = network
+            .to_dh_configs()
+            .expect_err("a network payload has no path");
         assert!(said.contains("network") && said.contains("path"), "{said}");
 
         // An attribute inherited from a group applies to a payload exactly as
@@ -2876,7 +2906,10 @@ payloads:
         // And a trigger of text, written with quotes because its escapes are
         // what the quotes are for.
         assert_eq!(with("\"READ\\r\"").unwrap(), b"READ\r".to_vec());
-        assert_eq!(with("0x52 45 41 44 0D").unwrap(), with("\"READ\\r\"").unwrap());
+        assert_eq!(
+            with("0x52 45 41 44 0D").unwrap(),
+            with("\"READ\\r\"").unwrap()
+        );
     }
 
     /// Which file an interval belongs in follows from the kind of payload.
@@ -2973,10 +3006,15 @@ payloads:
     port: 5000
     packet_size: 12
 ";
-        let handlers = payload(grouped).to_dh_configs().expect("the group states it");
+        let handlers = payload(grouped)
+            .to_dh_configs()
+            .expect("the group states it");
         assert!(matches!(
             handlers[0].mode,
-            DHMode::Triggered { interval_ms: 500, .. }
+            DHMode::Triggered {
+                interval_ms: 500,
+                ..
+            }
         ));
     }
 
@@ -3059,7 +3097,10 @@ payloads:
     /// where one read ends and reaches no handler, as it reached none when an
     /// endpoint configuration was what stated it -- so a test of a rule asks
     /// for the terms the rules settled rather than for the handler.
-    fn link_terms(kind: &str, attributes: &str) -> Result<crate::endpoint_config::GroupKind, String> {
+    fn link_terms(
+        kind: &str,
+        attributes: &str,
+    ) -> Result<crate::endpoint_config::GroupKind, String> {
         let config = link(kind, attributes)?;
         let payload = &config.payloads[0];
         let group = payload.group.as_deref().and_then(|g| config.group(g));
@@ -3097,7 +3138,8 @@ payloads:
 
     #[test]
     fn terminators_alone_end_a_read() {
-        let stream = line_stream("      max_length: 64\n      terminators: [10]\n").expect("accepted");
+        let stream =
+            line_stream("      max_length: 64\n      terminators: [10]\n").expect("accepted");
         assert_eq!(stream.timeout, None);
         assert_eq!(stream.terminators, vec![10]);
         assert!(!stream.is_fixed_length());
@@ -3105,8 +3147,9 @@ payloads:
 
     #[test]
     fn a_timeout_and_terminators_may_both_end_a_read() {
-        let stream = line_stream("      max_length: 64\n      timeout: 1s\n      terminators: [0x04]\n")
-            .expect("accepted");
+        let stream =
+            line_stream("      max_length: 64\n      timeout: 1s\n      terminators: [0x04]\n")
+                .expect("accepted");
         assert_eq!(stream.timeout, Some(Duration::from_secs(1)));
         assert_eq!(stream.terminators, vec![0x04]);
     }
@@ -3152,8 +3195,8 @@ payloads:
 
     #[test]
     fn a_timeout_without_a_unit_is_refused() {
-        let said = line_stream("      max_length: 8\n      timeout: 250\n")
-            .expect_err("250 of what");
+        let said =
+            line_stream("      max_length: 8\n      timeout: 250\n").expect_err("250 of what");
         assert!(said.contains("no unit"), "{said}");
     }
 
@@ -3248,8 +3291,10 @@ payloads:
             "    encoding: nrzi\n",
             "    loopback: true\n",
         ] {
-            let said = line(&format!("    asynchronous: true\n    stop_bits: 1\n{stated}"))
-                .expect_err("a start-stop line shares no clock");
+            let said = line(&format!(
+                "    asynchronous: true\n    stop_bits: 1\n{stated}"
+            ))
+            .expect_err("a start-stop line shares no clock");
             let named = stated.trim().split(':').next().unwrap();
             assert!(
                 said.contains(named) && said.contains("shares no clock"),
@@ -3333,7 +3378,10 @@ payloads:
         // asked, because the size is one every kind states.
         for (kind, rest) in [
             ("device", "    path: /dev/null\n"),
-            ("network", "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n"),
+            (
+                "network",
+                "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n",
+            ),
             ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n"),
             (
                 "spi",
@@ -3472,6 +3520,41 @@ payloads:
     fn a_payload_on_a_bus_says_where_on_it_it_is() {
         let said = bus_place("    path: /dev/i2c-1\n").expect_err("which device on the bus");
         assert!(said.contains("address"), "{said}");
+
+        // And which bus, the two together being what tells one device on a
+        // bus from another.
+        let said = bus_place("    address: 0x48\n").expect_err("which bus");
+        assert!(said.contains("reached through"), "{said}");
+    }
+
+    #[test]
+    fn a_payload_that_is_on_no_link_is_given_no_stream_rule() {
+        // The rule says where one read of a line ends. A device read whole
+        // and a datagram that arrives whole have no use for one, so a file
+        // that gives them one is told, rather than having the section read
+        // and dropped.
+        for (kind, rest) in [
+            ("device", "    path: /dev/null\n"),
+            (
+                "network",
+                "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n",
+            ),
+        ] {
+            let said = link(
+                kind,
+                &format!(
+                    "{rest}    packet_size: 8\n    stream:\n      max_length: 8\n      \
+                     timeout: none\n"
+                ),
+            )
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err(kind);
+            assert!(
+                said.contains("stream") && said.contains("does not apply"),
+                "{kind}: {said}"
+            );
+        }
     }
 
     // -- a peripheral -------------------------------------------------------
@@ -3572,8 +3655,16 @@ payloads:
         // The rule that a misplaced term is reported where it was written,
         // checked across the cross-product rather than one way.
         for (kind, rest, foreign) in [
-            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n", "    datarate: 9600\n"),
-            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n", "    spi_mode: 0\n"),
+            (
+                "i2c",
+                "    path: /dev/i2c-1\n    address: 0x40\n",
+                "    datarate: 9600\n",
+            ),
+            (
+                "i2c",
+                "    path: /dev/i2c-1\n    address: 0x40\n",
+                "    spi_mode: 0\n",
+            ),
             (
                 "spi",
                 "    path: /dev/spidev0.0\n    max_speed: 1\n    spi_mode: 0\n",

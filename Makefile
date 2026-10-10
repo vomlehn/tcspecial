@@ -15,9 +15,8 @@ RUST = .
 #
 # One variable rather than two, because the two files of a set are named for
 # each other: PAYLOAD_FILE is the stem, `$(PAYLOAD_FILE).yaml` the payload
-# file -- which may be written as a payload configuration or as an endpoint
-# configuration, and in YAML or XML -- and `$(PAYLOAD_FILE)sim.yaml` the
-# simulator settings beside it. So:
+# file -- in YAML or XML -- and `$(PAYLOAD_FILE)sim.yaml` the simulator
+# settings beside it. So:
 #   make run     PAYLOAD_FILE=tests/manual/tcspecial2
 #   make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
 #   make runsim  PAYLOAD_FILE=tests/manual/tcspecial2

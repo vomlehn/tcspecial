@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::endpoint_config::{validate_stream, StreamParams};
 use crate::endpoint_config::{
     bad, parse_flag, parse_u32, reject_foreign_fields, require, EndpointConfigError,
-    EndpointConfigResult, GroupKind, GroupWire, Scalar,
+    EndpointConfigResult, GroupKind, LinkTerms, Scalar,
 };
 
 /// Which parity a file's word names, for an asynchronous line.
@@ -381,7 +381,7 @@ fn parse_stop_bits(group: &str, s: &Scalar) -> EndpointConfigResult<StopBits> {
 /// hardware is at the other end of.
 pub(crate) fn group_kind_of(
     name: &str,
-    g: GroupWire,
+    g: LinkTerms,
 ) -> EndpointConfigResult<GroupKind> {
 
     reject_foreign_fields(

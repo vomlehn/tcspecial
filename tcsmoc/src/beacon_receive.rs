@@ -10,7 +10,7 @@ use slint::{Color, Weak};
 
 use crate::MainWindow;
 use slint::SharedString;
-use tcslibgs::{TcsError, TcsResult, Timestamp, NO_TRANSFER_TIME};
+use tcslibgs::{TcsError, TcsResult, Telemetry, Timestamp, NO_TRANSFER_TIME};
 use tcspecial::config::Beacon;
 
 const DEBUG_BEACON: bool = false;
@@ -173,9 +173,18 @@ impl IndicatorStates {
  * ui_weak      Slint window with beacon information
  * indicators   Indicator state configuration
  */
+/// What the message line says before any beacon has arrived.
+///
+/// Said rather than left empty, because an empty line next to a label reads
+/// as a line that has not been filled in yet by the program rather than as
+/// one the spacecraft has not filled in.
+pub const NO_BEACON_MESSAGE: &str = "<none>";
+
 #[derive(Clone)]
 pub struct BeaconReceive {
     last_beacon:        ArcCondPair<Option<SystemTime>>,
+    /// What the last beacon said, kept for the passes that find nothing.
+    last_message:       Arc<Mutex<String>>,
     /// The multicast group beacons arrive on, and the local interface to join
     /// it on. Both come from the command interpreter's configuration, which
     /// is also where tcspecial reads them, so the two cannot differ.
@@ -185,10 +194,10 @@ pub struct BeaconReceive {
 }
 
 /// What a pass of the receive loop found.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Arrived {
-    /// A beacon, now.
-    Beacon,
+    /// A beacon, now, and what it said.
+    Beacon(String),
     /// Nothing, for as long as the pass waited.
     Nothing,
     /// The socket failed, which says nothing about the spacecraft.
@@ -205,11 +214,25 @@ pub(crate) enum Arrived {
 pub(crate) fn after_a_pass(
     states: &IndicatorStates,
     last: &CondPair<Option<SystemTime>>,
-    arrived: Arrived,
+    last_message: &Mutex<String>,
+    arrived: &Arrived,
     now: SystemTime,
-) -> (Color, Option<SystemTime>) {
-    match arrived {
-        Arrived::Beacon => {
+) -> (Color, Option<SystemTime>, String) {
+    // What the last beacon said, which a pass that received one replaces and
+    // every other pass keeps. Kept for the same reason the time is: a beacon
+    // said what it said, whatever the passes after it find, and blanking the
+    // line would say the spacecraft had gone quiet about something it has
+    // not gone quiet about.
+    let said = {
+        let mut guard = last_message.lock().unwrap();
+        if let Arrived::Beacon(message) = arrived {
+            *guard = message.clone();
+        }
+        guard.clone()
+    };
+
+    let (color, at) = match arrived {
+        Arrived::Beacon(_) => {
             let mut guard = last.lock.lock().unwrap();
             *guard = Some(now);
             last.cvar.notify_all();
@@ -222,7 +245,9 @@ pub(crate) fn after_a_pass(
             (states.delay_and_color(&at).1, at)
         }
         Arrived::Broken => (states.unset_color(), *last.lock.lock().unwrap()),
-    }
+    };
+
+    (color, at, said)
 }
 
 /// When the last beacon arrived, as the window shows it.
@@ -239,15 +264,50 @@ fn beacon_last_received(at: Option<SystemTime>) -> String {
     }
 }
 
-/// Put the beacon's state in the window: the indicator's colour, and when the
-/// last beacon arrived.
+/// What a beacon said, as the window shows it.
 ///
-/// Both at once, from the one reading of when the last beacon was: a colour
-/// that said beacons were arriving beside a time that said none had would be
-/// two answers to one question.
-pub(crate) fn show_beacon(ui: &MainWindow, at: Option<SystemTime>, color: Color) {
+/// The build the spacecraft is running and the digest of the configuration it
+/// read, which is what a beacon carries -- the same two values a CONNECT is
+/// answered with, so a ground station that has not connected can still see
+/// which software is flying and which payload set it is serving.
+///
+/// A datagram this cannot read is shown as what arrived, cut short. Something
+/// else is sending to the group, or something is sending a beacon this build
+/// does not understand, and either is worth seeing on the line rather than
+/// hidden behind a green light.
+fn beacon_message(datagram: &[u8]) -> String {
+    match serde_json::from_slice::<Telemetry>(datagram) {
+        Ok(Telemetry::Beacon(beacon)) => {
+            format!("version {}, md5 {}", beacon.version, beacon.digest)
+        }
+        Ok(other) => format!("not a beacon: {:?}", other.tm_type()),
+        Err(_) => {
+            let text = String::from_utf8_lossy(datagram);
+            let head: String = text.chars().take(40).collect();
+            if head.len() < text.len() {
+                format!("unreadable: {head}...")
+            } else {
+                format!("unreadable: {head}")
+            }
+        }
+    }
+}
+
+/// Put the beacon's state in the window: the indicator's colour, when the
+/// last beacon arrived, and what it said.
+///
+/// All three at once, from the one reading of what the last beacon was: a
+/// colour that said beacons were arriving beside a time that said none had
+/// would be two answers to one question.
+pub(crate) fn show_beacon(
+    ui: &MainWindow,
+    at: Option<SystemTime>,
+    color: Color,
+    message: &str,
+) {
     ui.set_indicator_color(color);
     ui.set_beacon_last_recv(SharedString::from(beacon_last_received(at)));
+    ui.set_beacon_last_msg(SharedString::from(message));
 }
 
 impl BeaconReceive {
@@ -263,6 +323,7 @@ impl BeaconReceive {
 
         let b = BeaconReceive {
             last_beacon,
+            last_message: Arc::new(Mutex::new(NO_BEACON_MESSAGE.to_string())),
             beacon,
             ui_weak,
             indicator_states,
@@ -318,7 +379,7 @@ impl BeaconReceive {
             socket.set_read_timeout(timeout)?;
 
             let arrived = match socket.recv_from(&mut buf) {
-                Ok((_size, _addr)) => Arrived::Beacon,
+                Ok((size, _addr)) => Arrived::Beacon(beacon_message(&buf[..size])),
                 Err(ref e)
                     if e.kind() == std::io::ErrorKind::WouldBlock
                         || e.kind() == std::io::ErrorKind::TimedOut =>
@@ -328,20 +389,24 @@ impl BeaconReceive {
                 Err(_) => Arrived::Broken,
             };
 
-            let (color, at) = after_a_pass(
+            let (color, at, said) = after_a_pass(
                 &self.indicator_states,
                 &self.last_beacon,
-                arrived,
+                &self.last_message,
+                &arrived,
                 SystemTime::now(),
             );
             if DEBUG_BEACON {
-                eprintln!("{:?}: colour {:?}, last beacon {:?}", arrived, color, at);
+                eprintln!(
+                    "{:?}: colour {:?}, last beacon {:?}, said {:?}",
+                    arrived, color, at, said
+                );
             }
 
             let ui_weak = self.ui_weak.clone();
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
-                    show_beacon(&ui, at, color);
+                    show_beacon(&ui, at, color, &said);
                 }
             });
         }
@@ -460,33 +525,91 @@ mod tests {
     fn every_pass_says_when_the_last_beacon_arrived() {
         let states = states();
         let last = no_beacon_yet();
+        let said = Mutex::new(NO_BEACON_MESSAGE.to_string());
 
         // Nothing has arrived yet, so there is nothing to show and the
         // indicator is at the colour of never having heard anything.
-        let (color, at) = after_a_pass(&states, &last, Arrived::Nothing, SystemTime::now());
+        let (color, at, message) =
+            after_a_pass(&states, &last, &said, &Arrived::Nothing, SystemTime::now());
         assert_eq!(at, None);
         assert_eq!(color, states.unset_color());
+        assert_eq!(message, NO_BEACON_MESSAGE);
 
-        // A beacon: the time is the time of this pass.
+        // A beacon: the time is the time of this pass, and the line says what
+        // the beacon said.
         let arrival = SystemTime::now();
-        let (fresh, at) = after_a_pass(&states, &last, Arrived::Beacon, arrival);
+        let (fresh, at, message) = after_a_pass(
+            &states,
+            &last,
+            &said,
+            &Arrived::Beacon("version 9.9.9, md5 abc".to_string()),
+            arrival,
+        );
         assert_eq!(at, Some(arrival), "a pass that received a beacon must say when");
+        assert_eq!(message, "version 9.9.9, md5 abc");
         assert_ne!(
             fresh,
             states.unset_color(),
             "a beacon that has just arrived is not nothing heard from"
         );
 
-        // A later pass that finds nothing keeps that time: the beacon did
-        // arrive when it arrived, whatever the passes after it find.
-        let (_, at) = after_a_pass(&states, &last, Arrived::Nothing, SystemTime::now());
+        // A later pass that finds nothing keeps that time and that message:
+        // the beacon did arrive when it arrived and said what it said,
+        // whatever the passes after it find.
+        let (_, at, message) =
+            after_a_pass(&states, &last, &said, &Arrived::Nothing, SystemTime::now());
         assert_eq!(at, Some(arrival), "the time of the last beacon was lost");
+        assert_eq!(message, "version 9.9.9, md5 abc", "the last message was lost");
 
-        // And a broken socket says nothing about the spacecraft: the time
-        // stands, and the indicator goes to the colour of not knowing.
-        let (unknown, at) = after_a_pass(&states, &last, Arrived::Broken, SystemTime::now());
+        // And a broken socket says nothing about the spacecraft: the time and
+        // the message stand, and the indicator goes to the colour of not
+        // knowing.
+        let (unknown, at, message) =
+            after_a_pass(&states, &last, &said, &Arrived::Broken, SystemTime::now());
         assert_eq!(at, Some(arrival));
+        assert_eq!(message, "version 9.9.9, md5 abc");
         assert_eq!(unknown, states.unset_color());
+    }
+
+    /// A beacon's own words are what the line shows: the build flying and the
+    /// configuration it read.
+    ///
+    /// The beacon used to carry a timestamp and nothing else, so the window
+    /// could say only that one had arrived. Both values are in it now, and
+    /// they are the two a CONNECT is answered with, so a ground station that
+    /// has not connected still knows what it is listening to.
+    #[test]
+    fn a_beacon_is_shown_by_what_it_said() {
+        let version = tcslibgs::ConfigVersion {
+            major: 1,
+            minor: 2,
+            patch: 3,
+        };
+        let digest = tcslibgs::ConfigDigest([0xab; 16]);
+        let beacon = Telemetry::Beacon(tcslibgs::BeaconTelemetry::new(version, digest));
+        let datagram = serde_json::to_vec(&beacon).expect("it serializes");
+
+        let shown = beacon_message(&datagram);
+        assert!(shown.contains("1.2.3"), "{shown}");
+        assert!(shown.contains(&digest.to_string()), "{shown}");
+
+        // Something else sending to the group is shown rather than hidden: a
+        // green light beside a line that said nothing would be a window
+        // reporting a beacon it had not had.
+        let shown = beacon_message(b"hello");
+        assert!(shown.contains("unreadable") && shown.contains("hello"), "{shown}");
+
+        // And a long one is cut short rather than filling the window.
+        let shown = beacon_message(&[b'x'; 200]);
+        assert!(shown.ends_with("..."), "{shown}");
+        assert!(shown.len() < 60, "{shown}");
+
+        // Telemetry that is not a beacon says so. Nothing sends a response to
+        // the group, so this is a misconfiguration worth naming.
+        let other = Telemetry::Ping(tcslibgs::PingTelemetry::new(1, tcslibgs::CommandStatus::Success));
+        let datagram = serde_json::to_vec(&other).expect("it serializes");
+        let shown = beacon_message(&datagram);
+        assert!(shown.contains("not a beacon"), "{shown}");
     }
 
     /// A beacon that has arrived is shown by the time it arrived, and one

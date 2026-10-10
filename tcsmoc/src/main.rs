@@ -2212,23 +2212,37 @@ mod tests {
         };
 
         // Before a beacon: the placeholder every other time line uses, so the
-        // window says one thing about having received nothing.
+        // window says one thing about having received nothing, and the
+        // message line saying nothing has been said.
+        let shown = on_screen(&ui);
         assert!(
-            on_screen(&ui).iter().any(|line| line == NO_TRANSFER_TIME),
-            "the beacon box does not say that nothing has arrived: {:?}",
-            on_screen(&ui)
+            shown.iter().any(|line| line == NO_TRANSFER_TIME),
+            "the beacon box does not say that nothing has arrived: {shown:?}"
+        );
+        assert!(
+            shown
+                .iter()
+                .any(|line| line == beacon_receive::NO_BEACON_MESSAGE),
+            "the beacon box does not say that nothing has been said: {shown:?}"
         );
 
-        // And after one, the time it arrived.
+        // And after one, the time it arrived and what it said.
         beacon_receive::show_beacon(
             &ui,
             Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
             slint::Color::from_rgb_u8(0, 255, 0),
+            "version 0.1.0, md5 0123456789abcdef",
         );
         let shown = on_screen(&ui);
         assert!(
             shown.iter().any(|line| line == "02:02:02"),
             "the beacon's arrival time is not on screen: {shown:?}"
+        );
+        assert!(
+            shown
+                .iter()
+                .any(|line| line == "version 0.1.0, md5 0123456789abcdef"),
+            "what the beacon said is not on screen: {shown:?}"
         );
     }
 

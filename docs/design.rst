@@ -495,7 +495,26 @@ Beacon
 |                +------------+-----------+------------------------------------+
 |                | timestamp  | Timestamp | Spacecraft time at which the       |
 |                |            |           | beacon message was sent            |
+|                +------------+-----------+------------------------------------+
+|                | version    | 3 bytes   | Major, minor and patch version of  |
+|                |            |           | the tcspecial build sending it,    |
+|                |            |           | from its ``Cargo.toml``            |
+|                +------------+-----------+------------------------------------+
+|                | digest     | 16 bytes  | MD5 of the configuration file this |
+|                |            |           | tcspecial read                     |
 +----------------+------------+-----------+------------------------------------+
+
+Requirement
+    A beacon carries the version and the digest a CONNECT is answered with.
+    A beacon arrives whether or not anything has connected, so a ground
+    station that is only listening can see which software is flying and which
+    payload set it is serving rather than having to ask first.
+
+Requirement
+    Both are settled when the process starts, not read when a beacon goes
+    out. The digest is of the file this process read, and a file edited since
+    would otherwise have the beacons claiming a configuration nothing is
+    serving.
 
 TCSpecial
 =========

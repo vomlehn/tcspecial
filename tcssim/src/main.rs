@@ -127,7 +127,12 @@ fn sizes_problem(packet_size: i32, segment_size: i32) -> String {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Transfer {
     /// Start it, so it sends.
-    Transmit,
+    ///
+    /// Named `Receive` on the button, which is the word tcsmoc's panels use
+    /// for the same press: the two windows are read side by side while a
+    /// link is watched, and one of them calling it something else would read
+    /// as two different things to do.
+    Receive,
     /// Stop it, so it goes quiet.
     Silent,
 }
@@ -136,14 +141,14 @@ enum Transfer {
 ///
 /// Decided by what the button offered, read back from the status its label
 /// comes from -- not by what the payload turns out to be doing. Anything that
-/// is not the running status offers to transmit: a payload that failed to
+/// is not the running status offers to receive: a payload that failed to
 /// start shows the stopped status, and the useful thing to offer then is the
 /// start that failed rather than a stop of something that never began.
 fn transfer_wanted(status: &str) -> Transfer {
     if status == RUNNING_STATUS {
         Transfer::Silent
     } else {
-        Transfer::Transmit
+        Transfer::Receive
     }
 }
 
@@ -336,7 +341,7 @@ fn main() {
             };
 
             match transfer_wanted(&showing) {
-                Transfer::Transmit => match payload.start() {
+                Transfer::Receive => match payload.start() {
                     Ok(_) => update_row(&model, row, |info| {
                         info.status = SharedString::from(RUNNING_STATUS);
                     }),
@@ -482,7 +487,7 @@ mod tests {
         ui.show().unwrap();
 
         let button = |ui: &MainWindow| {
-            ElementHandle::find_by_accessible_label(ui, "Transmit")
+            ElementHandle::find_by_accessible_label(ui, RECEIVE_LABEL)
                 .next()
                 .and_then(|b| b.accessible_enabled())
         };
@@ -581,13 +586,13 @@ mod tests {
     /// labels: Slint builds the string, and these are how the test below
     /// holds it to the same rule Rust decides a press by.
     const SILENT_LABEL: &str = "Silent";
-    const TRANSMIT_LABEL: &str = "Transmit";
+    const RECEIVE_LABEL: &str = "Receive";
 
     impl Transfer {
         /// The label a button offering this carries.
         fn label(&self) -> &'static str {
             match self {
-                Transfer::Transmit => TRANSMIT_LABEL,
+                Transfer::Receive => RECEIVE_LABEL,
                 Transfer::Silent => SILENT_LABEL,
             }
         }
@@ -606,20 +611,19 @@ mod tests {
     #[test]
     fn the_transfer_button_does_what_its_label_offers() {
         // A payload that is sending offers to go silent, and one that is not
-        // offers to transmit. Anything that is not the running status offers
-        // to transmit: a payload that failed to start shows the stopped
-        // status, and the useful thing to offer then is the start that
-        // failed.
+        // offers to start. Anything that is not the running status offers to:
+        // a payload that failed to start shows the stopped status, and the
+        // useful thing to offer then is the start that failed.
         assert_eq!(transfer_wanted(RUNNING_STATUS), Transfer::Silent);
-        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Transmit);
-        assert_eq!(transfer_wanted(""), Transfer::Transmit);
+        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Receive);
+        assert_eq!(transfer_wanted(""), Transfer::Receive);
 
         assert_eq!(Transfer::Silent.label(), SILENT_LABEL);
-        assert_eq!(Transfer::Transmit.label(), TRANSMIT_LABEL);
+        assert_eq!(Transfer::Receive.label(), RECEIVE_LABEL);
 
         // And the window labels it by the same rule, which is the half Rust
         // cannot fail on: the label is a Slint expression, so a drift between
-        // the two files is a button that offers Transmit and stops the
+        // the two files is a button that offers Receive and stops the
         // payload.
         let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         let source = std::fs::read_to_string(&window).unwrap();

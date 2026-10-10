@@ -260,7 +260,7 @@ component PayloadPanel inherits Rectangle {
             // Rust reads the same status back to decide which way a press
             // goes, so the button and what it does cannot disagree.
             Button {
-                text: payload-status == "Running" ? "Silent" : "Transmit";
+                text: payload-status == "Running" ? "Silent" : "Receive";
                 // Nothing to press while the two sizes describe something
                 // that cannot be sent: a segment is a piece of a packet, and
                 // a piece larger than the whole is not a thing to start.

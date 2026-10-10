@@ -330,12 +330,13 @@ named for what it is, which is what a panel in the MOC shows.
 
 Starting and stopping a payload
 ===============================
-Each panel has one button for it, labelled with what pressing it will do. In
-tcssim a payload that is sending offers ``Silent`` and one that is not offers
-``Transmit``; in tcsmoc, where the same two things are a handler carrying data
-to the ground or dropping it on the spacecraft, they are ``Discard`` and
-``Receive`` -- the ground's words for it, since what the press starts is the
-MOC receiving. Each panel also shows its own status beside the name, which is
+Each panel has one button for it, labelled with what pressing it will do. The
+press that starts the data flowing says ``Receive`` in both programs, because
+the two windows are read side by side while a link is watched and one of them
+calling it something else reads as two different things to do. The press that
+stops it is each program's own: a simulated payload goes ``Silent``, and a
+handler ``Discard``\ s what its payload sends rather than carrying it to the
+ground. Each panel also shows its own status beside the name, which is
 where the label comes from.
 
 There were two buttons in each, Start and Stop, and either was pressable

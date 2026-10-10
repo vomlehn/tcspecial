@@ -128,11 +128,12 @@ fn sizes_problem(packet_size: i32, segment_size: i32) -> String {
 enum Transfer {
     /// Start it, so it sends.
     ///
-    /// Named `Receive` on the button, which is the word tcsmoc's panels use
-    /// for the same press: the two windows are read side by side while a
-    /// link is watched, and one of them calling it something else would read
-    /// as two different things to do.
-    Receive,
+    /// Named for what the payload does, which is what this window is about:
+    /// a payload sends, and the panel that stands in for it says so. It said
+    /// `Receive` for a while -- the word tcsmoc's panels used for the press
+    /// that started the data flowing -- and on a payload's own panel that is
+    /// the far end's word for it.
+    Send,
     /// Stop it, so it goes quiet.
     Silent,
 }
@@ -141,14 +142,14 @@ enum Transfer {
 ///
 /// Decided by what the button offered, read back from the status its label
 /// comes from -- not by what the payload turns out to be doing. Anything that
-/// is not the running status offers to receive: a payload that failed to
+/// is not the running status offers to send: a payload that failed to
 /// start shows the stopped status, and the useful thing to offer then is the
 /// start that failed rather than a stop of something that never began.
 fn transfer_wanted(status: &str) -> Transfer {
     if status == RUNNING_STATUS {
         Transfer::Silent
     } else {
-        Transfer::Receive
+        Transfer::Send
     }
 }
 
@@ -341,7 +342,7 @@ fn main() {
             };
 
             match transfer_wanted(&showing) {
-                Transfer::Receive => match payload.start() {
+                Transfer::Send => match payload.start() {
                     Ok(_) => update_row(&model, row, |info| {
                         info.status = SharedString::from(RUNNING_STATUS);
                     }),
@@ -487,7 +488,7 @@ mod tests {
         ui.show().unwrap();
 
         let button = |ui: &MainWindow| {
-            ElementHandle::find_by_accessible_label(ui, RECEIVE_LABEL)
+            ElementHandle::find_by_accessible_label(ui, SEND_LABEL)
                 .next()
                 .and_then(|b| b.accessible_enabled())
         };
@@ -586,13 +587,13 @@ mod tests {
     /// labels: Slint builds the string, and these are how the test below
     /// holds it to the same rule Rust decides a press by.
     const SILENT_LABEL: &str = "Silent";
-    const RECEIVE_LABEL: &str = "Receive";
+    const SEND_LABEL: &str = "Send";
 
     impl Transfer {
         /// The label a button offering this carries.
         fn label(&self) -> &'static str {
             match self {
-                Transfer::Receive => RECEIVE_LABEL,
+                Transfer::Send => SEND_LABEL,
                 Transfer::Silent => SILENT_LABEL,
             }
         }
@@ -615,15 +616,15 @@ mod tests {
         // a payload that failed to start shows the stopped status, and the
         // useful thing to offer then is the start that failed.
         assert_eq!(transfer_wanted(RUNNING_STATUS), Transfer::Silent);
-        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Receive);
-        assert_eq!(transfer_wanted(""), Transfer::Receive);
+        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Send);
+        assert_eq!(transfer_wanted(""), Transfer::Send);
 
         assert_eq!(Transfer::Silent.label(), SILENT_LABEL);
-        assert_eq!(Transfer::Receive.label(), RECEIVE_LABEL);
+        assert_eq!(Transfer::Send.label(), SEND_LABEL);
 
         // And the window labels it by the same rule, which is the half Rust
         // cannot fail on: the label is a Slint expression, so a drift between
-        // the two files is a button that offers Receive and stops the
+        // the two files is a button that offers Send and stops the
         // payload.
         let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         let source = std::fs::read_to_string(&window).unwrap();

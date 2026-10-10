@@ -9,6 +9,9 @@ import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, Scroll
 export struct DHInfo {
     // From the configuration file
     name: string,
+    /// Which payload of the configuration this is, counted from nought in the
+    /// order the file describes them.
+    dev-id: int,
     config: string,
     packet-size: int,
     // From tcspecial, by way of the command interpreter
@@ -34,6 +37,7 @@ export struct DHInfo {
 
 component DHPanel inherits Rectangle {
     in property <string> dh-name: "DH0";
+    in property <int> dev-id: 0;
     in property <string> dh-config: "UDP localhost:5000";
     in property <string> dh-status: "Stopped";
     in property <int> packet-size: 12;
@@ -61,8 +65,13 @@ component DHPanel inherits Rectangle {
         // every_panels_data_is_inside_the_window measures.
         HorizontalLayout {
             min-height: 20px;
+            // The name and the number of the payload, which is its place in
+            // the payload configuration -- the first payload the file
+            // describes is 0. Nothing states it: the file's order is what
+            // decides it, and both windows count the same way, so a payload
+            // is the same number in each.
             Text {
-                text: dh-name;
+                text: dh-name + " (dev id " + dev-id + ")";
                 font-size: 14px;
                 font-weight: 700;
             }
@@ -558,6 +567,7 @@ export component MainWindow inherits Window {
                         row: Math.floor(i / Math.max(1, root.columns));
                         col: Math.mod(i, Math.max(1, root.columns));
                         dh-name: dh.name;
+                        dev-id: dh.dev-id;
                         dh-config: dh.config;
                         dh-status: dh.status;
                         packet-size: dh.packet-size;

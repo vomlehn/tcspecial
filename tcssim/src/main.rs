@@ -170,9 +170,13 @@ fn show_traffic(info: &mut PayloadInfo, stats: &PayloadStats) {
 
 /// Turn a data handler and its settled simulator settings into the panel the
 /// window shows for it.
-fn payload_info_from(dh: &DHConfig, sim: &ResolvedSim) -> PayloadInfo {
+fn payload_info_from(dev_id: usize, dh: &DHConfig, sim: &ResolvedSim) -> PayloadInfo {
     PayloadInfo {
         name: SharedString::from(dh.name.0.clone()),
+        // Its place in the payload configuration, which is the only number a
+        // payload has: nothing in the file states one, and tcsmoc counts the
+        // same way.
+        dev_id: i32::try_from(dev_id).unwrap_or(i32::MAX),
         config: SharedString::from(endpoint_description(&dh.endpoint)),
         packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
         segment_size: sim.segment_size as i32,
@@ -299,7 +303,8 @@ fn main() {
         dh_configs
             .iter()
             .zip(&sims)
-            .map(|(dh, sim)| payload_info_from(dh, sim))
+            .enumerate()
+            .map(|(row, (dh, sim))| payload_info_from(row, dh, sim))
             .collect::<Vec<_>>(),
     ));
     ui.set_payload_model(ModelRc::from(model.clone()));
@@ -507,7 +512,7 @@ mod tests {
         let dh = handler("DH0");
         let settings = sim(1000, 1000, 12);
         let model: Rc<VecModel<PayloadInfo>> =
-            Rc::new(VecModel::from(vec![payload_info_from(&dh, &settings)]));
+            Rc::new(VecModel::from(vec![payload_info_from(0, &dh, &settings)]));
 
         let ui = MainWindow::new().unwrap();
         ui.set_payload_model(ModelRc::from(model.clone()));
@@ -581,7 +586,7 @@ mod tests {
     #[test]
     fn a_payload_whose_files_disagree_starts_out_unsendable() {
         let dh = handler("DH0");
-        let info = payload_info_from(&dh, &sim(1000, 1000, 20));
+        let info = payload_info_from(0, &dh, &sim(1000, 1000, 20));
         assert_eq!(dh.packet_size, 12, "the tcspecial configuration says twelve bytes");
         assert!(
             info.sizes_problem.contains("segment of 20")
@@ -591,7 +596,7 @@ mod tests {
         );
 
         // And one whose files agree says nothing.
-        let info = payload_info_from(&dh, &sim(1000, 1000, 12));
+        let info = payload_info_from(0, &dh, &sim(1000, 1000, 12));
         assert_eq!(info.sizes_problem, "");
     }
 
@@ -708,7 +713,7 @@ mod tests {
     /// traffic.
     #[test]
     fn a_panel_shows_when_the_last_packet_went_and_what_it_was() {
-        let mut info = payload_info_from(&handler("DH0"), &sim(1000, 1000, 12));
+        let mut info = payload_info_from(0, &handler("DH0"), &sim(1000, 1000, 12));
         assert_eq!(info.last_sent_time, NO_TRANSFER_TIME);
         assert_eq!(info.last_recv_time, NO_TRANSFER_TIME);
 
@@ -795,7 +800,8 @@ mod tests {
                 dh_configs
                     .iter()
                     .zip(&sims)
-                    .map(|(dh, sim)| payload_info_from(dh, sim))
+                    .enumerate()
+                    .map(|(row, (dh, sim))| payload_info_from(row, dh, sim))
                     .collect(),
             ));
         }
@@ -924,6 +930,7 @@ mod tests {
         // The backend is up and this thread owns its windows, so the other
         // checks that need one run from here.
         the_panel_shows_the_time_and_bytes_it_was_given();
+        each_panel_says_which_payload_of_the_set_it_is();
         the_params_button_shows_what_both_files_said();
         sizes_that_cannot_be_sent_stop_the_button_and_say_so();
     }
@@ -1143,7 +1150,8 @@ mod tests {
             let panels: Vec<PayloadInfo> = dh_configs
                 .iter()
                 .zip(&sims)
-                .map(|(dh, s)| payload_info_from(dh, s))
+                .enumerate()
+                .map(|(row, (dh, s))| payload_info_from(row, dh, s))
                 .collect();
 
             assert_eq!(
@@ -1203,7 +1211,7 @@ mod tests {
         // in the direction it can move in, and has no received line at all --
         // nothing is ever sent to such a payload, so a line for it would read
         // the same from the first packet to the last.
-        let quiet = payload_info_from(&handler("DH0"), &sim(1000, 1000, 12));
+        let quiet = payload_info_from(0, &handler("DH0"), &sim(1000, 1000, 12));
         let (sent, recv, pkts) = shown(quiet.clone());
         assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
         assert!(
@@ -1220,14 +1228,14 @@ mod tests {
         asked.triggered = true;
         asked.packet_interval_ms = 0;
         asked.segment_interval_ms = 0;
-        let (sent, recv, pkts) = shown(payload_info_from(&handler("DH0"), &asked));
+        let (sent, recv, pkts) = shown(payload_info_from(0, &handler("DH0"), &asked));
         assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
         assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME} ")]);
         assert_eq!(pkts, vec!["Pkts: 0 sent / 0 recv".to_string()]);
 
         // And one that has sent and been spoken to shows when each happened
         // and the head of what moved.
-        let mut moving = payload_info_from(&handler("DH0"), &asked);
+        let mut moving = payload_info_from(0, &handler("DH0"), &asked);
         show_traffic(
             &mut moving,
             &PayloadStats {
@@ -1252,6 +1260,48 @@ mod tests {
         assert_eq!(pkts, vec!["Pkts: 3 sent / 1 recv".to_string()]);
     }
 
+    /// Each panel says which payload of the configuration it is, beside the
+    /// name.
+    ///
+    /// The number is the payload's place in the file, counted from nought,
+    /// and nothing in the file states it: the order is what decides it. Both
+    /// windows count the same way, so a payload is the same number in each,
+    /// which is the whole use of it -- two windows read side by side.
+    ///
+    /// Not a test of its own: one test per binary may start the backend.
+    fn each_panel_says_which_payload_of_the_set_it_is() {
+        use i_slint_backend_testing::ElementHandle;
+
+        let first = handler("DH0");
+        let mut second = handler("DH0");
+        second.name = tcslibgs::DHName::new("DH1");
+        let settings = sim(1000, 1000, 12);
+
+        let ui = MainWindow::new().unwrap();
+        ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
+            payload_info_from(0, &first, &settings),
+            payload_info_from(1, &second, &settings),
+        ]))));
+        // Opened as main() opens it for two payloads, so both panels are laid
+        // out: a panel scrolled out of sight is never built at all.
+        let shape = grid::grid_shape(2);
+        ui.set_columns(i32::try_from(shape.columns).unwrap());
+        ui.window().set_size(grid::window_size(&shape, 2));
+        ui.show().unwrap();
+
+        let shown: Vec<String> = ElementHandle::find_by_element_type_name(&ui, "Text")
+            .filter_map(|e| e.accessible_label())
+            .map(|label| label.to_string())
+            .collect();
+
+        for wanted in ["DH0 (dev id 0)", "DH1 (dev id 1)"] {
+            assert!(
+                shown.iter().any(|line| line == wanted),
+                "no panel is labelled {wanted:?}: {shown:?}"
+            );
+        }
+    }
+
     /// Pressing a panel's Configuration button shows what both files said about
     /// that payload.
     ///
@@ -1270,7 +1320,7 @@ mod tests {
         let sim = sim(1000, 1000, 12);
         let ui = MainWindow::new().unwrap();
         ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
-            payload_info_from(&dh, &sim),
+            payload_info_from(0, &dh, &sim),
         ]))));
         ui.set_columns(1);
         ui.show().unwrap();
@@ -1330,7 +1380,7 @@ mod tests {
       mode: Default::default(),
  };
 
-        let info = payload_info_from(&dh, &sim(500, 250, 5));
+        let info = payload_info_from(0, &dh, &sim(500, 250, 5));
         assert_eq!(info.name, SharedString::from("DH3"));
         assert_eq!(info.config, SharedString::from("UDP localhost:5003"));
         // From the tcspecial configuration

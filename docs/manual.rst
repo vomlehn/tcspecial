@@ -1173,8 +1173,9 @@ From the ``Command`` menu. Three of the seven items send a command:
 
 Ping
   Sends a PING and waits for the answer. ``Last Response`` says that one was
-  sent, then what came back, and if nothing came back within the client's
-  timeout it says when it stopped waiting.
+  sent, then what came back -- ``PING OK at 14:22:31``, the time the
+  spacecraft made the answer, which every response carries -- and if nothing
+  came back within the client's timeout it says when it stopped waiting.
 
 ARM Restart
   Arms a restart, which a restart will not happen without.

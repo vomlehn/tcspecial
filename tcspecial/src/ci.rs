@@ -1493,7 +1493,15 @@ mod tests {
         let (spacecraft, payload) = (ci.process_command(ask()), ci.payload.process(ask()));
         match (spacecraft, payload) {
             (Telemetry::Connect(one), Telemetry::Connect(two)) => {
-                assert_eq!(one, two, "the two links said different things");
+                // The three facts a CONNECT answers with, rather than the
+                // whole answer: the two were made a moment apart and every
+                // response carries the time it was made, so two identical
+                // answers do differ there.
+                assert_eq!(
+                    (one.version, one.config_version, one.digest),
+                    (two.version, two.config_version, two.digest),
+                    "the two links said different things"
+                );
                 assert_eq!(one.digest, a_digest());
                 assert_eq!(one.config_version, a_config_version());
             }

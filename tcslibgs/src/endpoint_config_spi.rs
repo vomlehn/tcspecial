@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::endpoint_config::reject_stream;
 use crate::endpoint_config::{
     bad, parse_u32, reject_foreign_fields, require, EndpointConfigResult, GroupKind,
-    GroupWire, Scalar,
+    LinkTerms, Scalar,
 };
 
 /// Attributes of a SPI group.
@@ -173,7 +173,7 @@ fn parse_cs_active(group: &str, s: &Scalar) -> EndpointConfigResult<CsActive> {
 /// to them. There is no stream section, for the reason an I2C group has none.
 pub(crate) fn group_kind_of(
     name: &str,
-    g: GroupWire,
+    g: LinkTerms,
 ) -> EndpointConfigResult<GroupKind> {
 
     reject_foreign_fields(

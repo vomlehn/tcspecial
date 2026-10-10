@@ -1,37 +1,33 @@
-//! Endpoint configuration files, in YAML or XML
+//! The rules of a link: a serial line, an I2C bus, a SPI peripheral.
 //!
-//! Both formats describe the same thing and parse into the same Rust types:
-//! a general section, a section naming groups of endpoints, and a section
-//! naming the endpoints themselves. A group carries every attribute shared by
-//! endpoints of its type; what it deliberately does not carry is the device
-//! name or network address, because that is what distinguishes one endpoint
-//! in a group from another and so belongs to the endpoint. Every group has an
-//! endpoint in it: a group nothing names has no effect on the configuration,
-//! which is also what a misspelled group name looks like.
+//! What terms each kind of link takes, which of them it must be told, what
+//! each means, and which belong to another kind. A payload file states them
+//! -- see `types::link_params_of`, which is the only caller -- and the rules
+//! are here, once, rather than beside each file format that can state them.
 //!
-//! The syntax of both formats is specified in `docs/design.rst`, under
-//! "Endpoint Configuration Files".
+//! There was a second file format that stated them: an endpoint
+//! configuration, with a general section, groups of endpoints, and the
+//! endpoints in them. It described the same payloads in other words, this
+//! module parsed it, and the rules were reachable only through it. It is
+//! gone; a payload states what an endpoint and its group stated between them.
+//! What is left here is the part that was never about the file: the terms
+//! ([`LinkTerms`]), what they mean once settled ([`GroupKind`] and the
+//! per-kind parameters), where a payload is reached ([`EndpointLocation`]),
+//! and the scalar spellings a file may use ([`Scalar`], [`ByteList`]).
 //!
-//! One set of wire types serves both formats. XML attributes reach serde with
-//! an `@` prefix, so every field carries that spelling as an alias alongside
-//! its YAML spelling, and a section arrives either as a YAML sequence or as
-//! an XML element with repeated children (see [`Section`]).
+//! The syntax a payload file states them in is specified in
+//! `docs/design.rst`, under "Payload Configuration Files".
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::marker::PhantomData;
-use std::path::Path;
 use std::time::Duration;
 
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::endpoint_config_i2c::{parse_i2c_address, I2cParams};
-use crate::endpoint_config_network::NetworkParams;
+use crate::endpoint_config_i2c::I2cParams;
 use crate::endpoint_config_serial::SerialParams;
 use crate::endpoint_config_spi::SpiParams;
-use crate::format::ConfigFormat;
 
 // The per-kind types are named from here as well as from their own files, so
 // that a reader of a configuration document reaches everything it can hold
@@ -39,137 +35,53 @@ use crate::format::ConfigFormat;
 pub use crate::endpoint_config_i2c::I2cParams as I2cGroupParams;
 pub use crate::endpoint_config_serial::{ByteLength, StopBits};
 pub use crate::endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
-use crate::types::{
-    DHConfig, DHId, DHName, EndpointConfig, I2cConfig, NetworkConfig,
-    NetworkProtocol, SerialConfig, SpiConfig,
-};
+use crate::types::{EndpointConfig, I2cConfig, SerialConfig, SpiConfig};
 use crate::TcsError;
 
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
 
-/// What can be wrong with an endpoint configuration file.
+/// What can be wrong with the terms a payload gave its link.
 ///
 /// Parse errors come from the format's own reader; everything else is a rule
 /// this module enforces after a syntactically valid file has been read.
 #[derive(Error, Debug)]
 pub enum EndpointConfigError {
-    #[error("I/O error reading {path}: {source}")]
-    Io {
-        path: String,
-        #[source]
-        source: std::io::Error,
-    },
-
-    #[error("{0}: a configuration file is named .yaml, .yml or .xml, and this is none of those")]
-    UnknownFormat(String),
-
-    #[error("YAML parse error: {0}")]
-    Yaml(#[from] serde_norway::Error),
-
-    #[error("XML parse error: {0}")]
-    Xml(#[from] quick_xml::DeError),
-
-    #[error("group \"{0}\" is defined more than once")]
-    DuplicateGroup(String),
-
-    #[error("endpoint \"{0}\" is defined more than once")]
-    DuplicateEndpoint(String),
-
-    #[error("endpoint \"{endpoint}\" refers to group \"{group}\", which is not defined")]
-    UnknownGroup { endpoint: String, group: String },
-
-    /// Worded exactly as the payload and simulator configuration formats word
-    /// the same rule, so that one rule reads as one rule wherever it is met.
-    #[error(
-        "endpoint group \"{0}\" is named by no endpoint: name it from one, or remove \
-         the group"
-    )]
-    UnusedGroup(String),
-
-    #[error(
-        "group \"{group}\": unknown endpoint type \"{kind}\": expected \"serial\", \
-         \"network\", \"i2c\", or \"spi\""
-    )]
-    UnknownGroupKind { group: String, kind: String },
-
-    #[error("group \"{group}\", a {kind} group, has no {field}")]
+    #[error("payload \"{group}\", on a {kind} link, has no {field}")]
     MissingGroupField {
         group: String,
         kind: &'static str,
         field: &'static str,
     },
 
-    #[error("group \"{group}\" is a {kind} group, so {field} does not apply to it")]
+    #[error("payload \"{group}\" is on a {kind} link, so {field} does not apply to it")]
     UnusedGroupField {
         group: String,
         kind: &'static str,
         field: &'static str,
     },
 
-    #[error("endpoint \"{endpoint}\" is in {kind} group \"{group}\", so it needs {field}")]
-    MissingEndpointField {
-        endpoint: String,
-        group: String,
-        kind: &'static str,
-        field: &'static str,
-    },
-
-    #[error("endpoint \"{endpoint}\" is in {kind} group \"{group}\", so {field} does not apply to it")]
-    UnusedEndpointField {
-        endpoint: String,
-        group: String,
-        kind: &'static str,
-        field: &'static str,
-    },
-
-    #[error("group \"{0}\": a stream section must give max_length")]
+    #[error("payload \"{0}\": a stream section must give max_length")]
     StreamMissingMaxLength(String),
 
     #[error(
-        "group \"{0}\": a stream section must give a timeout or a terminator list, or both. \
-         To read a fixed number of bytes with neither, say timeout: none explicitly"
+        "payload \"{0}\": a stream section must give a timeout or a terminator list, or \
+         both. To read a fixed number of bytes with neither, say timeout: none explicitly"
     )]
     StreamNeedsTimeoutOrTerminators(String),
 
-    #[error("group \"{0}\": an empty terminator list is not a terminator list; omit it or give at least one byte")]
+    #[error(
+        "payload \"{0}\": an empty terminator list is not a terminator list; omit it or \
+         give at least one byte"
+    )]
     StreamEmptyTerminators(String),
 
-    #[error("group \"{group}\": {message}")]
+    #[error("payload \"{group}\": {message}")]
     BadGroupValue { group: String, message: String },
-
-    // The four below arise only when converting endpoints into data handlers,
-    // not when reading a file. An endpoint configuration describing how to
-    // reach a device is complete without any of them.
-    #[error("endpoint \"{0}\" has no dh_id, and a data handler is addressed by id")]
-    EndpointHasNoDhId(String),
-
-    #[error("endpoints \"{first}\" and \"{second}\" share dh_id {dh_id}")]
-    DuplicateDhId {
-        first: String,
-        second: String,
-        dh_id: u32,
-    },
-
-    /// Two handlers want one address, one device file, or one place on a bus.
-    ///
-    /// Carried as its own message because the rule is shared with the payload
-    /// configuration format: the hazard is in the handlers rather than in the
-    /// words that described them, so both formats end at the same check and
-    /// report what it said.
-    #[error("{0}")]
-    Collision(String),
-
-    #[error(
-        "endpoint \"{endpoint}\" is in group \"{group}\", which states no packet size, \
-         and a data handler needs one"
-    )]
-    GroupHasNoPacketSize { endpoint: String, group: String },
-
 }
 
-/// Result of reading an endpoint configuration file.
+/// The answer to asking the rules about a link.
 pub type EndpointConfigResult<T> = Result<T, EndpointConfigError>;
 
 impl From<EndpointConfigError> for TcsError {
@@ -181,121 +93,6 @@ impl From<EndpointConfigError> for TcsError {
 // ---------------------------------------------------------------------------
 // Domain types -- what a caller gets back
 // ---------------------------------------------------------------------------
-
-/// A whole endpoint configuration file, validated.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct EndpointConfigDoc {
-    /// The general section.
-    pub general: GeneralSection,
-    /// Endpoint groups, in the order the file gave them.
-    pub groups: Vec<EndpointGroup>,
-    /// Endpoints, in the order the file gave them.
-    pub endpoints: Vec<EndpointDef>,
-}
-
-impl EndpointConfigDoc {
-    /// Look up a group by name.
-    pub fn group(&self, name: &str) -> Option<&EndpointGroup> {
-        self.groups.iter().find(|g| g.name == name)
-    }
-
-    /// The group an endpoint belongs to.
-    ///
-    /// Never `None` for an endpoint of this document: a reference to an
-    /// undefined group is rejected at parse time.
-    pub fn group_of(&self, endpoint: &EndpointDef) -> Option<&EndpointGroup> {
-        self.group(&endpoint.group)
-    }
-
-    /// Turn these endpoints into data handler configurations.
-    ///
-    /// The two formats describe overlapping things: a payload configuration
-    /// says which data handlers exist and how tcspecial reaches each one, and
-    /// an endpoint configuration says how to reach a device in far more
-    /// detail. This is the bridge, so that the richer description can serve
-    /// where the payload format does today.
-    ///
-    /// Nothing calls it yet. It exists so that the conversion is settled and
-    /// tested before any program depends on it; which file each program reads
-    /// is a separate question, and one that has to be answered for all three
-    /// at once, since tcsmoc's panels, tcssim's payloads and tcspecial's
-    /// handlers must describe the same thing.
-    ///
-    /// Not every endpoint can become a data handler. A file describing only
-    /// how to reach a device is complete without an id or a packet size, and
-    /// an I2C endpoint has no transport tcspecial can open; each of those is
-    /// an error here rather than at the file's own validation, because none of
-    /// them is wrong about the endpoint.
-    pub fn to_dh_configs(&self) -> EndpointConfigResult<Vec<DHConfig>> {
-        let mut by_id: BTreeMap<u32, &str> = BTreeMap::new();
-        let mut configs = Vec::with_capacity(self.endpoints.len());
-
-        for endpoint in &self.endpoints {
-            let group = self
-                .group_of(endpoint)
-                .ok_or_else(|| EndpointConfigError::UnknownGroup {
-                    endpoint: endpoint.name.clone(),
-                    group: endpoint.group.clone(),
-                })?;
-
-            let dh_id = endpoint
-                .dh_id
-                .ok_or_else(|| EndpointConfigError::EndpointHasNoDhId(endpoint.name.clone()))?;
-
-            // A duplicate parses cleanly and then has one handler shadow
-            // another, as it would in a payload file.
-            if let Some(first) = by_id.insert(dh_id, endpoint.name.as_str()) {
-                return Err(EndpointConfigError::DuplicateDhId {
-                    first: first.to_string(),
-                    second: endpoint.name.clone(),
-                    dh_id,
-                });
-            }
-
-            let packet_size = group.packet_size.ok_or_else(|| {
-                EndpointConfigError::GroupHasNoPacketSize {
-                    endpoint: endpoint.name.clone(),
-                    group: group.name.clone(),
-                }
-            })?;
-
-            configs.push(DHConfig {
-                dh_id: DHId(dh_id),
-                name: DHName::new(&endpoint.name),
-                endpoint: endpoint_config_of(endpoint, group)?,
-                packet_size: packet_size as usize,
-                oc: endpoint.oc.clone(),
-                // An endpoint configuration has no mode to give yet, so its
-                // endpoints describe the kind of payload that sends on its
-                // own. A triggered endpoint would need the trigger and its
-                // interval here, which is a group's business -- several
-                // endpoints of one group are commonly polled alike.
-                mode: Default::default(),
-            });
-        }
-
-        crate::types::no_two_handlers_claim_one_thing(&configs)
-            .map_err(EndpointConfigError::Collision)?;
-
-        Ok(configs)
-    }
-}
-
-/// What tcspecial opens to reach one endpoint.
-///
-/// The transport follows from the group and the address from the endpoint,
-/// which is the division the format is built around. A Unix socket is the one
-/// case where the two disagree about shape: its group is a network group, but
-/// it is located by a path rather than by host and port, so it becomes a
-/// network endpoint whose address is that path. Its port is meaningless and
-/// set to zero, which is how a payload file spells the same thing.
-fn endpoint_config_of(
-    endpoint: &EndpointDef,
-    group: &EndpointGroup,
-) -> EndpointConfigResult<EndpointConfig> {
-    endpoint_of(&endpoint.name, &endpoint.location, &group.kind)
-        .map_err(|e| bad(&group.name, &e))
-}
 
 /// What tcspecial opens to reach a payload, from where it is and what kind of
 /// link it is on.
@@ -325,20 +122,6 @@ pub(crate) fn endpoint_of(
                 kind.type_name()
             )),
         },
-        EndpointLocation::Network { address, port } => match kind {
-            GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
-                protocol: net.protocol,
-                address: address.clone(),
-                port: *port,
-            })),
-            // Only a network group gives an endpoint a host and a port, so
-            // this is unreachable through the parser; it is an error rather
-            // than a panic because a library should not bring a caller down.
-            _ => Err(format!(
-                "\"{what}\" has a network address, which a {} link does not give it",
-                kind.type_name()
-            )),
-        },
         // Every kind but a network address is located by a device node, and
         // which kind it is decides what else goes with it. They used all to
         // become a plain Device, which opened the right file and then talked
@@ -346,11 +129,6 @@ pub(crate) fn endpoint_of(
         // whatever rate the port was last left at, a SPI peripheral at
         // whatever mode.
         EndpointLocation::Path { path } => match kind {
-            GroupKind::Network(net) => Ok(EndpointConfig::Network(NetworkConfig {
-                protocol: net.protocol,
-                address: path.clone(),
-                port: 0,
-            })),
             GroupKind::Serial(serial) => Ok(EndpointConfig::Serial(SerialConfig {
                 path: path.clone(),
                 datarate: serial.datarate,
@@ -382,40 +160,10 @@ pub(crate) fn endpoint_of(
     }
 }
 
-/// The general section: settings that are not specific to any one group.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
-pub struct GeneralSection {
-    /// Version of the configuration file format.
-    pub version: Option<String>,
-    /// Free text describing what this file configures.
-    pub description: Option<String>,
-}
-
-/// A named group of endpoints that share every attribute but their device
-/// name or network address.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct EndpointGroup {
-    /// Name endpoints use to refer to this group.
-    pub name: String,
-    /// Bytes in one packet exchanged with an endpoint of this group.
-    ///
-    /// Shared by every endpoint of the group, like every other group
-    /// attribute, and applying to all four types: a packet has a size
-    /// whether it travels over a serial line, a socket, or a bus.
-    ///
-    /// `None` for a file that did not state one. An endpoint configuration
-    /// describing only how to reach a device need not, so this is optional;
-    /// a data handler built from one needs it.
-    pub packet_size: Option<u32>,
-    /// The attributes, which depend on the type of endpoint.
-    pub kind: GroupKind,
-}
-
 /// Per-type group attributes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum GroupKind {
     Serial(SerialParams),
-    Network(NetworkParams),
     I2c(I2cParams),
     Spi(SpiParams),
 }
@@ -425,7 +173,6 @@ impl GroupKind {
     pub fn type_name(&self) -> &'static str {
         match self {
             GroupKind::Serial(_) => "serial",
-            GroupKind::Network(_) => "network",
             GroupKind::I2c(_) => "i2c",
             GroupKind::Spi(_) => "spi",
         }
@@ -439,7 +186,6 @@ impl GroupKind {
     pub fn stream(&self) -> Option<&StreamParams> {
         match self {
             GroupKind::Serial(s) => Some(&s.stream),
-            GroupKind::Network(n) => n.stream.as_ref(),
             GroupKind::I2c(_) | GroupKind::Spi(_) => None,
         }
     }
@@ -472,48 +218,6 @@ impl StreamParams {
     }
 }
 
-/// One endpoint: a member of a group, plus the one thing the group left out.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct EndpointDef {
-    /// Name of this endpoint.
-    pub name: String,
-    /// Name of the group supplying its attributes.
-    pub group: String,
-    /// Where this endpoint is.
-    pub location: EndpointLocation,
-    /// Identifier of the data handler this endpoint becomes.
-    ///
-    /// `None` for a file that assigns none. An endpoint configuration
-    /// describing only how to reach a device need not, so this is optional
-    /// exactly as a group's packet size is; converting the endpoint into a
-    /// data handler needs it, because a handler is addressed by id.
-    pub dh_id: Option<u32>,
-    /// UDP address the data handler this endpoint becomes exchanges payload
-    /// data with the OC on.
-    ///
-    /// Optional, and belonging to the endpoint rather than its group for the
-    /// reason the endpoint's own address does: it is what distinguishes one
-    /// handler from another. Nothing but starting a handler needs it, so an
-    /// endpoint configuration that only says how to reach devices has none.
-    pub oc: Option<NetworkConfig>,
-    /// Which endpoint of the file this is: the first is 0.
-    ///
-    /// The same number a payload file's payloads carry, for the same reason
-    /// and on the same assumption -- that a parser hands entries over in the
-    /// order the file gave them, which every format here does. The order is
-    /// configuration rather than spelling, since ids will be assigned in it,
-    /// so it is carried by the data instead of living in whatever order a
-    /// `Vec` happens to keep: the configuration digest walks the endpoints by
-    /// this number, and two ends that read the same file agree about which
-    /// endpoint came first whatever either has since done with its own list.
-    ///
-    /// Given as the document is built rather than deserialized. That is the
-    /// one place an `EndpointDef` is made, so none exists without it, and a
-    /// file stating a number of its own has none to state -- the wire type has
-    /// no such field.
-    pub sequence: usize,
-}
-
 /// What locates one endpoint of a group, and so distinguishes it from the
 /// others: a device name, a network address, or, on a bus that addresses its
 /// devices, the address of the device on that bus.
@@ -529,8 +233,6 @@ pub enum EndpointLocation {
     /// a SPI group is a peripheral -- and a SPI device node needs no address
     /// beside it because it names the bus and the chip select together.
     Path { path: String },
-    /// A network host and port.
-    Network { address: String, port: u16 },
     /// A bus device and the address of one device on that bus.
     ///
     /// Both are needed because two endpoints of one I2C group commonly sit
@@ -542,272 +244,73 @@ pub enum EndpointLocation {
 // Public entry points
 // ---------------------------------------------------------------------------
 
-/// Read an endpoint configuration from text in the given format.
-pub fn from_str(text: &str, format: ConfigFormat) -> EndpointConfigResult<EndpointConfigDoc> {
-    let wire: DocWire = match format {
-        ConfigFormat::Yaml => serde_norway::from_str(text)?,
-        ConfigFormat::Xml => quick_xml::de::from_str(text)?,
-    };
-    validate(wire)
-}
-
-/// Read an endpoint configuration from YAML text.
-pub fn from_yaml_str(text: &str) -> EndpointConfigResult<EndpointConfigDoc> {
-    from_str(text, ConfigFormat::Yaml)
-}
-
-/// Read an endpoint configuration from XML text.
-pub fn from_xml_str(text: &str) -> EndpointConfigResult<EndpointConfigDoc> {
-    from_str(text, ConfigFormat::Xml)
-}
-
-/// Read an endpoint configuration file, choosing the format from the file
-/// name the same way every other configuration file in the project does --
-/// see [`ConfigFormat::from_path`].
-pub fn load<P: AsRef<Path>>(path: P) -> EndpointConfigResult<EndpointConfigDoc> {
-    let path = path.as_ref();
-    let format = ConfigFormat::from_path(path).ok_or_else(|| {
-        EndpointConfigError::UnknownFormat(path.display().to_string())
-    })?;
-    let text = read_to_string(path)?;
-    from_str(&text, format)
-}
-
-fn read_to_string(path: &Path) -> EndpointConfigResult<String> {
-    std::fs::read_to_string(path).map_err(|source| EndpointConfigError::Io {
-        path: path.display().to_string(),
-        source,
-    })
-}
-
 // ---------------------------------------------------------------------------
 // Wire types -- one set, both formats
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize)]
-struct DocWire {
-    #[serde(default, alias = "general_configuration")]
-    general: GeneralWire,
-    #[serde(default, alias = "groups", alias = "endpoint-groups")]
-    endpoint_groups: Section<GroupWire>,
-    #[serde(default)]
-    endpoints: Section<EndpointWire>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct GeneralWire {
-    #[serde(default, alias = "@version")]
-    version: Option<String>,
-    #[serde(default, alias = "@description")]
-    description: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct GroupWire {
-    #[serde(alias = "@name")]
-    pub(crate) name: String,
-    #[serde(rename = "type", alias = "@type")]
-    pub(crate) kind: String,
-    // Serial attributes.
-    #[serde(default, alias = "@datarate")]
+/// The terms of a link, as a payload and the group it names state them
+/// between them.
+///
+/// One struct for every kind, each kind reading the ones that are its own and
+/// refusing the ones that are not -- which is how a term written on the wrong
+/// kind of payload is reported rather than ignored. The terms arrive as text
+/// [`Scalar`]s because a file may spell a number in decimal or hexadecimal
+/// and a flag as a word; what each means is settled by the rules for the
+/// kind.
+///
+/// It was a wire type once: an endpoint configuration file deserialized
+/// straight into it, which is why every field carried an XML `@` alias and a
+/// hyphenated spelling beside its own. Nothing deserializes into it now -- a
+/// payload file has its own shape, and `types::link_params_of` fills this in
+/// from a payload -- so the aliases are gone and so is the name.
+#[derive(Debug)]
+pub(crate) struct LinkTerms {
+    // A line.
     pub(crate) datarate: Option<Scalar>,
-    #[serde(default, alias = "@stop_bits", alias = "stop-bits", alias = "@stop-bits")]
     pub(crate) stop_bits: Option<Scalar>,
-    #[serde(default, alias = "@asynchronous")]
     pub(crate) asynchronous: Option<Scalar>,
     /// A parity per character on an asynchronous line, and the frame check on
     /// a synchronous one: the kernel calls both a line's parity.
-    #[serde(default, alias = "@parity")]
     pub(crate) parity: Option<Scalar>,
-    #[serde(default, alias = "@clock_type", alias = "clock-type", alias = "@clock-type")]
     pub(crate) clock_type: Option<Scalar>,
-    #[serde(default, alias = "@encoding")]
     pub(crate) encoding: Option<Scalar>,
-    #[serde(default, alias = "@loopback")]
     pub(crate) loopback: Option<Scalar>,
-    #[serde(
-        default,
-        alias = "@byte_length",
-        alias = "byte-length",
-        alias = "@byte-length"
-    )]
     pub(crate) byte_length: Option<Scalar>,
-    // Network attributes.
-    #[serde(default, alias = "@protocol")]
+    /// Which protocol a network payload speaks, which no link has: here so
+    /// that a link stating one is told so.
     pub(crate) protocol: Option<String>,
-    // I2C attributes.
-    #[serde(default, alias = "@ten_bit", alias = "ten-bit", alias = "@ten-bit")]
+    // A bus.
     pub(crate) ten_bit: Option<Scalar>,
-    #[serde(default, alias = "@pec")]
     pub(crate) pec: Option<Scalar>,
-    #[serde(default, alias = "@retries")]
     pub(crate) retries: Option<Scalar>,
-    #[serde(default, alias = "@timeout")]
     pub(crate) timeout: Option<Scalar>,
-    #[serde(
-        default,
-        alias = "@bus_speed",
-        alias = "bus-speed",
-        alias = "@bus-speed"
-    )]
     pub(crate) bus_speed: Option<Scalar>,
-    // SPI attributes.
-    #[serde(
-        default,
-        alias = "@max_speed",
-        alias = "max-speed",
-        alias = "@max-speed"
-    )]
+    // A peripheral on one.
     pub(crate) max_speed: Option<Scalar>,
     /// Which of the four SPI modes a peripheral is clocked in.
     ///
     /// Named `spi_mode` because a payload already has a `mode` -- whether it
     /// sends on its own or on a trigger -- and one word cannot mean both.
-    #[serde(default, rename = "mode", alias = "@mode")]
     pub(crate) spi_mode: Option<Scalar>,
-    #[serde(
-        default,
-        alias = "@bits_per_word",
-        alias = "bits-per-word",
-        alias = "@bits-per-word"
-    )]
     pub(crate) bits_per_word: Option<Scalar>,
-    #[serde(
-        default,
-        alias = "@bit_order",
-        alias = "bit-order",
-        alias = "@bit-order"
-    )]
     pub(crate) bit_order: Option<Scalar>,
-    #[serde(
-        default,
-        alias = "@cs_active",
-        alias = "cs-active",
-        alias = "@cs-active"
-    )]
     pub(crate) cs_active: Option<Scalar>,
-    // Shared: every type of group may state a packet size.
-    #[serde(
-        default,
-        alias = "@packet_size",
-        alias = "packet-size",
-        alias = "@packet-size"
-    )]
-    pub(crate) packet_size: Option<Scalar>,
-    // Shared: stream payload protocol attributes.
-    #[serde(default)]
-    pub(crate) stream: Option<StreamWire>,
+    /// Where one read of a line ends. A line's alone: see
+    /// [`GroupKind::stream`].
+    pub(crate) stream: Option<StreamTerms>,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct StreamWire {
-    #[serde(
-        default,
-        alias = "@max_length",
-        alias = "max-length",
-        alias = "@max-length"
-    )]
+/// Where one read of a line ends, as a file states it.
+#[derive(Debug)]
+pub(crate) struct StreamTerms {
     pub(crate) max_length: Option<Scalar>,
-    #[serde(default, alias = "@timeout")]
     pub(crate) timeout: Option<Scalar>,
-    #[serde(
-        default,
-        alias = "@terminators",
-        alias = "terminator",
-        alias = "@terminator"
-    )]
     pub(crate) terminators: Option<ByteList>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EndpointWire {
-    #[serde(alias = "@name")]
-    name: String,
-    #[serde(alias = "@group")]
-    group: String,
-    #[serde(default, alias = "@device", alias = "path", alias = "@path")]
-    device: Option<String>,
-    #[serde(default, alias = "@address")]
-    address: Option<String>,
-    #[serde(default, alias = "@port")]
-    port: Option<Scalar>,
-    #[serde(default, alias = "@dh_id", alias = "dh-id", alias = "@dh-id")]
-    dh_id: Option<Scalar>,
-    #[serde(
-        default,
-        alias = "@oc_address",
-        alias = "oc-address",
-        alias = "@oc-address"
-    )]
-    oc_address: Option<String>,
-    #[serde(default, alias = "@oc_port", alias = "oc-port", alias = "@oc-port")]
-    oc_port: Option<Scalar>,
 }
 
 // ---------------------------------------------------------------------------
 // Shapes that differ between the two formats
 // ---------------------------------------------------------------------------
-
-/// A document section holding a list of items.
-///
-/// YAML gives a section as a sequence; XML gives it as an element whose
-/// children repeat. This accepts either, so one set of wire types serves
-/// both formats.
-#[derive(Debug)]
-struct Section<T>(Vec<T>);
-
-impl<T> Default for Section<T> {
-    fn default() -> Self {
-        Section(Vec::new())
-    }
-}
-
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Section<T> {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        struct V<T>(PhantomData<T>);
-
-        impl<'de, T: Deserialize<'de>> Visitor<'de> for V<T> {
-            type Value = Section<T>;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a sequence of entries, or an element with repeated children")
-            }
-
-            fn visit_seq<A: SeqAccess<'de>>(self, mut a: A) -> Result<Self::Value, A::Error> {
-                let mut out = Vec::new();
-                while let Some(v) = a.next_element()? {
-                    out.push(v);
-                }
-                Ok(Section(out))
-            }
-
-            fn visit_map<A: MapAccess<'de>>(self, mut a: A) -> Result<Self::Value, A::Error> {
-                let mut out = Vec::new();
-                while let Some(key) = a.next_key::<String>()? {
-                    // One child element arrives as a single value, several of
-                    // the same name as a sequence.
-                    match a.next_value::<OneOrMany<T>>() {
-                        Ok(OneOrMany::One(v)) => out.push(v),
-                        Ok(OneOrMany::Many(vs)) => out.extend(vs),
-                        Err(e) => {
-                            return Err(de::Error::custom(format!("in <{key}>: {e}")));
-                        }
-                    }
-                }
-                Ok(Section(out))
-            }
-        }
-
-        d.deserialize_any(V(PhantomData))
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum OneOrMany<T> {
-    Many(Vec<T>),
-    One(T),
-}
 
 /// A scalar as the file spelled it.
 ///
@@ -974,102 +477,8 @@ fn split_list(text: &str) -> Vec<String> {
 // Validation -- wire types to domain types
 // ---------------------------------------------------------------------------
 
-fn validate(doc: DocWire) -> EndpointConfigResult<EndpointConfigDoc> {
-    let general = GeneralSection {
-        version: doc.general.version,
-        description: doc.general.description,
-    };
-
-    let mut groups: Vec<EndpointGroup> = Vec::with_capacity(doc.endpoint_groups.0.len());
-    let mut by_name: BTreeMap<String, usize> = BTreeMap::new();
-
-    for g in doc.endpoint_groups.0 {
-        if by_name.contains_key(&g.name) {
-            return Err(EndpointConfigError::DuplicateGroup(g.name));
-        }
-        let group = validate_group(g)?;
-        by_name.insert(group.name.clone(), groups.len());
-        groups.push(group);
-    }
-
-    let mut endpoints: Vec<EndpointDef> = Vec::with_capacity(doc.endpoints.0.len());
-    let mut seen: BTreeMap<String, ()> = BTreeMap::new();
-    let mut used: BTreeSet<String> = BTreeSet::new();
-
-    for (sequence, e) in doc.endpoints.0.into_iter().enumerate() {
-        if seen.contains_key(&e.name) {
-            return Err(EndpointConfigError::DuplicateEndpoint(e.name));
-        }
-        let idx = *by_name
-            .get(&e.group)
-            .ok_or_else(|| EndpointConfigError::UnknownGroup {
-                endpoint: e.name.clone(),
-                group: e.group.clone(),
-            })?;
-        seen.insert(e.name.clone(), ());
-        used.insert(e.group.clone());
-        endpoints.push(validate_endpoint(e, &groups[idx], sequence)?);
-    }
-
-    // A group no endpoint is in has no effect on the configuration, which is
-    // also what a group whose name an endpoint misspelled looks like. Checked
-    // after the endpoints, so that a misspelling is reported from the
-    // endpoint's end, where the name actually is.
-    if let Some(group) = groups.iter().find(|g| !used.contains(&g.name)) {
-        return Err(EndpointConfigError::UnusedGroup(group.name.clone()));
-    }
-
-    Ok(EndpointConfigDoc {
-        general,
-        groups,
-        endpoints,
-    })
-}
-
-fn validate_group(g: GroupWire) -> EndpointConfigResult<EndpointGroup> {
-    // Cloned rather than moved out: the checks below read the whole wire
-    // group, to reject any attribute belonging to another type.
-    let name = g.name.clone();
-    let kind_text = g.kind.trim().to_ascii_lowercase();
-
-    // Shared across the four types, so it is read before the match and is
-    // not listed among the type-specific fields any type would reject.
-    let packet_size = match g.packet_size.as_ref() {
-        Some(s) => {
-            let bytes = parse_u32(&name, "packet_size", s)?;
-            if bytes == 0 {
-                return Err(bad(&name, "packet_size must be greater than zero"));
-            }
-            Some(bytes)
-        }
-        None => None,
-    };
-
-    // One arm per kind of group, each in the file that owns that kind: what
-    // a group of that kind may say, what it must say, and what the values it
-    // gives mean are all one subject, and not this function's.
-    let kind = match kind_text.as_str() {
-        "serial" => crate::endpoint_config_serial::group_kind_of(&name, g)?,
-        "network" => crate::endpoint_config_network::group_kind_of(&name, g)?,
-        "i2c" => crate::endpoint_config_i2c::group_kind_of(&name, g)?,
-        "spi" => crate::endpoint_config_spi::group_kind_of(&name, g)?,
-        other => {
-            return Err(EndpointConfigError::UnknownGroupKind {
-                group: name,
-                kind: other.to_string(),
-            })
-        }
-    };
-
-    Ok(EndpointGroup {
-        name,
-        packet_size,
-        kind,
-    })
-}
-
 /// Apply the three rules governing a stream section.
-pub(crate) fn validate_stream(group: &str, s: StreamWire) -> EndpointConfigResult<StreamParams> {
+pub(crate) fn validate_stream(group: &str, s: StreamTerms) -> EndpointConfigResult<StreamParams> {
     // 1. max_length is required.
     let max_length = s
         .max_length
@@ -1124,197 +533,6 @@ pub(crate) fn validate_stream(group: &str, s: StreamWire) -> EndpointConfigResul
     })
 }
 
-/// The shape of the thing that locates an endpoint, which follows from the
-/// type of its group.
-enum LocationShape {
-    /// A path alone, whatever kind of endpoint is at the end of it.
-    Path,
-    /// A host and a port.
-    Network,
-    /// A bus device and the address of a device on that bus.
-    I2cBusAndAddress,
-}
-
-fn validate_endpoint(
-    e: EndpointWire,
-    group: &EndpointGroup,
-    sequence: usize,
-) -> EndpointConfigResult<EndpointDef> {
-    let kind = group.kind.type_name();
-
-    let dh_id = match e.dh_id.as_ref() {
-        Some(s) => Some(parse_u32(&group.name, "dh_id", s)?),
-        None => None,
-    };
-
-    let oc_port = match e.oc_port.as_ref() {
-        Some(s) => {
-            let port = parse_u32(&group.name, "oc_port", s)?;
-            if port > u16::MAX as u32 {
-                return Err(bad(&group.name, &format!("oc_port {port} is out of range")));
-            }
-            Some(port as u16)
-        }
-        None => None,
-    };
-
-    // Half an OC address reaches nothing and says nothing about which half was
-    // meant, so it is an error rather than a handler with no OC side.
-    let oc = match (e.oc_address.clone(), oc_port) {
-        // The OC link is UDP whatever the payload side of the handler is.
-        (Some(address), Some(port)) => Some(NetworkConfig {
-            protocol: NetworkProtocol::Udp,
-            address,
-            port,
-        }),
-        (None, None) => None,
-        (Some(_), None) => {
-            return Err(bad(
-                &group.name,
-                &format!("endpoint \"{}\": oc_address without oc_port", e.name),
-            ))
-        }
-        (None, Some(_)) => {
-            return Err(bad(
-                &group.name,
-                &format!("endpoint \"{}\": oc_port without oc_address", e.name),
-            ))
-        }
-    };
-
-    let shape = match &group.kind {
-        GroupKind::Serial(_) => LocationShape::Path,
-        // A SPI device node names the bus and the chip select together.
-        GroupKind::Spi(_) => LocationShape::Path,
-        GroupKind::I2c(_) => LocationShape::I2cBusAndAddress,
-        // A Unix-domain socket is named by a path, not by host and port.
-        GroupKind::Network(n) => {
-            if matches!(
-                n.protocol,
-                NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram
-            ) {
-                LocationShape::Path
-            } else {
-                LocationShape::Network
-            }
-        }
-    };
-
-    if let LocationShape::I2cBusAndAddress = shape {
-        // An I2C endpoint gives both, and a port is no part of a bus.
-        if e.port.is_some() {
-            return Err(EndpointConfigError::UnusedEndpointField {
-                endpoint: e.name,
-                group: group.name.clone(),
-                kind,
-                field: "a port",
-            });
-        }
-
-        let bus = e
-            .device
-            .ok_or_else(|| EndpointConfigError::MissingEndpointField {
-                endpoint: e.name.clone(),
-                group: group.name.clone(),
-                kind,
-                field: "a bus device",
-            })?;
-
-        let address = e
-            .address
-            .ok_or_else(|| EndpointConfigError::MissingEndpointField {
-                endpoint: e.name.clone(),
-                group: group.name.clone(),
-                kind,
-                field: "a slave address",
-            })?;
-
-        let ten_bit = match &group.kind {
-            GroupKind::I2c(p) => p.ten_bit,
-            _ => unreachable!("shape follows from the group kind"),
-        };
-        let address = parse_i2c_address(&group.name, &address, ten_bit)?;
-
-        return Ok(EndpointDef {
-            name: e.name,
-            group: e.group,
-            location: EndpointLocation::I2c { bus, address },
-            dh_id,
-            oc,
-            sequence,
-        });
-    }
-
-    let wants_network = matches!(shape, LocationShape::Network);
-
-    let location = if wants_network {
-        for (field, present) in [("device", e.device.is_some())] {
-            if present {
-                return Err(EndpointConfigError::UnusedEndpointField {
-                    endpoint: e.name,
-                    group: group.name.clone(),
-                    kind,
-                    field,
-                });
-            }
-        }
-        let address = e
-            .address
-            .ok_or_else(|| EndpointConfigError::MissingEndpointField {
-                endpoint: e.name.clone(),
-                group: group.name.clone(),
-                kind,
-                field: "an address",
-            })?;
-        let port = e
-            .port
-            .as_ref()
-            .ok_or_else(|| EndpointConfigError::MissingEndpointField {
-                endpoint: e.name.clone(),
-                group: group.name.clone(),
-                kind,
-                field: "a port",
-            })?;
-        let port = parse_u32(&group.name, "port", port)?;
-        if port > u16::MAX as u32 {
-            return Err(bad(&group.name, &format!("port {port} is out of range")));
-        }
-        EndpointLocation::Network {
-            address,
-            port: port as u16,
-        }
-    } else {
-        for (field, present) in [("an address", e.address.is_some()), ("a port", e.port.is_some())] {
-            if present {
-                return Err(EndpointConfigError::UnusedEndpointField {
-                    endpoint: e.name,
-                    group: group.name.clone(),
-                    kind,
-                    field,
-                });
-            }
-        }
-        let path = e
-            .device
-            .ok_or_else(|| EndpointConfigError::MissingEndpointField {
-                endpoint: e.name.clone(),
-                group: group.name.clone(),
-                kind,
-                field: "a device",
-            })?;
-        EndpointLocation::Path { path }
-    };
-
-    Ok(EndpointDef {
-        name: e.name,
-        group: e.group,
-        location,
-        dh_id,
-        oc,
-        sequence,
-    })
-}
-
 // ---------------------------------------------------------------------------
 // Scalar parsers
 // ---------------------------------------------------------------------------
@@ -1360,7 +578,7 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &GroupWire) -> [(&'static str, bool); 19] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 19] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
@@ -1395,7 +613,7 @@ fn type_specific_fields(g: &GroupWire) -> [(&'static str, bool); 19] {
 pub(crate) fn reject_foreign_fields(
     group: &str,
     kind: &'static str,
-    g: &GroupWire,
+    g: &LinkTerms,
     own: &[&str],
 ) -> EndpointConfigResult<()> {
     for (field, present) in type_specific_fields(g) {
@@ -1408,7 +626,11 @@ pub(crate) fn reject_foreign_fields(
 
 /// Reject a stream section on a bus type, where a transfer is already bounded
 /// by the number of bytes the master clocks.
-pub(crate) fn reject_stream(group: &str, kind: &'static str, present: bool) -> EndpointConfigResult<()> {
+pub(crate) fn reject_stream(
+    group: &str,
+    kind: &'static str,
+    present: bool,
+) -> EndpointConfigResult<()> {
     reject_unused(group, kind, "a stream section", present)
 }
 
@@ -1447,7 +669,11 @@ fn parse_byte(group: &str, text: &str) -> EndpointConfigResult<u8> {
 /// A YAML 1.1 reader folds `yes`, `no`, `on`, and `off` to a boolean before
 /// this sees them, and [`Scalar`] puts the result back as `true` or `false`,
 /// so those spellings work too without being named here.
-pub(crate) fn parse_flag(group: &str, field: &str, s: Option<&Scalar>) -> EndpointConfigResult<Option<bool>> {
+pub(crate) fn parse_flag(
+    group: &str,
+    field: &str,
+    s: Option<&Scalar>,
+) -> EndpointConfigResult<Option<bool>> {
     let Some(s) = s else { return Ok(None) };
     match s.as_str().to_ascii_lowercase().as_str() {
         "true" => Ok(Some(true)),
@@ -1517,1272 +743,3 @@ pub(crate) fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Opt
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The same configuration written both ways. These two must parse into
-    /// structures that compare equal; that is the point of the module.
-    const YAML: &str = r#"
-general:
-  version: "1.0"
-  description: Payload endpoints
-
-endpoint_groups:
-  - name: payload_serial
-    type: serial
-    asynchronous: true
-    datarate: 115200
-    stop_bits: 1
-    byte_length: 8
-    stream:
-      max_length: 1024
-      timeout: 500ms
-      terminators: [0x0D, 0x0A]
-
-  - name: payload_tcp
-    type: network
-    protocol: tcp
-    stream:
-      max_length: 4096
-      timeout: none
-
-  - name: payload_udp
-    type: network
-    protocol: udp
-
-endpoints:
-  - name: pay0
-    group: payload_serial
-    device: /dev/ttyS0
-  - name: pay1
-    group: payload_serial
-    device: /dev/ttyS1
-  - name: pay2
-    group: payload_tcp
-    address: 192.168.1.10
-    port: 5000
-  - name: pay3
-    group: payload_udp
-    address: 192.168.1.11
-    port: 5001
-"#;
-
-    const XML: &str = r#"<endpoint-configuration>
-  <general version="1.0" description="Payload endpoints"/>
-
-  <endpoint-groups>
-    <group name="payload_serial" type="serial" asynchronous="true"
-           datarate="115200" stop_bits="1" byte_length="8">
-      <stream max_length="1024" timeout="500ms" terminators="0x0D,0x0A"/>
-    </group>
-
-    <group name="payload_tcp" type="network" protocol="tcp">
-      <stream max_length="4096" timeout="none"/>
-    </group>
-
-    <group name="payload_udp" type="network" protocol="udp"/>
-  </endpoint-groups>
-
-  <endpoints>
-    <endpoint name="pay0" group="payload_serial" device="/dev/ttyS0"/>
-    <endpoint name="pay1" group="payload_serial" device="/dev/ttyS1"/>
-    <endpoint name="pay2" group="payload_tcp" address="192.168.1.10" port="5000"/>
-    <endpoint name="pay3" group="payload_udp" address="192.168.1.11" port="5001"/>
-  </endpoints>
-</endpoint-configuration>"#;
-
-    /// An endpoint knows which one of the file it is, in every format.
-    ///
-    /// The same number a payload carries, for the same reason: the order is
-    /// configuration, since ids will be assigned in it, and the digest walks
-    /// the endpoints by it.
-    #[test]
-    fn an_endpoint_knows_which_one_of_the_file_it_is() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
-                    endpoints:\n  \
-                    - name: first\n    group: g\n    address: localhost\n    port: 5000\n  \
-                    - name: second\n    group: g\n    address: localhost\n    port: 5001\n  \
-                    - name: third\n    group: g\n    address: localhost\n    port: 5002\n";
-        let xml = "<endpoint-configuration>\
-                   <endpoint-groups><group name=\"g\" type=\"network\" protocol=\"udp\"/>\
-                   </endpoint-groups><endpoints>\
-                   <endpoint name=\"first\" group=\"g\" address=\"localhost\" port=\"5000\"/>\
-                   <endpoint name=\"second\" group=\"g\" address=\"localhost\" port=\"5001\"/>\
-                   <endpoint name=\"third\" group=\"g\" address=\"localhost\" port=\"5002\"/>\
-                   </endpoints></endpoint-configuration>";
-
-        for (what, doc) in [
-            ("yaml", from_yaml_str(yaml).expect("the YAML parses")),
-            ("xml", from_xml_str(xml).expect("the XML parses")),
-        ] {
-            let order: Vec<(&str, usize)> = doc
-                .endpoints
-                .iter()
-                .map(|e| (e.name.as_str(), e.sequence))
-                .collect();
-            assert_eq!(
-                order,
-                vec![("first", 0), ("second", 1), ("third", 2)],
-                "{what}: {order:?}"
-            );
-        }
-    }
-
-    /// The file order survives the list being reordered, which is what
-    /// carrying the number is for.
-    #[test]
-    fn an_endpoints_place_in_the_file_survives_a_reordered_list() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
-                    endpoints:\n  \
-                    - name: first\n    group: g\n    address: localhost\n    port: 5000\n  \
-                    - name: second\n    group: g\n    address: localhost\n    port: 5001\n";
-        let mut doc = from_yaml_str(yaml).expect("it parses");
-
-        doc.endpoints.reverse();
-        assert_eq!(doc.endpoints[0].name, "second");
-        assert_eq!(doc.endpoints[0].sequence, 1, "it forgot where it stood");
-        assert_eq!(doc.endpoints[1].sequence, 0);
-    }
-
-    #[test]
-    fn yaml_and_xml_produce_the_same_structures() {
-        let from_yaml = from_yaml_str(YAML).expect("YAML should parse");
-        let from_xml = from_xml_str(XML).expect("XML should parse");
-        assert_eq!(from_yaml, from_xml);
-    }
-
-    #[test]
-    fn general_section_is_read() {
-        let doc = from_yaml_str(YAML).unwrap();
-        assert_eq!(doc.general.version.as_deref(), Some("1.0"));
-        assert_eq!(doc.general.description.as_deref(), Some("Payload endpoints"));
-    }
-
-    #[test]
-    fn serial_group_attributes_are_read() {
-        let doc = from_yaml_str(YAML).unwrap();
-        let g = doc.group("payload_serial").expect("group present");
-        match &g.kind {
-            GroupKind::Serial(s) => {
-                assert_eq!(s.datarate, 115_200);
-                assert_eq!(s.stop_bits, Some(StopBits::One));
-                assert_eq!(s.byte_length.bits(), 8);
-                assert_eq!(s.stream.max_length, 1024);
-                assert_eq!(s.stream.timeout, Some(Duration::from_millis(500)));
-                assert_eq!(s.stream.terminators, vec![0x0D, 0x0A]);
-            }
-            other => panic!("expected a serial group, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn groups_hold_no_device_or_address_and_endpoints_hold_nothing_else() {
-        // The division of labour the file format exists to express.
-        let doc = from_yaml_str(YAML).unwrap();
-        let serial: Vec<_> = doc
-            .endpoints
-            .iter()
-            .filter(|e| e.group == "payload_serial")
-            .collect();
-        assert_eq!(serial.len(), 2);
-        assert_eq!(
-            serial[0].location,
-            EndpointLocation::Path {
-                path: "/dev/ttyS0".to_string()
-            }
-        );
-        assert_eq!(
-            serial[1].location,
-            EndpointLocation::Path {
-                path: "/dev/ttyS1".to_string()
-            }
-        );
-        // Both endpoints share one set of attributes, held once, in the group.
-        assert_eq!(
-            doc.group_of(serial[0]).unwrap().kind,
-            doc.group_of(serial[1]).unwrap().kind
-        );
-    }
-
-    #[test]
-    fn network_endpoints_carry_address_and_port() {
-        let doc = from_xml_str(XML).unwrap();
-        let e = doc.endpoints.iter().find(|e| e.name == "pay2").unwrap();
-        assert_eq!(
-            e.location,
-            EndpointLocation::Network {
-                address: "192.168.1.10".to_string(),
-                port: 5000
-            }
-        );
-    }
-
-    // -- the stream rules ---------------------------------------------------
-
-    /// An endpoints section putting one endpoint in group `g`.
-    ///
-    /// A group no endpoint is in is rejected, so a test of group parsing has
-    /// to put something in the group it parses. What an endpoint must give
-    /// depends on its group's type, so there is one of these per shape.
-    const DEVICE_ENDPOINT: &str = "endpoints:\n  - name: e\n    group: g\n    \
-                                   device: /dev/ttyS0\n";
-    const NETWORK_ENDPOINT: &str = "endpoints:\n  - name: e\n    group: g\n    \
-                                    address: 192.168.1.10\n    port: 5000\n";
-    const I2C_ENDPOINT: &str = "endpoints:\n  - name: e\n    group: g\n    \
-                                device: /dev/i2c-1\n    address: 0x40\n";
-
-    fn serial_stream(stream_body: &str) -> EndpointConfigResult<EndpointConfigDoc> {
-        from_yaml_str(&format!(
-            "endpoint_groups:\n  \
-             - name: g\n    \
-               type: serial\n    asynchronous: true\n    \
-               datarate: 9600\n    \
-               stop_bits: 1\n    \
-               byte_length: 8\n    \
-               stream:\n{stream_body}{DEVICE_ENDPOINT}"
-        ))
-    }
-
-    fn stream_of(doc: &EndpointConfigDoc) -> &StreamParams {
-        doc.group("g").unwrap().kind.stream().unwrap()
-    }
-
-    #[test]
-    fn max_length_is_required() {
-        let e = serial_stream("      timeout: 1s\n").unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::StreamMissingMaxLength(_)),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn timeout_alone_is_accepted() {
-        let doc = serial_stream("      max_length: 64\n      timeout: 250ms\n").unwrap();
-        let s = stream_of(&doc);
-        assert_eq!(s.timeout, Some(Duration::from_millis(250)));
-        assert!(s.terminators.is_empty());
-        assert!(!s.is_fixed_length());
-    }
-
-    #[test]
-    fn terminators_alone_are_accepted() {
-        let doc = serial_stream("      max_length: 64\n      terminators: [10]\n").unwrap();
-        let s = stream_of(&doc);
-        assert_eq!(s.timeout, None);
-        assert_eq!(s.terminators, vec![10]);
-        assert!(!s.is_fixed_length());
-    }
-
-    #[test]
-    fn both_timeout_and_terminators_are_accepted() {
-        let doc =
-            serial_stream("      max_length: 64\n      timeout: 1s\n      terminators: [0x04]\n")
-                .unwrap();
-        let s = stream_of(&doc);
-        assert_eq!(s.timeout, Some(Duration::from_secs(1)));
-        assert_eq!(s.terminators, vec![0x04]);
-    }
-
-    #[test]
-    fn neither_timeout_nor_terminators_is_rejected() {
-        let e = serial_stream("      max_length: 64\n").unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::StreamNeedsTimeoutOrTerminators(_)),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn timeout_none_is_how_a_fixed_length_read_is_requested() {
-        // The documented way to say "hand me max_length bytes at a time".
-        let doc = serial_stream("      max_length: 12\n      timeout: none\n").unwrap();
-        let s = stream_of(&doc);
-        assert_eq!(s.max_length, 12);
-        assert_eq!(s.timeout, None);
-        assert!(s.terminators.is_empty());
-        assert!(s.is_fixed_length());
-    }
-
-    #[test]
-    fn empty_terminator_list_is_rejected() {
-        let e = serial_stream("      max_length: 64\n      terminators: []\n").unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::StreamEmptyTerminators(_)),
-            "got {e:?}"
-        );
-    }
-
-    // -- scalar spellings ---------------------------------------------------
-
-    #[test]
-    fn timeout_units_are_understood() {
-        for (text, want) in [
-            ("900us", Duration::from_micros(900)),
-            ("250ms", Duration::from_millis(250)),
-            ("3s", Duration::from_secs(3)),
-        ] {
-            let doc =
-                serial_stream(&format!("      max_length: 8\n      timeout: {text}\n")).unwrap();
-            assert_eq!(stream_of(&doc).timeout, Some(want), "for {text}");
-        }
-    }
-
-    /// A one-group file of the given type, with `extra` folded into the group.
-    fn group_of_type(kind: &str, extra: &str) -> EndpointConfigResult<EndpointConfigDoc> {
-        let body = match kind {
-            "serial" => {
-                "    asynchronous: true\n    datarate: 9600\n    stop_bits: 1\n\
-                 \x20   byte_length: 8\n    stream:\n      max_length: 8\n\
-                 \x20     timeout: none\n"
-            }
-            "network" => "    protocol: udp\n",
-            "i2c" => "",
-            _ => "    max_speed: 1000000\n    mode: 0\n",
-        };
-        let endpoint = match kind {
-            "network" => NETWORK_ENDPOINT,
-            "i2c" => I2C_ENDPOINT,
-            // A serial line and a SPI chip select are both named by a device.
-            _ => DEVICE_ENDPOINT,
-        };
-        from_yaml_str(&format!(
-            "endpoint_groups:\n  - name: g\n    type: {kind}\n{body}{extra}{endpoint}"
-        ))
-    }
-
-    #[test]
-    fn packet_size_is_read_for_every_type_of_group() {
-        // It is a shared attribute, so no type may treat it as foreign.
-        for kind in ["serial", "network", "i2c", "spi"] {
-            let doc = group_of_type(kind, "    packet_size: 128\n")
-                .unwrap_or_else(|e| panic!("{kind}: {e}"));
-            assert_eq!(doc.group("g").unwrap().packet_size, Some(128), "{kind}");
-        }
-    }
-
-    /// A serial group says which kind of line it is, and stop bits belong to
-    /// only one of them.
-    ///
-    /// The two are read differently all the way down -- a start-stop line
-    /// delimits every byte for itself, a synchronous one carries its bits on
-    /// a clock -- so a group that did not say would be guessed at, and a line
-    /// read as the wrong one of the two is a line read as noise.
-    #[test]
-    fn a_serial_group_says_whether_the_line_is_start_stop() {
-        let line = |extra: &str| {
-            from_yaml_str(&format!(
-                "endpoint_groups:\n  - name: g\n    type: serial\n    datarate: 9600\n\
-                 \x20   byte_length: 8\n    stream:\n      max_length: 8\n      \
-                 timeout: none\n{extra}{DEVICE_ENDPOINT}"
-            ))
-        };
-
-        // Saying nothing is refused: this is not a thing to default.
-        let e = line("    stop_bits: 1\n").unwrap_err();
-        assert!(
-            format!("{e}").contains("no asynchronous"),
-            "a serial group must say which kind of line it is: {e}"
-        );
-
-        // A start-stop line has stop bits, and must state them.
-        let doc = line("    asynchronous: true\n    stop_bits: 2\n").expect("a start-stop line");
-        match &doc.group("g").unwrap().kind {
-            GroupKind::Serial(serial) => {
-                assert!(serial.asynchronous);
-                assert_eq!(serial.stop_bits, Some(StopBits::Two));
-            }
-            other => panic!("{other:?}"),
-        }
-        let e = line("    asynchronous: true\n").unwrap_err();
-        assert!(format!("{e}").contains("stop_bits"), "{e}");
-
-        // A synchronous line has none, and stating them is refused: a stop
-        // bit is what start-stop framing uses in place of a clock, so a line
-        // whose bits are on a clock has nothing for one to delimit.
-        let doc = line("    asynchronous: false\n    clock_type: external\n")
-            .expect("a synchronous line");
-        match &doc.group("g").unwrap().kind {
-            GroupKind::Serial(serial) => {
-                assert!(!serial.asynchronous);
-                assert_eq!(serial.stop_bits, None);
-            }
-            other => panic!("{other:?}"),
-        }
-
-        let e = line("    asynchronous: false\n    clock_type: external\n    stop_bits: 1\n")
-            .unwrap_err();
-        let said = format!("{e}");
-        assert!(
-            said.contains("stop_bits") && said.contains("in place of a clock"),
-            "{said}"
-        );
-
-        // And it is true or false, not a word that looks like one.
-        let e = line("    asynchronous: sometimes\n").unwrap_err();
-        assert!(format!("{e}").contains("is not true or false"), "{e}");
-
-        // What each kind may say is the other half of the rule: a start-stop
-        // line shares no clock, so the settings of one are refused for it.
-        for stated in [
-            "    clock_type: external\n",
-            "    encoding: nrzi\n",
-            "    loopback: true\n",
-        ] {
-            let e = line(&format!("    asynchronous: true\n    stop_bits: 1\n{stated}"))
-                .unwrap_err();
-            let said = format!("{e}");
-            let named = stated.trim().split(':').next().unwrap();
-            assert!(
-                said.contains(named) && said.contains("shares no clock"),
-                "{stated}: {said}"
-            );
-        }
-
-        // And a synchronous line takes each of them, with the clock required
-        // and the rest defaulted.
-        let doc = line(
-            "    asynchronous: false\n    clock_type: internal\n    encoding: nrzi\n\
-             \x20   parity: crc32_pr1_ccitt\n    loopback: true\n",
-        )
-        .expect("a synchronous line");
-        match &doc.group("g").unwrap().kind {
-            GroupKind::Serial(serial) => {
-                assert_eq!(serial.clock_type, Some(crate::ClockType::Internal));
-                assert!(serial.clock_type.unwrap().is_ours(), "this end clocks it");
-                assert_eq!(serial.encoding, Some(crate::Encoding::Nrzi));
-                assert_eq!(serial.frame_check, Some(crate::FrameCheck::Crc32Pr1Ccitt));
-                assert_eq!(serial.loopback, Some(true));
-                assert_eq!(serial.parity, None, "a synchronous line has no per-character parity");
-            }
-            other => panic!("{other:?}"),
-        }
-
-        // The unstated ones are the driver's own defaults.
-        let doc = line("    asynchronous: false\n    clock_type: external\n")
-            .expect("a synchronous line");
-        match &doc.group("g").unwrap().kind {
-            GroupKind::Serial(serial) => {
-                assert_eq!(serial.encoding, Some(crate::Encoding::Nrz));
-                assert_eq!(serial.frame_check, Some(crate::FrameCheck::None));
-                assert_eq!(serial.loopback, Some(false));
-            }
-            other => panic!("{other:?}"),
-        }
-
-        // A value that is not one of a kind's is refused with the ones that
-        // are, and each kind has its own list: a CRC is not a parity a
-        // character can have, and even is not a frame check.
-        let e = line("    asynchronous: true\n    stop_bits: 1\n    parity: crc16_pr1\n")
-            .unwrap_err();
-        assert!(format!("{e}").contains("none, even, odd, mark, or space"), "{e}");
-
-        let e = line("    asynchronous: false\n    clock_type: external\n    parity: even\n")
-            .unwrap_err();
-        assert!(format!("{e}").contains("is not a frame check"), "{e}");
-    }
-
-    #[test]
-    fn packet_size_is_optional() {
-        // A file describing only how to reach a device need not state one.
-        for kind in ["serial", "network", "i2c", "spi"] {
-            let doc = group_of_type(kind, "").unwrap_or_else(|e| panic!("{kind}: {e}"));
-            assert_eq!(doc.group("g").unwrap().packet_size, None, "{kind}");
-        }
-    }
-
-    #[test]
-    fn a_zero_packet_size_is_rejected() {
-        // A packet of no bytes is not a packet, and the other sizes and rates
-        // in this format reject zero for the same reason.
-        let e = group_of_type("network", "    packet_size: 0\n").unwrap_err();
-        assert!(format!("{e}").contains("greater than zero"), "got {e}");
-    }
-
-    #[test]
-    fn packet_size_accepts_hex_and_a_hyphenated_name() {
-        let hex = group_of_type("network", "    packet_size: 0x80\n").unwrap();
-        let hyphen = group_of_type("network", "    packet-size: 128\n").unwrap();
-        assert_eq!(hex.group("g").unwrap().packet_size, Some(128));
-        assert_eq!(hyphen.group("g").unwrap().packet_size, Some(128));
-    }
-
-    #[test]
-    fn a_timeout_without_a_unit_is_rejected() {
-        let e = serial_stream("      max_length: 8\n      timeout: 250\n").unwrap_err();
-        assert!(format!("{e}").contains("no unit"), "got {e}");
-    }
-
-    #[test]
-    fn a_zero_timeout_is_rejected_in_favour_of_none() {
-        let e = serial_stream("      max_length: 8\n      timeout: 0ms\n").unwrap_err();
-        assert!(format!("{e}").contains("say none"), "got {e}");
-    }
-
-    #[test]
-    fn terminators_accept_a_sequence_or_a_delimited_string() {
-        let seq = serial_stream("      max_length: 8\n      terminators: [0x0D, 0x0A]\n").unwrap();
-        let text = serial_stream("      max_length: 8\n      terminators: \"0x0D, 0x0A\"\n").unwrap();
-        assert_eq!(stream_of(&seq).terminators, vec![0x0D, 0x0A]);
-        assert_eq!(stream_of(&seq).terminators, stream_of(&text).terminators);
-    }
-
-    #[test]
-    fn terminators_accept_decimal_and_hex() {
-        let doc = serial_stream("      max_length: 8\n      terminators: [13, 0x0A]\n").unwrap();
-        assert_eq!(stream_of(&doc).terminators, vec![13, 10]);
-    }
-
-    #[test]
-    fn a_terminator_above_a_byte_is_rejected() {
-        let e = serial_stream("      max_length: 8\n      terminators: [256]\n").unwrap_err();
-        assert!(format!("{e}").contains("not a byte value"), "got {e}");
-    }
-
-    #[test]
-    fn stop_bits_accept_one_one_and_a_half_and_two() {
-        for (text, want) in [
-            ("1", StopBits::One),
-            ("1.5", StopBits::OnePointFive),
-            ("2", StopBits::Two),
-        ] {
-            let yaml = format!(
-                "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
-                 stop_bits: {text}\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
-                 timeout: none\n{DEVICE_ENDPOINT}"
-            );
-            let doc = from_yaml_str(&yaml).unwrap();
-            match &doc.group("g").unwrap().kind {
-                GroupKind::Serial(s) => assert_eq!(s.stop_bits, Some(want), "for {text}"),
-                other => panic!("expected serial, got {other:?}"),
-            }
-        }
-    }
-
-    #[test]
-    fn a_byte_length_no_uart_offers_is_rejected() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
-                    stop_bits: 1\n    byte_length: 9\n    stream:\n      max_length: 8\n      \
-                    timeout: none\n";
-        let e = from_yaml_str(yaml).unwrap_err();
-        assert!(format!("{e}").contains("out of range"), "got {e}");
-    }
-
-    // -- cross-section rules ------------------------------------------------
-
-    #[test]
-    fn an_endpoint_naming_an_undefined_group_is_rejected() {
-        let yaml = "endpoints:\n  - name: e\n    group: nope\n    device: /dev/ttyS0\n";
-        let e = from_yaml_str(yaml).unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::UnknownGroup { .. }),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_group_no_endpoint_is_in_is_rejected() {
-        // A group with no members has no effect on the configuration, so a
-        // file carrying one is more likely wrong than deliberate.
-        let yaml = format!(
-            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
-             \x20 - name: spare\n    type: network\n    protocol: udp\n{NETWORK_ENDPOINT}"
-        );
-        let e = from_yaml_str(&yaml).unwrap_err();
-        assert!(
-            matches!(&e, EndpointConfigError::UnusedGroup(name) if name == "spare"),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_misspelled_group_is_reported_from_the_endpoint_not_the_group() {
-        // A typo leaves the group unused and the name undefined at once. The
-        // endpoint's end is where the misspelling actually is, so that is the
-        // error worth giving.
-        let yaml = "endpoint_groups:\n  - name: payload_udp\n    type: network\n    \
-                    protocol: udp\nendpoints:\n  - name: e\n    group: payload_upd\n    \
-                    address: 192.168.1.10\n    port: 5000\n";
-        let e = from_yaml_str(yaml).unwrap_err();
-        assert!(
-            matches!(&e, EndpointConfigError::UnknownGroup { group, .. } if group == "payload_upd"),
-            "got {e:?}"
-        );
-    }
-
-    // -- endpoints as data handlers -----------------------------------------
-
-    /// A whole set of endpoints becoming data handlers.
-    ///
-    /// The transports come from the groups and the addresses from the
-    /// endpoints, which is the division the format exists for.
-    #[test]
-    fn endpoints_become_data_handlers() {
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  \
-             - name: payload_tcp\n    type: network\n    protocol: tcp\n    \
-               packet_size: 1024\n    stream:\n      max_length: 1024\n      \
-               timeout: none\n  \
-             - name: payload_unix\n    type: network\n    protocol: unix_dgram\n    \
-               packet_size: 64\n  \
-             - name: rs422\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    stop_bits: 1\n    \
-               byte_length: 8\n    packet_size: 512\n    stream:\n      \
-               max_length: 512\n      timeout: none\n\
-             endpoints:\n  \
-             - name: camera\n    group: payload_tcp\n    dh_id: 0\n    \
-               address: 192.168.1.10\n    port: 5000\n  \
-             - name: recorder\n    group: payload_unix\n    dh_id: 1\n    \
-               device: /run/tcs/recorder.sock\n  \
-             - name: magnetometer\n    group: rs422\n    dh_id: 2\n    \
-               device: /dev/ttyS0\n",
-        )
-        .expect("parses");
-
-        let handlers = doc.to_dh_configs().expect("converts");
-        assert_eq!(handlers.len(), 3);
-
-        assert_eq!(handlers[0].dh_id, DHId(0));
-        assert_eq!(handlers[0].name, DHName::new("camera"));
-        assert_eq!(handlers[0].packet_size, 1024);
-        assert_eq!(
-            handlers[0].endpoint,
-            EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::Tcp,
-                address: "192.168.1.10".to_string(),
-                port: 5000,
-            })
-        );
-
-        // A Unix socket is a network endpoint named by a path, with no port.
-        assert_eq!(
-            handlers[1].endpoint,
-            EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::UnixDgram,
-                address: "/run/tcs/recorder.sock".to_string(),
-                port: 0,
-            })
-        );
-        assert_eq!(handlers[1].packet_size, 64);
-
-        // A serial line is its own kind of endpoint: a device node, and the
-        // framing of the line it opens. It used to be a plain device, which
-        // is the right file read at whatever rate the port was left at.
-        assert_eq!(
-            handlers[2].endpoint,
-            EndpointConfig::Serial(SerialConfig {
-                path: "/dev/ttyS0".to_string(),
-                datarate: 9600,
-                asynchronous: true,
-                parity: Some(crate::Parity::None),
-                clock_type: None,
-                encoding: None,
-                frame_check: None,
-                loopback: None,
-                stop_bits: Some(StopBits::One),
-                byte_length: 8,
-            })
-        );
-    }
-
-    /// A SPI endpoint is named by a device node -- which names the bus and
-    /// the chip select together -- and carries the terms it is clocked on.
-    #[test]
-    fn a_spi_endpoint_becomes_a_spi_handler_with_its_terms() {
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: spi\n    max_speed: 1000000\n    \
-             mode: 0\n    packet_size: 32\n\
-             endpoints:\n  - name: imu\n    group: g\n    dh_id: 7\n    \
-             device: /dev/spidev0.0\n",
-        )
-        .expect("parses");
-
-        let handlers = doc.to_dh_configs().expect("converts");
-        assert_eq!(handlers[0].dh_id, DHId(7));
-        assert_eq!(
-            handlers[0].endpoint,
-            EndpointConfig::Spi(SpiConfig {
-                path: "/dev/spidev0.0".to_string(),
-                max_speed: 1_000_000,
-                mode: SpiMode::Mode0,
-                bits_per_word: 8,
-                bit_order: BitOrder::MsbFirst,
-                cs_active: CsActive::Low,
-            }),
-            "a SPI endpoint used to become a plain device handler, which opened \
-             the node and then clocked it however it had been left"
-        );
-    }
-
-    /// An I2C endpoint becomes a handler carrying both halves of where it is.
-    ///
-    /// It used to become nothing at all: there was no `EndpointConfig` that
-    /// could hold a bus and an address, so the conversion refused, and an I2C
-    /// bus could be described in a file and never run.
-    #[test]
-    fn an_i2c_endpoint_becomes_an_i2c_handler_with_bus_and_address() {
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: i2c\n    packet_size: 8\n    \
-             pec: true\n\
-             endpoints:\n  - name: thermal_a\n    group: g\n    dh_id: 0\n    \
-             device: /dev/i2c-1\n    address: 0x48\n",
-        )
-        .expect("parses: an I2C endpoint is a perfectly good endpoint");
-
-        let handlers = doc.to_dh_configs().expect("converts");
-        assert_eq!(
-            handlers[0].endpoint,
-            EndpointConfig::I2c(I2cConfig {
-                bus: "/dev/i2c-1".to_string(),
-                address: 0x48,
-                ten_bit: false,
-                pec: true,
-            })
-        );
-    }
-
-    #[test]
-    fn an_endpoint_with_no_dh_id_cannot_become_a_data_handler() {
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n    \
-             packet_size: 8\n\
-             endpoints:\n  - name: e\n    group: g\n    address: 10.0.0.1\n    \
-             port: 5000\n",
-        )
-        .expect("parses: an id is only needed to become a handler");
-
-        let e = doc.to_dh_configs().unwrap_err();
-        assert!(
-            matches!(&e, EndpointConfigError::EndpointHasNoDhId(name) if name == "e"),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn two_endpoints_sharing_a_dh_id_are_rejected() {
-        // A duplicate converts cleanly and then has one handler shadow the
-        // other, which is what the payload format rejects as well.
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n    \
-             packet_size: 8\n\
-             endpoints:\n  - name: first\n    group: g\n    dh_id: 3\n    \
-             address: 10.0.0.1\n    port: 5000\n  \
-             - name: second\n    group: g\n    dh_id: 3\n    address: 10.0.0.2\n    \
-             port: 5001\n",
-        )
-        .expect("parses");
-
-        let e = doc.to_dh_configs().unwrap_err();
-        assert!(
-            matches!(&e, EndpointConfigError::DuplicateDhId { dh_id: 3, .. }),
-            "got {e:?}"
-        );
-    }
-
-    /// Two endpoints wanting one thing are refused here as in a payload file.
-    ///
-    /// The rule belongs to the handlers rather than to the words that
-    /// described them, so both formats end at the same check. This format is
-    /// also the only one that can describe the kinds where it matters most: a
-    /// serial line opened twice is two handlers splitting one line between
-    /// them, each reporting part of it as though it were the whole.
-    #[test]
-    fn two_endpoints_wanting_one_line_are_rejected() {
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
-             byte_length: 8\n    stop_bits: 1\n    packet_size: 8\n    stream:\n      \
-             max_length: 8\n      timeout: none\n\
-             endpoints:\n  - name: first\n    group: g\n    dh_id: 0\n    \
-             path: /dev/ttyS0\n  - name: second\n    group: g\n    dh_id: 1\n    \
-             path: /dev/ttyS0\n",
-        )
-        .expect("parses");
-
-        let e = doc.to_dh_configs().unwrap_err();
-        let said = format!("{e}");
-        assert!(
-            matches!(&e, EndpointConfigError::Collision(_))
-                && said.contains("/dev/ttyS0")
-                && said.contains("first")
-                && said.contains("second"),
-            "got {e:?}"
-        );
-
-        // Two lines, two handlers, which is the ordinary case.
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
-             byte_length: 8\n    stop_bits: 1\n    packet_size: 8\n    stream:\n      \
-             max_length: 8\n      timeout: none\n\
-             endpoints:\n  - name: first\n    group: g\n    dh_id: 0\n    \
-             path: /dev/ttyS0\n  - name: second\n    group: g\n    dh_id: 1\n    \
-             path: /dev/ttyS1\n",
-        )
-        .expect("parses");
-        assert_eq!(doc.to_dh_configs().expect("both convert").len(), 2);
-    }
-
-    #[test]
-    fn an_endpoint_whose_group_states_no_packet_size_cannot_become_a_handler() {
-        // The group attribute is optional, because a file saying only how to
-        // reach a device need not state one. A data handler must have one.
-        let doc = from_yaml_str(
-            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
-             endpoints:\n  - name: e\n    group: g\n    dh_id: 0\n    \
-             address: 10.0.0.1\n    port: 5000\n",
-        )
-        .expect("parses: packet_size is optional");
-
-        let e = doc.to_dh_configs().unwrap_err();
-        assert!(
-            matches!(
-                &e,
-                EndpointConfigError::GroupHasNoPacketSize { endpoint, group }
-                    if endpoint == "e" && group == "g"
-            ),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_dh_id_is_read_from_every_format_and_either_spelling() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n    \
-                    packet_size: 8\n\
-                    endpoints:\n  - name: e\n    group: g\n    dh_id: 0x2a\n    \
-                    address: 10.0.0.1\n    port: 5000\n";
-        let hyphen = yaml.replace("dh_id", "dh-id");
-        // XML carries values as attributes, which reach serde with an `@`
-        // prefix -- so this exercises the `@dh_id` alias rather than `dh_id`.
-        let xml = r#"<endpoint-configuration>
-                       <endpoint-groups>
-                         <group name="g" type="network" protocol="udp" packet_size="8"/>
-                       </endpoint-groups>
-                       <endpoints>
-                         <endpoint name="e" group="g" dh_id="42"
-                                   address="10.0.0.1" port="5000"/>
-                       </endpoints>
-                     </endpoint-configuration>"#;
-        // 0x2a is 42: the id accepts hex as every other number in this format
-        // does.
-        for (label, doc) in [
-            ("yaml", from_yaml_str(yaml).unwrap()),
-            ("hyphenated", from_yaml_str(&hyphen).unwrap()),
-            ("xml", from_xml_str(xml).unwrap()),
-        ] {
-            assert_eq!(doc.endpoints[0].dh_id, Some(42), "{label}");
-            assert_eq!(doc.to_dh_configs().unwrap()[0].dh_id, DHId(42), "{label}");
-        }
-    }
-
-    #[test]
-    fn a_duplicate_group_name_is_rejected() {
-        let one = "  - name: g\n    type: network\n    protocol: udp\n";
-        let e = from_yaml_str(&format!("endpoint_groups:\n{one}{one}")).unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::DuplicateGroup(_)),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_serial_endpoint_given_an_address_is_rejected() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
-                    stop_bits: 1\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
-                    timeout: none\n\
-                    endpoints:\n  - name: e\n    group: g\n    address: 10.0.0.1\n    port: 1\n";
-        let e = from_yaml_str(yaml).unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::UnusedEndpointField { .. }),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_serial_group_given_a_protocol_is_rejected() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    protocol: tcp\n    \
-                    datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n    stream:\n      \
-                    max_length: 8\n      timeout: none\n";
-        let e = from_yaml_str(yaml).unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::UnusedGroupField { .. }),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_datagram_group_needs_no_stream_section() {
-        let doc = from_yaml_str(&format!(
-            "endpoint_groups:\n  - name: g\n    type: network\n    protocol: udp\n\
-             {NETWORK_ENDPOINT}"
-        ))
-        .unwrap();
-        assert!(doc.group("g").unwrap().kind.stream().is_none());
-    }
-
-    #[test]
-    fn a_tcp_group_without_a_stream_section_is_rejected() {
-        let e =
-            from_yaml_str("endpoint_groups:\n  - name: g\n    type: network\n    protocol: tcp\n")
-                .unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::MissingGroupField { .. }),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn an_unknown_group_type_is_rejected() {
-        let e = from_yaml_str("endpoint_groups:\n  - name: g\n    type: carrier_pigeon\n")
-            .unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::UnknownGroupKind { .. }),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_unix_socket_endpoint_is_named_by_a_path() {
-        let yaml = "endpoint_groups:\n  - name: g\n    type: network\n    \
-                    protocol: unix_dgram\n\
-                    endpoints:\n  - name: e\n    group: g\n    device: /run/pay.sock\n";
-        let doc = from_yaml_str(yaml).unwrap();
-        assert_eq!(
-            doc.endpoints[0].location,
-            EndpointLocation::Path {
-                path: "/run/pay.sock".to_string()
-            }
-        );
-    }
-
-    // -- the bus types ------------------------------------------------------
-
-    /// A group of the given type, plus one endpoint, written compactly.
-    fn bus(group_body: &str, endpoint_body: &str) -> EndpointConfigResult<EndpointConfigDoc> {
-        from_yaml_str(&format!(
-            "endpoint_groups:\n  - name: g\n{group_body}\
-             endpoints:\n  - name: e\n    group: g\n{endpoint_body}"
-        ))
-    }
-
-    #[test]
-    fn i2c_group_attributes_are_read() {
-        let doc = bus(
-            "    type: i2c\n    ten_bit: false\n    pec: true\n    retries: 3\n    \
-             timeout: 50ms\n    bus_speed: 400000\n",
-            "    device: /dev/i2c-1\n    address: 0x48\n",
-        )
-        .unwrap();
-        match &doc.group("g").unwrap().kind {
-            GroupKind::I2c(p) => {
-                assert!(!p.ten_bit);
-                assert!(p.pec);
-                assert_eq!(p.retries, 3);
-                assert_eq!(p.timeout, Some(Duration::from_millis(50)));
-                assert_eq!(p.bus_speed, Some(400_000));
-            }
-            other => panic!("expected i2c, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn i2c_attributes_all_have_defaults() {
-        // Nothing but the type is required: the protocol fixes the framing,
-        // and every knob here has a sensible quiet setting.
-        let doc = bus("    type: i2c\n", "    device: /dev/i2c-1\n    address: 16\n").unwrap();
-        match &doc.group("g").unwrap().kind {
-            GroupKind::I2c(p) => {
-                assert!(!p.ten_bit);
-                assert!(!p.pec);
-                assert_eq!(p.retries, 0);
-                assert_eq!(p.timeout, None);
-                assert_eq!(p.bus_speed, None);
-            }
-            other => panic!("expected i2c, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn an_i2c_endpoint_carries_both_a_bus_and_an_address() {
-        let doc = bus(
-            "    type: i2c\n",
-            "    device: /dev/i2c-2\n    address: 0x49\n",
-        )
-        .unwrap();
-        assert_eq!(
-            doc.endpoints[0].location,
-            EndpointLocation::I2c {
-                bus: "/dev/i2c-2".to_string(),
-                address: 0x49
-            }
-        );
-    }
-
-    #[test]
-    fn an_i2c_endpoint_without_an_address_is_rejected() {
-        let e = bus("    type: i2c\n", "    device: /dev/i2c-2\n").unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::MissingEndpointField { .. }),
-            "got {e:?}"
-        );
-        assert!(format!("{e}").contains("slave address"), "got {e}");
-    }
-
-    #[test]
-    fn an_i2c_endpoint_without_a_bus_is_rejected() {
-        let e = bus("    type: i2c\n", "    address: 0x48\n").unwrap_err();
-        assert!(format!("{e}").contains("bus device"), "got {e}");
-    }
-
-    #[test]
-    fn an_address_too_wide_for_the_groups_addressing_is_rejected() {
-        let e = bus("    type: i2c\n", "    device: /dev/i2c-2\n    address: 0x90\n").unwrap_err();
-        assert!(format!("{e}").contains("does not fit in 7 bits"), "got {e}");
-        // ...and the same address is fine once the group says so.
-        let doc = bus(
-            "    type: i2c\n    ten_bit: true\n",
-            "    device: /dev/i2c-2\n    address: 0x90\n",
-        )
-        .unwrap();
-        assert_eq!(
-            doc.endpoints[0].location,
-            EndpointLocation::I2c {
-                bus: "/dev/i2c-2".to_string(),
-                address: 0x90
-            }
-        );
-    }
-
-    #[test]
-    fn a_reserved_seven_bit_address_is_rejected() {
-        // In range, but the specification keeps these, so no device can
-        // answer to one.
-        for addr in ["0x00", "0x01", "0x07", "0x78", "0x7B", "0x7F"] {
-            let e = bus(
-                "    type: i2c\n",
-                &format!("    device: /dev/i2c-1\n    address: {addr}\n"),
-            )
-            .unwrap_err();
-            assert!(
-                format!("{e}").contains("reserved by the I2C specification"),
-                "for {addr}: got {e}"
-            );
-        }
-    }
-
-    #[test]
-    fn the_addresses_either_side_of_the_reserved_blocks_are_accepted() {
-        for (addr, want) in [("0x08", 0x08), ("0x77", 0x77)] {
-            let doc = bus(
-                "    type: i2c\n",
-                &format!("    device: /dev/i2c-1\n    address: {addr}\n"),
-            )
-            .unwrap_or_else(|e| panic!("{addr} should be usable: {e}"));
-            assert_eq!(
-                doc.endpoints[0].location,
-                EndpointLocation::I2c {
-                    bus: "/dev/i2c-1".to_string(),
-                    address: want
-                }
-            );
-        }
-    }
-
-    #[test]
-    fn ten_bit_addressing_has_no_reserved_block() {
-        // A 10-bit transfer carries its address after the 0x78 prefix, so the
-        // whole space is available and the 7-bit reservations do not apply.
-        for addr in ["0x00", "0x78", "0x3FF"] {
-            bus(
-                "    type: i2c\n    ten_bit: true\n",
-                &format!("    device: /dev/i2c-1\n    address: {addr}\n"),
-            )
-            .unwrap_or_else(|e| panic!("{addr} should be usable with ten_bit: {e}"));
-        }
-    }
-
-    #[test]
-    fn an_i2c_timeout_is_rounded_up_to_the_drivers_resolution() {
-        let doc = bus(
-            "    type: i2c\n    timeout: 25ms\n",
-            "    device: /dev/i2c-1\n    address: 8\n",
-        )
-        .unwrap();
-        match &doc.group("g").unwrap().kind {
-            GroupKind::I2c(p) => {
-                assert_eq!(p.timeout, Some(Duration::from_millis(25)));
-                assert_eq!(p.effective_timeout(), Some(Duration::from_millis(30)));
-            }
-            other => panic!("expected i2c, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn spi_group_attributes_are_read() {
-        let doc = bus(
-            "    type: spi\n    max_speed: 10000000\n    mode: 3\n    bits_per_word: 16\n    \
-             bit_order: lsb\n    cs_active: high\n",
-            "    device: /dev/spidev0.1\n",
-        )
-        .unwrap();
-        match &doc.group("g").unwrap().kind {
-            GroupKind::Spi(p) => {
-                assert_eq!(p.max_speed, 10_000_000);
-                assert_eq!(p.mode, SpiMode::Mode3);
-                assert_eq!(p.bits_per_word.bits(), 16);
-                assert_eq!(p.bit_order, BitOrder::LsbFirst);
-                assert_eq!(p.cs_active, CsActive::High);
-            }
-            other => panic!("expected spi, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn spi_defaults_are_the_usual_eight_bit_msb_first_active_low() {
-        let doc = bus(
-            "    type: spi\n    max_speed: 1000000\n    mode: 0\n",
-            "    device: /dev/spidev0.0\n",
-        )
-        .unwrap();
-        match &doc.group("g").unwrap().kind {
-            GroupKind::Spi(p) => {
-                assert_eq!(p.bits_per_word.bits(), 8);
-                assert_eq!(p.bit_order, BitOrder::MsbFirst);
-                assert_eq!(p.cs_active, CsActive::Low);
-            }
-            other => panic!("expected spi, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn a_spi_group_without_a_mode_is_rejected() {
-        let e = bus(
-            "    type: spi\n    max_speed: 1000000\n",
-            "    device: /dev/spidev0.0\n",
-        )
-        .unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::MissingGroupField { field: "spi_mode", .. }),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_spi_mode_outside_zero_to_three_is_rejected() {
-        let e = bus(
-            "    type: spi\n    max_speed: 1000000\n    mode: 4\n",
-            "    device: /dev/spidev0.0\n",
-        )
-        .unwrap_err();
-        assert!(format!("{e}").contains("not one of 0, 1, 2, or 3"), "got {e}");
-    }
-
-    #[test]
-    fn spi_modes_carry_the_polarity_and_phase_their_numbers_mean() {
-        for (mode, cpol, cpha) in [
-            (SpiMode::Mode0, false, false),
-            (SpiMode::Mode1, false, true),
-            (SpiMode::Mode2, true, false),
-            (SpiMode::Mode3, true, true),
-        ] {
-            assert_eq!(mode.cpol(), cpol, "cpol of mode {mode}");
-            assert_eq!(mode.cpha(), cpha, "cpha of mode {mode}");
-        }
-    }
-
-    #[test]
-    fn a_spi_endpoint_is_named_by_its_device_node_alone() {
-        // The node names the bus and the chip select, so an address is not
-        // merely unnecessary but wrong.
-        let e = bus(
-            "    type: spi\n    max_speed: 1000000\n    mode: 0\n",
-            "    device: /dev/spidev0.0\n    address: 0x10\n    port: 1\n",
-        )
-        .unwrap_err();
-        assert!(
-            matches!(e, EndpointConfigError::UnusedEndpointField { .. }),
-            "got {e:?}"
-        );
-    }
-
-    #[test]
-    fn a_bus_group_given_a_stream_section_is_rejected() {
-        // A master clocks exactly as many bytes as it asks for, so there is
-        // no rule to give for where a read ends.
-        for kind in ["    type: i2c\n", "    type: spi\n    max_speed: 1\n    mode: 0\n"] {
-            let yaml = format!(
-                "endpoint_groups:\n  - name: g\n{kind}    stream:\n      max_length: 8\n      \
-                 timeout: none\n"
-            );
-            let e = from_yaml_str(&yaml).unwrap_err();
-            assert!(
-                matches!(e, EndpointConfigError::UnusedGroupField { .. }),
-                "for {kind}: got {e:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn an_attribute_of_another_type_is_rejected_on_every_type() {
-        // The rule that a misplaced attribute is reported where it was
-        // written, checked across the cross-product rather than one way.
-        for (group, foreign) in [
-            ("    type: i2c\n", "    datarate: 9600\n"),
-            ("    type: i2c\n", "    mode: 0\n"),
-            ("    type: spi\n    max_speed: 1\n    mode: 0\n", "    pec: true\n"),
-            ("    type: spi\n    max_speed: 1\n    mode: 0\n", "    protocol: tcp\n"),
-            ("    type: network\n    protocol: udp\n", "    bus_speed: 100000\n"),
-            (
-                "    type: serial\n    asynchronous: true\n    datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n    \
-                 stream:\n      max_length: 8\n      timeout: none\n",
-                "    cs_active: low\n",
-            ),
-        ] {
-            let yaml = format!("endpoint_groups:\n  - name: g\n{group}{foreign}");
-            let e = from_yaml_str(&yaml).unwrap_err();
-            assert!(
-                matches!(e, EndpointConfigError::UnusedGroupField { .. }),
-                "for {foreign}on {group}: got {e:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn bus_groups_round_trip_between_yaml_and_xml() {
-        let yaml = "endpoint_groups:\n  \
-                    - name: bus\n    type: i2c\n    pec: true\n    retries: 2\n    \
-                    bus_speed: 400000\n  \
-                    - name: chip\n    type: spi\n    max_speed: 8000000\n    mode: 1\n    \
-                    bit_order: lsb\n\
-                    endpoints:\n  \
-                    - name: a\n    group: bus\n    device: /dev/i2c-0\n    address: 0x2A\n  \
-                    - name: b\n    group: chip\n    device: /dev/spidev1.0\n";
-        let xml = r#"<endpoint-configuration>
-  <endpoint-groups>
-    <group name="bus" type="i2c" pec="true" retries="2" bus_speed="400000"/>
-    <group name="chip" type="spi" max_speed="8000000" mode="1" bit_order="lsb"/>
-  </endpoint-groups>
-  <endpoints>
-    <endpoint name="a" group="bus" device="/dev/i2c-0" address="0x2A"/>
-    <endpoint name="b" group="chip" device="/dev/spidev1.0"/>
-  </endpoints>
-</endpoint-configuration>"#;
-        assert_eq!(from_yaml_str(yaml).unwrap(), from_xml_str(xml).unwrap());
-    }
-
-    #[test]
-    fn hyphenated_and_underscored_spellings_both_work() {
-        let a = from_yaml_str(&format!(
-            "endpoint_groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
-             stop_bits: 1\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
-             timeout: none\n{DEVICE_ENDPOINT}"
-        ))
-        .unwrap();
-        let b = from_yaml_str(&format!(
-            "endpoint-groups:\n  - name: g\n    type: serial\n    asynchronous: true\n    datarate: 9600\n    \
-             stop-bits: 1\n    byte-length: 8\n    stream:\n      max-length: 8\n      \
-             timeout: none\n{DEVICE_ENDPOINT}"
-        ))
-        .unwrap();
-        assert_eq!(a, b);
-    }
-}

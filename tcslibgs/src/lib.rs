@@ -16,7 +16,6 @@ pub mod config;
 pub mod config_digest;
 pub mod endpoint_config;
 pub mod endpoint_config_i2c;
-pub mod endpoint_config_network;
 pub mod endpoint_config_serial;
 pub mod endpoint_config_spi;
 pub mod error;

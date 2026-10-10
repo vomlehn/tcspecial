@@ -6,12 +6,12 @@ use std::env;
 use std::process;
 
 use log::{error, info, trace};
-use tcspecial::config::{beacon, load_endpoint_config, load_tcspecial_config, tcspecial_config_path};
-use tcspecial::CommandInterpreter;
 use tcslibgs::config::{
     load_dh_configs, load_tcspecial_section, payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR,
 };
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
+use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path};
+use tcspecial::CommandInterpreter;
 
 fn main() {
     // Default to info so that the startup messages below, which used to
@@ -40,8 +40,7 @@ fn main() {
     };
 
     // Named on the command line, or by PAYLOAD_CONFIG_PATH, or the default.
-    // The file may be a payload configuration or an endpoint configuration;
-    // load_dh_configs reads either. It is the one thing the command line
+    // It is the one thing the command line
     // says: where commands are taken and where beacons go are both the
     // configuration file's, so each address is written in one place.
     let payload_path = match payload_path_from_args(env::args(), Some(PAYLOAD_CONFIG_PATH_VAR)) {
@@ -55,8 +54,7 @@ fn main() {
 
     // Where beacons go belongs to the payload set: it is the set's ground
     // station that listens for them, so the set's own file is where it is
-    // said, and this file is the fallback for a set that does not say. A set
-    // written in the endpoint language has no such section and so never does.
+    // said, and this file is the fallback for a set that does not say.
     let section = match load_tcspecial_section(&payload_path) {
         Ok(section) => section,
         Err(e) => {
@@ -97,7 +95,10 @@ fn main() {
         }
     };
 
-    info!("Loaded {} data handler configurations", payload_config.len());
+    info!(
+        "Loaded {} data handler configurations",
+        payload_config.len()
+    );
 
     // What this process read, said as it read it and before the command
     // interpreter's socket is bound below. On stderr, as the command address
@@ -123,35 +124,6 @@ fn main() {
         payload_path,
         digest
     );
-
-    // An endpoint configuration file is read when one is named. Its endpoints
-    // can become data handlers -- EndpointConfigDoc::to_dh_configs does it --
-    // but nothing here calls that yet, and the file is read only so that a
-    // malformed one is reported at startup rather than whenever the first
-    // reader of it appears.
-    //
-    // What is left is not the conversion but the choice of which file each
-    // program reads. It has to be made for all three at once: tcsmoc's panels,
-    // tcssim's payloads and the handlers served here must describe the same
-    // handlers, so a program reading an endpoint file while the others read a
-    // payload file is the drift the payload set mechanism exists to prevent.
-    // Every kind of endpoint converts now, I2C included: see
-    // EndpointConfigDoc::to_dh_configs.
-    if let Ok(endpoint_path) = env::var("ENDPOINT_CONFIG_PATH") {
-        info!("Loading endpoint configuration from: {}", endpoint_path);
-
-        match load_endpoint_config(&endpoint_path) {
-            Ok(endpoints) => info!(
-                "Loaded {} endpoint groups and {} endpoints",
-                endpoints.groups.len(),
-                endpoints.endpoints.len()
-            ),
-            Err(e) => {
-                error!("Error loading endpoint configuration: {}", e);
-                process::exit(1);
-            }
-        }
-    }
 
     // Create command interpreter
     let mut ci = match CommandInterpreter::new(tcspecial_config, payload_config, digest) {

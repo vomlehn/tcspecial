@@ -458,9 +458,8 @@ mod tests {
 
     /// Each kind of endpoint shows the attributes that belong to it.
     ///
-    /// The kinds a payload file cannot describe are the ones worth checking:
-    /// a line, a bus and a peripheral come from an endpoint configuration and
-    /// carry terms -- a baud rate, a slave address, a clock mode -- that
+    /// A line, a bus and a peripheral are the ones worth checking: each
+    /// carries terms -- a baud rate, a slave address, a clock mode -- that
     /// nothing else in the window shows.
     #[test]
     fn every_kind_shows_what_belongs_to_it() {

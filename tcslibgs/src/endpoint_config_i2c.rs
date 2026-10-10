@@ -15,7 +15,7 @@ use serde::Serialize;
 
 use crate::endpoint_config::{parse_flag, parse_timeout, reject_stream};
 use crate::endpoint_config::{
-    bad, parse_u32, reject_foreign_fields, EndpointConfigResult, GroupKind, GroupWire,
+    bad, parse_u32, reject_foreign_fields, EndpointConfigResult, GroupKind, LinkTerms,
 };
 
 /// Attributes of an I2C group.
@@ -130,7 +130,7 @@ pub(crate) fn parse_i2c_address(group: &str, text: &str, ten_bit: bool) -> Endpo
 /// by the transfer itself rather than by anything in the data.
 pub(crate) fn group_kind_of(
     name: &str,
-    g: GroupWire,
+    g: LinkTerms,
 ) -> EndpointConfigResult<GroupKind> {
 
     reject_foreign_fields(

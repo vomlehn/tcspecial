@@ -32,6 +32,7 @@ pub mod sim_config;
 pub mod telemetry;
 pub mod trigger;
 pub mod types;
+pub mod verify;
 
 pub use commands::*;
 // The value types a runtime endpoint configuration carries. They are defined
@@ -52,3 +53,4 @@ pub use telemetry::*;
 pub use config_digest::*;
 pub use trigger::*;
 pub use types::*;
+pub use verify::*;

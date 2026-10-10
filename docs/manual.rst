@@ -806,6 +806,54 @@ they cannot be given for different sets.
 Started in that order, tcsmoc finds the tcspecial already running and attaches
 to it.
 
+Checking a set without running it
+---------------------------------
+``tcsverify`` reads a payload set and says what is wrong with it, without
+opening a socket or a device node:
+
+.. code-block:: console
+
+   $ make runverifyy                       # reading the set's YAML
+   $ make runverifyx                       # reading its XML
+   $ make runverifyy PAYLOAD_FILE=tests/manual/tcspecial4
+
+A good set prints nothing and the target succeeds. A bad one prints a line per
+problem and the target fails:
+
+.. code-block:: console
+
+   $ make runverifyy PAYLOAD_FILE=/tmp/draft
+   /tmp/draft.yaml:55: payload "DH1": packet_size must be greater than zero
+   /tmp/draft.yaml:63: payload "DH2" is a device payload, so port does not apply to it
+
+Every program that runs a set refuses the first thing wrong with it and stops,
+which is what a program that cannot run without it should do and is not what a
+person fixing the file wants: a set with three mistakes in it is three runs of
+tcsmoc, each reporting one of them. This asks the same rules -- the library's,
+the ones those programs use -- for all of their answers at once.
+
+It reports a hundred problems at most, and then says ``Too many errors,
+halting``. The hundred and first is what says there are more; beyond that a
+page of them would mostly be consequences of the first few.
+
+Both files of the set are checked, and the second against the first: every
+payload simulated, every simulated payload a payload, and every setting one
+that payload can have. A payload file with problems of its own is not joined
+to -- there would be nothing to join to, and a join against half of a set
+reports the other half as unsimulated -- and tcsverify says so rather than
+leaving it unsaid.
+
+Without the Makefile it takes one file or two, the payload file first:
+
+.. code-block:: console
+
+   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml
+   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
+
+It exits 0 when nothing is wrong, 1 when something is, and 2 when the command
+line is neither of those two shapes -- which a script can tell apart from a
+bad file.
+
 What the programs take without the Makefile
 -------------------------------------------
 .. code-block:: console
@@ -887,13 +935,17 @@ set to:
 
 Testing
 =======
-Testing is done with two programs:
+Testing is done with two programs, and a third that checks the files they
+read:
 
 * tcsmoc - Simulates an operations center/mission control application. It
   communicates to TCSpecial via UDP datagrams.
 
 * tcssim - Simulates payloads using various types of communication protocols
   and errors.
+
+* tcsverify - Checks a payload set and prints what is wrong with it, without
+  running any of it: see `Checking a set without running it`_.
 
 tcsmoc
 ------

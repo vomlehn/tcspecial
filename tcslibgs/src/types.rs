@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config_serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
 use crate::endpoint_config_spi::{BitOrder, CsActive, SpiMode};
+use crate::verify::Problem;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -193,21 +194,37 @@ fn claim_text(claim: &Claim) -> String {
 /// address it reaches the OC on are compared together, since a port is a port
 /// whatever means to claim it.
 pub fn no_two_handlers_claim_one_thing(handlers: &[DHConfig]) -> Result<(), String> {
+    match collisions(handlers).into_iter().next() {
+        Some((_, message)) => Err(message),
+        None => Ok(()),
+    }
+}
+
+/// Every pair of handlers that want one thing, each named by the handler
+/// whose claim came second.
+///
+/// The second one, because the first claim is the one that stands: a reader
+/// given both names has to change one of them, and the one that came second
+/// is the one the file can lose without the other becoming unreachable.
+pub fn collisions(handlers: &[DHConfig]) -> Vec<(DHName, String)> {
     let mut taken: BTreeMap<Claim, String> = BTreeMap::new();
+    let mut found = Vec::new();
 
     for dh in handlers {
         for (claim, what) in claims_of(dh) {
-            if let Some(first) = taken.get(&claim) {
-                return Err(format!(
-                    "{first} and {what} both want {}",
-                    claim_text(&claim)
-                ));
+            match taken.get(&claim) {
+                Some(first) => found.push((
+                    dh.name.clone(),
+                    format!("{first} and {what} both want {}", claim_text(&claim)),
+                )),
+                None => {
+                    taken.insert(claim, what);
+                }
             }
-            taken.insert(claim, what);
         }
     }
 
-    Ok(())
+    found
 }
 
 impl DHType {
@@ -870,13 +887,48 @@ impl PayloadConfig {
     /// named by a handler and defined nowhere, or defined and named by no
     /// handler is an error here rather than a handler quietly taking the wrong
     /// attributes or none at all.
+    ///
+    /// The first thing wrong with the file, which is what a program loading
+    /// one can do something about: it cannot run, and which of several
+    /// mistakes it names changes nothing. [`Self::problems`] is the same
+    /// rules asked for all of their answers.
     pub fn to_dh_configs(&self) -> Result<Vec<DHConfig>, String> {
+        let (configs, problems) = self.check();
+        match problems.into_iter().next() {
+            Some(problem) => Err(problem.message),
+            None => Ok(configs),
+        }
+    }
+
+    /// Everything wrong with this file, in the order the rules are asked.
+    ///
+    /// For a reader checking a file rather than a program running one: see
+    /// [`crate::verify`]. Each problem says which payload or group it is
+    /// about, which is how `tcsverify` finds the line it belongs to.
+    ///
+    /// One mistake can answer two rules, and both are reported. A payload
+    /// that misspells its group's name both names a group that is not defined
+    /// and leaves the group named by nobody; the file has one line to change
+    /// and a reader is told where both ends of it are.
+    pub fn problems(&self) -> Vec<Problem> {
+        self.check().1
+    }
+
+    /// Every handler this file describes, and everything wrong with it.
+    ///
+    /// The handlers are the ones that converted, so a file with a problem
+    /// still yields the payloads that have none -- which is what lets a
+    /// simulator file be checked against a payload file that is itself being
+    /// reported on.
+    pub fn check(&self) -> (Vec<DHConfig>, Vec<Problem>) {
+        let mut problems: Vec<Problem> = Vec::new();
+
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         for group in &self.payload_groups {
             if !seen.insert(group.name.as_str()) {
-                return Err(format!(
-                    "payload group \"{}\" is defined more than once",
-                    group.name
+                problems.push(Problem::group(
+                    &group.name,
+                    format!("payload group \"{}\" is defined more than once", group.name),
                 ));
             }
         }
@@ -891,37 +943,54 @@ impl PayloadConfig {
         let mut by_name: BTreeSet<&str> = BTreeSet::new();
         for payload in &self.payloads {
             if let Some(first) = by_id.insert(payload.dh_id, payload.name.as_str()) {
-                return Err(format!(
-                    "payloads \"{}\" and \"{}\" share dh_id {}",
-                    first, payload.name, payload.dh_id
+                problems.push(Problem::payload(
+                    &payload.name,
+                    format!(
+                        "payloads \"{}\" and \"{}\" share dh_id {}",
+                        first, payload.name, payload.dh_id
+                    ),
                 ));
             }
             if !by_name.insert(payload.name.as_str()) {
-                return Err(format!(
-                    "payload \"{}\" is defined more than once",
-                    payload.name
+                problems.push(Problem::payload(
+                    &payload.name,
+                    format!("payload \"{}\" is defined more than once", payload.name),
                 ));
             }
         }
 
-        let configs: Vec<DHConfig> = self
-            .payloads
-            .iter()
-            .map(|dh| {
-                let group = match &dh.group {
-                    Some(name) => Some(self.group(name).ok_or_else(|| {
-                        format!(
-                            "data handler \"{}\" names group \"{}\", which is not defined",
-                            dh.name, name
-                        )
-                    })?),
-                    None => None,
-                };
-                dh.to_dh_config_in(group)
-            })
-            .collect::<Result<_, String>>()?;
+        let mut configs: Vec<DHConfig> = Vec::new();
+        for dh in &self.payloads {
+            let group = match &dh.group {
+                Some(name) => match self.group(name) {
+                    Some(group) => Some(group),
+                    None => {
+                        problems.push(Problem::payload(
+                            &dh.name,
+                            format!(
+                                "data handler \"{}\" names group \"{}\", which is not \
+                                 defined",
+                                dh.name, name
+                            ),
+                        ));
+                        continue;
+                    }
+                },
+                None => None,
+            };
 
-        no_two_handlers_claim_one_thing(&configs)?;
+            match dh.to_dh_config_in(group) {
+                Ok(config) => configs.push(config),
+                Err(message) => problems.push(Problem::payload(&dh.name, message)),
+            }
+        }
+
+        // Over the handlers that converted. A payload the rules refused is
+        // not a payload claiming anything, so leaving it out is the only way
+        // this stage can say something true.
+        for (name, message) in collisions(&configs) {
+            problems.push(Problem::payload(&name.0, message));
+        }
 
         // The tcspecial section is checked here whether or not anything reads
         // the attribute in question.
@@ -930,34 +999,40 @@ impl PayloadConfig {
         // better refused by whoever loads the file than discovered by whoever
         // first tries to use it.
         if let Some(ci) = &self.tcspecial {
-            ci.to_ci_config().map_err(|e| format!("tcspecial: {e}"))?;
+            if let Err(e) = ci.to_ci_config() {
+                problems.push(Problem::section("tcspecial", format!("tcspecial: {e}")));
+            }
         }
 
         // A group no handler names has no effect on the configuration, which
         // is exactly what a group whose name a handler misspelled looks like.
-        // Checked after the handlers, so that the misspelling is reported from
-        // the handler's end, where the name actually is.
+        // Checked after the handlers, so that a reader following the problems
+        // in order meets the misspelling at the handler's end first, where
+        // the name actually is.
         let named: BTreeSet<&str> = self
             .payloads
             .iter()
             .filter_map(|dh| dh.group.as_deref())
             .collect();
-        if let Some(unused) = self
+        for unused in self
             .payload_groups
             .iter()
-            .find(|group| !named.contains(group.name.as_str()))
+            .filter(|group| !named.contains(group.name.as_str()))
         {
-            // Worded exactly as the endpoint and simulator configuration
-            // formats word the same rule, so that one rule reads as one rule
-            // wherever it is met.
-            return Err(format!(
-                "data handler group \"{}\" is named by no data handler: name it \
-                 from one, or remove the group",
-                unused.name
+            // Worded exactly as the simulator configuration format words the
+            // same rule, so that one rule reads as one rule wherever it is
+            // met.
+            problems.push(Problem::group(
+                &unused.name,
+                format!(
+                    "data handler group \"{}\" is named by no data handler: name it \
+                     from one, or remove the group",
+                    unused.name
+                ),
             ));
         }
 
-        Ok(configs)
+        (configs, problems)
     }
 }
 

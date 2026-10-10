@@ -23,6 +23,7 @@ use tcslibgs::{
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
 
 use crate::beacon_receive::BeaconReceive;
+use crate::oc_link::Arrivals;
 use crate::ci_link::{CiLink, NOT_CONNECTED};
 use crate::endpoint::endpoint_description;
 use crate::config::constants::BEACON_INDICATOR;
@@ -33,6 +34,7 @@ mod beacon_receive;
 mod ci_link;
 mod config;
 mod endpoint;
+mod oc_link;
 
 /// Default CI address
 const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
@@ -141,9 +143,11 @@ const PANEL_WIDTH: f32 = 206.0;
 /// `every_panels_data_is_inside_the_window`. This was 210 against the 259 the
 /// panel took when its two readings each sat in a group box of their own, so
 /// the window opened too small for every row and the three rows of data at
-/// the bottom of each panel went over the edge. Those readings are labelled
+/// the bottom of each panel went over the edge. It went 162 to 180 when the
+/// panels gained the line saying what the ground itself received, which is
+/// the row and the spacing above it. Those readings are labelled
 /// lines now, which is most of the difference.
-const PANEL_HEIGHT: f32 = 162.0;
+const PANEL_HEIGHT: f32 = 180.0;
 /// Everything above and below the grid: both group box headings, the command
 /// interpreter's own controls, the row holding Quit, and the padding around
 /// them all, and the grid's own padding inside the scrolling area. Measured
@@ -210,7 +214,23 @@ fn window_size(shape: &GridShape, panels: usize) -> LogicalSize {
 /// is wide -- so the four-panel case is what the floor holds up.) Anything that changes the panel or chrome heights has to be
 /// weighed the same way, against
 /// `the_shipped_payload_config_opens_a_nearly_square_window`.
-const MIN_WINDOW_WIDTH: f32 = 700.0;
+const CONTROLS_WIDTH: f32 = 700.0;
+
+/// The least the window is ever opened at, across.
+///
+/// Two halves of one floor. [`CONTROLS_WIDTH`] is what the command
+/// interpreter's own controls need; the other half is the shape of the grid,
+/// which must be wider than it is tall while it fits two rows -- panels read
+/// across the window, and a window taller than wide invites a column of them.
+///
+/// Written as that rule rather than as the number it comes to, so that a
+/// panel which grows widens the window instead of breaking the rule. The line
+/// saying what the ground itself received took two rows from 680 to 716, and
+/// a floor fixed at 700 would have left the shipped four-panel set taller
+/// than wide.
+fn min_window_width() -> f32 {
+    CONTROLS_WIDTH.max(height_for_rows(2))
+}
 
 /// How the grid of data handler panels is shaped, and the window size that
 /// shape asks for.
@@ -255,10 +275,10 @@ fn grid_shape(panels: usize) -> GridShape {
     GridShape {
         columns,
         rows,
-        // MIN_WINDOW_WIDTH is a floor rather than the width of one column:
+        // The floor is a floor rather than the width of one column:
         // what the command interpreter's controls need is wider than a single
         // panel, so one and two panels both open at it.
-        width: (columns as f32 * PANEL_WIDTH).max(MIN_WINDOW_WIDTH),
+        width: (columns as f32 * PANEL_WIDTH).max(min_window_width()),
         height: height_for_rows(rows),
     }
 }
@@ -281,6 +301,10 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         last_sent: SharedString::new(),
         last_recv_time: SharedString::from(NO_TRANSFER_TIME),
         last_recv: SharedString::new(),
+        // What the ground has received from this payload, which is nothing
+        // until it has.
+        oc_time: SharedString::from(NO_TRANSFER_TIME),
+        oc_data: SharedString::new(),
         bytes_sent: 0,
         bytes_recv: 0,
         // What both files said about this payload, ready for the panel's
@@ -288,9 +312,6 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         // read, which is not an error here: the MOC controls payloads and
         // does not simulate them.
         parameters: SharedString::from(payload_parameters(dh, sim)),
-        // Whether this handler's payload answers requests, which decides
-        // whether its panel shows a sent line.
-        triggered: dh.mode.polling().is_some(),
     }
 }
 
@@ -875,7 +896,17 @@ fn main() {
     handle_link_button(&ui, ui_weak.clone(), link.clone());
     handle_main_menu(&ui, ui_weak.clone(), link.clone());
     query_dh_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
-    poll_panels(link.clone(), dh_configs.clone(), dh_model.clone(), payload_port);
+    // The payload data path, one listener per handler: see oc_link. Opened
+    // before the poller, so a handler that is already running is heard from
+    // on the first pass.
+    let arrivals = oc_link::listen(&dh_configs);
+    poll_panels(
+        link.clone(),
+        dh_configs.clone(),
+        dh_model.clone(),
+        payload_port,
+        arrivals,
+    );
     handle_transfer_button(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
 /*
     // Menu action handler
@@ -1163,6 +1194,7 @@ fn poll_panels(
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
     payload_port: u16,
+    arrivals: Arrivals,
 ) {
     let pending: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -1206,6 +1238,23 @@ fn poll_panels(
             };
             for update in &updates {
                 apply_panel_update(&dh_model, update);
+            }
+
+            // And what the ground itself received, which no command asked
+            // for: the listeners put it where this can pick it up, as the
+            // poller does. Read every pass rather than taken, because it is
+            // the last thing that arrived rather than a queue of events --
+            // a panel shows the latest, as it does for the samples above.
+            if let Ok(slots) = arrivals.lock() {
+                for (row, arrival) in slots.iter().enumerate() {
+                    if let Some(arrival) = arrival {
+                        let (time, data) = arrival.panel_lines();
+                        update_row(&dh_model, row, |info| {
+                            info.oc_time = SharedString::from(time.clone());
+                            info.oc_data = SharedString::from(data.clone());
+                        });
+                    }
+                }
             }
         },
     );
@@ -2009,7 +2058,7 @@ mod tests {
         // checks that need one run from here.
         the_params_button_shows_what_both_files_said();
         the_window_shows_when_the_last_beacon_arrived();
-        only_a_triggered_payloads_panel_shows_a_sent_line();
+        every_panel_shows_both_sample_lines();
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
     }
@@ -2211,14 +2260,17 @@ mod tests {
         );
     }
 
-    /// A panel shows a sent line only where its payload answers requests.
+    /// Every panel shows both lines, whichever kind of payload it is.
     ///
-    /// The row stays and its contents go, so every panel is the same shape
-    /// and the rows below do not move from one panel to the next.
+    /// The sent line is what the spacecraft last sent to the ground, which
+    /// for a payload that sends on its own is the payload's own data going
+    /// up -- the thing such a panel is watched for. It was shown only for a
+    /// payload that answers requests, so the panels of the payloads that send
+    /// most showed least.
     ///
     /// Not a test of its own: one test per binary may start the testing
     /// backend, and its windows belong to the thread that made them.
-    fn only_a_triggered_payloads_panel_shows_a_sent_line() {
+    fn every_panel_shows_both_sample_lines() {
         use i_slint_backend_testing::ElementHandle;
 
         let shown = |info: DHInfo| {
@@ -2245,29 +2297,20 @@ mod tests {
             mode: tcslibgs::DHMode::Periodic,
         };
 
-        // A payload that sends on its own: the received line is there and the
-        // sent line is empty.
-        let lines = shown(dh_info_from(&dh, None));
-        assert!(
-            lines.iter().any(|line| line == "Last rcvd:"),
-            "the received line went missing: {lines:?}"
-        );
-        assert!(
-            !lines.iter().any(|line| line == "Last sent:"),
-            "a payload that sends on its own has a sent line: {lines:?}"
-        );
+        for kind in ["sends on its own", "answers requests"] {
+            let lines = shown(dh_info_from(&dh, None));
+            for line in ["Last sent:", "Last rcvd:", "From payload:"] {
+                assert!(
+                    lines.iter().any(|shown| shown == line),
+                    "a payload that {kind} has no {line} line: {lines:?}"
+                );
+            }
 
-        // And one that answers requests has both.
-        dh.mode = tcslibgs::DHMode::Triggered {
-            trigger: b"READ\r".to_vec(),
-            interval_ms: 500,
-        };
-        let lines = shown(dh_info_from(&dh, None));
-        assert!(
-            lines.iter().any(|line| line == "Last sent:"),
-            "a payload that answers requests has no sent line: {lines:?}"
-        );
-        assert!(lines.iter().any(|line| line == "Last rcvd:"), "{lines:?}");
+            dh.mode = tcslibgs::DHMode::Triggered {
+                trigger: b"READ\r".to_vec(),
+                interval_ms: 500,
+            };
+        }
     }
 
     /// The window shows the beacon's last-received time where it says it
@@ -2436,7 +2479,7 @@ mod tests {
         let source = std::fs::read_to_string(&window).unwrap();
 
         for (what, expected) in [
-            ("min-width", MIN_WINDOW_WIDTH),
+            ("min-width", min_window_width()),
             // The least the window is ever opened at: one row of panels.
             ("min-height", height_for_rows(1)),
             ("panel-height", PANEL_HEIGHT),

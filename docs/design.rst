@@ -3336,11 +3336,37 @@ Requirement
     three to a row, and a fourth starts a row under the first.
 
 Requirement
+    The MOC opens the payload data path of every handler that has an OC
+    address: one socket per handler, which says hello and then reads what
+    arrives. A panel shows the latest arrival with the time it arrived.
+
+Two things were wrong without it. A handler's OC endpoint binds the address
+the ground sends to and learns where to answer from what arrives there, so
+with nobody on the ground it had no peer at all: every write to the ground
+failed, and a payload's data went into a handler and no further. And every
+reading in a panel was the spacecraft's own account -- the statistics it
+counted, the samples it kept -- which is worth having and is not evidence
+that anything reached the ground.
+
+Requirement
+    The hello is a datagram of no bytes. It teaches the handler where the
+    ground is, which is all it is for, and a handler hands nought bytes up to
+    a conduit that drops them rather than writing them on -- so nothing of
+    the ground's own making enters the payload's link.
+
+Requirement
+    The hello is said again while nothing is arriving. A handler stopped and
+    started rebinds its OC socket, and the peer it had learnt goes with the
+    socket; a ground station that said hello once would be silently cut off,
+    which is the fault this exists to remove.
+
+Requirement
     The window opens wide enough for the row.
 
 It already did. Three columns come to 644 pixels including the margins, and
-the window's width floor is the 700 the command interpreter's controls need, so
-a third column cost nothing. That was not obvious before the panels were
+the window's width floor is wider than that: the command interpreter's
+controls need 700, and the floor is at least what two rows of panels stand, so
+that a two-row grid is wider than it is tall. A third column cost nothing. That was not obvious before the panels were
 measured: the constant the window width was worked out from said a panel was
 320 wide, with a comment claiming the layout stretched them to fill it, and
 they are 196 and do not stretch. Three columns of 320 would have opened a
@@ -3348,20 +3374,20 @@ they are 196 and do not stretch. Three columns of 320 would have opened a
 
 So the shape follows from the count alone: three handlers are one row of three,
 and the four of the shipped tcspecial1.yaml are a row of three and a row of
-one, in a 700x852 window. A test reads that size out of this document and
+one, in a 716x906 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcssim.
 
 This replaced a rule that chose the shape nearest square among those at least
 as wide as they were tall. It read well and laid the panels out badly: two
-panels came out as one column of two, because a 700x680 window is squarer than
-a 700x508 one, so the set the Makefile runs went down the window instead of
+panels came out as one column of two, because a 716x716 window is squarer than
+a 716x526 one, so the set the Makefile runs went down the window instead of
 across it. Which row and column each panel is given was row-major all along --
 the shape was the whole of the fault. Squareness was never the thing wanted
 either; it was a proxy for a window that fits a screen, and a column count says
 that directly.
 
 What is given up is that the grid is no longer always wider than it is tall.
-Seven panels or more take a third row, which is 852 against a 700-wide window;
+Seven panels or more take a third row, which is 906 against a 716-wide window;
 they scroll, as too many panels always have. Up to six it still is, and a test
 says so. The window the MOC opens has been taller than wide since it gained its
 three-row floor, which is a different thing: the floor is room to grow into.

@@ -15,6 +15,11 @@
 #
 # A serial payload takes no protocol and no address of its own: a line is
 # reached by its device and by nothing else.
+#
+# Read as YAML because it is named .yaml. A simulator configuration chooses
+# its parser from its extension as every configuration file in this project
+# does, so the same settings in an .xml file would be read just as well; the
+# shipped ones are YAML because that is what carries comments.
 version: "1.0"
 description: Simulator settings for the payloads of tcspecial4.yaml
 

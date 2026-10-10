@@ -600,6 +600,63 @@ Requirement
 TCSpecial
 =========
 
+Configuration Files
+-------------------
+Requirement
+    Every configuration file may be written in YAML or XML: the command
+    interpreter's own, a payload configuration, and a simulator
+    configuration alike. Both formats describe the same settings and are read
+    into the same Rust values, so which one a file uses is a matter of local
+    preference and tooling and never of capability.
+
+Requirement
+    The format is taken from the file's extension and from nothing else.
+    ``.yaml`` and ``.yml`` are YAML, ``.xml`` is XML, and a file whose
+    extension is neither is refused, naming the file and what a configuration
+    file is called.
+
+Refused rather than assumed. JSON was read as well and was what an
+extensionless or unfamiliar name was taken to be, so a misspelled extension
+was not an error but a file parsed as the wrong language -- a ``.yam`` file
+"describing no payloads" rather than a file whose name was wrong. Nothing was
+written in JSON that was not also written in YAML.
+
+The structs the files parse into are the single description of the data, in
+``tcslibgs``; a format is a spelling of it. Adding a third would be a variant
+of ``ConfigFormat`` and no second set of structs. Every shipped payload set
+exists in both formats, so each parser is exercised by a file someone runs
+rather than only by a fixture, and a test loads both of every set and
+compares the payloads they produce.
+
+**How the two correspond**
+
+A section is a key in YAML and an element in XML; a value is a key in YAML and
+a child element in XML.
+
+Requirement
+    In XML every value is a child element and never an attribute. The two
+    formats then say the same thing in the same shape, and one reader of a
+    payload file learns one convention.
+
+Requirement
+    A sequence in XML is repeated sibling elements named for the field, and
+    the repeats are contiguous. There is no wrapper element around a list:
+    two payloads are two ``<payloads>`` elements, which is how a sequence
+    reaches serde from quick-xml.
+
+Requirement
+    An optional value nothing states is an omitted element, not an empty one.
+    An empty element is a value of no characters, which is a different thing
+    from an absent one.
+
+A value's own syntax is the same in both -- a number may be decimal or
+hexadecimal, a flag is ``true`` or ``false``, a timeout carries its unit; see
+`Value Syntax`_. The YAML of a shipped set is the one to read, because it
+carries the comments.
+
+(The command link carries JSON between the ground and the spacecraft. That is
+not configuration and is no part of this.)
+
 tcspecial
 ---------
 Tcspecial reads two configuration files. Its own is
@@ -609,10 +666,9 @@ beacons are sent, the beacon interval, and where the telemetry log goes. The oth
 and is named on the command line; see `Payload Configuration Files`_.
 
 Both choose their parser from their extension, as every configuration file in
-the project does, so either may be written in YAML or XML. The shipped one is
-YAML because that is what the rest of the project's configuration is written
-in; it was JSON when JSON was the only format the project read, which is no
-longer a format it reads at all.
+the project does, so either may be written in YAML or XML; see `Configuration
+Files`_. The shipped one is YAML because that is what the rest of the
+project's configuration is written in.
 
 This is the shipped ``tcspecial/src/tcspecial.yaml``:
 

@@ -17,6 +17,11 @@
 # stated again here only so that the two files can be checked against each
 # other: the files are joined by name alone, and a payload set copied from
 # another one keeps the names.
+#
+# Read as YAML because it is named .yaml. A simulator configuration chooses
+# its parser from its extension as every configuration file in this project
+# does, so the same settings in an .xml file would be read just as well; the
+# shipped ones are YAML because that is what carries comments.
 version: "1.0"
 description: Simulator settings for the payloads of tcspecial2.yaml
 

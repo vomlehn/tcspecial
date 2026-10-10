@@ -6,8 +6,10 @@
 # line.
 #
 # This is parsed as YAML because it is named .yaml. Every configuration file in
-# the project chooses its parser from its extension, so the same settings in a
-# .json or .xml file would be read just as well.
+# the project chooses its parser from its extension -- .yaml, .yml or .xml --
+# so the same settings in an .xml file would be read just as well. That is as
+# true of this file as of a payload configuration or a simulator
+# configuration: the formats are two spellings of one set of values.
 #
 # Note the quotes on the address: unquoted, 0.0.0.0 is a string in YAML only
 # because it happens not to be a number, which is a thin reason to rely on.

@@ -1303,6 +1303,12 @@ direction that has carried nothing. Once one has, the time stays: a pass that
 finds nothing ages the colour beside it and leaves the time alone, because the
 beacon did arrive when it arrived.
 
+Panels start at ``Unknown``: a MOC that has just come up has been told
+nothing, and the tcspecial it attached to may have been running handlers for
+hours. The first thing the poller does is ask every handler what it is doing,
+so the panels are filled in as the window opens, whether or not a beacon has
+arrived yet.
+
 The indicator leaving green is also what the payload panels go by. A panel's
 status is what the spacecraft answered the last ``Enable`` or ``Disable``, and
 that answer is worth as much as the ground's hearing from the spacecraft: a

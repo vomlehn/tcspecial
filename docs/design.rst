@@ -3219,6 +3219,18 @@ Requirement
     things about one beacon.
 
 Requirement
+    A panel starts unknown and the poller's first pass asks what its handler
+    is doing. A MOC that has just opened has been told nothing about any
+    handler, so a panel claiming anything is a panel claiming what nobody
+    said: it claimed Stopped, and was commonly wrong, since the MOC attaches
+    to a tcspecial that is already serving the set rather than starting a
+    second one, and that one's handlers may have been moving data for hours.
+    The asking does not wait for a beacon -- a set whose beacons never arrive
+    is still a set whose handlers can be asked about -- and it does not wait
+    out a poll interval either: the pass happens as the window opens and the
+    interval follows it.
+
+Requirement
     A panel's status is what a START_DH or STOP_DH was answered, and the
     beacons are what can take it away. Beacons stopping makes every panel's
     status unknown: the status is the answer to a command and is worth as much

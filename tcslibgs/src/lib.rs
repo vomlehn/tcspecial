@@ -14,6 +14,7 @@
 pub mod commands;
 pub mod config;
 pub mod config_digest;
+pub mod display;
 pub mod endpoint_config;
 pub mod endpoint_config_i2c;
 pub mod endpoint_config_serial;
@@ -44,6 +45,7 @@ pub use endpoint_config_serial::{
 };
 pub use endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 pub use config::*;
+pub use display::{screen_height, Edge};
 pub use error::*;
 pub use format::*;
 pub use parameters::*;

@@ -3503,6 +3503,32 @@ Requirement
     which is the fault this exists to remove.
 
 Requirement
+    The window asks to be put against the top of the display, and tcssim's
+    against the bottom. The two are read together -- what the ground sees of
+    a payload and what the payload is doing about it -- and left where a
+    window manager puts them they land on top of each other.
+
+Requirement
+    It is a request and nothing depends on it. X11 honours a client's
+    position; Wayland leaves placement to the compositor and may ignore it,
+    and a tiling window manager places windows as it sees fit. A window that
+    lands elsewhere is a window in the wrong place, not a program that
+    failed.
+
+Requirement
+    The display's height is read from ``/sys/class/drm``: the tallest
+    connected output's first mode. Nothing can know which display the windows
+    opened on, and the tallest is the one that makes a window asking for the
+    bottom land on a display rather than above it. With no height to be had,
+    neither window asks for anything.
+
+Requirement
+    The position is asked for once the event loop is running, because that is
+    when a window has a size. Before it is shown it reports what was
+    requested rather than what it was given, and the bottom of the display is
+    the display's height less the window's.
+
+Requirement
     The window opens wide enough for the row.
 
 It already did. Three columns come to 644 pixels including the margins, and

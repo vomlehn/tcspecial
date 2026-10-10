@@ -17,7 +17,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use tcslibgs::config::{load_dh_configs, payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
-use tcslibgs::{payload_parameters, DHConfig, DHSample, NO_TRANSFER_TIME};
+use tcslibgs::{payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME};
 
 mod endpoint;
 mod grid;
@@ -399,7 +399,41 @@ fn main() {
         std::mem::forget(timer);
     }
 
+    // Against the bottom of the display, tcsmoc having asked for the top.
+    ask_for_the_edge(&ui, Edge::Bottom);
+
     ui.run().unwrap();
+}
+
+/// Ask for this window to be put against one edge of the display.
+///
+/// Asked once the event loop is running, because that is when the window has
+/// a size: before it is shown, what it reports is what was requested rather
+/// than what it was given, and the bottom of the display is the display's
+/// height less the window's.
+///
+/// A request, and not a thing to report on: see `tcslibgs::display`.
+fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
+    let ui_weak = ui.as_weak();
+    let timer = slint::Timer::default();
+    timer.start(
+        slint::TimerMode::SingleShot,
+        std::time::Duration::ZERO,
+        move || {
+            let Some(ui) = ui_weak.upgrade() else { return };
+            let window = ui.window();
+            if let Some(y) = tcslibgs::display::top_of(
+                edge,
+                tcslibgs::screen_height(),
+                window.size().height,
+            ) {
+                window.set_position(slint::PhysicalPosition::new(0, y));
+            }
+        },
+    );
+    // The timer fires once and is done; dropping it here would cancel it
+    // before the loop had a chance to run it.
+    std::mem::forget(timer);
 }
 
 #[cfg(test)]

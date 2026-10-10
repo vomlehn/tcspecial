@@ -1019,7 +1019,7 @@ the beacon box
 
      Beacon:    (indicator)
      Last rcvd: 02:02:02
-     Last msg:  v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+     Last msg:  v0.1.0 config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
 
   ``Last msg`` reads ``<none>`` until a beacon arrives. ``v`` is the software
   flying, ``config v`` the version the payload set states, and ``md5`` the
@@ -1104,9 +1104,9 @@ the answer said:
 
 .. code-block:: console
 
-   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
-   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
-   tcspecial answers v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
+   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
+   tcspecial answers v0.1.0 config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
 
 The first two lines are written the same way by the two programs, so two ends
 reading one payload set print the same line twice -- which is what makes a
@@ -1117,7 +1117,7 @@ the link.
 
 .. code-block:: text
 
-   tcspecial agrees: v0.1.0, config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+   tcspecial agrees: v0.1.0, config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
 
 The set's version shown there is the one tcspecial sent, which is the version
 of the file it read. The MOC does not send its own, so there is nothing to

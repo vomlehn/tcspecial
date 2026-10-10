@@ -270,7 +270,7 @@ fn beacon_last_received(at: Option<SystemTime>) -> String {
 /// payload set states, and the digest of the configuration file it read.
 ///
 /// ```text
-/// v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+/// v0.1.0 config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
 /// ```
 ///
 /// Both versions are three decimal parts, as they go on the link -- a byte

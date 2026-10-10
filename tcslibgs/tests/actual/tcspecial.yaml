@@ -30,12 +30,12 @@ payloads:
   # Takes everything but its port from the group it names, so this is also
   # the proof that an attribute stated only by a group reaches the handler.
   - dh_id: 0
-    name: DH0
+    name: udp-grouped
     group: udp_localhost
     port: 5000
   # States every attribute for itself, naming no group.
   - dh_id: 1
-    name: DH1
+    name: device-alone
     type: device
     path: /dev/ttyS0
     packet_size: 64

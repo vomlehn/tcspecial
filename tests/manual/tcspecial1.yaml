@@ -32,9 +32,9 @@ tcspecial:
   log_segment_bytes: 65536
 
 payload_groups:
-  # DH1 and DH3 are reached the same way: a UDP socket on this host. What
-  # tells them apart is their port and packet size, so those stay with the
-  # handlers and everything they share is here.
+  # udp-steady and udp-fast are reached the same way: a UDP socket on this
+  # host. What tells them apart is their port and packet size, so those stay
+  # with the handlers and everything they share is here.
   - name: udp_localhost
     type: network
     protocol: udp
@@ -42,7 +42,7 @@ payload_groups:
 
 payloads:
   - dh_id: 0
-    name: DH0
+    name: tcp-stream
     oc_address: 127.0.0.1
     oc_port: 6000
     type: network
@@ -52,7 +52,7 @@ payloads:
     packet_size: 12
 
   - dh_id: 1
-    name: DH1
+    name: udp-steady
     oc_address: 127.0.0.1
     oc_port: 6001
     group: udp_localhost
@@ -60,7 +60,7 @@ payloads:
     packet_size: 11
 
   - dh_id: 2
-    name: DH2
+    name: random-device
     oc_address: 127.0.0.1
     oc_port: 6002
     type: device
@@ -68,7 +68,7 @@ payloads:
     packet_size: 1
 
   - dh_id: 3
-    name: DH3
+    name: udp-fast
     oc_address: 127.0.0.1
     oc_port: 6003
     group: udp_localhost

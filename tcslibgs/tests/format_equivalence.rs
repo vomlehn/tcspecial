@@ -116,7 +116,7 @@ fn a_grouped_handler_resolves_the_same_from_every_format() {
                 // The handler's own.
                 assert_eq!(net.port, 5000, "tcspecial.{ext}");
             }
-            other => panic!("tcspecial.{ext}: DH0 resolved to {other:?}"),
+            other => panic!("tcspecial.{ext}: udp-grouped resolved to {other:?}"),
         }
         // Stated by the group alone, so this is what proves an attribute no
         // handler mentions still reaches it.

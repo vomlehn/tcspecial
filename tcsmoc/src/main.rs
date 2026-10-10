@@ -1304,7 +1304,7 @@ fn hear_what_tcspecial_read(
                 )
             } else {
                 format!(
-                    "tcspecial agrees: version {version}, \
+                    "tcspecial agrees: v{version}, \
                      config v{their_config_version} md5: {digest}"
                 )
             };

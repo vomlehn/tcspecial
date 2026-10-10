@@ -1732,8 +1732,9 @@ Requirement
     had to rename its payloads because another set in the same directory had
     used the names would be renaming them for no reason: a set is read on its
     own, with the simulator file beside it, and nothing compares the names in
-    one file with the names in another. The shipped sets rely on it -- more
-    than one of them names a payload ``DH0``.
+    one file with the names in another. The shipped sets rely on it: set 3 is
+    set 2's first payload over a stream and carries the same name,
+    ``auto-send``.
 
 Requirement
     An attribute of another kind of payload is an error. A device payload
@@ -2128,10 +2129,13 @@ Attribute names may be spelled with either underscores or hyphens, so
 ``max_length`` and ``max-length`` are the same attribute.
 Example
 -------
-This is the shipped tcspecial1.yaml. DH1 and DH3 are reached the same way, over a
-UDP socket on this host, so what they share is a group and what tells them
-apart stays with each of them. DH0 and DH2 share nothing with anything and so
-state every attribute for themselves.
+This is the shipped tcspecial1.yaml. ``udp-steady`` and ``udp-fast`` are
+reached the same way, over a UDP socket on this host, so what they share is a
+group and what tells them apart stays with each of them. ``tcp-stream`` and
+``random-device`` share nothing with anything and so state every attribute for
+themselves. Each payload is named for what it is: a set whose payloads were
+called DH0 to DH3 said which handler each was and nothing else, and the name
+is what a panel in the MOC shows.
 
 .. code-block:: yaml
 
@@ -2146,7 +2150,7 @@ state every attribute for themselves.
 
    payloads:
      - dh_id: 0
-       name: DH0
+       name: tcp-stream
        oc_address: 127.0.0.1
        oc_port: 6000
        type: network
@@ -2156,7 +2160,7 @@ state every attribute for themselves.
        packet_size: 12
 
      - dh_id: 1
-       name: DH1
+       name: udp-steady
        oc_address: 127.0.0.1
        oc_port: 6001
        group: udp_localhost
@@ -2164,7 +2168,7 @@ state every attribute for themselves.
        packet_size: 11
 
      - dh_id: 2
-       name: DH2
+       name: random-device
        oc_address: 127.0.0.1
        oc_port: 6002
        type: device
@@ -2172,7 +2176,7 @@ state every attribute for themselves.
        packet_size: 1
 
      - dh_id: 3
-       name: DH3
+       name: udp-fast
        oc_address: 127.0.0.1
        oc_port: 6003
        group: udp_localhost
@@ -2516,21 +2520,21 @@ states its own rate instead.
        packet_interval_ms: 0
 
    simulated_payloads:
-     - name: DH0
+     - name: tcp-stream
        type: network
        protocol: tcp
        group: steady_1hz
 
-     - name: DH1
+     - name: udp-steady
        type: network
        protocol: udp
        group: steady_1hz
 
-     - name: DH2
+     - name: random-device
        type: device
        group: continuous
 
-     - name: DH3
+     - name: udp-fast
        type: network
        protocol: udp
        packet_interval_ms: 500

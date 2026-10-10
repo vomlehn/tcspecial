@@ -30,7 +30,7 @@
     </payload_groups>
     <payloads>
         <dh_id>0</dh_id>
-        <name>DH0</name>
+        <name>tcp-stream</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6000</oc_port>
         <type>network</type>
@@ -41,7 +41,7 @@
     </payloads>
     <payloads>
         <dh_id>1</dh_id>
-        <name>DH1</name>
+        <name>udp-steady</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6001</oc_port>
         <group>udp_localhost</group>
@@ -50,7 +50,7 @@
     </payloads>
     <payloads>
         <dh_id>2</dh_id>
-        <name>DH2</name>
+        <name>random-device</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6002</oc_port>
         <type>device</type>
@@ -59,7 +59,7 @@
     </payloads>
     <payloads>
         <dh_id>3</dh_id>
-        <name>DH3</name>
+        <name>udp-fast</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6003</oc_port>
         <group>udp_localhost</group>

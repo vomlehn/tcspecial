@@ -24,7 +24,7 @@
     </tcspecial>
     <payloads>
         <dh_id>0</dh_id>
-        <name>DH0</name>
+        <name>auto-send</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6000</oc_port>
         <type>network</type>

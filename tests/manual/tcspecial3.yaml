@@ -29,7 +29,7 @@ tcspecial:
 
 payloads:
   - dh_id: 0
-    name: DH0
+    name: auto-send
     oc_address: 127.0.0.1
     oc_port: 6000
     type: network

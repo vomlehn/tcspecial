@@ -189,7 +189,7 @@ a trigger that a YAML one states with the format's own escapes.
    payloads:
      # Sends on its own: nothing here about timing.
      - dh_id: 0
-       name: DH0
+       name: auto-send
        oc_address: 127.0.0.1
        oc_port: 6000
        type: network
@@ -201,7 +201,7 @@ a trigger that a YAML one states with the format's own escapes.
      # Answers a request: both halves of the request are here, and the rate
      # is the rate the trigger goes out at.
      - dh_id: 1
-       name: DH1
+       name: triggered-send
        oc_address: 127.0.0.1
        oc_port: 6001
        type: network
@@ -275,9 +275,10 @@ otherwise produces a payload that looks configured and is not:
 The rule is over the handlers a file produced rather than the words that
 produced them, so it applies to every kind of payload alike.
 
-This is the shipped ``tcspecial1.yaml``. DH1 and DH3 are reached the same way,
-so what they share is a group; DH0 and DH2 share nothing and state everything
-for themselves.
+This is the shipped ``tcspecial1.yaml``. ``udp-steady`` and ``udp-fast`` are
+reached the same way, so what they share is a group; ``tcp-stream`` and
+``random-device`` share nothing and state everything for themselves. Each is
+named for what it is, which is what a panel in the MOC shows.
 
 .. code-block:: yaml
 
@@ -292,7 +293,7 @@ for themselves.
 
    payloads:
      - dh_id: 0
-       name: DH0
+       name: tcp-stream
        oc_address: 127.0.0.1
        oc_port: 6000
        type: network
@@ -302,7 +303,7 @@ for themselves.
        packet_size: 12
 
      - dh_id: 1
-       name: DH1
+       name: udp-steady
        oc_address: 127.0.0.1
        oc_port: 6001
        group: udp_localhost
@@ -310,7 +311,7 @@ for themselves.
        packet_size: 11
 
      - dh_id: 2
-       name: DH2
+       name: random-device
        oc_address: 127.0.0.1
        oc_port: 6002
        type: device
@@ -318,7 +319,7 @@ for themselves.
        packet_size: 1
 
      - dh_id: 3
-       name: DH3
+       name: udp-fast
        oc_address: 127.0.0.1
        oc_port: 6003
        group: udp_localhost
@@ -450,7 +451,7 @@ socket the simulated payload answers from.
 .. code-block:: yaml
 
    simulated_payloads:
-     - name: DH0
+     - name: auto-send
        type: network
        protocol: udp
        payload_address: 127.0.0.1   # the socket this payload answers from,
@@ -537,7 +538,7 @@ run is not left to be guessed at afterwards.
 .. code-block:: yaml
 
    simulated_payloads:
-     - name: DH0
+     - name: auto-send
        type: network
        protocol: udp
        packet_interval_ms: 500
@@ -572,21 +573,21 @@ This is the shipped ``tcspecial1sim.yaml``.
        packet_interval_ms: 0
 
    simulated_payloads:
-     - name: DH0
+     - name: tcp-stream
        type: network
        protocol: tcp
        group: steady_1hz
 
-     - name: DH1
+     - name: udp-steady
        type: network
        protocol: udp
        group: steady_1hz
 
-     - name: DH2
+     - name: random-device
        type: device
        group: continuous
 
-     - name: DH3
+     - name: udp-fast
        type: network
        protocol: udp
        packet_interval_ms: 500
@@ -823,8 +824,8 @@ problem and the target fails:
 .. code-block:: console
 
    $ make runverifyy PAYLOAD_FILE=/tmp/draft
-   /tmp/draft.yaml:55: payload "DH1": packet_size must be greater than zero
-   /tmp/draft.yaml:63: payload "DH2" is a device payload, so port does not apply to it
+   /tmp/draft.yaml:55: payload "udp-steady": packet_size must be greater than zero
+   /tmp/draft.yaml:63: payload "random-device" is a device payload, so port does not apply to it
 
 Every program that runs a set refuses the first thing wrong with it and stops,
 which is what a program that cannot run without it should do and is not what a

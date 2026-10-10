@@ -26,7 +26,7 @@ simulated_payload_groups:
     packet_interval_ms: 1000
 
 simulated_payloads:
-  - name: DH0
+  - name: auto-send
     type: network
     protocol: tcp
     group: steady_1hz

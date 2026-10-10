@@ -30,28 +30,29 @@ simulated_payload_groups:
     packet_interval_ms: 0
 
 simulated_payloads:
-  # DH0 and DH1 are driven alike and so share a group, but they are not
-  # reached alike: one is a stream and the other a datagram socket. That is
-  # why the transport stays with the payload rather than going in the group.
-  - name: DH0
+  # tcp-stream and udp-steady are driven alike and so share a group, but they
+  # are not reached alike: one is a stream and the other a datagram socket.
+  # That is why the transport stays with the payload rather than going in the
+  # group.
+  - name: tcp-stream
     type: network
     protocol: tcp
     group: steady_1hz
 
-  - name: DH1
+  - name: udp-steady
     type: network
     protocol: udp
     group: steady_1hz
 
   # A device has no transport: it is opened and read.
-  - name: DH2
+  - name: random-device
     type: device
     group: continuous
 
   # Twice a second rather than once, so this one states its own rate instead
   # of naming a group. Nothing about segments: a segment interval the file
   # does not state is the packet interval, which is what this payload wants.
-  - name: DH3
+  - name: udp-fast
     type: network
     protocol: udp
     packet_interval_ms: 500

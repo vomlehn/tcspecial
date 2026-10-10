@@ -1815,6 +1815,32 @@ Requirement
     a payload that had stopped answering would look exactly like a handler
     that had stopped asking.
 
+Requirement
+    A handler goes on asking its payload however the asking goes. A trigger
+    that will not go is the payload's silence and not the handler's: the
+    payload may come back, and a handler is stopped by a STOP_DH rather than
+    by a payload that has gone away. It used to give up three different ways
+    -- the write failing, the payload's end of a stream reading as end of
+    file, and the wait on the endpoint reporting POLLERR or POLLHUP -- and in
+    two of them it spun through the interval it was no longer asking in.
+
+Requirement
+    Triggers that failed are counted apart from triggers that were taken, and
+    apart from the writes that carry data to the ground. A payload that is
+    answering, one that has gone away, and a handler that has given up asking
+    are three states, and one count of attempts could not tell them apart. A
+    failed write to the ground is data the ground did not get; a failed
+    trigger is a payload that would not take a request.
+
+Requirement
+    A conduit with nothing to read and nothing to wait on pauses before going
+    round again, and spends the pause watching its command pipe rather than
+    asleep. An endpoint in error or at its end is ready the instant it is
+    polled and yields nothing every time, so a conduit that only went round
+    held a core down for as long as its handler ran; and one that slept the
+    pause out would answer a STOP_DH only when it woke. A conduit that asks
+    pauses until its next trigger is due, so the asking keeps its interval.
+
 The format has no packet interval. How fast a payload produces packets is a
 property of a simulation rather than of the payload, and belongs to a
 simulator configuration file.

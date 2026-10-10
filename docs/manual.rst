@@ -905,6 +905,19 @@ A command sent to the wrong one of the two is refused rather than served: it
 means one end is not reading the configuration the other is, and that is the
 last fault to hide on the link the spacecraft is restarted over.
 
+The MOC opens both when it connects, and says so:
+
+.. code-block:: console
+
+   Connected to 127.0.0.1:4000, payload commands to 127.0.0.1:4001
+
+The address box is the host and the spacecraft's command port, as before;
+payload commands go to the same host on the port ``tcspecial.yaml`` states,
+so moving the link moves both by typing one address. The MOC sends each
+command on the link it belongs on, and asks ``CONNECT`` of both -- if the two
+answer differently they are not one spacecraft, and ``Last Response`` says
+so.
+
 Where it sends beacons, on what interface, and how often belong to the payload
 set -- a set's ground station being what listens for its beacons -- and are
 stated in the ``tcspecial`` section of the set's own payload configuration

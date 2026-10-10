@@ -132,16 +132,22 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
     (addr, handle)
 }
 
+/// A client whose two links both go to the one stub.
+///
+/// The stub answers whatever arrives, so one socket stands in for both links
+/// here. What the two links are for is tested where they are served; this is
+/// about every operation reaching the far end and coming back.
 fn client_to(addr: &str) -> TcsClient {
-    let connection = UdpConnection::new("127.0.0.1:0", addr).expect("connection");
-    let mut client = TcsClient::new(Box::new(connection));
+    let spacecraft = UdpConnection::new("127.0.0.1:0", addr).expect("connection");
+    let payload = UdpConnection::new("127.0.0.1:0", addr).expect("the payload link");
+    let mut client = TcsClient::new(Box::new(spacecraft), Box::new(payload));
     client.set_timeout(Duration::from_secs(10));
     client
 }
 
 #[test]
 fn every_operation_reaches_the_spacecraft_and_comes_back() {
-    let (addr, stub) = stub_spacecraft(9);
+    let (addr, stub) = stub_spacecraft(10);
     let mut client = client_to(&addr);
 
     assert!(client.ping().unwrap().header.status.is_success());
@@ -199,7 +205,8 @@ fn a_spacecraft_that_does_not_answer_times_out() {
     drop(socket);
 
     let connection = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
-    let mut client = TcsClient::new(Box::new(connection));
+    let payload = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
+    let mut client = TcsClient::new(Box::new(connection), Box::new(payload));
     client.set_timeout(Duration::from_millis(250));
 
     assert!(client.ping().is_err(), "a silent link should be an error");

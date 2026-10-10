@@ -3096,7 +3096,31 @@ spacecraft over is the last place to learn that the two ends disagree about
 where commands go.
 
 Requirement
-    The ground sends each command on the link the table names, and
+    The ground sends each command on the link the table names. A client holds
+    a connection to each, and which one a command goes on is read from the
+    same ``CommandType::link`` the spacecraft refuses it by, so the ground
+    cannot spend a round trip learning what it already knows.
+
+Requirement
+    A client has both links or neither. One would send only half of what
+    there is to send, and the half it could not send is the half the panels
+    use.
+
+Requirement
+    The ground asks ``CONNECT`` on both links, and the two answers have to
+    agree. Two links pointed at two spacecraft is the one way this
+    arrangement can be wrong that nothing else would catch: each link works,
+    each answer looks right, and the payloads being commanded are not the
+    ones being restarted.
+
+Requirement
+    The MOC takes the payload port from the command interpreter's own
+    configuration file, which is where tcspecial takes it from. The host is
+    the operator's -- it is what the address box says, and a bind address of
+    ``0.0.0.0`` is no destination -- so moving the link moves both of them by
+    typing one address.
+
+Requirement
     ``tcsverify`` reports a missing or colliding port from the line that
     states it.
 

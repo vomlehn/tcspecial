@@ -83,7 +83,8 @@ payload
 
 data handler
     The pair of conduits between one payload endpoint and one OC endpoint,
-    named by a ``dh_id`` and a name. "Handler" alone always means this.
+    named by a ``name``, which is what every command addresses it by.
+    "Handler" alone always means this.
 
 conduit
     One direction of one data handler: a thread that reads one endpoint and
@@ -344,11 +345,11 @@ Start a data handler.
 +================+============+===========+====================================+
 | START_DH_CM    | Name       | Type      | Description                        |
 |                +------------+-----------+------------------------------------+
-|                | dh_id      | DHId      | Identifer to assign to the new     |
-|                +------------+-----------+------------------------------------+
 |                | type       | DHType    | Type of DH, network or device      |
 |                +------------+-----------+------------------------------------+
-|                | name       | DHName    | If the DH is a network interface   |
+|                | name       | DHName    | Which handler to start, as the     |
+|                |            |           | configuration names it. If the DH  |
+|                |            |           | is a network interface             |
 |                |            |           | this is server:port optionally     |
 |                |            |           | followed by a colon and a          |
 |                |            |           | protocol. If this is a device      |
@@ -366,14 +367,15 @@ STOP_DH
 ^^^^^^^
 Stop stop a data handler. To make this idempotent, if the command has previously
 been executed sucessfully, supplying a DH that has been stopped must also
-produce a successful value. This, in turn, means the dh_id must not be reused.
+produce a successful value. This, in turn, means a handler's name must not be
+reused.
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
 +================+============+===========+====================================+
 | STOP_DH_CM     | Name       | Type      | Description                        |
 |                +------------+-----------+------------------------------------+
-|                | dh_id      | DHId      |                                    |
+|                | name       | DHName    | Data handler to stop               |
 +----------------+------------+-----------+------------------------------------+
 | STOP_DH_TM     | Parameters                                                  |
 |                +------------+-----------+------------------------------------+
@@ -418,8 +420,7 @@ The statistics are:
 +================+============+===========+====================================+
 | QUERY_DH_CM    | Name       | Type      | Description                        |
 |                +------------+-----------+------------------------------------+
-|                | dh_id      | DHId      | Value that must match the RESTART  |
-|                |            |           | command key                        |
+|                | name       | DHName    | Data handler to ask about          |
 +----------------+------------+-----------+------------------------------------+
 | QUERY_DH_TM    | Parameters                                                  |
 |                +------------+-----------+------------------------------------+
@@ -469,13 +470,13 @@ on a display, where a blocked conduit costs data.
 +================+============+===========+====================================+
 | QUERY_DH_      | Name       | Type      | Description                        |
 | SAMPLE_CM      +------------+-----------+------------------------------------+
-|                | dh_id      | DHId      | Data handler to ask about          |
+|                | name       | DHName    | Data handler to ask about          |
 +----------------+------------+-----------+------------------------------------+
 | QUERY_DH_      | Parameters                                                  |
 | SAMPLE_TM      +------------+-----------+------------------------------------+
 |                | Name       | Type      |  Description                       |
 |                +------------+-----------+------------------------------------+
-|                | dh_id      | DHId      | Data handler this answers for      |
+|                | name       | DHName    | Data handler this answers for      |
 |                +------------+-----------+------------------------------------+
 |                | sent       | DHSample  | Time and head of the last data     |
 |                |            |           | written towards its destination    |
@@ -1683,7 +1684,7 @@ Requirement
 +---------------------+--------+---------------------------------------------+
 
 A group states any of these; a data handler states any of these plus its
-``dh_id``, its ``name``, and the ``group`` it takes attributes from.
+``name`` and the ``group`` it takes attributes from.
 
 The OC address is where a handler is reached from the ground, and is a
 different thing from the address at which it reaches its payload. It is
@@ -1857,8 +1858,18 @@ Requirement
     itself is.
 
 Requirement
-    A ``dh_id`` and a ``name`` belong to a data handler and never to a group.
-    They are what tell one handler of a group from another.
+    A ``name`` belongs to a data handler and never to a group. It is what
+    tells one handler of a group from another, and what every command about a
+    handler addresses it by.
+
+Requirement
+    A data handler has no number. It was addressed by a ``dh_id`` the file
+    stated and found by its name, which meant a file could state two
+    identities for one payload and keep them consistent by hand -- and a
+    command naming an id the ground had and the spacecraft had not was
+    reported against a number nobody reading the file would recognise. The
+    name was already required, already unique and already what the panels and
+    the simulator configuration use, so it is the identity.
 
 Requirement
     A data handler takes each attribute it does not state from the group it
@@ -1881,12 +1892,11 @@ Requirement
     error rather than one silently shadowing the other.
 
 Requirement
-    A payload name and a ``dh_id`` are each defined once in a file. Both pick
-    out one payload, and a repeat of either parses cleanly and then loses a
-    payload:
-    tcspecial keeps its handlers by id, so a repeated id has one silently
-    replace the other, and a simulator configuration is joined to this file by
-    name, so a repeated name has one entry drive two payloads.
+    A payload name is defined once in a file. It picks out one payload, and a
+    repeat parses cleanly and then loses one: tcspecial keeps its handlers by
+    name, so a repeated name has one silently replace the other, and a
+    simulator configuration is joined to the payloads by name, so it would
+    drive two payloads from one entry.
 
 Requirement
     Each of these names is unique within its file and nowhere wider. Two
@@ -2311,8 +2321,7 @@ is what a panel in the MOC shows.
        address: localhost
 
    payloads:
-     - dh_id: 0
-       name: tcp-stream
+     - name: tcp-stream
        oc_address: 127.0.0.1
        oc_port: 6000
        type: network
@@ -2321,34 +2330,31 @@ is what a panel in the MOC shows.
        port: 5000
        packet_size: 12
 
-     - dh_id: 1
-       name: udp-steady
+     - name: udp-steady
        oc_address: 127.0.0.1
        oc_port: 6001
        group: udp_localhost
        port: 5001
        packet_size: 11
 
-     - dh_id: 2
-       name: random-device
+     - name: random-device
        oc_address: 127.0.0.1
        oc_port: 6002
        type: device
        path: /dev/urandom
        packet_size: 1
 
-     - dh_id: 3
-       name: udp-fast
+     - name: udp-fast
        oc_address: 127.0.0.1
        oc_port: 6003
        group: udp_localhost
        port: 5003
        packet_size: 15
 
-Every handler here shares an OC address and has a port of its own, numbered to
-match its ``dh_id``. The OC address could have been a group attribute for that
-reason; it is written out per handler so that the file reads as the four
-handlers it describes rather than as three attributes and an exception.
+Every handler here shares an OC address and has a port of its own. The OC
+address could have been a group attribute for that reason; it is written out
+per handler so that the file reads as the four handlers it describes rather
+than as three attributes and an exception.
 
 Simulator Configuration Files
 =============================
@@ -3756,8 +3762,6 @@ These are some things that Claude doesn't seem to figure out by itself.
 
 * Do not pass an i32 to PollFd::new() as the first argument. Instead, pass the i32
   value as the result of applying BorrowedFd::borrowed_raw() to it.
-
-* DHId must implement the trait Ord.
 
 * The crate libc must be included to Cargo.toml for all crates to get definitions of AF_UNIX and other address families.
 

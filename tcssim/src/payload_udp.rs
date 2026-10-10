@@ -155,7 +155,6 @@ mod tests {
             .expect("a read timeout");
 
         let mut payload = SimulatedPayload::new(PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -225,7 +224,6 @@ mod tests {
         own_port: Option<u16>,
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -266,7 +264,6 @@ mod tests {
         drop(nowhere);
 
         let config = PayloadConfig {
-            _id: 7,
             name: "serial-line".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -553,7 +550,6 @@ mod tests {
             .expect("a read timeout");
 
         let mut payload = SimulatedPayload::new(PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),

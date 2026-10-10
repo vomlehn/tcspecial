@@ -11,8 +11,7 @@
 #
 # oc_address and oc_port are the UDP address the handler exchanges payload data
 # with the OC on, which is a different thing from the address it reaches its
-# payload at. Every handler here shares the address and has a port of its own,
-# numbered to match its dh_id.
+# payload at. Every handler here shares the address and has a port of its own.
 version: "1.0"
 description: TCSpecial payload set 1
 
@@ -50,8 +49,7 @@ payload_groups:
     address: localhost
 
 payloads:
-  - dh_id: 0
-    name: tcp-stream
+  - name: tcp-stream
     oc_address: 127.0.0.1
     oc_port: 6000
     type: network
@@ -60,24 +58,21 @@ payloads:
     port: 5000
     packet_size: 12
 
-  - dh_id: 1
-    name: udp-steady
+  - name: udp-steady
     oc_address: 127.0.0.1
     oc_port: 6001
     group: udp_localhost
     port: 5001
     packet_size: 11
 
-  - dh_id: 2
-    name: random-device
+  - name: random-device
     oc_address: 127.0.0.1
     oc_port: 6002
     type: device
     path: /dev/urandom
     packet_size: 1
 
-  - dh_id: 3
-    name: udp-fast
+  - name: udp-fast
     oc_address: 127.0.0.1
     oc_port: 6003
     group: udp_localhost

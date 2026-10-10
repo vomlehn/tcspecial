@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use log::info;
-use tcslibgs::{DHConfig, DHId, DHName, Statistics, TcsError, TcsResult};
+use tcslibgs::{DHConfig, DHName, Statistics, TcsError, TcsResult};
 
 use crate::endpoint::{connect_endpoint_pair, EndpointReadable, EndpointWritable};
 use crate::conduit::{Conduit, ConduitDirection, DHSamples, Polling};
@@ -25,7 +25,6 @@ pub enum DHState {
 
 /// Data handler
 pub struct DataHandler {
-    id: DHId,
     name: DHName,
     config: DHConfig,
     state: DHState,
@@ -65,7 +64,6 @@ impl DataHandler {
     /// Create a new data handler
     pub fn new(config: DHConfig) -> TcsResult<Self> {
         Ok(Self {
-            id: config.dh_id,
             name: config.name.clone(),
             config,
             state: DHState::Created,
@@ -99,11 +97,6 @@ impl DataHandler {
             }
         };
         Ok([g2p, p2g])
-    }
-
-    /// Get the data handler ID
-    pub fn id(&self) -> DHId {
-        self.id
     }
 
     /// Get the data handler name
@@ -382,7 +375,6 @@ mod tests {
         drop(oc);
 
         let config = DHConfig {
-            dh_id: DHId(1),
             name: DHName::new("Net"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,
@@ -504,7 +496,6 @@ mod tests {
         drop(oc);
 
         let config = DHConfig {
-            dh_id: DHId(4),
             name: DHName::new("Polled"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -647,7 +638,6 @@ mod tests {
         drop(oc);
 
         let config = DHConfig {
-            dh_id: DHId(5),
             name: DHName::new("Abandoned"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -729,7 +719,6 @@ mod tests {
         drop(probe);
 
         let config = DHConfig {
-            dh_id: DHId(0),
             name: DHName::new("Live"),
             // /dev/urandom is always readable, so the payload-to-ground
             // conduit has something to move as soon as it starts.
@@ -816,7 +805,6 @@ mod tests {
         let oc_addr = free_port();
 
         let config = DHConfig {
-            dh_id: DHId(2),
             name: DHName::new("Restarted"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,
@@ -903,7 +891,6 @@ mod tests {
     #[test]
     fn test_dh_creation() {
         let config = DHConfig {
-            dh_id: DHId(0),
             name: DHName::new("Test"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/null".to_string(),

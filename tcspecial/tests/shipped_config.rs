@@ -143,30 +143,26 @@ fn the_shipped_payload_configs_load() {
         assert!(!handlers.is_empty(), "{file} has no data handlers");
 
         for dh in &handlers {
-            assert!(
-                !dh.name.0.is_empty(),
-                "{file}: data handler {:?} has no name",
-                dh.dh_id
-            );
+            assert!(!dh.name.0.is_empty(), "{file}: a data handler has no name");
             assert_ne!(
                 dh.packet_size, 0,
-                "{file}: {:?} has a zero packet size",
-                dh.dh_id
+                "{file}: {} has a zero packet size",
+                dh.name.0
             );
             match &dh.endpoint {
                 EndpointConfig::Network(net) => {
                     assert!(
                         !net.address.is_empty(),
-                        "{file}: {:?} has no address",
-                        dh.dh_id
+                        "{file}: {} has no address",
+                        dh.name.0
                     );
-                    assert_ne!(net.port, 0, "{file}: {:?} has no port", dh.dh_id);
+                    assert_ne!(net.port, 0, "{file}: {} has no port", dh.name.0);
                 }
                 EndpointConfig::Device(dev) => {
                     assert!(
                         !dev.path.is_empty(),
-                        "{file}: {:?} has no device path",
-                        dh.dh_id
+                        "{file}: {} has no device path",
+                        dh.name.0
                     );
                 }
                 // The kinds that are device files with terms of their own:
@@ -175,28 +171,28 @@ fn the_shipped_payload_configs_load() {
                 EndpointConfig::Serial(serial) => {
                     assert!(
                         !serial.path.is_empty(),
-                        "{file}: {:?} has no serial device",
-                        dh.dh_id
+                        "{file}: {} has no serial device",
+                        dh.name.0
                     );
                     assert_ne!(
                         serial.datarate, 0,
-                        "{file}: {:?} has no data rate",
-                        dh.dh_id
+                        "{file}: {} has no data rate",
+                        dh.name.0
                     );
                 }
                 EndpointConfig::I2c(i2c) => {
-                    assert!(!i2c.bus.is_empty(), "{file}: {:?} has no bus", dh.dh_id);
+                    assert!(!i2c.bus.is_empty(), "{file}: {} has no bus", dh.name.0);
                 }
                 EndpointConfig::Spi(spi) => {
                     assert!(
                         !spi.path.is_empty(),
-                        "{file}: {:?} has no SPI device",
-                        dh.dh_id
+                        "{file}: {} has no SPI device",
+                        dh.name.0
                     );
                     assert_ne!(
                         spi.max_speed, 0,
-                        "{file}: {:?} has no clock rate",
-                        dh.dh_id
+                        "{file}: {} has no clock rate",
+                        dh.name.0
                     );
                 }
             }
@@ -205,20 +201,20 @@ fn the_shipped_payload_configs_load() {
 }
 
 #[test]
-fn the_shipped_files_have_distinct_data_handler_ids() {
-    // The loader refuses a duplicate id now, so this says the shipped files
+fn the_shipped_files_have_distinct_data_handler_names() {
+    // The loader refuses a duplicate name now, so this says the shipped files
     // get past that rule rather than being the only thing that enforces it,
     // which is what it was before the rule existed.
     for path in shipped_payload_files() {
         let handlers = load_dh_configs(&path).unwrap();
-        let mut ids: Vec<_> = handlers.iter().map(|dh| dh.dh_id).collect();
-        let before = ids.len();
-        ids.sort();
-        ids.dedup();
+        let mut names: Vec<_> = handlers.iter().map(|dh| dh.name.0.clone()).collect();
+        let before = names.len();
+        names.sort();
+        names.dedup();
         assert_eq!(
             before,
-            ids.len(),
-            "{}: two data handlers share a dh_id",
+            names.len(),
+            "{}: two data handlers share a name",
             path.display()
         );
     }

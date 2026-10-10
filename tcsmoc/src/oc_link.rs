@@ -145,13 +145,12 @@ fn serve(socket: UdpSocket, handler: SocketAddr, arrivals: Arrivals, row: usize)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::{DHId, DHMode, DHName, EndpointConfig, NetworkProtocol};
+    use tcslibgs::{DHMode, DHName, EndpointConfig, NetworkProtocol};
 
     /// A handler as the payload file describes one, with an OC address of its
     /// own.
     fn handler(oc: Option<SocketAddr>) -> DHConfig {
         DHConfig {
-            dh_id: DHId(0),
             name: DHName::new("auto-send"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,

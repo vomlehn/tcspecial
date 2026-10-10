@@ -131,7 +131,6 @@ mod tests {
         faults: Faults,
     ) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Tcp,
             address: "127.0.0.1".to_string(),

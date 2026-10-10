@@ -54,8 +54,7 @@ payloads:
   # path a link to the pty's slave while the payload runs, which it can do
   # here and could not do in /dev. A flight configuration names the port
   # itself.
-  - dh_id: 0
-    name: serial-line
+  - name: serial-line
     group: payload_line
     path: /tmp/tcspecial4-line
     oc_address: 127.0.0.1

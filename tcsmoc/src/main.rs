@@ -456,8 +456,7 @@ fn triggered_startup(dh: &DHConfig, status: &str) -> Option<String> {
     triggered_note(
         dh,
         &format!(
-            "dh_id {}, {}, trigger {} every {} ms, OC {}, status {}",
-            dh.dh_id.0,
+            "{}, trigger {} every {} ms, OC {}, status {}",
             endpoint_description(&dh.endpoint),
             trigger_as_written(trigger),
             interval_ms,
@@ -492,7 +491,7 @@ fn panel_update_for(
     dh: &DHConfig,
     said: &mut Option<String>,
 ) -> Option<PanelUpdate> {
-    let (status, stats) = match client.query_dh(dh.dh_id) {
+    let (status, stats) = match client.query_dh(dh.name.clone()) {
         Ok(answer) => answer,
         Err(e) => {
             note_triggered_if_new(dh, format!("QUERY_DH got no answer: {e}"), said);
@@ -1497,15 +1496,14 @@ fn enable(
     note_triggered(
         dh,
         format!(
-            "Enable pressed: sending START_DH for dh_id {} as a {:?} handler",
-            dh.dh_id.0,
+            "Enable pressed: sending START_DH as a {:?} handler",
             dh.endpoint.kind()
         ),
     );
 
     let mut guard = link.lock().unwrap();
     let sent = match guard.client() {
-        Some(client) => client.start_dh(dh.dh_id, dh.endpoint.kind(), dh.name.clone()),
+        Some(client) => client.start_dh(dh.endpoint.kind(), dh.name.clone()),
         None => {
             note_triggered(dh, format!("START_DH not sent: {NOT_CONNECTED}"));
             ui.set_last_response(SharedString::from(NOT_CONNECTED));
@@ -1551,12 +1549,12 @@ fn disable(
 ) {
     note_triggered(
         dh,
-        format!("Disable pressed: sending STOP_DH for dh_id {}", dh.dh_id.0),
+        "Disable pressed: sending STOP_DH".to_string(),
     );
 
     let mut guard = link.lock().unwrap();
     let sent = match guard.client() {
-        Some(client) => client.stop_dh(dh.dh_id),
+        Some(client) => client.stop_dh(dh.name.clone()),
         None => {
             note_triggered(dh, format!("STOP_DH not sent: {NOT_CONNECTED}"));
             ui.set_last_response(SharedString::from(NOT_CONNECTED));
@@ -1644,7 +1642,7 @@ mod tests {
     use std::time::Instant;
     use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
     use tcspecial::config::DEFAULT_TCSPECIAL_CONFIG_PATH;
-    use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig};
+    use tcslibgs::{DHName, DeviceConfig, NetworkConfig};
 
     /// Arguments as the program really receives them, the program's own name
     /// first.
@@ -1661,7 +1659,6 @@ mod tests {
     /// One data handler, for the tests that need something to ask about.
     fn a_dh() -> DHConfig {
         DHConfig {
-            dh_id: DHId(1),
             name: DHName::new("DH1"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/null".to_string(),
@@ -2147,13 +2144,12 @@ mod tests {
     /// by and asked with.
     ///
     /// Every one of these is a thing the two ends can disagree about, and a
-    /// panel shows only the first: the id addresses the handler, the OC
+    /// panel shows only the first: the name addresses the handler, the OC
     /// address is where its data comes back to, and the trigger and interval
     /// are what tcspecial will be sending while the panel just says Active.
     #[test]
     fn the_startup_line_says_what_the_payload_will_be_asked_with() {
         let dh = DHConfig {
-            dh_id: DHId(1),
             name: DHName::new("triggered-send"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -2175,9 +2171,8 @@ mod tests {
         let said = triggered_startup(&dh, STOPPED_STATUS).expect("a triggered payload");
         for wanted in [
             "triggered-send",
-            "dh_id 1",
-            // As the payload file writes it, so that the console and the file
-            // can be read against each other.
+            // As the configuration writes it, so that the console and the
+            // file can be read against each other.
             &trigger_as_written(b"go"),
             "1000 ms",
             "127.0.0.1:6003",
@@ -2281,7 +2276,6 @@ mod tests {
         };
 
         let mut dh = DHConfig {
-            dh_id: DHId(0),
             name: DHName::new("DH0"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -2422,7 +2416,7 @@ mod tests {
 
         // Nothing of it is on screen until the button is pressed.
         assert!(
-            !on_screen(&ui).iter().any(|line| line.contains("dh_id")),
+            !on_screen(&ui).iter().any(|line| line.contains("packet_size")),
             "the parameters are shown before anyone asked for them"
         );
 
@@ -2611,7 +2605,6 @@ mod tests {
     #[test]
     fn an_update_goes_to_its_own_panel() {
         let dh = DHConfig {
-            dh_id: DHId(1),
             name: DHName::new("DH1"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/null".to_string(),
@@ -2654,7 +2647,6 @@ mod tests {
     #[test]
     fn a_fresh_panel_has_heard_nothing_from_its_payload() {
         let dh = DHConfig {
-            dh_id: DHId(0),
             name: DHName::new("DH0"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/null".to_string(),
@@ -2817,7 +2809,6 @@ mod tests {
     fn a_panel_row_names_the_handler_at_that_index() {
         let dh_configs = vec![
             DHConfig {
-                dh_id: DHId(7),
                 name: DHName::new("DH7"),
                 endpoint: EndpointConfig::Device(DeviceConfig {
                     path: "/dev/urandom".to_string(),
@@ -2827,7 +2818,6 @@ mod tests {
                             mode: Default::default(),
             },
             DHConfig {
-                dh_id: DHId(9),
                 name: DHName::new("DH9"),
                 endpoint: EndpointConfig::Network(NetworkConfig {
                     protocol: NetworkProtocol::Udp,
@@ -2843,9 +2833,9 @@ mod tests {
         let model: Vec<DHInfo> = dh_configs.iter().map(|dh| dh_info_from(dh, None)).collect();
 
         assert_eq!(model.len(), dh_configs.len());
-        // Row 1 is DH9, whose id is neither 1 nor its row number.
+        // Row 1 is the second handler, whatever it is called.
         assert_eq!(model[1].name, SharedString::from("DH9"));
-        assert_eq!(dh_configs[1].dh_id, DHId(9));
+        assert_eq!(dh_configs[1].name, DHName::new("DH9"));
     }
 
     /// How many panel counts to check the grid rules against. Well past any

@@ -144,8 +144,9 @@ pub fn digest_of_payload_config(config: &PayloadConfig) -> TcsResult<ConfigDiges
     // straight from a parser is in that order already; ordering it here says
     // so rather than relying on it, so that two ends agree about which
     // payload came first whatever either has since done with its own list --
-    // sorted it for a lookup, say. The order means something, because ids
-    // will be assigned in it.
+    // sorted it for a lookup, say. The order means something: it is the order
+    // the file was written in, and two ends that read one file agree about
+    // it.
     let mut ordered = config.clone();
     ordered.payloads.sort_by_key(|payload| payload.sequence);
     digest_of_value(&ordered)
@@ -168,9 +169,9 @@ fn digest_of_value<T: Serialize>(document: &T) -> TcsResult<ConfigDigest> {
 /// * A map is written with its keys in order, so the sections of a file may
 ///   be given in any order, and so may the attributes of one payload.
 /// * A list is written in the order it was given, because that order means
-///   something: ids will be assigned in the order the payloads appear. The
-///   payloads reach here sorted by the sequence number each recorded as it
-///   was read, so "the order it was given" is the order the file gave.
+///   something: it is the order the file was written in. The payloads reach
+///   here sorted by the sequence number each recorded as it was read, so "the
+///   order it was given" is the order the file gave.
 /// * A scalar is written as its text, which is the same text whichever format
 ///   it was read from.
 ///
@@ -261,13 +262,11 @@ tcspecial:
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: device
     path: /dev/null
     packet_size: 1
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     type: device
     path: /dev/zero
     packet_size: 2
@@ -309,13 +308,11 @@ payloads:
     fn the_order_of_the_sections_does_not_matter() {
         let moved = "\
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: device
     path: /dev/null
     packet_size: 1
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     type: device
     path: /dev/zero
     packet_size: 2
@@ -337,8 +334,8 @@ version: \"1.0\"
     #[test]
     fn the_order_of_attributes_does_not_matter() {
         let shuffled = YAML.replace(
-            "  - dh_id: 0\n    name: DH0\n    type: device\n    path: /dev/null\n    packet_size: 1\n",
-            "  - packet_size: 1\n    path: /dev/null\n    name: DH0\n    type: device\n    dh_id: 0\n",
+            "  - name: DH0\n    type: device\n    path: /dev/null\n    packet_size: 1\n",
+            "  - packet_size: 1\n    path: /dev/null\n    type: device\n    name: DH0\n",
         );
         assert_ne!(shuffled, YAML, "the test did not shuffle anything");
         assert_eq!(digest(&shuffled), digest(YAML));
@@ -360,13 +357,11 @@ tcspecial:
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     type: device
     path: /dev/zero
     packet_size: 2
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: device
     path: /dev/null
     packet_size: 1
@@ -415,13 +410,11 @@ tcspecial:
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     type: device
     path: /dev/zero
     packet_size: 2
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: device
     path: /dev/null
     packet_size: 1

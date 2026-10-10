@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use tcslibgs::{
     ArmKey, BeaconTime, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
-    ConfigDigest, ConfigVersion, ConnectTelemetry, DHId, DHName,
+    ConfigDigest, ConfigVersion, ConnectTelemetry, DHName,
     DHSample, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry, RestartArmTelemetry,
     RestartTelemetry, StartDHTelemetry, Statistics, StopDHTelemetry, Telemetry,
 };
@@ -105,14 +105,14 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Command::QueryDH(cmd) => Telemetry::QueryDH(QueryDHTelemetry::new(
                     seq,
                     CommandStatus::Success,
-                    cmd.dh_id,
+                    cmd.name.clone(),
                     stub_statistics(),
                 )),
                 Command::QueryDHSample(cmd) => {
                     Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
                         seq,
                         CommandStatus::Success,
-                        cmd.dh_id,
+                        cmd.name.clone(),
                         stub_sample(0x10),
                         stub_sample(0x20),
                     ))
@@ -172,19 +172,19 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     );
     assert_eq!(
         client
-            .start_dh(DHId(2), DHType::Device, DHName::new("DH2"))
+            .start_dh(DHType::Device, DHName::new("DH2"))
             .unwrap(),
         CommandStatus::Success
     );
-    assert_eq!(client.stop_dh(DHId(2)).unwrap(), CommandStatus::Success);
+    assert_eq!(client.stop_dh(DHName::new("DH2")).unwrap(), CommandStatus::Success);
 
     // The statistics must arrive field for field, not merely arrive.
-    let (status, stats) = client.query_dh(DHId(2)).unwrap();
+    let (status, stats) = client.query_dh(DHName::new("DH2")).unwrap();
     assert_eq!(status, CommandStatus::Success);
     assert_eq!(stats, stub_statistics());
 
     // Sent first, received second, which is the order the client documents.
-    let (status, sent, received) = client.query_dh_sample(DHId(2)).unwrap();
+    let (status, sent, received) = client.query_dh_sample(DHName::new("DH2")).unwrap();
     assert_eq!(status, CommandStatus::Success);
     assert_eq!(sent.data(), &[0x10, 0x11, 0x12]);
     assert_eq!(received.data(), &[0x20, 0x21, 0x22]);

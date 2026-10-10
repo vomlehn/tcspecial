@@ -30,13 +30,11 @@
         <packet_size>12</packet_size>
     </payload_groups>
     <payloads>
-        <dh_id>0</dh_id>
         <name>udp-grouped</name>
         <group>udp_localhost</group>
         <port>5000</port>
     </payloads>
     <payloads>
-        <dh_id>1</dh_id>
         <name>device-alone</name>
         <type>device</type>
         <path>/dev/ttyS0</path>

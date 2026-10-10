@@ -137,7 +137,6 @@ mod tests {
     fn a_spi_payload_is_a_node_the_configured_path_leads_to() {
         let path = a_path();
         let mut payload = SimulatedPayload::new(PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Spi,
             address: path.display().to_string(),

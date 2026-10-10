@@ -440,7 +440,7 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
 mod tests {
     use super::*;
     use std::path::Path;
-    use tcslibgs::{DHId, DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
+    use tcslibgs::{DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
 
     fn repo_file(name: &str) -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
@@ -977,7 +977,6 @@ mod tests {
     /// A data handler, for the tests that only need one to exist.
     fn handler(name: &str) -> DHConfig {
         DHConfig {
-            dh_id: DHId(0),
             name: DHName::new(name),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,
@@ -1090,7 +1089,7 @@ mod tests {
         for (payload_path, sim_path) in shipped_sets() {
             let text = std::fs::read_to_string(&payload_path).unwrap();
             // Whether the payload whose attributes are being read is one that
-            // answers requests. Each payload starts with its dh_id.
+            // answers requests. Each payload starts with its name.
             let mut triggered = false;
 
             for (number, line) in text.lines().enumerate() {
@@ -1098,7 +1097,7 @@ mod tests {
                 if line.starts_with('#') {
                     continue;
                 }
-                if line.starts_with("dh_id") {
+                if line.starts_with("name") {
                     triggered = false;
                 }
                 if line.starts_with("mode") && line.contains("triggered") {
@@ -1283,7 +1282,7 @@ mod tests {
         // Nothing of the parameters is on screen until the button is pressed:
         // a panel is a dozen lines tall and the parameters are thirty.
         assert!(
-            !on_screen(&ui).iter().any(|line| line.contains("dh_id")),
+            !on_screen(&ui).iter().any(|line| line.contains("packet_size")),
             "the parameters are shown before anyone asked for them"
         );
 
@@ -1316,7 +1315,6 @@ mod tests {
     #[test]
     fn a_panel_shows_both_files_values() {
         let dh = DHConfig {
-            dh_id: DHId(3),
             name: DHName::new("DH3"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,

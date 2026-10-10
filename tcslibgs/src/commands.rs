@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{ArmKey, BeaconTime, DHId, DHName, DHType};
+use crate::types::{ArmKey, BeaconTime, DHName, DHType};
 
 /// Command message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -226,19 +226,17 @@ impl ConnectCommand {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StartDHCommand {
     pub header: CommandHeader,
-    pub dh_id: DHId,
     pub dh_type: DHType,
     pub name: DHName,
 }
 
 impl StartDHCommand {
-    pub fn new(sequence: u32, dh_id: DHId, dh_type: DHType, name: DHName) -> Self {
+    pub fn new(sequence: u32, dh_type: DHType, name: DHName) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::StartDH,
             },
-            dh_id,
             dh_type,
             name,
         }
@@ -246,39 +244,39 @@ impl StartDHCommand {
 }
 
 /// STOP_DH command - stop a data handler
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StopDHCommand {
     pub header: CommandHeader,
-    pub dh_id: DHId,
+    pub name: DHName,
 }
 
 impl StopDHCommand {
-    pub fn new(sequence: u32, dh_id: DHId) -> Self {
+    pub fn new(sequence: u32, name: DHName) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::StopDH,
             },
-            dh_id,
+            name,
         }
     }
 }
 
 /// QUERY_DH command - query statistics from a data handler
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QueryDHCommand {
     pub header: CommandHeader,
-    pub dh_id: DHId,
+    pub name: DHName,
 }
 
 impl QueryDHCommand {
-    pub fn new(sequence: u32, dh_id: DHId) -> Self {
+    pub fn new(sequence: u32, name: DHName) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::QueryDH,
             },
-            dh_id,
+            name,
         }
     }
 }
@@ -289,20 +287,20 @@ impl QueryDHCommand {
 /// size they are. A sample is wanted only while someone is looking at a
 /// panel, and carrying payload bytes in routine telemetry would spend downlink
 /// on data nobody reads.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QueryDHSampleCommand {
     pub header: CommandHeader,
-    pub dh_id: DHId,
+    pub name: DHName,
 }
 
 impl QueryDHSampleCommand {
-    pub fn new(sequence: u32, dh_id: DHId) -> Self {
+    pub fn new(sequence: u32, name: DHName) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::QueryDHSample,
             },
-            dh_id,
+            name,
         }
     }
 }
@@ -327,21 +325,21 @@ impl ConfigCommand {
 }
 
 /// CONFIG_DH command - configure data handler values
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigDHCommand {
     pub header: CommandHeader,
-    pub dh_id: DHId,
+    pub name: DHName,
     // Additional configuration fields can be added here
 }
 
 impl ConfigDHCommand {
-    pub fn new(sequence: u32, dh_id: DHId) -> Self {
+    pub fn new(sequence: u32, name: DHName) -> Self {
         Self {
             header: CommandHeader {
                 sequence,
                 cmd_type: CommandType::ConfigDH,
             },
-            dh_id,
+            name,
         }
     }
 }

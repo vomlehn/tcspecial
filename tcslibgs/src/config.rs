@@ -250,8 +250,7 @@ mod tests {
 version: \"1.0\"
 description: a payload file
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     oc_address: 127.0.0.1
     oc_port: 6000
     type: network
@@ -337,9 +336,9 @@ payloads:
         let xml = "<payload>\
              <version>1.0</version>\
              <description>two of them</description>\
-             <payloads><dh_id>0</dh_id><name>DH0</name><type>device</type>\
+             <payloads><name>DH0</name><type>device</type>\
                <path>/dev/null</path><packet_size>1</packet_size></payloads>\
-             <payloads><dh_id>1</dh_id><name>DH1</name><type>device</type>\
+             <payloads><name>DH1</name><type>device</type>\
                <path>/dev/zero</path><packet_size>1</packet_size></payloads>\
              </payload>";
 
@@ -361,7 +360,7 @@ payloads:
         let stated = "version: \"1.0\"\ndescription: a set\n\
                       tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  payload_port: 4001\n  protocol: udp\n  \
                       beacon_interval_ms: 5000\n  beacon_address: 239.255.0.7:7550\n  beacon_interface: 127.0.0.1\n\
-                      payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
+                      payloads:\n  - name: DH0\n    type: device\n    \
                       path: /dev/null\n    packet_size: 1\n";
         let file = write_temp(".yaml", stated);
         let section = load_tcspecial_section(file.path())
@@ -372,7 +371,7 @@ payloads:
 
         // A payload set with no section at all.
         let bare = "version: \"1.0\"\ndescription: a set\n\
-                    payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
+                    payloads:\n  - name: DH0\n    type: device\n    \
                     path: /dev/null\n    packet_size: 1\n";
         let file = write_temp(".yaml", bare);
         assert!(load_tcspecial_section(file.path())
@@ -393,7 +392,7 @@ payloads:
                      tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  payload_port: 4001\n  protocol: udp\n  \
                      beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
                      beacon_interface: 127.0.0.1\n\
-                     payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
+                     payloads:\n  - name: DH0\n    type: device\n    \
                      path: /dev/null\n    packet_size: 1\n";
         let file = write_temp(".yaml", whole);
         let section = load_tcspecial_section(file.path())
@@ -455,7 +454,7 @@ payloads:
     #[test]
     fn a_file_naming_the_old_payload_section_is_told_the_new_name() {
         for old in [
-            "data_handlers:\n  - dh_id: 0\n",
+            "data_handlers:\n  - ",
             "data_handler_groups:\n  - name: g\n",
         ] {
             let text = format!("version: \"1.0\"\n{old}");

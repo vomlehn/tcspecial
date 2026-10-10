@@ -113,7 +113,6 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // what arrives here is for a kind that has.
         own_address: sim.payload_address.clone(),
         own_port: sim.payload_port,
-        _id: dh.dh_id.0,
         name: dh.name.0.clone(),
         protocol,
         address,
@@ -159,7 +158,7 @@ mod tests {
     use tcslibgs::ResolvedSim;
     use std::sync::atomic::Ordering;
     use tcslibgs::{
-        BitOrder, CsActive, DHId, DHMode, DHName, DeviceConfig, I2cConfig, NetworkConfig,
+        BitOrder, CsActive, DHMode, DHName, DeviceConfig, I2cConfig, NetworkConfig,
         NetworkProtocol, SerialConfig, SpiConfig, SpiMode, StopBits,
     };
 
@@ -178,7 +177,6 @@ mod tests {
     #[test]
     fn a_device_handler_simulates_against_its_path() {
         let dh = DHConfig {
-            dh_id: DHId(7),
             name: DHName::new("DH7"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/urandom".to_string(),
@@ -211,7 +209,6 @@ mod tests {
     #[test]
     fn a_triggered_payload_the_simulator_cannot_hear_is_refused() {
         let triggered = |name: &str, endpoint: EndpointConfig| DHConfig {
-            dh_id: DHId(12),
             name: DHName::new(name),
             endpoint,
             packet_size: 4,
@@ -259,7 +256,6 @@ mod tests {
     #[test]
     fn a_triggered_payload_reaches_the_simulator_as_triggered() {
         let dh = DHConfig {
-            dh_id: DHId(14),
             name: DHName::new("DH14"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -296,7 +292,6 @@ mod tests {
             (NetworkProtocol::UnixDgram, PayloadProtocol::UnixDgram),
         ] {
             let dh = DHConfig {
-                dh_id: DHId(8),
                 name: DHName::new("DH8"),
                 endpoint: EndpointConfig::Network(NetworkConfig {
                     protocol,
@@ -323,7 +318,6 @@ mod tests {
     #[test]
     fn a_serial_line_becomes_a_payload_at_the_configured_path() {
         let dh = DHConfig {
-            dh_id: DHId(9),
             name: DHName::new("DH9"),
             endpoint: EndpointConfig::Serial(SerialConfig {
                 path: "/tmp/ttyS0".to_string(),
@@ -363,7 +357,6 @@ mod tests {
     #[test]
     fn an_i2c_device_becomes_a_payload_on_its_bus_at_its_address() {
         let dh = DHConfig {
-            dh_id: DHId(10),
             name: DHName::new("DH10"),
             endpoint: EndpointConfig::I2c(I2cConfig {
                 bus: "/tmp/i2c-sim".to_string(),
@@ -394,7 +387,6 @@ mod tests {
     #[test]
     fn a_spi_peripheral_becomes_a_payload_at_the_configured_path() {
         let dh = DHConfig {
-            dh_id: DHId(11),
             name: DHName::new("DH11"),
             endpoint: EndpointConfig::Spi(SpiConfig {
                 path: "/tmp/spidev0.0".to_string(),

@@ -1057,16 +1057,28 @@ it.
 What each end read
 ^^^^^^^^^^^^^^^^^^
 When a link comes up, tcsmoc sends its software version and an MD5 of the
-payload configuration it read, and tcspecial answers with its own two. Each
-prints its own on the terminal it was started from before it makes the socket,
-so the two are there to read even when the link never comes up:
+payload configuration it read, and tcspecial answers with its own, and with
+the version its payload set states. Each prints its own on the terminal it was
+started from before it makes the socket, so they are there to read even when
+the link never comes up -- the MOC's first, then tcspecial's, then what the
+answer said:
 
 .. code-block:: console
 
+   Version 0.1.0, configuration tests/manual/tcspecial2.yaml md5 8d908f54a3d72d0704213113b92d958b
    Version 0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
    tcspecial answers v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
-and ``Last Response`` says whether the two agree. They are the same payload
+and ``Last Response`` says whether the two agree:
+
+.. code-block:: text
+
+   tcspecial agrees: version 0.1.0, config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+
+The set's version shown there is the one tcspecial sent, which is the version
+of the file it read. The MOC does not send its own, so there is nothing to
+compare it with: what the verdict is reached on is the software version and
+the digest. They are the same payload
 set if the digests match: the digest is of what a file says rather than of its
 bytes, so the YAML and the XML of one set digest alike, and so do two files
 differing only in comments, spacing, the order of their sections or the order

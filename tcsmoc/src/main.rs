@@ -1290,15 +1290,23 @@ fn hear_what_tcspecial_read(
                 )
             );
 
+            // What the answer said, in the words a beacon and tcspecial's own
+            // console line use: the set's version labelled config v, and the
+            // digest after md5:. The set's version is the one tcspecial sent,
+            // which is the version of the file it read -- this end does not
+            // send its own, so there is nothing here to compare it with.
             let said = if their_version != version {
                 format!("tcspecial is version {their_version}, this is {version}")
             } else if their_digest != digest {
                 format!(
-                    "tcspecial is serving a different configuration: md5 {their_digest}, \
-                     not {digest}"
+                    "tcspecial is serving a different configuration: \
+                     config v{their_config_version} md5: {their_digest}, not {digest}"
                 )
             } else {
-                format!("tcspecial agrees: version {version}, md5 {digest}")
+                format!(
+                    "tcspecial agrees: version {version}, \
+                     config v{their_config_version} md5: {digest}"
+                )
             };
             if their_version != version || their_digest != digest {
                 eprintln!("{said}");

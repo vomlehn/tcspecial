@@ -3714,8 +3714,8 @@ tcsverify
 Tcsverify reads a payload set -- the tcspecial configuration file, and the
 simulator file beside it when one is given -- and prints what is wrong with
 it. It opens no socket and no device node, so it can be run anywhere, by a
-person editing a file or by a recipe: ``make runverifyy`` checks a set's YAML
-and ``make runverifyx`` its XML.
+person editing a file or by a recipe: it is given the files to read and says
+nothing when they are good.
 
 Requirement
     Tcsverify takes one file or two. The first is the tcspecial configuration

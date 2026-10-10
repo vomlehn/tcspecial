@@ -867,22 +867,31 @@ to it.
 Checking a set without running it
 ---------------------------------
 ``tcsverify`` reads a payload set and says what is wrong with it, without
-opening a socket or a device node:
+opening a socket or a device node. It takes one file or two, the tcspecial
+configuration first:
 
 .. code-block:: console
 
-   $ make runverifyy                       # reading the set's YAML
-   $ make runverifyx                       # reading its XML
-   $ make runverifyy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial4
+   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml
+   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
+   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.xml tests/manual/tcspecial2sim.yaml
 
-A good set prints nothing and the target succeeds. A bad one prints a line per
-problem and the target fails:
+Either spelling of the configuration will do -- the last line reads the XML of
+the same set -- and the simulator configuration is named in full rather than
+worked out from the first file's name.
+
+A good set prints nothing. A bad one prints a line per problem, each naming
+the file, the line and what is wrong there:
 
 .. code-block:: console
 
-   $ make runverifyy TCSPECIAL_CONFIG_FILE=/tmp/draft
-   /tmp/draft.yaml:55: payload "udp-steady": packet_size must be greater than zero
-   /tmp/draft.yaml:63: payload "random-device" is a device payload, so port does not apply to it
+   $ cargo run --bin tcsverify -- /tmp/draft.yaml
+   /tmp/draft.yaml:61: payload "udp-steady": packet_size must be greater than zero
+   /tmp/draft.yaml:68: payload "random-device" is a device payload, so port does not apply to it
+
+It exits 0 when nothing is wrong, 1 when something is, and 2 when the command
+line is neither of those two shapes -- which a script can tell apart from a
+bad file.
 
 Every program that runs a set refuses the first thing wrong with it and stops,
 which is what a program that cannot run without it should do and is not what a
@@ -897,22 +906,9 @@ page of them would mostly be consequences of the first few.
 Both files of the set are checked, and the second against the first: every
 payload simulated, every simulated payload a payload, and every setting one
 that payload can have. A tcspecial configuration with problems of its own is
-not joined
-to -- there would be nothing to join to, and a join against half of a set
-reports the other half as unsimulated -- and tcsverify says so rather than
-leaving it unsaid.
-
-Without the Makefile it takes one file or two, the tcspecial configuration
-first:
-
-.. code-block:: console
-
-   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml
-   $ cargo run --bin tcsverify -- tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
-
-It exits 0 when nothing is wrong, 1 when something is, and 2 when the command
-line is neither of those two shapes -- which a script can tell apart from a
-bad file.
+not joined to -- there would be nothing to join to, and a join against half of
+a set reports the other half as unsimulated -- and tcsverify says so rather
+than leaving it unsaid.
 
 What the programs take without the Makefile
 -------------------------------------------

@@ -980,12 +980,13 @@ the beacon box
 
      Beacon:    (indicator)
      Last rcvd: 02:02:02
-     Last msg:  ver: 0.1.0 config ver: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+     Last msg:  v: 0.1.0 config v: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
-  ``Last msg`` reads ``<none>`` until a beacon arrives. ``ver`` is the
-  software flying, ``config ver`` the version the payload set states, and
-  ``md5`` the digest of the configuration file tcspecial read, so the line
-  says what is up there without anything having to connect first. A datagram the MOC cannot read is shown as
+  ``Last msg`` reads ``<none>`` until a beacon arrives. ``v`` is the software
+  flying, ``config v`` the version the payload set states, and ``md5`` the
+  digest of the configuration file tcspecial read, so the line says what is up
+  there without anything having to connect first. The answer to a ``CONNECT``
+  says the same three in the same words: see `What each end read`_. A datagram the MOC cannot read is shown as
   what arrived, cut short, rather than left off the line: something else
   sending to the group is worth seeing beside a green light.
 
@@ -1063,7 +1064,7 @@ so the two are there to read even when the link never comes up:
 .. code-block:: console
 
    Version 0.1.0, configuration tests/manual/tcspecial2.yaml version 1.0.0 md5 8d908f54a3d72d0704213113b92d958b
-   tcspecial answers version 0.1.0, md5 8d908f54a3d72d0704213113b92d958b
+   tcspecial answers v: 0.1.0 config v: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
 and ``Last Response`` says whether the two agree. They are the same payload
 set if the digests match: the digest is of what a file says rather than of its

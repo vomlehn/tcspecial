@@ -268,6 +268,7 @@ impl CommandInterpreter {
                 Telemetry::Connect(ConnectTelemetry::new(
                     cmd.header.sequence,
                     self.version,
+                    self.config_version,
                     self.digest,
                 ))
             }

@@ -1278,8 +1278,17 @@ fn hear_what_tcspecial_read(
     };
 
     match answer {
-        Ok((their_version, their_digest)) => {
-            eprintln!("tcspecial answers version {their_version}, md5 {their_digest}");
+        Ok((their_version, their_config_version, their_digest)) => {
+            // Said the way a beacon says the same three facts, by the one
+            // function that writes them: the two are read against each other.
+            eprintln!(
+                "tcspecial answers {}",
+                beacon_receive::what_it_read(
+                    their_version,
+                    their_config_version,
+                    their_digest
+                )
+            );
 
             let said = if their_version != version {
                 format!("tcspecial is version {their_version}, this is {version}")

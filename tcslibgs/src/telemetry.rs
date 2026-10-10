@@ -130,11 +130,20 @@ impl RestartTelemetry {
 pub struct ConnectTelemetry {
     pub header: TelemetryHeader,
     pub version: ConfigVersion,
+    /// The version the payload configuration file states, which the beacon
+    /// carries too: a ground station reading the answer is told which set
+    /// this end is serving and not only which build is serving it.
+    pub config_version: ConfigVersion,
     pub digest: ConfigDigest,
 }
 
 impl ConnectTelemetry {
-    pub fn new(sequence: u32, version: ConfigVersion, digest: ConfigDigest) -> Self {
+    pub fn new(
+        sequence: u32,
+        version: ConfigVersion,
+        config_version: ConfigVersion,
+        digest: ConfigDigest,
+    ) -> Self {
         Self {
             header: TelemetryHeader {
                 sequence,
@@ -142,6 +151,7 @@ impl ConnectTelemetry {
                 status: CommandStatus::Success,
             },
             version,
+            config_version,
             digest,
         }
     }

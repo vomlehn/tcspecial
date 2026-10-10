@@ -42,6 +42,16 @@ fn stub_sample(first: u8) -> DHSample {
     sample
 }
 
+/// The version a payload set states, as the stub spacecraft answers it.
+///
+/// Not this build's: the two are different things, and a test that used one
+/// value for both would pass whichever of them the answer carried.
+const A_SETS_VERSION: ConfigVersion = ConfigVersion {
+    major: 2,
+    minor: 3,
+    patch: 4,
+};
+
 /// Answer `count` commands as tcspecial would, then stop.
 ///
 /// Every answer carries the command's own sequence number, which is what lets
@@ -70,9 +80,15 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 }
                 // The stub answers with the ground's own two, which is a
                 // spacecraft reading the same configuration.
-                Command::Connect(cmd) => {
-                    Telemetry::Connect(ConnectTelemetry::new(seq, cmd.version, cmd.digest))
-                }
+                Command::Connect(cmd) => Telemetry::Connect(ConnectTelemetry::new(
+                    seq,
+                    cmd.version,
+                    // The ground does not say which set it read, so the stub
+                    // answers with a version of its own: what matters here is
+                    // that all three come back.
+                    A_SETS_VERSION,
+                    cmd.digest,
+                )),
                 Command::RestartArm(_) => {
                     Telemetry::RestartArm(RestartArmTelemetry::new(seq, CommandStatus::Success))
                 }
@@ -135,7 +151,10 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     // configuration difference rather than being handed a verdict.
     let version = ConfigVersion::of_this_build();
     let digest = ConfigDigest([0x5A; 16]);
-    assert_eq!(client.connect(version, digest).unwrap(), (version, digest));
+    assert_eq!(
+        client.connect(version, digest).unwrap(),
+        (version, A_SETS_VERSION, digest)
+    );
     assert_eq!(
         client.restart_arm(ArmKey(0x1234)).unwrap(),
         CommandStatus::Success

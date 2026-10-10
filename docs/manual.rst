@@ -1306,7 +1306,10 @@ under `Seeing what was read`_ -- and then three lines:
   sent`` line is blank.
 
 ``Pkts``
-  How many packets have gone and arrived since the payload started.
+  How many packets have gone and arrived since the payload started. The
+  arrived half is there for a payload that answers requests, as the ``Recv``
+  line is and for the same reason: a payload that sends of its own accord is
+  never spoken to, so a count of what arrived could only ever read nought.
 
 The times and bytes are the simulator's own account of what it did, where
 tcsmoc's panels show the same transfers as the spacecraft reported them. Two

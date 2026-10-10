@@ -292,9 +292,20 @@ component PayloadPanel inherits Rectangle {
                 font-size: 9px;
             }
         }
+        // The received count goes the same way the received line does, and
+        // for the same reason: a payload that sends on its own is never
+        // spoken to, so "0 recv" is a number that cannot become anything
+        // else. What it sent is all there is to count.
         packets-row := HorizontalLayout {
             height: 14px;
-            Text { text: "Pkts: " + packets-sent + " sent / " + packets-recv + " recv"; font-size: 9px; }
+            if triggered : Text {
+                text: "Pkts: " + packets-sent + " sent / " + packets-recv + " recv";
+                font-size: 9px;
+            }
+            if !triggered : Text {
+                text: "Pkts: " + packets-sent + " sent";
+                font-size: 9px;
+            }
         }
     }
 }

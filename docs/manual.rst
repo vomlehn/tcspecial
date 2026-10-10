@@ -762,6 +762,11 @@ The sets live under ``tests/manual`` because running one is something a person
 does at a terminal: each opens sockets or device nodes, so none of them belongs
 in a test that runs on every build.
 
+The two windows open at opposite edges of the display -- tcsmoc at the top and
+tcssim at the bottom -- because they are read together and would otherwise
+land on top of each other. It is a request to the window system: X11 honours
+it, Wayland may ignore it, and a tiling window manager will do as it likes.
+
 Everything at once
 ------------------
 ``make runmocy`` runs tcsmoc, which starts a tcspecial and a tcssim of its own:

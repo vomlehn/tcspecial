@@ -3003,12 +3003,18 @@ that shows the whole of what the two files said about it.
 Requirement
     The button that starts and stops a payload is labelled with what pressing
     it will do. A payload that is sending offers ``Silent``, which stops it; a
-    payload that is not offers ``Transmit``, which starts it. There were two
+    payload that is not offers ``Receive``, which starts it. There were two
     buttons, Start and Stop, and either was pressable whatever the payload was
     doing: a Stop on a payload that was not sending did nothing and read as
-    though it had. Tcsmoc's panels carry the same rule in their own words,
-    ``Discard`` and ``Receive``, which are what starting and stopping a
-    handler mean from the ground.
+    though it had.
+
+Requirement
+    The press that starts the data flowing is labelled ``Receive`` in both
+    windows. They are read side by side while a link is watched, and one of
+    them calling that press something else reads as two different things to
+    do. The press that stops it is each window's own: a simulated payload goes
+    ``Silent``, and a handler ``Discard``\ s what its payload sends rather
+    than carrying it to the ground.
 
 Requirement
     Which way a press goes is decided by the status the label was made from.
@@ -3017,7 +3023,7 @@ Requirement
     the other would be worse than either button alone.
 
 Requirement
-    A payload that failed to start offers ``Transmit`` again. It is not
+    A payload that failed to start offers ``Receive`` again. It is not
     sending, which is what its status says, and the useful thing to offer is
     the start that failed rather than a stop of something that never began.
 

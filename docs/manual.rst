@@ -1058,18 +1058,23 @@ What each end read
 ^^^^^^^^^^^^^^^^^^
 When a link comes up, tcsmoc sends its software version and an MD5 of the
 payload configuration it read, and tcspecial answers with its own, and with
-the version its payload set states. Each prints its own on the terminal it was
-started from before it makes the socket, so they are there to read even when
-the link never comes up -- the MOC's first, then tcspecial's, then what the
-answer said:
+the version its payload set states. Each prints what it read on the terminal
+it was started from before it makes the socket, so they are there to read even
+when the link never comes up -- the MOC's first, then tcspecial's, then what
+the answer said:
 
 .. code-block:: console
 
-   Version 0.1.0, configuration tests/manual/tcspecial2.yaml md5 8d908f54a3d72d0704213113b92d958b
+   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
    v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
    tcspecial answers v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
-and ``Last Response`` says whether the two agree:
+The first two lines are written the same way by the two programs, so two ends
+reading one payload set print the same line twice -- which is what makes a
+difference in any part of it worth reading. The third says what came back over
+the link.
+
+``Last Response`` says whether the two agree:
 
 .. code-block:: text
 

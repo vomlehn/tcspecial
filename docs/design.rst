@@ -1313,11 +1313,25 @@ Requirement
     answers with what it read and logs a disagreement it can see.
 
 Requirement
-    Each end says its own version and digest before it makes the socket the
-    link runs over. A socket that cannot be made, or a far end that is not
-    answering, takes the exchange with it -- and that is exactly when the two
-    facts are wanted. In tcspecial this also puts an address already in use
-    under the configuration it was going to serve rather than instead of it.
+    Each end says its own version, the version of the set it read, and the
+    digest, before it makes the socket the link runs over. A socket that
+    cannot be made, or a far end that is not answering, takes the exchange
+    with it -- and that is exactly when those facts are wanted. In tcspecial
+    this also puts an address already in use under the configuration it was
+    going to serve rather than instead of it.
+
+Requirement
+    The two ends write that line the same way, naming the file each read:
+
+    .. code-block:: text
+
+       v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+
+    Two ends reading one payload set therefore print the same line twice,
+    which is what makes a difference in any part of it worth reading. The
+    MOC's line used to be written differently -- ``Version 0.1.0``, a bare
+    ``md5``, and no set version at all -- so the two could only be compared
+    by the one fact they spelled alike.
 
 Nothing else in the protocol makes the two ends prove they are talking about
 the same payload set, and when they were not, the only sign was a command

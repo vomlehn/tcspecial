@@ -12,7 +12,9 @@ use std::thread;
 use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::config::{load_dh_configs, load_tcspecial_section, payload_path_from_args};
+use tcslibgs::config::{
+    load_config_version, load_dh_configs, load_tcspecial_section, payload_path_from_args,
+};
 use tcslibgs::config_digest::{digest_of_file, ConfigDigest, ConfigVersion};
 use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
@@ -766,13 +768,29 @@ fn main() {
     // the exchange below with it -- and that is exactly when an operator wants
     // to know which configuration each end was holding.
     let version = ConfigVersion::of_this_build();
+
+    // The set's version, said the way tcspecial says its own and the way a
+    // beacon says it: this line and tcspecial's are read against each other,
+    // so they state the same three facts in the same words.
+    //
+    // The file has already been loaded, and its version is one of the rules
+    // that loading applies, so a failure here is a file that changed between
+    // the two reads. Said rather than left out: a line missing one of its
+    // three facts reads as a set that has no version.
+    let config_version = load_config_version(&payload_path)
+        .map(|stated| format!("config v{stated}"))
+        .unwrap_or_else(|e| format!("config version unreadable ({e})"));
+
     let digest = match digest_of_file(&payload_path) {
         Ok(digest) => {
-            eprintln!("Version {version}, configuration {payload_path} md5 {digest}");
+            eprintln!("v{version}, configuration {payload_path} {config_version} md5: {digest}");
             Some(digest)
         }
         Err(e) => {
-            eprintln!("Version {version}, configuration {payload_path} cannot be digested: {e}");
+            eprintln!(
+                "v{version}, configuration {payload_path} {config_version} cannot be \
+                 digested: {e}"
+            );
             None
         }
     };

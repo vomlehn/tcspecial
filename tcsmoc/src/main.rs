@@ -318,9 +318,13 @@ fn grid_shape(panels: usize) -> GridShape {
 /// no packet interval among them: how often a payload produces a packet is a
 /// property of a simulation rather than of a payload, so it is stated in the
 /// simulator's own file and tcssim is what shows it.
-fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
+fn dh_info_from(dev_id: usize, dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
     DHInfo {
         name: SharedString::from(dh.name.0.clone()),
+        // Its place in the payload configuration, which is the only number a
+        // payload has: nothing in the file states one, and the order the file
+        // describes them in is what both windows count.
+        dev_id: i32::try_from(dev_id).unwrap_or(i32::MAX),
         config: SharedString::from(endpoint_description(&dh.endpoint)),
         packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
         status: SharedString::from("Stopped"),
@@ -780,7 +784,9 @@ fn main() {
         dh_configs
             .iter()
             .enumerate()
-            .map(|(row, dh)| dh_info_from(dh, sims.as_ref().and_then(|sims| sims.get(row))))
+            .map(|(row, dh)| {
+                dh_info_from(row, dh, sims.as_ref().and_then(|sims| sims.get(row)))
+            })
             .collect::<Vec<_>>(),
     ));
     ui.set_dh_model(ModelRc::from(dh_model.clone()));
@@ -2203,7 +2209,11 @@ mod tests {
             ("both periodic", vec![&periodic, &periodic]),
             ("both triggered", vec![&triggered, &triggered]),
         ] {
-            let rows: Vec<DHInfo> = dhs.iter().map(|dh| dh_info_from(dh, None)).collect();
+            let rows: Vec<DHInfo> = dhs
+                .iter()
+                .enumerate()
+                .map(|(row, dh)| dh_info_from(row, dh, None))
+                .collect();
             let panels = rows.len();
 
             let ui = MainWindow::new().unwrap();
@@ -2244,7 +2254,7 @@ mod tests {
                 .map(|i| {
                     let mut dh = a_dh();
                     dh.name = DHName::new(format!("DH{i}"));
-                    dh_info_from(&dh, None)
+                    dh_info_from(i, &dh, None)
                 })
                 .collect();
 
@@ -2259,7 +2269,9 @@ mod tests {
             // of each panel and nothing else shows it.
             let mut placed: Vec<(String, f32, f32)> = Vec::new();
             for i in 0..panels {
-                let name = format!("DH{i}");
+                // As the panel writes it: the handler's name and its number,
+                // which is its place in the configuration.
+                let name = format!("DH{i} (dev id {i})");
                 let handle = ElementHandle::find_by_accessible_label(&ui, &name)
                     .next()
                     .unwrap_or_else(|| panic!("{panels} panels: no panel labelled {name}"));
@@ -2332,7 +2344,11 @@ mod tests {
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
         let dh_configs = load_dh_configs(&path)
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
-        let shipped: Vec<DHInfo> = dh_configs.iter().map(|dh| dh_info_from(dh, None)).collect();
+        let shipped: Vec<DHInfo> = dh_configs
+            .iter()
+            .enumerate()
+            .map(|(row, dh)| dh_info_from(row, dh, None))
+            .collect();
 
         // More handlers than the three-row floor covers, as well as the
         // shipped file. Both are needed: the floor leaves the shipped four
@@ -2731,7 +2747,7 @@ mod tests {
         };
 
         for kind in ["sends on its own", "answers requests"] {
-            let lines = shown(dh_info_from(&dh, None));
+            let lines = shown(dh_info_from(0, &dh, None));
             let count = |label: &str| lines.iter().filter(|shown| *shown == label).count();
 
             // The one panel's two readings of what arrived.
@@ -2762,7 +2778,7 @@ mod tests {
             // rather than how many bytes the spacecraft read from the ground:
             // that was the other direction, and read nought for every
             // payload nobody sends to.
-            let mut counted = dh_info_from(&dh, None);
+            let mut counted = dh_info_from(0, &dh, None);
             counted.packets_recv = 3;
             let shown_counted = shown(counted);
             assert!(
@@ -2871,7 +2887,9 @@ mod tests {
         // Without the simulator file, which is the case this program has to
         // handle: it controls payloads and does not simulate them.
         let ui = MainWindow::new().unwrap();
-        ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(vec![dh_info_from(dh, None)]))));
+        ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(vec![dh_info_from(
+            0, dh, None,
+        )]))));
         ui.set_columns(1);
         ui.show().unwrap();
 
@@ -3093,8 +3111,8 @@ mod tests {
             mode: Default::default(),
         };
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
-            dh_info_from(&dh, None),
-            dh_info_from(&dh, None),
+            dh_info_from(0, &dh, None),
+            dh_info_from(1, &dh, None),
         ]));
 
         let mut data = DHSample::new();
@@ -3141,8 +3159,8 @@ mod tests {
         };
 
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
-            dh_info_from(&dh, None),
-            dh_info_from(&dh, None),
+            dh_info_from(0, &dh, None),
+            dh_info_from(1, &dh, None),
         ]));
 
         apply_panel_update(
@@ -3191,7 +3209,7 @@ mod tests {
             mode: Default::default(),
         };
 
-        let info = dh_info_from(&dh, None);
+        let info = dh_info_from(0, &dh, None);
         assert_eq!(info.oc_time, SharedString::from(NO_TRANSFER_TIME));
         assert!(info.oc_data.is_empty());
     }
@@ -3329,7 +3347,16 @@ mod tests {
 
         assert!(!dh_configs.is_empty(), "no data handlers to show");
 
-        for (dh, info) in dh_configs.iter().zip(dh_configs.iter().map(|dh| dh_info_from(dh, None))) {
+        for (row, (dh, info)) in dh_configs
+            .iter()
+            .zip(dh_configs.iter().enumerate().map(|(row, dh)| dh_info_from(row, dh, None)))
+            .enumerate()
+        {
+            assert_eq!(
+                info.dev_id,
+                i32::try_from(row).unwrap(),
+                "a payload's number is its place in the configuration"
+            );
             assert_eq!(info.name, SharedString::from(dh.name.0.clone()));
             assert!(!info.config.is_empty(), "{} has no endpoint to show", dh.name.0);
             // A panel showing a saturated size would be showing a number the
@@ -3365,10 +3392,16 @@ mod tests {
             },
         ];
 
-        let model: Vec<DHInfo> = dh_configs.iter().map(|dh| dh_info_from(dh, None)).collect();
+        let model: Vec<DHInfo> = dh_configs
+            .iter()
+            .enumerate()
+            .map(|(row, dh)| dh_info_from(row, dh, None))
+            .collect();
 
         assert_eq!(model.len(), dh_configs.len());
-        // Row 1 is the second handler, whatever it is called.
+        // Row 1 is the second handler, whatever it is called, and its number
+        // is its row: a payload is numbered by where the file put it.
+        assert_eq!(model[1].dev_id, 1);
         assert_eq!(model[1].name, SharedString::from("DH9"));
         assert_eq!(dh_configs[1].name, DHName::new("DH9"));
     }

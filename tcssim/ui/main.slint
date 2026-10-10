@@ -10,6 +10,9 @@ import { Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox, Scroll
 export struct PayloadInfo {
     // From the tcspecial configuration file
     name: string,
+    // Which payload of that configuration this is, counted from nought in the
+    // order the file describes them.
+    dev-id: int,
     config: string,
     packet-size: int,
     // Everything both files said about this payload, as Rust read them. Held
@@ -42,6 +45,7 @@ export struct PayloadInfo {
 
 component PayloadPanel inherits Rectangle {
     in property <string> payload-name: "Payload 0";
+    in property <int> dev-id: 0;
     in property <string> payload-config: "TCP localhost:5000";
     in property <string> payload-status: "Stopped";
     in property <int> packet-size: 12;
@@ -148,8 +152,13 @@ component PayloadPanel inherits Rectangle {
         HorizontalLayout {
             spacing: 4px;
             height: 18px;
+            // The name and the number of the payload, which is its place in
+            // the payload configuration -- the first payload the file
+            // describes is 0. Nothing states it: the file's order decides it,
+            // and tcsmoc counts the same way, so a payload is the same number
+            // in both windows.
             Text {
-                text: payload-name;
+                text: payload-name + " (dev id " + dev-id + ")";
                 font-size: 11px;
                 font-weight: 700;
                 vertical-alignment: top;
@@ -376,6 +385,7 @@ export component MainWindow inherits Window {
                     min-height: cell-height;
 
                     payload-name: p.name;
+                    dev-id: p.dev-id;
                     payload-config: p.config;
                     payload-status: p.status;
                     packet-size: p.packet-size;

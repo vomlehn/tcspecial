@@ -3722,6 +3722,15 @@ A handler whose conduits have carried nothing in a direction shows
 ``--:--:--`` and no data for it, which is also what a panel shows before it
 has been queried at all.
 
+Requirement
+    A panel says which payload of the configuration it is, beside the name:
+    ``auto-send (dev id 0)``. The number is the payload's place in the payload
+    configuration, counted from nought in the order the file describes them,
+    and nothing in the file states it -- a payload stated a ``dh_id`` once and
+    that was a second identity to keep consistent by hand. Both windows count
+    the same way, which is the use of it: the two are read side by side, and a
+    payload is then the same number in each.
+
 Each panel has three buttons: ``Enable``, ``Disable``, and ``Configuration``,
 which shows what the configuration files said about the handler and is
 described under `tcssim`_ where the same button is. It read ``Config`` while

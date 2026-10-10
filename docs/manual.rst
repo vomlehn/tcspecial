@@ -1123,8 +1123,12 @@ Below that is one panel per data handler, filled across the window before
 another row is started under it, and a ``Quit`` button at the foot of the
 window, which stops the tcspecial and tcssim the MOC started.
 
-Each panel shows its handler's name and status, how it is reached, and its
-packet size; then two readings and one count. The status is ``Active``,
+Each panel shows its handler's name and number, its status, how it is
+reached, and its packet size; then two readings and one count. The number is
+the payload's place in the payload configuration, counted from nought in the
+order the file describes them -- ``auto-send (dev id 0)`` -- and nothing in
+the file states it. Both windows count the same way, so a payload is the same
+number in each. The status is ``Active``,
 ``Stopped`` or ``Unknown``, and where each comes from is under `Beaconing`_:
 the spacecraft's answer to the last ``Enable`` or ``Disable``, and ``Unknown``
 for a handler nobody can speak for -- which is what the panels say while no
@@ -1331,8 +1335,10 @@ removed from them adds or removes a panel.
 
 Each panel shows, from the top:
 
-the name and status
-  The status is red while the payload is not sending and black while it is.
+the name, the number and the status
+  The number is the payload's place in the payload configuration, as tcsmoc's
+  panels show it, so the two windows name the same payload the same way. The
+  status is red while the payload is not sending and black while it is.
 
 how the payload is reached
   The same description tcsmoc's panels carry for the handler at the other end

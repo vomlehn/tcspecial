@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Equivalent to tcspecial.json and tcspecial.yaml. All three must deserialize
-     into an identical PayloadConfig; tests/format_equivalence.rs enforces it.
+<!-- Equivalent to tcspecial.yaml. Both must deserialize into an identical
+     PayloadConfig; tests/format_equivalence.rs enforces it.
 
-     Conventions this file must follow, because they are the subset JSON,
-     YAML, and XML all agree on:
+     Conventions this file must follow, which are what XML and YAML agree on
+     -- a payload configuration may be written in either:
        - every value is a child element, never an attribute
        - a sequence is repeated sibling elements named for the field
          (<payloads> here), and the repeats must be contiguous

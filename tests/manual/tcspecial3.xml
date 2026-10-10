@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- TCSpecial payload set 3, in the payload configuration language.
 
-     Equivalent to tcspecial3.yaml and tcspecial3.json. The YAML is the one
-     to read: it carries the comments, which JSON has no way to hold.
+     Equivalent to tcspecial3.yaml -- a payload configuration may be
+     written in either format, and both of this set are shipped. The YAML is
+     the one to read: it carries the comments.
 
-     Conventions, which are the subset JSON, YAML and XML all agree on:
+     Conventions, which are what XML and YAML agree on:
        - every value is a child element, never an attribute
        - a sequence is repeated sibling elements named for the field,
          and the repeats must be contiguous

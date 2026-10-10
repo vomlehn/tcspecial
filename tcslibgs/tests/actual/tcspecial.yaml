@@ -1,5 +1,5 @@
-# Equivalent to tcspecial.json and tcspecial.xml. All three must deserialize
-# into an identical PayloadConfig; tests/format_equivalence.rs enforces it.
+# Equivalent to tcspecial.xml. Both must deserialize into an identical
+# PayloadConfig; tests/format_equivalence.rs enforces it.
 #
 # Note the quotes on version: unquoted 1.0 is a YAML float, not a string.
 version: "1.0"

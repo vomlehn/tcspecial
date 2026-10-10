@@ -14,29 +14,34 @@ RUST = .
 # The payload set to run, named without a suffix.
 #
 # One variable rather than two, because the two files of a set are named for
-# each other: PAYLOAD_FILE is the stem, `$(PAYLOAD_FILE).yaml` the payload
-# file -- in YAML or XML -- and `$(PAYLOAD_FILE)sim.yaml` the simulator
-# settings beside it. So:
-#   make run     PAYLOAD_FILE=tests/manual/tcspecial2
-#   make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
-#   make runsim  PAYLOAD_FILE=tests/manual/tcspecial2
+# each other: TCSPECIAL_CONFIG_FILE is the stem,
+# `$(TCSPECIAL_CONFIG_FILE).yaml` the tcspecial configuration -- in YAML or
+# XML -- and `$(TCSPECIAL_CONFIG_FILE)sim.yaml` the simulator settings beside
+# it. So:
+#   make run     TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
+#   make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
+#   make runsim  TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
 #
-# Every program takes the payload file as a command line argument. The
+# Not TCSPECIAL_CONFIG_PATH, which is the environment variable tcspecial and
+# tcsmoc read for the command interpreter's own settings: this names a set to
+# run and is nothing the programs look for.
+#
+# Every program takes the configuration file as a command line argument. The
 # simulator file reaches tcssim through the environment: runmocy passes it
-# because tcsmoc hands its own payload file to the tcspecial and tcssim it
+# because tcsmoc hands its own configuration to the tcspecial and tcssim it
 # starts but never reads the simulation file, and runsim passes it because
 # tcssim run on its own needs both, and the two must describe the same set or
 # the names will not match.
 #
 # The sets live under tests/manual because running one is something a person
 # does at a terminal: each opens sockets or device nodes.
-PAYLOAD_FILE=tests/manual/tcspecial2
+TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
 # set is:
 #   make runmocy RUST_LOG=debug
-#   make run PAYLOAD_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
+#   make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
 RUST_LOG = info
 
 RELEASE = --release
@@ -57,7 +62,7 @@ help:
 	@echo "  make test        - Run all tests"
 	@echo "  make run         - Run tcspecial"
 	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and tcssim"
-	@echo "  make runmocx     - As runmocy, on the XML payload configuration"
+	@echo "  make runmocx     - As runmocy, on the XML configuration"
 	@echo "  make runsim      - Run tcssim alone"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
@@ -68,7 +73,7 @@ help:
 	@echo "  make distclean   - Remove everything that can be rebuilt"
 	@echo "  make install     - Install tcspecial globally"
 	@echo ""
-	@echo "Payload set: make runmocy PAYLOAD_FILE=tests/manual/tcspecial1"
+	@echo "Payload set: make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1"
 	@echo "Logging:     make runmocy RUST_LOG=debug"
 
 # Build the project
@@ -117,28 +122,28 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run -q --bin tcspecial -- $(PAYLOAD_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run -q --bin tcspecial -- $(TCSPECIAL_CONFIG_FILE).yaml \
 	)
 
-# Running tcsmoc on one spelling of its payload configuration file.
+# Running tcsmoc on one spelling of the tcspecial configuration.
 #
-# $(1) is that spelling -- yaml or xml. A payload configuration may be written
-# in either and they describe the same payloads, so which one a run reads is a
+# $(1) is that spelling -- yaml or xml. A configuration may be written in
+# either and they describe the same payloads, so which one a run reads is a
 # choice, and a run that always read the YAML could not exercise the other at
 # all.
 #
-# Only the suffix is given here. The stem comes from PAYLOAD_FILE, so a payload
-# set is still chosen the way every other target chooses it, and the simulator
-# file is untouched: it is tcssim's, and tcsmoc only passes it on.
+# Only the suffix is given here. The stem comes from TCSPECIAL_CONFIG_FILE, so
+# a payload set is still chosen the way every other target chooses it, and the
+# simulator file is untouched: it is tcssim's, and tcsmoc only passes it on.
 define runmoc_on
 	( \
 		set -eu; \
-		echo "Running $(MOC_NAME) on $(basename $(PAYLOAD_FILE)).$(1)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run -q --bin tcsmoc -- $(basename $(PAYLOAD_FILE).$(1)).$(1) \
+		echo "Running $(MOC_NAME) on $(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_CONFIG_FILE)sim.yaml cargo run -q --bin tcsmoc -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
 	)
 endef
 
-# Run the MOC application, on each spelling of the payload configuration.
+# Run the MOC application, on each spelling of the tcspecial configuration.
 #
 # One target per spelling rather than one target and a variable, so that a
 # spelling is asked for the way everything else here is asked for -- by name,
@@ -165,12 +170,12 @@ runmocx:
 define runverify_on
 	( \
 		set -eu; \
-		echo "Verifying $(basename $(PAYLOAD_FILE)).$(1)..."; \
-		cd $(RUST) && cargo run -q --bin tcsverify -- $(basename $(PAYLOAD_FILE).$(1)).$(1) $(PAYLOAD_FILE)sim.yaml \
+		echo "Verifying $(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
+		cd $(RUST) && cargo run -q --bin tcsverify -- $(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) $(TCSPECIAL_CONFIG_FILE)sim.yaml \
 	)
 endef
 
-# Verify a payload set, in each spelling of the payload configuration.
+# Verify a payload set, in each spelling of the tcspecial configuration.
 #
 # One target per spelling rather than one target and a variable, as with the
 # runmoc targets: a spelling is asked for by name, with nothing to remember
@@ -189,7 +194,7 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run -q --bin tcssim -- $(PAYLOAD_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_CONFIG_FILE)sim.yaml cargo run -q --bin tcssim -- $(TCSPECIAL_CONFIG_FILE).yaml \
 	)
 
 # Clean build artifacts
@@ -267,3 +272,7 @@ release: test
 	cd $(RUST) && cargo build --release
 	@echo "✓ Release binary: target/release/$(PROJECT_NAME)"
 
+# Generate HTML files
+.PHONY: docs
+docs:
+	make -C $(DOCS_DIR)

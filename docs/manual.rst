@@ -557,7 +557,8 @@ and ``tcspecial2.xml`` are one set written two ways, and a test holds the two
 to describing the same data handlers. The YAML is the one to read: it carries
 the comments. Which spelling a run reads is the last letter of the MOC's
 target, ``runmocy`` or ``runmocx``; every other target takes the file named in
-``PAYLOAD_FILE``. The simulator configurations are YAML alone: nothing asked
+``TCSPECIAL_CONFIG_FILE``. The simulator configurations are YAML alone:
+nothing asked
 for them in both spellings, and the pairing convention names them from the
 other file's stem.
 
@@ -791,10 +792,10 @@ so a program
 reading a different one would serve or simulate payloads the panels do not
 describe.
 
-``PAYLOAD_FILE`` is the set, named without a suffix:
-``$(PAYLOAD_FILE).yaml`` is the tcspecial configuration, which reaches every
-program as a command line argument, and ``$(PAYLOAD_FILE)sim.yaml`` the
-simulator configuration,
+``TCSPECIAL_CONFIG_FILE`` is the set, named without a suffix:
+``$(TCSPECIAL_CONFIG_FILE).yaml`` is the tcspecial configuration, which
+reaches every program as a command line argument, and
+``$(TCSPECIAL_CONFIG_FILE)sim.yaml`` the simulator configuration,
 which reaches tcssim through the environment -- and tcsmoc too, which it
 inherits the same way: tcsmoc acts on none of it, and reads it only so a panel
 can show what the tcssim it started is simulating. It defaults to
@@ -816,13 +817,14 @@ Everything at once
 .. code-block:: console
 
    $ make runmocy
-   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
-   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
-   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial4
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial4
 
 The last letter is the spelling of the tcspecial configuration it reads:
 ``runmocy`` the YAML and ``runmocx`` the XML. Both take the same
-``PAYLOAD_FILE``, and add the suffix themselves, so the two are one payload set
+``TCSPECIAL_CONFIG_FILE``, and add the suffix themselves, so the two are one
+payload set
 read two ways rather than two sets. The simulator configuration is not
 spelled by it: only tcssim reads that one, and tcsmoc merely passes it on.
 
@@ -850,9 +852,9 @@ disturbing the others, or watched with its own logging.
 
 .. code-block:: console
 
-   $ make run PAYLOAD_FILE=tests/manual/tcspecial1
-   $ make runsim PAYLOAD_FILE=tests/manual/tcspecial1
-   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runsim TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
 
 ``make run`` passes only the tcspecial configuration: tcspecial does not
 simulate anything. ``make runsim`` passes both, because tcssim run on its own
@@ -871,14 +873,14 @@ opening a socket or a device node:
 
    $ make runverifyy                       # reading the set's YAML
    $ make runverifyx                       # reading its XML
-   $ make runverifyy PAYLOAD_FILE=tests/manual/tcspecial4
+   $ make runverifyy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial4
 
 A good set prints nothing and the target succeeds. A bad one prints a line per
 problem and the target fails:
 
 .. code-block:: console
 
-   $ make runverifyy PAYLOAD_FILE=/tmp/draft
+   $ make runverifyy TCSPECIAL_CONFIG_FILE=/tmp/draft
    /tmp/draft.yaml:55: payload "udp-steady": packet_size must be greater than zero
    /tmp/draft.yaml:63: payload "random-device" is a device payload, so port does not apply to it
 

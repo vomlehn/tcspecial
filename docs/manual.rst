@@ -39,46 +39,44 @@ not a configuration file and is unaffected.)
 
 Which Files There Are
 =====================
-Three kinds of configuration file, each read by the programs that need it.
-There were four: an endpoint configuration file described the same payloads a
-payload file does, in other words, and is gone.
+Two configuration files, and neither of them has a name of its own. Any name
+will do so long as it ends in ``.yaml`` or ``.xml``, which is what says how to
+read it; the names used throughout this manual are the shipped examples' and
+are suggestions, nothing more.
 
-``tcspecial.yaml``
-    The command interpreter's own settings: the address and the two ports it
-    takes commands on, where beacons go and how often, and where the telemetry
-    log goes. A payload
-    set's ``tcspecial`` section states the beacon settings for that set and
-    wins over these. Read at startup by tcspecial, and by tcsmoc for the
-    beacon settings, both from the path ``TCSPECIAL_CONFIG_PATH`` names when
-    that is set. Nothing about the payloads is in it.
+the tcspecial configuration file
+    Everything tcspecial is configured with. Its ``tcspecial`` section is the
+    command interpreter's own settings -- the address and the two ports it
+    takes commands on, where beacons go and how often, and where the
+    telemetry log goes -- and its payload configuration section says which
+    data handlers there are, how tcspecial reaches each one and how large its
+    packets are. Named on the command line of every program that reads it,
+    which is tcspecial, tcsmoc, tcssim and tcsverify.
 
-a payload configuration file
-    Which data handlers exist, how tcspecial reaches each one, and how large
-    its packets are. Named on the command line of every program that reads it;
-    ``tests/manual/tcspecial1.yaml`` when nothing names one. Four sets are
-    shipped, ``tcspecial1`` to ``tcspecial4``, each in both formats; see
-    `The shipped payload sets`_.
+the simulator configuration file
+    How a simulated payload behaves: how often it produces a packet and how
+    it divides one into segments. Read only by tcssim, which takes it from
+    ``PAYLOAD_SIM_YAML``, and by tcsmoc, which shows it and acts on none of
+    it. There is nothing in it about the payloads themselves.
 
-a simulator configuration file
-    How a simulated payload behaves: how often it produces a packet and how it
-    divides one into segments. Read only by tcssim, which takes it from
-    ``PAYLOAD_SIM_YAML``. Named for the payload file it goes with:
-    ``tcspecial1sim.yaml`` beside ``tcspecial1.yaml``, both under
-    ``tests/manual``.
+A file is recognised by what is in it rather than by what it is called: a
+configuration with no ``payloads`` section describes no data handlers and is
+refused.
 
-Each of them may be written in YAML or XML, chosen from the extension. A
-payload file is recognised by its ``payloads`` section rather than by its name; a file
-that names no payloads is refused, and so is one written in the language that
-used to be the alternative -- groups of endpoints and the endpoints in them --
-which is gone.
+The command interpreter's own settings are in the one place with the payloads
+today only for the beacons. The ``tcspecial`` section is read for where
+beacons go and how often; the address, the two command ports and the log are
+read from the file ``TCSPECIAL_CONFIG_PATH`` names, which states those same
+attributes at its top level. The section is checked wherever it appears, so
+one that could never place a command interpreter is refused where it is read
+rather than carried.
 
-Payload Configuration Files
-===========================
-A payload configuration has a version, a description, an optional section
-saying what tcspecial is configured with for this set, an optional section of
-groups, and the data handlers themselves. A handler takes every attribute it
-does not state from the group it names, so a group holds what several handlers
-share.
+The Payload Configuration
+=========================
+The payloads are a section of the tcspecial configuration file: a version, a
+description, the ``tcspecial`` section, an optional section of groups, and the
+data handlers themselves. A handler takes every attribute it does not state
+from the group it names, so a group holds what several handlers share.
 
 .. code-block:: text
 
@@ -86,7 +84,7 @@ share.
    description    free text
 
    tcspecial                       optional
-     ...          the same attributes a tcspecial.yaml holds, of which
+     ...          the command interpreter's own settings, of which
                   beacon_address is read
 
    payload_groups                  optional
@@ -99,25 +97,28 @@ share.
      group        the group to take unstated attributes from, if any
      ...          any of the attributes below
 
-The shipped sets each carry a ``tcspecial`` section, first in the file, so one
-file says what the set is and where its command interpreter belongs.
-``beacon_address`` is read from it, since where a set's beacons go is the set's
-own business; the rest is not yet, tcspecial being placed by the file
-``TCSPECIAL_CONFIG_PATH`` names. It is all checked when the file is loaded --
-a section that could never place a command interpreter is refused where the
-file is read.
+The shipped examples each carry a ``tcspecial`` section, first in the file, so
+one file says what the set is and where its command interpreter belongs.
+``beacon_address`` is read from it, since where a set's beacons go is the
+set's own business; the rest is not read yet, tcspecial being placed by the
+file ``TCSPECIAL_CONFIG_PATH`` names. It is all checked when the file is
+loaded -- a section that could never place a command interpreter is refused
+where it is read.
 
-**Attributes**
+What follows is the attributes every payload has, whatever it is, and then one
+section per kind of payload for the attributes only that kind has. A payload
+states its kind in ``type`` and is then held to that kind's attributes and no
+others: a device stating a ``port``, or a network payload stating a ``path``,
+is refused.
 
+Attributes Every Payload Has
+----------------------------
 .. code-block:: text
 
-   type           network | device
-   protocol       tcp | udp | unix_stream | unix_dgram     network only
-   address        the host a network handler reaches, or the path of a
-                  Unix-domain socket
-   port           the port a network handler reaches; none for a Unix socket,
-                  which is named by its path alone
-   path           the device a device handler opens
+   dh_id          the handler's number, which commands name it by
+   name           the handler's name, which the panels show
+   group          the group to take unstated attributes from, if any
+   type           network | device | serial | i2c | spi
    packet_size    bytes in one packet
    oc_address     the host this handler exchanges payload data with the
                   OC on, which is always UDP
@@ -141,22 +142,23 @@ decides where its timing is written down.
 
 **periodic** -- the payload sends and tcspecial reads. Nothing here says when:
 how fast a simulated one produces data is a property of the simulation, so the
-intervals are in the simulator file. A periodic payload takes no ``trigger``
-and no ``packet_interval_ms`` here.
+intervals are in the simulator configuration. A periodic payload takes no
+``trigger`` and no ``packet_interval_ms`` here.
 
 **triggered** -- tcspecial sends a request and the payload answers. Both the
 request and how often it goes out are here, because tcspecial does the sending
 and what to send comes from the payload's interface document. Its entry in the
-simulator file states no interval at all, packet or segment, and takes none
-from the group it names: such a payload sends when it is asked, so a rate
-there would govern nothing. A group's settings reach a payload exactly as its
-own do, so an inherited interval is refused as a stated one is -- a triggered
-payload may share a group for the settings it can use, but not one that states
-a rate.
+simulator configuration states no interval at all, packet or segment, and
+takes none from the group it names: such a payload sends when it is asked, so
+a rate there would govern nothing. A group's settings reach a payload exactly
+as its own do, so an inherited interval is refused as a stated one is -- a
+triggered payload may share a group for the settings it can use, but not one
+that states a rate.
 
-The interval is ``packet_interval_ms`` in whichever file states it -- one name,
-in the file the payload's kind puts it in. It was ``trigger_interval_ms`` here;
-a file still using that name is told the name it has now.
+The interval is ``packet_interval_ms`` in whichever configuration states it --
+one name, in the place the payload's kind puts it. It was
+``trigger_interval_ms`` here; a file still using that name is told the name it
+has now.
 
 **The trigger itself** is bytes, not text, since an interface document asks
 for what it asks for. A series of bytes is written in hexadecimal after
@@ -183,8 +185,8 @@ format hands the same string over whichever way it was written, so a quoted
 
 An escape C does not have is refused rather than passed through, and a trigger
 of no bytes at all is refused: a payload that answers requests has to be asked
-something. Writing the escapes yourself is also how an XML payload file states
-a trigger that a YAML one states with the format's own escapes.
+something. Writing the escapes yourself is also how an XML configuration
+states a trigger that a YAML one states with the format's own escapes.
 
 .. code-block:: yaml
 
@@ -227,23 +229,184 @@ payload does not do.
 
 Tcspecial counts the triggers it sends apart from the data it carries, which
 ``QUERY_DH`` reports: a handler whose triggers climb while nothing arrives is
-one whose payload is not answering.
+one whose payload is not answering. The triggers that would not go are counted
+apart again, since a payload that has gone away and a handler that has stopped
+asking are different things -- and a handler goes on asking through either.
 
-A serial line, an I\ :superscript:`2`\ C bus or a SPI peripheral has terms of
-its own beyond these -- a data rate, an address on a bus, the shape of a clock
--- which the payload states beside the rest; see `Payloads on a Link`_.
+A Network Payload
+-----------------
+``type: network``. A socket, which the transport decides the shape of.
 
-**What the file will not let pass**
+.. code-block:: text
 
+   protocol       tcp | udp | unix_stream | unix_dgram
+   address        the host this payload is reached at, or the path of a
+                  Unix-domain socket
+   port           the port it is reached at; none for a Unix socket, which is
+                  named by its path alone
+
+Which end waits and which reaches out follows from the transport, and so does
+whether a handler can trigger the payload at all: a stream is connected, so
+the handler reaches out and may ask the payload for data, while a datagram
+handler waits to be spoken to and learns where its payload is from the first
+packet that arrives.
+
+A Device Payload
+----------------
+``type: device``. A file in the filesystem, opened and read as the data comes.
+
+.. code-block:: text
+
+   path           the device the handler opens
+
+Nothing else: a plain device has no terms to be set and no address to be
+reached at. A device cannot be triggered -- tcspecial opens it and reads it,
+and there is nothing to write a request to.
+
+Three other kinds are reached through a device file too and are not devices in
+this sense: a serial line, a bus and a SPI peripheral each have terms of their
+own, which is why each has a kind of its own below.
+
+A Serial Payload
+----------------
+``type: serial``. A line, with terms that say how it is driven. A payload
+states them beside everything else it states, or takes them from its
+``payload_groups`` group the way it takes the rest.
+
+.. code-block:: text
+
+   path           the serial port
+
+   asynchronous   true | false -- true for a start-stop line, false for a
+                  synchronous one, whose bits are carried on a clock
+   datarate       bits per second
+   byte_length    5 | 6 | 7 | 8
+   stream         where a read ends; see below
+
+   stop_bits      1 | 1.5 | 2 -- asynchronous lines only, and required for
+                  them; a synchronous line has no stop bits to state, a stop
+                  bit being what start-stop framing uses in place of a clock
+   parity         asynchronous: none | even | odd | mark | space, default
+                  none. synchronous: the frame check -- none | crc16_pr0 |
+                  crc16_pr1 | crc16_pr0_ccitt | crc16_pr1_ccitt |
+                  crc32_pr0_ccitt | crc32_pr1_ccitt, default none
+   clock_type     external | internal | tx_internal | tx_from_rx --
+                  synchronous lines only, and required for them
+   encoding       nrz | nrzi | fm_mark | fm_space | manchester, default nrz --
+                  synchronous lines only
+   loopback       true | false, default false -- synchronous lines only
+
+What each kind of line may say is what the Linux driver for such a line can be
+told, and nothing else: termios sets a parity per character on a start-stop
+line, and the kernel's generic HDLC takes a clock, a coding, a frame check and
+a loopback for a synchronous one. A payload stating the other kind's
+attributes is refused.
+
+Both kinds write the frame check as ``parity``, which is what Linux calls both
+of them; the values say which is meant.
+
+Two things are worth knowing before setting a parity. A line is read back
+after it is set, and a parity the port did not take is an error rather than a
+handler quietly checking nothing. And a simulated line is a pseudo-terminal,
+which will not take a parity at all -- it rejects ``even`` outright and drops
+the others silently -- so a payload meant to be run against tcssim states
+``parity: none``, which is what a payload link commonly runs anyway.
+
+A synchronous line's attributes are recorded rather than applied: the kernel
+drives such a line through a network interface of its own rather than through
+the terms of a device file, so a handler that opens a path cannot set them.
+They are kept so that the link a file describes can be checked against the
+equipment, as an I\ :superscript:`2`\ C payload's bus speed is.
+
+**A stream section**
+
+Where one read of the line ends.
+
+.. code-block:: text
+
+   max_length     the longest payload one read may deliver; always required
+   timeout        how long a read waits, or the word none for a read that
+                  does not time out
+   terminators    bytes that each end a read, as a sequence or a delimited
+                  string. Also spelled terminator
+
+A file gives a timeout, terminators, or both. One that gives neither is
+refused, because it would describe a read with no way to end but filling the
+buffer -- which is a real intent, but one a file states by giving
+``timeout: none``.
+
+Only a line takes a stream section. A master on a bus clocks exactly as many
+bytes as it asks for, so a transfer is already bounded and needs no rule for
+where a read ends; a network payload's datagram is already a frame.
+
+``tests/manual/tcspecial4.yaml`` is a worked example of a line, with its
+group, its terms and its stream rule, and ``tcspecial4.xml`` is the same set
+in the other format.
+
+An I\ :superscript:`2`\ C Payload
+---------------------------------
+``type: i2c``. A device on a bus, which is why it gives two things to be found
+by: the bus and the address on it. Two payloads commonly sit on the same bus
+and differ only in which device the master addresses.
+
+.. code-block:: text
+
+   path           the bus
+   address        the address of the device on it
+
+   ten_bit        true | false, ten address bits rather than seven
+   pec            true | false, an SMBus packet error check on each transfer
+   retries        how many times the master tries a transfer
+   timeout        a whole number with a unit: 50ms, 2s. Rounded up to a
+                  multiple of 10 ms by the kernel
+   bus_speed      recorded, not applied: the bus clock belongs to the
+                  controller and is set by the platform
+
+With seven-bit addressing the usable addresses are 0x08 through 0x77: the
+specification reserves 0x00 through 0x07 and 0x78 through 0x7F, so no device
+can answer to one of those. With ten-bit addressing the whole range 0x000
+through 0x3FF is usable.
+
+There is no parity or byte length. I\ :superscript:`2`\ C fixes the framing at
+eight data bits, most significant first, followed by an acknowledge bit.
+
+Such a payload cannot be triggered by a simulated stand-in: the master's own
+read is the request, and a second master on the bus cannot see it.
+
+A SPI Payload
+-------------
+``type: spi``. A peripheral on a clocked, full-duplex link.
+
+.. code-block:: text
+
+   path           the device node, which names the bus and the chip select
+                  together
+
+   max_speed      the greatest clock rate the peripheral accepts, in Hz
+   spi_mode       0 | 1 | 2 | 3, the clock polarity and phase. Named so
+                  because a payload's own mode says whether it sends of
+                  its own accord or on a trigger
+   bits_per_word  commonly 8, though a controller may support other widths
+   bit_order      msb | lsb
+   cs_active      low | high
+
+The mode must match the peripheral; a mismatch fails the way a wrong data rate
+fails on a serial line.
+
+There is no parity and there are no stop bits. SPI is clocked and full duplex,
+and a transfer is delimited by the chip select rather than by framing bits.
+
+What the Configuration Will Not Let Pass
+----------------------------------------
 These mistakes are refused rather than ignored, because each of them
 otherwise produces a payload that looks configured and is not:
 
-* A **repeated name or ``dh_id``** within the file. Both pick out one
-  payload: tcspecial keeps its handlers by id, so a repeated id has one
-  silently replace the other, and a simulator configuration is joined to this
-  file by name, so a repeated name has one entry drive two payloads. The rule
-  reaches no further than the file -- two payload sets may name their payloads
-  and their groups alike, and the shipped sets do.
+* A **repeated name or ``dh_id``**. Both pick out one payload: tcspecial keeps
+  its handlers by id, so a repeated id has one silently replace the other, and
+  a simulator configuration is joined to the payloads by name, so a repeated
+  name has one entry drive two payloads. The rule reaches no further than the
+  file -- two sets may name their payloads and their groups alike, and the
+  shipped examples do.
 * An **attribute of another kind** -- a device payload stating ``protocol``,
   ``address`` or ``port``, or a network payload stating ``path``. The check is
   made after the group has been laid under the payload, since an attribute
@@ -257,13 +420,14 @@ otherwise produces a payload that looks configured and is not:
 * A **misspelled section**, for the same reason: ``payload`` is not
   ``payloads``, and a file whose only section is misspelled describes no
   payloads at all.
-* A **packet interval**. How fast a payload sends is a property of the
-  simulation, so the interval belongs in the simulator configuration file and
-  the error says so. This was ignored for a while, which was the same silence
-  the two modes exist to prevent -- a file stating an interval has said
-  something about the payload's timing, and reading it as though it had not is
-  reading a different file than the one that was written. An interval a
-  payload takes from its group is refused as one it states itself is.
+* A **packet interval** on a periodic payload. How fast a payload sends is a
+  property of the simulation, so the interval belongs in the simulator
+  configuration and the error says so. This was ignored for a while, which was
+  the same silence the two modes exist to prevent -- a file stating an
+  interval has said something about the payload's timing, and reading it as
+  though it had not is reading a different file than the one that was written.
+  An interval a payload takes from its group is refused as one it states
+  itself is.
 * **Two payloads wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
@@ -277,10 +441,13 @@ otherwise produces a payload that looks configured and is not:
 The rule is over the handlers a file produced rather than the words that
 produced them, so it applies to every kind of payload alike.
 
-This is the shipped ``tcspecial1.yaml``. ``udp-steady`` and ``udp-fast`` are
-reached the same way, so what they share is a group; ``tcp-stream`` and
-``random-device`` share nothing and state everything for themselves. Each is
-named for what it is, which is what a panel in the MOC shows.
+An Example
+----------
+This is the shipped ``tcspecial1.yaml``, without its ``tcspecial`` section.
+``udp-steady`` and ``udp-fast`` are reached the same way, so what they share is
+a group; ``tcp-stream`` and ``random-device`` share nothing and state
+everything for themselves. Each is named for what it is, which is what a panel
+in the MOC shows.
 
 .. code-block:: yaml
 
@@ -328,6 +495,19 @@ named for what it is, which is what a panel in the MOC shows.
        port: 5003
        packet_size: 15
 
+Not Yet Read
+------------
+These have been described for this project and are not yet accepted by any
+parser. A file giving one is refused rather than quietly running without it.
+
+.. code-block:: text
+
+   length-prefixed framing a read whose length is in its first one or two
+                           bytes
+   max_interbyte_interval  a read ended by a gap between bytes
+   bidirectional           whether a handler carries data both ways; every
+                           handler does at present
+
 Starting and stopping a payload
 ===============================
 In tcsmoc each panel has a button per command: ``Enable`` sends START_DH and
@@ -350,11 +530,11 @@ what the spacecraft says to the command is the thing worth finding out.
 Seeing what was read
 ====================
 Each payload's panel has a button for it: ``Config`` in tcsmoc, where three
-buttons share the row, and ``Configuration`` in tcssim. It shows
-every parameter read from the two configuration files for that payload: what
-the payload file said about the payload and how it is reached, and what the
-simulator file said about how a stand-in for it behaves, each under the name
-of the file it came from.
+buttons share the row, and ``Configuration`` in tcssim. It shows every
+parameter read for that payload: what the tcspecial configuration said about
+the payload and how it is reached, and what the simulator configuration said
+about how a stand-in for it behaves, each under the name of the file it came
+from.
 
 It shows nothing but what the files said. What a payload has actually done is
 on the panel itself, and only the attributes of that payload's own kind appear
@@ -364,23 +544,26 @@ program will use instead rather than passing it off as a statement: a handler
 with no OC address is shown as one that cannot be started.
 
 In tcsmoc the simulator half is shown when that file can be read. The MOC
-simulates nothing, so a simulator file that is missing or written for a
-different payload file costs it that half and nothing else; the panel says so
-in place of the settings.
+simulates nothing, so a simulator configuration that is missing or written for
+different payloads costs it that half and nothing else; the panel says so in
+place of the settings.
 
-The shipped payload sets
-========================
-Each is a pair: the payload file and the simulator file beside it, named for
-it. A set added by that convention needs no change anywhere to be run.
+The shipped examples
+====================
+Four payload sets are shipped under ``tests/manual``, each a pair: a tcspecial
+configuration and the simulator configuration beside it, named for it. The
+pairing is a convention of these files and not a rule -- a name only has to
+end in ``.yaml`` or ``.xml`` -- but a set added that way needs no change
+anywhere to be run.
 
-Each payload file is shipped in both formats -- ``tcspecial2.yaml`` and
-``tcspecial2.xml`` are one set written two ways, and a test holds the two to
-describing the same data handlers. The YAML is the one to read: it carries the
-comments. Which spelling a run reads is the last letter of the MOC's target,
-``runmocy`` or ``runmocx``; every other target takes the file named in
-``PAYLOAD_FILE``. The simulator files are YAML alone: nothing asked for them in
-both spellings, and the pairing convention names them from the payload file's
-stem.
+Each tcspecial configuration is shipped in both formats -- ``tcspecial2.yaml``
+and ``tcspecial2.xml`` are one set written two ways, and a test holds the two
+to describing the same data handlers. The YAML is the one to read: it carries
+the comments. Which spelling a run reads is the last letter of the MOC's
+target, ``runmocy`` or ``runmocx``; every other target takes the file named in
+``PAYLOAD_FILE``. The simulator configurations are YAML alone: nothing asked
+for them in both spellings, and the pairing convention names them from the
+other file's stem.
 
 ``tcspecial1.yaml``
   Four payloads of three kinds, which is what exercises the panels and the
@@ -393,8 +576,8 @@ stem.
 ``tcspecial3.yaml``
   One payload, reached over a stream. It differs from set 2's first payload
   only in the transport, which is what makes it the set to debug a single link
-  against -- and what the kind and transport in a simulator file are there to
-  tell apart.
+  against -- and what the kind and transport in a simulator configuration are
+  there to tell apart.
 
 ``tcspecial4.yaml``
   One payload on a serial line, which is the set that exercises a link's own
@@ -402,8 +585,8 @@ stem.
   a pty and makes the device the file names a link to it while the payload
   runs.
 
-Simulator Configuration Files
-=============================
+The Simulator Configuration
+===========================
 What simulating a payload takes, which is not a property of the payload: how
 often it produces a packet, and how it divides one into segments. Only tcssim
 acts on it; tcsmoc reads it too, to show what the tcssim it started is
@@ -417,7 +600,8 @@ simulating, and does without it if it is not there.
 
    simulated_payloads
      name                 the payload this one stands in for
-     type                 the kind of payload it is, as the payload file says
+     type                 the kind of payload it is, as the tcspecial
+                          configuration says
      protocol             which transport, for a network payload
      payload_address      the socket the payload answers from, if this file
                           cares to say
@@ -429,18 +613,19 @@ simulating, and does without it if it is not there.
 
 Two of the attributes describe the payload rather than the simulation, and are
 required for that reason. The two files are joined by handler name and by
-nothing else -- and a name is what a payload set copied from another one keeps
--- so a simulator file written for one set parses happily against another
-set's payload file, and the run that follows looks like a payload that never
+nothing else -- and a name is what a set copied from another one keeps -- so a
+simulator configuration written for one set parses happily against another
+set's payloads, and the run that follows looks like a payload that never
 sends. Stating the kind here makes that pairing an error instead.
 
 .. code-block:: text
 
    type                   the kind of payload this stands in for, in the
-                          payload file's own word: network, device, serial,
-                          i2c, or spi. Must be what the payload file says
+                          tcspecial configuration's own word: network,
+                          device, serial, i2c, or spi. Must be what that
+                          configuration says
    protocol               which transport, for a network payload, and refused
-                          for any other kind. Must be what the payload file
+                          for any other kind. Must be what that configuration
                           says
    payload_address        the socket the simulated payload answers from: a
                           host for a UDP payload, a path for a Unix datagram
@@ -449,9 +634,9 @@ sends. Stating the kind here makes that pairing an error instead.
                           a Unix datagram payload, which answers from a path
 
 Where the payload *is* is not stated here at all: the simulator takes it from
-the payload file, which decides it. Writing ``address`` or ``port`` here is
-refused with the file they belong in -- they are the likeliest thing to be
-carried across from the payload file beside this one.
+the tcspecial configuration, which decides it. Writing ``address`` or ``port``
+here is refused with the place they belong -- they are the likeliest thing to
+be carried across from the other file.
 
 What this file may say about an address is the other end of the same link: the
 socket the simulated payload answers from.
@@ -470,11 +655,12 @@ Nothing in the link needs it -- a handler learns where its payload is from the
 first packet it gets -- but something outside the simulation may: a rule on a
 firewall, or a capture being read afterwards. Only a datagram payload has an
 address of its own to bind; a stream payload is the end that waits, so it
-binds the address the payload file gives it. A Unix datagram payload answers
-from a path, so it takes an address and no port. Neither end may be the other:
-a payload told to bind its handler's own socket is refused rather than left to
-fail at the bind. Stating neither gets what every simulator file asked for
-before this existed -- any interface and a port the system chooses.
+binds the address the tcspecial configuration gives it. A Unix datagram
+payload answers from a path, so it takes an address and no port. Neither end
+may be the other: a payload told to bind its handler's own socket is refused
+rather than left to fail at the bind. Stating neither gets what every
+simulator configuration asked for before this existed -- any interface and a
+port the system chooses.
 
 A word that is not a setting is refused here too -- in a payload, in a group,
 and in the file's own sections. A misspelled setting that was ignored would
@@ -482,11 +668,11 @@ have the simulator do something other than what the file asked for and say
 nothing: a payload asked through a misspelling to drop a tenth of its packets
 drops none, and looks exactly like one that was never asked.
 
-Neither is taken from this file: the payload file decides both, and a
-disagreement about either is an error naming the payload and what each file
-says of it. A group may carry them, like any other setting -- though payloads
-that share a rate need not share a transport, which is why the shipped
-``tcspecial1sim.yaml`` leaves them with the payloads.
+Neither the kind nor the transport is taken from this file: the tcspecial
+configuration decides both, and a disagreement about either is an error naming
+the payload and what each file says of it. A group may carry them, like any
+other setting -- though payloads that share a rate need not share a transport,
+which is why the shipped ``tcspecial1sim.yaml`` leaves them with the payloads.
 
 **Settings**
 
@@ -499,7 +685,7 @@ that share a rate need not share a transport, which is why the shipped
    segment_interval_ms    milliseconds between the segments of one packet;
                           defaults to the packet interval
    segment_size           bytes in one segment; defaults to the whole packet,
-                          whose size the payload file gives
+                          whose size the tcspecial configuration gives
 
 **Fault injection**
 
@@ -538,10 +724,10 @@ configuration written before these existed asks for.
 The percentages are nought to a hundred; a larger number is an error naming
 the setting and the value. A fault the payload could not have is an error too:
 ``close_after`` for anything but a stream, and ``ignore_trigger_percent`` for a
-payload that sends on its own. Faults belong in this file alone -- a payload
-configuration file describes what a payload is meant to do, and tcspecial reads
-it. A payload that starts with any fault set says so in one line of log, so a
-run is not left to be guessed at afterwards.
+payload that sends on its own. Faults belong in this file alone -- the
+tcspecial configuration describes what a payload is meant to do, and tcspecial
+reads it. A payload that starts with any fault set says so in one line of log,
+so a run is not left to be guessed at afterwards.
 
 .. code-block:: yaml
 
@@ -553,10 +739,10 @@ run is not left to be guessed at afterwards.
        drop_percent: 10        # one packet in ten never arrives
        jitter_ms: 50           # and the rest are up to 50ms late
 
-The two files are joined by name. Every data handler of the payload file needs
-a simulated payload naming it, and a name here that no handler has is an error
-rather than a line with no effect, because a typo is otherwise
-indistinguishable from a payload meant to be left out.
+The two files are joined by name. Every data handler needs a simulated payload
+naming it, and a name here that no handler has is an error rather than a line
+with no effect, because a typo is otherwise indistinguishable from a payload
+meant to be left out.
 
 A simulated triggered payload sends one packet for each request it is sent and
 nothing otherwise. The segment settings still apply to it -- how a payload
@@ -600,159 +786,19 @@ This is the shipped ``tcspecial1sim.yaml``.
        protocol: udp
        packet_interval_ms: 500
 
-Payloads on a Link
-==================
-Three kinds of payload are on a link of their own -- ``serial``, ``i2c`` and
-``spi`` -- and each has terms that say how the link is driven. A payload
-states them beside everything else it states, or takes them from its
-``payload_groups`` group the way it takes the rest.
-
-These used to be a second kind of file: an endpoint configuration, which
-described groups of endpoints and the endpoints in them. It is gone, and a
-payload states what an endpoint and its group stated between them.
-
-**What locates a payload on a link**
-
-.. code-block:: text
-
-   path           a serial port or a SPI device node
-   path, address  a bus and the address of a device on it, for I2C
-
-**A serial payload**
-
-.. code-block:: text
-
-   asynchronous   true | false -- true for a start-stop line, false for a
-                  synchronous one, whose bits are carried on a clock
-   datarate       bits per second
-   byte_length    5 | 6 | 7 | 8
-   stream         where a read ends; see below
-
-   stop_bits      1 | 1.5 | 2 -- asynchronous lines only, and required for
-                  them; a synchronous line has no stop bits to state, a stop
-                  bit being what start-stop framing uses in place of a clock
-   parity         asynchronous: none | even | odd | mark | space, default
-                  none. synchronous: the frame check -- none | crc16_pr0 |
-                  crc16_pr1 | crc16_pr0_ccitt | crc16_pr1_ccitt |
-                  crc32_pr0_ccitt | crc32_pr1_ccitt, default none
-   clock_type     external | internal | tx_internal | tx_from_rx --
-                  synchronous lines only, and required for them
-   encoding       nrz | nrzi | fm_mark | fm_space | manchester, default nrz --
-                  synchronous lines only
-   loopback       true | false, default false -- synchronous lines only
-
-What each kind of line may say is what the Linux driver for such a line can be
-told, and nothing else: termios sets a parity per character on a start-stop
-line, and the kernel's generic HDLC takes a clock, a coding, a frame check and
-a loopback for a synchronous one. A payload stating the other kind's
-attributes is refused.
-
-Both kinds write the frame check as ``parity``, which is what Linux calls both
-of them; the values say which is meant.
-
-Two things are worth knowing before setting a parity. A line is read back
-after it is set, and a parity the port did not take is an error rather than a
-handler quietly checking nothing. And a simulated line is a pseudo-terminal,
-which will not take a parity at all -- it rejects ``even`` outright and drops
-the others silently -- so a set meant to be run against tcssim states
-``parity: none``, which is what a payload link commonly runs anyway.
-
-A synchronous line's attributes are recorded rather than applied: the kernel
-drives such a line through a network interface of its own rather than through
-the terms of a device file, so a handler that opens a path cannot set them.
-They are kept so that the link a file describes can be checked against the
-equipment, as an I\ :superscript:`2`\ C payload's bus speed is.
-
-**An I**\ :superscript:`2`\ **C payload**
-
-.. code-block:: text
-
-   ten_bit        true | false, ten address bits rather than seven
-   pec            true | false, an SMBus packet error check on each transfer
-   retries        how many times the master tries a transfer
-   timeout        a whole number with a unit: 50ms, 2s. Rounded up to a
-                  multiple of 10 ms by the kernel
-   bus_speed      recorded, not applied: the bus clock belongs to the
-                  controller and is set by the platform
-
-A payload on a bus gives both the bus device and the address on it, because
-two payloads commonly sit on the same bus and differ only in which device the
-master addresses. With seven-bit addressing the
-usable addresses are 0x08 through 0x77: the specification reserves 0x00
-through 0x07 and 0x78 through 0x7F, so no device can answer to one of those.
-With ten-bit addressing the whole range 0x000 through 0x3FF is usable.
-
-There is no parity or byte length. I\ :superscript:`2`\ C fixes the framing at
-eight data bits, most significant first, followed by an acknowledge bit.
-
-**A SPI payload**
-
-.. code-block:: text
-
-   max_speed      the greatest clock rate the peripheral accepts, in Hz
-   spi_mode       0 | 1 | 2 | 3, the clock polarity and phase. Named so
-                  because a payload's own mode says whether it sends of
-                  its own accord or on a trigger
-   bits_per_word  commonly 8, though a controller may support other widths
-   bit_order      msb | lsb
-   cs_active      low | high
-
-The mode must match the peripheral; a mismatch fails the way a wrong data rate
-fails on a serial line. A SPI payload gives the device node alone, which names
-the bus and the chip select together.
-
-There is no parity and there are no stop bits. SPI is clocked and full duplex,
-and a transfer is delimited by the chip select rather than by framing bits.
-
-**A stream section**
-
-Where one read of a stream payload ends, for the kinds that are streams.
-
-.. code-block:: text
-
-   max_length     the longest payload one read may deliver; always required
-   timeout        how long a read waits, or the word none for a read that
-                  does not time out
-   terminators    bytes that each end a read, as a sequence or a delimited
-                  string. Also spelled terminator
-
-A file gives a timeout, terminators, or both. One that gives neither is
-refused, because it would describe a read with no way to end but filling the
-buffer -- which is a real intent, but one a file states by giving
-``timeout: none``.
-
-Only a line takes a stream section. A master on a bus clocks exactly as many
-bytes as it asks for, so a transfer is already bounded and needs no rule for
-where a read ends; a network payload's datagram is already a frame.
-
-``tests/manual/tcspecial4.yaml`` is a worked example of a line, with its
-group, its terms and its stream rule, and ``tcspecial4.xml`` is the same set
-in the other format.
-
-Not Yet Read
-------------
-These have been described for this project and are not yet accepted by any
-parser. A file giving one is refused rather than quietly running without it.
-
-.. code-block:: text
-
-   length-prefixed framing a read whose length is in its first one or two
-                           bytes
-   max_interbyte_interval  a read ended by a gap between bytes
-   bidirectional           whether a handler carries data both ways; every
-                           handler does at present
-
 Running the Programs
 ====================
 The Makefile names a payload set once and gives it to every program that needs
-it, which is the point: tcsmoc builds its panels from the payload file and
-hands that same file to the tcspecial and tcssim it starts, so a program
+it, which is the point: tcsmoc builds its panels from the tcspecial
+configuration and hands that same file to the tcspecial and tcssim it starts,
+so a program
 reading a different one would serve or simulate payloads the panels do not
 describe.
 
 ``PAYLOAD_FILE`` is the set, named without a suffix:
-``$(PAYLOAD_FILE).yaml`` is the payload file, which reaches every program as a
-command line argument, and ``$(PAYLOAD_FILE)sim.yaml`` the simulator file,
+``$(PAYLOAD_FILE).yaml`` is the tcspecial configuration, which reaches every
+program as a command line argument, and ``$(PAYLOAD_FILE)sim.yaml`` the
+simulator configuration,
 which reaches tcssim through the environment -- and tcsmoc too, which it
 inherits the same way: tcsmoc acts on none of it, and reads it only so a panel
 can show what the tcssim it started is simulating. It defaults to
@@ -778,25 +824,24 @@ Everything at once
    $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
    $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial4
 
-The last letter is the spelling of the payload configuration file it reads:
+The last letter is the spelling of the tcspecial configuration it reads:
 ``runmocy`` the YAML and ``runmocx`` the XML. Both take the same
 ``PAYLOAD_FILE``, and add the suffix themselves, so the two are one payload set
-read two ways rather than two sets. The simulator file
-is not spelled by it: only tcssim reads that one, and tcsmoc merely passes it
-on.
+read two ways rather than two sets. The simulator configuration is not
+spelled by it: only tcssim reads that one, and tcsmoc merely passes it on.
 
-Both files are named because tcsmoc passes the payload file on to its children
-and never reads the simulator file, which reaches tcssim by being in tcsmoc's
-environment. Naming only one of a pair is how the two files come to describe
-different sets, which is reported rather than run: every data handler of the
-payload file must have a simulated payload naming it.
+Both files are named because tcsmoc passes the tcspecial configuration on to
+its children and never reads the simulator configuration, which reaches tcssim
+by being in tcsmoc's environment. Naming only one of a pair is how the two
+files come to describe different sets, which is reported rather than run:
+every data handler must have a simulated payload naming it.
 
 If a tcspecial is already running, tcsmoc attaches to it instead of starting a
 second -- it asks by PING -- and leaves it running when the window is closed.
 One it starts itself is started on the address it will send commands to, so
 that half of the question never arises.
 Starting a second never worked: the command interpreter's address can be bound
-once. What it is serving, though, is the payload file it was started with: one
+once. What it is serving, though, is the configuration it was started with: one
 left over from an earlier payload set goes on serving that set's handlers,
 and a payload the new file plainly contains is then answered ``NotFound``.
 Stopping it and letting tcsmoc start a fresh one is the fix; tcspecial's log
@@ -813,9 +858,10 @@ disturbing the others, or watched with its own logging.
    $ make runsim PAYLOAD_FILE=tests/manual/tcspecial1
    $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
 
-``make run`` passes only the payload file: tcspecial does not simulate
-anything. ``make runsim`` passes both, because tcssim run on its own needs the
-payload file as well as the simulator file -- and one variable names both, so
+``make run`` passes only the tcspecial configuration: tcspecial does not
+simulate anything. ``make runsim`` passes both, because tcssim run on its own
+needs the payloads as well as the simulator configuration -- and one variable
+names both, so
 they cannot be given for different sets.
 Started in that order, tcsmoc finds the tcspecial already running and attaches
 to it.
@@ -852,12 +898,14 @@ page of them would mostly be consequences of the first few.
 
 Both files of the set are checked, and the second against the first: every
 payload simulated, every simulated payload a payload, and every setting one
-that payload can have. A payload file with problems of its own is not joined
+that payload can have. A tcspecial configuration with problems of its own is
+not joined
 to -- there would be nothing to join to, and a join against half of a set
 reports the other half as unsimulated -- and tcsverify says so rather than
 leaving it unsaid.
 
-Without the Makefile it takes one file or two, the payload file first:
+Without the Makefile it takes one file or two, the tcspecial configuration
+first:
 
 .. code-block:: console
 
@@ -878,14 +926,15 @@ What the programs take without the Makefile
    $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
        cargo run --bin tcsmoc -- tests/manual/tcspecial1.yaml
 
-An argument naming the payload file beats any environment variable naming one.
+An argument naming the configuration file beats any environment variable
+naming one.
 Failing an argument, tcspecial reads ``PAYLOAD_CONFIG_PATH`` and tcssim reads
 ``SIM_PAYLOAD_CONFIG_PATH``; failing that, every program reads
 ``tcspecial1.yaml``. Tcsmoc has no variable of its own, because the programs it
 starts inherit its environment: a variable naming tcsmoc's file would name
 theirs as well.
 
-The payload file is the only argument tcspecial takes. Where it serves
+The configuration file is the only argument tcspecial takes. Where it serves
 commands is in ``tcspecial.yaml``:
 
 .. code-block:: yaml
@@ -947,7 +996,7 @@ All three are required of every command interpreter configuration, with no
 defaults: beacons are how the ground knows the spacecraft is alive, and a
 configuration that has not been asked where to send them has not answered.
 ``tcspecial.yaml`` states them too, and a set's section wins over it; the
-file's are what place a set whose payload file states no section at all.
+file's are what place a set whose configuration states no section at all.
 
 The address is a **multicast group** -- in ``224.0.0.0/4``, and
 ``239.0.0.0/8`` for one of local scope, which is what a mission network wants.
@@ -1139,7 +1188,7 @@ payload that is not transmitting therefore says this once and then nothing.
 
 ``NotFound`` there is worth knowing: the panel shows zeroes either way, but it
 means the tcspecial being talked to has no such handler, which usually means it
-was started from a different payload file -- most often one left running from
+was started from a different configuration -- most often one left running from
 an earlier payload set, which tcsmoc attaches to rather than replacing. The
 trigger count is the one number that says the asking is happening at all; it
 appears in no other counter, because a trigger is a write with no read behind
@@ -1266,12 +1315,12 @@ how the payload is reached
   of the link.
 
 ``Pkt`` and ``Seg``
-  The packet size, from the payload file, and the segment size, from the
-  simulator file.
+  The packet size, from the tcspecial configuration, and the segment size,
+  from the simulator configuration.
 
 ``Pkt Int`` and ``Seg Int``
   The interval between packets and between the segments of one packet, both
-  from the simulator file.
+  from the simulator configuration.
 
 Those four can be changed while a payload is running, and take effect on the
 next packet: that is what the simulator is for, and it is quicker than editing
@@ -1284,8 +1333,8 @@ Make them disagree and a message says so at once, naming both sizes and
 either way out of it, and the button that starts the payload is taken away
 until they agree again; the edit that fixes them takes the message back. The
 sizes are checked when the files are read as well, so a set whose simulator
-file states a segment larger than the payload file's packet says so before
-anything is touched.
+configuration states a segment larger than the packet it is given says so
+before anything is touched.
 
 Below them are the two buttons -- one to start and stop the payload, described
 under `Starting and stopping a payload`_, and ``Configuration``, described

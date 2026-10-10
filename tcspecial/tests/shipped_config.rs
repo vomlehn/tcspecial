@@ -33,7 +33,7 @@ fn repo_file(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-/// Every shipped payload file.
+/// Every shipped tcspecial configuration.
 ///
 /// Discovered rather than listed, so a payload set added to the repository is
 /// covered by these tests without anyone having to remember to name it here.
@@ -55,7 +55,7 @@ fn shipped_payload_files() -> Vec<PathBuf> {
     files.sort();
     assert!(
         !files.is_empty(),
-        "no payload files found in {}",
+        "no tcspecial configurations found in {}",
         root.display()
     );
     files

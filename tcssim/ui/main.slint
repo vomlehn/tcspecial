@@ -1,6 +1,6 @@
 import { Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox, ScrollView, GridBox } from "std-widgets.slint";
 
-// One simulated payload: what the payload configuration file says about the
+// One simulated payload: what the tcspecial configuration file says about the
 // data handler it stands in for, what the simulator configuration file says
 // about how to simulate it, and what it has done since it started.
 //
@@ -8,7 +8,7 @@ import { Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox, Scroll
 // reads them from the two files and hands them over as this model, so a
 // payload added to or removed from the files adds or removes a panel.
 export struct PayloadInfo {
-    // From the payload configuration file
+    // From the tcspecial configuration file
     name: string,
     config: string,
     packet-size: int,
@@ -314,9 +314,9 @@ export component MainWindow inherits Window {
     title: "TCSpecial Payload Simulator";
     background: white;
 
-    // One row of panels and the chrome, which is the least the window is
-    // ever opened at -- a payload file of one payload. How much more it opens
-    // at is Rust's to say: see rows_of_room() in grid.rs.
+    // One row of panels and the chrome, which is the least the window is ever
+    // opened at -- a tcspecial configuration of one payload. How much more it
+    // opens at is Rust's to say: see rows_of_room() in grid.rs.
     min-height: 302px;
 
     // The simulated payloads, read from the configuration files by Rust.

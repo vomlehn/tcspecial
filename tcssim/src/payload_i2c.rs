@@ -15,10 +15,10 @@
 //! also true of a real sensor read over I2C, and is why a payload link over a
 //! bus is a different thing from one over a line.
 //!
-//! The stub is a kernel module and loading it needs root, so the simulator
-//! does not create the bus: it finds one and says how to make one if there is
-//! none. The chips are fixed when the module is loaded, too, which is why the
-//! address a payload file gives has to be one the stub was loaded with.
+//! The stub is a kernel module and loading it needs root, so the simulator does
+//! not create the bus: it finds one and says how to make one if there is none.
+//! The chips are fixed when the module is loaded, too, which is why the address
+//! a tcspecial configuration gives has to be one the stub was loaded with.
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
@@ -88,8 +88,9 @@ impl SimulatedBus {
         let stub = find_stub(Path::new(I2C_ADAPTERS))?;
         let named = PathBuf::from(path);
 
-        // A payload file may name the stub itself, in which case there is
-        // nothing to link: the handler and the simulator open the same node.
+        // A tcspecial configuration may name the stub itself, in which case
+        // there is nothing to link: the handler and the simulator open the same
+        // node.
         let linked = named != Path::new(&stub);
         if linked {
             make_the_path_lead_to(&named, &stub)?;
@@ -170,7 +171,7 @@ impl Drop for SimulatedBus {
 ///
 /// Found by name rather than by number: the kernel numbers adapters as it
 /// finds them, so the stub is `/dev/i2c-13` on one machine and `/dev/i2c-3`
-/// on the next, and a payload file cannot know which.
+/// on the next, and a tcspecial configuration cannot know which.
 fn find_stub(adapters: &Path) -> Result<String, String> {
     let entries = std::fs::read_dir(adapters)
         .map_err(|e| format!("{} cannot be read: {e}", adapters.display()))?;
@@ -198,7 +199,7 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
         None => Err(format!(
             "no I2C stub bus is loaded, so there is nothing to stand in for a device \
              on one: sudo modprobe i2c-stub chip_addr=0x48, with the address the \
-             payload file gives"
+             tcspecial configuration gives"
         )),
     }
 }
@@ -319,7 +320,7 @@ mod tests {
     }
 
     /// The stub is found by name, because its number is whatever the kernel
-    /// gave it and a payload file cannot know that.
+    /// gave it and a tcspecial configuration cannot know that.
     #[test]
     fn the_stub_is_found_by_name_among_the_real_adapters() {
         let root = adapters(&[

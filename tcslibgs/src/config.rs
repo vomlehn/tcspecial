@@ -48,7 +48,7 @@ pub fn load_payload_config<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> 
     payload_config.to_dh_configs().map_err(TcsError::Config)
 }
 
-/// The payload configuration file a program was told to read.
+/// The tcspecial configuration file a program was told to read.
 ///
 /// Every program that serves, controls or simulates a payload set needs to be
 /// pointed at one, and they are all pointed the same way: a command line
@@ -73,7 +73,7 @@ pub fn payload_path_from_args<I: Iterator<Item = String>>(
     let from_args = args.next();
     if let Some(extra) = args.next() {
         return Err(format!(
-            "unexpected argument \"{}\"\nusage: {} [payload configuration file]",
+            "unexpected argument \"{}\"\nusage: {} [tcspecial configuration file]",
             extra, program
         ));
     }
@@ -97,9 +97,9 @@ pub fn payload_path_from_args<I: Iterator<Item = String>>(
 /// Each is a list rather than one ignored value, for XML's sake: a sequence
 /// there is repeated sibling elements, so a file with two payloads presents
 /// `payloads` twice and a single field is a duplicate-field error. That read
-/// every XML payload file of more than one payload as unrecognisable -- and
-/// said `duplicate field`, which is a complaint about this struct rather than
-/// about the file.
+/// every XML tcspecial configuration of more than one payload as unrecognisable
+/// -- and said `duplicate field`, which is a complaint about this struct rather
+/// than about the file.
 ///
 /// There used to be a second set of sections here, and this said which of two
 /// languages a file was written in. The other one -- `general`,
@@ -180,7 +180,7 @@ pub fn file_describes_payloads<P: AsRef<Path>>(path: P) -> TcsResult<()> {
 
 /// What a payload set says about the command interpreter, if it says anything.
 ///
-/// The `tcspecial` section of a payload configuration file. `None` for a file
+/// The `tcspecial` section of a tcspecial configuration file. `None` for a file
 /// that has no such section, in which case the command interpreter is placed
 /// by its own file alone.
 ///
@@ -225,13 +225,13 @@ pub fn load_config_version<P: AsRef<Path>>(path: P) -> TcsResult<ConfigVersion> 
     })
 }
 
-/// Load data handlers from a payload configuration file.
+/// Load data handlers from a tcspecial configuration file.
 ///
 /// Every program that needs data handlers reads them through this, so that all
-/// of them agree about what a given file describes. That matters more than it sounds: tcsmoc's
-/// panels, tcssim's payloads and tcspecial's handlers have to be the same
-/// handlers, and one program reading a file a different way is the drift the
-/// payload set mechanism exists to prevent.
+/// of them agree about what a given file describes. That matters more than it
+/// sounds: tcsmoc's panels, tcssim's payloads and tcspecial's handlers have to
+/// be the same handlers, and one program reading a file a different way is the
+/// drift the payload set mechanism exists to prevent.
 pub fn load_dh_configs<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> {
     let path = path.as_ref();
     let text = fs::read_to_string(path)?;
@@ -248,7 +248,7 @@ mod tests {
 
     const PAYLOAD: &str = "
 version: \"1.0\"
-description: a payload file
+description: a tcspecial configuration
 payloads:
   - name: DH0
     oc_address: 127.0.0.1
@@ -323,14 +323,15 @@ payloads:
         );
     }
 
-    /// An XML file of several payloads is recognised as a payload file.
+    /// An XML file of several payloads is recognised as a tcspecial
+    /// configuration.
     ///
     /// A sequence in XML is repeated sibling elements, so a file of two
     /// payloads names `payloads` twice. Asking about the section with a single
     /// field made the second one a duplicate-field error, and every XML
-    /// payload file of more than one payload was refused -- with a complaint
-    /// about a duplicate field, which says nothing about the file and is not
-    /// even true of it.
+    /// tcspecial configuration of more than one payload was refused -- with a
+    /// complaint about a duplicate field, which says nothing about the file and
+    /// is not even true of it.
     #[test]
     fn an_xml_file_of_several_payloads_is_recognised() {
         let xml = "<payload>\
@@ -342,7 +343,7 @@ payloads:
                <path>/dev/zero</path><packet_size>1</packet_size></payloads>\
              </payload>";
 
-        describes_payloads(xml, ConfigFormat::Xml).expect("an XML payload file");
+        describes_payloads(xml, ConfigFormat::Xml).expect("an XML tcspecial configuration");
 
         // And the whole file still loads, which is the thing the sniffer was
         // standing in the way of.
@@ -421,7 +422,7 @@ payloads:
 
     #[test]
     fn a_file_is_recognised_by_its_payloads_section() {
-        describes_payloads(PAYLOAD, ConfigFormat::Yaml).expect("a payload file");
+        describes_payloads(PAYLOAD, ConfigFormat::Yaml).expect("a tcspecial configuration");
     }
 
     /// A file written in the language that is gone is told what became of it.

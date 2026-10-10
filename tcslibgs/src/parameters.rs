@@ -363,7 +363,7 @@ mod tests {
         assert!(payload_half < sim_half);
         assert!(
             shown.find("packet_size").unwrap() < sim_half,
-            "the packet size is the payload file's"
+            "the packet size is the tcspecial configuration's"
         );
         assert!(
             shown.find("segment_size").unwrap() > sim_half,
@@ -506,7 +506,7 @@ mod tests {
         assert!(shown.contains("cs_active        low"), "{shown}");
 
         // A socket named by a path shows the path and no port, the port a
-        // payload file gives it meaning nothing.
+        // tcspecial configuration gives it meaning nothing.
         dh.endpoint = EndpointConfig::Network(NetworkConfig {
             protocol: NetworkProtocol::UnixStream,
             address: "/tmp/dh.sock".to_string(),

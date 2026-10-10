@@ -4,7 +4,7 @@
 //! tcspecial's, and the MOC only ever talks to the command interpreter. What
 //! it needs of them is what to say about one in a panel, and which kind of
 //! handler a START_DH is asking for, since both follow from the endpoint the
-//! payload configuration file gives.
+//! tcspecial configuration file gives.
 //!
 //! Which kind of handler a START_DH asks for is not worked out here: it is
 //! `EndpointConfig::kind`, in tcslibgs, because tcspecial checks the kind a

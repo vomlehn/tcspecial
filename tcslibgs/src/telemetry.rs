@@ -144,7 +144,7 @@ impl RestartTelemetry {
 pub struct ConnectTelemetry {
     pub header: TelemetryHeader,
     pub version: ConfigVersion,
-    /// The version the payload configuration file states, which the beacon
+    /// The version the tcspecial configuration file states, which the beacon
     /// carries too: a ground station reading the answer is told which set
     /// this end is serving and not only which build is serving it.
     pub config_version: ConfigVersion,

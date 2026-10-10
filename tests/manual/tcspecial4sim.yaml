@@ -1,14 +1,15 @@
 # How tcssim simulates the payloads of tcspecial4.yaml.
 #
-# Nothing here describes a payload: tcspecial4.yaml does that, and this file adds
-# only what simulating one needs. The two are joined by name. Every data
-# handler of the payload file needs settings here, and a name here that no data
-# handler has is an error rather than a line with no effect, because a typo is
-# otherwise indistinguishable from a payload that was meant not to be
-# simulated.
+# Nothing here describes a payload: tcspecial4.yaml does that, and this file
+# adds only what simulating one needs. The two are joined by name. Every data
+# handler of the tcspecial configuration needs settings here, and a name here
+# that no data handler has is an error rather than a line with no effect,
+# because a typo is otherwise indistinguishable from a payload that was meant
+# not to be simulated.
 #
 # The payload states the kind of payload it is, in the same word its own file
-# uses. That is not a setting of the simulation -- the payload file decides it
+# uses. That is not a setting of the simulation -- the tcspecial configuration
+# decides it
 # -- and it is stated again here only so that the two files can be checked
 # against each other: the files are joined by name alone, and a payload set
 # copied from another one keeps the names.

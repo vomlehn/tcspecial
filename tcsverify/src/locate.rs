@@ -180,7 +180,7 @@ fn xml(text: &str) -> Where {
             }
             depth += 1;
 
-            // `<name>DH0</name>`, which is how a payload file written in XML
+            // `<name>DH0</name>`, which is how a tcspecial configuration written in XML
             // says which payload this is.
             if element == "name" {
                 if let Some(close) = rest.find("</") {

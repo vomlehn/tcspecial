@@ -2,12 +2,12 @@
 //!
 //! A GUI application for simulating payloads that communicate with tcspecial.
 //!
-//! Two configuration files describe what to simulate. The payload file
-//! describes the payloads themselves: which data handlers exist, how tcspecial
-//! reaches each one, and how big its packets are. The simulator file adds what
-//! simulating one takes and the payload file has no business knowing: how fast
-//! a payload produces packets, and how a packet is divided into segments. The
-//! two are joined by the data handler's name; see
+//! Two configuration files describe what to simulate. The tcspecial
+//! configuration describes the payloads themselves: which data handlers exist,
+//! how tcspecial reaches each one, and how big its packets are. The simulator
+//! file adds what simulating one takes and the tcspecial configuration has no
+//! business knowing: how fast a payload produces packets, and how a packet is
+//! divided into segments. The two are joined by the data handler's name; see
 //! [`tcslibgs::sim_config`].
 
 use slint::{Model, ModelRc, SharedString, VecModel};
@@ -189,12 +189,12 @@ fn payload_info_from(dh: &DHConfig, sim: &ResolvedSim) -> PayloadInfo {
         // panels can show the whole of what a payload set says about a
         // payload.
         parameters: SharedString::from(payload_parameters(dh, Some(sim))),
-        // Checked from the start, not only after an edit: a simulator file
-        // may state a segment larger than the payload file's packet, and a
-        // panel that said nothing about it until a spin box was touched would
-        // have the payload refuse to start for no stated reason.
-        // Whether anything is ever sent to this payload, which decides
-        // whether its panel has a received line at all.
+        // Checked from the start, not only after an edit: a simulator file may
+        // state a segment larger than the tcspecial configuration's packet, and
+        // a panel that said nothing about it until a spin box was touched would
+        // have the payload refuse to start for no stated reason. Whether
+        // anything is ever sent to this payload, which decides whether its
+        // panel has a received line at all.
         triggered: sim.triggered,
         sizes_problem: SharedString::from(sizes_problem(
             i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
@@ -574,14 +574,15 @@ mod tests {
     /// A payload whose files disagree about the two sizes cannot be started,
     /// and says why before anything is touched.
     ///
-    /// A simulator file may state a segment larger than the payload file's
-    /// packet. A panel that said nothing about it until a spin box was
-    /// touched would have the payload refuse to start for no stated reason.
+    /// A simulator file may state a segment larger than the tcspecial
+    /// configuration's packet. A panel that said nothing about it until a spin
+    /// box was touched would have the payload refuse to start for no stated
+    /// reason.
     #[test]
     fn a_payload_whose_files_disagree_starts_out_unsendable() {
         let dh = handler("DH0");
         let info = payload_info_from(&dh, &sim(1000, 1000, 20));
-        assert_eq!(dh.packet_size, 12, "the payload file says twelve bytes");
+        assert_eq!(dh.packet_size, 12, "the tcspecial configuration says twelve bytes");
         assert!(
             info.sizes_problem.contains("segment of 20")
                 && info.sizes_problem.contains("packet of 12"),
@@ -926,14 +927,14 @@ mod tests {
         sizes_that_cannot_be_sent_stop_the_button_and_say_so();
     }
 
-    /// Every shipped payload set: a payload file and the simulator file beside
-    /// it.
+    /// Every shipped payload set: a tcspecial configuration and the simulator
+    /// file beside it.
     ///
     /// The sets are discovered rather than listed, so a set added to the
     /// repository is covered by the tests that already exist, instead of only
-    /// by whichever one somebody remembers to extend. A payload file with no
-    /// simulator file beside it fails here: tcssim needs both, so half a set
-    /// is a set that cannot be run.
+    /// by whichever one somebody remembers to extend. A tcspecial configuration
+    /// with no simulator file beside it fails here: tcssim needs both, so half
+    /// a set is a set that cannot be run.
     fn shipped_sets() -> Vec<(std::path::PathBuf, std::path::PathBuf)> {
         let root = repo_file("tests/manual");
         let mut sets = Vec::new();
@@ -945,8 +946,9 @@ mod tests {
                 None => continue,
             };
 
-            // The simulator files are found through their payload file, not on
-            // their own, so that one with no payload file is noticed too.
+            // The simulator files are found through their tcspecial
+            // configuration, not on their own, so that one with no tcspecial
+            // configuration is noticed too.
             let stem = match name
                 .strip_prefix("tcspecial")
                 .and_then(|rest| rest.strip_suffix(".yaml"))
@@ -1001,7 +1003,7 @@ mod tests {
         }
     }
 
-    /// No shipped simulator file fits another set's payload file.
+    /// No shipped simulator file fits another set's tcspecial configuration.
     ///
     /// Two sets of the repository differ only in how their one payload is
     /// reached -- one by datagram, one by stream -- and the files of a set are
@@ -1020,7 +1022,8 @@ mod tests {
         assert!(sets.len() > 1, "one set cannot be paired with another");
 
         for (payload_path, _) in &sets {
-            let dh_configs = load_dh_configs(payload_path).expect("the payload file loads");
+            let dh_configs =
+                load_dh_configs(payload_path).expect("the configuration loads");
 
             for (other_payload, sim_path) in &sets {
                 if other_payload == payload_path {
@@ -1074,16 +1077,16 @@ mod tests {
         }
     }
 
-    /// A shipped payload file states a packet interval only where a payload
-    /// is triggered, and no other simulation setting at all.
+    /// A shipped tcspecial configuration states a packet interval only where a
+    /// payload is triggered, and no other simulation setting at all.
     ///
-    /// The interval a payload file may state is the rate a trigger goes out
-    /// at, which is tcspecial's doing and so flight behaviour. Everything
-    /// else about timing and segmentation is the simulator's, and a line of
-    /// it that crept into the payload file would be read by nothing: the
-    /// loader refuses an interval on a periodic payload, but a segment size
-    /// there is an unknown attribute, and this says plainly which file the
-    /// settings belong in.
+    /// The interval a tcspecial configuration may state is the rate a trigger
+    /// goes out at, which is tcspecial's doing and so flight behaviour.
+    /// Everything else about timing and segmentation is the simulator's, and a
+    /// line of it that crept into the tcspecial configuration would be read by
+    /// nothing: the loader refuses an interval on a periodic payload, but a
+    /// segment size there is an unknown attribute, and this says plainly which
+    /// file the settings belong in.
     #[test]
     fn a_shipped_payload_file_states_only_a_triggered_payload_s_interval() {
         for (payload_path, sim_path) in shipped_sets() {
@@ -1329,7 +1332,7 @@ mod tests {
         let info = payload_info_from(&dh, &sim(500, 250, 5));
         assert_eq!(info.name, SharedString::from("DH3"));
         assert_eq!(info.config, SharedString::from("UDP localhost:5003"));
-        // From the payload file
+        // From the tcspecial configuration
         assert_eq!(info.packet_size, 15);
         // From the simulator file
         assert_eq!(info.packet_interval, 500);

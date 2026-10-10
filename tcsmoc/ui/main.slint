@@ -1,10 +1,10 @@
 import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
 
-// One data handler, as the payload configuration file describes it plus what
+// One data handler, as the tcspecial configuration file describes it plus what
 // tcspecial reports about it at run time.
 //
 // The window has no knowledge of which data handlers exist: Rust reads them
-// from the payload configuration file and hands them over as this model, so a
+// from the tcspecial configuration file and hands them over as this model, so a
 // handler added to or removed from that file adds or removes a panel here.
 export struct DHInfo {
     // From the configuration file
@@ -221,8 +221,8 @@ export component MainWindow inherits Window {
     // main.rs, which the_window_and_rust_agree_on_the_sizes checks.
     min-width: 739px;
     // One row of panels and the chrome, which is the least the window is ever
-    // opened at -- a payload file of one handler. How much more it opens at
-    // is Rust's to say: see rows_of_room() in main.rs.
+    // opened at -- a tcspecial configuration of one handler. How much more it
+    // opens at is Rust's to say: see rows_of_room() in main.rs.
     min-height: 549px;
     background: white;
 
@@ -241,7 +241,7 @@ export component MainWindow inherits Window {
     in-out property <string> cmd-recv-time: "--:--:--";
     in-out property <color> indicator-color: #c0c0c0;
 
-    // The data handlers, read from the payload configuration file by Rust.
+    // The data handlers, read from the tcspecial configuration file by Rust.
     in-out property <[DHInfo]> dh-model: [];
 
     // How many panels to a row. Rust chooses this from the number of data

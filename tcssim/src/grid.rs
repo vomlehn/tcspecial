@@ -35,10 +35,10 @@ pub const CHROME_WIDTH: f32 = 24.0;
 /// How many rows of panels the window looks ahead for.
 ///
 /// Asked for rather than worked out: a window with room for only the rows a
-/// particular payload file happens to have is one that has to be resized
-/// before a larger file can be watched, and three rows is the room that was
-/// wanted. It is not a floor, though -- see [`rows_of_room`]. tcsmoc follows
-/// the same rule, in its own panel sizes.
+/// particular tcspecial configuration happens to have is one that has to be
+/// resized before a larger file can be watched, and three rows is the room that
+/// was wanted. It is not a floor, though -- see [`rows_of_room`]. tcsmoc
+/// follows the same rule, in its own panel sizes.
 pub const MIN_PANEL_ROWS: usize = 3;
 
 /// How many rows of panels the window opens with room for.
@@ -56,8 +56,8 @@ pub fn rows_of_room(rows: usize, panels: usize) -> usize {
 /// gap between them, so there is none to allow for.
 ///
 /// One row of them is the window's `min-height`, the least it is ever opened
-/// at; [`rows_of_room`] says how many rows a particular payload file opens
-/// with.
+/// at; [`rows_of_room`] says how many rows a particular tcspecial configuration
+/// opens with.
 pub fn height_for_rows(rows: usize) -> f32 {
     rows.max(1) as f32 * PANEL_HEIGHT + CHROME_HEIGHT
 }
@@ -146,7 +146,7 @@ mod tests {
         assert_eq!(rows_of_room(4, 16), 4);
         assert_eq!(rows_of_room(8, 64), 8);
 
-        // An empty payload file still opens a window.
+        // An empty tcspecial configuration still opens a window.
         assert_eq!(rows_of_room(1, 0), 1);
     }
 

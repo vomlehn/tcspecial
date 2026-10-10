@@ -512,11 +512,13 @@ tcspecial takes a START_DH for one already running and a STOP_DH for one
 already stopped without harm -- and the status beside the name says which of
 the two has taken effect.
 
-In tcssim a payload that is sending offers ``Silent``, which stops it, and one
-that is not offers ``Send``, which starts it: one button, labelled with what
-pressing it will do, since a simulated payload is either sending or not and
-there is nothing else to ask of it. The words are the payload's own -- it is
-the thing that sends -- where tcsmoc's are the ground's.
+In tcssim a payload that is sending offers ``Disable``, which stops it, and
+one that is not offers ``Enable``, which starts it: one button, labelled with
+what pressing it will do, since a simulated payload is either sending or not
+and there is nothing else to ask of it. The words are tcsmoc's, so that a
+payload disabled in one window is disabled in the other rather than silent in
+one and disabled in the other; they were the payload's own, ``Send`` and
+``Silent``, which left the reader of two windows translating.
 
 tcsmoc had one button that way too. It said ``Receive`` or ``Discard``
 according to the status, which meant a press could not be made until the

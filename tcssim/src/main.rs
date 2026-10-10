@@ -128,13 +128,13 @@ fn sizes_problem(packet_size: i32, segment_size: i32) -> String {
 enum Transfer {
     /// Start it, so it sends.
     ///
-    /// Named for what the payload does, which is what this window is about:
-    /// a payload sends, and the panel that stands in for it says so. It said
-    /// `Receive` for a while -- the word tcsmoc's panels used for the press
-    /// that started the data flowing -- and on a payload's own panel that is
-    /// the far end's word for it.
+    /// Named for what the payload does, where the button it comes from is
+    /// labelled for what the press does: `Enable`, as the MOC's panels label
+    /// the same press. The two windows are read side by side and the label is
+    /// the thing both have to say the same way, which the payload's own words
+    /// -- `Send` and `Silent` -- did not.
     Send,
-    /// Stop it, so it goes quiet.
+    /// Stop it, so it goes quiet. The button offering it says `Disable`.
     Silent,
 }
 
@@ -522,7 +522,7 @@ mod tests {
         ui.show().unwrap();
 
         let button = |ui: &MainWindow| {
-            ElementHandle::find_by_accessible_label(ui, SEND_LABEL)
+            ElementHandle::find_by_accessible_label(ui, ENABLE_LABEL)
                 .next()
                 .and_then(|b| b.accessible_enabled())
         };
@@ -621,15 +621,15 @@ mod tests {
     /// Here rather than beside the statuses because the window owns its
     /// labels: Slint builds the string, and these are how the test below
     /// holds it to the same rule Rust decides a press by.
-    const SILENT_LABEL: &str = "Silent";
-    const SEND_LABEL: &str = "Send";
+    const DISABLE_LABEL: &str = "Disable";
+    const ENABLE_LABEL: &str = "Enable";
 
     impl Transfer {
         /// The label a button offering this carries.
         fn label(&self) -> &'static str {
             match self {
-                Transfer::Send => SEND_LABEL,
-                Transfer::Silent => SILENT_LABEL,
+                Transfer::Send => ENABLE_LABEL,
+                Transfer::Silent => DISABLE_LABEL,
             }
         }
     }
@@ -646,20 +646,21 @@ mod tests {
     /// thing and doing the other.
     #[test]
     fn the_transfer_button_does_what_its_label_offers() {
-        // A payload that is sending offers to go silent, and one that is not
-        // offers to start. Anything that is not the running status offers to:
-        // a payload that failed to start shows the stopped status, and the
-        // useful thing to offer then is the start that failed.
+        // A payload that is sending offers to be disabled, and one that is
+        // not offers to be enabled. Anything that is not the running status
+        // offers to start: a payload that failed to start shows the stopped
+        // status, and the useful thing to offer then is the start that
+        // failed.
         assert_eq!(transfer_wanted(RUNNING_STATUS), Transfer::Silent);
         assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Send);
         assert_eq!(transfer_wanted(""), Transfer::Send);
 
-        assert_eq!(Transfer::Silent.label(), SILENT_LABEL);
-        assert_eq!(Transfer::Send.label(), SEND_LABEL);
+        assert_eq!(Transfer::Silent.label(), DISABLE_LABEL);
+        assert_eq!(Transfer::Send.label(), ENABLE_LABEL);
 
         // And the window labels it by the same rule, which is the half Rust
         // cannot fail on: the label is a Slint expression, so a drift between
-        // the two files is a button that offers Send and stops the
+        // the two files is a button that offers Enable and stops the
         // payload.
         let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         let source = std::fs::read_to_string(&window).unwrap();

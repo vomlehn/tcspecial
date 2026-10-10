@@ -3045,19 +3045,19 @@ that shows the whole of what the two files said about it.
 
 Requirement
     The button that starts and stops a payload is labelled with what pressing
-    it will do. A payload that is sending offers ``Silent``, which stops it; a
-    payload that is not offers ``Send``, which starts it. There were two
+    it will do. A payload that is sending offers ``Disable``, which stops it;
+    a payload that is not offers ``Enable``, which starts it. There were two
     buttons, Start and Stop, and either was pressable whatever the payload was
     doing: a Stop on a payload that was not sending did nothing and read as
     though it had.
 
 Requirement
-    Each window's labels are its own end's words. A simulated payload
-    ``Send``\ s or goes ``Silent``, because the payload is the thing that
-    sends; the MOC's panels ``Enable`` and ``Disable`` a handler, because
-    what the ground does is turn a conduit on and off. They were made to
-    share a word for a while, and it was the far end's word on one of the two
-    windows.
+    Both windows label those two presses the same way. ``Enable`` and
+    ``Disable`` in the MOC's panels and in the simulator's, so that one state
+    is said one way in the two windows an operator reads side by side. The
+    simulator said ``Send`` and ``Silent`` -- the payload's own words, the
+    payload being the thing that sends -- which read well in one window alone
+    and left the reader of both translating.
 
 Requirement
     Which way a press goes is decided by the status the label was made from.
@@ -3066,7 +3066,7 @@ Requirement
     the other would be worse than either button alone.
 
 Requirement
-    A payload that failed to start offers ``Send`` again. It is not
+    A payload that failed to start offers ``Enable`` again. It is not
     sending, which is what its status says, and the useful thing to offer is
     the start that failed rather than a stop of something that never began.
 

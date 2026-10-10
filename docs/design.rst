@@ -3069,6 +3069,16 @@ Requirement
     though it had.
 
 Requirement
+    One button here where the MOC's panels have two, because a press in this
+    window is the act itself: it starts or stops a payload in this same
+    program, so it cannot be lost and there is never a reason to make it
+    twice. The status the label is built from is this program's own knowledge
+    of its own payload, so the press it offers is the press that is wanted.
+    The MOC presses across a link to a spacecraft, where a command may not
+    arrive and may have to be sent again; see the MOC's panels for why that
+    takes two buttons.
+
+Requirement
     Both windows label those two presses the same way. ``Enable`` and
     ``Disable`` in the MOC's panels and in the simulator's, so that one state
     is said one way in the two windows an operator reads side by side. The
@@ -3741,6 +3751,20 @@ make, and what it gains is that either can be made without first getting the
 handler into the state that offers it.
 
 Requirement
+    The MOC has a button per command where the simulator has one button for
+    both, and the difference is the link each press crosses. Pressing a button
+    in tcssim starts or stops a payload in that same program: the press is the
+    act, it cannot be lost, and one button labelled with what it will do says
+    everything there is to say. A press in the MOC sends a datagram to a
+    spacecraft, which may not arrive -- so the same START_DH or STOP_DH may
+    have to be sent again, and again, before tcspecial has it. A single button
+    offering the press that suits the status cannot be pressed twice: the
+    status it reads is the ground's own guess about a handler it may not have
+    reached, and the press worth making is exactly the one such a button
+    refuses. Two buttons, both always pressable, are a command an operator can
+    repeat.
+
+Requirement
     The panels are refreshed without being asked. A handler moving data must
     not look like one doing nothing, which is what a panel that changed only
     when a button was pressed showed.
@@ -3753,13 +3777,22 @@ Requirement
 
 Requirement
     A panel shows what arrived from its payload, the time it arrived, and how
-    many bytes have come to the ground -- and not the spacecraft's account of
-    what it last sent and last received, nor its count of the bytes it sent
-    to the payload. Three rows and a counter carried that account and are
-    gone: a panel is watched for what reached the ground, and the claim about
-    it took a third of the panel's height to say nearly the same thing.
+    many packets have arrived -- and not the spacecraft's account of what it
+    last sent and last received, nor its count of the bytes it sent to the
+    payload. Three rows and a counter carried that account and are gone: a
+    panel is watched for what reached the ground, and the claim about it took
+    a third of the panel's height to say nearly the same thing.
     QUERY_DH_SAMPLE is not asked for any more either -- a command a second
     per handler whose answer nothing showed.
+
+Requirement
+    All three of those readings are kept by the end that received them, which
+    is the ground. The count was taken from the QUERY_DH statistics instead,
+    and from the wrong half of them: a handler's ``bytes_received`` is what it
+    read from the ground, which is the direction nobody sends in, so a panel
+    beside a payload sending steadily read ``0 bytes``. The listener that
+    already kept the time and the data counts the packets as it receives
+    them.
 
 Requirement
     The window says when the last command went out and when its answer came

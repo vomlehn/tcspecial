@@ -1139,13 +1139,17 @@ beacons are arriving.
   What arrived, as the ground received it.
 
 ``Recv``
-  How many bytes have come to the ground from that payload.
+  How many packets have arrived from that payload, counted from the moment
+  the MOC started: ``3 recv``.
 
-All three are the ground's end of it. The spacecraft's account of what it
-last sent and last received, and its count of the bytes it sent to its
-payload, were shown beside them and are gone: a panel is watched for what
-reached the ground, and the claim about it cost a third of the panel to say
-nearly the same thing. The panels refresh themselves about once a second;
+All three are the ground's end of it, counted and timed by the end that
+received them. The spacecraft's account of what it last sent and last
+received, and its count of the bytes it sent to its payload, were shown beside
+them and are gone: a panel is watched for what reached the ground, and the
+claim about it cost a third of the panel to say nearly the same thing. The
+count was the spacecraft's too, and the wrong half of its statistics -- the
+bytes its handler had read from the ground, a direction nobody sends in, so
+the line read ``0 bytes`` beside a payload that was sending steadily. The panels refresh themselves about once a second;
 nothing has to be pressed to see traffic.
 
 Each panel has three buttons. ``Enable`` and ``Disable`` are described under

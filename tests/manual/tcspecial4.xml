@@ -40,7 +40,6 @@
         </stream>
     </payload_groups>
     <payloads>
-        <dh_id>0</dh_id>
         <name>serial-line</name>
         <group>payload_line</group>
         <path>/tmp/tcspecial4-line</path>

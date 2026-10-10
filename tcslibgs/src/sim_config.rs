@@ -1065,12 +1065,11 @@ impl SimConfigFile {
 mod tests {
     use super::*;
     use crate::{
-        DHId, DHMode, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol,
+        DHMode, DHName, DeviceConfig, EndpointConfig, NetworkConfig, NetworkProtocol,
     };
 
     fn handler(name: &str, packet_size: usize) -> DHConfig {
         DHConfig {
-            dh_id: DHId(0),
             name: DHName::new(name),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,
@@ -1682,7 +1681,6 @@ simulated_payloads:
     #[test]
     fn the_faults_reach_the_payload_through_its_group() {
         let stream = |name: &str| DHConfig {
-            dh_id: DHId(0),
             name: DHName::new(name),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -1736,7 +1734,6 @@ simulated_payloads:
     #[test]
     fn a_triggered_payload_has_no_timing_here_at_all() {
         let triggered = |name: &str| DHConfig {
-            dh_id: DHId(0),
             name: DHName::new(name),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -1807,7 +1804,6 @@ simulated_payloads:
     #[test]
     fn a_triggered_payload_takes_no_interval_here() {
         let triggered = |name: &str| DHConfig {
-            dh_id: DHId(0),
             name: DHName::new(name),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/urandom".to_string(),

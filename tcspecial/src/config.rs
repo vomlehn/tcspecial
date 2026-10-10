@@ -317,15 +317,13 @@ mod tests {
 version: \"1.0\"
 description: a bus and a peripheral
 payloads:
-  - dh_id: 0
-    name: thermal
+  - name: thermal
     type: i2c
     path: /dev/i2c-1
     address: 0x48
     pec: true
     packet_size: 8
-  - dh_id: 1
-    name: imu
+  - name: imu
     type: spi
     path: /dev/spidev0.0
     max_speed: 1000000
@@ -337,7 +335,6 @@ payloads:
   <version>1.0</version>
   <description>a bus and a peripheral</description>
   <payloads>
-    <dh_id>0</dh_id>
     <name>thermal</name>
     <type>i2c</type>
     <path>/dev/i2c-1</path>
@@ -346,7 +343,6 @@ payloads:
     <packet_size>8</packet_size>
   </payloads>
   <payloads>
-    <dh_id>1</dh_id>
     <name>imu</name>
     <type>spi</type>
     <path>/dev/spidev0.0</path>

@@ -36,8 +36,7 @@ use tcslibgs::Faults;
 /// Payload configuration
 #[derive(Clone)]
 pub struct PayloadConfig {
-    pub _id: u32,
-    /// The payload's name, as the payload configuration file gives it.
+    /// The payload's name, as the tcspecial configuration gives it.
     ///
     /// Carried so that everything a payload says of itself says which payload
     /// it is. A run of four payloads whose messages said only "the payload is
@@ -579,7 +578,6 @@ mod tests {
     /// payload that works has.
     fn with(faults: Faults) -> PayloadConfig {
         PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),
@@ -936,7 +934,6 @@ mod tests {
     #[test]
     fn test_payload_config() {
         let config = PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: "127.0.0.1".to_string(),

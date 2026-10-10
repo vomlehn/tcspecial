@@ -245,13 +245,11 @@ payload_groups:
     type: device
 
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: shared
     packet_size: 1
 
-  - dh_id: 1
-    name: \"DH1\"
+  - name: \"DH1\"
     type: device
     path: /dev/zero
     packet_size: 1
@@ -261,9 +259,9 @@ payloads:
     fn a_yaml_file_says_where_each_payload_is() {
         let found = Where::of(YAML, ConfigFormat::Yaml);
 
-        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 14);
+        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 13);
         // Quoted or not: the name is the name.
-        assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 19);
+        assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 17);
         assert_eq!(found.line_of(&About::Group("shared".to_string())), 9);
         assert_eq!(found.line_of(&About::Section("tcspecial")), 4);
     }
@@ -326,27 +324,25 @@ simulated_payloads:
     <type>device</type>
   </payload_groups>
   <payloads>
-    <dh_id>0</dh_id>
     <name>DH0</name>
     <group>shared</group>
   </payloads>
   <payloads>
-    <dh_id>1</dh_id>
     <name>DH1</name>
   </payloads>
 </payload-configuration>
 ";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Group("shared".to_string())), 4);
-        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 9);
-        assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 14);
+        assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 8);
+        assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 12);
     }
 
     /// A name written as an attribute is found too, on one line or several.
     #[test]
     fn an_xml_name_may_be_an_attribute() {
-        let text = "<doc>\n  <payloads name=\"DH0\" dh_id=\"0\"/>\n  \
-                    <payloads dh_id='1' name='DH1'/>\n</doc>\n";
+        let text = "<doc>\n  <payloads name=\"DH0\"/>\n  \
+                    <payloads type='device' name='DH1'/>\n</doc>\n";
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 2);
         assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 3);

@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use tcslibgs::{
     answer_to, ArmKey, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry,
-    DHConfig, DHId, DHName, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
+    DHConfig, DHName, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
@@ -37,7 +37,7 @@ use crate::telemetry_log::TelemetryLog;
 /// log are shared handles, and the rest is read-only.
 #[derive(Clone)]
 pub struct PayloadCommands {
-    data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
+    data_handlers: Arc<Mutex<BTreeMap<DHName, DataHandler>>>,
     payload_config: Arc<Vec<DHConfig>>,
     telemetry_log: TelemetryLog,
     version: ConfigVersion,
@@ -90,11 +90,11 @@ impl PayloadCommands {
                     let config = self
                         .payload_config
                         .iter()
-                        .find(|c| c.dh_id == cmd.dh_id);
+                        .find(|c| c.name == cmd.name);
 
-                    match (handlers.get_mut(&cmd.dh_id), config) {
+                    match (handlers.get_mut(&cmd.name), config) {
                         (None, _) | (_, None) => {
-                            error!("{}", no_such_handler(&cmd.name, cmd.dh_id, &self.payload_config));
+                            error!("{}", no_such_handler(&cmd.name, &self.payload_config));
                             CommandStatus::NotFound
                         }
 
@@ -151,7 +151,7 @@ impl PayloadCommands {
                         Err(_) => return Telemetry::StopDH(StopDHTelemetry::new(cmd.header.sequence, CommandStatus::Failure)),
                     };
 
-                    if let Some(dh) = handlers.get_mut(&cmd.dh_id) {
+                    if let Some(dh) = handlers.get_mut(&cmd.name) {
                         match dh.stop() {
                             Ok(_) => {
                                 info!("{} stopped", dh.name().0);
@@ -176,18 +176,23 @@ impl PayloadCommands {
                         Err(_) => return Telemetry::QueryDH(QueryDHTelemetry::new(
                             cmd.header.sequence,
                             CommandStatus::Failure,
-                            cmd.dh_id,
+                            cmd.name.clone(),
                             Statistics::new(),
                         )),
                     };
 
-                    if let Some(dh) = handlers.get(&cmd.dh_id) {
+                    if let Some(dh) = handlers.get(&cmd.name) {
                         (CommandStatus::Success, dh.statistics())
                     } else {
                         (CommandStatus::NotFound, Statistics::new())
                     }
                 };
-                Telemetry::QueryDH(QueryDHTelemetry::new(cmd.header.sequence, status, cmd.dh_id, stats))
+                Telemetry::QueryDH(QueryDHTelemetry::new(
+                    cmd.header.sequence,
+                    status,
+                    cmd.name.clone(),
+                    stats,
+                ))
             }
             Command::QueryDHSample(cmd) => {
                 let (status, samples) = {
@@ -197,14 +202,14 @@ impl PayloadCommands {
                             return Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
                                 cmd.header.sequence,
                                 CommandStatus::Failure,
-                                cmd.dh_id,
+                                cmd.name.clone(),
                                 DHSample::new(),
                                 DHSample::new(),
                             ))
                         }
                     };
 
-                    match handlers.get(&cmd.dh_id) {
+                    match handlers.get(&cmd.name) {
                         Some(dh) => (CommandStatus::Success, dh.samples()),
                         None => (CommandStatus::NotFound, Default::default()),
                     }
@@ -212,7 +217,7 @@ impl PayloadCommands {
                 Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
                     cmd.header.sequence,
                     status,
-                    cmd.dh_id,
+                    cmd.name.clone(),
                     samples.sent,
                     samples.received,
                 ))
@@ -220,7 +225,7 @@ impl PayloadCommands {
             Command::ConfigDH(cmd) => {
                 // Refused rather than answered Success. Nothing here
                 // configures a data handler, and the command carries nothing
-                // to configure it with: ConfigDHCommand has a dh_id and a
+                // to configure it with: ConfigDHCommand has a name and a
                 // note that settings could be added to it. Answering Success
                 // told the ground a handler had been reconfigured when
                 // nothing had happened, which is worse than saying so,
@@ -230,8 +235,8 @@ impl PayloadCommands {
                 // fail to be configured, the command is one tcspecial does
                 // not implement.
                 error!(
-                    "CONFIG_DH for {:?} refused: tcspecial does not implement it",
-                    cmd.dh_id
+                    "CONFIG_DH for {} refused: tcspecial does not implement it",
+                    cmd.name.0
                 );
                 Telemetry::ConfigDH(tcslibgs::ConfigDHTelemetry::new(
                     cmd.header.sequence,
@@ -339,7 +344,7 @@ pub struct CommandInterpreter {
     /// Whether that thread should still be serving. Cleared by `stop` and
     /// `shutdown`, which is how a loop in another thread is told.
     serving: Arc<AtomicBool>,
-    data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
+    data_handlers: Arc<Mutex<BTreeMap<DHName, DataHandler>>>,
     payload_config: Arc<Vec<DHConfig>>,
     arm_key: Option<ArmKey>,
     arm_time: Option<Instant>,
@@ -393,23 +398,23 @@ pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
 /// the operator are the new set's -- and the only sign of it was a status with
 /// no explanation. So this says what this process does serve, which is the
 /// fact that identifies the stale end.
-fn no_such_handler(name: &DHName, dh_id: DHId, configs: &[DHConfig]) -> String {
+fn no_such_handler(name: &DHName, configs: &[DHConfig]) -> String {
     let served = if configs.is_empty() {
         "no handlers at all".to_string()
     } else {
         configs
             .iter()
-            .map(|c| format!("{} ({})", c.dh_id.0, c.name.0))
+            .map(|c| c.name.0.clone())
             .collect::<Vec<_>>()
             .join(", ")
     };
 
     format!(
-        "{}: START_DH names dh_id {}, which this tcspecial does not have; it \
-         serves {}. The ground and this process are reading different payload \
+        "START_DH names the handler {}, which this tcspecial does not have; it \
+         serves {}. The ground and this process are reading different \
          configurations -- most often a tcspecial left running from an earlier \
          payload set, which a tcsmoc attaches to rather than replacing",
-        name.0, dh_id.0, served
+        name.0, served
     )
 }
 
@@ -571,7 +576,7 @@ impl CommandInterpreter {
 
         for config in self.payload_config.iter() {
             let dh = DataHandler::new(config.clone())?;
-            handlers.insert(config.dh_id, dh);
+            handlers.insert(config.name.clone(), dh);
         }
 
         Ok(())
@@ -842,17 +847,15 @@ mod tests {
     ///
     /// What this was written for: a tcsmoc showing payload set 2's two panels
     /// pressed Transmit on the second and was answered `NotFound` with the
-    /// payload's name in it, which reads as a name that was looked up and
-    /// missed. Nothing is looked up by name -- the id is what addresses a
-    /// handler -- and the real cause was a tcspecial left running from before
-    /// that payload set had a second payload, which the panels had attached
-    /// to. The status alone could not say that, so the log now does.
+    /// payload's name in it and nothing else: the real cause was a tcspecial
+    /// left running from before that payload set had a second payload, which
+    /// the panels had attached to. The status alone could not say that, so the
+    /// log now says which handlers this process does serve.
     #[test]
     fn a_start_dh_for_a_handler_that_is_not_here_says_what_is_here() {
         use tcslibgs::{DHConfig, DHName, DHType, DeviceConfig, EndpointConfig, StartDHCommand};
 
         let handler = DHConfig {
-            dh_id: DHId(0),
             name: DHName::new("auto-send"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/urandom".to_string(),
@@ -884,7 +887,6 @@ mod tests {
         // The one this process has not got, named as the ground names it.
         match ci.payload.process(Command::StartDH(StartDHCommand::new(
             1,
-            DHId(1),
             DHType::Network,
             DHName::new("triggered-send"),
         ))) {
@@ -894,18 +896,20 @@ mod tests {
             other => panic!("expected START_DH telemetry, got {other:?}"),
         }
 
-        // And the message says which payload was asked for, which id it came
-        // in as, and what this process does serve -- the three facts that tell
-        // an operator the two ends are reading different files.
-        let said = no_such_handler(&DHName::new("triggered-send"), DHId(1), &ci.payload_config);
-        assert!(said.contains("triggered-send"), "no payload named: {said}");
-        assert!(said.contains("dh_id 1"), "no id said: {said}");
+        // And the message says which payload was asked for and what this
+        // process does serve -- the two facts that tell an operator the two
+        // ends are reading different files.
+        let said = no_such_handler(&DHName::new("triggered-send"), &ci.payload_config);
         assert!(
-            said.contains("0 (auto-send)"),
+            said.contains("triggered-send"),
+            "the handler asked for is not named: {said}"
+        );
+        assert!(
+            said.contains("auto-send"),
             "it does not say what is served: {said}"
         );
         assert!(
-            said.contains("different payload configurations"),
+            said.contains("different configurations"),
             "it does not say what that usually means: {said}"
         );
     }
@@ -939,7 +943,6 @@ mod tests {
         drop(oc);
 
         let handler = DHConfig {
-            dh_id: DHId(1),
             name: DHName::new("triggered-send"),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Tcp,
@@ -979,7 +982,6 @@ mod tests {
 
         match ci.payload.process(Command::StartDH(StartDHCommand::new(
             1,
-            DHId(1),
             DHType::Network,
             DHName::new("triggered-send"),
         ))) {
@@ -1036,7 +1038,7 @@ mod tests {
     fn a_tcspecial_serving_nothing_says_so() {
         use tcslibgs::DHName;
 
-        let said = no_such_handler(&DHName::new("auto-send"), DHId(0), &[]);
+        let said = no_such_handler(&DHName::new("auto-send"), &[]);
         assert!(
             said.contains("no handlers at all"),
             "an empty configuration is not said: {said}"
@@ -1056,7 +1058,6 @@ mod tests {
         use tcslibgs::{DHConfig, DHName, DHType, DeviceConfig, EndpointConfig, StartDHCommand};
 
         let handler = DHConfig {
-            dh_id: DHId(2),
             name: DHName::new("DH2"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/urandom".to_string(),
@@ -1091,7 +1092,6 @@ mod tests {
         for wrong in [DHType::Network, DHType::Serial, DHType::I2c, DHType::Spi] {
             match ci.payload.process(Command::StartDH(StartDHCommand::new(
                 1,
-                DHId(2),
                 wrong,
                 DHName::new("DH2"),
             ))) {
@@ -1110,7 +1110,7 @@ mod tests {
         let handlers = ci.data_handlers.lock().expect("the handler map");
         assert_eq!(
             handlers
-                .get(&DHId(2))
+                .get(&DHName::new("DH2"))
                 .expect("the handler is still there")
                 .state(),
             DHState::Created
@@ -1135,7 +1135,6 @@ mod tests {
         drop(oc);
 
         let handler = DHConfig {
-            dh_id: DHId(2),
             name: DHName::new("DH2"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/urandom".to_string(),
@@ -1174,7 +1173,6 @@ mod tests {
 
         match ci.payload.process(Command::StartDH(StartDHCommand::new(
             1,
-            DHId(2),
             tcslibgs::DHType::Device,
             DHName::new("DH2"),
         ))) {
@@ -1214,7 +1212,7 @@ mod tests {
 
         let stats = match ci.payload.process(Command::QueryDH(tcslibgs::QueryDHCommand::new(
             2,
-            DHId(2),
+            DHName::new("DH2"),
         ))) {
             Telemetry::QueryDH(tm) => tm.statistics,
             other => panic!("expected QUERY_DH telemetry, got {other:?}"),
@@ -1243,7 +1241,6 @@ mod tests {
         drop(probe);
 
         let handler = DHConfig {
-            dh_id: DHId(2),
             name: DHName::new("DH2"),
             endpoint: EndpointConfig::Device(DeviceConfig {
                 path: "/dev/urandom".to_string(),
@@ -1279,7 +1276,6 @@ mod tests {
         for attempt in 1..=2 {
             match ci.payload.process(Command::StartDH(StartDHCommand::new(
                 attempt,
-                DHId(2),
                 tcslibgs::DHType::Device,
                 DHName::new("DH2"),
             ))) {
@@ -1384,7 +1380,12 @@ mod tests {
     fn config_dh_is_refused_rather_than_answered_with_success() {
         let ci = interpreter();
 
-        let answer = ci.payload.process(Command::ConfigDH(ConfigDHCommand::new(7, DHId(0))));
+        let answer = ci
+            .payload
+            .process(Command::ConfigDH(ConfigDHCommand::new(
+                7,
+                DHName::new("whoever"),
+            )));
 
         match answer {
             Telemetry::ConfigDH(tm) => {
@@ -1430,7 +1431,6 @@ mod tests {
         // A payload command, offered to the spacecraft link.
         match ci.process_command(Command::StartDH(StartDHCommand::new(
             7,
-            DHId(0),
             DHType::Network,
             DHName::new("whoever"),
         ))) {
@@ -1457,7 +1457,6 @@ mod tests {
         // command arrived on and not about commands being refused.
         match ci.payload.process(Command::StartDH(StartDHCommand::new(
             9,
-            DHId(0),
             DHType::Network,
             DHName::new("whoever"),
         ))) {
@@ -1530,7 +1529,6 @@ mod tests {
             .expect("a timeout");
         let asked = serde_json::to_vec(&Command::StartDH(StartDHCommand::new(
             11,
-            DHId(0),
             DHType::Network,
             DHName::new("whoever"),
         )))
@@ -1585,7 +1583,6 @@ mod tests {
 
         let stuck = serde_json::to_vec(&Command::StartDH(StartDHCommand::new(
             20,
-            DHId(0),
             DHType::Network,
             DHName::new("whoever"),
         )))

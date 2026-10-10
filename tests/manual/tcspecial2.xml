@@ -25,7 +25,6 @@
         <log_segment_bytes>65536</log_segment_bytes>
     </tcspecial>
     <payloads>
-        <dh_id>0</dh_id>
         <name>auto-send</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6000</oc_port>
@@ -36,7 +35,6 @@
         <packet_size>12</packet_size>
     </payloads>
     <payloads>
-        <dh_id>1</dh_id>
         <name>triggered-send</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6003</oc_port>

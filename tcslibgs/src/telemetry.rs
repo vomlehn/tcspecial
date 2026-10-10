@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{CommandStatus, DHId, DHSample, Statistics, Timestamp};
+use crate::types::{CommandStatus, DHName, DHSample, Statistics, Timestamp};
 
 /// Telemetry message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -200,18 +200,23 @@ impl StopDHTelemetry {
 }
 
 /// QUERY_DH telemetry response
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QueryDHTelemetry {
     pub header: TelemetryHeader,
-    pub dh_id: DHId,
+    pub name: DHName,
     pub statistics: Statistics,
 }
 
 impl QueryDHTelemetry {
-    pub fn new(sequence: u32, status: CommandStatus, dh_id: DHId, statistics: Statistics) -> Self {
+    pub fn new(
+        sequence: u32,
+        status: CommandStatus,
+        name: DHName,
+        statistics: Statistics,
+    ) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, TelemetryType::QueryDH, status),
-            dh_id,
+            name,
             statistics,
         }
     }
@@ -223,10 +228,10 @@ impl QueryDHTelemetry {
 /// it happened. Either may be empty, which is what a handler that has moved
 /// nothing in that direction looks like -- distinct from a handler that has
 /// moved zero bytes, which cannot happen.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QueryDHSampleTelemetry {
     pub header: TelemetryHeader,
-    pub dh_id: DHId,
+    pub name: DHName,
     pub sent: DHSample,
     pub received: DHSample,
 }
@@ -235,13 +240,13 @@ impl QueryDHSampleTelemetry {
     pub fn new(
         sequence: u32,
         status: CommandStatus,
-        dh_id: DHId,
+        name: DHName,
         sent: DHSample,
         received: DHSample,
     ) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, TelemetryType::QueryDHSample, status),
-            dh_id,
+            name,
             sent,
             received,
         }
@@ -360,13 +365,13 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
         Command::QueryDH(cmd) => Telemetry::QueryDH(QueryDHTelemetry::new(
             sequence,
             status,
-            cmd.dh_id,
+            cmd.name.clone(),
             Statistics::new(),
         )),
         Command::QueryDHSample(cmd) => Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
             sequence,
             status,
-            cmd.dh_id,
+            cmd.name.clone(),
             DHSample::new(),
             DHSample::new(),
         )),
@@ -513,13 +518,13 @@ mod tests {
             Telemetry::QueryDH(QueryDHTelemetry::new(
                 7,
                 CommandStatus::Success,
-                DHId(0),
+                DHName::new("DH0"),
                 Statistics::new(),
             )),
             Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
                 8,
                 CommandStatus::Success,
-                DHId(0),
+                DHName::new("DH0"),
                 DHSample::new(),
                 DHSample::new(),
             )),

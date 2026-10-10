@@ -37,8 +37,7 @@ tcspecial:
   log_segment_bytes: 65536
 
 payloads:
-  - dh_id: 0
-    name: auto-send
+  - name: auto-send
     oc_address: 127.0.0.1
     oc_port: 6000
     type: network

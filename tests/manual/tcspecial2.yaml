@@ -40,8 +40,7 @@ tcspecial:
 payloads:
   # Sends of its own accord: nothing here about timing, since how fast a
   # simulated payload sends is a property of the simulation.
-  - dh_id: 0
-    name: auto-send
+  - name: auto-send
     oc_address: 127.0.0.1
     oc_port: 6000
     type: network
@@ -57,8 +56,7 @@ payloads:
   # TCP rather than UDP because a datagram handler learns where its payload is
   # from the payload's first packet, so it has nowhere to send a trigger until
   # the payload has spoken, which a triggered payload does not do.
-  - dh_id: 1
-    name: triggered-send
+  - name: triggered-send
     oc_address: 127.0.0.1
     oc_port: 6003
     type: network

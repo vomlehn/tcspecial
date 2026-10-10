@@ -92,8 +92,8 @@ from the group it names, so a group holds what several handlers share.
      ...          any of the attributes below
 
    payloads
-     dh_id        the handler's number, which commands name it by
-     name         the handler's name, which the panels show
+     name         the handler's name, which commands address it by and the
+                  panels show
      group        the group to take unstated attributes from, if any
      ...          any of the attributes below
 
@@ -115,8 +115,8 @@ Attributes Every Payload Has
 ----------------------------
 .. code-block:: text
 
-   dh_id          the handler's number, which commands name it by
-   name           the handler's name, which the panels show
+   name           the handler's name, which commands address it by and the
+                  panels show
    group          the group to take unstated attributes from, if any
    type           network | device | serial | i2c | spi
    packet_size    bytes in one packet
@@ -130,10 +130,12 @@ Attributes Every Payload Has
    packet_interval_ms
                   how often the trigger is sent               triggered only
 
-``dh_id`` and ``name`` belong to a handler and never to a group: they are what
-tell one handler of a group from another. An OC address and an OC port are
-given together or not at all, and a handler needs them before it can be
-started.
+``name`` belongs to a handler and never to a group: it is what tells one
+handler of a group from another, and what every command about a handler names
+it by. There is no number beside it -- a handler used to state a ``dh_id`` as
+well, which was a second identity for one payload to keep consistent by hand.
+An OC address and an OC port are given together or not at all, and a handler
+needs them before it can be started.
 
 The two kinds of payload
 ------------------------
@@ -192,8 +194,7 @@ states a trigger that a YAML one states with the format's own escapes.
 
    payloads:
      # Sends on its own: nothing here about timing.
-     - dh_id: 0
-       name: auto-send
+     - name: auto-send
        oc_address: 127.0.0.1
        oc_port: 6000
        type: network
@@ -204,8 +205,7 @@ states a trigger that a YAML one states with the format's own escapes.
 
      # Answers a request: both halves of the request are here, and the rate
      # is the rate the trigger goes out at.
-     - dh_id: 1
-       name: triggered-send
+     - name: triggered-send
        oc_address: 127.0.0.1
        oc_port: 6001
        type: network
@@ -401,12 +401,12 @@ What the Configuration Will Not Let Pass
 These mistakes are refused rather than ignored, because each of them
 otherwise produces a payload that looks configured and is not:
 
-* A **repeated name or ``dh_id``**. Both pick out one payload: tcspecial keeps
-  its handlers by id, so a repeated id has one silently replace the other, and
-  a simulator configuration is joined to the payloads by name, so a repeated
-  name has one entry drive two payloads. The rule reaches no further than the
-  file -- two sets may name their payloads and their groups alike, and the
-  shipped examples do.
+* A **repeated name**. A name picks out one payload: tcspecial keeps its
+  handlers by name, so a repeat has one silently replace the other, and a
+  simulator configuration is joined to the payloads by name, so it would drive
+  two payloads from one entry. The rule reaches no further than the file --
+  two sets may name their payloads and their groups alike, and the shipped
+  examples do.
 * An **attribute of another kind** -- a device payload stating ``protocol``,
   ``address`` or ``port``, or a network payload stating ``path``. The check is
   made after the group has been laid under the payload, since an attribute
@@ -461,8 +461,7 @@ in the MOC shows.
        address: localhost
 
    payloads:
-     - dh_id: 0
-       name: tcp-stream
+     - name: tcp-stream
        oc_address: 127.0.0.1
        oc_port: 6000
        type: network
@@ -471,24 +470,21 @@ in the MOC shows.
        port: 5000
        packet_size: 12
 
-     - dh_id: 1
-       name: udp-steady
+     - name: udp-steady
        oc_address: 127.0.0.1
        oc_port: 6001
        group: udp_localhost
        port: 5001
        packet_size: 11
 
-     - dh_id: 2
-       name: random-device
+     - name: random-device
        oc_address: 127.0.0.1
        oc_port: 6002
        type: device
        path: /dev/urandom
        packet_size: 1
 
-     - dh_id: 3
-       name: udp-fast
+     - name: udp-fast
        oc_address: 127.0.0.1
        oc_port: 6003
        group: udp_localhost
@@ -1164,13 +1160,13 @@ by and asked with:
 
 .. code-block:: console
 
-   triggered payload triggered-send: dh_id 1, TCP localhost:5003, trigger 0x67 6F ("go") every 1000 ms, OC 127.0.0.1:6003, status Stopped
+   triggered payload triggered-send: TCP localhost:5003, trigger 0x67 6F ("go") every 1000 ms, OC 127.0.0.1:6003, status Stopped
 
 Then one line for every command sent about it. A press of its button:
 
 .. code-block:: console
 
-   triggered payload triggered-send: Enable pressed: sending START_DH for dh_id 1 as a Network handler
+   triggered payload triggered-send: Enable pressed: sending START_DH as a Network handler
    triggered payload triggered-send: START_DH answered Success, so the panel now says Active
 
 and one from the refresh, carrying the status each answer came back with and

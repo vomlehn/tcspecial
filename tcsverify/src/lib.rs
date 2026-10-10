@@ -278,13 +278,11 @@ mod tests {
 version: \"1.0\"
 description: two payloads
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: device
     path: /dev/zero
     packet_size: 4
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     type: network
     protocol: udp
     address: localhost
@@ -332,16 +330,13 @@ simulated_payloads:
 version: \"1.0\"
 description: three bad payloads
 payloads:
-  - dh_id: 0
-    name: no_size
+  - name: no_size
     type: device
     path: /dev/zero
-  - dh_id: 1
-    name: no_path
+  - name: no_path
     type: device
     packet_size: 4
-  - dh_id: 2
-    name: bad_kind
+  - name: bad_kind
     type: device
     path: /dev/null
     port: 5000
@@ -356,7 +351,7 @@ payloads:
         // Each beside the payload it is about, in the order the file wrote
         // them.
         let lines: Vec<usize> = report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![5, 9, 13]);
+        assert_eq!(lines, vec![4, 7, 10]);
         assert!(
             report.findings[0].message.contains("packet_size"),
             "{:?}",
@@ -412,7 +407,7 @@ payloads:
     /// A file that does not parse is reported from where the parser stopped.
     #[test]
     fn a_file_that_does_not_parse_says_where_it_stopped() {
-        let text = "version: \"1.0\"\ndescription: x\npayloads:\n  - dh_id: 0\n   name: bad\n";
+        let text = "version: \"1.0\"\ndescription: x\npayloads:\n  - name: bad\n";
         let set = written(".yaml", text, GOOD_SIM);
         let report = verify(&set.payload, None);
         assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
@@ -512,7 +507,7 @@ simulated_payloads:
     /// problems this program caused rather than found.
     #[test]
     fn a_broken_payload_file_is_not_joined_to() {
-        let text = GOOD.replace("    packet_size: 4\n  - dh_id: 1", "  - dh_id: 1");
+        let text = GOOD.replace("    packet_size: 4\n  - name: DH1", "  - name: DH1");
         let set = written(".yaml", &text, GOOD_SIM);
         let report = verify(&set.payload, Some(&set.sim));
 
@@ -528,7 +523,7 @@ simulated_payloads:
     /// file is like.
     #[test]
     fn a_simulator_file_is_read_even_when_the_other_one_is_broken() {
-        let text = GOOD.replace("    packet_size: 4\n  - dh_id: 1", "  - dh_id: 1");
+        let text = GOOD.replace("    packet_size: 4\n  - name: DH1", "  - name: DH1");
         let set = written(
             ".yaml",
             &text,
@@ -550,7 +545,7 @@ simulated_payloads:
         let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
         for id in 0..150 {
             text.push_str(&format!(
-                "  - dh_id: {id}\n    name: DH{id}\n    type: device\n    \
+                "  - name: DH{id}\n    type: device\n    \
                  path: /dev/null{id}\n    port: 1\n    packet_size: 4\n"
             ));
         }
@@ -580,7 +575,7 @@ simulated_payloads:
         let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
         for id in 0..ERROR_LIMIT {
             text.push_str(&format!(
-                "  - dh_id: {id}\n    name: DH{id}\n    type: device\n    \
+                "  - name: DH{id}\n    type: device\n    \
                  path: /dev/null{id}\n    port: 1\n    packet_size: 4\n"
             ));
         }

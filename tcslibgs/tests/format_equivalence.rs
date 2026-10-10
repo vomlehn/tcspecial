@@ -83,7 +83,6 @@ fn the_actual_file_has_expected_contents() {
 
     // A handler in the group states only what the group does not carry.
     let network = &config.payloads[0];
-    assert_eq!(network.dh_id, 0);
     assert_eq!(network.group.as_deref(), Some("udp_localhost"));
     assert_eq!(network.dh_type, None);
     assert_eq!(network.packet_size, None);
@@ -134,8 +133,7 @@ fn a_handler_naming_an_undefined_group_is_rejected() {
             "version: \"1.0\"
 description: one handler naming a group that is not there
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: nonesuch
     port: 5000
     packet_size: 1
@@ -165,8 +163,7 @@ payload_groups:
     type: device
     path: /dev/null
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: dup
     port: 5000
     packet_size: 1
@@ -235,8 +232,7 @@ fn a_tcspecial_section_that_could_never_be_used_is_refused() {
             "version: \"1.0\"
 description: a set whose tcspecial section is wrong
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: device
     path: /dev/null
     packet_size: 1

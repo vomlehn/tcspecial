@@ -18,7 +18,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    ArmKey, BeaconTime, Command, CommandLink, CommandStatus, ConfigCommand, DHId, DHName,
+    ArmKey, BeaconTime, Command, CommandLink, CommandStatus, ConfigCommand, DHName,
     DHSample, DHType, Timestamp,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
     ConfigDigest, ConfigVersion, ConnectCommand,
@@ -226,9 +226,9 @@ impl TcsClient {
     // -- per data handler --------------------------------------------------
 
     /// Send a START_DH command
-    pub fn start_dh(&mut self, dh_id: DHId, dh_type: DHType, name: DHName) -> TcsResult<CommandStatus> {
+    pub fn start_dh(&mut self, dh_type: DHType, name: DHName) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
-        let cmd = Command::StartDH(StartDHCommand::new(seq, dh_id, dh_type, name));
+        let cmd = Command::StartDH(StartDHCommand::new(seq, dh_type, name));
         let response = self.send_command(cmd)?;
 
         match response {
@@ -238,9 +238,9 @@ impl TcsClient {
     }
 
     /// Send a STOP_DH command
-    pub fn stop_dh(&mut self, dh_id: DHId) -> TcsResult<CommandStatus> {
+    pub fn stop_dh(&mut self, name: DHName) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
-        let cmd = Command::StopDH(StopDHCommand::new(seq, dh_id));
+        let cmd = Command::StopDH(StopDHCommand::new(seq, name));
         let response = self.send_command(cmd)?;
 
         match response {
@@ -250,9 +250,9 @@ impl TcsClient {
     }
 
     /// Send a QUERY_DH command
-    pub fn query_dh(&mut self, dh_id: DHId) -> TcsResult<(CommandStatus, Statistics)> {
+    pub fn query_dh(&mut self, name: DHName) -> TcsResult<(CommandStatus, Statistics)> {
         let seq = self.next_sequence();
-        let cmd = Command::QueryDH(QueryDHCommand::new(seq, dh_id));
+        let cmd = Command::QueryDH(QueryDHCommand::new(seq, name));
         let response = self.send_command(cmd)?;
 
         match response {
@@ -266,10 +266,10 @@ impl TcsClient {
     /// Returns what the handler last sent and last received, in that order.
     pub fn query_dh_sample(
         &mut self,
-        dh_id: DHId,
+        name: DHName,
     ) -> TcsResult<(CommandStatus, DHSample, DHSample)> {
         let seq = self.next_sequence();
-        let cmd = Command::QueryDHSample(QueryDHSampleCommand::new(seq, dh_id));
+        let cmd = Command::QueryDHSample(QueryDHSampleCommand::new(seq, name));
         let response = self.send_command(cmd)?;
 
         match response {

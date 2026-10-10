@@ -106,8 +106,9 @@ CI must have an element named dh of type BTreeMap
 
 .. note::
    Implemented, named ``data_handlers``, and behind a mutex and a reference
-   count: ``Arc<Mutex<BTreeMap<DHId, DataHandler>>>``. Two command links and
-   the handlers' own threads reach it.
+   count: ``Arc<Mutex<BTreeMap<DHName, DataHandler>>>``. Keyed by name, a
+   handler having no number; two command links and the handlers' own threads
+   reach it.
 
 CI must support sending telemetry responses to all CI commands
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

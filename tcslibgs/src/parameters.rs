@@ -29,7 +29,6 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
     // reached. This half is flight configuration -- tcspecial serves it and
     // the ground controls it -- which is why it is first.
     let _ = writeln!(out, "From the payload configuration");
-    let _ = writeln!(out, "  dh_id            {}", dh.dh_id.0);
     let _ = writeln!(out, "  name             {}", dh.name.0);
     let _ = writeln!(out, "  type             {}", dh.endpoint.kind().spelling());
     endpoint_parameters(&mut out, &dh.endpoint);
@@ -290,12 +289,11 @@ mod tests {
     use super::*;
     use crate::sim_config::SimConfigFile;
     use crate::{
-        ConfigFormat, DHId, DHName, DeviceConfig, I2cConfig, NetworkConfig, SpiConfig,
+        ConfigFormat, DHName, DeviceConfig, I2cConfig, NetworkConfig, SpiConfig,
     };
 
     fn udp(name: &str) -> DHConfig {
         DHConfig {
-            dh_id: DHId(2),
             name: DHName::new(name),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,
@@ -340,7 +338,6 @@ mod tests {
 
         for said in [
             "From the payload configuration",
-            "dh_id            2",
             "name             DH2",
             "type             network",
             "protocol         udp",

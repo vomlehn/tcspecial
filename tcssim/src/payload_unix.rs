@@ -324,7 +324,6 @@ mod tests {
 
     fn payload_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
-            _id: 0,
             name: "DH0".to_string(),
             protocol,
             address: path.display().to_string(),

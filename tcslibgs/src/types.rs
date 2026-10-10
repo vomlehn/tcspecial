@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use crate::endpoint_config_serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
 use crate::endpoint_config_spi::{BitOrder, CsActive, SpiMode};
 use crate::verify::Problem;
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -90,22 +89,6 @@ impl Timestamp {
             (within_a_day % 3600) / 60,
             within_a_day % 60
         )
-    }
-}
-
-/// Data handler identifier
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct DHId(pub u32);
-
-impl Ord for DHId {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl PartialOrd for DHId {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
     }
 }
 
@@ -382,7 +365,13 @@ impl NetworkProtocol {
 }
 
 /// Data handler name
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// What a handler is called and what it is addressed by: commands name a
+/// handler with it, telemetry answers with it, and tcspecial keeps its
+/// handlers in order of it. Ordered and hashed for that reason -- a name is a
+/// map key -- and the configuration holds every name in a file to being
+/// distinct, there being nothing else to tell two handlers apart.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DHName(pub String);
 
 impl DHName {
@@ -772,7 +761,6 @@ impl DHMode {
 /// handlers, and that is a comparison rather than an inspection.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DHConfig {
-    pub dh_id: DHId,
     pub name: DHName,
     pub endpoint: EndpointConfig,
     pub packet_size: usize,
@@ -1045,24 +1033,14 @@ impl PayloadConfig {
             }
         }
 
-        // A payload is addressed by its id and found by its name, and both
-        // have to pick out one payload. A repeat of either parses cleanly and
-        // then loses a payload: tcspecial keeps its handlers by id, so a
-        // repeated id has one silently replace the other, and a simulator
-        // file is joined to this one by name, so a repeated name has one
-        // entry drive two payloads.
-        let mut by_id: BTreeMap<u32, &str> = BTreeMap::new();
+        // A payload is addressed by its name and found by its name, so a
+        // name has to pick out one payload. A repeat parses cleanly and then
+        // loses one: tcspecial keeps its handlers by name, so a repeated name
+        // has one silently replace the other, and a simulator configuration
+        // is joined to this one by name, so it would drive two payloads from
+        // one entry.
         let mut by_name: BTreeSet<&str> = BTreeSet::new();
         for payload in &self.payloads {
-            if let Some(first) = by_id.insert(payload.dh_id, payload.name.as_str()) {
-                problems.push(Problem::payload(
-                    &payload.name,
-                    format!(
-                        "payloads \"{}\" and \"{}\" share dh_id {}",
-                        first, payload.name, payload.dh_id
-                    ),
-                ));
-            }
             if !by_name.insert(payload.name.as_str()) {
                 problems.push(Problem::payload(
                     &payload.name,
@@ -1162,8 +1140,8 @@ impl PayloadConfig {
 ///
 /// Every attribute is optional, so a group carries exactly what its handlers
 /// have in common and no more. What a group deliberately cannot carry is a
-/// `dh_id` or a `name`: those are what tell one handler of a group from
-/// another, and so belong to the handler.
+/// `name`: that is what tells one handler of a group from another, and so
+/// belongs to the handler.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct DHGroupJson {
@@ -1294,12 +1272,11 @@ pub struct StreamJson {
 
 /// The file-level form of a data handler's configuration
 ///
-/// Every attribute but `dh_id` and `name` is optional, because a handler
-/// naming a group need only state what it does not take from that group.
+/// Every attribute but `name` is optional, because a handler naming a group
+/// need only state what it does not take from that group.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct DHConfigJson {
-    pub dh_id: u32,
     pub name: String,
     /// Name of the group supplying the attributes this handler does not state.
     #[serde(default)]
@@ -1695,7 +1672,6 @@ impl DHConfigJson {
         };
 
         Ok(DHConfig {
-            dh_id: DHId(self.dh_id),
             name: DHName::new(&self.name),
             endpoint,
             packet_size: packet_size.ok_or("Missing packet_size")?,
@@ -1896,7 +1872,6 @@ mod tests {
         use super::*;
 
         let dh = DHConfigJson {
-            dh_id: 0,
             name: "DH0".to_string(),
             group: None,
             dh_type: Some("device".to_string()),
@@ -1924,7 +1899,6 @@ mod tests {
         use super::*;
 
         let dh = DHConfigJson {
-            dh_id: 1,
             name: "DH1".to_string(),
             group: None,
             dh_type: Some("network".to_string()),
@@ -1963,7 +1937,6 @@ mod tests {
 
         let bare = |mode: Option<&str>, trigger: Option<&str>, interval: Option<u32>| {
             DHConfigJson {
-                dh_id: 2,
                 name: "DH2".to_string(),
                 group: None,
                 dh_type: Some("network".to_string()),
@@ -2017,7 +1990,6 @@ mod tests {
 
         for protocol in ["udp", "unix_dgram"] {
             let dh = DHConfigJson {
-                dh_id: 3,
                 name: "DH3".to_string(),
                 group: None,
                 dh_type: Some("network".to_string()),
@@ -2099,13 +2071,6 @@ mod tests {
     }
 
     use super::*;
-
-    #[test]
-    fn test_dhid_ordering() {
-        let id1 = DHId(1);
-        let id2 = DHId(2);
-        assert!(id1 < id2);
-    }
 
     #[test]
     fn test_timestamp_now() {
@@ -2278,13 +2243,11 @@ payload_groups:
     protocol: udp
     address: localhost
 payloads:
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     group: udp_localhost
     port: 5001
     packet_size: 11
-  - dh_id: 3
-    name: DH3
+  - name: DH3
     group: udp_localhost
     port: 5003
     packet_size: 15
@@ -2328,8 +2291,7 @@ payload_groups:
     address: localhost
     packet_size: 11
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: udp_localhost
     protocol: tcp
     port: 5000
@@ -2358,8 +2320,7 @@ payloads:
 version: \"1.0\"
 description: a handler stating everything for itself
 payloads:
-  - dh_id: 2
-    name: DH2
+  - name: DH2
     type: device
     path: /dev/urandom
     packet_size: 1
@@ -2388,8 +2349,7 @@ payload_groups:
     address: localhost
     oc_address: 127.0.0.1
 payloads:
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     group: udp_localhost
     oc_port: 6001
     port: 5001
@@ -2418,8 +2378,7 @@ payloads:
 version: \"1.0\"
 description: no OC side at all
 payloads:
-  - dh_id: 2
-    name: DH2
+  - name: DH2
     type: device
     path: /dev/urandom
     packet_size: 1
@@ -2442,8 +2401,7 @@ payloads:
 version: \"1.0\"
 description: half an OC address
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     {line}
     type: device
     path: /dev/urandom
@@ -2471,7 +2429,7 @@ payloads:
     #[test]
     fn a_payload_file_describes_a_serial_payload() {
         let yaml = "version: \"1.0\"\ndescription: a line\n\
-                    payloads:\n  - dh_id: 0\n    name: line\n    type: serial\n    \
+                    payloads:\n  - name: line\n    type: serial\n    \
                     path: /dev/ttyS0\n    datarate: 115200\n    asynchronous: true\n    \
                     stop_bits: 1\n    parity: none\n    byte_length: 8\n    \
                     packet_size: 12\n    stream:\n      max_length: 12\n      \
@@ -2501,7 +2459,7 @@ payloads:
     #[test]
     fn a_payload_file_describes_a_bus_and_a_peripheral() {
         let i2c = "version: \"1.0\"\ndescription: a bus\n\
-                   payloads:\n  - dh_id: 0\n    name: sensor\n    type: i2c\n    \
+                   payloads:\n  - name: sensor\n    type: i2c\n    \
                    path: /dev/i2c-1\n    address: 0x48\n    pec: true\n    \
                    packet_size: 8\n";
         let config: PayloadConfig = ConfigFormat::Yaml.parse(i2c).expect("it parses");
@@ -2515,7 +2473,7 @@ payloads:
         }
 
         let spi = "version: \"1.0\"\ndescription: a peripheral\n\
-                   payloads:\n  - dh_id: 0\n    name: imu\n    type: spi\n    \
+                   payloads:\n  - name: imu\n    type: spi\n    \
                    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 3\n    \
                    bits_per_word: 8\n    packet_size: 8\n";
         let config: PayloadConfig = ConfigFormat::Yaml.parse(spi).expect("it parses");
@@ -2538,7 +2496,7 @@ payloads:
     #[test]
     fn a_links_own_rules_survived_the_move() {
         let serial = "version: \"1.0\"\ndescription: a line\n\
-                      payloads:\n  - dh_id: 0\n    name: line\n    type: serial\n    \
+                      payloads:\n  - name: line\n    type: serial\n    \
                       path: /dev/ttyS0\n    datarate: 9600\n    asynchronous: true\n    \
                       stop_bits: 1\n    byte_length: 8\n    clock_type: txint\n    \
                       packet_size: 1\n    stream:\n      max_length: 1\n      \
@@ -2551,7 +2509,7 @@ payloads:
         assert!(said.contains("clock_type"), "{said}");
 
         let spi = "version: \"1.0\"\ndescription: a peripheral\n\
-                   payloads:\n  - dh_id: 0\n    name: imu\n    type: spi\n    \
+                   payloads:\n  - name: imu\n    type: spi\n    \
                    path: /dev/spidev0.0\n    max_speed: 1000000\n    \
                    bits_per_word: 8\n    packet_size: 8\n";
         let said = ConfigFormat::Yaml
@@ -2562,7 +2520,7 @@ payloads:
         assert!(said.contains("mode"), "{said}");
 
         let reserved = "version: \"1.0\"\ndescription: a bus\n\
-                        payloads:\n  - dh_id: 0\n    name: sensor\n    type: i2c\n    \
+                        payloads:\n  - name: sensor\n    type: i2c\n    \
                         path: /dev/i2c-1\n    address: 0x00\n    packet_size: 8\n";
         let said = ConfigFormat::Yaml
             .parse::<PayloadConfig>(reserved)
@@ -2578,18 +2536,18 @@ payloads:
             (
                 ConfigFormat::Yaml,
                 "version: \"1.0\"\ndescription: two\npayloads:\n  \
-                 - dh_id: 0\n    name: first\n    type: device\n    path: /dev/null\n    \
+                 - name: first\n    type: device\n    path: /dev/null\n    \
                  packet_size: 1\n  \
-                 - dh_id: 1\n    name: second\n    type: device\n    path: /dev/zero\n    \
+                 - name: second\n    type: device\n    path: /dev/zero\n    \
                  packet_size: 2\n"
                     .to_string(),
             ),
             (
                 ConfigFormat::Xml,
                 "<payload><version>1.0</version><description>two</description>\
-                 <payloads><dh_id>0</dh_id><name>first</name><type>device</type>\
+                 <payloads><name>first</name><type>device</type>\
                  <path>/dev/null</path><packet_size>1</packet_size></payloads>\
-                 <payloads><dh_id>1</dh_id><name>second</name><type>device</type>\
+                 <payloads><name>second</name><type>device</type>\
                  <path>/dev/zero</path><packet_size>2</packet_size></payloads></payload>"
                     .to_string(),
             ),
@@ -2618,7 +2576,7 @@ payloads:
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
                  address: 0.0.0.0\n{ports}  protocol: udp\n  \
                  beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
-                 beacon_interface: 127.0.0.1\npayloads:\n  - dh_id: 0\n    \
+                 beacon_interface: 127.0.0.1\npayloads:\n  - \
                  name: p\n    type: device\n    path: /dev/null\n    \
                  packet_size: 1\n"
             )
@@ -2660,7 +2618,7 @@ payloads:
                  address: {address}\n  port: 4000\n  payload_port: 4001\n  \
                  protocol: udp\n  beacon_interval_ms: 5000\n  \
                  beacon_address: 239.255.0.1:5550\n  \
-                 beacon_interface: 127.0.0.1\npayloads:\n  - dh_id: 0\n    \
+                 beacon_interface: 127.0.0.1\npayloads:\n  - \
                  name: p\n    type: network\n    protocol: udp\n    \
                  address: localhost\n    port: {port}\n    packet_size: 1\n"
             )
@@ -2696,7 +2654,7 @@ payloads:
         let with = |version: &str| {
             format!(
                 "version: \"{version}\"\ndescription: one payload\npayloads:\n  \
-                 - dh_id: 0\n    name: p\n    type: device\n    path: /dev/null\n    \
+                 - name: p\n    type: device\n    path: /dev/null\n    \
                  packet_size: 1\n"
             )
         };
@@ -2760,7 +2718,7 @@ payloads:
     #[test]
     fn a_file_may_not_state_a_position() {
         let text = "version: \"1.0\"\ndescription: one\npayloads:\n  \
-                    - dh_id: 0\n    name: first\n    type: device\n    path: /dev/null\n    \
+                    - name: first\n    type: device\n    path: /dev/null\n    \
                     packet_size: 1\n    sequence: 7\n";
 
         let message = ConfigFormat::Yaml
@@ -2787,8 +2745,7 @@ payload_groups:
     protocol: udp
     address: localhost
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: network
     protocol: tcp
     address: localhost
@@ -2818,8 +2775,7 @@ payloads:
 version: \"1.0\"
 description: two payloads
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: network
     protocol: udp
     address: localhost
@@ -2830,18 +2786,8 @@ payloads:
             )
         };
 
-        let same_id = payload(&two(
-            "  - dh_id: 0\n    name: DH1\n    type: network\n    protocol: udp\n    \
-             address: localhost\n    port: 5001\n    packet_size: 12",
-        ));
-        let said = same_id.to_dh_configs().expect_err("two payloads, one id");
-        assert!(
-            said.contains("DH0") && said.contains("DH1") && said.contains("dh_id 0"),
-            "the error should name both payloads and the id: {said}"
-        );
-
         let same_name = payload(&two(
-            "  - dh_id: 1\n    name: DH0\n    type: network\n    protocol: udp\n    \
+            "  - name: DH0\n    type: network\n    protocol: udp\n    \
              address: localhost\n    port: 5001\n    packet_size: 12",
         ));
         let said = same_name
@@ -2855,7 +2801,7 @@ payloads:
         // And two payloads that differ in both are fine, which is what the
         // checks must not get in the way of.
         let distinct = payload(&two(
-            "  - dh_id: 1\n    name: DH1\n    type: network\n    protocol: udp\n    \
+            "  - name: DH1\n    type: network\n    protocol: udp\n    \
              address: localhost\n    port: 5001\n    packet_size: 12",
         ));
         assert_eq!(distinct.to_dh_configs().expect("both convert").len(), 2);
@@ -2876,12 +2822,10 @@ payloads:
 version: \"1.0\"
 description: two payloads
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     packet_size: 12
 {first}
-  - dh_id: 1
-    name: DH1
+  - name: DH1
     packet_size: 12
 {second}
 "
@@ -2922,8 +2866,7 @@ payloads:
 version: \"1.0\"
 description: an OC address on the payload's own port
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     packet_size: 12
     oc_address: 127.0.0.1
     oc_port: 5000
@@ -2954,8 +2897,7 @@ payloads:
     /// built directly.
     #[test]
     fn a_bus_is_shared_and_a_place_on_it_is_not() {
-        let on_bus = |id: u32, name: &str, address: u16| DHConfig {
-            dh_id: DHId(id),
+        let on_bus = |name: &str, address: u16| DHConfig {
             name: DHName::new(name),
             endpoint: EndpointConfig::I2c(I2cConfig {
                 bus: "/dev/i2c-1".to_string(),
@@ -2968,12 +2910,11 @@ payloads:
             mode: DHMode::Periodic,
         };
 
-        no_two_handlers_claim_one_thing(&[on_bus(0, "DH0", 0x48), on_bus(1, "DH1", 0x49)])
+        no_two_handlers_claim_one_thing(&[on_bus("DH0", 0x48), on_bus("DH1", 0x49)])
             .expect("two devices on one bus is what a bus is for");
 
-        let said =
-            no_two_handlers_claim_one_thing(&[on_bus(0, "DH0", 0x48), on_bus(1, "DH1", 0x48)])
-                .expect_err("two devices at one address on one bus");
+        let said = no_two_handlers_claim_one_thing(&[on_bus("DH0", 0x48), on_bus("DH1", 0x48)])
+            .expect_err("two devices at one address on one bus");
         assert!(
             said.contains("0x48") && said.contains("/dev/i2c-1"),
             "the error should name the address and the bus: {said}"
@@ -2988,8 +2929,7 @@ payloads:
     /// one kind of claim.
     #[test]
     fn a_unix_socket_collides_by_its_path() {
-        let socket = |id: u32, name: &str, port: u16| DHConfig {
-            dh_id: DHId(id),
+        let socket = |name: &str, port: u16| DHConfig {
             name: DHName::new(name),
             endpoint: EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::UnixStream,
@@ -3001,16 +2941,16 @@ payloads:
             mode: DHMode::Periodic,
         };
 
-        let said = no_two_handlers_claim_one_thing(&[socket(0, "DH0", 0), socket(1, "DH1", 7)])
+        let said = no_two_handlers_claim_one_thing(&[socket("DH0", 0), socket("DH1", 7)])
             .expect_err("one socket path, whatever the ports say");
         assert!(said.contains("/tmp/dh.sock"), "{said}");
 
-        let mut device = socket(1, "DH1", 0);
+        let mut device = socket("DH1", 0);
         device.endpoint = EndpointConfig::Device(DeviceConfig {
             path: "/tmp/dh.sock".to_string(),
         });
         assert!(
-            no_two_handlers_claim_one_thing(&[socket(0, "DH0", 0), device]).is_err(),
+            no_two_handlers_claim_one_thing(&[socket("DH0", 0), device]).is_err(),
             "a path is a path, whichever kind of handler opens it"
         );
     }
@@ -3036,8 +2976,7 @@ payload_groups:
     protocol: udp
     address: localhost
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: localhost_udp
     port: {port}
     packet_size: {packet_size}
@@ -3055,7 +2994,6 @@ payloads:
             .expect("the second set");
 
         assert_eq!(first[0].name.0, second[0].name.0);
-        assert_eq!(first[0].dh_id, second[0].dh_id);
         assert_ne!(
             first[0].packet_size, second[0].packet_size,
             "the two sets describe different payloads under the one name"
@@ -3074,8 +3012,7 @@ payloads:
 version: \"1.0\"
 description: a device stating network attributes
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: device
     path: /dev/urandom
     protocol: udp
@@ -3097,8 +3034,7 @@ payloads:
 version: \"1.0\"
 description: a network payload stating a path
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: network
     protocol: udp
     address: localhost
@@ -3127,8 +3063,7 @@ payload_groups:
     protocol: udp
     address: localhost
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: udp_localhost
     type: device
     path: /dev/urandom
@@ -3154,8 +3089,7 @@ payloads:
 version: \"1.0\"
 description: a misspelled attribute
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: network
     protocol: udp
     address: localhost
@@ -3172,8 +3106,7 @@ payload_groups:
     type: network
     protocl: udp
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: g
     protocol: udp
     address: localhost
@@ -3185,8 +3118,7 @@ payloads:
 version: \"1.0\"
 description: a misspelled section
 payload:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
 ",
         ] {
             let e = crate::ConfigFormat::Yaml
@@ -3218,8 +3150,7 @@ payload:
 version: \"1.0\"
 description: a trigger, written one way
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: network
     protocol: tcp
     address: localhost
@@ -3275,8 +3206,7 @@ payloads:
 version: \"1.0\"
 description: a payload and an interval
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     type: network
     protocol: tcp
     address: localhost
@@ -3347,8 +3277,7 @@ payload_groups:
     trigger: \"READ\\r\"
     packet_interval_ms: 500
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: asked
     port: 5000
     packet_size: 12
@@ -3380,8 +3309,7 @@ payload_groups:
     protocol: udp
     address: localhost
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: udp_localhst
     port: 5000
     packet_size: 12
@@ -3409,8 +3337,7 @@ payload_groups:
     protocol: udp
     address: localhost
 payloads:
-  - dh_id: 0
-    name: DH0
+  - name: DH0
     group: udp_localhost
     port: 5000
 ",
@@ -3431,7 +3358,7 @@ payloads:
     fn link(kind: &str, attributes: &str) -> Result<PayloadConfig, String> {
         let text = format!(
             "version: \"1.0\"\ndescription: one payload\npayloads:\n  \
-             - dh_id: 0\n    name: p\n    type: {kind}\n{attributes}"
+             - name: p\n    type: {kind}\n{attributes}"
         );
         ConfigFormat::Yaml
             .parse::<PayloadConfig>(&text)
@@ -4050,17 +3977,17 @@ payloads:
     fn the_links_round_trip_between_yaml_and_xml() {
         let yaml = "version: \"1.0\"\ndescription: a bus and a peripheral\n\
                     payloads:\n  \
-                    - dh_id: 0\n    name: a\n    type: i2c\n    path: /dev/i2c-0\n    \
+                    - name: a\n    type: i2c\n    path: /dev/i2c-0\n    \
                     address: 0x2A\n    pec: true\n    retries: 2\n    \
                     bus_speed: 400000\n    packet_size: 8\n  \
-                    - dh_id: 1\n    name: b\n    type: spi\n    path: /dev/spidev1.0\n    \
+                    - name: b\n    type: spi\n    path: /dev/spidev1.0\n    \
                     max_speed: 8000000\n    spi_mode: 1\n    bit_order: lsb\n    \
                     packet_size: 8\n";
         let xml = r#"<payload-configuration>
   <version>1.0</version>
   <description>a bus and a peripheral</description>
   <payloads>
-    <dh_id>0</dh_id>
+    
     <name>a</name>
     <type>i2c</type>
     <path>/dev/i2c-0</path>
@@ -4071,7 +3998,7 @@ payloads:
     <packet_size>8</packet_size>
   </payloads>
   <payloads>
-    <dh_id>1</dh_id>
+    
     <name>b</name>
     <type>spi</type>
     <path>/dev/spidev1.0</path>

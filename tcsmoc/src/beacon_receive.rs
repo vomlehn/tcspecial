@@ -41,19 +41,98 @@ pub enum IndicatorState {
 #[derive(Clone)]
 pub struct IndicatorStates {
     unset:              Color,
+    /// The colour this indicator shows while the thing it watches is being
+    /// heard from. The states that show it are the leading ones, and how long
+    /// they last is how long contact is held; see [`IndicatorStates::contact_at`].
+    contact:            Color,
     indicator_states:   Vec<IndicatorState>,
 }
 
+/// Whether the beacons say the spacecraft is still being heard from.
+///
+/// The indicator ages through colours and blinks, which is what an operator
+/// reads; this is the same thing in the one form a program can act on. It is
+/// what the panels need: a handler's state is known only for as long as the
+/// spacecraft is being heard from, and a panel that went on showing what the
+/// last command implied would be stating something nobody knows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Contact {
+    /// Beacons are arriving, or the last one is recent enough that the
+    /// indicator still shows the contact colour.
+    Made,
+    /// None has arrived, or the last one is old enough that the indicator has
+    /// left that colour.
+    Lost,
+}
+
 impl IndicatorStates {
-    pub fn new(unset: Color, indicator_states: Vec<IndicatorState>) -> Self {
+    pub fn new(unset: Color, contact: Color, indicator_states: Vec<IndicatorState>) -> Self {
         IndicatorStates {
             unset,
+            contact,
             indicator_states,
         }
     }
 
     pub fn unset_color(&self) -> Color {
         self.unset
+    }
+
+    /// Whether the spacecraft is being heard from, `now`.
+    ///
+    /// Contact is held while the indicator is still showing its contact
+    /// colour -- the leading states that show it, blinking or steady, since a
+    /// blinking green says beacons are arriving and ageing rather than gone.
+    /// `now` is given rather than read so that this can be tested at a time
+    /// of the test's choosing.
+    ///
+    /// Lost with no beacon at all: a MOC that has heard nothing knows nothing
+    /// about the spacecraft, which is the same position as one that heard it
+    /// and then stopped.
+    ///
+    /// Lost, too, when the last beacon is in the future, which is a system
+    /// clock that moved: the indicator goes back to its unset colour for the
+    /// same reason, and an elapsed time that cannot be worked out is not a
+    /// reason to claim contact.
+    pub fn contact_at(&self, last_beacon: &Option<SystemTime>, now: SystemTime) -> Contact {
+        let Some(last) = *last_beacon else {
+            return Contact::Lost;
+        };
+        let Ok(elapsed) = now.duration_since(last) else {
+            return Contact::Lost;
+        };
+
+        if elapsed < self.while_in_contact() {
+            Contact::Made
+        } else {
+            Contact::Lost
+        }
+    }
+
+    /// How long the indicator shows its contact colour after a beacon.
+    ///
+    /// The leading run of states that show it. A later state of that colour
+    /// would not count, and there is no sense in one: these are read in order
+    /// and say how stale the last beacon is, so a colour returning after
+    /// another would be an indicator going backwards.
+    fn while_in_contact(&self) -> Duration {
+        let mut held = Duration::ZERO;
+
+        for state in &self.indicator_states {
+            let (duration, shown) = match state {
+                IndicatorState::Steady(duration, color) => (*duration, *color),
+                // The "on" colour: a blinking state is that colour, going
+                // dark and back rather than being two colours.
+                IndicatorState::Blinking(duration, _, _, color_on, _) => (*duration, *color_on),
+            };
+
+            if shown != self.contact {
+                break;
+            }
+            held = held.saturating_add(duration);
+        }
+
+        held
     }
 
     /*
@@ -183,6 +262,11 @@ pub const NO_BEACON_MESSAGE: &str = "<none>";
 #[derive(Clone)]
 pub struct BeaconReceive {
     last_beacon:        ArcCondPair<Option<SystemTime>>,
+    /// Whether the spacecraft is being heard from, left where the rest of the
+    /// window can read it. The indicator says the same thing in colours, for
+    /// an operator; this is for the panels, whose statuses are only as good
+    /// as the last beacon.
+    contact:            Arc<Mutex<Contact>>,
     /// What the last beacon said, kept for the passes that find nothing.
     last_message:       Arc<Mutex<String>>,
     /// The multicast group beacons arrive on, and the local interface to join
@@ -204,6 +288,20 @@ pub(crate) enum Arrived {
     Broken,
 }
 
+/// What a pass of the receive loop leaves behind.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Showing {
+    /// The indicator's colour.
+    pub color: Color,
+    /// When the last beacon arrived, if one ever has.
+    pub at: Option<SystemTime>,
+    /// What that beacon said.
+    pub said: String,
+    /// Whether the spacecraft is still being heard from, which is the same
+    /// reading as the colour in the form the panels act on.
+    pub contact: Contact,
+}
+
 /// What the window should show after a pass, and when the last beacon was.
 ///
 /// Separate from the loop so that it can be exercised without a socket. The
@@ -217,7 +315,7 @@ pub(crate) fn after_a_pass(
     last_message: &Mutex<String>,
     arrived: &Arrived,
     now: SystemTime,
-) -> (Color, Option<SystemTime>, String) {
+) -> Showing {
     // What the last beacon said, which a pass that received one replaces and
     // every other pass keeps. Kept for the same reason the time is: a beacon
     // said what it said, whatever the passes after it find, and blanking the
@@ -247,7 +345,15 @@ pub(crate) fn after_a_pass(
         Arrived::Broken => (states.unset_color(), *last.lock.lock().unwrap()),
     };
 
-    (color, at, said)
+    Showing {
+        color,
+        at,
+        said,
+        // From the same reading of the same beacon as the colour: a window
+        // whose light said one thing while its panels acted on another would
+        // be two answers to one question.
+        contact: states.contact_at(&at, now),
+    }
 }
 
 /// When the last beacon arrived, as the window shows it.
@@ -388,6 +494,7 @@ impl BeaconReceive {
         ui_weak:            Weak<MainWindow>,
         beacon:             Beacon,
         indicator_states:   IndicatorStates,
+        contact:            Arc<Mutex<Contact>>,
     ) -> Option<BeaconReceive> {
         let last_beacon = Arc::new(CondPair {
             lock: Mutex::new(None),
@@ -400,6 +507,7 @@ impl BeaconReceive {
             beacon,
             ui_weak,
             indicator_states,
+            contact,
         };
 
         let b_clone = b.clone();
@@ -491,13 +599,22 @@ impl BeaconReceive {
                 Err(_) => Arrived::Broken,
             };
 
-            let (color, at, said) = after_a_pass(
+            let showing = after_a_pass(
                 &self.indicator_states,
                 &self.last_beacon,
                 &self.last_message,
                 &arrived,
                 SystemTime::now(),
             );
+            let Showing { color, at, said, contact } = showing;
+
+            // The panels' half of the same reading, left where the poller can
+            // read it. Every pass, not only the ones that received something:
+            // contact is lost by nothing arriving, which is what the passes
+            // that time out are.
+            if let Ok(mut held) = self.contact.lock() {
+                *held = contact;
+            }
             if DEBUG_BEACON {
                 eprintln!(
                     "{:?}: colour {:?}, last beacon {:?}, said {:?}",
@@ -603,11 +720,101 @@ mod tests {
     fn states() -> IndicatorStates {
         IndicatorStates::new(
             Color::from_rgb_u8(0xC0, 0xC0, 0xC0),
+            Color::from_rgb_u8(0, 255, 0),
             vec![
                 IndicatorState::Steady(Duration::from_millis(4000), Color::from_rgb_u8(0, 255, 0)),
                 IndicatorState::Steady(Duration::MAX, Color::from_rgb_u8(255, 0, 0)),
             ],
         )
+    }
+
+    /// Contact is held while the indicator is green and lost when it is not.
+    ///
+    /// This is what the panels act on: a handler's status is the answer to a
+    /// command, and the ground may go on showing it only while it is still
+    /// hearing from the spacecraft. The colours an operator reads age through
+    /// green, yellow and red; what a program needs out of that is the one
+    /// question of whether anything is being heard, which is this.
+    #[test]
+    fn contact_is_held_while_the_indicator_shows_its_colour() {
+        let states = states();
+        let at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let last = Some(at);
+
+        // The green state lasts four seconds, so contact is held through it
+        // and lost after it. The instant it arrived counts: a beacon just
+        // received is the strongest contact there is.
+        assert_eq!(states.contact_at(&last, at), Contact::Made);
+        assert_eq!(
+            states.contact_at(&last, at + Duration::from_millis(3_999)),
+            Contact::Made
+        );
+        assert_eq!(
+            states.contact_at(&last, at + Duration::from_millis(4_001)),
+            Contact::Lost,
+            "the indicator has gone red, so the spacecraft is not being heard from"
+        );
+
+        // Nothing heard at all is the same position as having stopped
+        // hearing: the ground knows nothing either way.
+        assert_eq!(states.contact_at(&None, at), Contact::Lost);
+
+        // A beacon in the future is a clock that moved, which the indicator
+        // treats as never having heard anything. An elapsed time that cannot
+        // be worked out is not a reason to claim contact.
+        assert_eq!(
+            states.contact_at(&Some(at + Duration::from_secs(60)), at),
+            Contact::Lost
+        );
+    }
+
+    /// A blinking state of the contact colour still counts as contact, and
+    /// only the leading run of states does.
+    ///
+    /// The real indicator holds green steady for four seconds and then blinks
+    /// it for four more before going yellow: a blinking green says beacons
+    /// are arriving and ageing, not that they have stopped. The run stops at
+    /// the first state of another colour, whatever comes after it.
+    #[test]
+    fn a_blinking_contact_colour_is_still_contact() {
+        let green = Color::from_rgb_u8(0, 255, 0);
+        let red = Color::from_rgb_u8(255, 0, 0);
+        let grey = Color::from_rgb_u8(0xC0, 0xC0, 0xC0);
+        let states = IndicatorStates::new(
+            grey,
+            green,
+            vec![
+                IndicatorState::Steady(Duration::from_millis(4000), green),
+                IndicatorState::Blinking(
+                    Duration::from_millis(4000),
+                    Duration::from_millis(1000),
+                    Duration::from_millis(1000),
+                    green,
+                    grey,
+                ),
+                IndicatorState::Steady(Duration::from_millis(6000), red),
+                // Green again, which is not reached: the run ended above.
+                IndicatorState::Steady(Duration::MAX, green),
+            ],
+        );
+
+        let at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let last = Some(at);
+
+        assert_eq!(
+            states.contact_at(&last, at + Duration::from_millis(7_999)),
+            Contact::Made,
+            "the indicator is still blinking green"
+        );
+        assert_eq!(
+            states.contact_at(&last, at + Duration::from_millis(8_001)),
+            Contact::Lost
+        );
+        assert_eq!(
+            states.contact_at(&last, at + Duration::from_secs(20)),
+            Contact::Lost,
+            "a later state of the contact colour is not a run of it"
+        );
     }
 
     /// Every pass of the loop says when the last beacon arrived, not only the
@@ -631,46 +838,63 @@ mod tests {
 
         // Nothing has arrived yet, so there is nothing to show and the
         // indicator is at the colour of never having heard anything.
-        let (color, at, message) =
+        let nothing =
             after_a_pass(&states, &last, &said, &Arrived::Nothing, SystemTime::now());
-        assert_eq!(at, None);
-        assert_eq!(color, states.unset_color());
-        assert_eq!(message, NO_BEACON_MESSAGE);
+        assert_eq!(nothing.at, None);
+        assert_eq!(nothing.color, states.unset_color());
+        assert_eq!(nothing.said, NO_BEACON_MESSAGE);
+        assert_eq!(
+            nothing.contact,
+            Contact::Lost,
+            "a MOC that has heard nothing is in contact with nothing"
+        );
 
         // A beacon: the time is the time of this pass, and the line says what
         // the beacon said.
         let arrival = SystemTime::now();
-        let (fresh, at, message) = after_a_pass(
+        let heard = after_a_pass(
             &states,
             &last,
             &said,
             &Arrived::Beacon("version 9.9.9, md5 abc".to_string()),
             arrival,
         );
-        assert_eq!(at, Some(arrival), "a pass that received a beacon must say when");
-        assert_eq!(message, "version 9.9.9, md5 abc");
+        assert_eq!(
+            heard.at,
+            Some(arrival),
+            "a pass that received a beacon must say when"
+        );
+        assert_eq!(heard.said, "version 9.9.9, md5 abc");
         assert_ne!(
-            fresh,
+            heard.color,
             states.unset_color(),
             "a beacon that has just arrived is not nothing heard from"
+        );
+        assert_eq!(
+            heard.contact,
+            Contact::Made,
+            "a beacon has just arrived, so the spacecraft is being heard from"
         );
 
         // A later pass that finds nothing keeps that time and that message:
         // the beacon did arrive when it arrived and said what it said,
         // whatever the passes after it find.
-        let (_, at, message) =
+        let quiet =
             after_a_pass(&states, &last, &said, &Arrived::Nothing, SystemTime::now());
-        assert_eq!(at, Some(arrival), "the time of the last beacon was lost");
-        assert_eq!(message, "version 9.9.9, md5 abc", "the last message was lost");
+        assert_eq!(quiet.at, Some(arrival), "the time of the last beacon was lost");
+        assert_eq!(
+            quiet.said, "version 9.9.9, md5 abc",
+            "the last message was lost"
+        );
 
         // And a broken socket says nothing about the spacecraft: the time and
         // the message stand, and the indicator goes to the colour of not
         // knowing.
-        let (unknown, at, message) =
+        let broken =
             after_a_pass(&states, &last, &said, &Arrived::Broken, SystemTime::now());
-        assert_eq!(at, Some(arrival));
-        assert_eq!(message, "version 9.9.9, md5 abc");
-        assert_eq!(unknown, states.unset_color());
+        assert_eq!(broken.at, Some(arrival));
+        assert_eq!(broken.said, "version 9.9.9, md5 abc");
+        assert_eq!(broken.color, states.unset_color());
     }
 
     /// A beacon's own words are what the line shows: the build flying and the

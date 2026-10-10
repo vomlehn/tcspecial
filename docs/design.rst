@@ -393,7 +393,18 @@ reused.
 
 QUERY_DH
 ^^^^^^^^
-Return statistics from the indicated data handler.
+Return what the indicated data handler is doing and what it has moved.
+
+Requirement
+    A QUERY_DH answer says what state the handler is in, and says nothing
+    where there is no such handler. Nothing else on the link says it: the
+    ground had only its own commands to go by, so a panel showed what the
+    last START_DH or STOP_DH implied and went on showing it -- through a
+    handler stopped on the spacecraft, and through a MOC attached to a
+    tcspecial serving another payload set, whose every command is answered
+    NotFound for payloads the operator can see on the screen. A state for a
+    handler that does not exist would have to be invented, and a ground
+    station reading one would show it, so a NotFound carries none.
 
 Requirement
     A running data handler reports what has moved so far. Its conduits count
@@ -432,6 +443,12 @@ The statistics are:
 | QUERY_DH_TM    | Parameters                                                  |
 |                +------------+-----------+------------------------------------+
 |                | Name       | Type      |  Description                       |
+|                +------------+-----------+------------------------------------+
+|                | name       | DHName    | Data handler this answers for      |
+|                +------------+-----------+------------------------------------+
+|                | state      | DHState?  | Created, Active or Stopped, and    |
+|                |            |           | absent for a handler this          |
+|                |            |           | tcspecial has not got              |
 |                +------------+-----------+------------------------------------+
 |                | Statistics                                                  |
 +----------------+------------+-----------+------------------------------------+
@@ -3179,6 +3196,56 @@ Requirement
     life of the program before the time was ever set: the window declared the
     line, the receiver set the colour beside it, and the line itself said no
     beacon had arrived while the colour said they were arriving steadily.
+
+Requirement
+    The beacons also say whether the spacecraft is being heard from at all,
+    which the panels act on. Contact is held for as long as the indicator
+    shows the colour of being heard from -- the leading states of it, blinking
+    or steady, a blinking green being beacons that are arriving and ageing
+    rather than gone -- and is lost when the indicator leaves that colour,
+    when no beacon has ever arrived, and when the system clock has moved so
+    that the last one is in the future. One reading serves both, taken where
+    the colour is taken, so the light and the panels cannot say different
+    things about one beacon.
+
+Requirement
+    A panel's status is what a START_DH or STOP_DH was answered, and the
+    beacons are what can take it away. Beacons stopping makes every panel's
+    status unknown: the status is the answer to a command and is worth as much
+    as the ground's hearing from the spacecraft, where a handler may since
+    have stopped or gone with a process that restarted, and a panel still
+    saying Active would be read as a reading. It is said once, when contact is
+    lost, rather than every pass of the silence.
+
+Requirement
+    The panels are made unknown whether or not there is a command link. A MOC
+    that has been disconnected cannot find out either, and the beacon is what
+    it has to go on.
+
+Requirement
+    When contact returns, the spacecraft is asked what its handlers are doing
+    and the panels say what it answers. Going back to what they said before
+    the silence would be a claim nothing has supported since: handlers may
+    have been stopped in it, or the process may have restarted with none of
+    them running. The answer's own state is what a panel then shows -- active
+    for a handler that is active, stopped for one created or stopped, and
+    unknown for a handler the spacecraft has not got or a command it could not
+    answer.
+
+Requirement
+    A restoration owed to the panels survives a pass that could not ask. The
+    beacon says the spacecraft is there; what its handlers are doing is a
+    question for the command link, which may be down at that moment or may
+    leave the first pass unanswered. A restoration that was forgotten would
+    leave every panel unknown until the next time beacons stopped and came
+    back.
+
+Requirement
+    No other pass of the poller touches a panel's status. The ground asked for
+    a handler to start or stop and was answered, and a poll is not a second
+    opinion on that: the statistics a pass carries are what it is for. The
+    Query all button sets the status as well, that being somebody asking the
+    spacecraft directly.
 
 Every program is pointed at its tcspecial configuration the same way: as a
 command line argument, failing that the program's own environment variable --

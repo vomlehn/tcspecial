@@ -14,13 +14,13 @@ use std::time::{Duration, Instant};
 use tcslibgs::{
     answer_to, ArmKey, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry,
-    DHConfig, DHName, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
+    DHConfig, DHName, DHSample, DHState, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
     StartDHTelemetry, Statistics, StopDHTelemetry, TcsError, TcsResult, Telemetry,
 };
 
 use crate::config::constants::RESTART_ARM_TIMEOUT;
-use crate::dh::{DHState, DataHandler};
+use crate::dh::DataHandler;
 use crate::endpoint::bind_endpoint_pair;
 use crate::telemetry_log::TelemetryLog;
 
@@ -170,27 +170,35 @@ impl PayloadCommands {
                 Telemetry::StopDH(StopDHTelemetry::new(cmd.header.sequence, status))
             }
             Command::QueryDH(cmd) => {
-                let (status, stats) = {
+                let (status, state, stats) = {
                     let handlers = match self.data_handlers.lock() {
                         Ok(h) => h,
                         Err(_) => return Telemetry::QueryDH(QueryDHTelemetry::new(
                             cmd.header.sequence,
                             CommandStatus::Failure,
                             cmd.name.clone(),
+                            None,
                             Statistics::new(),
                         )),
                     };
 
+                    // The state as well as the counters. A handler that
+                    // stopped on the spacecraft -- or one the ground never
+                    // started, this process having been running before the
+                    // MOC attached to it -- is a panel saying what the last
+                    // command implied, and nothing else on the link says
+                    // otherwise.
                     if let Some(dh) = handlers.get(&cmd.name) {
-                        (CommandStatus::Success, dh.statistics())
+                        (CommandStatus::Success, Some(dh.state()), dh.statistics())
                     } else {
-                        (CommandStatus::NotFound, Statistics::new())
+                        (CommandStatus::NotFound, None, Statistics::new())
                     }
                 };
                 Telemetry::QueryDH(QueryDHTelemetry::new(
                     cmd.header.sequence,
                     status,
                     cmd.name.clone(),
+                    state,
                     stats,
                 ))
             }
@@ -1211,17 +1219,99 @@ mod tests {
             .expect("the handler should still be moving data half a second later");
         assert_ne!(n, 0);
 
-        let stats = match ci.payload.process(Command::QueryDH(tcslibgs::QueryDHCommand::new(
-            2,
-            DHName::new("DH2"),
-        ))) {
-            Telemetry::QueryDH(tm) => tm.statistics,
+        let (state, stats) = match ci.payload.process(Command::QueryDH(
+            tcslibgs::QueryDHCommand::new(2, DHName::new("DH2")),
+        )) {
+            Telemetry::QueryDH(tm) => (tm.state, tm.statistics),
             other => panic!("expected QUERY_DH telemetry, got {other:?}"),
         };
         assert_ne!(
             stats.bytes_received, 0,
             "a handler that has been spoken to should report receiving something"
         );
+
+        // And what it is doing, which nothing else on the link says: the
+        // ground had only its own commands to go by, so a panel showed what
+        // the last START_DH implied and went on showing it.
+        assert_eq!(
+            state,
+            Some(DHState::Active),
+            "a running handler should answer that it is running"
+        );
+    }
+
+    /// A QUERY_DH for a handler this tcspecial has not got answers NotFound
+    /// and no state.
+    ///
+    /// The pair is the point. A state would have to be invented for a handler
+    /// that does not exist, and a ground station reading one would show it --
+    /// which is exactly the fault the state was added to cure, in the one
+    /// case that causes it: a MOC attached to a tcspecial left running for
+    /// another payload set.
+    #[test]
+    fn a_query_for_a_handler_that_is_not_here_answers_with_no_state() {
+        let ci = interpreter();
+
+        match ci.payload.process(Command::QueryDH(tcslibgs::QueryDHCommand::new(
+            3,
+            DHName::new("nobody"),
+        ))) {
+            Telemetry::QueryDH(tm) => {
+                assert_eq!(tm.header.status, CommandStatus::NotFound);
+                assert_eq!(tm.state, None);
+            }
+            other => panic!("expected QUERY_DH telemetry, got {other:?}"),
+        }
+    }
+
+    /// A handler that has been made and not started answers Created.
+    ///
+    /// Which a panel shows as stopped, that being what the word is read for;
+    /// what matters here is that the state is the handler's own rather than
+    /// the last thing the ground asked of it.
+    #[test]
+    fn a_query_before_any_start_answers_the_state_the_handler_is_in() {
+        use tcslibgs::{DHConfig, DHName, DeviceConfig, EndpointConfig};
+
+        let handler = DHConfig {
+            name: DHName::new("auto-send"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 1,
+            oc: None,
+            mode: Default::default(),
+        };
+
+        let mut ci = CommandInterpreter::new(
+            CIConfig {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+                payload_port: 0,
+                protocol: NetworkProtocol::Udp,
+                beacon_interval: BeaconTime(5000),
+                beacon_address: a_beacon_address(),
+                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                log_dir: None,
+                log_segment_bytes: 65_536,
+            },
+            vec![handler],
+            a_config_version(),
+            a_digest(),
+        )
+        .expect("an interpreter");
+        ci.initialize_handlers().expect("handlers are made at startup");
+
+        match ci.payload.process(Command::QueryDH(tcslibgs::QueryDHCommand::new(
+            4,
+            DHName::new("auto-send"),
+        ))) {
+            Telemetry::QueryDH(tm) => {
+                assert_eq!(tm.header.status, CommandStatus::Success);
+                assert_eq!(tm.state, Some(DHState::Created));
+            }
+            other => panic!("expected QUERY_DH telemetry, got {other:?}"),
+        }
     }
 
     /// Starting a handler twice is harmless, and the second time starts

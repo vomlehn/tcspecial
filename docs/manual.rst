@@ -1124,7 +1124,11 @@ another row is started under it, and a ``Quit`` button at the foot of the
 window, which stops the tcspecial and tcssim the MOC started.
 
 Each panel shows its handler's name and status, how it is reached, and its
-packet size; then two readings and one count:
+packet size; then two readings and one count. The status is ``Active``,
+``Stopped`` or ``Unknown``, and where each comes from is under `Beaconing`_:
+the spacecraft's answer to the last ``Enable`` or ``Disable``, and ``Unknown``
+for a handler nobody can speak for -- which is what the panels say while no
+beacons are arriving.
 
 ``Last recv``
   When the MOC last received anything from that payload, on the handler's OC
@@ -1290,6 +1294,26 @@ Until a beacon has arrived the line shows ``--:--:--``, as a panel does for a
 direction that has carried nothing. Once one has, the time stays: a pass that
 finds nothing ages the colour beside it and leaves the time alone, because the
 beacon did arrive when it arrived.
+
+The indicator leaving green is also what the payload panels go by. A panel's
+status is what the spacecraft answered the last ``Enable`` or ``Disable``, and
+that answer is worth as much as the ground's hearing from the spacecraft: a
+handler may since have stopped, or gone with a process that restarted. So when
+the indicator leaves green every panel's status becomes ``Unknown``, whether
+or not the command link is up -- a disconnected MOC cannot find out either.
+
+When the indicator is green again, the MOC asks the spacecraft what each
+handler is doing and the panels say what it answers: ``Active`` for one that
+is running, ``Stopped`` for one that is not, and ``Unknown`` for a handler
+this tcspecial has not got -- which is what an operator sees when the MOC has
+attached to a tcspecial left running for another payload set. If the link is
+down when contact returns, the asking waits for it rather than being
+forgotten.
+
+Nothing else changes a panel's status. The once-a-second refresh carries what
+each handler has moved and leaves the status to the commands and to the
+beacon; ``Query all`` sets it too, that being somebody asking the spacecraft
+directly.
 
 tcssim
 ------

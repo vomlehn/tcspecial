@@ -364,6 +364,21 @@ impl NetworkProtocol {
     }
 }
 
+/// What a data handler is doing, as the spacecraft knows it.
+///
+/// In the library rather than in tcspecial because the ground reads it: a
+/// QUERY_DH answer carries it, which is how a panel can say what a handler is
+/// doing rather than what the last command it was sent implied.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DHState {
+    /// Created but not activated
+    Created,
+    /// Active and conduiting data
+    Active,
+    /// Stopped
+    Stopped,
+}
+
 /// Data handler name
 ///
 /// What a handler is called and what it is addressed by: commands name a

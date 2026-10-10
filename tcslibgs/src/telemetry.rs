@@ -310,14 +310,26 @@ pub struct BeaconTelemetry {
 }
 
 impl BeaconTelemetry {
+    /// `sequence` counts the beacons this process has sent, from one.
+    ///
+    /// Every other telemetry's sequence number is the command's, which is how
+    /// a ground station pairs an answer with what it asked. A beacon answers
+    /// nothing, so the number is the beacon's own: it says which beacon this
+    /// is, and a ground station that sees 7 after 5 knows it missed one
+    /// rather than wondering whether the spacecraft went quiet.
+    ///
+    /// Counted by the sender, so it starts again at one when tcspecial does.
+    /// A number going backwards is therefore a restart, which is worth
+    /// knowing and is not the same thing as a gap.
     pub fn new(
+        sequence: u32,
         version: ConfigVersion,
         config_version: ConfigVersion,
         digest: ConfigDigest,
     ) -> Self {
         Self {
             header: TelemetryHeader {
-                sequence: 0,
+                sequence,
                 tm_type: TelemetryType::Beacon,
                 status: CommandStatus::Success,
             },
@@ -462,11 +474,14 @@ mod tests {
     #[test]
     fn test_beacon_telemetry() {
         let tm = BeaconTelemetry::new(
+            7,
             ConfigVersion::of_this_build(),
             ConfigVersion::of_text("1.0").expect("a version"),
             ConfigDigest([0u8; 16]),
         );
         assert_eq!(tm.header.tm_type, TelemetryType::Beacon);
+        // The beacon's own number, not a command's: a beacon answers nothing.
+        assert_eq!(tm.header.sequence, 7);
     }
 
     #[test]

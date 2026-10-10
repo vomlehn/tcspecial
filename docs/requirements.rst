@@ -126,13 +126,12 @@ CI must periodically send a Telemetry::Beacon message with a timestamp and uniqu
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
-   Sent periodically, with a timestamp, and to a multicast group so that any
-   number of ground stations can hear it. The unique sequence number is not
-   implemented: every beacon carries nought, so a ground station cannot tell
-   a beacon it missed from one it received twice. A beacon also carries what
-   a CONNECT is answered with -- the software version, the version the
-   payload set states, and the digest of the configuration file the
-   spacecraft read -- which this did not ask for.
+   Implemented, and to a multicast group so that any number of ground
+   stations can hear it. The number is counted by the sender from one, so it
+   starts again when tcspecial does, and the MOC tells a gap from a restart
+   by that. A beacon also carries what a CONNECT is answered with -- the
+   software version, the version the payload set states, and the digest of
+   the configuration file the spacecraft read -- which this did not ask for.
 
 CI must parse commands from the ground receved via UDP/IP
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

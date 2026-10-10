@@ -10,6 +10,7 @@
  */
 
 use std::net::UdpSocket;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -29,6 +30,12 @@ pub struct BeaconSend {
     /// The telemetry log every beacon is recorded in, shared with the
     /// command interpreter so that one log holds all of the telemetry.
     log:        TelemetryLog,
+    /// How many beacons this process has sent.
+    ///
+    /// Shared with every duplicate of this sender, because the thread that
+    /// sends them holds one: two counters would both say "the third beacon"
+    /// about different beacons.
+    sent:       Arc<AtomicU32>,
     /// What this build is, what the configuration says it is, and what it
     /// read, carried in every beacon.
     ///
@@ -62,6 +69,7 @@ impl BeaconSend {
         });
 
         let b = BeaconSend {
+            sent: Arc::new(AtomicU32::new(0)),
             pair,
             interval: Arc::new(Mutex::new(interval)),
             dest_addr,
@@ -130,7 +138,11 @@ impl BeaconSend {
     }
 
     pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {
+        // From one: the first beacon is the first beacon, and nought is what
+        // every beacon used to carry.
+        let sequence = self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
         let beacon = Telemetry::Beacon(BeaconTelemetry::new(
+            sequence,
             self.version,
             self.config_version,
             self.digest,
@@ -167,4 +179,68 @@ type ArcCondPair<T> = Arc<CondPair<T>>;
 struct CondPair<T> {
     lock: Mutex<T>,
     cvar: Condvar,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tcslibgs::{BeaconTime, CIConfig, NetworkProtocol};
+
+    /// Every beacon carries the next number, from one.
+    ///
+    /// Through the thread that really sends them, because the counting is
+    /// what is being tested and the sender holds the counter: a test that
+    /// called the send twice on one BeaconSend would not say that the beacons
+    /// a running spacecraft emits are numbered in order.
+    ///
+    /// Sent to a plain address on the loopback interface rather than to a
+    /// multicast group. What goes out is the same datagram, and a test that
+    /// joined a group would be testing the network stack's multicast rather
+    /// than this.
+    #[test]
+    fn the_beacons_are_numbered_in_order_from_one() {
+        let ground = std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+        let at = ground.local_addr().expect("where it is");
+
+        let log = TelemetryLog::open(&CIConfig {
+            address: "127.0.0.1".to_string(),
+            port: 0,
+            payload_port: 0,
+            protocol: NetworkProtocol::Udp,
+            beacon_interval: BeaconTime(50),
+            beacon_address: at,
+            beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+            // Nothing to write: what is being tested is what goes out.
+            log_dir: None,
+            log_segment_bytes: 65_536,
+        })
+        .expect("a log that logs nothing");
+
+        let _beacon = BeaconSend::new(
+            Duration::from_millis(50),
+            at,
+            std::net::Ipv4Addr::LOCALHOST,
+            log,
+            ConfigVersion::of_this_build(),
+            ConfigVersion::of_text("1.0").expect("a version"),
+            ConfigDigest([0u8; 16]),
+        )
+        .expect("a sender");
+
+        let mut buffer = [0u8; 65535];
+        for expected in 1..=3u32 {
+            let (size, _) = ground.recv_from(&mut buffer).expect("a beacon");
+            match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
+                Telemetry::Beacon(beacon) => assert_eq!(
+                    beacon.header.sequence, expected,
+                    "beacon {expected} is numbered {}",
+                    beacon.header.sequence
+                ),
+                other => panic!("expected a beacon, got {other:?}"),
+            }
+        }
+    }
 }

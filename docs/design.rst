@@ -524,8 +524,9 @@ Requirement
 
 Requirement
     The MOC shows what the last beacon said as one line, each of the three
-    labelled: ``ver: 0.1.0 config ver: 1.0.0 md5:`` and the digest's sixteen
-    bytes in hex with nothing between them.
+    labelled: ``v: 0.1.0 config v: 1.0.0 md5:`` and the digest's sixteen
+    bytes in hex with nothing between them. The answer to a ``CONNECT`` is
+    written the same way; see `What Each End Read`_.
 
 Requirement
     Both are settled when the process starts, not read when a beacon goes
@@ -1293,11 +1294,18 @@ What Each End Read
 Requirement
     A link begins with each end saying what it read. The ground sends a
     ``CONNECT`` carrying its software version and a digest of its
-    configuration, and the spacecraft answers with its own two.
+    configuration, and the spacecraft answers with its own, and with the
+    version the payload set it is serving states.
 
 Requirement
-    The version is three bytes -- major, minor and patch, each in binary --
+    Each version is three bytes -- major, minor and patch, each in binary --
     and the digest is an MD5.
+
+Requirement
+    The answer is shown as one line, each of the three labelled:
+    ``v: 0.1.0 config v: 1.0.0 md5:`` and the digest in hex. The same three
+    facts a beacon carries, written the same way by the same function, because
+    the two are read against each other.
 
 Requirement
     The ground compares and the spacecraft says. Tcsmoc is the end that knows

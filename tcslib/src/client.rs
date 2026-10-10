@@ -94,13 +94,13 @@ impl TcsClient {
         &mut self,
         version: ConfigVersion,
         digest: ConfigDigest,
-    ) -> TcsResult<(ConfigVersion, ConfigDigest)> {
+    ) -> TcsResult<(ConfigVersion, ConfigVersion, ConfigDigest)> {
         let seq = self.next_sequence();
         let cmd = Command::Connect(ConnectCommand::new(seq, version, digest));
         let response = self.send_command(cmd)?;
 
         match response {
-            Telemetry::Connect(tm) => Ok((tm.version, tm.digest)),
+            Telemetry::Connect(tm) => Ok((tm.version, tm.config_version, tm.digest)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }

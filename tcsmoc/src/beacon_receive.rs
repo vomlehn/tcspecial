@@ -264,19 +264,33 @@ fn beacon_last_received(at: Option<SystemTime>) -> String {
     }
 }
 
-/// What a beacon said, as the window shows it.
+/// What one end of the link is running and reading, as one line.
 ///
-/// Three things, each labelled: the version of the software that sent it, the
-/// version the payload set states, and the digest of the configuration file
-/// that tcspecial read.
+/// Three things, each labelled: the version of the software, the version the
+/// payload set states, and the digest of the configuration file it read.
 ///
 /// ```text
-/// ver: 0.1.0 config ver: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+/// v: 0.1.0 config v: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 /// ```
 ///
 /// Both versions are three decimal parts, as they go on the link -- a byte
 /// each -- and the digest is the hex of its sixteen bytes with nothing
 /// between them.
+///
+/// One function because two messages carry these three facts: a beacon, which
+/// arrives on its own, and the answer to a CONNECT, which is asked for. They
+/// say the same thing about the same spacecraft, so they are read against each
+/// other, and two format strings would eventually disagree about how to write
+/// one of them.
+pub(crate) fn what_it_read(
+    version: tcslibgs::ConfigVersion,
+    config_version: tcslibgs::ConfigVersion,
+    digest: tcslibgs::ConfigDigest,
+) -> String {
+    format!("v: {version} config v: {config_version} md5: {digest}")
+}
+
+/// What a beacon said, as the window shows it.
 ///
 /// A datagram this cannot read is shown as what arrived, cut short. Something
 /// else is sending to the group, or something is sending a beacon this build
@@ -285,10 +299,7 @@ fn beacon_last_received(at: Option<SystemTime>) -> String {
 fn beacon_message(datagram: &[u8]) -> String {
     match serde_json::from_slice::<Telemetry>(datagram) {
         Ok(Telemetry::Beacon(beacon)) => {
-            format!(
-                "ver: {} config ver: {} md5: {}",
-                beacon.version, beacon.config_version, beacon.digest
-            )
+            what_it_read(beacon.version, beacon.config_version, beacon.digest)
         }
         Ok(other) => format!("not a beacon: {:?}", other.tm_type()),
         Err(_) => {
@@ -610,10 +621,12 @@ mod tests {
 
         // Each labelled, each version three decimal parts, and the digest hex
         // with nothing between the bytes.
-        assert_eq!(
-            beacon_message(&datagram),
-            format!("ver: 1.2.3 config ver: 4.5.6 md5: {}", "ab".repeat(16))
-        );
+        let want = format!("v: 1.2.3 config v: 4.5.6 md5: {}", "ab".repeat(16));
+        assert_eq!(beacon_message(&datagram), want);
+
+        // And the answer to a CONNECT is written by the same function, so the
+        // two lines cannot come to disagree about how to say it.
+        assert_eq!(what_it_read(version, config_version, digest), want);
 
         let shown = beacon_message(&datagram);
         assert!(shown.contains("1.2.3"), "{shown}");

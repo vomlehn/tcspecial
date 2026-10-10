@@ -1066,14 +1066,14 @@ answer said:
 .. code-block:: console
 
    Version 0.1.0, configuration tests/manual/tcspecial2.yaml md5 8d908f54a3d72d0704213113b92d958b
-   Version 0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
    tcspecial answers v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
 and ``Last Response`` says whether the two agree:
 
 .. code-block:: text
 
-   tcspecial agrees: version 0.1.0, config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+   tcspecial agrees: v0.1.0, config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
 The set's version shown there is the one tcspecial sent, which is the version
 of the file it read. The MOC does not send its own, so there is nothing to

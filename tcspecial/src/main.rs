@@ -134,7 +134,7 @@ fn main() {
     // it -- config v1.0.0 -- so the three lines a reader compares say the
     // same thing in the same words.
     eprintln!(
-        "Version {}, configuration {} config v{} md5: {}",
+        "v{}, configuration {} config v{} md5: {}",
         ConfigVersion::of_this_build(),
         payload_path,
         config_version,

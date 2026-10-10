@@ -117,7 +117,7 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run --bin tcspecial -- $(PAYLOAD_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) cargo run -q --bin tcspecial -- $(PAYLOAD_FILE).yaml \
 	)
 
 # Running tcsmoc on one spelling of its payload configuration file.
@@ -134,7 +134,7 @@ define runmoc_on
 	( \
 		set -eu; \
 		echo "Running $(MOC_NAME) on $(basename $(PAYLOAD_FILE)).$(1)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run --bin tcsmoc -- $(basename $(PAYLOAD_FILE).$(1)).$(1) \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run -q --bin tcsmoc -- $(basename $(PAYLOAD_FILE).$(1)).$(1) \
 	)
 endef
 
@@ -166,7 +166,7 @@ define runverify_on
 	( \
 		set -eu; \
 		echo "Verifying $(basename $(PAYLOAD_FILE)).$(1)..."; \
-		cd $(RUST) && cargo run --bin tcsverify -- $(basename $(PAYLOAD_FILE).$(1)).$(1) $(PAYLOAD_FILE)sim.yaml \
+		cd $(RUST) && cargo run -q --bin tcsverify -- $(basename $(PAYLOAD_FILE).$(1)).$(1) $(PAYLOAD_FILE)sim.yaml \
 	)
 endef
 
@@ -189,7 +189,7 @@ runsim:
 	( \
 		set -eu; \
 		echo "Running $(SIM_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run --bin tcssim -- $(PAYLOAD_FILE).yaml \
+		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(PAYLOAD_FILE)sim.yaml cargo run -q --bin tcssim -- $(PAYLOAD_FILE).yaml \
 	)
 
 # Clean build artifacts

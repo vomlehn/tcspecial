@@ -155,6 +155,24 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                     if loopback { "yes" } else { "no" }
                 );
             }
+
+            // The electrical layer under a start-stop line. Shown only where
+            // the line is a two-wire bus: a panel is read for what a payload
+            // is, and three lines saying a line is not an RS-485 bus would
+            // say it of every line there is.
+            if let Some(rs485) = serial.rs485 {
+                let _ = writeln!(out, "  rs485            yes, a half-duplex bus");
+                let _ = writeln!(
+                    out,
+                    "  rs485_rts_on_send {}, while sending",
+                    if rs485.rts_on_send { "high" } else { "low" }
+                );
+                let _ = writeln!(
+                    out,
+                    "  rs485 turnaround {} ms before, {} ms after",
+                    rs485.delay_before_send_ms, rs485.delay_after_send_ms
+                );
+            }
         }
         EndpointConfig::I2c(i2c) => {
             let _ = writeln!(out, "  bus              {}", i2c.bus);

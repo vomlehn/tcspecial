@@ -2024,6 +2024,20 @@ Requirement
     whether it sends of its own accord or on a trigger -- and one word cannot
     mean both.
 
+What Is Experimental
+^^^^^^^^^^^^^^^^^^^^
+Some of what follows is **experimental and not yet supported**: RS-485 on a
+serial line, and the ``can``, ``iio``, ``rpmsg`` and ``gpio`` kinds of
+payload. Each is written, parses, reaches a handler and has tests of its
+rules; none has been run against the hardware it describes, and no shipped
+payload set uses one.
+
+The requirements for them are written the way every other requirement here is,
+because that is what they are for: a statement of what the configuration will
+be, settled before there is equipment to try it against. They may change,
+where the five supported kinds -- ``network``, ``device``, ``serial``, ``i2c``
+and ``spi`` -- will not.
+
 Serial Payloads: a Line
 ^^^^^^^^^^^^^^^^^^^^^^^
 A serial payload states which kind of line it describes, and what else it may
@@ -2078,6 +2092,66 @@ Requirement
     set them; keeping them lets the link a file describes be checked against
     the equipment and reported plainly, as an I\ :superscript:`2`\ C group's
     bus speed is.
+
+RS-485: a Two-Wire Bus
+^^^^^^^^^^^^^^^^^^^^^^
+**Experimental, not yet supported.**
+
+A start-stop line may be half of an RS-485 bus rather than one end of a
+point-to-point link: one pair of wires, several transmitters, and each of them
+obliged to stop driving the pair the instant it has finished. The turnaround
+is a few bit times -- a write returns before the last bit has left the shift
+register -- so Linux does it in the UART driver, told through ``TIOCSRS485``.
+
+RS-485 is not a kind of link. It is the electrical layer under a start-stop
+line: the same termios terms, the same framing, the same device file. So these
+are terms of the ``serial`` kind, in ``tcslibgs::endpoint_config_rs485``, and a
+payload on a four-wire line states none of them and is unchanged.
+
+Requirement
+    A line states ``rs485: true`` to be a bus, and says nothing to be a plain
+    line. Absent is what every payload set written before this says, and what
+    an RS-422 line says.
+
+Requirement
+    A line that states ``rs485: true`` states ``rs485_rts_on_send``. Which
+    level of RTS drives the transceiver is a property of the board rather than
+    of the protocol -- the signal commonly reaches the enable pin through an
+    inverter -- so a line given a default would have an even chance of
+    transmitting exactly when it should be listening.
+
+Requirement
+    The turnaround delays default to nought and are refused above a second. A
+    turnaround is measured in bit times, so a file asking for seconds of it
+    has mistaken the unit, and a line that held the bus that long would look
+    like one that had failed.
+
+Requirement
+    A turnaround stated without ``rs485: true`` is refused rather than kept
+    against the day it is turned on. A file that set one and left the mode off
+    has described a bus whose driver is never released, and reading it as a
+    plain line would be reading a different file from the one that was
+    written.
+
+Requirement
+    None of it applies to a synchronous line. The kernel's RS-485 support is
+    part of its start-stop drivers, where a synchronous line is driven through
+    generic HDLC and a network interface instead.
+
+Requirement
+    The mode is applied and read back, and a line that did not take it is
+    refused rather than started. A driver that does not support the mode may
+    take the call and clear the flag, and a line left in point-to-point mode
+    on a two-wire bus transmits into every other transmitter on it --
+    including the payload this handler is trying to read. Which is also why
+    this is refused where a synchronous line's terms are merely recorded: the
+    kernel takes it through an ioctl on the file the handler already has open.
+
+Requirement
+    A simulated line cannot be an RS-485 bus and says so. A pseudo-terminal
+    has no transceiver and no RTS to drive, so it refuses the mode, and a set
+    meant to be run against tcssim states no ``rs485`` -- as it states
+    ``parity: none`` for the same reason.
 
 **A line's terms**
 

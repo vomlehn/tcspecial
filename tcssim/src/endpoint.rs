@@ -330,6 +330,7 @@ mod tests {
                 loopback: None,
                 stop_bits: Some(StopBits::One),
                 byte_length: 8,
+                rs485: None,
             }),
             packet_size: 4,
             oc: None,

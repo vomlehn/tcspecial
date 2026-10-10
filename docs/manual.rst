@@ -111,6 +111,18 @@ states its kind in ``type`` and is then held to that kind's attributes and no
 others: a device stating a ``port``, or a network payload stating a ``path``,
 is refused.
 
+About the experimental interfaces
+---------------------------------
+Some of what follows is marked **experimental, not yet supported**. Each of
+those is written, parses, reaches a handler and has tests; none has been run
+against the hardware it describes, and none is shipped in a payload set. What
+is marked that way is: RS-485 on a serial line, and the ``can``, ``iio``,
+``rpmsg`` and ``gpio`` kinds of payload.
+
+Read them as a statement of what the configuration will be rather than as a
+feature to rely on. They may change in ways the five supported kinds --
+``network``, ``device``, ``serial``, ``i2c`` and ``spi`` -- will not.
+
 Attributes Every Payload Has
 ----------------------------
 .. code-block:: text
@@ -317,6 +329,47 @@ drives such a line through a network interface of its own rather than through
 the terms of a device file, so a handler that opens a path cannot set them.
 They are kept so that the link a file describes can be checked against the
 equipment, as an I\ :superscript:`2`\ C payload's bus speed is.
+
+**RS-485: a two-wire bus** -- experimental, not yet supported
+
+A start-stop line may be a half-duplex RS-485 bus rather than a point-to-point
+RS-232 or RS-422 line. One pair of wires carries several transmitters, so a
+transmitter has to stop driving the pair the instant it has finished; the
+turnaround is a few bit times, too quick for a program, so Linux does it in
+the UART driver and is told through an ioctl.
+
+.. code-block:: text
+
+   rs485             true | false, default false -- asynchronous lines only
+   rs485_rts_on_send true | false -- the level of RTS while sending.
+                     Required of a line that states rs485: true
+   rs485_delay_before_send_ms
+                     milliseconds to hold the bus before the first bit,
+                     default 0
+   rs485_delay_after_send_ms
+                     and after the last, default 0
+
+Which level of RTS drives the transceiver is a property of the board rather
+than of the protocol -- the signal commonly reaches the transceiver's enable
+pin through an inverter -- so a line that states ``rs485: true`` must state it,
+and a line that got it the wrong way round would transmit exactly when it
+should be listening. The delays default to nought, which is right where the
+transceivers are quick enough, and a delay longer than a second is refused as
+microseconds mistaken for milliseconds.
+
+The turnaround details are refused on a line that does not state
+``rs485: true``, and all of it is refused on a synchronous line: the kernel's
+RS-485 support is part of its start-stop drivers, where a synchronous line is
+driven through generic HDLC instead.
+
+Unlike the synchronous terms above, these are applied rather than recorded,
+and the line is read back after being set: a driver that does not support the
+mode may take the call and clear the flag, and a line left in
+point-to-point mode on a two-wire bus transmits into other transmitters. A
+line that will not take what the file asked for is refused rather than
+started. A simulated line is a pseudo-terminal, which will not take it at all,
+so a set meant to be run against tcssim does not state ``rs485`` -- as it
+states ``parity: none`` for the same kind of reason.
 
 **A stream section**
 

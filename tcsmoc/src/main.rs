@@ -84,8 +84,15 @@ fn tcspecial_already_running(address: &str) -> bool {
         Ok(connection) => connection,
         Err(_) => return false,
     };
+    // A PING is a spacecraft command, so the payload link is never sent
+    // anything here; it is given the same address because a client has two
+    // links and this question needs one.
+    let payload = match UdpConnection::new("0.0.0.0:0", address) {
+        Ok(connection) => connection,
+        Err(_) => return false,
+    };
 
-    let mut client = TcsClient::new(Box::new(connection));
+    let mut client = TcsClient::new(Box::new(connection), Box::new(payload));
     client.set_timeout(ALREADY_RUNNING_TIMEOUT);
     client.ping().is_ok()
 }
@@ -798,7 +805,18 @@ fn main() {
     // Open the link to the command interpreter on startup, by the same call
     // the Connect button makes, so the link the window comes up with is the
     // one that button would have given it.
-    let mut link = CiLink::down();
+    // Where payload commands go. A MOC that cannot work this out cannot
+    // command a payload at all, so it says so and stops rather than coming up
+    // with panels whose buttons would be refused.
+    let payload_port = match payload_command_port() {
+        Ok(port) => port,
+        Err(e) => {
+            eprintln!("Cannot tell where payload commands go: {e}");
+            exit(1);
+        }
+    };
+
+    let mut link = CiLink::down(payload_port);
     if let Err(e) = link.connect(DEFAULT_CI_ADDRESS) {
         eprintln!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e);
         ui.set_ci_status(SharedString::from(ERROR_STATUS));
@@ -806,7 +824,18 @@ fn main() {
         // Exit since we can't operate without a connection
         exit(1);
     }
-    eprintln!("Connected to {}", DEFAULT_CI_ADDRESS);
+    match link.payload_address() {
+        Ok(payload) => eprintln!(
+            "Connected to {}, payload commands to {}",
+            DEFAULT_CI_ADDRESS, payload
+        ),
+        // The link is up, so the address parsed when it was opened; said
+        // rather than hidden all the same.
+        Err(e) => eprintln!(
+            "Connected to {}, and cannot say where payload commands go: {}",
+            DEFAULT_CI_ADDRESS, e
+        ),
+    }
     let link: Arc<Mutex<CiLink>> = Arc::new(Mutex::new(link));
     if let Some(digest) = digest {
         hear_what_tcspecial_read(&ui, &link, version, digest);
@@ -846,7 +875,7 @@ fn main() {
     handle_link_button(&ui, ui_weak.clone(), link.clone());
     handle_main_menu(&ui, ui_weak.clone(), link.clone());
     query_dh_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
-    poll_panels(link.clone(), dh_configs.clone(), dh_model.clone());
+    poll_panels(link.clone(), dh_configs.clone(), dh_model.clone(), payload_port);
     handle_transfer_button(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
 /*
     // Menu action handler
@@ -1133,6 +1162,7 @@ fn poll_panels(
     link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
+    payload_port: u16,
 ) {
     let pending: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -1148,7 +1178,7 @@ fn poll_panels(
             let mut said: Vec<Option<String>> = vec![None; dh_configs.len()];
 
             // The poller's own link, kept wherever the window's link is.
-            let mut poll_link = CiLink::down();
+            let mut poll_link = CiLink::down(payload_port);
 
             loop {
                 thread::sleep(PANEL_POLL_INTERVAL);
@@ -1265,6 +1295,21 @@ fn beacon_to_listen_for(payload_path: &str) -> Result<Beacon, String> {
         .map_err(|e| format!("{payload_path} could not be read: {e}"))?;
 
     beacon(&config, section.as_ref())
+}
+
+/// Which port the spacecraft takes payload commands on.
+///
+/// From the command interpreter's own configuration, which is where tcspecial
+/// takes it from: one file, read by both ends, so they cannot name different
+/// ports. The payload set's section states one too and is not read for it,
+/// for the reason tcspecial does not read it there -- where commands are
+/// taken is the interpreter's own business, not the set's.
+fn payload_command_port() -> Result<u16, String> {
+    let config_path = tcspecial_config_path();
+    let config = load_tcspecial_config(&config_path)
+        .map_err(|e| format!("{config_path} could not be read: {e}"))?;
+
+    Ok(config.payload_port)
 }
 
 /// Send what this MOC read, and hear what the spacecraft read.
@@ -1546,6 +1591,9 @@ fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The port a test's payload commands would go to; nothing answers on it.
+    const A_PAYLOAD_PORT: u16 = 4001;
     use std::ffi::OsStr;
     use std::path::Path;
     use tcslibgs::{EndpointConfig, NetworkProtocol};
@@ -1591,14 +1639,14 @@ mod tests {
     /// link of its own and locks the shared one only to read where it went.
     #[test]
     fn a_poll_leaves_the_window_its_link() {
-        let link = Arc::new(Mutex::new(CiLink::down()));
+        let link = Arc::new(Mutex::new(CiLink::down(A_PAYLOAD_PORT)));
         link.lock().unwrap().connect(UNANSWERED_ADDRESS).unwrap();
 
         let pass = {
             let link = link.clone();
             thread::spawn(move || {
                 let dh_configs = vec![a_dh()];
-                let mut poll_link = CiLink::down();
+                let mut poll_link = CiLink::down(A_PAYLOAD_PORT);
                 let mut last = vec![None];
                 let mut said = vec![None];
 

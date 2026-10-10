@@ -1063,7 +1063,7 @@ so the two are there to read even when the link never comes up:
 
 .. code-block:: console
 
-   Version 0.1.0, configuration tests/manual/tcspecial2.yaml version 1.0.0 md5 8d908f54a3d72d0704213113b92d958b
+   Version 0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
    tcspecial answers v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
 and ``Last Response`` says whether the two agree. They are the same payload

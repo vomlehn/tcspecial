@@ -130,8 +130,11 @@ fn main() {
         }
     };
 
+    // The set's version is labelled as a beacon and a CONNECT answer label
+    // it -- config v1.0.0 -- so the three lines a reader compares say the
+    // same thing in the same words.
     eprintln!(
-        "Version {}, configuration {} version {} md5 {}",
+        "Version {}, configuration {} config v{} md5: {}",
         ConfigVersion::of_this_build(),
         payload_path,
         config_version,

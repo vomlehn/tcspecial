@@ -32,7 +32,81 @@ pub enum CommandType {
     ConfigDH,
 }
 
+/// Which of the command interpreter's two links a command belongs on.
+///
+/// There are two because what the ground needs in a hurry must never be
+/// queued behind what it asked for at leisure: a RESTART waiting behind a
+/// payload's statistics is a spacecraft that cannot be rescued while it is
+/// busy. On a space link the two become two virtual channels, which is where
+/// the priority between them is really decided; over IP they are two ports --
+/// `port` and `payload_port`; see [`crate::CIConfigJson`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandLink {
+    /// The spacecraft's own link: ping it, arm it, restart it, configure it.
+    Spacecraft,
+    /// A payload's link: start one, stop one, ask one what it has moved.
+    Payload,
+    /// Either of them.
+    Either,
+}
+
+impl CommandLink {
+    /// The word a message uses for this link.
+    pub fn spelling(&self) -> &'static str {
+        match self {
+            CommandLink::Spacecraft => "spacecraft command",
+            CommandLink::Payload => "payload command",
+            CommandLink::Either => "either command",
+        }
+    }
+}
+
 impl CommandType {
+    /// Which link this command is sent on and taken on.
+    ///
+    /// One table, read by the ground when it sends and by the spacecraft when
+    /// it answers, so that the two cannot come to disagree about where a
+    /// command belongs. A disagreement there is the worst kind: nothing can
+    /// report it except as a command that went unanswered.
+    ///
+    /// A match over every kind rather than a rule with an exception, so that
+    /// a command added later is placed deliberately -- by someone who has to
+    /// decide, rather than by whichever side of a default it fell on.
+    ///
+    /// CONNECT is on neither side of the question. It says what the end that
+    /// answers read, and the holder of either link wants that of the link it
+    /// holds, so both answer it.
+    pub fn link(&self) -> CommandLink {
+        match self {
+            CommandType::Ping
+            | CommandType::RestartArm
+            | CommandType::Restart
+            | CommandType::Config => CommandLink::Spacecraft,
+
+            CommandType::StartDH
+            | CommandType::StopDH
+            | CommandType::QueryDH
+            | CommandType::QueryDHSample
+            | CommandType::ConfigDH => CommandLink::Payload,
+
+            CommandType::Connect => CommandLink::Either,
+        }
+    }
+
+    /// Whether a command of this kind may be taken on `link`.
+    ///
+    /// A command that arrives on the other one is refused rather than served:
+    /// it reached the spacecraft, so something can be said about it, and what
+    /// has gone wrong is that one end is not reading the configuration the
+    /// other is. Serving it would hide that, and hide it in the one place the
+    /// split is supposed to be reliable.
+    pub fn may_arrive_on(&self, link: CommandLink) -> bool {
+        match (self.link(), link) {
+            (CommandLink::Either, _) | (_, CommandLink::Either) => true,
+            (wanted, arrived) => wanted == arrived,
+        }
+    }
+
     pub fn to_u8(&self) -> u8 {
         match self {
             CommandType::Ping => 0x01,
@@ -303,6 +377,11 @@ impl Command {
         }
     }
 
+    /// Which link this command belongs on; see [`CommandType::link`].
+    pub fn link(&self) -> CommandLink {
+        self.cmd_type().link()
+    }
+
     pub fn cmd_type(&self) -> CommandType {
         match self {
             Command::Ping(cmd) => cmd.header.cmd_type,
@@ -322,6 +401,74 @@ impl Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every command belongs to one link, and the two classes between them
+    /// hold every command there is.
+    ///
+    /// The table is what the two ends agree by, so what matters is that it is
+    /// total: a command with no link would be a command the ground could not
+    /// send and the spacecraft could not refuse.
+    #[test]
+    fn every_command_says_which_link_it_belongs_on() {
+        let spacecraft = [
+            CommandType::Ping,
+            CommandType::RestartArm,
+            CommandType::Restart,
+            CommandType::Config,
+        ];
+        let payload = [
+            CommandType::StartDH,
+            CommandType::StopDH,
+            CommandType::QueryDH,
+            CommandType::QueryDHSample,
+            CommandType::ConfigDH,
+        ];
+
+        for kind in spacecraft {
+            assert_eq!(kind.link(), CommandLink::Spacecraft, "{kind:?}");
+            assert!(kind.may_arrive_on(CommandLink::Spacecraft), "{kind:?}");
+            assert!(
+                !kind.may_arrive_on(CommandLink::Payload),
+                "{kind:?} is not a payload's business"
+            );
+        }
+
+        for kind in payload {
+            assert_eq!(kind.link(), CommandLink::Payload, "{kind:?}");
+            assert!(kind.may_arrive_on(CommandLink::Payload), "{kind:?}");
+            assert!(
+                !kind.may_arrive_on(CommandLink::Spacecraft),
+                "{kind:?} is a payload's, and the spacecraft link is for what \
+                 cannot wait behind one"
+            );
+        }
+
+        // Every command, and no command twice: the two lists above are the
+        // whole of the enumeration, which is what makes the table total.
+        let mut all: Vec<u8> = spacecraft
+            .iter()
+            .chain(payload.iter())
+            .chain([CommandType::Connect].iter())
+            .map(|kind| kind.to_u8())
+            .collect();
+        all.sort_unstable();
+        let mut known: Vec<u8> = (0u8..=255)
+            .filter(|byte| CommandType::from_u8(*byte).is_some())
+            .collect();
+        known.sort_unstable();
+        assert_eq!(all, known, "a command was left out of both lists");
+    }
+
+    /// A CONNECT is answered on either link.
+    ///
+    /// It says what the end that answers read, and the holder of either link
+    /// wants that of the link it holds.
+    #[test]
+    fn what_each_end_read_is_asked_on_either_link() {
+        assert_eq!(CommandType::Connect.link(), CommandLink::Either);
+        assert!(CommandType::Connect.may_arrive_on(CommandLink::Spacecraft));
+        assert!(CommandType::Connect.may_arrive_on(CommandLink::Payload));
+    }
 
     #[test]
     fn test_command_type_conversion() {

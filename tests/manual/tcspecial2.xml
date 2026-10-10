@@ -15,6 +15,7 @@
     <tcspecial>
         <address>0.0.0.0</address>
         <port>4000</port>
+        <payload_port>4001</payload_port>
         <protocol>udp</protocol>
         <beacon_interval_ms>5000</beacon_interval_ms>
         <beacon_address>239.255.0.1:5550</beacon_address>

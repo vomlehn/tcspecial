@@ -3012,8 +3012,67 @@ Requirement
     only argument.
 
 Requirement
-    The address and port the command interpreter binds are in its own
+    The address and ports the command interpreter binds are in its own
     configuration file.
+
+Requirement
+    The command interpreter takes commands on two links. A command about the
+    spacecraft -- ``PING``, ``RESTART_ARM``, ``RESTART``, ``CONFIGURE`` --
+    arrives on ``port``; a command about a payload -- ``START_DH``,
+    ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE``, ``CONFIGURE_DH`` --
+    arrives on ``payload_port``. ``CONNECT`` is answered on either.
+
+Two links because what the ground needs in a hurry must never be queued
+behind what it asked for at leisure. A ``RESTART`` waiting behind a payload's
+statistics is a spacecraft that cannot be rescued while it is busy, and the
+two kinds of command are unlike in every way that matters: one is rare,
+urgent, and about the vehicle, the other routine, bulky, and about an
+instrument. Missions divide them for the same reason, often between different
+operators with different authority.
+
+On a space link the division is by virtual channel, which is where the
+priority between them is really decided and where a command link gets COP-1's
+sequence control. Over IP there is no such thing, so it is two ports -- what
+an IP network has to divide traffic with. A payload set that is flown rather
+than tested would map ``port`` to the command virtual channel and
+``payload_port`` to a payload one.
+
+Requirement
+    One table says which link a command belongs on, read by the ground when
+    it sends and by the spacecraft when it answers:
+    ``CommandType::link``. The two ends cannot come to disagree about where a
+    command belongs, which is a disagreement nothing could report except as a
+    command that went unanswered.
+
+Requirement
+    The table is a match over every kind of command, not a rule with a
+    default. A command added later is placed deliberately, by someone who has
+    to decide, rather than by whichever side of a default it fell on.
+
+Requirement
+    Both ports are required of every command interpreter configuration, with
+    no default, as the beacon attributes are: where commands are taken is not
+    a question to be answered by whatever a file was silently given.
+
+Requirement
+    The two ports are two ports. A configuration giving both the same number
+    describes a split it has not made, and the half of it that bound second
+    would fail at startup with the other half's address.
+
+Requirement
+    No payload may bind a port a command link binds. It is the one collision
+    that does not stop a payload from working -- it stops the commanding that
+    would have started it -- and which of the two fails depends on the order
+    the programs happened to start in. A command link bound to every
+    interface, which ``0.0.0.0`` is, takes its port on every address, so a
+    payload at ``localhost:4000`` collides with a link at ``0.0.0.0:4000``
+    without either naming the other's host.
+
+The ports are stated and checked ahead of being served: a payload set states
+both, every loader validates both, and ``tcsverify`` reports either from the
+line that states it. What binds the second socket, routes a command to it,
+and refuses one that arrived on the wrong link comes next; until then the
+command interpreter binds ``port`` alone.
 
 Requirement
     A beacon is sent to a multicast group. ``beacon_address`` is a group

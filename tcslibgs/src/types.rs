@@ -227,6 +227,60 @@ pub fn collisions(handlers: &[DHConfig]) -> Vec<(DHName, String)> {
     found
 }
 
+/// Whether an address binds every interface rather than one of them.
+///
+/// A wildcard claims a port on every address at once, which is why it has to
+/// be told from a host: a handler at `localhost:4000` and a command link at
+/// `0.0.0.0:4000` do collide, without naming one host between them.
+fn binds_every_interface(address: &str) -> bool {
+    address.is_empty() || address == "0.0.0.0" || address == "::" || address == "*"
+}
+
+/// What the command interpreter's own two links take from the handlers.
+///
+/// A handler that binds a port a command link binds takes the commanding with
+/// it: the link that bound second fails at startup, and which of them that is
+/// depends on the order two programs happened to start in. Worth refusing
+/// where the file is read, where it is one line to change.
+///
+/// Only a payload set that states a `tcspecial` section can be asked this.
+/// For a set that states none, the ports are in the command interpreter's own
+/// file and nothing here has seen it.
+fn interpreter_collisions(ci: &CIConfig, handlers: &[DHConfig]) -> Vec<(DHName, String)> {
+    let links = [
+        (ci.port, "spacecraft command"),
+        (ci.payload_port, "payload command"),
+    ];
+    let wildcard = binds_every_interface(&ci.address);
+    let host = one_host(&ci.address);
+
+    let mut found = Vec::new();
+    for dh in handlers {
+        for (claim, what) in claims_of(dh) {
+            let Claim::Port { host: theirs, port } = &claim else {
+                continue;
+            };
+            for (mine, which) in links {
+                if *port == mine && (wildcard || *theirs == host) {
+                    found.push((
+                        dh.name.clone(),
+                        format!(
+                            "{what} and the {which} link both want port {port}{}",
+                            if wildcard {
+                                format!(", which the link takes on every interface ({})", ci.address)
+                            } else {
+                                String::new()
+                            }
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
+    found
+}
+
 impl DHType {
     /// The word a configuration file uses for this kind.
     ///
@@ -1015,6 +1069,16 @@ impl PayloadConfig {
             problems.push(Problem::payload(&name.0, message));
         }
 
+        // And against the command links, when the file says where they are.
+        // A handler on a command port is the one collision that does not stop
+        // a handler from working: it stops the commanding that would have
+        // started it.
+        if let Some(Ok(ci)) = self.tcspecial.as_ref().map(CIConfigJson::to_ci_config) {
+            for (name, message) in interpreter_collisions(&ci, &configs) {
+                problems.push(Problem::payload(&name.0, message));
+            }
+        }
+
         // The tcspecial section is checked here whether or not anything reads
         // the attribute in question.
         // A section a file states is a section its author meant, and one that
@@ -1655,6 +1719,25 @@ pub fn beacon_interface_of(stated: &str) -> Result<Ipv4Addr, String> {
 pub struct CIConfigJson {
     pub address: String,
     pub port: u16,
+    /// The port payload commands are taken on, which is not the port above.
+    ///
+    /// A command about a payload -- start it, stop it, ask it for its
+    /// statistics -- arrives here; a command about the spacecraft -- ping it,
+    /// arm it, restart it -- arrives on `port`. See
+    /// [`crate::CommandType::is_payload_command`], which is the one table
+    /// that says which is which, read by both ends.
+    ///
+    /// Two links because what the ground needs in a hurry must never be
+    /// queued behind what it asked for at leisure: a RESTART waiting behind a
+    /// payload's statistics is a spacecraft that cannot be rescued while it
+    /// is busy. On a space link the two become two virtual channels, which is
+    /// where the priority between them is really decided; here they are two
+    /// ports, which is what an IP network has to divide traffic with.
+    ///
+    /// Required, with no default, for the reason the beacon attributes are:
+    /// where commands are taken is not a question to be answered by whatever
+    /// a file was silently given.
+    pub payload_port: u16,
     pub protocol: String,
     pub beacon_interval_ms: u32,
     /// Directory holding the telemetry log's segment files. The directory
@@ -1687,6 +1770,9 @@ pub struct CIConfigJson {
 pub struct CIConfig {
     pub address: String,
     pub port: u16,
+    /// The port payload commands are taken on; see
+    /// [`CIConfigJson::payload_port`].
+    pub payload_port: u16,
     pub protocol: NetworkProtocol,
     pub beacon_interval: BeaconTime,
     /// The multicast group beacons are sent to.
@@ -1716,9 +1802,22 @@ impl CIConfigJson {
         let beacon_address = beacon_address_of(&self.beacon_address)?;
         let beacon_interface = beacon_interface_of(&self.beacon_interface)?;
 
+        // One socket cannot be two links. A file that gave both the same port
+        // would describe a split it has not made, and the half of it that
+        // bound second would fail at startup with the other half's address.
+        if self.payload_port == self.port {
+            return Err(format!(
+                "port and payload_port are both {}, and the two links cannot be \
+                 one socket: spacecraft commands are taken on port and payload \
+                 commands on payload_port",
+                self.port
+            ));
+        }
+
         Ok(CIConfig {
             address: self.address.clone(),
             port: self.port,
+            payload_port: self.payload_port,
             protocol,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
             beacon_address,
@@ -2474,6 +2573,91 @@ payloads:
     /// The version goes out in every beacon as three bytes, so a file whose
     /// version is not one, two or three decimal parts is refused rather than
     /// announced as something it is not.
+    /// A set states both command ports, and they are two ports.
+    ///
+    /// One socket cannot be two links: a file that gave both the same port
+    /// would describe a split it has not made, and the half that bound second
+    /// would fail at startup with the other half's address.
+    #[test]
+    fn a_set_states_two_command_ports() {
+        let with = |ports: &str| {
+            format!(
+                "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
+                 address: 0.0.0.0\n{ports}  protocol: udp\n  \
+                 beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
+                 beacon_interface: 127.0.0.1\npayloads:\n  - dh_id: 0\n    \
+                 name: p\n    type: device\n    path: /dev/null\n    \
+                 packet_size: 1\n"
+            )
+        };
+
+        payload(&with("  port: 4000\n  payload_port: 4001\n"))
+            .to_dh_configs()
+            .expect("two ports are two links");
+
+        let said = payload(&with("  port: 4000\n  payload_port: 4000\n"))
+            .to_dh_configs()
+            .expect_err("one socket cannot be two links");
+        assert!(
+            said.contains("payload_port") && said.contains("4000"),
+            "{said}"
+        );
+
+        // And a section that names only one of them has not been asked the
+        // question: the parser refuses it, as it refuses a section with no
+        // beacon.
+        assert!(
+            ConfigFormat::Yaml
+                .parse::<PayloadConfig>(&with("  port: 4000\n"))
+                .is_err(),
+            "a section with no payload_port was accepted"
+        );
+    }
+
+    /// No payload may bind a port the commanding is taken on.
+    ///
+    /// The one collision that does not stop a payload from working: it stops
+    /// the commanding that would have started it, and which of the two fails
+    /// depends on the order they were started in.
+    #[test]
+    fn no_payload_may_bind_a_command_port() {
+        let with = |address: &str, port: u16| {
+            format!(
+                "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
+                 address: {address}\n  port: 4000\n  payload_port: 4001\n  \
+                 protocol: udp\n  beacon_interval_ms: 5000\n  \
+                 beacon_address: 239.255.0.1:5550\n  \
+                 beacon_interface: 127.0.0.1\npayloads:\n  - dh_id: 0\n    \
+                 name: p\n    type: network\n    protocol: udp\n    \
+                 address: localhost\n    port: {port}\n    packet_size: 1\n"
+            )
+        };
+
+        // Either link, and a wildcard link takes its port on every interface
+        // -- so a payload on localhost collides with one on 0.0.0.0 without
+        // either naming the other's host.
+        for port in [4000, 4001] {
+            let said = payload(&with("0.0.0.0", port))
+                .to_dh_configs()
+                .unwrap_err();
+            assert!(
+                said.contains(&port.to_string()) && said.contains("command"),
+                "port {port}: {said}"
+            );
+        }
+
+        // A link bound to one interface takes the port on that one alone, so
+        // a payload on another host may have it.
+        payload(&with("192.0.2.1", 4000))
+            .to_dh_configs()
+            .expect("another interface's port 4000 is not this link's");
+
+        // A port neither link wants is nobody's business.
+        payload(&with("0.0.0.0", 4002))
+            .to_dh_configs()
+            .expect("4002 is not a command port");
+    }
+
     #[test]
     fn a_set_says_its_version_in_parts_a_beacon_can_carry() {
         let with = |version: &str| {

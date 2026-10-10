@@ -133,13 +133,15 @@ mod tests {
         load_tcspecial_config(file.path())
     }
 
-    const YAML: &str = "address: 0.0.0.0\nport: 4000\nprotocol: udp\n\
+    const YAML: &str = "address: 0.0.0.0\nport: 4000\npayload_port: 4001\n\
+                        protocol: udp\n\
                         beacon_interval_ms: 5000\nbeacon_address: 239.255.0.1:5550\n\
                         beacon_interface: 127.0.0.1\n";
 
     const XML: &str = "<tcspecial>\
         <address>0.0.0.0</address>\
         <port>4000</port>\
+        <payload_port>4001</payload_port>\
         <protocol>udp</protocol>\
         <beacon_interval_ms>5000</beacon_interval_ms>\
         <beacon_address>239.255.0.1:5550</beacon_address>\
@@ -154,6 +156,7 @@ mod tests {
 
             assert_eq!(config.address, "0.0.0.0", "{ext}");
             assert_eq!(config.port, 4000, "{ext}");
+            assert_eq!(config.payload_port, 4001, "{ext}");
             assert_eq!(config.protocol, NetworkProtocol::Udp, "{ext}");
             assert_eq!(config.beacon_interval.0, 5000, "{ext}");
             // Absent in every actual input, so the serde defaults must apply.
@@ -210,6 +213,7 @@ mod tests {
         let section = |beacon: &str| CIConfigJson {
             address: "0.0.0.0".to_string(),
             port: 4000,
+            payload_port: 4001,
             protocol: "udp".to_string(),
             beacon_interval_ms: 5000,
             beacon_address: beacon.to_string(),

@@ -102,7 +102,7 @@ fn tcspecial_already_running(address: &str) -> bool {
 
 /// The programs the MOC starts.
 ///
-/// Each takes its payload configuration file as an argument, as the MOC does,
+/// Each takes its tcspecial configuration file as an argument, as the MOC does,
 /// so the MOC passes on the file it was given. It used to set each child's own
 /// environment variable instead; an argument says the same thing without a
 /// name that reaches further than intended, and all three programs now read
@@ -117,7 +117,8 @@ fn tcspecial_already_running(address: &str) -> bool {
 const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 
 /// Which environment variable names the simulator configuration, and what is
-/// read when the variable is unset and no file is beside the payload file.
+/// read when the variable is unset and no file is beside the tcspecial
+/// configuration.
 ///
 /// The same variable tcssim reads, which is the point: the MOC shows what the
 /// tcssim it starts is simulating, so the two have to be looking at one file.
@@ -172,9 +173,9 @@ const GRID_MARGINS: f32 = 30.0;
 /// How many rows of panels the window looks ahead for.
 ///
 /// Asked for rather than worked out: a window with room for only the rows a
-/// particular payload file happens to have is one that has to be resized
-/// before a larger file can be watched, and three rows is the room that was
-/// wanted. It is not a floor, though -- see `rows_of_room`.
+/// particular tcspecial configuration happens to have is one that has to be
+/// resized before a larger file can be watched, and three rows is the room that
+/// was wanted. It is not a floor, though -- see `rows_of_room`.
 const MIN_PANEL_ROWS: usize = 3;
 
 /// How many rows of panels the window opens with room for.
@@ -191,8 +192,8 @@ fn rows_of_room(rows: usize, panels: usize) -> usize {
 /// How tall a window with room for `rows` rows of panels is.
 ///
 /// One row of them is the window's `min-height`, the least it is ever opened
-/// at; `rows_of_room` says how many rows a particular payload file opens
-/// with.
+/// at; `rows_of_room` says how many rows a particular tcspecial configuration
+/// opens with.
 fn height_for_rows(rows: usize) -> f32 {
     let rows = rows.max(1);
     rows as f32 * PANEL_HEIGHT + (rows - 1) as f32 * GRID_SPACING + CHROME_HEIGHT
@@ -219,9 +220,9 @@ fn window_size(shape: &GridShape, panels: usize) -> LogicalSize {
 /// open in a 3x2 grid with two cells empty. At 700 every panel count keeps the
 /// shape it has. (Two panels used to be the other half of this argument: they
 /// stacked, and a narrower window would have put them side by side. They are
-/// side by side at any width now -- a grid is never taller in panels than it
-/// is wide -- so the four-panel case is what the floor holds up.) Anything that changes the panel or chrome heights has to be
-/// weighed the same way, against
+/// side by side at any width now -- a grid is never taller in panels than it is
+/// wide -- so the four-panel case is what the floor holds up.) Anything that
+/// changes the panel or chrome heights has to be weighed the same way, against
 /// `the_shipped_payload_config_opens_a_nearly_square_window`.
 const CONTROLS_WIDTH: f32 = 700.0;
 
@@ -297,7 +298,7 @@ fn grid_shape(panels: usize) -> GridShape {
     }
 }
 
-/// Turn a data handler from the payload configuration file into the panel the
+/// Turn a data handler from the tcspecial configuration file into the panel the
 /// window shows for it.
 ///
 /// The configured values fill in what the file knows; the run-time fields
@@ -317,9 +318,9 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         oc_data: SharedString::new(),
         bytes_recv: 0,
         // What both files said about this payload, ready for the panel's
-        // Configuration button. `sim` is absent when the simulator file could not be
-        // read, which is not an error here: the MOC controls payloads and
-        // does not simulate them.
+        // Configuration button. `sim` is absent when the simulator file could
+        // not be read, which is not an error here: the MOC controls payloads
+        // and does not simulate them.
         parameters: SharedString::from(payload_parameters(dh, sim)),
     }
 }
@@ -330,14 +331,14 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
 /// Read so that a panel can show the whole of what a payload set says, and
 /// read loosely for the same reason it is read at all: the MOC does not
 /// simulate anything, so a simulator file that is missing, unreadable, or
-/// written for a different payload file must not stop the MOC from
+/// written for a different tcspecial configuration must not stop the MOC from
 /// controlling payloads. Each of those is said once on the way past and the
 /// panels then say, where the parameters are shown, that this half was not
 /// read.
 fn simulator_settings(payload_path: &str, dh_configs: &[DHConfig]) -> Option<Vec<ResolvedSim>> {
     let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
-        // Beside the payload file and named for it, which is the convention
-        // the whole payload set mechanism rests on.
+        // Beside the tcspecial configuration and named for it, which is the
+        // convention the whole payload set mechanism rests on.
         payload_path
             .strip_suffix(".yaml")
             .map(|stem| format!("{stem}sim.yaml"))
@@ -539,20 +540,20 @@ fn update_row(model: &Rc<VecModel<DHInfo>>, row: usize, f: impl FnOnce(&mut DHIn
 
 /// The command that starts one of the MOC's children.
 ///
-/// The child is told which payload file to read, as an argument. Tcsmoc builds
-/// its panels from that file, so a child reading a different one would serve
-/// or simulate payloads the panels do not describe -- handlers that never
-/// connect, with nothing on screen to say why. An argument also beats anything
-/// the child would have taken from the environment, so for the run of a
-/// payload set the MOC's own file is the one that counts.
+/// The child is told which tcspecial configuration to read, as an argument.
+/// Tcsmoc builds its panels from that file, so a child reading a different one
+/// would serve or simulate payloads the panels do not describe -- handlers that
+/// never connect, with nothing on screen to say why. An argument also beats
+/// anything the child would have taken from the environment, so for the run of
+/// a payload set the MOC's own file is the one that counts.
 ///
-/// The payload file is the whole of what a child is told. Where tcspecial
-/// takes commands and where it sends beacons are both in its own
+/// The tcspecial configuration is the whole of what a child is told. Where
+/// tcspecial takes commands and where it sends beacons are both in its own
 /// configuration file, so neither is the MOC's to hand over -- which means the
 /// MOC and a tcspecial it starts agree about the command address only by
 /// reading the same default, and a tcspecial whose file moves it is one this
-/// MOC will not reach. The exchange on connecting is what reports a mismatch
-/// of configuration; an address is not part of it.
+/// MOC will not reach. The exchange on connecting is what reports a mismatch of
+/// configuration; an address is not part of it.
 ///
 /// The command is built rather than run so that a test can read what a child
 /// would be started with, without starting it. The children open windows and
@@ -1743,7 +1744,7 @@ mod tests {
         assert_eq!(rows_of_room(4, 16), 4);
         assert_eq!(rows_of_room(8, 64), 8);
 
-        // An empty payload file still opens a window.
+        // An empty tcspecial configuration still opens a window.
         assert_eq!(rows_of_room(1, 0), 1);
     }
 
@@ -2221,29 +2222,30 @@ mod tests {
         assert!(mine.group.ip().is_multicast(), "{} is not a group", mine.group);
     }
 
-    /// The simulator file beside a payload file is found and read.
+    /// The simulator file beside a tcspecial configuration is found and read.
     ///
     /// The MOC shows what the tcssim it starts is simulating, so the two have
     /// to be looking at one file: the convention is that it sits beside the
-    /// payload file and is named for it.
+    /// tcspecial configuration and is named for it.
     #[test]
     fn the_simulator_file_beside_a_payload_file_is_read() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let payload_path = root.join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_dh_configs(&payload_path).expect("the shipped payload file loads");
+        let dh_configs =
+            load_dh_configs(&payload_path).expect("the shipped configuration loads");
 
-        // Named from the payload file, since nothing in this test's
+        // Named from the tcspecial configuration, since nothing in this test's
         // environment says otherwise.
         let sims = simulator_settings(payload_path.to_str().unwrap(), &dh_configs)
-            .expect("the simulator file beside the shipped payload file");
+            .expect("the simulator file beside the shipped tcspecial configuration");
         assert_eq!(
             sims.len(),
             dh_configs.len(),
             "one settings entry per handler"
         );
 
-        // And a payload file with no simulator file beside it costs the MOC
-        // that half and nothing else: it controls payloads, it does not
+        // And a tcspecial configuration with no simulator file beside it costs
+        // the MOC that half and nothing else: it controls payloads, it does not
         // simulate them.
         assert!(
             simulator_settings("no_such_payload_set.yaml", &dh_configs).is_none(),
@@ -2397,7 +2399,7 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let dh_configs = load_dh_configs(&path).expect("the shipped payload file loads");
+        let dh_configs = load_dh_configs(&path).expect("the shipped tcspecial configuration loads");
         let dh = &dh_configs[0];
 
         // Without the simulator file, which is the case this program has to
@@ -2708,8 +2710,8 @@ mod tests {
         stub.join().unwrap();
     }
 
-    /// Each child is started on the payload file the MOC read, and told so by
-    /// argument.
+    /// Each child is started on the tcspecial configuration the MOC read, and
+    /// told so by argument.
     ///
     /// This is what was previously only ever confirmed by running the MOC and
     /// reading what its children printed.
@@ -2779,7 +2781,7 @@ mod tests {
         assert_eq!(CHILDREN, ["tcspecial", "tcssim"]);
     }
 
-    /// The shipped payload file has to be one the MOC can show.
+    /// The shipped tcspecial configuration has to be one the MOC can show.
     ///
     /// Nothing else checks that: until this test, the window's data handlers
     /// were transcribed from the file by hand, and a file that had moved on

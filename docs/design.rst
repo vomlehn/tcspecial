@@ -17,7 +17,7 @@ Introduction
 What there is, in the order a reader meets it:
 
 ``tcspecial``
-    The flight software. It serves the payloads a payload configuration file
+    The flight software. It serves the payloads its configuration file
     describes, takes commands from the ground, and sends beacons.
 
 ``tcslibgs``
@@ -46,9 +46,7 @@ Terminology
 
 These words are used in one sense each, here and in the code. Several of them
 had been used in two, which is why they are written down: "device" in
-particular had been both a kind of endpoint and a protocol beside TCP and UDP,
-and "endpoint" had been both one end of a data handler's path and an entry in a
-configuration file.
+particular had been both a kind of endpoint and a protocol beside TCP and UDP.
 
 endpoint
     One end of the path a data handler's data travels. A handler has two: the
@@ -79,7 +77,7 @@ bus
 payload
     What is at the far end of a payload endpoint: the instrument, recorder or
     radio whose data a handler carries. Also what tcssim stands in for, and
-    what a payload configuration file describes.
+    what the payload configuration describes.
 
 data handler
     The pair of conduits between one payload endpoint and one OC endpoint,
@@ -100,15 +98,23 @@ link
     A configured pairing of two endpoints that data passes between. Used of
     the whole path, where "endpoint" is used of one end of it.
 
-payload configuration file
-    The file describing payloads: which data handlers exist, how tcspecial
-    reaches each one, and how large its packets are. ``tcspecial1.yaml`` and the
-    rest.
+tcspecial configuration file
+    The file tcspecial is configured by: the command interpreter's own
+    settings in its ``tcspecial`` section, and the payload configuration
+    section beside them. No name of its own -- any name ending ``.yaml`` or
+    ``.xml`` -- the shipped examples being ``tcspecial1.yaml`` and the rest.
+
+payload configuration section
+    The part of that file describing payloads: which data handlers there are,
+    how tcspecial reaches each one, and how large its packets are. A section
+    rather than a file, because what tcspecial serves and what tcspecial is
+    are one configuration.
 
 simulator configuration file
     The file describing how a simulated payload behaves: how often it produces
     a packet and how it divides one into segments. Properties of a simulation
-    rather than of a payload, which is why they are not in the payload file.
+    rather than of a payload, which is why they are not in the payload
+    configuration.
 
 Features
 ========
@@ -135,8 +141,9 @@ Features
 
   * tcssim: Simulated payloads
 
-* There are two libraries and two YAML files with payload configuration
-  information:
+* There are two libraries and two configuration files -- the tcspecial
+  configuration, which holds the payload configuration section, and the
+  simulator configuration beside it:
 
     * tcslib: ground software library providing simple integration with mission control software
 
@@ -620,10 +627,10 @@ Configuration Files
 -------------------
 Requirement
     Every configuration file may be written in YAML or XML: the command
-    interpreter's own, a payload configuration, and a simulator
-    configuration alike. Both formats describe the same settings and are read
-    into the same Rust values, so which one a file uses is a matter of local
-    preference and tooling and never of capability.
+    interpreter's own settings, the payload configuration beside them, and a
+    simulator configuration alike. Both formats describe the same settings and
+    are read into the same Rust values, so which one a file uses is a matter of
+    local preference and tooling and never of capability.
 
 Requirement
     The format is taken from the file's extension and from nothing else.
@@ -652,7 +659,7 @@ a child element in XML.
 Requirement
     In XML every value is a child element and never an attribute. The two
     formats then say the same thing in the same shape, and one reader of a
-    payload file learns one convention.
+    configuration file learns one convention.
 
 Requirement
     A sequence in XML is repeated sibling elements named for the field, and
@@ -679,7 +686,7 @@ Tcspecial reads two configuration files. Its own is
 ``tcspecial/src/tcspecial.yaml``, named by ``TCSPECIAL_CONFIG_PATH`` when that
 is set, and holds the address the command interpreter listens on, where
 beacons are sent, the beacon interval, and where the telemetry log goes. The other describes the payloads
-and is named on the command line; see `Payload Configuration Files`_.
+and is named on the command line; see `The Payload Configuration`_.
 
 Both choose their parser from their extension, as every configuration file in
 the project does, so either may be written in YAML or XML; see `Configuration
@@ -930,8 +937,8 @@ sent to it. Until then its payload-to-ground writes fail and the data is
 dropped, which its statistics record as failed writes rather than as writes of
 no bytes. A handler whose payload only produces telemetry therefore needs the
 OC to speak first, even if only once. Configuring the OC's address instead
-would remove that, at the cost of stating in every payload file where the
-ground is.
+would remove that, at the cost of stating in every tcspecial configuration
+where the ground is.
 
 A handler's stream payload socket knows where to send from the moment it is
 connected, so a handler can speak to such a payload before the payload has
@@ -1402,7 +1409,7 @@ of TCSpecial as it must be supplied, but is also used by the
 test software. All three programs read it: tcspecial serves the payloads it
 describes, tcsmoc controls them, and tcssim simulates them, so a handler
 changed in it changes for all three at once. Its format is given under
-`Payload Configuration Files`_.
+`The Payload Configuration`_.
 
 The ``1`` names a payload set rather than a version, leaving room for further
 sets alongside it. The data handlers of this one have the following
@@ -1537,12 +1544,13 @@ What a file's own order does reach the digest through is the sequence number
 each payload was given as it was read, which is the one ordering that means
 something.
 
-Payload Configuration Files
-===========================
-A payload configuration file describes the payloads themselves: which data
-handlers exist, how tcspecial reaches each one, and how big its packets are.
-What it deliberately does not describe is how a simulated payload behaves; see
-`Simulator Configuration Files`_ for that. The parser is ``tcslibgs::config``.
+The Payload Configuration
+=========================
+The payload configuration section of a tcspecial configuration file describes
+the payloads themselves: which data handlers there are, how tcspecial reaches
+each one, and how big its packets are. What it deliberately does not describe
+is how a simulated payload behaves; see `Simulator Configuration Files`_ for
+that. The parser is ``tcslibgs::config``.
 
 Four sets are shipped, each with a simulator configuration beside it named
 for it -- ``tcspecial1sim.yaml`` for ``tcspecial1.yaml``, and so on -- and a set
@@ -1569,14 +1577,14 @@ at the end of this section.
     One handler on a serial line, which is the set that exercises a link's own
     terms -- a data rate, a framing, a rule for where a read ends -- and the
     simulator's pty stand-in. It was written in a second language, there being
-    no words in a payload file for a line; `Link Terms`_ are those words, and
-    the set is written here like every other.
+    no words in a tcspecial configuration for a line; `Link Terms`_ are those
+    words, and the set is written here like every other.
 
-A set is a pair of files: the payload file and the simulator file beside it,
-each read by whichever programs need it.
+A set is a pair of files: the tcspecial configuration and the simulator file
+beside it, each read by whichever programs need it.
 
 The format is chosen from the extension exactly as every other configuration
-file's is, so a payload configuration may be written in YAML or XML.
+file's is, so a tcspecial configuration may be written in YAML or XML.
 
 Requirement
     Every shipped set is written in both formats, and the two describe the
@@ -1592,7 +1600,7 @@ rather than only by a fixture -- ``make runmocx`` runs the XML of a set --
 which is what turned up the one bug this found:
 the check that a file describes payloads at all asked for the
 ``payloads`` section with a single field, and a sequence in XML is repeated
-sibling elements, so every XML payload file of more than one payload was
+sibling elements, so every XML configuration of more than one payload was
 refused as a duplicate field.
 
 The YAML of a set is the one to read: it carries the comments. The simulator
@@ -1600,8 +1608,9 @@ files are YAML alone, nothing having asked for them in both spellings.
 
 File Structure
 --------------
-A payload configuration file has a version, a description, and three sections,
-two of them optional. They are given below in the order the files carry them.
+A tcspecial configuration file has a version, a description, and three
+sections, two of them optional. They are given below in the order the files
+carry them.
 
 ``tcspecial``
     What tcspecial itself is configured with for this payload set: the same
@@ -1624,10 +1633,11 @@ two of them optional. They are given below in the order the files carry them.
     and states whatever attributes it does not take from that group.
 
 Requirement
-    ``tcspecial`` is the first of the sections, in every payload file. It is
-    about the set as a whole where the other two are about the payloads in it,
-    and a reader opening a file to find out what it describes should not have
-    to pass a list of payloads to find where its command interpreter is.
+    ``tcspecial`` is the first of the sections, in every tcspecial
+    configuration. It is about the set as a whole where the other two are about
+    the payloads in it, and a reader opening a file to find out what it
+    describes should not have to pass a list of payloads to find where its
+    command interpreter is.
 
 Requirement
     A ``tcspecial`` section a file states is checked when the file is loaded,
@@ -1697,7 +1707,7 @@ Requirement
     meant.
 
 Requirement
-    A payload configuration need not give any handler an OC address. Only
+    The payload configuration need not give any handler an OC address. Only
     starting a handler needs one, so a file describing payloads is complete
     without it and a handler without one is refused at the point it would be
     started.
@@ -1710,7 +1720,8 @@ where the timing of it is written down.
 Requirement
     A payload is periodic or triggered, and says which. A file that says
     neither describes a periodic payload, which is both the commoner kind and
-    what every payload file written before there was a mode describes.
+    what every tcspecial configuration written before there was a mode
+    describes.
 
 Requirement
     A periodic payload sends of its own accord and tcspecial reads what
@@ -1740,9 +1751,9 @@ Requirement
     name, in the file the payload's kind puts it in: the rate a triggered
     payload is asked at is the rate its packets come back at, so calling it
     something else in one file would be two names for one thing. It was
-    ``trigger_interval_ms`` in the payload configuration, and a file still
-    using that name is told the name it has now rather than told the word is
-    unknown.
+    ``trigger_interval_ms`` in the payload configuration section, and a file
+    still using that name is told the name it has now rather than told the word
+    is unknown.
 
 The two sets of attributes are exclusive in both directions, and a file giving
 the wrong one is reported rather than run: either guess about what was meant
@@ -1789,7 +1800,7 @@ Requirement
     ``\t`` ``\0`` ``\a`` ``\b`` ``\f`` ``\v`` and ``\xNN`` -- and an escape
     C does not have is refused rather than passed through. A file that wrote
     ``\q`` meant something, and a backslash and a q is unlikely to be it. This
-    is also what lets an XML payload file state a trigger that a YAML one
+    is also what lets an XML configuration state a trigger that a YAML one
     states with the format's own escapes.
 
 Requirement
@@ -1847,15 +1858,15 @@ property of a simulation rather than of the payload, and belongs to a
 simulator configuration file.
 
 Requirement
-    A payload configuration file states no packet interval, and one stated
-    here is an error naming the file it belongs in. How fast a payload sends
-    is a property of the simulation, so a payload file that states an interval
-    is describing a simulation. It was ignored for a while, which was the same
-    silence the mode rules exist to prevent: a file that states an interval
-    has said something about the payload's timing, and reading it as though it
-    had not is reading a different file than the one that was written. An
-    interval a payload takes from its group is refused as one it states
-    itself is.
+    A tcspecial configuration file states no packet interval, and one stated
+    here is an error naming the file it belongs in. How fast a payload sends is
+    a property of the simulation, so a tcspecial configuration that states an
+    interval is describing a simulation. It was ignored for a while, which was
+    the same silence the mode rules exist to prevent: a file that states an
+    interval has said something about the payload's timing, and reading it as
+    though it had not is reading a different file than the one that was
+    written. An interval a payload takes from its group is refused as one it
+    states itself is.
 
 Requirement
     A ``name`` belongs to a data handler and never to a group. It is what
@@ -1978,10 +1989,7 @@ A payload states them beside everything else it states, and may take any of
 them from its group as it takes the rest.
 
 The rules are in ``tcslibgs::endpoint_config`` and the per-kind modules beside
-it, and are asked of a payload by ``types::link_params_of``. They used to be
-reachable only from a second file format -- an endpoint configuration, which
-described the same payloads as groups of endpoints -- and that format is gone:
-a payload states what an endpoint and its group stated between them.
+it, and are asked of a payload by ``types::link_params_of``.
 
 Requirement
     A term that belongs to another kind of link is an error rather than
@@ -1997,8 +2005,7 @@ Requirement
 Requirement
     The SPI mode is written ``spi_mode``. A payload already has a ``mode`` --
     whether it sends of its own accord or on a trigger -- and one word cannot
-    mean both. It was ``mode`` in the format that is gone, where a group of
-    endpoints had no other use for the word.
+    mean both.
 
 Serial Payloads: a Line
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -2358,7 +2365,7 @@ than as three attributes and an exception.
 
 Simulator Configuration Files
 =============================
-A payload configuration file describes payloads. Simulating one takes more than
+The tcspecial configuration describes payloads. Simulating one takes more than
 that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
 choices about a simulation. They are stated in a separate file, which only
@@ -2399,7 +2406,8 @@ simulated payloads
 |                     |        | packet. Defaults to the packet interval     |
 +---------------------+--------+---------------------------------------------+
 | segment_size        | number | Bytes in one segment. Defaults to the whole |
-|                     |        | packet, whose size the payload file gives   |
+|                     |        | packet, whose size the payload configuration|
+|                     |        | gives                                       |
 +---------------------+--------+---------------------------------------------+
 
 **What it stands in for.** Neither of these is a setting of the simulation.
@@ -2410,8 +2418,9 @@ that the two files can be checked against each other.
 | Attribute           | Type   | Meaning                                     |
 +=====================+========+=============================================+
 | type                | string | The kind of payload this stands in for, in  |
-|                     |        | the payload file's own word: ``network``,   |
-|                     |        | ``device``, ``serial``, ``i2c``, or ``spi`` |
+|                     |        | the payload configuration's own word:       |
+|                     |        | ``network``, ``device``, ``serial``,        |
+|                     |        | ``i2c``, or ``spi``                         |
 +---------------------+--------+---------------------------------------------+
 | protocol            | string | Which transport, for a network payload.     |
 |                     |        | Refused for every other kind                |
@@ -2492,7 +2501,7 @@ The two files are joined by handler name and by nothing else, and a name is
 exactly what survives a payload set copied from another one. Two sets that
 differ only in how their payload is reached -- one a datagram socket, one a
 stream -- therefore have simulator files that each parse perfectly well
-against the other's payload file, and the run that follows looks like a
+against the other's payloads, and the run that follows looks like a
 payload that never sends. So each simulated payload says what it stands in
 for, and the statement is compared rather than used.
 
@@ -2575,7 +2584,7 @@ be made to happen on purpose rather than waited for.
 
 Requirement
     Fault injection settings appear in the simulator configuration file only.
-    A payload configuration file describes the payloads a mission flies, and
+    A tcspecial configuration file describes the payloads a mission flies, and
     nothing flying is configured to drop a tenth of its packets; a fault
     stated there would also be read by tcspecial, which must be told what the
     payload is meant to do rather than what the simulator is doing to it.
@@ -2638,14 +2647,16 @@ The two files are joined by name, not by position: the order of one file has no
 bearing on the other, and a data handler's id is not a row number.
 
 Requirement
-    A simulated payload names a data handler of the payload configuration file.
-    A name matching no data handler is an error, because a line that matched
-    nothing would otherwise be indistinguishable from a misspelled name.
+    A simulated payload names a data handler of the tcspecial configuration
+    file. A name matching no data handler is an error, because a line that
+    matched nothing would otherwise be indistinguishable from a misspelled
+    name.
 
 Requirement
-    Every data handler of the payload configuration file has a simulated payload
-    naming it. A handler nothing names is an error, because the simulator would
-    otherwise start with a payload that never produces anything.
+    Every data handler of the tcspecial configuration file has a simulated
+    payload naming it. A handler nothing names is an error, because the
+    simulator would otherwise start with a payload that never produces
+    anything.
 
 Requirement
     A name is defined once in a file. Two groups or two simulated payloads
@@ -2759,7 +2770,7 @@ tcspecial1sim.yaml, named by ``PAYLOAD_SIM_YAML``; see `Simulator Configuration
 Files`_.
 
 Requirement
-    A payload configuration file describes payloads and says nothing about
+    A tcspecial configuration file describes payloads and says nothing about
     simulating them. How often a payload produces a packet, and how a packet is
     divided into segments, are properties of a simulation rather than of a
     payload, and are stated in the simulator configuration file.
@@ -2769,11 +2780,11 @@ in for. Neither file is read in the order of the other, and neither may be
 silently short.
 
 Requirement
-    Every data handler of the payload file has a simulated payload naming it,
-    and every simulated payload names a data handler of the payload file.
-    Either kind of mismatch is reported rather than simulated around, because a
-    misspelled name is otherwise indistinguishable from a payload deliberately
-    left out.
+    Every data handler of the tcspecial configuration has a simulated payload
+    naming it, and every simulated payload names a data handler of the
+    tcspecial configuration. Either kind of mismatch is reported rather than
+    simulated around, because a misspelled name is otherwise indistinguishable
+    from a payload deliberately left out.
 
 Which Kinds Can Be Simulated
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2832,8 +2843,8 @@ Requirement
     A path that is anything other than a link the simulator itself made is left
     alone, and what is there is reported. A simulator that unlinked
     ``/dev/ttyS0`` to stand in for it would be worse than one that could not,
-    and a payload file meant for simulation can name a path the simulator may
-    create.
+    and a tcspecial configuration meant for simulation can name a path the
+    simulator may create.
 
 Requirement
     A simulated payload of an I2C endpoint is a chip of the kernel's
@@ -2858,10 +2869,10 @@ fixed when it is loaded.
 
 Requirement
     The simulator finds a stub bus by name among the kernel's adapters, since
-    their numbers are assigned as they are found and a payload file cannot know
-    which number the stub will have. With none loaded, or with no chip at the
-    configured address, what is reported is the command that would put it
-    there.
+    their numbers are assigned as they are found and a tcspecial configuration
+    cannot know which number the stub will have. With none loaded, or with no
+    chip at the configured address, what is reported is the command that would
+    put it there.
 
 Requirement
     A handler asks the adapter behind its bus what transfers it can do, and
@@ -2992,7 +3003,7 @@ Requirement
 
 The packet size and interval can be changed, as can the segment size and
 interval. Each starts at what the files gave it: the packet size from the
-payload file, the rest from the simulator file.
+tcspecial configuration, the rest from the simulator file.
 
 Requirement
     A segment is a piece of a packet, so a segment larger than the packet is
@@ -3018,10 +3029,10 @@ Requirement
     can, is the wrong answer left on the screen.
 
 Requirement
-    The two sizes are checked when the files are read, not only when a spin
-    box is touched. A simulator file may state a segment larger than the
-    payload file's packet, and a panel that said nothing until it was edited
-    would have the payload refuse to start for no stated reason.
+    The two sizes are checked when the files are read, not only when a spin box
+    is touched. A simulator file may state a segment larger than the packet the
+    tcspecial configuration gives, and a panel that said nothing until it was
+    edited would have the payload refuse to start for no stated reason.
 
 Requirement
     The window decides neither. It asks for the two sizes to be judged and
@@ -3099,9 +3110,9 @@ Requirement
 Requirement
     Tcsmoc reads the simulator configuration to show it, and does not require
     it. The MOC controls payloads and simulates nothing, so a simulator file
-    that is missing, unreadable, or written for another payload file costs it
-    that half of what a panel can show and nothing else; it says so once on
-    the way past, and the panel says so where the parameters are shown.
+    that is missing, unreadable, or written for another tcspecial configuration
+    costs it that half of what a panel can show and nothing else; it says so
+    once on the way past, and the panel says so where the parameters are shown.
 
 The panels are laid out in a grid whose shape follows from how many there are.
 The window is kept wider than it is tall, and among the shapes that satisfy
@@ -3134,7 +3145,7 @@ would name theirs too, and so could not point tcsmoc at one file and its
 children at another. An argument belongs to tcsmoc alone.
 
 Requirement
-    Tcsmoc accepts one payload configuration file. A second path is an error
+    Tcsmoc accepts one tcspecial configuration file. A second path is an error
     rather than an argument with no effect, because it is more likely a mistake
     about which file is being read than something meant to be ignored.
 
@@ -3160,30 +3171,30 @@ Requirement
     line, the receiver set the colour beside it, and the line itself said no
     beacon had arrived while the colour said they were arriving steadily.
 
-Every program is pointed at its payload file the same way: as a command line
-argument, failing that the program's own environment variable --
+Every program is pointed at its tcspecial configuration the same way: as a
+command line argument, failing that the program's own environment variable --
 ``PAYLOAD_CONFIG_PATH`` for tcspecial and ``SIM_PAYLOAD_CONFIG_PATH`` for
 tcssim, while tcsmoc has none for the reason below -- and failing that
 tcspecial1.yaml. Tcssim names its simulator configuration separately again,
 through ``PAYLOAD_SIM_YAML``.
 
 Requirement
-    An argument naming the payload file takes precedence over any environment
-    variable naming one. The argument is the unambiguous of the two: tcsmoc
-    starts the other programs and they inherit its environment, so a variable
-    can reach further than it was meant to, where an argument reaches exactly
-    the program it is given to.
+    An argument naming the tcspecial configuration takes precedence over any
+    environment variable naming one. The argument is the unambiguous of the
+    two: tcsmoc starts the other programs and they inherit its environment, so
+    a variable can reach further than it was meant to, where an argument
+    reaches exactly the program it is given to.
 
 Requirement
-    One payload file is named, and nothing else. A further argument is an
+    One configuration file is named, and nothing else. A further argument is an
     error rather than one with no effect, because it is more likely a mistake
     about which file is being read than something meant to be ignored.
 
 Where the Addresses Are
 ^^^^^^^^^^^^^^^^^^^^^^^
 Requirement
-    No address appears on tcspecial's command line. The payload file is its
-    only argument.
+    No address appears on tcspecial's command line. The configuration file is
+    its only argument.
 
 Requirement
     The address and ports the command interpreter binds are in its own
@@ -3345,7 +3356,7 @@ stopped.
 Requirement
     A payload set's section wins over the command interpreter's own file. A
     set's own ground station is what listens for its beacons, so the set is
-    where it is said; the file's is what places a set whose payload file
+    where it is said; the file's is what places a set whose own configuration
     states no section at all.
 
 Requirement
@@ -3392,7 +3403,7 @@ until this was printed, finding out what a running tcspecial had bound meant
 asking the operating system.
 
 Requirement
-    Tcsmoc passes its own payload file to each program it starts, as that
+    Tcsmoc passes its own configuration file to each program it starts, as that
     program's argument. Tcsmoc builds its panels from that file, so a child
     reading a different one would serve or simulate payloads the panels do not
     describe: handlers that never connect, with nothing on screen to say why.
@@ -3419,7 +3430,7 @@ Requirement
 Requirement
     A ``START_DH`` for a handler tcspecial does not have says which payload was
     asked for, which id it came in as, what this tcspecial does serve, and that
-    the two ends are reading different payload configurations.
+    the two ends are reading different configurations.
 
 Attaching is what makes this worth saying. A tcspecial left running from an
 earlier payload set is attached to rather than replaced, and it goes on serving
@@ -3450,25 +3461,27 @@ pointed at. Tcsmoc reads that file as well, but only to show what it says; it
 acts on none of it and so has nothing to say about which one is right.
 
 The Makefile names a set once for this reason, and names it as a stem:
-``PAYLOAD_FILE`` is the set, ``$(PAYLOAD_FILE).yaml`` the payload file that
-reaches every program as its argument, and ``$(PAYLOAD_FILE)sim.yaml`` the
-simulator file that reaches tcssim in the environment. One target then runs a
-whole set, and its last letter is the spelling of the payload configuration the
-MOC reads -- ``runmocy`` the YAML and ``runmocx`` the XML -- both adding the
-suffix to the same stem, so they are one set read two ways:
+``TCSPECIAL_CONFIG_FILE`` is the set, ``$(TCSPECIAL_CONFIG_FILE).yaml`` the
+tcspecial configuration that reaches every program as its argument, and
+``$(TCSPECIAL_CONFIG_FILE)sim.yaml`` the simulator file that reaches tcssim in
+the environment. One target then runs a whole set, and its last letter is the
+spelling of the configuration the MOC reads -- ``runmocy`` the YAML and
+``runmocx`` the XML -- both adding the suffix to the same stem, so they are one
+set read two ways:
 
 .. code-block:: console
 
    $ make runmocy
-   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
-   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial2
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
 
 Requirement
     The two files of a set are named by one variable rather than two. Naming
     one of a pair is how the two come to describe different sets, which is
-    reported rather than run -- every data handler of the payload file must
-    have a simulated payload naming it -- but it is reported by tcssim, after
-    tcsmoc has already come up, which makes it a confusing way to find out.
+    reported rather than run -- every data handler of the tcspecial
+    configuration must have a simulated payload naming it -- but it is reported
+    by tcssim, after tcsmoc has already come up, which makes it a confusing way
+    to find out.
 
 The sets live under ``tests/manual`` rather than at the repository root
 because running one is something a person does at a terminal: each opens
@@ -3476,15 +3489,15 @@ sockets or device nodes, so none of them belongs in a test that runs on every
 build. The tests that read them only parse them.
 
 ``make run`` runs tcspecial alone and ``make runsim`` the simulator alone, both
-from the same stem -- tcssim run by itself needs the payload file as well as
-the simulator file, and one variable is what keeps the two from being given for
-different sets:
+from the same stem -- tcssim run by itself needs the tcspecial configuration as
+well as the simulator file, and one variable is what keeps the two from being
+given for different sets:
 
 .. code-block:: console
 
-   $ make run PAYLOAD_FILE=tests/manual/tcspecial1
-   $ make runsim PAYLOAD_FILE=tests/manual/tcspecial1
-   $ make runmocy PAYLOAD_FILE=tests/manual/tcspecial1
+   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runsim TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+   $ make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
 
 Started in that order, the three run as separately as they can: tcsmoc finds
 the tcspecial already there, attaches to it rather than starting a second, and
@@ -3496,7 +3509,7 @@ is for -- a debugger on the one being worked on, and the others left alone.
 .. code-block:: console
 
    $ make runmocy RUST_LOG=debug
-   $ make run PAYLOAD_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
+   $ make run TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1 RUST_LOG=tcspecial::ci=trace
 
 The manual says the same thing from the other end -- what to type to run a
 set -- under "Running the Programs".
@@ -3679,15 +3692,15 @@ when tcsmoc is halted.
 
 tcsverify
 ---------
-Tcsverify reads a payload set -- the payload configuration file, and the
+Tcsverify reads a payload set -- the tcspecial configuration file, and the
 simulator file beside it when one is given -- and prints what is wrong with
 it. It opens no socket and no device node, so it can be run anywhere, by a
 person editing a file or by a recipe: ``make runverifyy`` checks a set's YAML
 and ``make runverifyx`` its XML.
 
 Requirement
-    Tcsverify takes one file or two. The first is the payload configuration
-    file and the second, if there is one, the payload simulator file. Which
+    Tcsverify takes one file or two. The first is the tcspecial configuration
+    file and the second, if there is one, the simulator configuration. Which
     they are follows from the order they are given in and not from their
     names, a set being free to name its files as it likes.
 
@@ -3742,12 +3755,12 @@ Requirement
     its first line.
 
 Requirement
-    The simulator file is checked against the payload file only when the
-    payload file has no problems of its own. There would be nothing to check
-    it against otherwise -- the payloads that did not settle are not handlers
-    -- and a join against the rest reports every one of them as unsimulated,
-    which is a page of problems the verifier caused rather than found. It says
-    that it did not do it, rather than leaving it unsaid.
+    The simulator file is checked against the tcspecial configuration only when
+    that configuration has no problems of its own. There would be nothing to
+    check it against otherwise -- the payloads that did not settle are not
+    handlers -- and a join against the rest reports every one of them as
+    unsimulated, which is a page of problems the verifier caused rather than
+    found. It says that it did not do it, rather than leaving it unsaid.
 
 GUI Framework
 -------------

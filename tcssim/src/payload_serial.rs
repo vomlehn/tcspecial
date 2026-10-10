@@ -157,8 +157,8 @@ mod tests {
     /// handler reads there is the packets the payload is producing.
     ///
     /// This is what the simulator could not do at all: a serial handler had no
-    /// far end to talk to, so a payload file with a line in it could be run
-    /// only against real hardware.
+    /// far end to talk to, so a tcspecial configuration with a line in it could
+    /// be run only against real hardware.
     #[test]
     fn a_serial_payload_is_a_line_the_configured_path_leads_to() {
         let path = a_path("line");

@@ -13,18 +13,18 @@
 //!
 //! What is checked:
 //!
-//! * The payload configuration file on its own: that it parses, that it
+//! * The tcspecial configuration file on its own: that it parses, that it
 //!   describes payloads, that every payload and group is settled by the rules
 //!   for its kind, and that no two payloads want one address or one device.
 //! * The simulator file, if one is given: that it parses, and that it and the
-//!   payload file agree -- every payload simulated, every simulated payload a
-//!   payload, and every setting one that payload can have.
+//! tcspecial configuration agree -- every payload simulated, every simulated
+//! payload a payload, and every setting one that payload can have.
 //!
-//! The second is checked against the first only when the first has no
-//! problems of its own. A payload file that did not settle has no handlers to
-//! join to, and a join against half of them would report every missing
-//! payload as unsimulated: a page of problems caused by this program rather
-//! than by the files.
+//! The second is checked against the first only when the first has no problems
+//! of its own. A tcspecial configuration that did not settle has no handlers to
+//! join to, and a join against half of them would report every missing payload
+//! as unsimulated: a page of problems caused by this program rather than by the
+//! files.
 
 use std::fmt;
 use std::io::{self, Write};
@@ -75,7 +75,8 @@ pub struct Report {
     pub findings: Vec<Finding>,
     /// Whether the run stopped because there were too many.
     pub halted: bool,
-    /// Whether the simulator file was checked against the payload file.
+    /// Whether the simulator file was checked against the tcspecial
+    /// configuration.
     ///
     /// False when no simulator file was given, and false when the payload
     /// file had problems of its own -- in which case the simulator file was
@@ -133,14 +134,15 @@ impl Report {
     }
 }
 
-/// Check a payload configuration file, and a simulator file if there is one.
+/// Check a tcspecial configuration file, and a simulator file if there is one.
 pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
     let mut report = Report::default();
 
     let handlers = check_payloads(payload_path, &mut report);
 
     if let Some(sim_path) = sim_path {
-        // Only against a payload file that settled; see the module comment.
+        // Only against a tcspecial configuration that settled; see the module
+        // comment.
         let clean = handlers.as_ref().filter(|_| !report.found_errors());
         report.joined = clean.is_some();
         check_simulator(sim_path, clean.map(Vec::as_slice), &mut report);
@@ -149,7 +151,7 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
     report
 }
 
-/// Check the payload configuration file, and hand back what it describes.
+/// Check the tcspecial configuration file, and hand back what it describes.
 ///
 /// The handlers come back even when something is wrong, because what came
 /// back is what the file does describe; whether that is all of it is what the
@@ -260,7 +262,7 @@ mod tests {
         let payload_path = dir.path().join(format!("set{payload_ext}"));
         let sim_path = dir.path().join("setsim.yaml");
         std::fs::File::create(&payload_path)
-            .expect("the payload file")
+            .expect("the tcspecial configuration")
             .write_all(payload.as_bytes())
             .expect("written");
         std::fs::File::create(&sim_path)
@@ -500,7 +502,8 @@ simulated_payloads:
         );
     }
 
-    /// A simulator file is not joined to a payload file that did not settle.
+    /// A simulator file is not joined to a tcspecial configuration that did not
+    /// settle.
     ///
     /// Every payload of the one is named in the other, so a join against the
     /// payloads that did settle reports the rest as unsimulated: a page of
@@ -514,7 +517,7 @@ simulated_payloads:
         assert!(!report.joined);
         assert!(
             report.findings.iter().all(|f| f.file == set.payload),
-            "the simulator file was faulted for the payload file's problems: {:?}",
+            "the simulator file was faulted for the tcspecial configuration's problems: {:?}",
             report.findings
         );
     }

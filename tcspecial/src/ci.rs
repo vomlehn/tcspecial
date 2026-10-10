@@ -359,7 +359,7 @@ pub struct CommandInterpreter {
     /// file edited since would otherwise have the spacecraft claiming a
     /// configuration it is not serving.
     version: ConfigVersion,
-    /// The version the payload configuration file states, which every beacon
+    /// The version the tcspecial configuration file states, which every beacon
     /// carries beside this build's. The file's own, versioned by whoever
     /// writes the payload set.
     config_version: ConfigVersion,
@@ -421,7 +421,8 @@ fn no_such_handler(name: &DHName, configs: &[DHConfig]) -> String {
 /// Start a data handler moving data.
 ///
 /// The handler already exists -- initialize_handlers made one for every entry
-/// in the payload file -- so this opens its OC endpoints and sets it running.
+/// in the tcspecial configuration -- so this opens its OC endpoints and sets it
+/// running.
 ///
 /// The OC endpoints are opened here because this is where the OC's address is
 /// known, from `oc` in the handler's configuration. It is opened once and both
@@ -917,10 +918,10 @@ mod tests {
     /// A START_DH that does find its handler starts the asking.
     ///
     /// The other half of the session above: once the two ends were reading the
-    /// same payload file, the command the button sends had to do what the
-    /// panel says it does. A triggered handler moves nothing until it has
-    /// asked, so what Success has to mean here is a trigger on its way to the
-    /// payload at the configured interval, sent of the handler's own accord
+    /// same tcspecial configuration, the command the button sends had to do
+    /// what the panel says it does. A triggered handler moves nothing until it
+    /// has asked, so what Success has to mean here is a trigger on its way to
+    /// the payload at the configured interval, sent of the handler's own accord
     /// with the ground having said nothing.
     #[test]
     fn start_dh_on_a_triggered_handler_starts_the_asking() {

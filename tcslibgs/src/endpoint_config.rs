@@ -1,7 +1,8 @@
 //! The rules of a link: a serial line, an I2C bus, a SPI peripheral.
 //!
-//! What terms each kind of link takes, which of them it must be told, what
-//! each means, and which belong to another kind. A payload file states them
+//! What terms each kind of link takes, which of them it must be told, what each
+//! means, and which belong to another kind. A tcspecial configuration states
+//! them
 //! -- see `types::link_params_of`, which is the only caller -- and the rules
 //! are here, once, rather than beside each file format that can state them.
 //!
@@ -15,7 +16,7 @@
 //! per-kind parameters), where a payload is reached ([`EndpointLocation`]),
 //! and the scalar spellings a file may use ([`Scalar`], [`ByteList`]).
 //!
-//! The syntax a payload file states them in is specified in
+//! The syntax a tcspecial configuration states them in is specified in
 //! `docs/design.rst`, under "Payload Configuration Files".
 
 use std::fmt;
@@ -261,8 +262,8 @@ pub enum EndpointLocation {
 /// It was a wire type once: an endpoint configuration file deserialized
 /// straight into it, which is why every field carried an XML `@` alias and a
 /// hyphenated spelling beside its own. Nothing deserializes into it now -- a
-/// payload file has its own shape, and `types::link_params_of` fills this in
-/// from a payload -- so the aliases are gone and so is the name.
+/// tcspecial configuration has its own shape, and `types::link_params_of` fills
+/// this in from a payload -- so the aliases are gone and so is the name.
 #[derive(Debug)]
 pub(crate) struct LinkTerms {
     // A line.

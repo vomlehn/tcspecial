@@ -1,10 +1,10 @@
 //! The simulator's own configuration file
 //!
-//! A payload configuration file describes payloads: which data handlers exist,
-//! how tcspecial reaches each one, and how big its packets are. None of that is
-//! enough to simulate one. How fast a payload produces packets, and how the
-//! simulator divides a packet into segments, are properties of the simulation
-//! rather than of the payload, so they are carried here instead.
+//! A tcspecial configuration file describes payloads: which data handlers
+//! exist, how tcspecial reaches each one, and how big its packets are. None of
+//! that is enough to simulate one. How fast a payload produces packets, and how
+//! the simulator divides a packet into segments, are properties of the
+//! simulation rather than of the payload, so they are carried here instead.
 //!
 //! The two files are joined by name. A simulated payload names the data handler
 //! it stands in for, and may name a group to take its settings from:
@@ -26,9 +26,9 @@
 //!     packet_interval_ms: 500
 //! ```
 //!
-//! The kind and the transport are the payload configuration's, not this
-//! file's: they are stated here only so that a simulator file paired with the
-//! wrong payload file is an error rather than a run that produces nothing.
+//! The kind and the transport are the payload configuration's, not this file's:
+//! they are stated here only so that a simulator file paired with the wrong
+//! tcspecial configuration is an error rather than a run that produces nothing.
 //!
 //! A group carries what several simulated payloads have in common; a payload
 //! overrides any of it for itself. The format is chosen from the file extension
@@ -57,7 +57,8 @@ pub enum SimConfigError {
     Duplicate { what: &'static str, name: String },
     /// A simulated payload names a group the file does not define.
     UnknownGroup { payload: String, group: String },
-    /// A simulated payload names no data handler of the payload file.
+    /// A simulated payload names no data handler of the tcspecial
+    /// configuration.
     UnknownPayload { payload: String },
     /// A data handler has no simulated payload to drive it.
     Unsimulated { handler: String },
@@ -204,7 +205,7 @@ impl fmt::Display for SimConfigError {
                  stands in for: state type: {}, as the payload configuration \
                  does. It is stated in both files so that the two can be \
                  checked against each other, which is the only thing that \
-                 catches a simulator file paired with the wrong payload file",
+                 catches a simulator file paired with the wrong tcspecial configuration",
                 payload,
                 actually.spelling()
             ),
@@ -225,7 +226,7 @@ impl fmt::Display for SimConfigError {
                 "simulated payload \"{}\" is a {} payload here and a {} payload in \
                  the payload configuration. Both files describe the one payload, so \
                  they cannot disagree about its kind: either this is not the \
-                 payload file these settings were written for, or one of the two \
+                 tcspecial configuration these settings were written for, or one of the two \
                  has been changed and the other has not",
                 payload,
                 in_sim_file.spelling(),
@@ -293,8 +294,9 @@ impl fmt::Display for SimConfigError {
             ),
             SimConfigError::TheOtherFilesBusiness { what, name, given } => write!(
                 f,
-                "{} \"{}\" states {}, which belongs in the payload configuration \
-                 file: the simulator takes where a payload is from there. What this \
+                "{} \"{}\" states {}, which belongs in the tcspecial \
+                 configuration file: the simulator takes where a payload is from \
+                 there. What this \
                  file may say is where the payload answers from -- payload_address \
                  and payload_port, the payload's own end of the link -- which \
                  nothing else states",
@@ -409,13 +411,13 @@ fn nothing_unknown(
         return Ok(());
     };
 
-    // The two the payload file spells without a prefix. Someone writing a
-    // simulator file beside a payload file, or copying from one, writes them
-    // the way the payload file does -- so they are named here and answered
-    // with the name this file uses, rather than reported as words nothing
-    // knows.
-    // The two the payload configuration states. Someone writing a simulator
-    // file beside one, or copying from it, writes them the way that file does
+    // The two the tcspecial configuration spells without a prefix. Someone
+    // writing a simulator file beside a tcspecial configuration, or copying
+    // from one, writes them the way the tcspecial configuration does -- so they
+    // are named here and answered with the name this file uses, rather than
+    // reported as words nothing knows. The two the payload configuration
+    // states. Someone writing a simulator file beside one, or copying from it,
+    // writes them the way that file does
     // -- so they are named here and answered with the file they belong in,
     // rather than reported as words nothing knows.
     if let Some(given) = ["address", "port"].iter().find(|plain| *plain == given) {
@@ -601,7 +603,7 @@ pub struct SimSettings {
     pub protocol: Option<String>,
     // The socket the simulated payload binds for itself.
     //
-    // Not where the payload is -- the payload configuration file says that,
+    // Not where the payload is -- the tcspecial configuration file says that,
     // and the simulator takes it from there -- but the other end of the same
     // link: where this payload answers from, which nothing else states at
     // all.
@@ -638,10 +640,10 @@ pub struct SimSettings {
 
     // What the payload does wrong, which is the whole reason a simulator is
     // better than the hardware for some of what it is used for. None of this
-    // has any business in a payload configuration: a payload file describing
-    // a payload that drops packets would be describing hardware nobody would
-    // fly. Every one of them is off when it is absent, so a file that says
-    // nothing about faults describes a payload that works.
+    // has any business in a payload configuration: a tcspecial configuration
+    // describing a payload that drops packets would be describing hardware
+    // nobody would fly. Every one of them is off when it is absent, so a file
+    // that says nothing about faults describes a payload that works.
     /// Packets in a hundred that are not sent at all.
     #[serde(default)]
     pub drop_percent: Option<u32>,
@@ -820,11 +822,11 @@ impl SimConfigFile {
 
     /// Settle every data handler's simulation settings.
     ///
-    /// The handlers come from the payload configuration file and this file adds
-    /// to them, so the result has one entry per handler, in the order the
-    /// payload file gave them. Both directions of the join are checked: a
-    /// handler nothing simulates is as much an error as a simulated payload
-    /// naming no handler.
+    /// The handlers come from the tcspecial configuration file and this file
+    /// adds to them, so the result has one entry per handler, in the order the
+    /// tcspecial configuration gave them. Both directions of the join are
+    /// checked: a handler nothing simulates is as much an error as a simulated
+    /// payload naming no handler.
     pub fn resolve(
         &self,
         handlers: &[DHConfig],
@@ -919,7 +921,7 @@ impl SimConfigFile {
                 // about it is believed. The files are joined by name, and a
                 // payload set copied from another keeps the names -- so the
                 // kind is what tells a simulator file paired with the wrong
-                // payload file from one paired with the right one.
+                // tcspecial configuration from one paired with the right one.
                 what_it_is(&payload.name, &settings, &dh.endpoint)?;
 
                 // Which kind of payload this is was settled by the payload
@@ -1267,11 +1269,11 @@ simulated_payloads:
     /// answered with the file they belong in.
     ///
     /// They are the two attributes someone writing a simulator file beside a
-    /// payload file is likeliest to copy across, and the simulator takes
-    /// where a payload is from that file -- so such a line is not so much a
-    /// mistake as a statement in the wrong file, and is answered as one. The
-    /// answer also names what this file may say instead, the two being easy
-    /// to confuse.
+    /// tcspecial configuration is likeliest to copy across, and the simulator
+    /// takes where a payload is from that file -- so such a line is not so much
+    /// a mistake as a statement in the wrong file, and is answered as one. The
+    /// answer also names what this file may say instead, the two being easy to
+    /// confuse.
     #[test]
     fn where_the_payload_is_belongs_in_the_other_file() {
         for plain in ["address: localhost", "port: 5000"] {
@@ -1281,7 +1283,7 @@ simulated_payloads:
             ));
             let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
             assert!(
-                said.contains("payload configuration file") && said.contains("DH0"),
+                said.contains("tcspecial configuration file") && said.contains("DH0"),
                 "writing {plain} should name the file it belongs in: {said}"
             );
             assert!(
@@ -1299,17 +1301,17 @@ simulated_payloads:
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
-            said.contains("payload configuration file") && said.contains("\"g\""),
+            said.contains("tcspecial configuration file") && said.contains("\"g\""),
             "the error should name the group: {said}"
         );
     }
 
     /// A datagram payload may be given the socket it answers from.
     ///
-    /// The other end of the link from the one the payload file states: a
-    /// datagram payload reaches out to a handler that is waiting, so its own
-    /// address is otherwise whatever the system gives it, and nothing else
-    /// says what it should be.
+    /// The other end of the link from the one the tcspecial configuration
+    /// states: a datagram payload reaches out to a handler that is waiting, so
+    /// its own address is otherwise whatever the system gives it, and nothing
+    /// else says what it should be.
     #[test]
     fn a_datagram_payload_may_be_told_what_to_bind() {
         let settled = |extra: &str, dh: &DHConfig| {
@@ -1416,9 +1418,9 @@ simulated_payloads:
     /// name theirs alike.
     ///
     /// The rule that a name is defined once reaches no further than the file.
-    /// Each simulator file is resolved against the payload file beside it, so
-    /// two sets using the same names are two sets, not a clash -- and the
-    /// shipped sets rely on it.
+    /// Each simulator file is resolved against the tcspecial configuration
+    /// beside it, so two sets using the same names are two sets, not a clash --
+    /// and the shipped sets rely on it.
     #[test]
     fn two_simulator_files_may_name_their_payloads_alike() {
         let a_set = |interval: u32| {
@@ -1431,7 +1433,7 @@ simulated_payloads:
         };
 
         // One name and one group name, in two files that know nothing of each
-        // other, each resolved against its own payload file.
+        // other, each resolved against its own tcspecial configuration.
         let first = a_set(1000)
             .resolve(&[handler("DH0", 12)])
             .expect("the first set");
@@ -1493,7 +1495,8 @@ simulated_payloads:
         );
     }
 
-    /// A simulator file paired with the wrong payload file is caught.
+    /// A simulator file paired with the wrong tcspecial configuration is
+    /// caught.
     ///
     /// This is what the kind and the transport are stated twice for. Two
     /// payload sets that differ only in how their payload is reached have the
@@ -1504,8 +1507,8 @@ simulated_payloads:
     /// look like a payload that never sends.
     #[test]
     fn a_simulator_file_paired_with_the_wrong_payload_file_is_caught() {
-        // The simulator file of the datagram set, against the payload file of
-        // the stream set.
+        // The simulator file of the datagram set, against the tcspecial
+        // configuration of the stream set.
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
              protocol: udp\n    packet_interval_ms: 1000\n",
@@ -1527,7 +1530,7 @@ simulated_payloads:
         // And the same file against the payload it was written for.
         let datagram = handler("DH0", 4);
         file.resolve(&[datagram])
-            .expect("the file its payload file was written for");
+            .expect("the file its tcspecial configuration was written for");
     }
 
     /// A disagreement about the kind itself, which is the same mistake one
@@ -1547,9 +1550,9 @@ simulated_payloads:
 
     /// Saying nothing is not agreement.
     ///
-    /// A payload that stated no kind could not be checked against anything,
-    /// so it is refused -- and told which kind the payload file makes it,
-    /// since that is the one thing an error here always knows.
+    /// A payload that stated no kind could not be checked against anything, so
+    /// it is refused -- and told which kind the tcspecial configuration makes
+    /// it, since that is the one thing an error here always knows.
     #[test]
     fn a_simulated_payload_says_what_it_stands_in_for() {
         let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 1000\n");

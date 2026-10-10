@@ -222,7 +222,7 @@ impl SimulatedPayload {
     }
 
     /// Get the current statistics
-    /// This payload's name, as the payload configuration file gives it.
+    /// This payload's name, as the tcspecial configuration file gives it.
     pub fn name(&self) -> &str {
         &self.config.name
     }
@@ -286,7 +286,7 @@ pub(crate) fn make_the_path_lead_to(path: &Path, leads_to: &str) -> Result<(), S
         Ok(found) if found.file_type().is_char_device() => {
             return Err(format!(
                 "{} is a real serial device, so the simulator will not stand in for it: \
-                 point the payload file at a path it may create, such as /tmp/{}",
+                 point the tcspecial configuration at a path it may create, such as /tmp/{}",
                 path.display(),
                 path.file_name()
                     .map(|n| n.to_string_lossy().into_owned())

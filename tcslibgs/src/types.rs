@@ -133,10 +133,10 @@ enum Claim {
 /// -- a hostname and the address it resolves to -- are left as written, since
 /// resolving them is a question for the network and not for a file.
 ///
-/// Public because two files naming one host differently is the same question
-/// as two handlers doing so: a simulator configuration stating `localhost`
-/// for a payload the payload file put at `127.0.0.1` has not disagreed with
-/// it.
+/// Public because two files naming one host differently is the same question as
+/// two handlers doing so: a simulator configuration stating `localhost` for a
+/// payload the tcspecial configuration put at `127.0.0.1` has not disagreed
+/// with it.
 pub fn one_host(address: &str) -> String {
     match address {
         "localhost" | "127.0.0.1" | "::1" => "localhost".to_string(),
@@ -292,9 +292,9 @@ impl DHType {
     /// The word a configuration file uses for this kind.
     ///
     /// One table, read in both directions and from both files, so that the
-    /// payload file and the simulator file cannot disagree about what a kind
-    /// is called. The spellings are also what an error says, which is how a
-    /// file is told what it could have written instead.
+    /// tcspecial configuration and the simulator file cannot disagree about
+    /// what a kind is called. The spellings are also what an error says, which
+    /// is how a file is told what it could have written instead.
     pub fn spelling(&self) -> &'static str {
         match self {
             DHType::Network => "network",
@@ -708,11 +708,11 @@ impl EndpointConfig {
 /// Payloads are generally one of two kinds, and which one a payload is decides
 /// where the timing of it is written down. A payload that sends on its own
 /// needs nothing from tcspecial, and how fast it sends is a property of the
-/// payload rather than of the handler -- so a payload file says nothing about
-/// it, and a simulated one takes its rate from the simulator file. A payload
-/// that answers a request needs tcspecial to send one, at some rate, and both
-/// are flight behaviour: what to send comes from the payload's interface
-/// document and so belongs in the payload file.
+/// payload rather than of the handler -- so a tcspecial configuration says
+/// nothing about it, and a simulated one takes its rate from the simulator
+/// file. A payload that answers a request needs tcspecial to send one, at some
+/// rate, and both are flight behaviour: what to send comes from the payload's
+/// interface document and so belongs in the tcspecial configuration.
 ///
 /// The two are exclusive by construction here: a periodic handler cannot be
 /// given a trigger, because the variant has nowhere to put one.
@@ -726,7 +726,7 @@ pub enum DHMode {
         /// document asks for, which is as likely to be `0x55AA` as `READ\r`.
         /// A file may write it either way; see [`crate::trigger`].
         trigger: Vec<u8>,
-        /// How often to send it, in milliseconds. The payload file's
+        /// How often to send it, in milliseconds. The tcspecial configuration's
         /// `packet_interval_ms`: tcspecial does the sending, so the rate is
         /// flight behaviour.
         interval_ms: u32,
@@ -734,8 +734,8 @@ pub enum DHMode {
 }
 
 impl Default for DHMode {
-    /// Periodic, which is both the commoner kind and what every payload file
-    /// written before there was a mode describes.
+    /// Periodic, which is both the commoner kind and what every tcspecial
+    /// configuration written before there was a mode describes.
     fn default() -> Self {
         DHMode::Periodic
     }
@@ -776,9 +776,9 @@ pub struct DHConfig {
     pub oc: Option<NetworkConfig>,
     /// How this payload is made to send; see [`DHMode`].
     ///
-    /// Defaulted rather than required, so that a payload file written before
-    /// there was a mode describes what it always described: a payload that
-    /// sends on its own.
+    /// Defaulted rather than required, so that a tcspecial configuration
+    /// written before there was a mode describes what it always described: a
+    /// payload that sends on its own.
     #[serde(default)]
     pub mode: DHMode,
 }
@@ -793,8 +793,8 @@ pub struct DHConfig {
 /// them, so there is one statement of each rule rather than one per language.
 ///
 /// The rules used to be reachable only from an endpoint configuration file,
-/// which is why a payload file could describe a network or a device payload
-/// and nothing else.
+/// which is why a tcspecial configuration could describe a network or a device
+/// payload and nothing else.
 fn link_of(
     name: &str,
     kind: DHType,
@@ -912,8 +912,8 @@ pub(crate) fn link_params_of(
 
 /// Payload configuration file structure
 ///
-/// A payload file describes payloads and nothing else. It carries no packet
-/// interval: how fast a payload produces packets is a property of a
+/// A tcspecial configuration describes payloads and nothing else. It carries no
+/// packet interval: how fast a payload produces packets is a property of a
 /// simulation rather than of a payload, so it belongs to the simulator's own
 /// configuration file, and one stated here is refused rather than ignored.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1001,9 +1001,9 @@ impl PayloadConfig {
 
     /// Every handler this file describes, and everything wrong with it.
     ///
-    /// The handlers are the ones that converted, so a file with a problem
-    /// still yields the payloads that have none -- which is what lets a
-    /// simulator file be checked against a payload file that is itself being
+    /// The handlers are the ones that converted, so a file with a problem still
+    /// yields the payloads that have none -- which is what lets a simulator
+    /// file be checked against a tcspecial configuration that is itself being
     /// reported on.
     pub fn check(&self) -> (Vec<DHConfig>, Vec<Problem>) {
         let mut problems: Vec<Problem> = Vec::new();
@@ -1864,9 +1864,9 @@ mod tests {
 
     use crate::ConfigFormat;
 
-    /// A payload file that says nothing about the mode describes the kind of
-    /// payload that sends on its own, which is what every file written before
-    /// there was a mode describes.
+    /// A tcspecial configuration that says nothing about the mode describes the
+    /// kind of payload that sends on its own, which is what every file written
+    /// before there was a mode describes.
     #[test]
     fn a_payload_that_states_no_mode_sends_on_its_own() {
         use super::*;
@@ -2172,8 +2172,8 @@ mod tests {
         assert!(stats.timestamp.is_some());
     }
 
-    /// A payload file as it is really read, so these tests go through the
-    /// same deserialization a file on disk does.
+    /// A tcspecial configuration as it is really read, so these tests go
+    /// through the same deserialization a file on disk does.
     fn payload(text: &str) -> PayloadConfig {
         crate::ConfigFormat::Yaml.parse(text).expect("parses")
     }
@@ -2419,7 +2419,8 @@ payloads:
         }
     }
 
-    /// A payload file describes a serial payload, with every term a line has.
+    /// A tcspecial configuration describes a serial payload, with every term a
+    /// line has.
     ///
     /// The language could describe a network or a device payload and nothing
     /// else: a line, a bus and a peripheral carry attributes it had no words
@@ -2890,10 +2891,10 @@ payloads:
 
     /// A bus is shared; a place on it is not.
     ///
-    /// The one exception the rule has to make, and the reason a claim is on
-    /// the address rather than on the bus device: several devices on one I2C
-    /// bus is what a bus is for, and refusing that would refuse the normal
-    /// case. These handlers cannot be written in a payload file, so they are
+    /// The one exception the rule has to make, and the reason a claim is on the
+    /// address rather than on the bus device: several devices on one I2C bus is
+    /// what a bus is for, and refusing that would refuse the normal case. These
+    /// handlers cannot be written in a tcspecial configuration, so they are
     /// built directly.
     #[test]
     fn a_bus_is_shared_and_a_place_on_it_is_not() {
@@ -3347,12 +3348,12 @@ payloads:
     }
     // -- the rules of a link ------------------------------------------------
     //
-    // A line, a bus and a peripheral each have rules of their own: which
-    // terms the kind takes, which it must be told, and which belong to
-    // another kind. The rules are stated once, in `endpoint_config` and its
-    // per-kind modules, and these are the tests of them. They used to read an
-    // endpoint configuration file, which was the only way to reach them;
-    // they read a payload file now, which is the only way to reach them.
+    // A line, a bus and a peripheral each have rules of their own: which terms
+    // the kind takes, which it must be told, and which belong to another kind.
+    // The rules are stated once, in `endpoint_config` and its per-kind modules,
+    // and these are the tests of them. They used to read an endpoint
+    // configuration file, which was the only way to reach them; they read a
+    // tcspecial configuration now, which is the only way to reach them.
 
     /// One payload of the given kind, with `attributes` folded into it.
     fn link(kind: &str, attributes: &str) -> Result<PayloadConfig, String> {

@@ -58,9 +58,9 @@ pub fn beacon(config: &CIConfig, section: Option<&CIConfigJson>) -> Result<Beaco
 
 /// Which file the command interpreter's own configuration is in.
 ///
-/// The path `TCSPECIAL_CONFIG_PATH` names, or the shipped one. Here rather
-/// than in tcspecial's own startup because tcsmoc reads the same file for the
-/// same reason it reads the payload file: to know where the beacons it is
+/// The path `TCSPECIAL_CONFIG_PATH` names, or the shipped one. Here rather than
+/// in tcspecial's own startup because tcsmoc reads the same file for the same
+/// reason it reads the tcspecial configuration: to know where the beacons it is
 /// listening for are being sent.
 pub fn tcspecial_config_path() -> String {
     std::env::var(TCSPECIAL_CONFIG_PATH_VAR)
@@ -232,8 +232,8 @@ mod tests {
             "239.255.0.7:7550"
         );
 
-        // No section at all, which a payload file need not have. This
-        // file's own address is for that set.
+        // No section at all, which a tcspecial configuration need not have.
+        // This file's own address is for that set.
         assert_eq!(
             beacon(&from_the_file, None)
                 .expect("it resolves")
@@ -302,10 +302,10 @@ mod tests {
         assert!(load_from(".yaml", &bad).is_err());
     }
 
-    // -- payload files ------------------------------------------------------
+    // -- tcspecial configurations ------------------------------------------------------
 
-    /// A payload file in each format, written to a temporary file and loaded
-    /// the way tcspecial loads one.
+    /// A tcspecial configuration in each format, written to a temporary file
+    /// and loaded the way tcspecial loads one.
     fn load_payloads_from(ext: &str, text: &str) -> TcsResult<Vec<tcslibgs::DHConfig>> {
         let mut file = Builder::new().suffix(ext).tempfile().unwrap();
         file.write_all(text.as_bytes()).unwrap();

@@ -39,11 +39,11 @@ use crate::payload::{
 
 /// What a datagram payload's own path is called, given the handler's.
 ///
-/// Derived rather than configured: nothing in a payload file names it, and
-/// nothing needs to -- the handler learns where its payload is from the first
-/// datagram, as it does over UDP. Beside the handler's path so that the two are
-/// plainly a pair when something goes wrong and somebody is looking at a
-/// directory.
+/// Derived rather than configured: nothing in a tcspecial configuration names
+/// it, and nothing needs to -- the handler learns where its payload is from the
+/// first datagram, as it does over UDP. Beside the handler's path so that the
+/// two are plainly a pair when something goes wrong and somebody is looking at
+/// a directory.
 fn a_path_of_its_own(handler: &str) -> PathBuf {
     PathBuf::from(format!("{handler}.payload"))
 }

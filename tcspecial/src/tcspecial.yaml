@@ -33,12 +33,12 @@ protocol: udp
 
 # How often beacons go out and where they go. Both are required of every
 # command interpreter configuration, here and in the tcspecial section of a
-# payload configuration file: beacons are how the ground knows the spacecraft
+# tcspecial configuration file: beacons are how the ground knows the spacecraft
 # is alive, so neither is a question to leave to a default that a file
 # silently takes.
 #
 # A payload set's section states them for that set and wins over these. These
-# are what place a set whose payload file states no such section.
+# are what place a set whose tcspecial configuration states no such section.
 #
 # The address is a multicast group, which is what a beacon wants: any number of
 # ground stations join it, and neither end needs the other's address. The

@@ -147,8 +147,8 @@ mod tests {
     use super::*;
     use tcslibgs::{DHMode, DHName, EndpointConfig, NetworkProtocol};
 
-    /// A handler as the payload file describes one, with an OC address of its
-    /// own.
+    /// A handler as the tcspecial configuration describes one, with an OC
+    /// address of its own.
     fn handler(oc: Option<SocketAddr>) -> DHConfig {
         DHConfig {
             name: DHName::new("auto-send"),

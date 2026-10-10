@@ -1,8 +1,8 @@
 //! What a data handler's endpoint means to the payload at its far end.
 //!
-//! The payload file describes the handler's side of the link: what kind of
-//! endpoint it is and where. The simulator takes the other end of that, so
-//! this is where an endpoint is read -- turned into the configuration a
+//! The tcspecial configuration describes the handler's side of the link: what
+//! kind of endpoint it is and where. The simulator takes the other end of that,
+//! so this is where an endpoint is read -- turned into the configuration a
 //! simulated payload runs on, and into the line a panel shows for it.
 //!
 //! It is also where the kinds of endpoint tcssim cannot stand in for are
@@ -24,10 +24,10 @@ use tcslibgs::ResolvedSim;
 /// Turn a data handler and its simulator settings into the simulator's own
 /// configuration.
 ///
-/// The payload file describes what tcspecial expects to talk to, so the
-/// simulator takes the other end of it: the handler's endpoint becomes the
-/// address the simulated payload uses. Everything about how the payload
-/// behaves comes from `sim`, which is what the simulator file settled.
+/// The tcspecial configuration describes what tcspecial expects to talk to, so
+/// the simulator takes the other end of it: the handler's endpoint becomes the
+/// address the simulated payload uses. Everything about how the payload behaves
+/// comes from `sim`, which is what the simulator file settled.
 pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadConfig, String> {
     let (protocol, address, port, bus_address) = match &dh.endpoint {
         EndpointConfig::Network(net) => {
@@ -189,8 +189,8 @@ mod tests {
         let config = payload_config_from(&dh, &sim(250, 100, 2)).unwrap();
         assert_eq!(config.address, "/dev/urandom");
         assert!(config.protocol == PayloadProtocol::Device);
-        // The packet size is the payload file's; everything else is the
-        // simulator file's.
+        // The packet size is the tcspecial configuration's; everything else is
+        // the simulator file's.
         assert_eq!(config.packet_size.load(Ordering::SeqCst), 4);
         assert_eq!(config.segment_size.load(Ordering::SeqCst), 2);
         assert_eq!(config.packet_interval_ms.load(Ordering::SeqCst), 250);

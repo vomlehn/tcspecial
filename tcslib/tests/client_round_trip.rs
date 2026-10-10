@@ -33,6 +33,7 @@ fn stub_statistics() -> Statistics {
         writes_completed: 55,
         writes_failed: 66,
         triggers_sent: 77,
+        triggers_failed: 88,
     }
 }
 

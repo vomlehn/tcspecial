@@ -143,6 +143,7 @@ impl DataHandler {
             // this conduit's own, with no read behind it, and would be
             // invisible without a count of its own.
             stats.triggers_sent += live.triggers_sent;
+            stats.triggers_failed += live.triggers_failed;
         }
 
         if let Some(conduit) = &self.payload_to_ground {
@@ -617,6 +618,94 @@ mod tests {
             stats.bytes_sent,
             b"from the payload".len() as u64,
             "the triggers were counted as data sent to the ground"
+        );
+
+        dh.stop().unwrap();
+    }
+
+    /// A handler goes on asking after its payload has gone away.
+    ///
+    /// Which is the one thing a triggered handler is for. A payload that
+    /// closes its end leaves the handler's socket reporting POLLHUP, which is
+    /// not an event the wait asked for -- and that used to end the conduit,
+    /// so the asking stopped and never started again. The payload may come
+    /// back; a handler is stopped by a STOP_DH, not by its payload's silence.
+    ///
+    /// What the handler does with the failed writes is count them. What it
+    /// must not do is give up.
+    #[test]
+    fn a_triggered_handler_goes_on_asking_after_its_payload_hangs_up() {
+        use std::net::{TcpListener, UdpSocket};
+        use std::time::{Duration, Instant};
+        use tcslibgs::{DHConfig, DHMode, DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
+
+        let payload = TcpListener::bind("127.0.0.1:0").expect("the payload listens");
+        let payload_addr = payload.local_addr().expect("its address");
+
+        let oc = UdpSocket::bind("127.0.0.1:0").expect("a free OC port");
+        let oc_addr = oc.local_addr().expect("its address");
+        drop(oc);
+
+        let config = DHConfig {
+            dh_id: DHId(5),
+            name: DHName::new("Abandoned"),
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: payload_addr.ip().to_string(),
+                port: payload_addr.port(),
+            }),
+            packet_size: 64,
+            oc: Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: oc_addr.ip().to_string(),
+                port: oc_addr.port(),
+            }),
+            mode: DHMode::Triggered {
+                trigger: b"READ\r".to_vec(),
+                interval_ms: 20,
+            },
+        };
+
+        let mut dh = DataHandler::new(config.clone()).unwrap();
+        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            &config.name.0,
+            &EndpointConfig::Network(config.oc.clone().unwrap()),
+        )
+        .unwrap();
+        dh.start(oc_reader, oc_writer)
+            .expect("the handler starts and connects to its payload");
+
+        // Accept, then hang up: the handler is now asking a payload that is
+        // not there.
+        let (asked, _) = payload.accept().expect("the handler connects");
+        drop(asked);
+        drop(payload);
+
+        // Attempts, not triggers sent: a write to a socket whose far end has
+        // gone is a write that failed, and failing is what these attempts do
+        // from here on -- what matters is that they go on being made.
+        let attempts = |dh: &DataHandler| {
+            let stats = dh.statistics();
+            stats.triggers_sent + stats.triggers_failed
+        };
+
+        // What it had attempted by the time the payload went away.
+        let before = attempts(&dh);
+
+        // And it is still asking a while later, which is the handler's own
+        // account of having gone on trying: there is nothing left to receive
+        // a trigger.
+        let until = Instant::now() + Duration::from_millis(500);
+        let mut after = before;
+        while Instant::now() < until && after <= before {
+            std::thread::sleep(Duration::from_millis(20));
+            after = attempts(&dh);
+        }
+
+        assert!(
+            after > before,
+            "the handler made {before} attempts before its payload hung up and \
+             none after: it gave up"
         );
 
         dh.stop().unwrap();

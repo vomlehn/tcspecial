@@ -433,6 +433,17 @@ pub struct Statistics {
     /// exactly like a handler that had stopped asking.
     #[serde(default)]
     pub triggers_sent: u64,
+    /// Triggers a triggered payload would not take.
+    ///
+    /// Apart from `writes_failed` for the reason above, and apart from
+    /// `triggers_sent` because the two say different things: a payload that
+    /// is answering, one that has gone away, and a handler that has given up
+    /// asking are three different states, and one count of attempts could
+    /// not tell them apart. `writes_failed` is data for the ground that did
+    /// not reach it, which is the ground's loss; a trigger that fails is the
+    /// payload's silence, and a handler goes on asking through it.
+    #[serde(default)]
+    pub triggers_failed: u64,
 }
 
 impl Statistics {

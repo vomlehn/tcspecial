@@ -10,10 +10,19 @@ use std::time::{Duration, Instant};
 use tcslibgs::{DHSample, Statistics, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
-use crate::endpoint::{EndpointReadable, EndpointWritable, WaitResult};
+use crate::endpoint::{pause_until_commanded, EndpointReadable, EndpointWritable, WaitResult};
 
 /// How long a conduit waits on its endpoint before looking at anything else.
 const WAIT_MS: i32 = 1000;
+
+/// How many reads of no bytes in a row are taken for an endpoint at its end.
+///
+/// One is ordinary: a datagram of no bytes is the ground saying where it is,
+/// and the wait after it blocks as usual. A stream whose far end has closed
+/// reports itself readable for ever and reads nothing every time, which is a
+/// loop that spins. Three in a row says which of the two this is without
+/// delaying the first.
+const QUIET_READS: u32 = 3;
 
 /// What a handler sends its payload to get anything back, and how often.
 ///
@@ -154,6 +163,33 @@ impl Conduit {
             // would be a handler that starts by doing nothing.
             let mut due = Instant::now();
 
+            // Reads of no bytes in a row; see QUIET_READS.
+            let mut quiet = 0;
+
+            // Wait out the rest of the interval, or a whole wait where there
+            // is no interval to wait out.
+            //
+            // For the passes that have nothing to do and nothing to wait on
+            // either: an endpoint in error or at its end is ready the instant
+            // it is polled, so a loop that did not pause would spin. A
+            // conduit that asks still asks on time, because what this waits
+            // out is the time until it is due; one that does not ask has
+            // nothing to be on time for and waits as it always waits.
+            //
+            // Spent on the command pipe rather than asleep, so that a stop is
+            // answered while a pause is still running; see
+            // `pause_until_commanded`.
+            let most = Duration::from_millis(WAIT_MS as u64);
+            let rest = |polls: bool, due: Instant| {
+                let left = if polls {
+                    due.saturating_duration_since(Instant::now())
+                } else {
+                    most
+                };
+                let ms = (left.min(most).as_millis() as i32).clamp(1, WAIT_MS);
+                pause_until_commanded(cmd_fd, ms);
+            };
+
             while running.load(Ordering::SeqCst) {
                 // A conduit that polls waits only as long as the next trigger
                 // allows, so that the interval is the interval rather than the
@@ -162,8 +198,14 @@ impl Conduit {
                 let timeout_ms = match &polling {
                     None => WAIT_MS,
                     Some(_) => {
+                        // At least a millisecond. The wait is in whole
+                        // milliseconds and the time left is not, so the last
+                        // fraction of every interval truncated to a wait of
+                        // nought -- a poll that returns at once, a loop that
+                        // spins through the rest of the interval, and a core
+                        // held down by a handler that was doing nothing.
                         let left = due.saturating_duration_since(Instant::now());
-                        (left.as_millis() as i32).min(WAIT_MS)
+                        (left.as_millis() as i32).clamp(1, WAIT_MS)
                     }
                 };
 
@@ -183,8 +225,20 @@ impl Conduit {
                     Ok(WaitResult::IoReady) => {
                         // Read from source
                         match reader.read(&mut buffer) {
-                            Ok(0) => continue,
+                            // Nothing to copy. Not a reason to go round
+                            // without asking, which is what this did: a
+                            // triggered handler whose payload had closed read
+                            // nothing for ever and never reached the asking
+                            // below, so it stopped asking and spun while it
+                            // did so.
+                            Ok(0) => {
+                                quiet += 1;
+                                if quiet >= QUIET_READS {
+                                    rest(polling.is_some(), due);
+                                }
+                            }
                             Ok(n) => {
+                                quiet = 0;
                                 count(&stats, |s| {
                                     s.bytes_received += n as u64;
                                     s.reads_completed += 1;
@@ -223,16 +277,31 @@ impl Conduit {
                             }
                         }
                     }
-                    Ok(WaitResult::Timeout) => {}
+                    Ok(WaitResult::Timeout) => quiet = 0,
+                    // The endpoint reported something this did not ask for --
+                    // POLLHUP from a payload that has gone away, POLLERR
+                    // after a write that got nowhere -- or the wait itself
+                    // failed.
+                    //
+                    // This used to end the conduit, and with it the asking: a
+                    // triggered handler whose payload went away stopped
+                    // asking and never asked again, which is the one thing
+                    // such a handler is for. The payload may come back, and a
+                    // handler is stopped by a STOP_DH rather than by its
+                    // payload's silence.
+                    //
+                    // Counted as a failed read, which is what it is from
+                    // here: the wait for something to read came to nothing.
                     Ok(WaitResult::Error) | Err(_) => {
-                        break;
+                        count(&stats, |s| s.reads_failed += 1);
+                        rest(polling.is_some(), due);
                     }
                 }
 
                 // And then the asking, if this conduit asks. After the copying
                 // rather than before it, so that a trigger never delays data
                 // the ground has already sent.
-                if let Some(polling) = &polling {
+                    if let Some(polling) = &polling {
                     if Instant::now() >= due {
                         match writer.write(&polling.trigger) {
                             Ok(written) => count(&stats, |s| {
@@ -241,9 +310,12 @@ impl Conduit {
                                 s.triggers_sent += 1;
                             }),
                             // A payload that will not take a trigger is one
-                            // that will not be answering either, which its
-                            // failed writes say.
-                            Err(_) => count(&stats, |s| s.writes_failed += 1),
+                            // that will not be answering either, which this
+                            // count is what says so. Not `writes_failed`:
+                            // that is data on its way to the ground, which a
+                            // trigger is not, and a handler reports the two
+                            // apart.
+                            Err(_) => count(&stats, |s| s.triggers_failed += 1),
                         }
                         due = Instant::now() + polling.interval;
                     }
@@ -308,8 +380,205 @@ impl Drop for Conduit {
 mod tests {
     use super::*;
 
+    use std::os::unix::io::RawFd;
+
+    use crate::endpoint::{EndpointWaitable, WaitResult};
+
     #[test]
     fn test_conduit_direction() {
         assert_ne!(ConduitDirection::GroundToPayload, ConduitDirection::PayloadToGround);
+    }
+
+    /// An endpoint whose wait always comes to nothing.
+    ///
+    /// What POLLERR looks like to a conduit: the wait returns, and neither
+    /// the endpoint nor the command pipe is what returned it.
+    struct Erring;
+
+    impl EndpointWaitable for Erring {
+        fn io_fd(&self) -> RawFd {
+            -1
+        }
+
+        fn wait_for_event(&self, _cmd_fd: RawFd, _timeout_ms: i32) -> TcsResult<WaitResult> {
+            Ok(WaitResult::Error)
+        }
+    }
+
+    impl EndpointReadable for Erring {
+        fn read(&mut self, _buffer: &mut [u8]) -> TcsResult<usize> {
+            Ok(0)
+        }
+    }
+
+    /// A payload that has gone away: every write to it fails, and it counts
+    /// how many times it was tried.
+    struct Gone(Arc<Mutex<usize>>);
+
+    impl EndpointWaitable for Gone {
+        fn io_fd(&self) -> RawFd {
+            -1
+        }
+
+        fn wait_for_event(&self, _cmd_fd: RawFd, _timeout_ms: i32) -> TcsResult<WaitResult> {
+            Ok(WaitResult::Error)
+        }
+    }
+
+    impl EndpointWritable for Gone {
+        fn write(&mut self, _data: &[u8]) -> TcsResult<usize> {
+            *self.0.lock().expect("the count") += 1;
+            Err(TcsError::DataHandler("gone".to_string()))
+        }
+    }
+
+    /// An endpoint that is readable for ever and reads nothing every time.
+    ///
+    /// What a stream whose far end has closed looks like: poll says there is
+    /// something, and the read says end of file. The count is how many times
+    /// it was asked.
+    struct Ended(Arc<Mutex<usize>>);
+
+    impl EndpointWaitable for Ended {
+        fn io_fd(&self) -> RawFd {
+            -1
+        }
+
+        fn wait_for_event(&self, _cmd_fd: RawFd, _timeout_ms: i32) -> TcsResult<WaitResult> {
+            Ok(WaitResult::IoReady)
+        }
+    }
+
+    impl EndpointReadable for Ended {
+        fn read(&mut self, _buffer: &mut [u8]) -> TcsResult<usize> {
+            *self.0.lock().expect("the count") += 1;
+            Ok(0)
+        }
+    }
+
+    /// A payload that takes everything and says nothing about it.
+    struct Sink;
+
+    impl EndpointWaitable for Sink {
+        fn io_fd(&self) -> RawFd {
+            -1
+        }
+
+        fn wait_for_event(&self, _cmd_fd: RawFd, _timeout_ms: i32) -> TcsResult<WaitResult> {
+            Ok(WaitResult::Timeout)
+        }
+    }
+
+    impl EndpointWritable for Sink {
+        fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
+            Ok(data.len())
+        }
+    }
+
+    /// A conduit whose endpoint is at its end waits rather than spinning.
+    ///
+    /// A read of no bytes is not a reason to go straight round again: an
+    /// endpoint whose far end has closed is ready the instant it is polled
+    /// and reads nothing every time, so a conduit that only ever went round
+    /// held a core down for as long as the handler was running.
+    #[test]
+    fn a_conduit_waits_out_an_endpoint_at_its_end() {
+        let mut pipe = [0 as RawFd; 2];
+        assert_eq!(unsafe { libc::pipe(pipe.as_mut_ptr()) }, 0, "a command pipe");
+        let (cmd_read, cmd_write) = (pipe[0], pipe[1]);
+
+        let reads = Arc::new(Mutex::new(0usize));
+        let mut conduit = Conduit::new(ConduitDirection::PayloadToGround, cmd_write);
+        conduit
+            .start(
+                Box::new(Ended(reads.clone())),
+                Box::new(Sink),
+                cmd_read,
+                Arc::new(Mutex::new(DHSamples::default())),
+                None,
+            )
+            .expect("the conduit starts");
+
+        thread::sleep(Duration::from_millis(200));
+        let asked = *reads.lock().expect("the count");
+
+        // And the pause is spent where a stop can cut it short: a conduit
+        // that slept it out would answer a STOP_DH only when it woke.
+        let asked_to_stop = Instant::now();
+        let _ = conduit.stop();
+        let took = asked_to_stop.elapsed();
+        assert!(
+            took < Duration::from_millis(500),
+            "the stop waited {took:?} for the pause to run out"
+        );
+
+        // A handful, not a hundred thousand: enough to tell an end from a
+        // datagram of no bytes, and then the wait it always had.
+        assert!(
+            asked <= QUIET_READS as usize + 2,
+            "it read {asked} times in 200 ms: it is spinning"
+        );
+        assert!(asked > 0, "it did not read at all");
+
+        unsafe {
+            libc::close(cmd_read);
+            libc::close(cmd_write);
+        }
+    }
+
+    /// A conduit whose endpoint errs and whose payload refuses goes on asking.
+    ///
+    /// Both halves of what a triggered handler owes its payload. The wait
+    /// erring used to end the conduit, and a trigger that would not go used
+    /// to be counted as a write to the ground; either way a payload that
+    /// stopped answering was a handler that stopped asking, and a payload
+    /// that came back was never heard from again.
+    #[test]
+    fn a_polling_conduit_asks_on_through_errors() {
+        let mut pipe = [0 as RawFd; 2];
+        assert_eq!(unsafe { libc::pipe(pipe.as_mut_ptr()) }, 0, "a command pipe");
+        let (cmd_read, cmd_write) = (pipe[0], pipe[1]);
+
+        let tries = Arc::new(Mutex::new(0usize));
+        let mut conduit = Conduit::new(ConduitDirection::GroundToPayload, cmd_write);
+        conduit
+            .start(
+                Box::new(Erring),
+                Box::new(Gone(tries.clone())),
+                cmd_read,
+                Arc::new(Mutex::new(DHSamples::default())),
+                Some(Polling {
+                    trigger: b"READ\r".to_vec(),
+                    interval: Duration::from_millis(5),
+                }),
+            )
+            .expect("the conduit starts");
+
+        // Several intervals' worth of asking, which is what an endpoint in
+        // error must not put a stop to.
+        let waited = (0..100)
+            .find(|_| {
+                thread::sleep(Duration::from_millis(10));
+                *tries.lock().expect("the count") >= 3
+            })
+            .is_some();
+        assert!(
+            waited,
+            "it asked {} times through an erring endpoint",
+            *tries.lock().expect("the count")
+        );
+        assert!(conduit.is_running(), "an endpoint in error ended the conduit");
+
+        // And the asking is in its own counters, apart from the data it
+        // carries for the ground.
+        let stats = conduit.stop().expect("it stops");
+        assert!(stats.triggers_failed >= 3, "{stats:?}");
+        assert_eq!(stats.triggers_sent, 0, "nothing was taken: {stats:?}");
+        assert_eq!(stats.writes_failed, 0, "a trigger is not data: {stats:?}");
+
+        unsafe {
+            libc::close(cmd_read);
+            libc::close(cmd_write);
+        }
     }
 }

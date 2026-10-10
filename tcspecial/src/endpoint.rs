@@ -97,6 +97,24 @@ pub(crate) fn wait_for_fds(io_fd: RawFd, cmd_fd: RawFd, io_events: PollFlags, ti
     }
 }
 
+/// Wait out a pause, but no longer than until there is a command.
+///
+/// For the passes a conduit has nothing to do and nothing to wait on either:
+/// an endpoint in error or at its end is ready the instant it is polled, so
+/// the pause is what keeps such a conduit from spinning. Spent on the command
+/// pipe rather than asleep, because a conduit that slept through a STOP_DH
+/// would answer it only when it woke -- a stop delayed by as much as the
+/// pause.
+///
+/// Nothing is read here and nothing is reported: the command stays in the
+/// pipe for the conduit's own wait to find on the next pass, which is where
+/// commands are acted on.
+pub(crate) fn pause_until_commanded(cmd_fd: RawFd, timeout_ms: i32) {
+    let cmd_borrowed = unsafe { BorrowedFd::borrow_raw(cmd_fd) };
+    let mut poll_fds = [PollFd::new(&cmd_borrowed, PollFlags::POLLIN)];
+    let _ = poll(&mut poll_fds, timeout_ms);
+}
+
 /// A reader and a writer that wait at one endpoint, opened once.
 ///
 /// For the OC side of a data handler, which the ground sends to at an address

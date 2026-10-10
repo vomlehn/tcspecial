@@ -20,6 +20,12 @@ export struct DHInfo {
     last-sent: string,
     last-recv-time: string,
     last-recv: string,
+    // What the ground itself received from this payload, with the time it
+    // arrived here. The two lines above are the spacecraft's account of what
+    // it moved; this is the only reading in the panel that says something
+    // reached the ground.
+    oc-time: string,
+    oc-data: string,
     bytes-sent: int,
     bytes-recv: int,
     // Everything both configuration files said about this handler, as Rust
@@ -27,10 +33,6 @@ export struct DHInfo {
     // nothing can change the files while the window is up, and this is not
     // telemetry -- no part of it is asked of the spacecraft.
     parameters: string,
-    // Whether this handler's payload answers requests. The payload
-    // configuration decides it, and the panel shows a sent line only for such
-    // a payload.
-    triggered: bool,
 }
 
 component DHPanel inherits Rectangle {
@@ -42,10 +44,11 @@ component DHPanel inherits Rectangle {
     in property <string> last-sent-data: "";
     in property <string> last-recv-time: "--:--:--";
     in property <string> last-recv-data: "";
+    in property <string> oc-time: "--:--:--";
+    in property <string> oc-data: "";
     in property <int> bytes-sent: 0;
     in property <int> bytes-recv: 0;
     in property <string> parameters: "";
-    in property <bool> triggered: false;
 
     callback transfer-clicked();
 
@@ -172,37 +175,25 @@ component DHPanel inherits Rectangle {
         // three rows of panels then wanted a window taller than a 1080 line
         // screen. The same two readings, named the same way, in a quarter of
         // the room.
-        // The line stays and its contents go, for a handler whose payload
-        // sends on its own. The row is kept so that every panel is the same
-        // shape and the rows below it do not move from one panel to the next.
+        // Shown for every payload. The line is what the spacecraft last sent
+        // to the ground, which for a payload that sends on its own is the
+        // payload's own data going up -- the thing such a panel is watched
+        // for. It was shown only for a payload that answers requests, from
+        // when the line was added for those, so the panels of the payloads
+        // that send most showed least.
         //
-        // The contents go by their text going empty rather than by `if
-        // triggered` on each of them, which is how this was written first. A
-        // layout whose children come and go is measured differently from one
-        // whose children are always there, and the panels of one payload set
-        // came out 196 and 458 wide for it: the triggered payload's panel took
-        // every pixel of slack in the row and the other sat at its minimum,
-        // which says nothing about either payload. Empty text draws nothing,
-        // so the line still shows no label and no reading, and every panel is
-        // measured the same way.
+        // Nothing here comes and goes. A layout whose children appear and
+        // disappear is measured differently from one whose children are
+        // always there, and the panels of one payload set came out 196 and
+        // 458 wide when this was written with `if triggered` on each text:
+        // one panel took every pixel of slack in the row and the other sat at
+        // its minimum, which says nothing about either payload.
         last-sent-row := HorizontalLayout {
             spacing: 4px;
             min-height: 14px;
-            Text {
-                text: triggered ? "Last sent:" : "";
-                font-size: 10px;
-                vertical-alignment: center;
-            }
-            Text {
-                text: triggered ? last-sent-time : "";
-                font-size: 10px;
-                vertical-alignment: center;
-            }
-            Text {
-                text: triggered ? last-sent-data : "";
-                font-size: 10px;
-                vertical-alignment: center;
-            }
+            Text { text: "Last sent:"; font-size: 10px; vertical-alignment: center; }
+            Text { text: last-sent-time; font-size: 10px; vertical-alignment: center; }
+            Text { text: last-sent-data; font-size: 10px; vertical-alignment: center; }
         }
 
         last-recv-row := HorizontalLayout {
@@ -211,6 +202,18 @@ component DHPanel inherits Rectangle {
             Text { text: "Last rcvd:"; font-size: 10px; vertical-alignment: center; }
             Text { text: last-recv-time; font-size: 10px; vertical-alignment: center; }
             Text { text: last-recv-data; font-size: 10px; vertical-alignment: center; }
+        }
+
+        // What the ground received, under what the spacecraft said it sent.
+        // The two read against each other: data the spacecraft sent and the
+        // ground did not receive is the one thing neither reading shows by
+        // itself.
+        from-payload-row := HorizontalLayout {
+            spacing: 4px;
+            min-height: 14px;
+            Text { text: "From payload:"; font-size: 10px; vertical-alignment: center; }
+            Text { text: oc-time; font-size: 10px; vertical-alignment: center; }
+            Text { text: oc-data; font-size: 10px; vertical-alignment: center; }
         }
 
         counters-row := HorizontalLayout {
@@ -230,11 +233,11 @@ export component MainWindow inherits Window {
     // fitting side by side and the grid stops having room for a row of
     // panels. They match MIN_WINDOW_WIDTH and CHROME_HEIGHT + PANEL_HEIGHT in
     // main.rs, which the_window_and_rust_agree_on_the_sizes checks.
-    min-width: 700px;
+    min-width: 716px;
     // One row of panels and the chrome, which is the least the window is ever
     // opened at -- a payload file of one handler. How much more it opens at
     // is Rust's to say: see rows_of_room() in main.rs.
-    min-height: 508px;
+    min-height: 526px;
     background: white;
 
     in-out property <string> ci-status: "Disconnected";
@@ -258,7 +261,7 @@ export component MainWindow inherits Window {
     // in main.rs read off a window they open headlessly. It was 210 for a
     // long time against the 259 the panel then took, and the three rows of
     // data at the bottom of every panel paid the difference.
-    property <length> panel-height: 162px;
+    property <length> panel-height: 180px;
 
     // The gap between one panel and the next, which has to agree with
     // GRID_SPACING in main.rs: the window opens tall enough for the gaps as
@@ -547,10 +550,11 @@ export component MainWindow inherits Window {
                         last-sent-data: dh.last-sent;
                         last-recv-time: dh.last-recv-time;
                         last-recv-data: dh.last-recv;
+                        oc-time: dh.oc-time;
+                        oc-data: dh.oc-data;
                         bytes-sent: dh.bytes-sent;
                         bytes-recv: dh.bytes-recv;
                         parameters: dh.parameters;
-                        triggered: dh.triggered;
                         transfer-clicked => { transfer-dh(i); }
                     }
                 }

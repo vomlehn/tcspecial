@@ -1042,9 +1042,24 @@ another row is started under it, and a ``Quit`` button at the foot of the
 window, which stops the tcspecial and tcssim the MOC started.
 
 Each panel shows its handler's name and status, how it is reached, and its
-packet size; then the time and first few bytes of the last transfer each way,
-and the byte counts. The two lines come from the spacecraft, so their times are
-when the data moved rather than when it was asked about. The panels refresh
+packet size; then three readings and the byte counts:
+
+``Last sent``
+  What the spacecraft last sent to the ground. For a payload that sends on its
+  own this is the payload's own data going up, which is what such a panel is
+  watched for.
+
+``Last rcvd``
+  What the spacecraft last received from the ground.
+
+``From payload``
+  What the MOC itself received on that handler's OC address. The two lines
+  above are the spacecraft's account of what it moved; this is the only one
+  that says something reached the ground, and the time on it is the MOC's
+  clock rather than the spacecraft's.
+
+The first two come from the spacecraft, so their times are when the data moved
+rather than when it was asked about. The panels refresh
 themselves about once a second; nothing has to be pressed to see traffic.
 
 Each panel has two buttons. One starts and stops the handler, and is described

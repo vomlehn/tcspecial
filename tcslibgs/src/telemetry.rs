@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{CommandStatus, DHName, DHSample, Statistics, Timestamp};
+use crate::types::{CommandStatus, DHName, DHSample, DHState, Statistics, Timestamp};
 
 /// Telemetry message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -204,6 +204,18 @@ impl StopDHTelemetry {
 pub struct QueryDHTelemetry {
     pub header: TelemetryHeader,
     pub name: DHName,
+    /// What the handler is doing, which nothing else on the link says.
+    ///
+    /// `None` when there is no such handler, which is the NotFound answer: a
+    /// state would have to be invented for a handler that does not exist, and
+    /// a ground station reading one would show it.
+    ///
+    /// The ground once had only its own commands to go by, so a panel showed
+    /// what the last START_DH or STOP_DH implied and went on showing it --
+    /// through a handler that stopped on the spacecraft, and through a MOC
+    /// attached to a tcspecial serving another payload set.
+    #[serde(default)]
+    pub state: Option<DHState>,
     pub statistics: Statistics,
 }
 
@@ -212,11 +224,13 @@ impl QueryDHTelemetry {
         sequence: u32,
         status: CommandStatus,
         name: DHName,
+        state: Option<DHState>,
         statistics: Statistics,
     ) -> Self {
         Self {
             header: TelemetryHeader::new(sequence, TelemetryType::QueryDH, status),
             name,
+            state,
             statistics,
         }
     }
@@ -366,6 +380,7 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
             sequence,
             status,
             cmd.name.clone(),
+            None,
             Statistics::new(),
         )),
         Command::QueryDHSample(cmd) => Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
@@ -519,6 +534,7 @@ mod tests {
                 7,
                 CommandStatus::Success,
                 DHName::new("DH0"),
+                Some(DHState::Active),
                 Statistics::new(),
             )),
             Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(

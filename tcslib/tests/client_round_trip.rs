@@ -17,7 +17,8 @@ use std::time::Duration;
 use tcslibgs::{
     ArmKey, BeaconTime, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry, DHName,
-    DHSample, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry, RestartArmTelemetry,
+    DHSample, DHState, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
+    RestartArmTelemetry,
     RestartTelemetry, StartDHTelemetry, Statistics, StopDHTelemetry, Telemetry,
 };
 use tcslib::{TcsClient, UdpConnection};
@@ -106,6 +107,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                     seq,
                     CommandStatus::Success,
                     cmd.name.clone(),
+                    Some(DHState::Active),
                     stub_statistics(),
                 )),
                 Command::QueryDHSample(cmd) => {
@@ -178,9 +180,11 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     );
     assert_eq!(client.stop_dh(DHName::new("DH2")).unwrap(), CommandStatus::Success);
 
-    // The statistics must arrive field for field, not merely arrive.
-    let (status, stats) = client.query_dh(DHName::new("DH2")).unwrap();
+    // The statistics must arrive field for field, not merely arrive, and the
+    // state beside them: a panel says what a handler is doing from this.
+    let (status, state, stats) = client.query_dh(DHName::new("DH2")).unwrap();
     assert_eq!(status, CommandStatus::Success);
+    assert_eq!(state, Some(DHState::Active));
     assert_eq!(stats, stub_statistics());
 
     // Sent first, received second, which is the order the client documents.

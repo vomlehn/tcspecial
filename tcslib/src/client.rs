@@ -18,7 +18,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    ArmKey, BeaconTime, Command, CommandLink, CommandStatus, ConfigCommand, DHName,
+    ArmKey, BeaconTime, Command, CommandLink, CommandStatus, ConfigCommand, DHName, DHState,
     DHSample, DHType, Timestamp,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
     ConfigDigest, ConfigVersion, ConnectCommand,
@@ -250,13 +250,20 @@ impl TcsClient {
     }
 
     /// Send a QUERY_DH command
-    pub fn query_dh(&mut self, name: DHName) -> TcsResult<(CommandStatus, Statistics)> {
+    ///
+    /// Three things come back: how the command was answered, what the handler
+    /// is doing, and what it has moved. The state is `None` for a handler the
+    /// spacecraft has not got, which is the NotFound answer.
+    pub fn query_dh(
+        &mut self,
+        name: DHName,
+    ) -> TcsResult<(CommandStatus, Option<DHState>, Statistics)> {
         let seq = self.next_sequence();
         let cmd = Command::QueryDH(QueryDHCommand::new(seq, name));
         let response = self.send_command(cmd)?;
 
         match response {
-            Telemetry::QueryDH(tm) => Ok((tm.header.status, tm.statistics)),
+            Telemetry::QueryDH(tm) => Ok((tm.header.status, tm.state, tm.statistics)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }

@@ -7,21 +7,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use log::info;
-use tcslibgs::{DHConfig, DHName, Statistics, TcsError, TcsResult};
+use tcslibgs::{DHConfig, DHName, DHState, Statistics, TcsError, TcsResult};
 
 use crate::endpoint::{connect_endpoint_pair, EndpointReadable, EndpointWritable};
 use crate::conduit::{Conduit, ConduitDirection, DHSamples, Polling};
-
-/// Data handler state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DHState {
-    /// Created but not activated
-    Created,
-    /// Active and conduiting data
-    Active,
-    /// Stopped
-    Stopped,
-}
 
 /// Data handler
 pub struct DataHandler {

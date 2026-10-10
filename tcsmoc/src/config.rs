@@ -25,6 +25,7 @@ pub mod constants {
     pub static BEACON_INDICATOR: LazyLock<IndicatorStates> = LazyLock::new(|| {
         IndicatorStates::new(
             grey(),                         // unset color
+            green(),                        // the colour of being heard from
             vec![
                 IndicatorState::Steady(Duration::from_millis(4000), green()),
                 IndicatorState::Blinking(Duration::from_millis(4000),

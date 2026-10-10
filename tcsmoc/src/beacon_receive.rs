@@ -266,10 +266,17 @@ fn beacon_last_received(at: Option<SystemTime>) -> String {
 
 /// What a beacon said, as the window shows it.
 ///
-/// The build the spacecraft is running and the digest of the configuration it
-/// read, which is what a beacon carries -- the same two values a CONNECT is
-/// answered with, so a ground station that has not connected can still see
-/// which software is flying and which payload set it is serving.
+/// Three things, each labelled: the version of the software that sent it, the
+/// version the payload set states, and the digest of the configuration file
+/// that tcspecial read.
+///
+/// ```text
+/// ver: 0.1.0 config ver: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+/// ```
+///
+/// Both versions are three decimal parts, as they go on the link -- a byte
+/// each -- and the digest is the hex of its sixteen bytes with nothing
+/// between them.
 ///
 /// A datagram this cannot read is shown as what arrived, cut short. Something
 /// else is sending to the group, or something is sending a beacon this build
@@ -278,7 +285,10 @@ fn beacon_last_received(at: Option<SystemTime>) -> String {
 fn beacon_message(datagram: &[u8]) -> String {
     match serde_json::from_slice::<Telemetry>(datagram) {
         Ok(Telemetry::Beacon(beacon)) => {
-            format!("version {}, md5 {}", beacon.version, beacon.digest)
+            format!(
+                "ver: {} config ver: {} md5: {}",
+                beacon.version, beacon.config_version, beacon.digest
+            )
         }
         Ok(other) => format!("not a beacon: {:?}", other.tm_type()),
         Err(_) => {
@@ -585,9 +595,25 @@ mod tests {
             minor: 2,
             patch: 3,
         };
+        let config_version = tcslibgs::ConfigVersion {
+            major: 4,
+            minor: 5,
+            patch: 6,
+        };
         let digest = tcslibgs::ConfigDigest([0xab; 16]);
-        let beacon = Telemetry::Beacon(tcslibgs::BeaconTelemetry::new(version, digest));
+        let beacon = Telemetry::Beacon(tcslibgs::BeaconTelemetry::new(
+            version,
+            config_version,
+            digest,
+        ));
         let datagram = serde_json::to_vec(&beacon).expect("it serializes");
+
+        // Each labelled, each version three decimal parts, and the digest hex
+        // with nothing between the bytes.
+        assert_eq!(
+            beacon_message(&datagram),
+            format!("ver: 1.2.3 config ver: 4.5.6 md5: {}", "ab".repeat(16))
+        );
 
         let shown = beacon_message(&datagram);
         assert!(shown.contains("1.2.3"), "{shown}");

@@ -925,6 +925,16 @@ set to:
 
    Commands are taken on 0.0.0.0:4000 as tcspecial/src/tcspecial.yaml asked, and beacons go to 0.0.0.0:5550
 
+A payload set states its own version, which every beacon carries:
+
+.. code-block:: yaml
+
+   version: "1.0"
+
+One, two or three decimal parts -- ``1.0`` means 1.0.0 -- because it goes out
+as three bytes. Anything else is refused where the file is read rather than
+announced as a version the set has not got.
+
 ``RUST_LOG`` sets the logging, which the Makefile leaves at ``info``.
 
 .. code-block:: console
@@ -970,12 +980,12 @@ the beacon box
 
      Beacon:    (indicator)
      Last rcvd: 02:02:02
-     Last msg:  version 0.1.0, md5 bd48126fe0faae6686398a4d23545d33
+     Last msg:  ver: 0.1.0 config ver: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 
-  ``Last msg`` reads ``<none>`` until a beacon arrives. A beacon carries the
-  build flying and the digest of the configuration it read -- the two values a
-  CONNECT is answered with -- so the line says what is up there without
-  anything having to connect first. A datagram the MOC cannot read is shown as
+  ``Last msg`` reads ``<none>`` until a beacon arrives. ``ver`` is the
+  software flying, ``config ver`` the version the payload set states, and
+  ``md5`` the digest of the configuration file tcspecial read, so the line
+  says what is up there without anything having to connect first. A datagram the MOC cannot read is shown as
   what arrived, cut short, rather than left off the line: something else
   sending to the group is worth seeing beside a green light.
 
@@ -1052,8 +1062,8 @@ so the two are there to read even when the link never comes up:
 
 .. code-block:: console
 
-   Version 0.1.0, configuration tests/manual/tcspecial2.yaml md5 bd48126fe0faae6686398a4d23545d33
-   tcspecial answers version 0.1.0, md5 bd48126fe0faae6686398a4d23545d33
+   Version 0.1.0, configuration tests/manual/tcspecial2.yaml version 1.0.0 md5 8d908f54a3d72d0704213113b92d958b
+   tcspecial answers version 0.1.0, md5 8d908f54a3d72d0704213113b92d958b
 
 and ``Last Response`` says whether the two agree. They are the same payload
 set if the digests match: the digest is of what a file says rather than of its

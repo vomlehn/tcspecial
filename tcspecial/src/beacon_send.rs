@@ -29,13 +29,15 @@ pub struct BeaconSend {
     /// The telemetry log every beacon is recorded in, shared with the
     /// command interpreter so that one log holds all of the telemetry.
     log:        TelemetryLog,
-    /// What this build is and what it read, carried in every beacon.
+    /// What this build is, what the configuration says it is, and what it
+    /// read, carried in every beacon.
     ///
     /// Settled once, here, rather than read when a beacon goes out: the
     /// digest is of the file this process read, and a file edited since would
     /// otherwise have the beacons claiming a configuration nothing is
-    /// serving. The same two values a CONNECT is answered with.
+    /// serving.
     version:    ConfigVersion,
+    config_version: ConfigVersion,
     digest:     ConfigDigest,
 }
 
@@ -46,6 +48,7 @@ impl BeaconSend {
         interface: std::net::Ipv4Addr,
         log: TelemetryLog,
         version: ConfigVersion,
+        config_version: ConfigVersion,
         digest: ConfigDigest,
     ) -> Option<BeaconSend> {
         if interval == Duration::from_secs(0) {
@@ -65,6 +68,7 @@ impl BeaconSend {
             interface,
             log,
             version,
+            config_version,
             digest,
         };
 
@@ -126,7 +130,11 @@ impl BeaconSend {
     }
 
     pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {
-        let beacon = Telemetry::Beacon(BeaconTelemetry::new(self.version, self.digest));
+        let beacon = Telemetry::Beacon(BeaconTelemetry::new(
+            self.version,
+            self.config_version,
+            self.digest,
+        ));
         let data = serde_json::to_vec(&beacon)?;
         trace!("send_beacon: sending to {:?}", dest_addr);
         // Recorded before it is sent, as a command response is, so that a

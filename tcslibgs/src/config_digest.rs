@@ -51,6 +51,40 @@ impl ConfigVersion {
             patch: part(env!("CARGO_PKG_VERSION_PATCH")),
         }
     }
+
+    /// The version a configuration file states, if it states one of these.
+    ///
+    /// One, two or three decimal parts: a file saying `1.0` means 1.0.0, the
+    /// part it leaves off being nought. Nothing else -- a part above 255 does
+    /// not fit the byte it goes on the link in, and a word is not a version
+    /// at all.
+    ///
+    /// `None` rather than a guess, because this goes on the wire: a file
+    /// whose version cannot be read as three bytes would otherwise be
+    /// announced as 0.0.0 to every ground station listening, which is a
+    /// version some other file might really have.
+    pub fn of_text(text: &str) -> Option<Self> {
+        let mut parts = [0u8; 3];
+        let mut count = 0;
+
+        for part in text.trim().split('.') {
+            if count == parts.len() {
+                return None;
+            }
+            parts[count] = part.trim().parse().ok()?;
+            count += 1;
+        }
+
+        if count == 0 {
+            return None;
+        }
+
+        Some(Self {
+            major: parts[0],
+            minor: parts[1],
+            patch: parts[2],
+        })
+    }
 }
 
 impl std::fmt::Display for ConfigVersion {
@@ -180,6 +214,39 @@ fn write_canonical(value: &serde_json::Value, out: &mut Vec<u8>) {
 
 #[cfg(test)]
 mod tests {
+    /// A configuration file's version is read as the three bytes it goes on
+    /// the link as, and a version that is not that is refused rather than
+    /// rounded.
+    ///
+    /// It is announced in every beacon, so a file whose version cannot be
+    /// read would otherwise be announced as 0.0.0 -- a version some other
+    /// file might really have.
+    #[test]
+    fn a_configuration_states_its_version_in_decimal_parts() {
+        for (text, want) in [
+            ("1.0", (1, 0, 0)),
+            ("1", (1, 0, 0)),
+            ("2.3.4", (2, 3, 4)),
+            (" 2.3.4 ", (2, 3, 4)),
+            ("0.0.0", (0, 0, 0)),
+            ("255.255.255", (255, 255, 255)),
+        ] {
+            let version = ConfigVersion::of_text(text).unwrap_or_else(|| panic!("{text}"));
+            assert_eq!(
+                (version.major, version.minor, version.patch),
+                want,
+                "for {text}"
+            );
+        }
+
+        for text in ["", "one", "1.0.0.0", "1.x", "-1", "256", "1.0-draft", "v1.0"] {
+            assert!(
+                ConfigVersion::of_text(text).is_none(),
+                "{text:?} is not a version"
+            );
+        }
+    }
+
     use super::*;
 
     const YAML: &str = "\

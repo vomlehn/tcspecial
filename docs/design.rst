@@ -500,15 +500,32 @@ Beacon
 |                |            |           | the tcspecial build sending it,    |
 |                |            |           | from its ``Cargo.toml``            |
 |                +------------+-----------+------------------------------------+
+|                | config     | 3 bytes   | The version the payload            |
+|                | version    |           | configuration file states, in the  |
+|                |            |           | same three parts                   |
+|                +------------+-----------+------------------------------------+
 |                | digest     | 16 bytes  | MD5 of the configuration file this |
 |                |            |           | tcspecial read                     |
 +----------------+------------+-----------+------------------------------------+
 
 Requirement
-    A beacon carries the version and the digest a CONNECT is answered with.
-    A beacon arrives whether or not anything has connected, so a ground
-    station that is only listening can see which software is flying and which
-    payload set it is serving rather than having to ask first.
+    A beacon carries the version and the digest a CONNECT is answered with,
+    and the version the payload set states as well. A beacon arrives whether
+    or not anything has connected, so a ground station that is only listening
+    can see which software is flying and which payload set it is serving
+    rather than having to ask first.
+
+Requirement
+    The payload set's version is the three decimal parts its ``version``
+    states: ``1.0`` is 1.0.0, the part it leaves off being nought. A version
+    that cannot be read that way is refused where the file is read, rather
+    than announced as 0.0.0 -- which is a version some other set might really
+    have. ``tcsverify`` reports it from the line that states it.
+
+Requirement
+    The MOC shows what the last beacon said as one line, each of the three
+    labelled: ``ver: 0.1.0 config ver: 1.0.0 md5:`` and the digest's sixteen
+    bytes in hex with nothing between them.
 
 Requirement
     Both are settled when the process starts, not read when a beacon goes

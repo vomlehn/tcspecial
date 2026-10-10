@@ -289,12 +289,22 @@ pub struct BeaconTelemetry {
     pub timestamp: Timestamp,
     /// The version of this build, from its `Cargo.toml`.
     pub version: ConfigVersion,
+    /// The version the configuration file states, as its three decimal parts.
+    ///
+    /// The file's own, not this build's: a payload set is versioned by
+    /// whoever writes it, and a ground station reading a beacon wants to know
+    /// which set it is hearing from as well as which software.
+    pub config_version: ConfigVersion,
     /// The digest of the configuration file this process read.
     pub digest: ConfigDigest,
 }
 
 impl BeaconTelemetry {
-    pub fn new(version: ConfigVersion, digest: ConfigDigest) -> Self {
+    pub fn new(
+        version: ConfigVersion,
+        config_version: ConfigVersion,
+        digest: ConfigDigest,
+    ) -> Self {
         Self {
             header: TelemetryHeader {
                 sequence: 0,
@@ -303,6 +313,7 @@ impl BeaconTelemetry {
             },
             timestamp: Timestamp::now(),
             version,
+            config_version,
             digest,
         }
     }
@@ -394,7 +405,11 @@ mod tests {
 
     #[test]
     fn test_beacon_telemetry() {
-        let tm = BeaconTelemetry::new(ConfigVersion::of_this_build(), ConfigDigest([0u8; 16]));
+        let tm = BeaconTelemetry::new(
+            ConfigVersion::of_this_build(),
+            ConfigVersion::of_text("1.0").expect("a version"),
+            ConfigDigest([0u8; 16]),
+        );
         assert_eq!(tm.header.tm_type, TelemetryType::Beacon);
     }
 

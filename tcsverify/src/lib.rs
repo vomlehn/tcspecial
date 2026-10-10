@@ -439,6 +439,29 @@ payloads:
         );
     }
 
+    /// A version a beacon cannot carry is reported from the version line.
+    ///
+    /// Which is the one problem reported from a line that is not a payload's:
+    /// the set's version is the set's, and the line that states it is the one
+    /// to change.
+    #[test]
+    fn a_version_a_beacon_cannot_carry_is_reported_from_its_own_line() {
+        let set = written(
+            ".yaml",
+            &GOOD.replace("version: \"1.0\"", "version: \"draft\""),
+            GOOD_SIM,
+        );
+        let report = verify(&set.payload, None);
+
+        assert_eq!(report.findings.len(), 1, "{:?}", report.findings);
+        assert_eq!(report.findings[0].line, 1, "the version is the first line");
+        assert!(
+            report.findings[0].message.contains("draft"),
+            "{:?}",
+            report.findings[0]
+        );
+    }
+
     /// An extension this does not read is refused, naming the file.
     #[test]
     fn a_file_that_is_not_a_configuration_file_is_refused() {

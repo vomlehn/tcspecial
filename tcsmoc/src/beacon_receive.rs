@@ -290,6 +290,58 @@ pub(crate) fn what_it_read(
     format!("v{version} config v{config_version} md5: {digest}")
 }
 
+/// What a datagram on the beacon group turned out to be.
+pub(crate) struct Heard {
+    /// What the window shows for it.
+    pub message: String,
+    /// The beacon's own number, if it was a beacon this build can read.
+    pub sequence: Option<u32>,
+}
+
+/// Read a datagram from the beacon group.
+pub(crate) fn hear(datagram: &[u8]) -> Heard {
+    Heard {
+        message: beacon_message(datagram),
+        sequence: match serde_json::from_slice::<Telemetry>(datagram) {
+            Ok(Telemetry::Beacon(beacon)) => Some(beacon.header.sequence),
+            _ => None,
+        },
+    }
+}
+
+/// What a beacon's number says about the ones before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Counted {
+    /// The first beacon this MOC has heard.
+    First,
+    /// The one after the last: nothing was missed.
+    Next,
+    /// This many beacons did not arrive.
+    Missed(u32),
+    /// The numbering started again, which is a spacecraft that restarted.
+    Restarted,
+}
+
+/// What `now` says about the beacons between it and `last`.
+///
+/// This is what the number is for. A beacon says nothing but that the
+/// spacecraft is alive, and without a number a ground station cannot tell a
+/// beacon it missed -- a lost datagram, a network that dropped it -- from one
+/// the spacecraft never sent. The indicator says how long ago the last one
+/// was; this says how many there should have been.
+pub(crate) fn counted(last: Option<u32>, now: u32) -> Counted {
+    match last {
+        None => Counted::First,
+        // A counter kept by the sender goes backwards only when the sender
+        // starts again, so that is what this is. It would also do so after
+        // 2^32 beacons, which at five seconds each is six centuries; a wrap
+        // is not worth telling from a restart.
+        Some(last) if now <= last => Counted::Restarted,
+        Some(last) if now == last + 1 => Counted::Next,
+        Some(last) => Counted::Missed(now - last - 1),
+    }
+}
+
 /// What a beacon said, as the window shows it.
 ///
 /// A datagram this cannot read is shown as what arrived, cut short. Something
@@ -387,6 +439,10 @@ impl BeaconReceive {
 
         let mut buf = [0u8; 65535];
 
+        // The number of the last beacon heard, so that the next one can say
+        // what happened in between.
+        let mut last_sequence: Option<u32> = None;
+
         loop {
             // How long to wait: until the colour would change by itself, so
             // that a blinking indicator blinks whether or not anything
@@ -400,7 +456,32 @@ impl BeaconReceive {
             socket.set_read_timeout(timeout)?;
 
             let arrived = match socket.recv_from(&mut buf) {
-                Ok((size, _addr)) => Arrived::Beacon(beacon_message(&buf[..size])),
+                Ok((size, _addr)) => {
+                    let heard = hear(&buf[..size]);
+
+                    // What its number says about the ones before it. Said on
+                    // the console rather than in the window: a gap is about
+                    // the beacons that did not arrive, and the window has
+                    // room for what did.
+                    if let Some(sequence) = heard.sequence {
+                        match counted(last_sequence, sequence) {
+                            Counted::Missed(missed) => eprintln!(
+                                "{missed} beacon{} did not arrive: #{sequence} came \
+                                 after #{}",
+                                if missed == 1 { "" } else { "s" },
+                                last_sequence.unwrap_or(0)
+                            ),
+                            Counted::Restarted => eprintln!(
+                                "the beacons start again at #{sequence}, so tcspecial \
+                                 has restarted"
+                            ),
+                            Counted::First | Counted::Next => {}
+                        }
+                        last_sequence = Some(sequence);
+                    }
+
+                    Arrived::Beacon(heard.message)
+                }
                 Err(ref e)
                     if e.kind() == std::io::ErrorKind::WouldBlock
                         || e.kind() == std::io::ErrorKind::TimedOut =>
@@ -613,6 +694,7 @@ mod tests {
         };
         let digest = tcslibgs::ConfigDigest([0xab; 16]);
         let beacon = Telemetry::Beacon(tcslibgs::BeaconTelemetry::new(
+            3,
             version,
             config_version,
             digest,
@@ -627,6 +709,11 @@ mod tests {
         // And the answer to a CONNECT is written by the same function, so the
         // two lines cannot come to disagree about how to say it.
         assert_eq!(what_it_read(version, config_version, digest), want);
+
+        // The beacon's own number comes back beside the message, which is
+        // what tells a beacon that was missed from one that was never sent.
+        assert_eq!(hear(&datagram).sequence, Some(3));
+        assert_eq!(hear(b"hello").sequence, None, "not a beacon, no number");
 
         let shown = beacon_message(&datagram);
         assert!(shown.contains("1.2.3"), "{shown}");
@@ -649,6 +736,29 @@ mod tests {
         let datagram = serde_json::to_vec(&other).expect("it serializes");
         let shown = beacon_message(&datagram);
         assert!(shown.contains("not a beacon"), "{shown}");
+    }
+
+    /// A beacon's number says how many did not arrive.
+    ///
+    /// Which is the whole of what it is for. A beacon says nothing but that
+    /// the spacecraft is alive, so without a number a ground station cannot
+    /// tell a beacon it missed from one the spacecraft never sent -- and
+    /// those are a network to look at and a spacecraft to look at.
+    #[test]
+    fn a_beacons_number_says_what_happened_before_it() {
+        assert_eq!(counted(None, 1), Counted::First);
+        assert_eq!(counted(None, 4096), Counted::First, "the MOC may start late");
+
+        assert_eq!(counted(Some(1), 2), Counted::Next);
+        assert_eq!(counted(Some(41), 42), Counted::Next);
+
+        assert_eq!(counted(Some(5), 7), Counted::Missed(1));
+        assert_eq!(counted(Some(5), 105), Counted::Missed(99));
+
+        // A number that does not go forward is a sender that started again:
+        // the count is the sender's, and it begins at one.
+        assert_eq!(counted(Some(99), 1), Counted::Restarted);
+        assert_eq!(counted(Some(99), 99), Counted::Restarted, "the same twice");
     }
 
     /// A beacon that has arrived is shown by the time it arrived, and one

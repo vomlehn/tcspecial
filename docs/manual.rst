@@ -1024,6 +1024,18 @@ the beacon box
      Last rcvd: 02:02:02
      Last msg:  v0.1.0 config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
 
+  Each beacon also carries its own number, counted from one by the
+  spacecraft, and the MOC says on the console what the numbers say about the
+  beacons between them:
+
+  .. code-block:: console
+
+     2 beacons did not arrive: #9 came after #6
+     the beacons start again at #1, so tcspecial has restarted
+
+  A beacon says only that the spacecraft is alive, so without the number a
+  beacon that was lost on the way reads exactly like one that was never sent.
+
   ``Last msg`` reads ``<none>`` until a beacon arrives. ``v`` is the software
   flying, ``config v`` the version the payload set states, and ``md5`` the
   digest of the configuration file tcspecial read, so the line says what is up

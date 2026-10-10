@@ -521,6 +521,10 @@ Beacon
 |                +------------+-----------+------------------------------------+
 |                | Name       | Type      |  Description                       |
 |                +------------+-----------+------------------------------------+
+|                | sequence   | 4 bytes   | Which beacon this is: the number   |
+|                |            |           | of beacons this process has sent,  |
+|                |            |           | from one                           |
+|                +------------+-----------+------------------------------------+
 |                | timestamp  | Timestamp | Spacecraft time at which the       |
 |                |            |           | beacon message was sent            |
 |                +------------+-----------+------------------------------------+
@@ -561,6 +565,23 @@ Requirement
     out. The digest is of the file this process read, and a file edited since
     would otherwise have the beacons claiming a configuration nothing is
     serving.
+
+Requirement
+    Every beacon carries its own number, counted by the sender from one. A
+    beacon answers nothing, so the number in its header is not a command's as
+    every other telemetry's is: it says which beacon this is.
+
+A beacon says only that the spacecraft is alive, and without a number a
+ground station cannot tell a beacon it missed from one the spacecraft never
+sent -- which are a network to look at and a spacecraft to look at. The
+indicator says how long ago the last beacon was; the number says how many
+there should have been in between.
+
+Requirement
+    The count is the sender's, so it starts again at one when tcspecial does.
+    A number that does not go forward is therefore a restart rather than a
+    gap, and the MOC says which it was: *n beacons did not arrive*, or *the
+    beacons start again at #1, so tcspecial has restarted*.
 
 TCSpecial
 =========

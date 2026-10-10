@@ -923,8 +923,8 @@ fn main() {
                     match guard.ping() {
                         Ok(tm) => {
                             ui.set_last_response(SharedString::from(format!(
-                                "PING OK - timestamp: {}.{}",
-                                tm.timestamp.seconds, tm.timestamp.nanoseconds
+                                "PING OK at {}",
+                                tm.header.timestamp.time_of_day()
                             )));
                         }
                         Err(e) => {
@@ -1074,9 +1074,13 @@ fn handle_main_menu (ui: &MainWindow, ui_weak: slint::Weak<MainWindow>, link: Ar
                 eprintln!("Ping from menu");
                 match guard.client().map(|client| client.ping()) {
                     Some(Ok(tm)) => {
+                        // The time the spacecraft answered, which every
+                        // response carries now. A time of day rather than the
+                        // seconds and nanoseconds it used to print: what an
+                        // operator reads it against is the clock on the wall.
                         ui.set_last_response(SharedString::from(format!(
-                            "PING OK - timestamp: {}.{}",
-                            tm.timestamp.seconds, tm.timestamp.nanoseconds
+                            "PING OK at {}",
+                            tm.header.timestamp.time_of_day()
                         )));
                     }
                     Some(Err(e)) => {

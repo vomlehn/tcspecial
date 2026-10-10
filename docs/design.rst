@@ -567,6 +567,20 @@ Requirement
     serving.
 
 Requirement
+    Every telemetry response carries the time the spacecraft made it, in its
+    header. Not the time the command was received, and not the time of
+    whatever the answer is about: a QUERY_DH_SAMPLE carries the times its
+    samples moved, and this is the time it was asked. The two are worth
+    telling apart -- a sample from an hour ago in an answer made a second ago
+    is a handler that has gone quiet, and without a time on the answer there
+    is nothing to read that against.
+
+Two of them used to carry a time of their own, PING and the beacon, and the
+other eight carried none; the header carries it for all of them now, and a
+header is built one way so that a kind of telemetry added later cannot be the
+ninth.
+
+Requirement
     Every beacon carries its own number, counted by the sender from one. A
     beacon answers nothing, so the number in its header is not a command's as
     every other telemetry's is: it says which beacon this is.

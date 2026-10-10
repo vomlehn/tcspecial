@@ -16,6 +16,34 @@ pub struct TelemetryHeader {
     pub tm_type: TelemetryType,
     /// Command status
     pub status: CommandStatus,
+    /// When the spacecraft made this answer.
+    ///
+    /// Not when the command was received, and not when whatever the answer is
+    /// about happened: a QUERY_DH_SAMPLE carries the times its samples moved
+    /// and this is the time it was asked. The two are worth telling apart --
+    /// a sample from an hour ago in an answer made a second ago is a handler
+    /// that has gone quiet, and without a time on the answer there is nothing
+    /// to read that against.
+    ///
+    /// In the header, so that every response has one. Two of them used to
+    /// carry a time of their own and the other eight carried none, which is
+    /// the sort of thing a reader of the eight finds out by needing it.
+    pub timestamp: Timestamp,
+}
+
+impl TelemetryHeader {
+    /// A header for an answer being made now.
+    ///
+    /// The only way one is built, so that a telemetry type added later cannot
+    /// forget the time: there is nowhere to leave it out.
+    pub fn new(sequence: u32, tm_type: TelemetryType, status: CommandStatus) -> Self {
+        Self {
+            sequence,
+            tm_type,
+            status,
+            timestamp: Timestamp::now(),
+        }
+    }
 }
 
 /// Telemetry types
@@ -73,18 +101,12 @@ impl TelemetryType {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PingTelemetry {
     pub header: TelemetryHeader,
-    pub timestamp: Timestamp,
 }
 
 impl PingTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::Ping,
-                status,
-            },
-            timestamp: Timestamp::now(),
+            header: TelemetryHeader::new(sequence, TelemetryType::Ping, status),
         }
     }
 }
@@ -98,11 +120,7 @@ pub struct RestartArmTelemetry {
 impl RestartArmTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::RestartArm,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::RestartArm, status),
         }
     }
 }
@@ -116,11 +134,7 @@ pub struct RestartTelemetry {
 impl RestartTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::Restart,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::Restart, status),
         }
     }
 }
@@ -145,11 +159,11 @@ impl ConnectTelemetry {
         digest: ConfigDigest,
     ) -> Self {
         Self {
-            header: TelemetryHeader {
+            header: TelemetryHeader::new(
                 sequence,
-                tm_type: TelemetryType::Connect,
-                status: CommandStatus::Success,
-            },
+                TelemetryType::Connect,
+                CommandStatus::Success,
+            ),
             version,
             config_version,
             digest,
@@ -166,11 +180,7 @@ pub struct StartDHTelemetry {
 impl StartDHTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::StartDH,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::StartDH, status),
         }
     }
 }
@@ -184,11 +194,7 @@ pub struct StopDHTelemetry {
 impl StopDHTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::StopDH,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::StopDH, status),
         }
     }
 }
@@ -204,11 +210,7 @@ pub struct QueryDHTelemetry {
 impl QueryDHTelemetry {
     pub fn new(sequence: u32, status: CommandStatus, dh_id: DHId, statistics: Statistics) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::QueryDH,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::QueryDH, status),
             dh_id,
             statistics,
         }
@@ -238,11 +240,7 @@ impl QueryDHSampleTelemetry {
         received: DHSample,
     ) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::QueryDHSample,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::QueryDHSample, status),
             dh_id,
             sent,
             received,
@@ -259,11 +257,7 @@ pub struct ConfigTelemetry {
 impl ConfigTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::Config,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::Config, status),
         }
     }
 }
@@ -277,11 +271,7 @@ pub struct ConfigDHTelemetry {
 impl ConfigDHTelemetry {
     pub fn new(sequence: u32, status: CommandStatus) -> Self {
         Self {
-            header: TelemetryHeader {
-                sequence,
-                tm_type: TelemetryType::ConfigDH,
-                status,
-            },
+            header: TelemetryHeader::new(sequence, TelemetryType::ConfigDH, status),
         }
     }
 }
@@ -296,7 +286,6 @@ impl ConfigDHTelemetry {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BeaconTelemetry {
     pub header: TelemetryHeader,
-    pub timestamp: Timestamp,
     /// The version of this build, from its `Cargo.toml`.
     pub version: ConfigVersion,
     /// The version the configuration file states, as its three decimal parts.
@@ -328,12 +317,11 @@ impl BeaconTelemetry {
         digest: ConfigDigest,
     ) -> Self {
         Self {
-            header: TelemetryHeader {
+            header: TelemetryHeader::new(
                 sequence,
-                tm_type: TelemetryType::Beacon,
-                status: CommandStatus::Success,
-            },
-            timestamp: Timestamp::now(),
+                TelemetryType::Beacon,
+                CommandStatus::Success,
+            ),
             version,
             config_version,
             digest,
@@ -451,6 +439,25 @@ impl Telemetry {
             Telemetry::Beacon(tm) => tm.header.status,
         }
     }
+
+    /// When the spacecraft made this answer.
+    ///
+    /// Every kind carries it, in the header; see [`TelemetryHeader`].
+    pub fn timestamp(&self) -> Timestamp {
+        match self {
+            Telemetry::Ping(tm) => tm.header.timestamp,
+            Telemetry::Connect(tm) => tm.header.timestamp,
+            Telemetry::RestartArm(tm) => tm.header.timestamp,
+            Telemetry::Restart(tm) => tm.header.timestamp,
+            Telemetry::StartDH(tm) => tm.header.timestamp,
+            Telemetry::StopDH(tm) => tm.header.timestamp,
+            Telemetry::QueryDH(tm) => tm.header.timestamp,
+            Telemetry::QueryDHSample(tm) => tm.header.timestamp,
+            Telemetry::Config(tm) => tm.header.timestamp,
+            Telemetry::ConfigDH(tm) => tm.header.timestamp,
+            Telemetry::Beacon(tm) => tm.header.timestamp,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -482,6 +489,64 @@ mod tests {
         assert_eq!(tm.header.tm_type, TelemetryType::Beacon);
         // The beacon's own number, not a command's: a beacon answers nothing.
         assert_eq!(tm.header.sequence, 7);
+    }
+
+    /// Every kind of response says when it was made.
+    ///
+    /// Two of them used to carry a time of their own and the other eight
+    /// carried none, which is the sort of thing a reader of the eight finds
+    /// out by needing it. The time is in the header now, and the header is
+    /// built one way, so a kind added later cannot be the ninth.
+    #[test]
+    fn every_response_says_when_it_was_made() {
+        let version = ConfigVersion::of_this_build();
+        let digest = ConfigDigest([0u8; 16]);
+        let before = Timestamp::now();
+
+        let answers = [
+            Telemetry::Ping(PingTelemetry::new(1, CommandStatus::Success)),
+            Telemetry::Connect(ConnectTelemetry::new(2, version, version, digest)),
+            Telemetry::RestartArm(RestartArmTelemetry::new(3, CommandStatus::Success)),
+            Telemetry::Restart(RestartTelemetry::new(4, CommandStatus::Success)),
+            Telemetry::StartDH(StartDHTelemetry::new(5, CommandStatus::Success)),
+            Telemetry::StopDH(StopDHTelemetry::new(6, CommandStatus::Success)),
+            Telemetry::QueryDH(QueryDHTelemetry::new(
+                7,
+                CommandStatus::Success,
+                DHId(0),
+                Statistics::new(),
+            )),
+            Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
+                8,
+                CommandStatus::Success,
+                DHId(0),
+                DHSample::new(),
+                DHSample::new(),
+            )),
+            Telemetry::Config(ConfigTelemetry::new(9, CommandStatus::Success)),
+            Telemetry::ConfigDH(ConfigDHTelemetry::new(10, CommandStatus::Success)),
+            Telemetry::Beacon(BeaconTelemetry::new(11, version, version, digest)),
+        ];
+
+        // Every kind there is, which is what makes this a statement about all
+        // of them rather than about the ones that were remembered.
+        assert_eq!(
+            answers.len(),
+            (0u8..=255)
+                .filter(|byte| TelemetryType::from_u8(*byte).is_some())
+                .count(),
+            "a kind of telemetry was left out of this test"
+        );
+
+        let after = Timestamp::now();
+        for answer in answers {
+            let at = answer.timestamp();
+            assert!(
+                at.seconds >= before.seconds && at.seconds <= after.seconds,
+                "{:?} was not stamped as this test ran: {at:?}",
+                answer.tm_type()
+            );
+        }
     }
 
     #[test]

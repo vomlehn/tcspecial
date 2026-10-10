@@ -12,7 +12,21 @@
 # Note the quotes on the address: unquoted, 0.0.0.0 is a string in YAML only
 # because it happens not to be a number, which is a thin reason to rely on.
 address: "0.0.0.0"
+
+# The two command links. A command about the spacecraft -- ping it, arm it,
+# restart it -- is taken on port; a command about a payload -- start it, stop
+# it, ask it for its statistics -- on payload_port. One table says which is
+# which, read by both ends, so neither can send a command to the link the
+# other does not expect it on.
+#
+# Two links rather than one because what the ground needs in a hurry must
+# never be queued behind what it asked for at leisure: a restart waiting
+# behind a payload's statistics is a spacecraft that cannot be rescued while
+# it is busy. On a space link the two become two virtual channels, which is
+# where the priority between them is really decided; here they are two ports,
+# which is what an IP network has to divide traffic with.
 port: 4000
+payload_port: 4001
 protocol: udp
 
 # How often beacons go out and where they go. Both are required of every
@@ -22,8 +36,7 @@ protocol: udp
 # silently takes.
 #
 # A payload set's section states them for that set and wins over these. These
-# are what place a set that has no such section -- one written in the endpoint
-# configuration language, which has no place to put them.
+# are what place a set whose payload file states no such section.
 #
 # The address is a multicast group, which is what a beacon wants: any number of
 # ground stations join it, and neither end needs the other's address. The

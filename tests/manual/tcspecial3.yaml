@@ -14,12 +14,21 @@ description: TCSpecial payload set 3
 
 # What tcspecial itself is configured with for this payload set -- the same
 # section a tcspecial.yaml holds. First, because it is about the set as a
-# whole rather than about any payload in it. Read by nothing yet: tcspecial
-# still takes its own configuration from the file TCSPECIAL_CONFIG_PATH names,
-# and the address it serves commands on from its command line before that.
+# whole rather than about any payload in it.
+#
+# Where the set's beacons go is read from here, that being the set's own
+# business; the rest is carried and checked and not yet read, tcspecial taking
+# it from the file TCSPECIAL_CONFIG_PATH names.
+#
+# Two ports, because there are two command links: a command about the
+# spacecraft -- ping it, arm it, restart it -- is taken on port, and a command
+# about a payload -- start it, stop it, ask it for its statistics -- on
+# payload_port. What the ground needs in a hurry is then never queued behind
+# what it asked for at leisure.
 tcspecial:
   address: 0.0.0.0
   port: 4000
+  payload_port: 4001
   protocol: udp
   beacon_interval_ms: 5000
   beacon_address: "239.255.0.1:5550"

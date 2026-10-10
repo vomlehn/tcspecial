@@ -359,7 +359,7 @@ payloads:
     #[test]
     fn a_payload_sets_tcspecial_section_is_read() {
         let stated = "version: \"1.0\"\ndescription: a set\n\
-                      tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  protocol: udp\n  \
+                      tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  payload_port: 4001\n  protocol: udp\n  \
                       beacon_interval_ms: 5000\n  beacon_address: 239.255.0.7:7550\n  beacon_interface: 127.0.0.1\n\
                       payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \
                       path: /dev/null\n    packet_size: 1\n";
@@ -390,7 +390,7 @@ payloads:
     #[test]
     fn a_tcspecial_section_states_both_beacon_attributes() {
         let whole = "version: \"1.0\"\ndescription: a set\n\
-                     tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  protocol: udp\n  \
+                     tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  payload_port: 4001\n  protocol: udp\n  \
                      beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
                      beacon_interface: 127.0.0.1\n\
                      payloads:\n  - dh_id: 0\n    name: DH0\n    type: device\n    \

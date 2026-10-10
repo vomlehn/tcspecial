@@ -243,6 +243,7 @@ payloads:
 tcspecial:
   address: 0.0.0.0
   port: 4000
+  payload_port: 4001
   protocol: carrier-pigeon
   beacon_interval_ms: 5000
   beacon_address: 239.255.0.1:5550

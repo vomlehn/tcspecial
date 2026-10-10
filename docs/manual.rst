@@ -878,7 +878,21 @@ commands is in ``tcspecial.yaml``:
 .. code-block:: yaml
 
    address: "0.0.0.0"
-   port: 4000
+   port: 4000          # commands about the spacecraft
+   payload_port: 4001  # commands about a payload
+
+Two links, because what the ground needs in a hurry must never be queued
+behind what it asked for at leisure: a restart waiting behind a payload's
+statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
+``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``port``; ``START_DH``,
+``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and ``CONFIGURE_DH`` go to
+``payload_port``; ``CONNECT`` is answered on either. One table in the library
+says which is which, so the two ends cannot disagree about it.
+
+Both are required, and they must differ -- one socket cannot be two links.
+Nothing else may bind either of them: a payload given port 4000 is refused
+where its file is read, since it would take the commanding with it. Both are
+stated and checked today; the second socket is not served yet.
 
 Where it sends beacons, on what interface, and how often belong to the payload
 set -- a set's ground station being what listens for its beacons -- and are

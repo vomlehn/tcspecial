@@ -891,8 +891,19 @@ says which is which, so the two ends cannot disagree about it.
 
 Both are required, and they must differ -- one socket cannot be two links.
 Nothing else may bind either of them: a payload given port 4000 is refused
-where its file is read, since it would take the commanding with it. Both are
-stated and checked today; the second socket is not served yet.
+where its file is read, since it would take the commanding with it.
+
+Each link has a loop and a thread of its own, so a payload command that takes
+its time waits for nothing on the other one. tcspecial says where both are as
+it starts:
+
+.. code-block:: console
+
+   Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go to the group 239.255.0.1:5550 on interface 127.0.0.1
+
+A command sent to the wrong one of the two is refused rather than served: it
+means one end is not reading the configuration the other is, and that is the
+last fault to hide on the link the spacecraft is restarted over.
 
 Where it sends beacons, on what interface, and how often belong to the payload
 set -- a set's ground station being what listens for its beacons -- and are

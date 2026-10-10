@@ -329,6 +329,52 @@ impl BeaconTelemetry {
     }
 }
 
+/// An answer of this status to a command of that kind.
+///
+/// The telemetry type has to match the command, because that is how the ground
+/// pairs an answer with what it asked: a refusal of the wrong type is an
+/// answer the ground cannot place, and the command then looks unanswered --
+/// which is the one thing a refusal is for saying it is not.
+///
+/// For the answers that carry nothing but a status. The ones that carry
+/// measurements -- a handler's statistics, a handler's last transfers -- are
+/// given empty ones here: a refused command measured nothing.
+pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> Telemetry {
+    use crate::commands::Command;
+
+    let sequence = command.sequence();
+    match command {
+        Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(sequence, status)),
+        Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
+            sequence,
+            ConfigVersion::of_this_build(),
+            ConfigVersion::of_this_build(),
+            ConfigDigest([0u8; 16]),
+        )),
+        Command::RestartArm(_) => {
+            Telemetry::RestartArm(RestartArmTelemetry::new(sequence, status))
+        }
+        Command::Restart(_) => Telemetry::Restart(RestartTelemetry::new(sequence, status)),
+        Command::StartDH(_) => Telemetry::StartDH(StartDHTelemetry::new(sequence, status)),
+        Command::StopDH(_) => Telemetry::StopDH(StopDHTelemetry::new(sequence, status)),
+        Command::QueryDH(cmd) => Telemetry::QueryDH(QueryDHTelemetry::new(
+            sequence,
+            status,
+            cmd.dh_id,
+            Statistics::new(),
+        )),
+        Command::QueryDHSample(cmd) => Telemetry::QueryDHSample(QueryDHSampleTelemetry::new(
+            sequence,
+            status,
+            cmd.dh_id,
+            DHSample::new(),
+            DHSample::new(),
+        )),
+        Command::Config(_) => Telemetry::Config(ConfigTelemetry::new(sequence, status)),
+        Command::ConfigDH(_) => Telemetry::ConfigDH(ConfigDHTelemetry::new(sequence, status)),
+    }
+}
+
 /// Union of all telemetry types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Telemetry {

@@ -525,8 +525,8 @@ what the spacecraft says to the command is the thing worth finding out.
 
 Seeing what was read
 ====================
-Each payload's panel has a button for it: ``Config`` in tcsmoc, where three
-buttons share the row, and ``Configuration`` in tcssim. It shows every
+Each payload's panel has a ``Configuration`` button for it, in both windows
+and spelled the same way in each. It shows every
 parameter read for that payload: what the tcspecial configuration said about
 the payload and how it is reached, and what the simulator configuration said
 about how a stand-in for it behaves, each under the name of the file it came
@@ -1147,8 +1147,8 @@ nearly the same thing. The panels refresh themselves about once a second;
 nothing has to be pressed to see traffic.
 
 Each panel has three buttons. ``Enable`` and ``Disable`` are described under
-`Starting and stopping a payload`_; ``Config`` shows what the files said about
-that handler: see `Seeing what was read`_.
+`Starting and stopping a payload`_; ``Configuration`` shows what the files
+said about that handler: see `Seeing what was read`_.
 
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

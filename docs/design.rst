@@ -3079,6 +3079,15 @@ Requirement
     themselves, which is no use for telling what the program actually read.
 
 Requirement
+    That button is labelled ``Configuration`` in both programs and sits to the
+    right of the button that starts and stops the payload. The press a panel
+    is opened to make comes first, and one word for one button means an
+    operator reading the two windows side by side is not told that a ``Config``
+    and a ``Configuration`` are the same thing. The MOC's was abbreviated while
+    its panel was narrower than the word; the panel is wider now, which is
+    what that cost.
+
+Requirement
     Both halves are shown and each is said to come from the file it came from.
     One is flight configuration, which tcspecial serves and the ground
     controls; the other is how a stand-in behaves and reaches no spacecraft at
@@ -3576,31 +3585,40 @@ Requirement
 Requirement
     The window opens wide enough for the row.
 
-It already did. Three columns come to 644 pixels including the margins, and
-the window's width floor is wider than that: the command interpreter's
-controls need 700, and the floor is at least what two rows of panels stand, so
-that a two-row grid is wider than it is tall. A third column cost nothing. That was not obvious before the panels were
-measured: the constant the window width was worked out from said a panel was
-320 wide, with a comment claiming the layout stretched them to fill it, and
-they are 196 and do not stretch. Three columns of 320 would have opened a
-960-wide window with a third of it empty to the right of the panels.
+It already did. Three columns come to 798 pixels including the margins, which
+is wider than the window's own width floor: the command interpreter's controls
+need 700, and the floor is at least what two rows of panels stand, so that a
+two-row grid is wider than it is tall. That was not obvious before the panels
+were measured: the constant the window width was worked out from said a panel
+was 320 wide, with a comment claiming the layout stretched them to fill it, and
+a panel is as wide as its widest row and does not stretch. Three columns of 320
+would have opened a 960-wide window with a third of it empty to the right of
+the panels.
+
+A panel's widest row is its three buttons, which is why spelling Config out as
+Configuration moved the window: 206 pixels became 256, and three columns 644
+became 798. A row of buttons that does not fit keeps them at their own width
+and hangs the last one over the panel's edge onto the panel beside it, so a
+test holds every button to the panel that contains it and not merely to the
+window.
 
 So the shape follows from the count alone: three handlers are one row of three,
 and the four of the shipped tcspecial1.yaml are a row of three and a row of
-one, in a 739x929 window. A test reads that size out of this document and
+one, in a 798x929 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcssim.
 
 This replaced a rule that chose the shape nearest square among those at least
 as wide as they were tall. It read well and laid the panels out badly: two
-panels came out as one column of two, because a 739x739 window is squarer than
-a 739x549 one, so the set the Makefile runs went down the window instead of
+panels came out as one column of two, because a 739x739 window is squarer
+than a 739x549 one, so the set the Makefile runs went down the window instead
+of
 across it. Which row and column each panel is given was row-major all along --
 the shape was the whole of the fault. Squareness was never the thing wanted
 either; it was a proxy for a window that fits a screen, and a column count says
 that directly.
 
 What is given up is that the grid is no longer always wider than it is tall.
-Seven panels or more take a third row, which is 929 against a 739-wide window;
+Seven panels or more take a third row, which is 929 against a 798-wide window;
 they scroll, as too many panels always have. Up to six it still is, and a test
 says so. The window the MOC opens has been taller than wide since it gained its
 three-row floor, which is a different thing: the floor is room to grow into.
@@ -3627,9 +3645,10 @@ A handler whose conduits have carried nothing in a direction shows
 ``--:--:--`` and no data for it, which is also what a panel shows before it
 has been queried at all.
 
-Each panel has three buttons: ``Enable``, ``Disable``, and ``Config``, which
-shows what the configuration files said about the handler and is described
-under `tcssim`_ where the same button is.
+Each panel has three buttons: ``Enable``, ``Disable``, and ``Configuration``,
+which shows what the configuration files said about the handler and is
+described under `tcssim`_ where the same button is. It read ``Config`` while
+the panel was narrower than the word.
 
 Requirement
     A panel has a button per command, each labelled with the command it

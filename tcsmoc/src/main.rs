@@ -132,14 +132,17 @@ const DEFAULT_SIM_CONFIG_PATH: &str = "tests/manual/tcspecial1sim.yaml";
 /// lays the panels out at the width they ask for. They have to agree with
 /// `ui/main.slint`, which sizes the grid with the same panel height.
 ///
-/// A panel measures 196 wide with `GRID_SPACING` beside it, which is what the
-/// testing backend reports in `every_panels_data_is_inside_the_window`. This
-/// was 320 -- a nominal figure, with a comment claiming the panels stretched
-/// to fill whatever it gave them, which they do not. Three columns of the real
-/// width fit the window floor the command interpreter's controls already set,
-/// where three of 320 would have asked for 960 and left a third of the window
-/// empty to the right of the panels.
-const PANEL_WIDTH: f32 = 206.0;
+/// What a panel's widest row takes with `GRID_SPACING` beside it, which is
+/// what the testing backend reports in
+/// `every_panels_data_is_inside_the_window`. That row is the three buttons:
+/// side by side they are wider than any line of text in the panel. This was
+/// 320 -- a nominal figure, with a comment claiming the panels stretched to
+/// fill whatever it gave them, which they do not -- and then 206 for a row
+/// whose last button said Config. Spelling that out as Configuration, which
+/// is what tcssim's says, took 41 pixels more than the panel had: a row that
+/// does not fit keeps its buttons at their own width and hangs them over the
+/// edge onto the panel beside it.
+const PANEL_WIDTH: f32 = 256.0;
 /// What a panel's contents come to: the sum of the floors its rows declare,
 /// measured through Slint's testing backend rather than guessed, by
 /// `every_panels_data_is_inside_the_window`. This was 210 against the 259 the
@@ -1967,6 +1970,39 @@ mod tests {
                 );
             }
 
+            // And inside the panel it belongs to, which is the stricter half
+            // of the same thing: a row of buttons wider than PANEL_WIDTH
+            // keeps its buttons at their own width and hangs them over the
+            // panel's edge, where they land on the panel beside it. The
+            // window is wide enough for that to happen with nothing running
+            // off its own edge, so this is what notices -- spelling Config
+            // out as Configuration wanted 41 pixels the panel had not got.
+            let panels_across: Vec<(f32, f32)> =
+                ElementHandle::find_by_element_type_name(&ui, "DHPanel")
+                    .map(|panel| {
+                        let left = panel.absolute_position().x;
+                        (left, left + panel.size().width)
+                    })
+                    .collect();
+            for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
+                let left = button.absolute_position().x;
+                let right = left + button.size().width;
+                // The command interpreter's own buttons are in no panel.
+                let Some(&(panel_left, panel_right)) = panels_across
+                    .iter()
+                    .find(|(panel_left, panel_right)| left >= *panel_left && left < *panel_right)
+                else {
+                    continue;
+                };
+                assert!(
+                    right <= panel_right,
+                    "{what}: the {:?} button runs from {left} to {right}, past the \
+                     panel that holds it, which ends at {panel_right} having \
+                     started at {panel_left}",
+                    button.accessible_label(),
+                );
+            }
+
             // The grid sits at the top of the area it is given and fits
             // inside it. Both halves matter: a grid shorter than its area is
             // centred in it, which is where the gap under the Data Handlers
@@ -2422,7 +2458,8 @@ mod tests {
             "the parameters are shown before anyone asked for them"
         );
 
-        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Config").collect();
+        let button: Vec<_> =
+            ElementHandle::find_by_accessible_label(&ui, "Configuration").collect();
         assert_eq!(button.len(), 1, "the panel has no Config button to press");
         button[0].invoke_accessible_default_action();
 

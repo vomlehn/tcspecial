@@ -101,10 +101,10 @@ component DHPanel inherits Rectangle {
         //
         // All three on one row, which is what sets the panel's width: three
         // buttons side by side are wider than any line of text in the panel.
-        // Configuration is abbreviated to Config for the same reason -- the
-        // word cost the panel more width than the button it opens is worth --
-        // and it is last because the two commands are what a panel is opened
-        // to press.
+        // Configuration is last because the two commands are what a panel is
+        // opened to press. It was abbreviated to Config to spend less of that
+        // width; it is spelled out now, as tcssim's is, so that the two
+        // windows name one button one way, and PANEL_WIDTH pays for it.
         commands-row := HorizontalLayout {
             spacing: 4px;
 
@@ -120,7 +120,7 @@ component DHPanel inherits Rectangle {
 
             // What the two configuration files said about this handler.
             Button {
-                text: "Config";
+                text: "Configuration";
                 clicked => { parameters-popup.show(); }
             }
         }
@@ -264,7 +264,7 @@ export component MainWindow inherits Window {
     // unequally -- the one with the longer name and address took it all --
     // which says nothing about either payload. Matches PANEL_WIDTH in
     // main.rs, which the_window_and_rust_agree_on_the_sizes checks.
-    property <length> panel-width: 206px;
+    property <length> panel-width: 256px;
 
     // The gap between one panel and the next, which has to agree with
     // GRID_SPACING in main.rs: the window opens tall enough for the gaps as

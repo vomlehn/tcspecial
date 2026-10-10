@@ -24,7 +24,7 @@ export struct DHInfo {
     // the same thing.
     oc-time: string,
     oc-data: string,
-    bytes-recv: int,
+    packets-recv: int,
     // Everything both configuration files said about this handler, as Rust
     // read them at startup. Held ready rather than fetched when asked:
     // nothing can change the files while the window is up, and this is not
@@ -39,7 +39,7 @@ component DHPanel inherits Rectangle {
     in property <int> packet-size: 12;
     in property <string> oc-time: "--:--:--";
     in property <string> oc-data: "";
-    in property <int> bytes-recv: 0;
+    in property <int> packets-recv: 0;
     in property <string> parameters: "";
 
     callback enable-clicked();
@@ -199,13 +199,15 @@ component DHPanel inherits Rectangle {
             Text { text: oc-data; font-size: 10px; vertical-alignment: center; }
         }
 
-        // What this handler has brought to the ground. The bytes it sent to
-        // its payload were counted beside it and are not: the panel is read
-        // for what arrived, and the handler's own count of the other
-        // direction said nothing an operator was watching for.
+        // How many packets have arrived from this payload, counted by the
+        // ground that received them -- as the two lines above are. It was a
+        // byte count out of the spacecraft's own statistics, and the wrong
+        // half of them: the bytes its handler had read from the ground, which
+        // is the direction nobody sends in, so the line read "0 bytes" for a
+        // payload that was sending steadily.
         counters-row := HorizontalLayout {
             min-height: 14px;
-            Text { text: "Recv: " + bytes-recv + " bytes"; font-size: 10px; }
+            Text { text: "Recv: " + packets-recv + " recv"; font-size: 10px; }
         }
     }
 }
@@ -561,7 +563,7 @@ export component MainWindow inherits Window {
                         packet-size: dh.packet-size;
                         oc-time: dh.oc-time;
                         oc-data: dh.oc-data;
-                        bytes-recv: dh.bytes-recv;
+                        packets-recv: dh.packets-recv;
                         parameters: dh.parameters;
                         enable-clicked => { enable-dh(i); }
                         disable-clicked => { disable-dh(i); }

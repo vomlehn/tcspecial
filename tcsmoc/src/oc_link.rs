@@ -45,6 +45,14 @@ pub struct Arrival {
     /// The head of what arrived, kept the way a handler's samples are so that
     /// the panel shows the three lines alike.
     pub data: DHSample,
+    /// How many have arrived from this payload since the MOC started.
+    ///
+    /// Counted here because this is what counts them: the panel's other two
+    /// lines are what the ground received, and so is this. The count the
+    /// panel showed before was the spacecraft's own -- the bytes its handler
+    /// had read from the ground, which is the other direction and reads
+    /// nought for a payload nobody sends to.
+    pub packets: u64,
 }
 
 impl Arrival {
@@ -102,6 +110,11 @@ fn oc_address(oc: &NetworkConfig) -> Option<SocketAddr> {
 fn serve(socket: UdpSocket, handler: SocketAddr, arrivals: Arrivals, row: usize) {
     let mut buffer = vec![0u8; 65535];
 
+    // How many have arrived from this payload. Kept here rather than read
+    // back out of the slot, so that a panel that has not been looked at yet
+    // cannot cost a count.
+    let mut packets = 0u64;
+
     loop {
         // An empty datagram. The handler's reader records the address it came
         // from and hands up nought bytes, which its conduit drops rather than
@@ -123,11 +136,13 @@ fn serve(socket: UdpSocket, handler: SocketAddr, arrivals: Arrivals, row: usize)
                 Ok((size, _from)) if size > 0 => {
                     let mut data = DHSample::new();
                     data.record(&buffer[..size]);
+                    packets += 1;
                     if let Ok(mut slots) = arrivals.lock() {
                         if let Some(slot) = slots.get_mut(row) {
                             *slot = Some(Arrival {
                                 at: Timestamp::now(),
                                 data,
+                                packets,
                             });
                         }
                     }
@@ -205,6 +220,21 @@ mod tests {
             data.contains("66") && data.contains("72"),
             "the first bytes of \"from the payload\": {data}"
         );
+        assert_eq!(found.packets, 1, "one datagram arrived, and it was counted");
+
+        // And a second is counted as a second, which is what the panel shows.
+        oc.send_to(b"again", ground).expect("it is sent");
+        let counted = (0..50)
+            .find_map(|_| {
+                thread::sleep(Duration::from_millis(20));
+                arrivals
+                    .lock()
+                    .ok()
+                    .and_then(|slots| slots[0].clone())
+                    .filter(|arrival| arrival.packets == 2)
+            })
+            .expect("the second arrival was not counted");
+        assert_eq!(counted.packets, 2);
     }
 
     /// A handler with no OC address is not listened for.

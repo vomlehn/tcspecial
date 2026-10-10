@@ -328,7 +328,7 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         // until it has.
         oc_time: SharedString::from(NO_TRANSFER_TIME),
         oc_data: SharedString::new(),
-        bytes_recv: 0,
+        packets_recv: 0,
         // What both files said about this payload, ready for the panel's
         // Configuration button. `sim` is absent when the simulator file could
         // not be read, which is not an error here: the MOC controls payloads
@@ -394,8 +394,6 @@ fn simulator_settings(payload_path: &str, dh_configs: &[DHConfig]) -> Option<Vec
 #[derive(Debug, Clone)]
 struct PanelUpdate {
     row: usize,
-    /// What the handler has received, where a pass asked and was answered.
-    bytes_recv: Option<i32>,
     /// What the panel should say the handler is doing, where this pass has
     /// something to say about it: the beacon stopping, which makes every
     /// handler unknown, or the beacon returning, which is when the spacecraft
@@ -409,7 +407,6 @@ impl PanelUpdate {
     fn unknown(row: usize) -> Self {
         Self {
             row,
-            bytes_recv: None,
             status: Some(UNKNOWN_STATUS),
         }
     }
@@ -586,7 +583,6 @@ fn panel_update_for(
 
     Some(PanelUpdate {
         row,
-        bytes_recv: Some(stats.bytes_received as i32),
         // Said where the caller asked for it: the pass that follows the
         // beacon coming back, and the Query all button, which is somebody
         // asking the spacecraft directly. Every other pass leaves the status
@@ -596,12 +592,36 @@ fn panel_update_for(
     })
 }
 
+/// Put what the ground received into the panels.
+///
+/// What no command asked for: the listeners in [`oc_link`] put it where this
+/// can pick it up, as the poller does. Read every pass rather than taken,
+/// because it is the last thing that arrived rather than a queue of events --
+/// a panel shows the latest, as it does for the times beside it.
+///
+/// All three of a panel's readings of its payload come from here, and that is
+/// the point of them coming from one place: when the data arrived, what it
+/// was, and how much of it there has been are one account, kept by the end
+/// that received it.
+fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
+    let Ok(slots) = arrivals.lock() else { return };
+
+    for (row, arrival) in slots.iter().enumerate() {
+        let Some(arrival) = arrival else { continue };
+
+        let (time, data) = arrival.panel_lines();
+        let packets = i32::try_from(arrival.packets).unwrap_or(i32::MAX);
+        update_row(dh_model, row, |info| {
+            info.oc_time = SharedString::from(time.clone());
+            info.oc_data = SharedString::from(data.clone());
+            info.packets_recv = packets;
+        });
+    }
+}
+
 /// Put a gathered update into its panel.
 fn apply_panel_update(dh_model: &Rc<VecModel<DHInfo>>, update: &PanelUpdate) {
     update_row(dh_model, update.row, |info| {
-        if let Some(bytes_recv) = update.bytes_recv {
-            info.bytes_recv = bytes_recv;
-        }
         if let Some(status) = update.status {
             info.status = SharedString::from(status);
         }
@@ -1249,10 +1269,9 @@ fn query_dh_buttons(
             match panel_update_for(client, row, dh, &mut None, true) {
                 Some(update) => {
                     results.push(format!(
-                        "{}: {} recv={}",
+                        "{}: {}",
                         dh.name.0,
-                        update.status.unwrap_or(UNKNOWN_STATUS),
-                        update.bytes_recv.unwrap_or(0)
+                        update.status.unwrap_or(UNKNOWN_STATUS)
                     ));
                     apply_panel_update(&dh_model, &update);
                 }
@@ -1352,22 +1371,7 @@ fn poll_panels(
                 apply_panel_update(&dh_model, update);
             }
 
-            // And what the ground itself received, which no command asked
-            // for: the listeners put it where this can pick it up, as the
-            // poller does. Read every pass rather than taken, because it is
-            // the last thing that arrived rather than a queue of events --
-            // a panel shows the latest, as it does for the samples above.
-            if let Ok(slots) = arrivals.lock() {
-                for (row, arrival) in slots.iter().enumerate() {
-                    if let Some(arrival) = arrival {
-                        let (time, data) = arrival.panel_lines();
-                        update_row(&dh_model, row, |info| {
-                            info.oc_time = SharedString::from(time.clone());
-                            info.oc_data = SharedString::from(data.clone());
-                        });
-                    }
-                }
-            }
+            show_arrivals(&dh_model, &arrivals);
 
             // And what the command link has been doing, under Last Response.
             //
@@ -1890,10 +1894,6 @@ mod tests {
         assert_eq!(gathered.len(), dh_configs.len(), "every panel, not some");
         for update in &gathered {
             assert_eq!(update.status, Some(UNKNOWN_STATUS));
-            assert_eq!(
-                update.bytes_recv, None,
-                "the counters are what the handler moved and are not in doubt"
-            );
         }
 
         // And the silence going on is not the same event: the panels already
@@ -1982,7 +1982,6 @@ mod tests {
             Some(ACTIVE_STATUS),
             "the panel was not given what the spacecraft said of its handler"
         );
-        assert_eq!(restored[0].bytes_recv, Some(24));
         assert!(
             !watch.restore_pending,
             "the reading was taken, so nothing is owed"
@@ -2003,7 +2002,6 @@ mod tests {
             ordinary[0].status, None,
             "an ordinary poll is not a second opinion on what a command was answered"
         );
-        assert_eq!(ordinary[0].bytes_recv, Some(24));
 
         stub.join().unwrap();
     }
@@ -2760,6 +2758,31 @@ mod tests {
                 );
             }
 
+            // The count beside them, which is how many packets arrived
+            // rather than how many bytes the spacecraft read from the ground:
+            // that was the other direction, and read nought for every
+            // payload nobody sends to.
+            let mut counted = dh_info_from(&dh, None);
+            counted.packets_recv = 3;
+            let shown_counted = shown(counted);
+            assert!(
+                shown_counted.iter().any(|line| line == "Recv: 3 recv"),
+                "a payload that {kind} does not show what arrived: {shown_counted:?}"
+            );
+            assert!(
+                !shown_counted
+                    .iter()
+                    .any(|line| line.starts_with("Recv: ") && line.contains("bytes")),
+                "a panel still counts bytes where packets are counted: {shown_counted:?}"
+            );
+
+            // And a panel that has heard nothing says nought rather than
+            // nothing: the count is a count from the moment the MOC started.
+            assert!(
+                lines.iter().any(|line| line == "Recv: 0 recv"),
+                "a payload that {kind} has no count at all: {lines:?}"
+            );
+
             dh.mode = tcslibgs::DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 500,
@@ -3047,6 +3070,63 @@ mod tests {
     }
 
     /// A panel's two lines, from the sample telemetry that feeds them.
+    /// A panel's three readings of its payload are what arrived at the
+    /// ground, counted by the ground.
+    ///
+    /// When, what, and how many: one account from the end that received it.
+    /// The count was the spacecraft's instead, and the wrong half of its
+    /// statistics -- the bytes its handler had read from the ground, which is
+    /// the direction nobody sends in -- so a payload sending steadily was
+    /// shown as having brought nothing.
+    #[test]
+    fn a_panel_counts_what_arrived_at_the_ground() {
+        use crate::oc_link::Arrival;
+        use tcslibgs::{DHSample, Timestamp};
+
+        let dh = DHConfig {
+            name: DHName::new("DH0"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/null".to_string(),
+            }),
+            packet_size: 4,
+            oc: None,
+            mode: Default::default(),
+        };
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
+            dh_info_from(&dh, None),
+            dh_info_from(&dh, None),
+        ]));
+
+        let mut data = DHSample::new();
+        data.record(&[0xDE, 0xAD]);
+        let arrival = Arrival {
+            at: Timestamp::at(
+                std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(3661),
+            ),
+            data,
+            packets: 5,
+        };
+        let arrivals: Arrivals = Arc::new(Mutex::new(vec![None, Some(arrival)]));
+
+        show_arrivals(&model, &arrivals);
+
+        let shown = model.row_data(1).unwrap();
+        assert_eq!(shown.packets_recv, 5, "the count the ground kept");
+        assert_eq!(shown.oc_time, SharedString::from("01:01:01"));
+        assert!(
+            shown.oc_data.contains("DE") && shown.oc_data.contains("AD"),
+            "what arrived: {}",
+            shown.oc_data
+        );
+
+        // The payload nothing has arrived from keeps its placeholders and its
+        // nought: a slot with nothing in it is a payload that has sent
+        // nothing, not a reading to be guessed at.
+        let quiet = model.row_data(0).unwrap();
+        assert_eq!(quiet.packets_recv, 0);
+        assert_eq!(quiet.oc_time, SharedString::from(NO_TRANSFER_TIME));
+    }
+
     /// A gathered update reaches the panel it names, and only that one.
     #[test]
     fn an_update_goes_to_its_own_panel() {
@@ -3069,26 +3149,29 @@ mod tests {
             &model,
             &PanelUpdate {
                 row: 1,
-                bytes_recv: Some(9),
-                status: None,
+                status: Some(ACTIVE_STATUS),
             },
         );
 
         let touched = model.row_data(1).unwrap();
-        assert_eq!(touched.bytes_recv, 9);
-        assert_eq!(
-            touched.status,
-            SharedString::from(STOPPED_STATUS),
-            "an update that said nothing about the status changed it"
-        );
+        assert_eq!(touched.status, SharedString::from(ACTIVE_STATUS));
 
         // Row 0 was not named, so it is untouched.
         let other = model.row_data(0).unwrap();
-        assert_eq!(other.bytes_recv, 0);
+        assert_eq!(other.status, SharedString::from(STOPPED_STATUS));
+        assert_eq!(other.packets_recv, 0);
         assert_eq!(
             other.oc_time,
             SharedString::from(NO_TRANSFER_TIME),
             "and nothing has arrived from its payload"
+        );
+
+        // And an update that says nothing about the status leaves it alone:
+        // what a pass has to say about a panel is whatever it learnt.
+        apply_panel_update(&model, &PanelUpdate { row: 1, status: None });
+        assert_eq!(
+            model.row_data(1).unwrap().status,
+            SharedString::from(ACTIVE_STATUS)
         );
     }
 

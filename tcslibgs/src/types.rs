@@ -643,6 +643,15 @@ pub struct SerialConfig {
     /// started the count has been checked, and this is the number the line
     /// is set to.
     pub byte_length: u8,
+    /// The half-duplex turnaround of an RS-485 bus, and `None` for a line
+    /// that is not one.
+    ///
+    /// Applied rather than recorded, unlike the synchronous terms above: the
+    /// kernel takes it through an ioctl on the same device file, which is the
+    /// file a handler has open. Experimental; see
+    /// [`crate::endpoint_config_rs485`].
+    #[serde(default)]
+    pub rs485: Option<crate::Rs485Params>,
 }
 
 /// Configuration for an endpoint on an I2C bus
@@ -904,6 +913,10 @@ pub(crate) fn link_params_of(
         bits_per_word: inherited!(bits_per_word),
         bit_order: inherited!(bit_order),
         cs_active: inherited!(cs_active),
+        rs485: inherited!(rs485),
+        rs485_rts_on_send: inherited!(rs485_rts_on_send),
+        rs485_delay_before_send_ms: inherited!(rs485_delay_before_send_ms),
+        rs485_delay_after_send_ms: inherited!(rs485_delay_after_send_ms),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
             timeout: s.timeout,
@@ -1257,6 +1270,20 @@ pub struct DHGroupJson {
     /// Whether a SPI chip select is active high or low.
     #[serde(default)]
     pub cs_active: Option<Scalar>,
+    /// Whether a start-stop line is a half-duplex RS-485 bus. Serial
+    /// payloads only, and experimental; see
+    /// [`crate::endpoint_config_rs485`].
+    #[serde(default)]
+    pub rs485: Option<Scalar>,
+    /// The logical level of RTS while an RS-485 line transmits.
+    #[serde(default)]
+    pub rs485_rts_on_send: Option<Scalar>,
+    /// Milliseconds an RS-485 line holds the bus before its first bit.
+    #[serde(default)]
+    pub rs485_delay_before_send_ms: Option<Scalar>,
+    /// Milliseconds it holds the bus after its last.
+    #[serde(default)]
+    pub rs485_delay_after_send_ms: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1388,6 +1415,20 @@ pub struct DHConfigJson {
     /// Whether a SPI chip select is active high or low.
     #[serde(default)]
     pub cs_active: Option<Scalar>,
+    /// Whether a start-stop line is a half-duplex RS-485 bus. Serial
+    /// payloads only, and experimental; see
+    /// [`crate::endpoint_config_rs485`].
+    #[serde(default)]
+    pub rs485: Option<Scalar>,
+    /// The logical level of RTS while an RS-485 line transmits.
+    #[serde(default)]
+    pub rs485_rts_on_send: Option<Scalar>,
+    /// Milliseconds an RS-485 line holds the bus before its first bit.
+    #[serde(default)]
+    pub rs485_delay_before_send_ms: Option<Scalar>,
+    /// Milliseconds it holds the bus after its last.
+    #[serde(default)]
+    pub rs485_delay_after_send_ms: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -2063,6 +2104,7 @@ mod tests {
             loopback: None,
             stop_bits: Some(StopBits::One),
             byte_length: 8,
+            rs485: None,
         });
         assert_eq!(serial.kind(), DHType::Serial);
 
@@ -3405,6 +3447,66 @@ payloads:
     /// The terms of a line, which is what the stream rule belongs to.
     const A_LINE: &str = "    path: /dev/ttyS0\n    asynchronous: true\n    \
                           datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n";
+
+    /// An RS-485 bus reaches a handler with its turnaround on it.
+    ///
+    /// The rule itself is tested where it lives; this is the other half --
+    /// that a file stating it produces a handler carrying it, through the
+    /// terms, the group rules and the endpoint. A term that is read and
+    /// dropped on the way is a line that is set to something nobody asked
+    /// for, and nothing in the rule's own tests would notice.
+    #[test]
+    fn an_rs485_line_carries_its_turnaround_to_the_handler() {
+        let bus = format!(
+            "{A_LINE}    rs485: true\n    rs485_rts_on_send: false\n    \
+             rs485_delay_after_send_ms: 2\n    packet_size: 8\n    stream:\n      \
+             timeout: none\n      max_length: 64\n"
+        );
+        let handlers = link("serial", &bus)
+            .expect("a line that is a two-wire bus")
+            .to_dh_configs()
+            .expect("it becomes a handler");
+
+        match &handlers[0].endpoint {
+            EndpointConfig::Serial(serial) => {
+                let rs485 = serial.rs485.expect("the bus reached the handler");
+                assert!(!rs485.rts_on_send, "RTS is low while sending on this board");
+                assert_eq!(rs485.delay_before_send_ms, 0, "nothing was asked for");
+                assert_eq!(rs485.delay_after_send_ms, 2);
+            }
+            other => panic!("expected a serial endpoint, got {other:?}"),
+        }
+
+        // And a line that says nothing is not a bus, which is what every set
+        // written before this says.
+        let plain = format!(
+            "{A_LINE}    packet_size: 8\n    stream:\n      timeout: none\n      \
+             max_length: 64\n"
+        );
+        let plain = link("serial", &plain)
+            .expect("a plain line")
+            .to_dh_configs()
+            .expect("it becomes a handler");
+        match &plain[0].endpoint {
+            EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
+            other => panic!("expected a serial endpoint, got {other:?}"),
+        }
+    }
+
+    /// The turnaround belongs to a line and to no other kind.
+    #[test]
+    fn rs485_terms_are_refused_on_a_kind_that_is_not_a_line() {
+        let peripheral = "    path: /dev/spidev0.0\n    max_speed: 1000000\n    \
+                          spi_mode: 0\n    rs485: true\n";
+        let said = link("spi", peripheral)
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("a peripheral is not an RS-485 bus");
+        assert!(
+            said.contains("rs485"),
+            "the error should name the term: {said}"
+        );
+    }
 
     /// A line whose stream section is the given body.
     fn line_stream(body: &str) -> Result<crate::endpoint_config::StreamParams, String> {

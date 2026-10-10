@@ -106,6 +106,9 @@ pub struct SerialParams {
     pub loopback: Option<bool>,
     /// Data bits in each byte.
     pub byte_length: ByteLength,
+    /// The half-duplex turnaround, for a line that is an RS-485 bus, and
+    /// `None` for one that is not; see [`crate::endpoint_config_rs485`].
+    pub rs485: Option<crate::endpoint_config_rs485::Rs485Params>,
     /// Stream payload protocol attributes. Required: a serial port is a
     /// stream, so there is always a rule for where one read ends.
     pub stream: StreamParams,
@@ -397,6 +400,10 @@ pub(crate) fn group_kind_of(
             "clock_type",
             "encoding",
             "loopback",
+            "rs485",
+            "rs485_rts_on_send",
+            "rs485_delay_before_send_ms",
+            "rs485_delay_after_send_ms",
         ],
     )?;
 
@@ -440,6 +447,11 @@ pub(crate) fn group_kind_of(
     let byte_length = parse_u32(name, "byte_length", byte_length)?;
     let byte_length = ByteLength::new(byte_length.min(u8::MAX as u32) as u8)
         .map_err(|m| bad(name, &m))?;
+
+    // The electrical layer under a start-stop line, which a two-wire bus
+    // needs told and a four-wire line says nothing about. Read before the
+    // stream section below, which takes the terms apart.
+    let rs485 = crate::endpoint_config_rs485::rs485_of(name, &g, asynchronous)?;
 
     // A serial port is a stream, so a read needs an end.
     let stream = g.stream.ok_or(EndpointConfigError::MissingGroupField {
@@ -516,5 +528,6 @@ pub(crate) fn group_kind_of(
         loopback,
         byte_length,
         stream,
+        rs485,
     }))
 }

@@ -217,6 +217,15 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
         ));
     }
 
+    // And last, the electrical layer under all of that, for a line that is a
+    // two-wire bus. After the termios terms, because the mode is a property
+    // of the port rather than of the line discipline and the driver wants the
+    // line already set up; and refused rather than reported, for the reason
+    // endpoint_rs485::apply gives.
+    if let Some(terms) = &config.rs485 {
+        crate::endpoint_rs485::apply(fd, what, terms)?;
+    }
+
     Ok(())
 }
 
@@ -397,6 +406,9 @@ mod tests {
             loopback: None,
             stop_bits: Some(StopBits::One),
             byte_length: 8,
+            // Not an RS-485 bus: a pty takes no turnaround, as it takes no
+            // parity.
+            rs485: None,
         };
 
         // No parity, which is what a payload link commonly runs and what a
@@ -498,6 +510,9 @@ mod tests {
             loopback: None,
             stop_bits: Some(StopBits::One),
             byte_length: 8,
+            // Not an RS-485 bus: a pty takes no turnaround, as it takes no
+            // parity.
+            rs485: None,
         };
         let mut endpoint = SerialEndpoint::new("telemetry", &config)
             .unwrap_or_else(|e| panic!("{slave} would not open as a line: {e}"));
@@ -542,6 +557,9 @@ mod tests {
             loopback: None,
             stop_bits: Some(StopBits::One),
             byte_length: 8,
+            // Not an RS-485 bus: a pty takes no turnaround, as it takes no
+            // parity.
+            rs485: None,
         };
 
         let e = match SerialEndpoint::new("telemetry", &config) {

@@ -34,6 +34,7 @@ use crate::endpoint_config_spi::SpiParams;
 // that a reader of a configuration document reaches everything it can hold
 // through the module that parses it.
 pub use crate::endpoint_config_i2c::I2cParams as I2cGroupParams;
+pub use crate::endpoint_config_rs485::Rs485Params;
 pub use crate::endpoint_config_serial::{ByteLength, StopBits};
 pub use crate::endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 use crate::types::{EndpointConfig, I2cConfig, SerialConfig, SpiConfig};
@@ -141,6 +142,7 @@ pub(crate) fn endpoint_of(
                 frame_check: serial.frame_check,
                 loopback: serial.loopback,
                 byte_length: serial.byte_length.bits(),
+                rs485: serial.rs485,
             })),
             GroupKind::Spi(spi) => Ok(EndpointConfig::Spi(SpiConfig {
                 path: path.clone(),
@@ -264,7 +266,7 @@ pub enum EndpointLocation {
 /// hyphenated spelling beside its own. Nothing deserializes into it now -- a
 /// tcspecial configuration has its own shape, and `types::link_params_of` fills
 /// this in from a payload -- so the aliases are gone and so is the name.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct LinkTerms {
     // A line.
     pub(crate) datarate: Option<Scalar>,
@@ -299,6 +301,12 @@ pub(crate) struct LinkTerms {
     /// Where one read of a line ends. A line's alone: see
     /// [`GroupKind::stream`].
     pub(crate) stream: Option<StreamTerms>,
+    /// Whether a start-stop line is a half-duplex RS-485 bus, and what its
+    /// turnaround is; see [`crate::endpoint_config_rs485`].
+    pub(crate) rs485: Option<Scalar>,
+    pub(crate) rs485_rts_on_send: Option<Scalar>,
+    pub(crate) rs485_delay_before_send_ms: Option<Scalar>,
+    pub(crate) rs485_delay_after_send_ms: Option<Scalar>,
 }
 
 /// Where one read of a line ends, as a file states it.
@@ -323,6 +331,14 @@ pub(crate) struct StreamTerms {
 pub struct Scalar(String);
 
 impl Scalar {
+    /// A scalar as a file would have spelled it.
+    ///
+    /// For the rules' own tests, which ask a rule what it makes of a term
+    /// without a file to put it in.
+    pub(crate) fn of(text: impl Into<String>) -> Self {
+        Scalar(text.into())
+    }
+
     pub(crate) fn as_str(&self) -> &str {
         self.0.trim()
     }
@@ -579,10 +595,20 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 19] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 23] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
+        ("rs485", g.rs485.is_some()),
+        ("rs485_rts_on_send", g.rs485_rts_on_send.is_some()),
+        (
+            "rs485_delay_before_send_ms",
+            g.rs485_delay_before_send_ms.is_some(),
+        ),
+        (
+            "rs485_delay_after_send_ms",
+            g.rs485_delay_after_send_ms.is_some(),
+        ),
         ("stop_bits", g.stop_bits.is_some()),
         ("asynchronous", g.asynchronous.is_some()),
         ("parity", g.parity.is_some()),

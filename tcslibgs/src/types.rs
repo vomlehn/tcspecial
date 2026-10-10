@@ -13,25 +13,39 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Timestamp type for spacecraft time
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+/// A time, in milliseconds since the UNIX epoch.
+///
+/// One number, one unit, everywhere a time is carried: in telemetry headers,
+/// in a handler's samples and statistics, and in the times a program reads
+/// off its own clock. Two ends comparing times, or a log read later, then
+/// have nothing to agree about beyond the epoch.
+///
+/// It was a pair -- seconds and nanoseconds within the second -- which is two
+/// fields to carry, two to serialize, and two to get wrong: arithmetic on it
+/// had to borrow across the second, and the nanoseconds were never shown or
+/// read by anything. Milliseconds are finer than anything here measures and
+/// coarse enough that a u64 holds half a billion years of them.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Timestamp {
-    /// Seconds since UNIX epoch
-    pub seconds: u64,
-    /// Nanoseconds within the current second
-    pub nanoseconds: u32,
+    /// Milliseconds since the UNIX epoch.
+    pub millis: u64,
+}
+
+impl std::fmt::Display for Timestamp {
+    /// The milliseconds, which is what the value is.
+    ///
+    /// A time of day is [`Timestamp::time_of_day`]; this is for a message
+    /// that wants the number -- a test saying which times it bracketed, a log
+    /// line that will be read against another program's.
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{} ms", self.millis)
+    }
 }
 
 impl Timestamp {
     /// Create a new timestamp from the current system time
     pub fn now() -> Self {
-        let duration = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default();
-        Self {
-            seconds: duration.as_secs(),
-            nanoseconds: duration.subsec_nanos(),
-        }
+        Self::at(SystemTime::now())
     }
 
     /// When a system clock reading happened, as a timestamp.
@@ -39,12 +53,21 @@ impl Timestamp {
     /// For the times a program takes from its own clock rather than from
     /// telemetry -- a beacon's arrival, say -- so that they are shown by the
     /// one function that shows every other time here.
+    ///
+    /// A reading before the epoch is the epoch. A clock set backwards that
+    /// far is a fault of its own, and a time that cannot be told is better
+    /// shown as the start of the count than as a panic in a program watching
+    /// a spacecraft.
     pub fn at(time: SystemTime) -> Self {
-        let duration = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+        let since = time.duration_since(UNIX_EPOCH).unwrap_or_default();
         Self {
-            seconds: duration.as_secs(),
-            nanoseconds: duration.subsec_nanos(),
+            millis: u64::try_from(since.as_millis()).unwrap_or(u64::MAX),
         }
+    }
+
+    /// This time in milliseconds since the epoch, which is what it is.
+    pub fn millis(&self) -> u64 {
+        self.millis
     }
 
     /// The time of day this names, as a panel shows it.
@@ -55,11 +78,12 @@ impl Timestamp {
     /// being watched, so one of them showing local time would make a transfer
     /// look an hour old.
     ///
-    /// The nanoseconds are deliberately unused. A panel refreshed twice a
-    /// second cannot show them, and a time that changed in its last digits
-    /// between two looks would read as traffic that had not happened.
+    /// The milliseconds within the second are deliberately unused. A panel
+    /// refreshed twice a second cannot show them, and a time that changed in
+    /// its last digits between two looks would read as traffic that had not
+    /// happened.
     pub fn time_of_day(&self) -> String {
-        let within_a_day = self.seconds % 86_400;
+        let within_a_day = (self.millis / 1_000) % 86_400;
         format!(
             "{:02}:{:02}:{:02}",
             within_a_day / 3600,
@@ -2075,7 +2099,7 @@ mod tests {
     #[test]
     fn test_timestamp_now() {
         let ts = Timestamp::now();
-        assert!(ts.seconds > 0);
+        assert!(ts.millis > 0, "milliseconds since the epoch, and it is not 1970");
     }
 
     /// Bytes read as hex pairs, and a transfer longer than what is kept
@@ -2107,8 +2131,7 @@ mod tests {
         let mut sample = DHSample::new();
         sample.record(&[0x52, 0x45, 0x41, 0x44, 0x0D]);
         sample.time = Some(Timestamp {
-            seconds: 3661,
-            nanoseconds: 0,
+            millis: 3661000,
         });
         assert_eq!(
             sample.panel_lines(),
@@ -2121,8 +2144,7 @@ mod tests {
         let mut sample = DHSample::new();
         sample.record(&[0xAB; 12]);
         sample.time = Some(Timestamp {
-            seconds: 0,
-            nanoseconds: 0,
+            millis: 0,
         });
         let (_, data) = sample.panel_lines();
         assert_eq!(data, "AB AB AB AB AB AB AB AB...");
@@ -2136,10 +2158,11 @@ mod tests {
     /// showing the epoch.
     #[test]
     fn a_timestamp_reads_as_a_time_of_day() {
-        let at = |seconds| {
+        // A time is milliseconds since the epoch, so a test that means a
+        // second says so.
+        let at = |seconds: u64| {
             Timestamp {
-                seconds,
-                nanoseconds: 0,
+                millis: seconds * 1_000,
             }
             .time_of_day()
         };
@@ -2154,14 +2177,13 @@ mod tests {
             "a timestamp of the kind a clock actually gives"
         );
 
-        // The nanoseconds are not shown, so two times within one second read
-        // alike: a panel refreshed twice a second cannot show them, and a
-        // time whose last digits changed between two looks would read as
-        // traffic that had not happened.
+        // The milliseconds within the second are not shown, so two times
+        // within one second read alike: a panel refreshed twice a second
+        // cannot show them, and a time whose last digits changed between two
+        // looks would read as traffic that had not happened.
         assert_eq!(
             Timestamp {
-                seconds: 1_700_000_000,
-                nanoseconds: 999_999_999,
+                millis: 1_700_000_000_999,
             }
             .time_of_day(),
             at(1_700_000_000)

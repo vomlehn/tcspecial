@@ -542,7 +542,7 @@ mod tests {
         for answer in answers {
             let at = answer.timestamp();
             assert!(
-                at.seconds >= before.seconds && at.seconds <= after.seconds,
+                at >= before && at <= after,
                 "{:?} was not stamped as this test ran: {at:?}",
                 answer.tm_type()
             );

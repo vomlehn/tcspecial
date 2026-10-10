@@ -59,6 +59,8 @@ help:
 	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and tcssim"
 	@echo "  make runmocx     - As runmocy, on the XML payload configuration"
 	@echo "  make runsim      - Run tcssim alone"
+	@echo "  make runverifyy  - Check the payload set, reading its YAML"
+	@echo "  make runverifyx  - Check the payload set, reading its XML"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -148,6 +150,38 @@ runmocy:
 .PHONY: runmocx
 runmocx:
 	$(call runmoc_on,xml)
+
+# Checking one spelling of a payload set without running anything.
+#
+# $(1) is that spelling -- yaml or xml -- as runmoc_on takes it, and for the
+# same reason: a set may be written in either, the two are transcribed by hand,
+# and a check that only ever read the YAML would leave the XML unchecked.
+#
+# Both files of the set are given, because tcsverify checks the pair: every
+# payload simulated, every simulated payload a payload, and every setting one
+# that payload can have. A good set prints nothing and the target succeeds; a
+# bad one prints a line per problem and the target fails, which is what makes
+# this usable from another recipe.
+define runverify_on
+	( \
+		set -eu; \
+		echo "Verifying $(basename $(PAYLOAD_FILE)).$(1)..."; \
+		cd $(RUST) && cargo run --bin tcsverify -- $(basename $(PAYLOAD_FILE).$(1)).$(1) $(PAYLOAD_FILE)sim.yaml \
+	)
+endef
+
+# Verify a payload set, in each spelling of the payload configuration.
+#
+# One target per spelling rather than one target and a variable, as with the
+# runmoc targets: a spelling is asked for by name, with nothing to remember
+# about which variable selects it.
+.PHONY: runverifyy
+runverifyy:
+	$(call runverify_on,yaml)
+
+.PHONY: runverifyx
+runverifyx:
+	$(call runverify_on,xml)
 
 # Run the simulation application
 .PHONY: runsim

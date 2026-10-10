@@ -41,6 +41,7 @@ use std::path::Path;
 
 use serde::de::IgnoredAny;
 use serde::Deserialize;
+use crate::verify::About;
 use crate::{
     load_config_file, one_host, DHConfig, DHType, EndpointConfig, NetworkProtocol, TcsResult,
 };
@@ -307,6 +308,54 @@ impl fmt::Display for SimConfigError {
                  packet_interval_ms in the payload configuration",
                 payload, setting
             ),
+        }
+    }
+}
+
+impl SimConfigError {
+    /// Which entry of the file this is about, which is how `tcsverify` finds
+    /// the line it belongs to. See [`crate::verify`].
+    ///
+    /// A handler nothing simulates is the one that is about no entry: there
+    /// is nothing in the file to point at, the mistake being that an entry is
+    /// missing, so it is reported against the section the entry belongs in.
+    pub fn about(&self) -> About {
+        // Two of these name a payload or a group according to what they were
+        // asked about, the rule being the same for both.
+        let either = |what: &str, name: &str| {
+            if what.contains("group") {
+                About::SimGroup(name.to_string())
+            } else {
+                About::SimPayload(name.to_string())
+            }
+        };
+
+        match self {
+            SimConfigError::Duplicate { what, name } => either(what, name),
+            SimConfigError::TheOtherFilesBusiness { what, name, .. } => either(what, name),
+            SimConfigError::NoSuchSetting { what, name, .. } => either(what, name),
+
+            SimConfigError::UnusedGroup { group } => About::SimGroup(group.clone()),
+
+            SimConfigError::Unsimulated { .. } => About::Section("simulated_payloads"),
+
+            SimConfigError::UnknownGroup { payload, .. }
+            | SimConfigError::UnknownPayload { payload }
+            | SimConfigError::NoPacketInterval { payload }
+            | SimConfigError::IntervalForATriggeredPayload { payload, .. }
+            | SimConfigError::NotAPercentage { payload, .. }
+            | SimConfigError::FaultForTheWrongPayload { payload, .. }
+            | SimConfigError::NoKind { payload, .. }
+            | SimConfigError::NoSuchKind { payload, .. }
+            | SimConfigError::KindMismatch { payload, .. }
+            | SimConfigError::NoProtocol { payload, .. }
+            | SimConfigError::NoSuchProtocol { payload, .. }
+            | SimConfigError::ProtocolMismatch { payload, .. }
+            | SimConfigError::NotForThisKind { payload, .. }
+            | SimConfigError::NoAddressOfItsOwn { payload, .. }
+            | SimConfigError::OneSocketForBothEnds { payload, .. } => {
+                About::SimPayload(payload.clone())
+            }
         }
     }
 }
@@ -780,11 +829,40 @@ impl SimConfigFile {
         &self,
         handlers: &[DHConfig],
     ) -> Result<Vec<ResolvedSim>, SimConfigError> {
+        let (resolved, problems) = self.check(handlers);
+        match problems.into_iter().next() {
+            Some(problem) => Err(problem),
+            None => Ok(resolved),
+        }
+    }
+
+    /// Everything wrong with this file against those handlers.
+    ///
+    /// The same rules [`Self::resolve`] asks, asked for all of their answers
+    /// rather than the first: for a reader checking a file rather than a
+    /// program running one. See [`crate::verify`].
+    pub fn problems(&self, handlers: &[DHConfig]) -> Vec<SimConfigError> {
+        self.check(handlers).1
+    }
+
+    /// Every handler's settled simulation settings, and everything wrong.
+    ///
+    /// The settings are the ones that settled, so a file with a problem still
+    /// yields the payloads that have none.
+    fn check(&self, handlers: &[DHConfig]) -> (Vec<ResolvedSim>, Vec<SimConfigError>) {
+        let mut problems: Vec<SimConfigError> = Vec::new();
+
         let mut groups: BTreeMap<&str, &SimSettings> = BTreeMap::new();
         for group in &self.simulated_payload_groups {
-            nothing_unknown("simulated payload group", &group.name, &group.unknown)?;
+            if let Err(e) = nothing_unknown("simulated payload group", &group.name, &group.unknown)
+            {
+                problems.push(e);
+            }
+            // Kept even when something is wrong with it, so that the payloads
+            // naming it are not also reported as naming a group that is not
+            // there. One mistake, one problem.
             if groups.insert(group.name.as_str(), &group.settings).is_some() {
-                return Err(SimConfigError::Duplicate {
+                problems.push(SimConfigError::Duplicate {
                     what: "simulated payload group",
                     name: group.name.clone(),
                 });
@@ -793,9 +871,11 @@ impl SimConfigFile {
 
         let mut payloads: BTreeMap<&str, &SimPayload> = BTreeMap::new();
         for payload in &self.simulated_payloads {
-            nothing_unknown("simulated payload", &payload.name, &payload.unknown)?;
+            if let Err(e) = nothing_unknown("simulated payload", &payload.name, &payload.unknown) {
+                problems.push(e);
+            }
             if payloads.insert(payload.name.as_str(), payload).is_some() {
-                return Err(SimConfigError::Duplicate {
+                problems.push(SimConfigError::Duplicate {
                     what: "simulated payload",
                     name: payload.name.clone(),
                 });
@@ -806,15 +886,16 @@ impl SimConfigFile {
         // no effect, which is what a misspelled handler name looks like.
         for name in payloads.keys() {
             if !handlers.iter().any(|dh| dh.name.0 == *name) {
-                return Err(SimConfigError::UnknownPayload {
+                problems.push(SimConfigError::UnknownPayload {
                     payload: (*name).to_string(),
                 });
             }
         }
 
-        let resolved: Vec<ResolvedSim> = handlers
-            .iter()
-            .map(|dh| {
+        // One handler at a time, because one payload's settings are its own:
+        // a reader is told what is wrong with each rather than what is wrong
+        // with the first.
+        let settle = |dh: &DHConfig| -> Result<ResolvedSim, SimConfigError> {
                 let payload = payloads.get(dh.name.0.as_str()).ok_or_else(|| {
                     SimConfigError::Unsimulated {
                         handler: dh.name.0.clone(),
@@ -946,29 +1027,37 @@ impl SimConfigFile {
                     triggered,
                     faults,
                 })
-            })
-            .collect::<Result<_, SimConfigError>>()?;
+        };
+
+        let mut resolved: Vec<ResolvedSim> = Vec::new();
+        for dh in handlers {
+            match settle(dh) {
+                Ok(settings) => resolved.push(settings),
+                Err(e) => problems.push(e),
+            }
+        }
 
         // A group no payload names has no effect on the simulation, which is
         // exactly what a group whose name a payload misspelled looks like.
-        // Checked after the payloads, so that the misspelling is reported from
-        // the payload's end, where the name actually is.
+        // Checked after the payloads, so that a reader following the problems
+        // in order meets the misspelling at the payload's end first, where
+        // the name actually is.
         let named: BTreeSet<&str> = self
             .simulated_payloads
             .iter()
             .filter_map(|payload| payload.group.as_deref())
             .collect();
-        if let Some(unused) = self
+        for unused in self
             .simulated_payload_groups
             .iter()
-            .find(|group| !named.contains(group.name.as_str()))
+            .filter(|group| !named.contains(group.name.as_str()))
         {
-            return Err(SimConfigError::UnusedGroup {
+            problems.push(SimConfigError::UnusedGroup {
                 group: unused.name.clone(),
             });
         }
 
-        Ok(resolved)
+        (resolved, problems)
     }
 }
 

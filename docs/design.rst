@@ -2500,7 +2500,9 @@ Testing
 =======
 There are two components of testing software. Tcssim is a GUI used to simulate
 payloads and tcsmoc is used to simulate the MOC. Both allow user interaction
-to change parameters and see what result the changes produce.
+to change parameters and see what result the changes produce. A third program,
+tcsverify, runs none of it: it reads the files the other three read and says
+what is wrong with them.
 
 **High-Level View of Test Configuration**
 
@@ -3276,6 +3278,78 @@ Requirement
 
 Testing requires starting up tcssim before other operations and shutting it down
 when tcsmoc is halted.
+
+tcsverify
+---------
+Tcsverify reads a payload set -- the payload configuration file, and the
+simulator file beside it when one is given -- and prints what is wrong with
+it. It opens no socket and no device node, so it can be run anywhere, by a
+person editing a file or by a recipe: ``make runverifyy`` checks a set's YAML
+and ``make runverifyx`` its XML.
+
+Requirement
+    Tcsverify takes one file or two. The first is the payload configuration
+    file and the second, if there is one, the payload simulator file. Which
+    they are follows from the order they are given in and not from their
+    names, a set being free to name its files as it likes.
+
+Requirement
+    Every problem is printed as the file it is in, the line of that file, and
+    what is wrong: ``file:line: message``. The shape an editor jumps to and a
+    build log is read with.
+
+Requirement
+    A hundred problems are printed at most. The hundred and first stops the
+    run and ``Too many errors, halting`` is printed in its place.
+
+Requirement
+    Tcsverify exits with a status of nought when it found nothing wrong and
+    non-nought when it found something, so that a recipe or a shell ``&&`` can
+    be told by it. A command line that is neither of the two shapes above is
+    a third status, which is not a statement about any file.
+
+Requirement
+    Tcsverify states no rule of its own. Every problem it reports comes from
+    the same rules in ``tcslibgs`` that the programs reading these files use,
+    so a set it accepts is a set they accept. A verifier with rules of its own
+    would eventually disagree with them, and then a passing check would mean
+    nothing.
+
+That last one is what the library's ``verify::Problem`` type is for. A loader wants the
+first thing wrong with a file and nothing else -- it cannot run, and which of
+several mistakes it names changes nothing -- where a reader wants all of them.
+So the rules are stated once and collect their answers:
+``PayloadConfig::to_dh_configs`` and ``SimConfigFile::resolve`` return the
+first problem, which is what they always returned, and
+``PayloadConfig::check`` and ``SimConfigFile::problems`` return the lot.
+
+**Where a line number comes from**
+
+Nothing in the library has seen the file. A parser hands up a document and the
+lines are gone by then, so a problem says which payload or group it is *about*
+and tcsverify works out where that name is written -- the same thing a reader
+does with the error a program prints. The alternative, carrying a line number
+through every struct in the library, would put one file format's shape into
+the types that exist so that two formats can describe one thing.
+
+Requirement
+    A problem about a payload or a group is reported from the line its name is
+    written on. One about a section is reported from the line the section
+    begins on, and one about the file as a whole from its first line.
+
+Requirement
+    A file that does not parse is reported from where the parser stopped, when
+    the parser says where that was. YAML says; XML does not, and a missing
+    element has no position even in principle, so such a file is reported from
+    its first line.
+
+Requirement
+    The simulator file is checked against the payload file only when the
+    payload file has no problems of its own. There would be nothing to check
+    it against otherwise -- the payloads that did not settle are not handlers
+    -- and a join against the rest reports every one of them as unsimulated,
+    which is a page of problems the verifier caused rather than found. It says
+    that it did not do it, rather than leaving it unsaid.
 
 GUI Framework
 -------------

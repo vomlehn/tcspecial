@@ -1,0 +1,11 @@
+[package]
+name = "tcsverify"
+version = "0.1.0"
+edition = "2021"
+description = "Checks a tcspecial configuration file, and the simulator file beside it"
+
+[dependencies]
+tcslibgs = { path = "../tcslibgs" }
+
+[dev-dependencies]
+tempfile = "3"

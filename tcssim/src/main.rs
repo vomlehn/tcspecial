@@ -1189,7 +1189,11 @@ mod tests {
             ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![info]))));
             ui.set_columns(1);
             ui.show().unwrap();
-            (lines_from(&ui, "Sent: "), lines_from(&ui, "Recv: "))
+            (
+                lines_from(&ui, "Sent: "),
+                lines_from(&ui, "Recv: "),
+                lines_from(&ui, "Pkts: "),
+            )
         };
 
         // A payload that sends on its own and has moved nothing: it says so
@@ -1197,12 +1201,15 @@ mod tests {
         // nothing is ever sent to such a payload, so a line for it would read
         // the same from the first packet to the last.
         let quiet = payload_info_from(&handler("DH0"), &sim(1000, 1000, 12));
-        let (sent, recv) = shown(quiet.clone());
+        let (sent, recv, pkts) = shown(quiet.clone());
         assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
         assert!(
             recv.is_empty(),
             "a payload that sends on its own has a received line: {recv:?}"
         );
+        // And it counts only what it sends: a received count would be a
+        // nought that nothing can change.
+        assert_eq!(pkts, vec!["Pkts: 0 sent".to_string()]);
 
         // One that answers requests has both, and says the same thing in
         // each before anything has moved.
@@ -1210,9 +1217,10 @@ mod tests {
         asked.triggered = true;
         asked.packet_interval_ms = 0;
         asked.segment_interval_ms = 0;
-        let (sent, recv) = shown(payload_info_from(&handler("DH0"), &asked));
+        let (sent, recv, pkts) = shown(payload_info_from(&handler("DH0"), &asked));
         assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
         assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME} ")]);
+        assert_eq!(pkts, vec!["Pkts: 0 sent / 0 recv".to_string()]);
 
         // And one that has sent and been spoken to shows when each happened
         // and the head of what moved.
@@ -1227,7 +1235,7 @@ mod tests {
                 ..PayloadStats::default()
             },
         );
-        let (sent, recv) = shown(moving);
+        let (sent, recv, pkts) = shown(moving);
         assert_eq!(
             sent,
             vec!["Sent: 01:01:01 DE AD".to_string()],
@@ -1238,6 +1246,7 @@ mod tests {
             vec!["Recv: 02:02:02 41 53 4B".to_string()],
             "the panel does not show the time and bytes of the last packet received"
         );
+        assert_eq!(pkts, vec!["Pkts: 3 sent / 1 recv".to_string()]);
     }
 
     /// Pressing a panel's Configuration button shows what both files said about

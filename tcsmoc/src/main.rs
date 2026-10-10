@@ -17,7 +17,7 @@ use tcslibgs::config::{
 };
 use tcslibgs::config_digest::{digest_of_file, ConfigDigest, ConfigVersion};
 use tcslibgs::{
-    payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHSample,
+    payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig,
     ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
 };
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
@@ -153,12 +153,20 @@ const PANEL_HEIGHT: f32 = 180.0;
 /// them all, and the grid's own padding inside the scrolling area. Measured
 /// the same way, and the estimate it replaces was 272 against the 346 it
 /// really takes.
-const CHROME_HEIGHT: f32 = 346.0;
+const CHROME_HEIGHT: f32 = 369.0;
 
 /// The gap between one panel and the next, matching `spacing` on the grid in
 /// the window. The window has to open tall enough for the gaps as well as the
 /// panels.
 const GRID_SPACING: f32 = 10.0;
+
+/// What the window spends around the grid, across.
+///
+/// The padding of the scrolling area the panels sit in and of the grid
+/// inside it. Measured through the testing backend like everything else
+/// here: a window of exactly `columns * PANEL_WIDTH` put the last column's
+/// buttons thirty pixels past its own edge.
+const GRID_MARGINS: f32 = 30.0;
 
 /// How many rows of panels the window looks ahead for.
 ///
@@ -278,7 +286,12 @@ fn grid_shape(panels: usize) -> GridShape {
         // The floor is a floor rather than the width of one column:
         // what the command interpreter's controls need is wider than a single
         // panel, so one and two panels both open at it.
-        width: (columns as f32 * PANEL_WIDTH).max(min_window_width()),
+        //
+        // GRID_MARGINS because a window as wide as its panels is not wide
+        // enough: the grid sits inside a scrolling area with padding of its
+        // own, and the last column's buttons went over the edge by exactly
+        // that much.
+        width: (columns as f32 * PANEL_WIDTH + GRID_MARGINS).max(min_window_width()),
         height: height_for_rows(rows),
     }
 }
@@ -297,10 +310,6 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         config: SharedString::from(endpoint_description(&dh.endpoint)),
         packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
         status: SharedString::from("Stopped"),
-        last_sent_time: SharedString::from(NO_TRANSFER_TIME),
-        last_sent: SharedString::new(),
-        last_recv_time: SharedString::from(NO_TRANSFER_TIME),
-        last_recv: SharedString::new(),
         // What the ground has received from this payload, which is nothing
         // until it has.
         oc_time: SharedString::from(NO_TRANSFER_TIME),
@@ -374,10 +383,6 @@ struct PanelUpdate {
     row: usize,
     bytes_sent: i32,
     bytes_recv: i32,
-    last_sent_time: SharedString,
-    last_sent: SharedString,
-    last_recv_time: SharedString,
-    last_recv: SharedString,
 }
 
 /// Ask one handler what its panel should show.
@@ -463,6 +468,17 @@ fn triggered_startup(dh: &DHConfig, status: &str) -> Option<String> {
     )
 }
 
+/// A time as the window shows it, or the placeholder if there is none.
+///
+/// The same placeholder every other time in the window uses, so a reading
+/// that has not happened looks the same wherever it is.
+fn shown_time(at: Option<tcslibgs::Timestamp>) -> String {
+    match at {
+        Some(at) => at.time_of_day(),
+        None => NO_TRANSFER_TIME.to_string(),
+    }
+}
+
 /// Where a handler's OC side is, or that it has not got one.
 fn oc_of(dh: &DHConfig) -> String {
     match &dh.oc {
@@ -475,7 +491,6 @@ fn panel_update_for(
     client: &mut TcsClient,
     row: usize,
     dh: &DHConfig,
-    previous: Option<&PanelUpdate>,
     said: &mut Option<String>,
 ) -> Option<PanelUpdate> {
     let (status, stats) = match client.query_dh(dh.dh_id) {
@@ -486,10 +501,6 @@ fn panel_update_for(
         }
     };
 
-    // A second command, because the statistics every poll asks for do not
-    // carry payload bytes.
-    let samples = client.query_dh_sample(dh.dh_id).ok();
-
     // The status each answer carried, which nothing else looks at: a handler
     // tcspecial has not got answers NotFound, and a panel showing zeroes
     // looks exactly like one whose payload is quiet. Triggers are said too,
@@ -498,50 +509,16 @@ fn panel_update_for(
     note_triggered_if_new(
         dh,
         format!(
-            "QUERY_DH {:?}: {} triggers sent, {} bytes to the ground, {} from it; \
-             QUERY_DH_SAMPLE {}",
-            status,
-            stats.triggers_sent,
-            stats.bytes_sent,
-            stats.bytes_received,
-            match &samples {
-                Some((status, _, _)) => format!("{status:?}"),
-                None => "no answer".to_string(),
-            }
+            "QUERY_DH {:?}: {} triggers sent, {} bytes to the ground, {} from it",
+            status, stats.triggers_sent, stats.bytes_sent, stats.bytes_received
         ),
         said,
     );
-
-    let (last_sent_time, last_sent, last_recv_time, last_recv) = match samples {
-        Some((_, sent, received)) => {
-            let (sent_time, sent_data) = sample_lines(&sent);
-            let (recv_time, recv_data) = sample_lines(&received);
-            (sent_time, sent_data, recv_time, recv_data)
-        }
-        None => match previous {
-            Some(p) => (
-                p.last_sent_time.clone(),
-                p.last_sent.clone(),
-                p.last_recv_time.clone(),
-                p.last_recv.clone(),
-            ),
-            None => (
-                SharedString::from(NO_TRANSFER_TIME),
-                SharedString::new(),
-                SharedString::from(NO_TRANSFER_TIME),
-                SharedString::new(),
-            ),
-        },
-    };
 
     Some(PanelUpdate {
         row,
         bytes_sent: stats.bytes_sent as i32,
         bytes_recv: stats.bytes_received as i32,
-        last_sent_time,
-        last_sent,
-        last_recv_time,
-        last_recv,
     })
 }
 
@@ -550,21 +527,7 @@ fn apply_panel_update(dh_model: &Rc<VecModel<DHInfo>>, update: &PanelUpdate) {
     update_row(dh_model, update.row, |info| {
         info.bytes_sent = update.bytes_sent;
         info.bytes_recv = update.bytes_recv;
-        info.last_sent_time = update.last_sent_time.clone();
-        info.last_sent = update.last_sent.clone();
-        info.last_recv_time = update.last_recv_time.clone();
-        info.last_recv = update.last_recv.clone();
     });
-}
-
-/// The two strings a panel shows for one sample: when, and what.
-///
-/// A sample with no time is one whose direction has carried nothing, which is
-/// not the same as having carried no bytes; it shows the placeholder rather
-/// than a time, and no data.
-fn sample_lines(sample: &DHSample) -> (SharedString, SharedString) {
-    let (time, data) = sample.panel_lines();
-    (SharedString::from(time), SharedString::from(data))
 }
 
 /// Change one panel's contents, leaving the rest of it alone.
@@ -901,13 +864,14 @@ fn main() {
     // on the first pass.
     let arrivals = oc_link::listen(&dh_configs);
     poll_panels(
+        ui_weak.clone(),
         link.clone(),
         dh_configs.clone(),
         dh_model.clone(),
         payload_port,
         arrivals,
     );
-    handle_transfer_button(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
+    handle_transfer_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
 /*
     // Menu action handler
     {
@@ -1151,7 +1115,7 @@ fn query_dh_buttons(
         let mut results = Vec::new();
 
         for (row, dh) in dh_configs.iter().enumerate() {
-            match panel_update_for(client, row, dh, None, &mut None) {
+            match panel_update_for(client, row, dh, &mut None) {
                 Some(update) => {
                     results.push(format!(
                         "{}: sent={} recv={}",
@@ -1194,6 +1158,7 @@ const POLL_TIMEOUT: Duration = Duration::from_millis(1000);
 /// The thread asks over a connection of its own, following the link the
 /// buttons control rather than sharing it; see [`poll_pass`] for why.
 fn poll_panels(
+    ui_weak: slint::Weak<MainWindow>,
     link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
@@ -1201,16 +1166,15 @@ fn poll_panels(
     arrivals: Arrivals,
 ) {
     let pending: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
+    // The link the window's buttons hold, for the two times shown under Last
+    // Response. The poller gets its own below.
+    let shown_link = link.clone();
 
     {
         let pending = pending.clone();
         thread::spawn(move || {
-            // What each panel last showed, so a handler that answers the
-            // statistics but not the samples keeps its sample lines.
-            let mut last: Vec<Option<PanelUpdate>> = vec![None; dh_configs.len()];
-
-            // And what was last said about each on the console, so a pass
-            // that found nothing new says nothing.
+            // What was last said about each on the console, so a pass that
+            // found nothing new says nothing.
             let mut said: Vec<Option<String>> = vec![None; dh_configs.len()];
 
             // The poller's own link, kept wherever the window's link is.
@@ -1220,7 +1184,7 @@ fn poll_panels(
                 thread::sleep(PANEL_POLL_INTERVAL);
 
                 let gathered =
-                    poll_pass(&link, &mut poll_link, &dh_configs, &mut last, &mut said);
+                    poll_pass(&link, &mut poll_link, &dh_configs, &mut said);
 
                 if let Ok(mut queue) = pending.lock() {
                     *queue = gathered;
@@ -1260,6 +1224,19 @@ fn poll_panels(
                     }
                 }
             }
+
+            // And what the command link has been doing, under Last Response.
+            //
+            // try_lock rather than lock: that link belongs to the buttons,
+            // and a window that waited for it here would stop repainting
+            // exactly while a command was in flight -- which is when an
+            // operator is watching it. A pass that cannot have it leaves the
+            // times as they are and the next one is a second away.
+            if let (Some(ui), Ok(guard)) = (ui_weak.upgrade(), shown_link.try_lock()) {
+                let (sent, received) = guard.command_times().unwrap_or((None, None));
+                ui.set_cmd_sent_time(SharedString::from(shown_time(sent)));
+                ui.set_cmd_recv_time(SharedString::from(shown_time(received)));
+            }
         },
     );
 
@@ -1296,7 +1273,6 @@ fn poll_pass(
     link: &Mutex<CiLink>,
     poll_link: &mut CiLink,
     dh_configs: &[DHConfig],
-    last: &mut [Option<PanelUpdate>],
     said: &mut [Option<String>],
 ) -> Vec<PanelUpdate> {
     // Where the buttons have the link now. A poisoned lock leaves the poller
@@ -1322,9 +1298,7 @@ fn poll_pass(
 
     let mut gathered = Vec::with_capacity(dh_configs.len());
     for (row, dh) in dh_configs.iter().enumerate() {
-        if let Some(update) = panel_update_for(client, row, dh, last[row].as_ref(), &mut said[row])
-        {
-            last[row] = Some(update.clone());
+        if let Some(update) = panel_update_for(client, row, dh, &mut said[row]) {
             gathered.push(update);
         }
     }
@@ -1436,70 +1410,45 @@ fn hear_what_tcspecial_read(
     }
 }
 
-/// Which way a press of a panel's one button goes.
+/// Wire a panel's two buttons.
 ///
-/// Decided by what the button offered, read back from the status its label
-/// comes from -- not by what the handler turns out to be doing. The two
-/// cannot disagree by any path through the window, and if they ever did,
-/// doing what the label said is the honest answer: a handler is told to start
-/// by a button that offered to start it.
+/// One button per command, each saying what it sends: Enable starts the
+/// handler and Disable stops it. There was one button whose label followed
+/// the status -- the one thing worth doing next -- and a press then had to be
+/// decided by reading that status back, so that the button and the command
+/// could not disagree. Two buttons have nothing to disagree about: a press is
+/// the command on the label.
 ///
-/// Anything that is not the running status offers to receive. A handler
-/// whose last command failed shows `Error`, and the useful thing to offer
-/// then is the start that failed, not a stop of something that never began.
-fn transfer_wanted(status: &str) -> Transfer {
-    if status == ACTIVE_STATUS {
-        Transfer::Discard
-    } else {
-        Transfer::Receive
-    }
-}
-
-/// What a press of a panel's button asks tcspecial for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Transfer {
-    /// Start the handler, so its payload's data reaches the MOC.
-    ///
-    /// Named for what the press does from the ground, which is what the
-    /// button says: the MOC begins receiving. The handler transmits, and the
-    /// label said so once -- a button on a ground station labelled for what
-    /// the far end does reads as though the operator were sending something.
-    Receive,
-    /// Stop it, so what the payload sends is dropped on the spacecraft.
-    Discard,
-}
-
-/// The one button that starts and stops a handler.
-///
-/// There were two, Start and Stop, and either was pressable whatever the
-/// handler was already doing: a Stop on a stopped handler asks tcspecial to
-/// stop something that is not running and reads as though it had done
-/// something. One button offers the one thing worth doing next.
-fn handle_transfer_button(
+/// Both are pressable whatever the handler is doing. tcspecial answers a
+/// START_DH for a handler already running and a STOP_DH for one already
+/// stopped without harm, and what the operator wants to know when a panel
+/// looks wrong is what the spacecraft says to the command, which a button
+/// that cannot be pressed does not say.
+fn handle_transfer_buttons(
     ui: &MainWindow,
     ui_weak: slint::Weak<MainWindow>,
     link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
 ) {
-    ui.on_transfer_dh(move |row| {
+    let enable = {
+        let (ui_weak, link, dh_configs, dh_model) =
+            (ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
+        move |row: i32| {
+            let ui = ui_weak.unwrap();
+            let row = row as usize;
+            if let Some(dh) = dh_configs.get(row) {
+                enable(&ui, &link, dh, &dh_model, row);
+            }
+        }
+    };
+    ui.on_enable_dh(enable);
+
+    ui.on_disable_dh(move |row| {
         let ui = ui_weak.unwrap();
         let row = row as usize;
-        let dh = match dh_configs.get(row) {
-            Some(dh) => dh,
-            None => return,
-        };
-
-        // The status the button's label came from, so the command sent is the
-        // one the label offered.
-        let showing = match dh_model.row_data(row) {
-            Some(info) => info.status.to_string(),
-            None => return,
-        };
-
-        match transfer_wanted(&showing) {
-            Transfer::Receive => receive(&ui, &link, dh, &dh_model, row),
-            Transfer::Discard => discard(&ui, &link, dh, &dh_model, row),
+        if let Some(dh) = dh_configs.get(row) {
+            disable(&ui, &link, dh, &dh_model, row);
         }
     });
 }
@@ -1508,7 +1457,7 @@ fn handle_transfer_button(
 ///
 /// The identity, name, and kind of the handler come from the configuration
 /// file rather than from the row number; the panel passes only its own row.
-fn receive(
+fn enable(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     dh: &DHConfig,
@@ -1518,7 +1467,7 @@ fn receive(
     note_triggered(
         dh,
         format!(
-            "Receive pressed: sending START_DH for dh_id {} as a {:?} handler",
+            "Enable pressed: sending START_DH for dh_id {} as a {:?} handler",
             dh.dh_id.0,
             dh.endpoint.kind()
         ),
@@ -1563,7 +1512,7 @@ fn receive(
 }
 
 /// Stop it: what the payload sends is dropped on the spacecraft instead.
-fn discard(
+fn disable(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     dh: &DHConfig,
@@ -1572,7 +1521,7 @@ fn discard(
 ) {
     note_triggered(
         dh,
-        format!("Discard pressed: sending STOP_DH for dh_id {}", dh.dh_id.0),
+        format!("Disable pressed: sending STOP_DH for dh_id {}", dh.dh_id.0),
     );
 
     let mut guard = link.lock().unwrap();
@@ -1665,7 +1614,7 @@ mod tests {
     use std::time::Instant;
     use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
     use tcspecial::config::DEFAULT_TCSPECIAL_CONFIG_PATH;
-    use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig, Timestamp};
+    use tcslibgs::{DHId, DHName, DeviceConfig, NetworkConfig};
 
     /// Arguments as the program really receives them, the program's own name
     /// first.
@@ -1712,12 +1661,11 @@ mod tests {
             thread::spawn(move || {
                 let dh_configs = vec![a_dh()];
                 let mut poll_link = CiLink::down(A_PAYLOAD_PORT);
-                let mut last = vec![None];
                 let mut said = vec![None];
 
                 let started = Instant::now();
                 let gathered =
-                    poll_pass(&link, &mut poll_link, &dh_configs, &mut last, &mut said);
+                    poll_pass(&link, &mut poll_link, &dh_configs, &mut said);
                 (gathered, started.elapsed())
             })
         };
@@ -2032,12 +1980,14 @@ mod tests {
                 area.size().height
             );
 
-            // Every panel, and then the three rows of data each one ends
-            // with.
+            // Every panel, then its buttons and the rows of data it ends
+            // with: those are what go off the bottom of a panel given less
+            // height than it needs.
             for found_what in [
                 "DHPanel",
-                "DHPanel::last-sent-row",
+                "DHPanel::commands-row",
                 "DHPanel::last-recv-row",
+                "DHPanel::from-payload-row",
                 "DHPanel::counters-row",
             ] {
                 let found: Vec<_> = if found_what.contains("::") {
@@ -2074,7 +2024,7 @@ mod tests {
         // checks that need one run from here.
         the_params_button_shows_what_both_files_said();
         the_window_shows_when_the_last_beacon_arrived();
-        every_panel_shows_both_sample_lines();
+        every_panel_shows_what_arrived_from_its_payload();
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
     }
@@ -2276,17 +2226,17 @@ mod tests {
         );
     }
 
-    /// Every panel shows both lines, whichever kind of payload it is.
+    /// Every panel shows what arrived from its payload, and nothing the
+    /// spacecraft merely claims.
     ///
-    /// The sent line is what the spacecraft last sent to the ground, which
-    /// for a payload that sends on its own is the payload's own data going
-    /// up -- the thing such a panel is watched for. It was shown only for a
-    /// payload that answers requests, so the panels of the payloads that send
-    /// most showed least.
+    /// Two lines, read for two things: whether anything is still coming, and
+    /// what it was. The spacecraft's own account of what it last sent and
+    /// last received was shown above them and is gone -- a panel is watched
+    /// for the data that reached the ground.
     ///
     /// Not a test of its own: one test per binary may start the testing
     /// backend, and its windows belong to the thread that made them.
-    fn every_panel_shows_both_sample_lines() {
+    fn every_panel_shows_what_arrived_from_its_payload() {
         use i_slint_backend_testing::ElementHandle;
 
         let shown = |info: DHInfo| {
@@ -2315,10 +2265,29 @@ mod tests {
 
         for kind in ["sends on its own", "answers requests"] {
             let lines = shown(dh_info_from(&dh, None));
-            for line in ["Last sent:", "Last rcvd:", "From payload:"] {
-                assert!(
-                    lines.iter().any(|shown| shown == line),
+            let count = |label: &str| lines.iter().filter(|shown| *shown == label).count();
+
+            // The one panel's two readings of what arrived.
+            for line in ["Last recv:", "From payload:"] {
+                assert_eq!(
+                    count(line),
+                    1,
                     "a payload that {kind} has no {line} line: {lines:?}"
+                );
+            }
+
+            // And the spacecraft's own account of what it last sent and
+            // received, which the panels showed and do not any more. The
+            // window has a line of its own saying when the last command went
+            // out and when its answer came back, so these two labels appear
+            // once each in the window and never in a panel: with one panel
+            // on screen, one of each is the window's.
+            for elsewhere in ["Last sent:", "Last rcvd:"] {
+                assert_eq!(
+                    count(elsewhere),
+                    1,
+                    "a payload that {kind} shows {elsewhere} in its panel, or \
+                     the window has lost its own: {lines:?}"
                 );
             }
 
@@ -2388,7 +2357,7 @@ mod tests {
         );
     }
 
-    /// Pressing a panel's Configuration button shows what both configuration files
+    /// Pressing a panel's Config button shows what both configuration files
     /// said about that handler.
     ///
     /// Everything up to the window is checked elsewhere -- the text itself by
@@ -2427,8 +2396,8 @@ mod tests {
             "the parameters are shown before anyone asked for them"
         );
 
-        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Configuration").collect();
-        assert_eq!(button.len(), 1, "the panel has no Configuration button to press");
+        let button: Vec<_> = ElementHandle::find_by_accessible_label(&ui, "Config").collect();
+        assert_eq!(button.len(), 1, "the panel has no Config button to press");
         button[0].invoke_accessible_default_action();
 
         let shown = on_screen(&ui);
@@ -2499,6 +2468,7 @@ mod tests {
             // The least the window is ever opened at: one row of panels.
             ("min-height", height_for_rows(1)),
             ("panel-height", PANEL_HEIGHT),
+            ("panel-width", PANEL_WIDTH),
             ("grid-spacing", GRID_SPACING),
         ] {
             let said = format!("{}: {}px;", what, expected);
@@ -2551,73 +2521,56 @@ mod tests {
         );
     }
 
-    /// What the window's one panel button says each way.
+    /// What a panel's two buttons say, and what each sends.
     ///
     /// Here rather than beside the statuses because the window owns its
-    /// labels: Slint builds the string, and these are how the test below
-    /// holds it to the same rule Rust decides a press by.
-    const DISCARD_LABEL: &str = "Discard";
-    const RECEIVE_LABEL: &str = "Receive";
+    /// labels: Slint builds the strings, and these are what the test below
+    /// holds them to.
+    const ENABLE_LABEL: &str = "Enable";
+    const DISABLE_LABEL: &str = "Disable";
 
-    impl Transfer {
-        /// The label a button offering this carries.
-        fn label(&self) -> &'static str {
-            match self {
-                Transfer::Receive => RECEIVE_LABEL,
-                Transfer::Discard => DISCARD_LABEL,
-            }
-        }
-    }
-
-    /// A panel's one button offers what pressing it will do, and Rust sends
-    /// what the label offered.
+    /// Each panel has a button per command, each saying what it sends.
     ///
-    /// There were two buttons, Start and Stop, and either was pressable
-    /// whatever the handler was doing: a Stop on a stopped handler asks
-    /// tcspecial to stop something that is not running, and reads as though
-    /// it had done something. One button offers the one thing worth doing
-    /// next -- and because Slint decides the label and Rust decides the
-    /// command, both from the same status, the two have to be checked against
-    /// each other or they drift into offering one thing and doing the other.
+    /// There was one button whose label followed the status -- the one thing
+    /// worth doing next -- so a press had to be decided by reading that
+    /// status back, and Slint's label and Rust's choice had to be held to one
+    /// rule or they would drift into offering one thing and doing the other.
+    /// Two buttons have nothing to drift: a press is the command on the
+    /// label. What this holds is that the window still has both, with Enable
+    /// first, and that each is wired to its own callback.
     #[test]
-    fn the_transfer_button_sends_what_its_label_offers() {
-        // A handler that is moving data offers to stop it, and one that is
-        // not offers to start it. Anything that is not the running status
-        // offers to receive: a handler whose last command failed shows
-        // Error, and the useful thing to offer then is the start that failed.
-        assert_eq!(transfer_wanted(ACTIVE_STATUS), Transfer::Discard);
-        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Receive);
-        assert_eq!(transfer_wanted(ERROR_STATUS), Transfer::Receive);
-        assert_eq!(transfer_wanted(""), Transfer::Receive);
-
-        assert_eq!(Transfer::Discard.label(), DISCARD_LABEL);
-        assert_eq!(Transfer::Receive.label(), RECEIVE_LABEL);
-
-        // And the window labels it by the same rule, which is the half Rust
-        // cannot fail on: the label is a Slint expression, so a drift between
-        // the two files is a button that offers Receive and stops the
-        // handler.
+    fn a_panel_has_a_button_for_each_command() {
         let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         let source = std::fs::read_to_string(&window).unwrap();
-        let offered = format!(
-            "dh-status == \"{}\" ? \"{}\" : \"{}\"",
-            ACTIVE_STATUS,
-            transfer_wanted(ACTIVE_STATUS).label(),
-            transfer_wanted(STOPPED_STATUS).label()
-        );
-        assert!(
-            source.contains(&offered),
-            "{} does not label its transfer button {:?}",
-            window.display(),
-            offered
-        );
 
-        // One button, not two: the pair they replaced took the same room and
-        // left a press available that said nothing.
-        for gone in ["text: \"Start\"", "text: \"Stop\""] {
+        for (label, callback) in [
+            (ENABLE_LABEL, "enable-clicked()"),
+            (DISABLE_LABEL, "disable-clicked()"),
+        ] {
+            let button = format!("text: \"{label}\";");
+            assert!(
+                source.contains(&button),
+                "{} has no button saying {label}",
+                window.display()
+            );
+            assert!(
+                source.contains(callback),
+                "{} does not wire {label} to {callback}",
+                window.display()
+            );
+        }
+
+        // Enable before Disable, which is the order a panel is read in: the
+        // press a panel is opened to make comes first.
+        let enable = source.find(&format!("text: \"{ENABLE_LABEL}\";")).unwrap();
+        let disable = source.find(&format!("text: \"{DISABLE_LABEL}\";")).unwrap();
+        assert!(enable < disable, "Disable is offered before Enable");
+
+        // And the one button they replaced is gone, label and callback both.
+        for gone in ["\"Receive\"", "\"Discard\"", "transfer-clicked"] {
             assert!(
                 !source.contains(gone),
-                "{} still has a panel button saying {gone}",
+                "{} still has the one-button wiring: {gone}",
                 window.display()
             );
         }
@@ -2649,104 +2602,29 @@ mod tests {
                 row: 1,
                 bytes_sent: 7,
                 bytes_recv: 9,
-                last_sent_time: SharedString::from("01:02:03"),
-                last_sent: SharedString::from("AA BB"),
-                last_recv_time: SharedString::from("04:05:06"),
-                last_recv: SharedString::from("CC"),
             },
         );
 
         let touched = model.row_data(1).unwrap();
         assert_eq!(touched.bytes_sent, 7);
         assert_eq!(touched.bytes_recv, 9);
-        assert_eq!(touched.last_sent_time, SharedString::from("01:02:03"));
-        assert_eq!(touched.last_recv, SharedString::from("CC"));
 
         // Row 0 was not named, so it is untouched.
         let other = model.row_data(0).unwrap();
         assert_eq!(other.bytes_sent, 0);
-        assert_eq!(other.last_sent_time, SharedString::from(NO_TRANSFER_TIME));
-    }
-
-    /// A handler that answers the statistics but not the samples keeps the
-    /// sample lines it had, rather than having them blanked.
-    ///
-    /// A blank line reads as a handler that has moved nothing, which is a
-    /// different thing from one that did not answer the question.
-    #[test]
-    fn a_missing_sample_leaves_the_previous_one_showing() {
-        let previous = PanelUpdate {
-            row: 0,
-            bytes_sent: 1,
-            bytes_recv: 2,
-            last_sent_time: SharedString::from("11:22:33"),
-            last_sent: SharedString::from("DE AD"),
-            last_recv_time: SharedString::from("44:55:66"),
-            last_recv: SharedString::from("BE EF"),
-        };
-
-        let dh = DHConfig {
-            dh_id: DHId(0),
-            name: DHName::new("DH0"),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/null".to_string(),
-            }),
-            packet_size: 1,
-            oc: None,
-                    mode: Default::default(),
-        };
-
-        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![dh_info_from(&dh, None)]));
-        apply_panel_update(&model, &previous);
-
-        // What panel_update_for does when the sample query fails: carry the
-        // previous strings through onto the new statistics.
-        let carried = PanelUpdate {
-            bytes_sent: 10,
-            bytes_recv: 20,
-            ..previous.clone()
-        };
-        apply_panel_update(&model, &carried);
-
-        let shown = model.row_data(0).unwrap();
-        assert_eq!(shown.bytes_sent, 10, "the new statistics are shown");
         assert_eq!(
-            shown.last_sent, previous.last_sent,
-            "the sample lines are the ones last seen"
+            other.oc_time,
+            SharedString::from(NO_TRANSFER_TIME),
+            "and nothing has arrived from its payload"
         );
-        assert_eq!(shown.last_recv_time, previous.last_recv_time);
     }
 
-    #[test]
-    fn a_sample_becomes_a_time_and_a_row_of_bytes() {
-        let mut sample = DHSample::new();
-        sample.record(&[0x01, 0xAB, 0xFF]);
-        // The time is the telemetry's, so pin it rather than reading a clock.
-        sample.time = Some(Timestamp {
-            millis: 3_661_000,
-        });
-
-        let (time, data) = sample_lines(&sample);
-        assert_eq!(time, SharedString::from("01:01:01"));
-        assert_eq!(data, SharedString::from("01 AB FF"));
-    }
-
-    /// A direction that has carried nothing shows the placeholder, not a time.
+    /// A fresh panel says nothing has arrived from its payload yet.
     ///
-    /// A handler that has never moved data and one whose clock read zero must
-    /// not look alike, which is why the sample's time is an Option rather than
-    /// a zero.
+    /// The placeholder every other time in the window uses, so a panel that
+    /// has heard nothing and one whose clock read zero do not look alike.
     #[test]
-    fn a_direction_that_has_carried_nothing_shows_no_time() {
-        let (time, data) = sample_lines(&DHSample::new());
-        assert_eq!(time, SharedString::from(NO_TRANSFER_TIME));
-        assert!(data.is_empty());
-    }
-
-    /// The placeholder a fresh panel shows is the one an empty sample gives,
-    /// so a panel does not change appearance on its first query.
-    #[test]
-    fn a_fresh_panel_and_an_empty_sample_agree() {
+    fn a_fresh_panel_has_heard_nothing_from_its_payload() {
         let dh = DHConfig {
             dh_id: DHId(0),
             name: DHName::new("DH0"),
@@ -2755,30 +2633,12 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
-                    mode: Default::default(),
+            mode: Default::default(),
         };
 
         let info = dh_info_from(&dh, None);
-        let (time, data) = sample_lines(&DHSample::new());
-        assert_eq!(info.last_sent_time, time);
-        assert_eq!(info.last_recv_time, time);
-        assert_eq!(info.last_sent, data);
-        assert_eq!(info.last_recv, data);
-    }
-
-    /// Longer data is shown as a head with an ellipsis rather than being cut
-    /// off silently.
-    #[test]
-    fn a_truncated_sample_says_so() {
-        let mut sample = DHSample::new();
-        sample.record(&(0..64).collect::<Vec<u8>>());
-        sample.time = Some(Timestamp { millis: 0 });
-
-        let (_, data) = sample_lines(&sample);
-        assert!(
-            data.ends_with("..."),
-            "a sample filling the buffer should show as truncated: {data}"
-        );
+        assert_eq!(info.oc_time, SharedString::from(NO_TRANSFER_TIME));
+        assert!(info.oc_data.is_empty());
     }
 
     /// Something answering as tcspecial is found, and nothing is not.

@@ -25,7 +25,7 @@
 use std::time::Duration;
 
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::{TcsError, TcsResult};
+use tcslibgs::{TcsError, TcsResult, Timestamp};
 
 /// The local address the MOC sends from: any interface, any port.
 ///
@@ -176,6 +176,19 @@ impl CiLink {
         }
     }
 
+    /// When the last command went out and when its answer came back, if the
+    /// link is up and has carried one.
+    ///
+    /// The client's own account of it: every command goes through one place
+    /// there, so nothing here has to remember at each press. A link that is
+    /// down has nothing to say -- the times belonged to a client that is
+    /// closed, and the next Connect starts a fresh one.
+    pub fn command_times(&self) -> Option<(Option<Timestamp>, Option<Timestamp>)> {
+        self.client
+            .as_ref()
+            .map(|client| (client.last_sent(), client.last_received()))
+    }
+
     /// How long a command on this link waits for its answer.
     ///
     /// Does nothing while the link is down, and a link brought up later
@@ -191,6 +204,62 @@ impl CiLink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A link says when it last sent a command and when the answer came.
+    ///
+    /// Which is what the window shows under Last Response. The times are the
+    /// client's, so this is the chain from the socket to the thing the window
+    /// reads: a link that is up and has carried a command has both, and one
+    /// that is down has nothing to say.
+    #[test]
+    fn a_link_says_when_it_last_sent_and_received() {
+        use std::net::UdpSocket;
+        use tcslibgs::{Command, PingTelemetry, Telemetry};
+
+        // A stub spacecraft that answers one PING on the command link. The
+        // payload link is never sent anything by a ping.
+        let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
+        let at = spacecraft.local_addr().expect("where it is").to_string();
+        let answering = std::thread::spawn(move || {
+            let mut buffer = [0u8; 65535];
+            let (size, from) = spacecraft.recv_from(&mut buffer).expect("a command");
+            let command: Command =
+                serde_json::from_slice(&buffer[..size]).expect("a valid command");
+            let answer = Telemetry::Ping(PingTelemetry::new(
+                command.sequence(),
+                tcslibgs::CommandStatus::Success,
+            ));
+            let data = serde_json::to_vec(&answer).expect("it serializes");
+            spacecraft.send_to(&data, from).expect("the answer is sent");
+        });
+
+        let mut link = CiLink::down(4001);
+        assert_eq!(link.command_times(), None, "a link that is down has no times");
+
+        link.connect(&at).expect("the link comes up");
+        assert_eq!(
+            link.command_times(),
+            Some((None, None)),
+            "a fresh link has sent nothing"
+        );
+
+        link.set_timeout(Duration::from_secs(5));
+        link.client()
+            .expect("the link is up")
+            .ping()
+            .expect("the stub answers");
+        answering.join().expect("the stub finishes");
+
+        let (sent, received) = link.command_times().expect("the link is up");
+        let sent = sent.expect("the command was timed");
+        let received = received.expect("so was the answer");
+        assert!(received >= sent, "the answer came before the command went");
+
+        // And a disconnect takes them with the client: the times belonged to
+        // it, and the next Connect starts a fresh one.
+        link.disconnect();
+        assert_eq!(link.command_times(), None);
+    }
 
     /// The payload link is the operator's host and the configuration's port.
     ///

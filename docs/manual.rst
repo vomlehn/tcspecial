@@ -346,7 +346,8 @@ start again, since that is what has not happened yet.
 
 Seeing what was read
 ====================
-Each payload's panel, in both programs, has a ``Configuration`` button. It shows
+Each payload's panel has a button for it: ``Config`` in tcsmoc, where three
+buttons share the row, and ``Configuration`` in tcssim. It shows
 every parameter read from the two configuration files for that payload: what
 the payload file said about the payload and how it is reached, and what the
 simulator file said about how a stand-in for it behaves, each under the name

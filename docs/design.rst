@@ -3516,20 +3516,20 @@ they are 196 and do not stretch. Three columns of 320 would have opened a
 
 So the shape follows from the count alone: three handlers are one row of three,
 and the four of the shipped tcspecial1.yaml are a row of three and a row of
-one, in a 716x906 window. A test reads that size out of this document and
+one, in a 739x929 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcssim.
 
 This replaced a rule that chose the shape nearest square among those at least
 as wide as they were tall. It read well and laid the panels out badly: two
-panels came out as one column of two, because a 716x716 window is squarer than
-a 716x526 one, so the set the Makefile runs went down the window instead of
+panels came out as one column of two, because a 739x739 window is squarer than
+a 739x549 one, so the set the Makefile runs went down the window instead of
 across it. Which row and column each panel is given was row-major all along --
 the shape was the whole of the fault. Squareness was never the thing wanted
 either; it was a proxy for a window that fits a screen, and a column count says
 that directly.
 
 What is given up is that the grid is no longer always wider than it is tall.
-Seven panels or more take a third row, which is 906 against a 716-wide window;
+Seven panels or more take a third row, which is 929 against a 739-wide window;
 they scroll, as too many panels always have. Up to six it still is, and a test
 says so. The window the MOC opens has been taller than wide since it gained its
 three-row floor, which is a different thing: the floor is room to grow into.

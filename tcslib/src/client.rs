@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
     ArmKey, BeaconTime, Command, CommandLink, CommandStatus, ConfigCommand, DHId, DHName,
-    DHSample, DHType,
+    DHSample, DHType, Timestamp,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
     ConfigDigest, ConfigVersion, ConnectCommand,
     StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
@@ -38,6 +38,15 @@ pub struct TcsClient {
     payload: Box<dyn Connection>,
     sequence: AtomicU32,
     timeout: Duration,
+    /// When the last command went out, and when its answer came back.
+    ///
+    /// Kept here because this is where every command passes: a caller that
+    /// wanted to time them would otherwise have to remember at each of its
+    /// own call sites, and the one it forgot would be the one that hung.
+    /// `received` stays as it was when an answer does not come, so the pair
+    /// says *sent at this time, nothing back since* rather than blanking.
+    last_sent: Option<Timestamp>,
+    last_received: Option<Timestamp>,
 }
 
 impl TcsClient {
@@ -53,7 +62,19 @@ impl TcsClient {
             payload,
             sequence: AtomicU32::new(1),
             timeout: DEFAULT_TIMEOUT,
+            last_sent: None,
+            last_received: None,
         }
+    }
+
+    /// When the last command went out, if one has.
+    pub fn last_sent(&self) -> Option<Timestamp> {
+        self.last_sent
+    }
+
+    /// When the last answer came back, if one has.
+    pub fn last_received(&self) -> Option<Timestamp> {
+        self.last_received
     }
 
     /// Set the command timeout, on both links.
@@ -87,8 +108,19 @@ impl TcsClient {
     fn send_command(&mut self, command: Command) -> TcsResult<Telemetry> {
         let timeout = self.timeout;
         let link = self.link_for(&command);
+
+        // Timed here, around the one place every command goes through. The
+        // times are the ground's own clock: what they are read for is how
+        // long an answer took and whether one came at all, which the
+        // spacecraft's own time in the answer cannot say.
         link.send(&command)?;
-        link.receive_timeout(timeout)
+        self.last_sent = Some(Timestamp::now());
+
+        let answer = self.link_for(&command).receive_timeout(timeout);
+        if answer.is_ok() {
+            self.last_received = Some(Timestamp::now());
+        }
+        answer
     }
 
     // -- global control and status ----------------------------------------
@@ -164,7 +196,16 @@ impl TcsClient {
         };
 
         link.send(&command)?;
-        match link.receive_timeout(timeout)? {
+        self.last_sent = Some(Timestamp::now());
+
+        let answer = match which {
+            ConnectLink::Spacecraft => &mut self.connection,
+            ConnectLink::Payload => &mut self.payload,
+        }
+        .receive_timeout(timeout)?;
+        self.last_received = Some(Timestamp::now());
+
+        match answer {
             Telemetry::Connect(tm) => Ok((tm.version, tm.config_version, tm.digest)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
@@ -387,6 +428,34 @@ mod tests {
             minor: 0,
             patch: 0,
         }
+    }
+
+    /// A client times the commands it sends.
+    ///
+    /// Here because this is where every command passes: a caller that timed
+    /// them at its own call sites would eventually add one that did not, and
+    /// the one it forgot would be the one that hung.
+    #[test]
+    fn a_client_times_the_commands_it_sends() {
+        let mut client = TcsClient::new(
+            Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
+                1,
+                CommandStatus::Success,
+            ))),
+            Canned::answering(an_answer(a_version(1))),
+        );
+
+        assert_eq!(client.last_sent(), None, "nothing has been sent yet");
+        assert_eq!(client.last_received(), None);
+
+        let before = Timestamp::now();
+        client.ping().expect("the canned answer");
+        let after = Timestamp::now();
+
+        let sent = client.last_sent().expect("the command was timed");
+        let received = client.last_received().expect("so was the answer");
+        assert!(sent >= before && sent <= after, "sent at {sent}");
+        assert!(received >= sent && received <= after, "answered at {received}");
     }
 
     /// Two links pointed at two spacecraft are refused.

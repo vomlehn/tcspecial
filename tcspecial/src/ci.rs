@@ -7,11 +7,12 @@ use log::{debug, error, info, trace};
 use crate::beacon_send::BeaconSend;
 use std::net::UdpSocket;
 //use std::os::unix::io::AsRawFd;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-//use std::thread;
+use std::thread;
 use std::time::{Duration, Instant};
 use tcslibgs::{
-    ArmKey, BeaconTime, CIConfig, Command, CommandStatus, ConfigTelemetry,
+    answer_to, ArmKey, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry,
     DHConfig, DHId, DHName, DHSample, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
@@ -23,238 +24,41 @@ use crate::dh::{DHState, DataHandler};
 use crate::endpoint::bind_endpoint_pair;
 use crate::telemetry_log::TelemetryLog;
 
-/// Command interpreter state
-pub struct CommandInterpreter {
-    /// The beacon sender, once the main loop has started it. Held so that a
-    /// Config command can retime it.
-    beacon: Option<BeaconSend>,
-    beacon_interval: BeaconTime,
-    /// Where beacons go, as the configuration said: the multicast group and
-    /// the interface to send it on.
-    beacon_address: std::net::SocketAddr,
-    beacon_interface: std::net::Ipv4Addr,
-    _config: CIConfig,
-    socket: UdpSocket,
+/// What serves the payload command link.
+///
+/// Everything a command about a payload needs and nothing a command about the
+/// spacecraft does: the handlers, the payloads as the file described them,
+/// the telemetry log, and the three facts a CONNECT is answered with. No
+/// command here touches the arming or the beacon, which is what lets this run
+/// in a thread of its own -- and the reason for the split is that it must, so
+/// that a payload command that takes its time cannot delay a RESTART.
+///
+/// Clonable, and every clone is the same interpreter: the handler map and the
+/// log are shared handles, and the rest is read-only.
+#[derive(Clone)]
+pub struct PayloadCommands {
     data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
-    payload_config: Vec<DHConfig>,
-    arm_key: Option<ArmKey>,
-    arm_time: Option<Instant>,
-    running: bool,
-    _global_stats: Statistics,
-    /// Telemetry log, shared with every other sender of telemetry.
+    payload_config: Arc<Vec<DHConfig>>,
     telemetry_log: TelemetryLog,
-    /// What this build is and what it read, answered to a CONNECT.
-    ///
-    /// Settled at startup rather than when a CONNECT arrives: the digest is of
-    /// the file this process read, which is the file it read *then*, and a
-    /// file edited since would otherwise have the spacecraft claiming a
-    /// configuration it is not serving.
     version: ConfigVersion,
-    /// The version the payload configuration file states, which every beacon
-    /// carries beside this build's. The file's own, versioned by whoever
-    /// writes the payload set.
     config_version: ConfigVersion,
     digest: ConfigDigest,
 }
 
-/// Say what could not be bound, and what that usually means.
+/// How often the payload link looks up from its socket to see whether the
+/// interpreter has stopped.
 ///
-/// A bare io::Error carries the kind and nothing else, so the whole of what a
-/// reader got was "Address already in use (os error 98)" -- not which address,
-/// and no hint that the usual cause is a second copy of the program. Both ends
-/// of a data handler bind an address too, so this is used for all of them.
-pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
-    if e.kind() == std::io::ErrorKind::AddrInUse {
-        TcsError::Config(format!(
-            "cannot listen on {addr} for the {what}: address already in use. \
-             Something else holds it -- most often another tcspecial, or a \
-             tcsmoc that starts one of its own"
-        ))
-    } else {
-        TcsError::Config(format!("cannot listen on {addr} for the {what}: {e}"))
-    }
-}
+/// A blocking read would serve commands just as well and would outlive the
+/// shutdown that is waiting for it, so the socket has a timeout and the loop
+/// asks. Short enough that a shutdown is not visibly delayed; long enough
+/// that an idle link is not a program spinning.
+const PAYLOAD_LINK_POLL: Duration = Duration::from_millis(200);
 
-/// Why a START_DH found no handler, in the words of the command.
-///
-/// Said with the name the command carries rather than with anything read
-/// here: the whole of a NotFound is that this process has no entry to take a
-/// name from, and the name in the command is the one on the button the
-/// operator pressed.
-///
-/// What it usually means is that the two ends are reading different payload
-/// configurations. A tcsmoc attaches to a tcspecial that is already listening
-/// rather than starting a second one, so a tcspecial left running from an
-/// earlier payload set serves that set's handlers while the panels in front of
-/// the operator are the new set's -- and the only sign of it was a status with
-/// no explanation. So this says what this process does serve, which is the
-/// fact that identifies the stale end.
-fn no_such_handler(name: &DHName, dh_id: DHId, configs: &[DHConfig]) -> String {
-    let served = if configs.is_empty() {
-        "no handlers at all".to_string()
-    } else {
-        configs
-            .iter()
-            .map(|c| format!("{} ({})", c.dh_id.0, c.name.0))
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-
-    format!(
-        "{}: START_DH names dh_id {}, which this tcspecial does not have; it \
-         serves {}. The ground and this process are reading different payload \
-         configurations -- most often a tcspecial left running from an earlier \
-         payload set, which a tcsmoc attaches to rather than replacing",
-        name.0, dh_id.0, served
-    )
-}
-
-/// Start a data handler moving data.
-///
-/// The handler already exists -- initialize_handlers made one for every entry
-/// in the payload file -- so this opens its OC endpoints and sets it running.
-///
-/// The OC endpoints are opened here because this is where the OC's address is
-/// known, from `oc` in the handler's configuration. It is opened once and both
-/// halves come from that one open, for the reason the payload endpoint is: a
-/// UDP address cannot be bound twice.
-///
-/// A handler with no OC address cannot be started. It has nowhere to send what
-/// it reads from its payload and nowhere to read what it should write there,
-/// so this says so rather than starting a handler that moves nothing.
-fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
-    let oc = config.oc.clone().ok_or_else(|| {
-        TcsError::Config(format!(
-            "data handler \"{}\" has no OC address: give it oc_address and oc_port",
-            config.name.0
-        ))
-    })?;
-    let (oc_reader, oc_writer) =
-        bind_endpoint_pair(&config.name.0, &EndpointConfig::Network(oc.clone()))?;
-    dh.start(oc_reader, oc_writer)?;
-
-    // Said on the way out, not only on the way wrong. Until this was here
-    // tcspecial logged a handler that failed to start and nothing at all about
-    // one that started, so a session where START_DH answered Success and no
-    // data moved left no record of what the handler had been pointed at.
-    info!(
-        "{} started: payload {}, OC {}:{}",
-        config.name.0,
-        endpoint_description(&config.endpoint),
-        oc.address,
-        oc.port
-    );
-
-    Ok(())
-}
-
-/// What a handler's payload endpoint is, in one line of log.
-///
-/// Each kind says what locates it, and the terms that cannot be read off the
-/// name: a log line that said only "device /dev/ttyS0" for a serial line left
-/// the rate it was opened at nowhere to be found.
-fn endpoint_description(endpoint: &EndpointConfig) -> String {
-    match endpoint {
-        EndpointConfig::Network(net) => {
-            format!("{:?} {}:{}", net.protocol, net.address, net.port)
-        }
-        EndpointConfig::Device(dev) => format!("device {}", dev.path),
-        EndpointConfig::Serial(serial) => format!(
-            "serial {} at {} baud, {} data bits, {}",
-            serial.path,
-            serial.datarate,
-            serial.byte_length,
-            match serial.stop_bits {
-                Some(stop_bits) => format!("{stop_bits} stop"),
-                None => "synchronous".to_string(),
-            }
-        ),
-        EndpointConfig::I2c(i2c) => format!(
-            "I2C device {:#04X} on bus {}{}",
-            i2c.address,
-            i2c.bus,
-            if i2c.pec { ", with PEC" } else { "" }
-        ),
-        EndpointConfig::Spi(spi) => format!(
-            "SPI {} in {} at up to {} Hz, {} bits per word",
-            spi.path, spi.mode, spi.max_speed, spi.bits_per_word
-        ),
-    }
-}
-
-impl CommandInterpreter {
-    /// Create a new command interpreter
-    pub fn new(
-        config: CIConfig,
-        payload_config: Vec<DHConfig>,
-        config_version: ConfigVersion,
-        digest: ConfigDigest,
-    ) -> TcsResult<Self> {
-        let addr = format!("{}:{}", config.address, config.port);
-        let socket = UdpSocket::bind(&addr).map_err(|e| bind_failed("command interpreter", &addr, e))?;
-        socket.set_nonblocking(false)?;
-
-        // Opened here, before the main loop: see TelemetryLog::open.
-        let telemetry_log = TelemetryLog::open(&config)?;
-
-        Ok(Self {
-            beacon_interval: config.beacon_interval,
-            beacon_address: config.beacon_address,
-            beacon_interface: config.beacon_interface,
-            beacon: None,
-            _config: config,
-            socket,
-            data_handlers: Arc::new(Mutex::new(BTreeMap::new())),
-            payload_config,
-            arm_key: None,
-            arm_time: None,
-            running: false,
-            _global_stats: Statistics::new(),
-            telemetry_log,
-            version: ConfigVersion::of_this_build(),
-            config_version,
-            digest,
-        })
-    }
-
-    /// Initialize data handlers from configuration
-    pub fn initialize_handlers(&mut self) -> TcsResult<()> {
-        let mut handlers = self.data_handlers.lock()
-            .map_err(|_| TcsError::DataHandler("Lock poisoned".to_string()))?;
-
-        for config in &self.payload_config {
-            let dh = DataHandler::new(config.clone())?;
-            handlers.insert(config.dh_id, dh);
-        }
-
-        Ok(())
-    }
-
-    /// Process a command and return the response telemetry
-    fn process_command(&mut self, command: Command) -> Telemetry {
-        trace!("process_command: {:?}", command);
+impl PayloadCommands {
+    /// Answer a command that belongs on this link.
+    pub fn process(&self, command: Command) -> Telemetry {
+        trace!("payload link: {:?}", command);
         match command {
-            Command::Ping(cmd) => {
-                Telemetry::Ping(PingTelemetry::new(cmd.header.sequence, CommandStatus::Success))
-            }
-            Command::RestartArm(cmd) => {
-                self.arm_key = Some(cmd.arm_key);
-                self.arm_time = Some(Instant::now());
-                Telemetry::RestartArm(RestartArmTelemetry::new(cmd.header.sequence, CommandStatus::Success))
-            }
-            Command::Restart(cmd) => {
-                let status = if let (Some(arm_key), Some(arm_time)) = (self.arm_key, self.arm_time) {
-                    if arm_key == cmd.arm_key && arm_time.elapsed() < RESTART_ARM_TIMEOUT {
-                        self.running = false;
-                        CommandStatus::Success
-                    } else {
-                        CommandStatus::InvalidParameter
-                    }
-                } else {
-                    CommandStatus::NotArmed
-                };
-                Telemetry::Restart(RestartTelemetry::new(cmd.header.sequence, status))
-            }
             Command::Connect(cmd) => {
                 // Said rather than judged. The ground is the end that knows
                 // what it put on the screen, so it compares; this end answers
@@ -413,17 +217,6 @@ impl CommandInterpreter {
                     samples.received,
                 ))
             }
-            Command::Config(cmd) => {
-                self.beacon_interval = cmd.beacon_interval;
-                // Retime the running sender too, or the new interval would
-                // be recorded and never take effect. set_interval also
-                // expires the current wait, so the next beacon goes out at
-                // once rather than after the old interval elapses.
-                if let Some(beacon) = self.beacon.as_mut() {
-                    beacon.set_interval(Duration::from_millis(cmd.beacon_interval.0 as u64));
-                }
-                Telemetry::Config(ConfigTelemetry::new(cmd.header.sequence, CommandStatus::Success))
-            }
             Command::ConfigDH(cmd) => {
                 // Refused rather than answered Success. Nothing here
                 // configures a data handler, and the command carries nothing
@@ -444,6 +237,396 @@ impl CommandInterpreter {
                     cmd.header.sequence,
                     CommandStatus::InvalidCommand,
                 ))
+            }
+            // The spacecraft's own commands. Refused rather than served, for
+            // the reason a payload command is refused on the other link: a
+            // command on the wrong one is one end not reading the
+            // configuration the other is.
+            theirs @ (Command::Ping(_)
+            | Command::RestartArm(_)
+            | Command::Restart(_)
+            | Command::Config(_)) => refused_on_the_wrong_link(&theirs, CommandLink::Payload),
+        }
+    }
+
+    /// Take payload commands on `socket` until the interpreter stops.
+    ///
+    /// A loop of its own, which is the whole point of the second link: a
+    /// command that takes time -- START_DH opens the payload's endpoint and
+    /// the handler's pair of OC sockets -- takes it here, where nothing the
+    /// ground needs in a hurry is waiting behind it.
+    ///
+    /// Answers go back to the address the command came from, as the other
+    /// link's do: a datagram's sender is the only statement of where the
+    /// ground is.
+    pub fn serve(&self, socket: UdpSocket, serving: Arc<AtomicBool>) -> TcsResult<()> {
+        socket.set_read_timeout(Some(PAYLOAD_LINK_POLL))?;
+        let mut buffer = vec![0u8; 65535];
+
+        while serving.load(Ordering::Relaxed) {
+            match socket.recv_from(&mut buffer) {
+                Ok((size, addr)) => {
+                    trace!("payload link: received from {:?}", addr);
+                    match serde_json::from_slice::<Command>(&buffer[..size]) {
+                        Ok(command) => {
+                            let response = self.process(command);
+                            if let Ok(data) = serde_json::to_vec(&response) {
+                                // Recorded before it is sent, as the other
+                                // link's answers are, so that one log holds
+                                // everything that went to the ground.
+                                self.telemetry_log.record(&data);
+                                let _ = socket.send_to(&data, addr);
+                            }
+                        }
+                        // Not a command. Nothing to answer and nobody to
+                        // answer it to: the sender is whatever sent this.
+                        Err(_) => error!("payload link: {} bytes that are not a command", size),
+                    }
+                }
+                Err(ref e)
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(e) => return Err(TcsError::Io(e)),
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// The answer to a command that arrived on the link it does not belong on.
+///
+/// Refused rather than served. It reached the spacecraft, so something can be
+/// said about it, and what has gone wrong is that one end is not reading the
+/// configuration the other is -- which serving it would hide, in the one
+/// place the split is supposed to be reliable.
+///
+/// The answer is of the type the command asks for, because that is how the
+/// ground pairs an answer with what it asked; see `tcslibgs::answer_to`.
+fn refused_on_the_wrong_link(command: &Command, arrived: CommandLink) -> Telemetry {
+    error!(
+        "{:?} arrived on the {} link and belongs on the {} one: the two ends are \
+         not reading the same configuration",
+        command.cmd_type(),
+        arrived.spelling(),
+        command.link().spelling()
+    );
+    answer_to(command, CommandStatus::InvalidCommand)
+}
+
+/// Command interpreter state
+pub struct CommandInterpreter {
+    /// The beacon sender, once the main loop has started it. Held so that a
+    /// Config command can retime it.
+    beacon: Option<BeaconSend>,
+    beacon_interval: BeaconTime,
+    /// Where beacons go, as the configuration said: the multicast group and
+    /// the interface to send it on.
+    beacon_address: std::net::SocketAddr,
+    beacon_interface: std::net::Ipv4Addr,
+    _config: CIConfig,
+    /// The spacecraft command link: ping, arm, restart, configure.
+    socket: UdpSocket,
+    /// The payload command link, until [`CommandInterpreter::run`] hands it
+    /// to the thread that serves it.
+    ///
+    /// Bound in `new`, with the other, so that a port already in use is
+    /// reported where every other configuration error is -- at startup,
+    /// naming itself -- rather than when the first payload command arrives.
+    payload_socket: Option<UdpSocket>,
+    /// What serves that link, and what the thread serving it holds.
+    payload: PayloadCommands,
+    /// Whether that thread should still be serving. Cleared by `stop` and
+    /// `shutdown`, which is how a loop in another thread is told.
+    serving: Arc<AtomicBool>,
+    data_handlers: Arc<Mutex<BTreeMap<DHId, DataHandler>>>,
+    payload_config: Arc<Vec<DHConfig>>,
+    arm_key: Option<ArmKey>,
+    arm_time: Option<Instant>,
+    running: bool,
+    _global_stats: Statistics,
+    /// Telemetry log, shared with every other sender of telemetry.
+    telemetry_log: TelemetryLog,
+    /// What this build is and what it read, answered to a CONNECT.
+    ///
+    /// Settled at startup rather than when a CONNECT arrives: the digest is of
+    /// the file this process read, which is the file it read *then*, and a
+    /// file edited since would otherwise have the spacecraft claiming a
+    /// configuration it is not serving.
+    version: ConfigVersion,
+    /// The version the payload configuration file states, which every beacon
+    /// carries beside this build's. The file's own, versioned by whoever
+    /// writes the payload set.
+    config_version: ConfigVersion,
+    digest: ConfigDigest,
+}
+
+/// Say what could not be bound, and what that usually means.
+///
+/// A bare io::Error carries the kind and nothing else, so the whole of what a
+/// reader got was "Address already in use (os error 98)" -- not which address,
+/// and no hint that the usual cause is a second copy of the program. Both ends
+/// of a data handler bind an address too, so this is used for all of them.
+pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
+    if e.kind() == std::io::ErrorKind::AddrInUse {
+        TcsError::Config(format!(
+            "cannot listen on {addr} for the {what}: address already in use. \
+             Something else holds it -- most often another tcspecial, or a \
+             tcsmoc that starts one of its own"
+        ))
+    } else {
+        TcsError::Config(format!("cannot listen on {addr} for the {what}: {e}"))
+    }
+}
+
+/// Why a START_DH found no handler, in the words of the command.
+///
+/// Said with the name the command carries rather than with anything read
+/// here: the whole of a NotFound is that this process has no entry to take a
+/// name from, and the name in the command is the one on the button the
+/// operator pressed.
+///
+/// What it usually means is that the two ends are reading different payload
+/// configurations. A tcsmoc attaches to a tcspecial that is already listening
+/// rather than starting a second one, so a tcspecial left running from an
+/// earlier payload set serves that set's handlers while the panels in front of
+/// the operator are the new set's -- and the only sign of it was a status with
+/// no explanation. So this says what this process does serve, which is the
+/// fact that identifies the stale end.
+fn no_such_handler(name: &DHName, dh_id: DHId, configs: &[DHConfig]) -> String {
+    let served = if configs.is_empty() {
+        "no handlers at all".to_string()
+    } else {
+        configs
+            .iter()
+            .map(|c| format!("{} ({})", c.dh_id.0, c.name.0))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+
+    format!(
+        "{}: START_DH names dh_id {}, which this tcspecial does not have; it \
+         serves {}. The ground and this process are reading different payload \
+         configurations -- most often a tcspecial left running from an earlier \
+         payload set, which a tcsmoc attaches to rather than replacing",
+        name.0, dh_id.0, served
+    )
+}
+
+/// Start a data handler moving data.
+///
+/// The handler already exists -- initialize_handlers made one for every entry
+/// in the payload file -- so this opens its OC endpoints and sets it running.
+///
+/// The OC endpoints are opened here because this is where the OC's address is
+/// known, from `oc` in the handler's configuration. It is opened once and both
+/// halves come from that one open, for the reason the payload endpoint is: a
+/// UDP address cannot be bound twice.
+///
+/// A handler with no OC address cannot be started. It has nowhere to send what
+/// it reads from its payload and nowhere to read what it should write there,
+/// so this says so rather than starting a handler that moves nothing.
+fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
+    let oc = config.oc.clone().ok_or_else(|| {
+        TcsError::Config(format!(
+            "data handler \"{}\" has no OC address: give it oc_address and oc_port",
+            config.name.0
+        ))
+    })?;
+    let (oc_reader, oc_writer) =
+        bind_endpoint_pair(&config.name.0, &EndpointConfig::Network(oc.clone()))?;
+    dh.start(oc_reader, oc_writer)?;
+
+    // Said on the way out, not only on the way wrong. Until this was here
+    // tcspecial logged a handler that failed to start and nothing at all about
+    // one that started, so a session where START_DH answered Success and no
+    // data moved left no record of what the handler had been pointed at.
+    info!(
+        "{} started: payload {}, OC {}:{}",
+        config.name.0,
+        endpoint_description(&config.endpoint),
+        oc.address,
+        oc.port
+    );
+
+    Ok(())
+}
+
+/// What a handler's payload endpoint is, in one line of log.
+///
+/// Each kind says what locates it, and the terms that cannot be read off the
+/// name: a log line that said only "device /dev/ttyS0" for a serial line left
+/// the rate it was opened at nowhere to be found.
+fn endpoint_description(endpoint: &EndpointConfig) -> String {
+    match endpoint {
+        EndpointConfig::Network(net) => {
+            format!("{:?} {}:{}", net.protocol, net.address, net.port)
+        }
+        EndpointConfig::Device(dev) => format!("device {}", dev.path),
+        EndpointConfig::Serial(serial) => format!(
+            "serial {} at {} baud, {} data bits, {}",
+            serial.path,
+            serial.datarate,
+            serial.byte_length,
+            match serial.stop_bits {
+                Some(stop_bits) => format!("{stop_bits} stop"),
+                None => "synchronous".to_string(),
+            }
+        ),
+        EndpointConfig::I2c(i2c) => format!(
+            "I2C device {:#04X} on bus {}{}",
+            i2c.address,
+            i2c.bus,
+            if i2c.pec { ", with PEC" } else { "" }
+        ),
+        EndpointConfig::Spi(spi) => format!(
+            "SPI {} in {} at up to {} Hz, {} bits per word",
+            spi.path, spi.mode, spi.max_speed, spi.bits_per_word
+        ),
+    }
+}
+
+impl CommandInterpreter {
+    /// Create a new command interpreter
+    pub fn new(
+        config: CIConfig,
+        payload_config: Vec<DHConfig>,
+        config_version: ConfigVersion,
+        digest: ConfigDigest,
+    ) -> TcsResult<Self> {
+        let addr = format!("{}:{}", config.address, config.port);
+        let socket = UdpSocket::bind(&addr).map_err(|e| bind_failed("command interpreter", &addr, e))?;
+        socket.set_nonblocking(false)?;
+
+        // The payload link, bound here too. Two links, because what the
+        // ground needs in a hurry must never be queued behind what it asked
+        // for at leisure: see CommandType::link.
+        let payload_addr = format!("{}:{}", config.address, config.payload_port);
+        let payload_socket = UdpSocket::bind(&payload_addr)
+            .map_err(|e| bind_failed("payload command link", &payload_addr, e))?;
+
+        // Opened here, before the main loop: see TelemetryLog::open.
+        let telemetry_log = TelemetryLog::open(&config)?;
+
+        let payload_config = Arc::new(payload_config);
+        let data_handlers = Arc::new(Mutex::new(BTreeMap::new()));
+        let version = ConfigVersion::of_this_build();
+        let payload = PayloadCommands {
+            data_handlers: data_handlers.clone(),
+            payload_config: payload_config.clone(),
+            telemetry_log: telemetry_log.clone(),
+            version,
+            config_version,
+            digest,
+        };
+
+        Ok(Self {
+            beacon_interval: config.beacon_interval,
+            beacon_address: config.beacon_address,
+            beacon_interface: config.beacon_interface,
+            beacon: None,
+            _config: config,
+            socket,
+            payload_socket: Some(payload_socket),
+            payload,
+            serving: Arc::new(AtomicBool::new(true)),
+            data_handlers,
+            payload_config,
+            arm_key: None,
+            arm_time: None,
+            running: false,
+            _global_stats: Statistics::new(),
+            telemetry_log,
+            version,
+            config_version,
+            digest,
+        })
+    }
+
+    /// Where spacecraft commands are taken, as the socket was bound.
+    ///
+    /// Not what the configuration asked for: a configuration may ask for port
+    /// 0, which is the operating system's invitation to choose, and then the
+    /// only statement of which port that is is the socket itself.
+    pub fn command_address(&self) -> TcsResult<std::net::SocketAddr> {
+        Ok(self.socket.local_addr()?)
+    }
+
+    /// Where payload commands are taken, as that socket was bound.
+    pub fn payload_command_address(&self) -> TcsResult<std::net::SocketAddr> {
+        match &self.payload_socket {
+            Some(socket) => Ok(socket.local_addr()?),
+            // Taken by the thread serving it, which is the only other place
+            // it can be: ask it there.
+            None => Err(TcsError::Config(
+                "the payload command link is already being served".to_string(),
+            )),
+        }
+    }
+
+    /// Initialize data handlers from configuration
+    pub fn initialize_handlers(&mut self) -> TcsResult<()> {
+        let mut handlers = self.data_handlers.lock()
+            .map_err(|_| TcsError::DataHandler("Lock poisoned".to_string()))?;
+
+        for config in self.payload_config.iter() {
+            let dh = DataHandler::new(config.clone())?;
+            handlers.insert(config.dh_id, dh);
+        }
+
+        Ok(())
+    }
+
+    /// Process a command and return the response telemetry
+    fn process_command(&mut self, command: Command) -> Telemetry {
+        trace!("process_command: {:?}", command);
+        match command {
+            Command::Ping(cmd) => {
+                Telemetry::Ping(PingTelemetry::new(cmd.header.sequence, CommandStatus::Success))
+            }
+            Command::RestartArm(cmd) => {
+                self.arm_key = Some(cmd.arm_key);
+                self.arm_time = Some(Instant::now());
+                Telemetry::RestartArm(RestartArmTelemetry::new(cmd.header.sequence, CommandStatus::Success))
+            }
+            Command::Restart(cmd) => {
+                let status = if let (Some(arm_key), Some(arm_time)) = (self.arm_key, self.arm_time) {
+                    if arm_key == cmd.arm_key && arm_time.elapsed() < RESTART_ARM_TIMEOUT {
+                        self.running = false;
+                        CommandStatus::Success
+                    } else {
+                        CommandStatus::InvalidParameter
+                    }
+                } else {
+                    CommandStatus::NotArmed
+                };
+                Telemetry::Restart(RestartTelemetry::new(cmd.header.sequence, status))
+            }
+            // Answered on either link, by the one piece of code that
+            // answers it: see CommandType::link.
+            connect @ Command::Connect(_) => self.payload.process(connect),
+            Command::Config(cmd) => {
+                self.beacon_interval = cmd.beacon_interval;
+                // Retime the running sender too, or the new interval would
+                // be recorded and never take effect. set_interval also
+                // expires the current wait, so the next beacon goes out at
+                // once rather than after the old interval elapses.
+                if let Some(beacon) = self.beacon.as_mut() {
+                    beacon.set_interval(Duration::from_millis(cmd.beacon_interval.0 as u64));
+                }
+                Telemetry::Config(ConfigTelemetry::new(cmd.header.sequence, CommandStatus::Success))
+            }
+            // The payload link's commands. Refused rather than served: a
+            // command that arrived here is one end not reading the
+            // configuration the other is, and serving it would hide that in
+            // the one place the split is supposed to be reliable. See
+            // CommandType::link.
+            theirs @ (Command::StartDH(_)
+            | Command::StopDH(_)
+            | Command::QueryDH(_)
+            | Command::QueryDHSample(_)
+            | Command::ConfigDH(_)) => {
+                refused_on_the_wrong_link(&theirs, CommandLink::Spacecraft)
             }
         }
     }
@@ -472,6 +655,29 @@ impl CommandInterpreter {
             self.config_version,
             self.digest,
         );
+
+        // The payload link, in a thread of its own. Its own loop and its own
+        // socket, so that a payload command taking its time -- opening a
+        // device node, binding a handler's sockets -- delays nothing on the
+        // link the ground restarts the spacecraft over.
+        match self.payload_socket.take() {
+            Some(socket) => {
+                let payload = self.payload.clone();
+                let serving = self.serving.clone();
+                let where_it_is = socket.local_addr();
+                thread::spawn(move || {
+                    if let Err(e) = payload.serve(socket, serving) {
+                        error!("the payload command link stopped: {}", e);
+                    }
+                });
+                if let Ok(addr) = where_it_is {
+                    debug!("payload commands are taken on {}", addr);
+                }
+            }
+            // run called twice. The first call has the link, and nothing
+            // about this one should take it from that thread.
+            None => error!("the payload command link is already being served"),
+        }
 
         while self.running {
             // Try to receive a command
@@ -511,11 +717,15 @@ impl CommandInterpreter {
     /// Stop the command interpreter
     pub fn stop(&mut self) {
         self.running = false;
+        // And the link served in another thread, which has no way to see the
+        // flag above.
+        self.serving.store(false, Ordering::Relaxed);
     }
 
     /// Shut down all data handlers
     pub fn shutdown(&mut self) -> TcsResult<()> {
         self.running = false;
+        self.serving.store(false, Ordering::Relaxed);
 
         let mut handlers = self.data_handlers.lock()
             .map_err(|_| TcsError::DataHandler("Lock poisoned".to_string()))?;
@@ -534,7 +744,9 @@ impl CommandInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::{ConfigDHCommand, NetworkProtocol};
+    use tcslibgs::{
+        ConfigDHCommand, ConnectCommand, DHType, NetworkProtocol, StartDHCommand,
+    };
 
     /// The version a payload set states, where which version is not what is
     /// being tested.
@@ -670,7 +882,7 @@ mod tests {
         ci.initialize_handlers().expect("handlers are made at startup");
 
         // The one this process has not got, named as the ground names it.
-        match ci.process_command(Command::StartDH(StartDHCommand::new(
+        match ci.payload.process(Command::StartDH(StartDHCommand::new(
             1,
             DHId(1),
             DHType::Network,
@@ -765,7 +977,7 @@ mod tests {
         .expect("an interpreter");
         ci.initialize_handlers().expect("handlers are made at startup");
 
-        match ci.process_command(Command::StartDH(StartDHCommand::new(
+        match ci.payload.process(Command::StartDH(StartDHCommand::new(
             1,
             DHId(1),
             DHType::Network,
@@ -877,7 +1089,7 @@ mod tests {
 
         // Every kind but the one it is.
         for wrong in [DHType::Network, DHType::Serial, DHType::I2c, DHType::Spi] {
-            match ci.process_command(Command::StartDH(StartDHCommand::new(
+            match ci.payload.process(Command::StartDH(StartDHCommand::new(
                 1,
                 DHId(2),
                 wrong,
@@ -960,7 +1172,7 @@ mod tests {
         // existence answer Success to every START_DH.
         ci.initialize_handlers().expect("handlers are made at startup");
 
-        match ci.process_command(Command::StartDH(StartDHCommand::new(
+        match ci.payload.process(Command::StartDH(StartDHCommand::new(
             1,
             DHId(2),
             tcslibgs::DHType::Device,
@@ -1000,7 +1212,7 @@ mod tests {
             .expect("the handler should still be moving data half a second later");
         assert_ne!(n, 0);
 
-        let stats = match ci.process_command(Command::QueryDH(tcslibgs::QueryDHCommand::new(
+        let stats = match ci.payload.process(Command::QueryDH(tcslibgs::QueryDHCommand::new(
             2,
             DHId(2),
         ))) {
@@ -1065,7 +1277,7 @@ mod tests {
         ci.initialize_handlers().unwrap();
 
         for attempt in 1..=2 {
-            match ci.process_command(Command::StartDH(StartDHCommand::new(
+            match ci.payload.process(Command::StartDH(StartDHCommand::new(
                 attempt,
                 DHId(2),
                 tcslibgs::DHType::Device,
@@ -1170,9 +1382,9 @@ mod tests {
     /// what will say so if the command is ever implemented.
     #[test]
     fn config_dh_is_refused_rather_than_answered_with_success() {
-        let mut ci = interpreter();
+        let ci = interpreter();
 
-        let answer = ci.process_command(Command::ConfigDH(ConfigDHCommand::new(7, DHId(0))));
+        let answer = ci.payload.process(Command::ConfigDH(ConfigDHCommand::new(7, DHId(0))));
 
         match answer {
             Telemetry::ConfigDH(tm) => {
@@ -1198,5 +1410,199 @@ mod tests {
             Telemetry::Ping(tm) => assert!(tm.header.status.is_success()),
             other => panic!("expected PING telemetry, got {other:?}"),
         }
+    }
+
+    // -- the two links ------------------------------------------------------
+
+    /// A command that arrived on the wrong link is refused, and the refusal
+    /// is of the kind the command asked for.
+    ///
+    /// Refused rather than served, because a command on the wrong link is one
+    /// end not reading the configuration the other is, and serving it would
+    /// hide that in the one place the split has to be reliable. Of the right
+    /// kind, because the type is how the ground pairs an answer with what it
+    /// asked: a refusal it cannot place reads as a command that went
+    /// unanswered, which is the one thing a refusal exists to deny.
+    #[test]
+    fn a_command_on_the_wrong_link_is_refused_in_its_own_words() {
+        let mut ci = interpreter();
+
+        // A payload command, offered to the spacecraft link.
+        match ci.process_command(Command::StartDH(StartDHCommand::new(
+            7,
+            DHId(0),
+            DHType::Network,
+            DHName::new("whoever"),
+        ))) {
+            Telemetry::StartDH(tm) => {
+                assert_eq!(tm.header.status, CommandStatus::InvalidCommand);
+                assert_eq!(tm.header.sequence, 7, "the answer is to that command");
+            }
+            other => panic!("expected START_DH telemetry, got {other:?}"),
+        }
+
+        // And a spacecraft command, offered to the payload link.
+        match ci.payload.process(Command::Restart(tcslibgs::RestartCommand::new(
+            8,
+            ArmKey(0x1234),
+        ))) {
+            Telemetry::Restart(tm) => {
+                assert_eq!(tm.header.status, CommandStatus::InvalidCommand);
+                assert_eq!(tm.header.sequence, 8);
+            }
+            other => panic!("expected RESTART telemetry, got {other:?}"),
+        }
+
+        // Each link still serves its own: the test above is about the link a
+        // command arrived on and not about commands being refused.
+        match ci.payload.process(Command::StartDH(StartDHCommand::new(
+            9,
+            DHId(0),
+            DHType::Network,
+            DHName::new("whoever"),
+        ))) {
+            Telemetry::StartDH(tm) => assert_eq!(
+                tm.header.status,
+                CommandStatus::NotFound,
+                "the payload link reached the handlers and found none"
+            ),
+            other => panic!("expected START_DH telemetry, got {other:?}"),
+        }
+        match ci.process_command(Command::Ping(tcslibgs::PingCommand::new(10))) {
+            Telemetry::Ping(tm) => assert!(tm.header.status.is_success()),
+            other => panic!("expected PING telemetry, got {other:?}"),
+        }
+    }
+
+    /// What each end read is answered on either link.
+    ///
+    /// The holder of either link wants it of the link it holds, and both
+    /// answers come from the one piece of code that answers it, so they
+    /// cannot come to differ.
+    #[test]
+    fn a_connect_is_answered_on_either_link() {
+        let mut ci = interpreter();
+        let ask = || {
+            Command::Connect(ConnectCommand::new(
+                3,
+                ConfigVersion::of_this_build(),
+                a_digest(),
+            ))
+        };
+
+        let (spacecraft, payload) = (ci.process_command(ask()), ci.payload.process(ask()));
+        match (spacecraft, payload) {
+            (Telemetry::Connect(one), Telemetry::Connect(two)) => {
+                assert_eq!(one, two, "the two links said different things");
+                assert_eq!(one.digest, a_digest());
+                assert_eq!(one.config_version, a_config_version());
+            }
+            other => panic!("expected CONNECT telemetry on both, got {other:?}"),
+        }
+    }
+
+    /// The payload link answers on its own socket.
+    ///
+    /// The loop, rather than what the loop calls: a link nothing serves is a
+    /// command that goes unanswered, and nothing above this would notice.
+    #[test]
+    fn the_payload_link_answers_on_its_own_socket() {
+        let ci = interpreter();
+        let link = ci.payload_command_address().expect("where it is");
+        let serving = Arc::new(AtomicBool::new(true));
+
+        let payload = ci.payload.clone();
+        let socket = ci.payload_socket.as_ref().unwrap().try_clone().unwrap();
+        let stop = serving.clone();
+        let served = thread::spawn(move || payload.serve(socket, serving));
+
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .expect("a timeout");
+        let asked = serde_json::to_vec(&Command::StartDH(StartDHCommand::new(
+            11,
+            DHId(0),
+            DHType::Network,
+            DHName::new("whoever"),
+        )))
+        .expect("it serializes");
+        ground.send_to(&asked, link).expect("it is sent");
+
+        let mut buffer = [0u8; 65535];
+        let (size, _) = ground.recv_from(&mut buffer).expect("an answer");
+        match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
+            Telemetry::StartDH(tm) => {
+                assert_eq!(tm.header.sequence, 11);
+                assert_eq!(tm.header.status, CommandStatus::NotFound);
+            }
+            other => panic!("expected START_DH telemetry, got {other:?}"),
+        }
+
+        // And the loop stops being told to serve, which is how a shutdown
+        // reaches a loop in another thread.
+        stop.store(false, Ordering::Relaxed);
+        served
+            .join()
+            .expect("the thread ends")
+            .expect("it served without failing");
+    }
+
+    /// A spacecraft command is answered while a payload command waits.
+    ///
+    /// This is the whole of why there are two links. The payload command here
+    /// cannot finish -- the test holds the handler map it needs -- and the
+    /// PING must be answered anyway. With one socket and one loop it could
+    /// not be: the ping would be the next datagram behind a command that
+    /// never finishes, which is a spacecraft that cannot be rescued while it
+    /// is busy.
+    #[test]
+    fn a_spacecraft_command_is_answered_while_a_payload_command_waits() {
+        let mut ci = interpreter();
+        let spacecraft_link = ci.command_address().expect("where it is");
+        let payload_link = ci.payload_command_address().expect("where it is");
+        let handlers = ci.data_handlers.clone();
+
+        // Held for as long as this test wants the payload link stuck.
+        let held = handlers.lock().expect("the handler map");
+
+        thread::spawn(move || {
+            let _ = ci.run();
+        });
+
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+
+        let stuck = serde_json::to_vec(&Command::StartDH(StartDHCommand::new(
+            20,
+            DHId(0),
+            DHType::Network,
+            DHName::new("whoever"),
+        )))
+        .expect("it serializes");
+        ground.send_to(&stuck, payload_link).expect("it is sent");
+
+        let ping = serde_json::to_vec(&Command::Ping(tcslibgs::PingCommand::new(21)))
+            .expect("it serializes");
+        ground.send_to(&ping, spacecraft_link).expect("it is sent");
+
+        let mut buffer = [0u8; 65535];
+        let (size, _) = ground
+            .recv_from(&mut buffer)
+            .expect("the spacecraft link answered");
+        match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
+            Telemetry::Ping(tm) => {
+                assert_eq!(tm.header.sequence, 21);
+                assert!(tm.header.status.is_success());
+            }
+            other => panic!(
+                "the first answer should be the ping's, since the payload \
+                 command cannot finish: got {other:?}"
+            ),
+        }
+
+        drop(held);
     }
 }

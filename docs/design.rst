@@ -3068,11 +3068,37 @@ Requirement
     payload at ``localhost:4000`` collides with a link at ``0.0.0.0:4000``
     without either naming the other's host.
 
-The ports are stated and checked ahead of being served: a payload set states
-both, every loader validates both, and ``tcsverify`` reports either from the
-line that states it. What binds the second socket, routes a command to it,
-and refuses one that arrived on the wrong link comes next; until then the
-command interpreter binds ``port`` alone.
+Requirement
+    Each link is served by a loop of its own, in a thread of its own. Two
+    sockets read by one loop are two queues into one bottleneck: a payload
+    command that takes its time -- ``START_DH`` opens the payload's endpoint
+    and the handler's pair of OC sockets -- would still be ahead of whatever
+    the ground sent next. The split is only worth having if what it separates
+    cannot wait for the other.
+
+Requirement
+    Both sockets are bound as the interpreter is created, before either loop
+    runs, so a port already in use is reported where every other
+    configuration error is -- at startup, naming itself -- rather than when
+    the first command of that kind arrives.
+
+Requirement
+    A command that arrives on the link it does not belong on is refused with
+    ``InvalidCommand``, and the refusal is of the telemetry type the command
+    asks for. The type is how the ground pairs an answer with what it asked,
+    so a refusal it cannot place reads as a command that went unanswered --
+    which is the one thing a refusal exists to deny.
+
+Serving it instead would be worse than refusing it. A command on the wrong
+link means one end is not reading the configuration the other is, and that is
+exactly the fault this split must not hide: the link the ground restarts the
+spacecraft over is the last place to learn that the two ends disagree about
+where commands go.
+
+Requirement
+    The ground sends each command on the link the table names, and
+    ``tcsverify`` reports a missing or colliding port from the line that
+    states it.
 
 Requirement
     A beacon is sent to a multicast group. ``beacon_address`` is a group

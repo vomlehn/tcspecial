@@ -24,7 +24,6 @@ export struct DHInfo {
     // the same thing.
     oc-time: string,
     oc-data: string,
-    bytes-sent: int,
     bytes-recv: int,
     // Everything both configuration files said about this handler, as Rust
     // read them at startup. Held ready rather than fetched when asked:
@@ -40,7 +39,6 @@ component DHPanel inherits Rectangle {
     in property <int> packet-size: 12;
     in property <string> oc-time: "--:--:--";
     in property <string> oc-data: "";
-    in property <int> bytes-sent: 0;
     in property <int> bytes-recv: 0;
     in property <string> parameters: "";
 
@@ -201,9 +199,12 @@ component DHPanel inherits Rectangle {
             Text { text: oc-data; font-size: 10px; vertical-alignment: center; }
         }
 
+        // What this handler has brought to the ground. The bytes it sent to
+        // its payload were counted beside it and are not: the panel is read
+        // for what arrived, and the handler's own count of the other
+        // direction said nothing an operator was watching for.
         counters-row := HorizontalLayout {
             min-height: 14px;
-            Text { text: "Sent: " + bytes-sent + " bytes"; font-size: 10px; }
             Text { text: "Recv: " + bytes-recv + " bytes"; font-size: 10px; }
         }
     }
@@ -560,7 +561,6 @@ export component MainWindow inherits Window {
                         packet-size: dh.packet-size;
                         oc-time: dh.oc-time;
                         oc-data: dh.oc-data;
-                        bytes-sent: dh.bytes-sent;
                         bytes-recv: dh.bytes-recv;
                         parameters: dh.parameters;
                         enable-clicked => { enable-dh(i); }

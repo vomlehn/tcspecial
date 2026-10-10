@@ -3003,18 +3003,18 @@ that shows the whole of what the two files said about it.
 Requirement
     The button that starts and stops a payload is labelled with what pressing
     it will do. A payload that is sending offers ``Silent``, which stops it; a
-    payload that is not offers ``Receive``, which starts it. There were two
+    payload that is not offers ``Send``, which starts it. There were two
     buttons, Start and Stop, and either was pressable whatever the payload was
     doing: a Stop on a payload that was not sending did nothing and read as
     though it had.
 
 Requirement
-    The press that starts the data flowing is labelled ``Receive`` in both
-    windows. They are read side by side while a link is watched, and one of
-    them calling that press something else reads as two different things to
-    do. The press that stops it is each window's own: a simulated payload goes
-    ``Silent``, and a handler ``Discard``\ s what its payload sends rather
-    than carrying it to the ground.
+    Each window's labels are its own end's words. A simulated payload
+    ``Send``\ s or goes ``Silent``, because the payload is the thing that
+    sends; the MOC's panels ``Enable`` and ``Disable`` a handler, because
+    what the ground does is turn a conduit on and off. They were made to
+    share a word for a while, and it was the far end's word on one of the two
+    windows.
 
 Requirement
     Which way a press goes is decided by the status the label was made from.
@@ -3023,7 +3023,7 @@ Requirement
     the other would be worse than either button alone.
 
 Requirement
-    A payload that failed to start offers ``Receive`` again. It is not
+    A payload that failed to start offers ``Send`` again. It is not
     sending, which is what its status says, and the useful thing to offer is
     the start that failed rather than a stop of something that never began.
 
@@ -3556,32 +3556,32 @@ A handler whose conduits have carried nothing in a direction shows
 ``--:--:--`` and no data for it, which is also what a panel shows before it
 has been queried at all.
 
-Each panel has two buttons: one that starts and stops the handler, and a
-``Configuration`` button that shows what the configuration files said about
-it, described under `tcssim`_ where the same button is.
+Each panel has three buttons: ``Enable``, ``Disable``, and ``Config``, which
+shows what the configuration files said about the handler and is described
+under `tcssim`_ where the same button is.
 
 Requirement
-    The button that starts and stops a handler is labelled with what pressing
-    it will do. A handler that is moving data offers ``Discard``, which stops
-    it; a handler that is not offers ``Receive``, which starts it. The words
-    are the ground's: what a press starts is the MOC receiving, and a button
-    on a ground station labelled for what the far end does reads as though
-    the operator were sending something. There were two buttons, Start and
-    Stop, and either was pressable whatever the handler was doing: a Stop on
-    a stopped handler asks tcspecial to stop something that is not running
-    and reads as though it had done something.
+    A panel has a button per command, each labelled with the command it
+    sends. ``Enable`` sends START_DH and ``Disable`` sends STOP_DH, with
+    Enable first: that is the press a panel is opened to make, and the status
+    beside the name is what says which of the two has taken effect.
 
 Requirement
-    Which command a press sends is decided by the status the label was made
-    from, not by what the handler turns out to be doing. The window builds the
-    label and the program decides the command, so the two are checked against
-    each other: a button that offered one thing and did the other would be
-    worse than either button alone.
+    Both are pressable whatever the handler is doing. tcspecial answers a
+    START_DH for a handler already running and a STOP_DH for one already
+    stopped without harm, and what an operator wants when a panel looks wrong
+    is what the spacecraft says to the command -- which a button that cannot
+    be pressed does not say.
 
-Requirement
-    A handler whose last command failed offers ``Receive``. Its status is
-    neither started nor stopped, and the useful thing to offer is the start
-    that failed rather than a stop of something that never began.
+There was one button, labelled with the one thing worth doing next:
+``Discard`` for a handler that was moving data and ``Receive`` for one that
+was not. It had to be read both ways -- Slint built the label from the status
+and the program decided the command from the same status -- so the two had to
+be held to one rule or they would drift into offering one thing and doing the
+other. Two buttons have nothing to drift: a press is the command on the
+label. What a panel gives up is that it no longer suggests which press to
+make, and what it gains is that either can be made without first getting the
+handler into the state that offers it.
 
 Requirement
     The panels are refreshed without being asked. A handler moving data must
@@ -3595,9 +3595,26 @@ Requirement
     answer is a worse fault than a panel a second out of date.
 
 Requirement
-    A handler that answers the statistics but not the samples keeps the sample
-    lines it had. A blank line says a handler has moved nothing, which is a
-    different thing from a question that went unanswered.
+    A panel shows what arrived from its payload, the time it arrived, and how
+    many bytes have come to the ground -- and not the spacecraft's account of
+    what it last sent and last received, nor its count of the bytes it sent
+    to the payload. Three rows and a counter carried that account and are
+    gone: a panel is watched for what reached the ground, and the claim about
+    it took a third of the panel's height to say nearly the same thing.
+    QUERY_DH_SAMPLE is not asked for any more either -- a command a second
+    per handler whose answer nothing showed.
+
+Requirement
+    The window says when the last command went out and when its answer came
+    back, under ``Last Response``. A response that is slow to come and one
+    that never comes read alike until those two times are beside it.
+
+Requirement
+    Both are the ground's own clock, and they are the window link's own
+    commands -- what the operator pressed -- not the panels' polling. The
+    times are read from the client that sends them, which is the one place
+    every command passes, so a press that forgot to record one cannot
+    happen.
 
 Testing requires starting up tcssim before other operations and shutting it down
 when tcsmoc is halted.

@@ -314,7 +314,6 @@ fn dh_info_from(dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
         // until it has.
         oc_time: SharedString::from(NO_TRANSFER_TIME),
         oc_data: SharedString::new(),
-        bytes_sent: 0,
         bytes_recv: 0,
         // What both files said about this payload, ready for the panel's
         // Configuration button. `sim` is absent when the simulator file could not be
@@ -381,7 +380,6 @@ fn simulator_settings(payload_path: &str, dh_configs: &[DHConfig]) -> Option<Vec
 #[derive(Clone)]
 struct PanelUpdate {
     row: usize,
-    bytes_sent: i32,
     bytes_recv: i32,
 }
 
@@ -517,7 +515,6 @@ fn panel_update_for(
 
     Some(PanelUpdate {
         row,
-        bytes_sent: stats.bytes_sent as i32,
         bytes_recv: stats.bytes_received as i32,
     })
 }
@@ -525,7 +522,6 @@ fn panel_update_for(
 /// Put a gathered update into its panel.
 fn apply_panel_update(dh_model: &Rc<VecModel<DHInfo>>, update: &PanelUpdate) {
     update_row(dh_model, update.row, |info| {
-        info.bytes_sent = update.bytes_sent;
         info.bytes_recv = update.bytes_recv;
     });
 }
@@ -1117,10 +1113,7 @@ fn query_dh_buttons(
         for (row, dh) in dh_configs.iter().enumerate() {
             match panel_update_for(client, row, dh, &mut None) {
                 Some(update) => {
-                    results.push(format!(
-                        "{}: sent={} recv={}",
-                        dh.name.0, update.bytes_sent, update.bytes_recv
-                    ));
+                    results.push(format!("{}: recv={}", dh.name.0, update.bytes_recv));
                     apply_panel_update(&dh_model, &update);
                 }
                 None => results.push(format!("{}: no answer", dh.name.0)),
@@ -2600,18 +2593,16 @@ mod tests {
             &model,
             &PanelUpdate {
                 row: 1,
-                bytes_sent: 7,
                 bytes_recv: 9,
             },
         );
 
         let touched = model.row_data(1).unwrap();
-        assert_eq!(touched.bytes_sent, 7);
         assert_eq!(touched.bytes_recv, 9);
 
         // Row 0 was not named, so it is untouched.
         let other = model.row_data(0).unwrap();
-        assert_eq!(other.bytes_sent, 0);
+        assert_eq!(other.bytes_recv, 0);
         assert_eq!(
             other.oc_time,
             SharedString::from(NO_TRANSFER_TIME),

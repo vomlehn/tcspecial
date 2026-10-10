@@ -330,19 +330,22 @@ named for what it is, which is what a panel in the MOC shows.
 
 Starting and stopping a payload
 ===============================
-Each panel has one button for it, labelled with what pressing it will do. The
-press that starts the data flowing says ``Receive`` in both programs, because
-the two windows are read side by side while a link is watched and one of them
-calling it something else reads as two different things to do. The press that
-stops it is each program's own: a simulated payload goes ``Silent``, and a
-handler ``Discard``\ s what its payload sends rather than carrying it to the
-ground. Each panel also shows its own status beside the name, which is
-where the label comes from.
+In tcsmoc each panel has a button per command: ``Enable`` sends START_DH and
+``Disable`` sends STOP_DH. Both are pressable whatever the handler is doing --
+tcspecial takes a START_DH for one already running and a STOP_DH for one
+already stopped without harm -- and the status beside the name says which of
+the two has taken effect.
 
-There were two buttons in each, Start and Stop, and either was pressable
-whatever the payload was doing: a Stop on something that was not sending did
-nothing and read as though it had. A payload that fails to start offers to
-start again, since that is what has not happened yet.
+In tcssim a payload that is sending offers ``Silent``, which stops it, and one
+that is not offers ``Send``, which starts it: one button, labelled with what
+pressing it will do, since a simulated payload is either sending or not and
+there is nothing else to ask of it. The words are the payload's own -- it is
+the thing that sends -- where tcsmoc's are the ground's.
+
+tcsmoc had one button that way too. It said ``Receive`` or ``Discard``
+according to the status, which meant a press could not be made until the
+handler was in the state that offered it -- and when a panel looks wrong,
+what the spacecraft says to the command is the thing worth finding out.
 
 Seeing what was read
 ====================
@@ -1054,34 +1057,46 @@ the ``Command`` menu
   in a session is whether tcspecial read the same configuration this MOC did:
   see `What each end read`_.
 
+  Under it, when the last command went out and when its answer came back:
+
+  .. code-block:: text
+
+     Last Response: START_DH OK
+     Last sent: 14:22:31   Last rcvd: 14:22:31
+
+  The ground's own clock, and the window's own commands -- what was pressed,
+  not the polling the panels do for themselves. A response that is slow to
+  come and one that never comes read alike until those two times are beside
+  it.
+
 Below that is one panel per data handler, filled across the window before
 another row is started under it, and a ``Quit`` button at the foot of the
 window, which stops the tcspecial and tcssim the MOC started.
 
 Each panel shows its handler's name and status, how it is reached, and its
-packet size; then three readings and the byte counts:
+packet size; then two readings and one count:
 
-``Last sent``
-  What the spacecraft last sent to the ground. For a payload that sends on its
-  own this is the payload's own data going up, which is what such a panel is
-  watched for.
-
-``Last rcvd``
-  What the spacecraft last received from the ground.
+``Last recv``
+  When the MOC last received anything from that payload, on the handler's OC
+  address. The MOC's own clock, and read for whether anything is still
+  coming.
 
 ``From payload``
-  What the MOC itself received on that handler's OC address. The two lines
-  above are the spacecraft's account of what it moved; this is the only one
-  that says something reached the ground, and the time on it is the MOC's
-  clock rather than the spacecraft's.
+  What arrived, as the ground received it.
 
-The first two come from the spacecraft, so their times are when the data moved
-rather than when it was asked about. The panels refresh
-themselves about once a second; nothing has to be pressed to see traffic.
+``Recv``
+  How many bytes have come to the ground from that payload.
 
-Each panel has two buttons. One starts and stops the handler, and is described
-under `Starting and stopping a payload`_. The other, ``Configuration``, shows
-what the files said about that handler: see `Seeing what was read`_.
+All three are the ground's end of it. The spacecraft's account of what it
+last sent and last received, and its count of the bytes it sent to its
+payload, were shown beside them and are gone: a panel is watched for what
+reached the ground, and the claim about it cost a third of the panel to say
+nearly the same thing. The panels refresh themselves about once a second;
+nothing has to be pressed to see traffic.
+
+Each panel has three buttons. ``Enable`` and ``Disable`` are described under
+`Starting and stopping a payload`_; ``Config`` shows what the files said about
+that handler: see `Seeing what was read`_.
 
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1101,7 +1116,7 @@ Then one line for every command sent about it. A press of its button:
 
 .. code-block:: console
 
-   triggered payload triggered-send: Receive pressed: sending START_DH for dh_id 1 as a Network handler
+   triggered payload triggered-send: Enable pressed: sending START_DH for dh_id 1 as a Network handler
    triggered payload triggered-send: START_DH answered Success, so the panel now says Active
 
 and one from the refresh, carrying the status each answer came back with and

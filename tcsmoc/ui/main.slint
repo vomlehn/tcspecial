@@ -119,7 +119,7 @@ component DHPanel inherits Rectangle {
                 // The label comes from the status this panel already shows,
                 // and Rust reads the same status back to decide which way a
                 // press goes, so the button and the command cannot disagree.
-                text: dh-status == "Active" ? "Discard" : "Transmit";
+                text: dh-status == "Active" ? "Discard" : "Receive";
                 clicked => { transfer-clicked(); }
             }
         }

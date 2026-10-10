@@ -332,7 +332,8 @@ Each panel has one button for it, labelled with what pressing it will do. In
 tcssim a payload that is sending offers ``Silent`` and one that is not offers
 ``Transmit``; in tcsmoc, where the same two things are a handler carrying data
 to the ground or dropping it on the spacecraft, they are ``Discard`` and
-``Transmit``. Each panel also shows its own status beside the name, which is
+``Receive`` -- the ground's words for it, since what the press starts is the
+MOC receiving. Each panel also shows its own status beside the name, which is
 where the label comes from.
 
 There were two buttons in each, Start and Stop, and either was pressable
@@ -1084,7 +1085,7 @@ Then one line for every command sent about it. A press of its button:
 
 .. code-block:: console
 
-   triggered payload triggered-send: Transmit pressed: sending START_DH for dh_id 1 as a Network handler
+   triggered payload triggered-send: Receive pressed: sending START_DH for dh_id 1 as a Network handler
    triggered payload triggered-send: START_DH answered Success, so the panel now says Active
 
 and one from the refresh, carrying the status each answer came back with and

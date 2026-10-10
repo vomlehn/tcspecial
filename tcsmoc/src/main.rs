@@ -1440,14 +1440,14 @@ fn hear_what_tcspecial_read(
 /// doing what the label said is the honest answer: a handler is told to start
 /// by a button that offered to start it.
 ///
-/// Anything that is not the running status offers to transmit. A handler
+/// Anything that is not the running status offers to receive. A handler
 /// whose last command failed shows `Error`, and the useful thing to offer
 /// then is the start that failed, not a stop of something that never began.
 fn transfer_wanted(status: &str) -> Transfer {
     if status == ACTIVE_STATUS {
         Transfer::Discard
     } else {
-        Transfer::Transmit
+        Transfer::Receive
     }
 }
 
@@ -1455,7 +1455,12 @@ fn transfer_wanted(status: &str) -> Transfer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Transfer {
     /// Start the handler, so its payload's data reaches the MOC.
-    Transmit,
+    ///
+    /// Named for what the press does from the ground, which is what the
+    /// button says: the MOC begins receiving. The handler transmits, and the
+    /// label said so once -- a button on a ground station labelled for what
+    /// the far end does reads as though the operator were sending something.
+    Receive,
     /// Stop it, so what the payload sends is dropped on the spacecraft.
     Discard,
 }
@@ -1489,7 +1494,7 @@ fn handle_transfer_button(
         };
 
         match transfer_wanted(&showing) {
-            Transfer::Transmit => transmit(&ui, &link, dh, &dh_model, row),
+            Transfer::Receive => receive(&ui, &link, dh, &dh_model, row),
             Transfer::Discard => discard(&ui, &link, dh, &dh_model, row),
         }
     });
@@ -1499,7 +1504,7 @@ fn handle_transfer_button(
 ///
 /// The identity, name, and kind of the handler come from the configuration
 /// file rather than from the row number; the panel passes only its own row.
-fn transmit(
+fn receive(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     dh: &DHConfig,
@@ -1509,7 +1514,7 @@ fn transmit(
     note_triggered(
         dh,
         format!(
-            "Transmit pressed: sending START_DH for dh_id {} as a {:?} handler",
+            "Receive pressed: sending START_DH for dh_id {} as a {:?} handler",
             dh.dh_id.0,
             dh.endpoint.kind()
         ),
@@ -2541,13 +2546,13 @@ mod tests {
     /// labels: Slint builds the string, and these are how the test below
     /// holds it to the same rule Rust decides a press by.
     const DISCARD_LABEL: &str = "Discard";
-    const TRANSMIT_LABEL: &str = "Transmit";
+    const RECEIVE_LABEL: &str = "Receive";
 
     impl Transfer {
         /// The label a button offering this carries.
         fn label(&self) -> &'static str {
             match self {
-                Transfer::Transmit => TRANSMIT_LABEL,
+                Transfer::Receive => RECEIVE_LABEL,
                 Transfer::Discard => DISCARD_LABEL,
             }
         }
@@ -2567,19 +2572,19 @@ mod tests {
     fn the_transfer_button_sends_what_its_label_offers() {
         // A handler that is moving data offers to stop it, and one that is
         // not offers to start it. Anything that is not the running status
-        // offers to transmit: a handler whose last command failed shows
+        // offers to receive: a handler whose last command failed shows
         // Error, and the useful thing to offer then is the start that failed.
         assert_eq!(transfer_wanted(ACTIVE_STATUS), Transfer::Discard);
-        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Transmit);
-        assert_eq!(transfer_wanted(ERROR_STATUS), Transfer::Transmit);
-        assert_eq!(transfer_wanted(""), Transfer::Transmit);
+        assert_eq!(transfer_wanted(STOPPED_STATUS), Transfer::Receive);
+        assert_eq!(transfer_wanted(ERROR_STATUS), Transfer::Receive);
+        assert_eq!(transfer_wanted(""), Transfer::Receive);
 
         assert_eq!(Transfer::Discard.label(), DISCARD_LABEL);
-        assert_eq!(Transfer::Transmit.label(), TRANSMIT_LABEL);
+        assert_eq!(Transfer::Receive.label(), RECEIVE_LABEL);
 
         // And the window labels it by the same rule, which is the half Rust
         // cannot fail on: the label is a Slint expression, so a drift between
-        // the two files is a button that offers Transmit and stops the
+        // the two files is a button that offers Receive and stops the
         // handler.
         let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         let source = std::fs::read_to_string(&window).unwrap();

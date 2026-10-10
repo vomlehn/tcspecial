@@ -2871,7 +2871,7 @@ Requirement
     buttons, Start and Stop, and either was pressable whatever the payload was
     doing: a Stop on a payload that was not sending did nothing and read as
     though it had. Tcsmoc's panels carry the same rule in their own words,
-    ``Discard`` and ``Transmit``, which are what starting and stopping a
+    ``Discard`` and ``Receive``, which are what starting and stopping a
     handler mean from the ground.
 
 Requirement
@@ -3421,7 +3421,10 @@ it, described under `tcssim`_ where the same button is.
 Requirement
     The button that starts and stops a handler is labelled with what pressing
     it will do. A handler that is moving data offers ``Discard``, which stops
-    it; a handler that is not offers ``Transmit``, which starts it. There were two buttons, Start and
+    it; a handler that is not offers ``Receive``, which starts it. The words
+    are the ground's: what a press starts is the MOC receiving, and a button
+    on a ground station labelled for what the far end does reads as though
+    the operator were sending something. There were two buttons, Start and
     Stop, and either was pressable whatever the handler was doing: a Stop on
     a stopped handler asks tcspecial to stop something that is not running
     and reads as though it had done something.
@@ -3434,7 +3437,7 @@ Requirement
     worse than either button alone.
 
 Requirement
-    A handler whose last command failed offers ``Transmit``. Its status is
+    A handler whose last command failed offers ``Receive``. Its status is
     neither started nor stopped, and the useful thing to offer is the start
     that failed rather than a stop of something that never began.
 

@@ -14,6 +14,33 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
+What there is, in the order a reader meets it:
+
+``tcspecial``
+    The flight software. It serves the payloads a payload configuration file
+    describes, takes commands from the ground, and sends beacons.
+
+``tcslibgs``
+    What both ends share: the configuration file formats and the rules about
+    them, the command and telemetry messages, and the digest and version each
+    end says it read. Every rule in this document is stated there once.
+
+``tcslib``
+    What a control application on the ground is built on. A mission control
+    system drives a client rather than speaking the protocol itself.
+
+``tcsmoc``
+    A simulated operations center, for testing: a window of panels, one per
+    payload, that commands them and shows what they have moved.
+
+``tcssim``
+    Simulated payloads, for testing: it stands in for the far end of every
+    link a payload set describes.
+
+``tcsverify``
+    Reads a payload set and says what is wrong with it, running none of it.
+    See `tcsverify`_.
+
 Terminology
 ===========
 
@@ -200,12 +227,13 @@ or MCT) to issue commands and receive telemetry. These are transmitted over
 what is shown as a single communications link, though these could be using
 multiple frequencies or channels.
 
-Commands sent through tcslib go to the tcscmd process, directed as appropriate to
-either the command interpreter or the the
-various data handlers. This is shown as a multiplexed link, such as something
-using an IP address for the command interpretter and each of the
-data handlers, the but other options
-can be easily implemented.
+Commands sent through tcslib go to the tcspecial process, directed as
+appropriate to either the command interpreter or the various data handlers.
+This is shown as a multiplexed link, and over IP it is one: the command
+interpreter takes commands about the spacecraft on one port and commands about
+a payload on another -- see `Where the Addresses Are`_ -- and each data
+handler exchanges payload data with the ground on an address of its own. On a
+space link the same division is by virtual channel.
 
 Telemetry from the command interpreter and the
 data handlers could also be transmitted in various ways. Each data handler
@@ -868,7 +896,7 @@ Requirement
 Requirement
     Each Endpoint has a command file descriptor
 
-In order for tcscmd to notify a given endpoint that it has some action
+In order for tcspecial to notify a given endpoint that it has some action
 to perform, it passes it a command file descriptor, which is a pipe
 interface, during endpoint initialization.
 When it wants an endpoint to perform some action, it writes a byte to that
@@ -1471,9 +1499,11 @@ two of them optional. They are given below in the order the files carry them.
 ``tcspecial``
     What tcspecial itself is configured with for this payload set: the same
     section a ``tcspecial.yaml`` holds, with the same attributes. Optional.
-    ``beacon_address`` is read from here -- see `Where the Addresses Are`_ --
-    and the rest is carried and checked and not yet read, tcspecial being
-    placed by the file ``TCSPECIAL_CONFIG_PATH`` names. The section is here so
+    Where the set's beacons go is read from here -- ``beacon_address`` and
+    ``beacon_interface``; see `Where the Addresses Are`_ -- and the rest is
+    carried and checked and not read, tcspecial being placed by the file
+    ``TCSPECIAL_CONFIG_PATH`` names. Which includes the two command ports: a
+    set does not decide where the interpreter serving it takes commands. The section is here so
     that one file can describe a whole payload set, the command interpreter
     included.
 

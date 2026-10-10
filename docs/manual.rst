@@ -39,11 +39,14 @@ not a configuration file and is unaffected.)
 
 Which Files There Are
 =====================
-Four kinds of configuration file, each read by the programs that need it.
+Three kinds of configuration file, each read by the programs that need it.
+There were four: an endpoint configuration file described the same payloads a
+payload file does, in other words, and is gone.
 
 ``tcspecial.yaml``
-    The command interpreter's own settings: the address it listens on, where
-    beacons go and how often, and where the telemetry log goes. A payload
+    The command interpreter's own settings: the address and the two ports it
+    takes commands on, where beacons go and how often, and where the telemetry
+    log goes. A payload
     set's ``tcspecial`` section states the beacon settings for that set and
     wins over these. Read at startup by tcspecial, and by tcsmoc for the
     beacon settings, both from the path ``TCSPECIAL_CONFIG_PATH`` names when
@@ -53,8 +56,7 @@ a payload configuration file
     Which data handlers exist, how tcspecial reaches each one, and how large
     its packets are. Named on the command line of every program that reads it;
     ``tests/manual/tcspecial1.yaml`` when nothing names one. Four sets are
-    shipped,
-    ``tcspecial1`` to ``tcspecial4``, each in all three formats; see
+    shipped, ``tcspecial1`` to ``tcspecial4``, each in both formats; see
     `The shipped payload sets`_.
 
 a simulator configuration file
@@ -64,8 +66,8 @@ a simulator configuration file
     ``tcspecial1sim.yaml`` beside ``tcspecial1.yaml``, both under
     ``tests/manual``.
 
-Either may be written in YAML or XML, chosen from the extension. A payload
-file is recognised by its ``payloads`` section rather than by its name; a file
+Each of them may be written in YAML or XML, chosen from the extension. A
+payload file is recognised by its ``payloads`` section rather than by its name; a file
 that names no payloads is refused, and so is one written in the language that
 used to be the alternative -- groups of endpoints and the endpoints in them --
 which is gone.

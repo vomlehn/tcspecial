@@ -1646,8 +1646,15 @@ fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<
 mod tests {
     use super::*;
 
-    /// The port a test's payload commands would go to; nothing answers on it.
-    const A_PAYLOAD_PORT: u16 = 4001;
+    /// The port a test's payload commands go to.
+    ///
+    /// Beside `UNANSWERED_ADDRESS` in the ephemeral range, and deliberately
+    /// not the 4001 a shipped configuration states: a test that wants both
+    /// links silent cannot use the port a real tcspecial binds, because one
+    /// running on the machine the tests run on would answer the payload
+    /// commands -- which is how `a_poll_leaves_the_window_its_link` came to
+    /// gather readings from a spacecraft nobody had asked for.
+    const A_PAYLOAD_PORT: u16 = 65124;
     use std::ffi::OsStr;
     use std::path::Path;
     use tcslibgs::{EndpointConfig, NetworkProtocol};

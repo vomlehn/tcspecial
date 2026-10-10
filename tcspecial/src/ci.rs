@@ -50,6 +50,10 @@ pub struct CommandInterpreter {
     /// file edited since would otherwise have the spacecraft claiming a
     /// configuration it is not serving.
     version: ConfigVersion,
+    /// The version the payload configuration file states, which every beacon
+    /// carries beside this build's. The file's own, versioned by whoever
+    /// writes the payload set.
+    config_version: ConfigVersion,
     digest: ConfigDigest,
 }
 
@@ -183,6 +187,7 @@ impl CommandInterpreter {
     pub fn new(
         config: CIConfig,
         payload_config: Vec<DHConfig>,
+        config_version: ConfigVersion,
         digest: ConfigDigest,
     ) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
@@ -207,6 +212,7 @@ impl CommandInterpreter {
             _global_stats: Statistics::new(),
             telemetry_log,
             version: ConfigVersion::of_this_build(),
+            config_version,
             digest,
         })
     }
@@ -462,6 +468,7 @@ impl CommandInterpreter {
             self.beacon_interface,
             self.telemetry_log.clone(),
             self.version,
+            self.config_version,
             self.digest,
         );
 
@@ -528,6 +535,12 @@ mod tests {
     use super::*;
     use tcslibgs::{ConfigDHCommand, NetworkProtocol};
 
+    /// The version a payload set states, where which version is not what is
+    /// being tested.
+    fn a_config_version() -> ConfigVersion {
+        ConfigVersion::of_text("1.0").expect("a version")
+    }
+
     /// A digest for an interpreter whose digest is not what is being tested.
     fn a_digest() -> ConfigDigest {
         ConfigDigest([0; 16])
@@ -555,7 +568,7 @@ mod tests {
             log_segment_bytes: 65_536,
         };
 
-        let ci = CommandInterpreter::new(config, vec![], a_digest());
+        let ci = CommandInterpreter::new(config, vec![], a_config_version(), a_digest());
         assert!(ci.is_ok());
     }
 
@@ -582,6 +595,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![],
+            a_config_version(),
             mine,
         )
         .expect("an interpreter");
@@ -645,6 +659,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_config_version(),
             a_digest(),
         )
         .expect("an interpreter");
@@ -739,6 +754,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_config_version(),
             a_digest(),
         )
         .expect("an interpreter");
@@ -847,6 +863,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_config_version(),
             a_digest(),
         )
         .expect("an interpreter");
@@ -926,6 +943,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_config_version(),
             a_digest(),
         )
         .expect("an interpreter");
@@ -1032,6 +1050,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![handler],
+            a_config_version(),
             a_digest(),
         )
         .expect("an interpreter");
@@ -1091,7 +1110,7 @@ mod tests {
             log_segment_bytes: 65_536,
         };
 
-        let message = CommandInterpreter::new(config, vec![], a_digest())
+        let message = CommandInterpreter::new(config, vec![], a_config_version(), a_digest())
             .err()
             .expect("binding a held port must fail")
             .to_string();
@@ -1124,6 +1143,7 @@ mod tests {
                 log_segment_bytes: 65_536,
             },
             vec![],
+            a_config_version(),
             a_digest(),
         )
         .expect("an interpreter")

@@ -7,7 +7,8 @@ use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 use crate::{
-    load_config_file, CIConfigJson, ConfigFormat, DHConfig, PayloadConfig, TcsError, TcsResult,
+    load_config_file, CIConfigJson, ConfigFormat, ConfigVersion, DHConfig, PayloadConfig,
+    TcsError, TcsResult,
 };
 
 /// Which environment variable names each program's payload configuration, and
@@ -195,6 +196,33 @@ pub fn load_tcspecial_section<P: AsRef<Path>>(path: P) -> TcsResult<Option<CICon
     describes_payloads(&text, format)?;
     let config: PayloadConfig = format.parse(&text)?;
     Ok(config.tcspecial)
+}
+
+/// The version a payload set states, as the three bytes a beacon carries.
+///
+/// Here beside the section loader and for the same reason: tcspecial wants one
+/// fact out of the file that the handlers do not carry, and reading the file
+/// again at startup is cheaper than threading the whole document through every
+/// program that only wants the handlers.
+///
+/// A version that is not one, two or three decimal parts is an error rather
+/// than a nought: it goes out in every beacon, where a wrong version is worse
+/// than no program at all.
+pub fn load_config_version<P: AsRef<Path>>(path: P) -> TcsResult<ConfigVersion> {
+    let path = path.as_ref();
+    let format = ConfigFormat::of_file(path)?;
+    let text = fs::read_to_string(path)?;
+
+    describes_payloads(&text, format)?;
+    let config: PayloadConfig = format.parse(&text)?;
+    config.config_version().ok_or_else(|| {
+        TcsError::Config(format!(
+            "{}: version \"{}\" is not one, two or three decimal parts, and a \
+             payload set says its version in every beacon",
+            path.display(),
+            config.version
+        ))
+    })
 }
 
 /// Load data handlers from a payload configuration file.

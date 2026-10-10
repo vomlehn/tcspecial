@@ -7,7 +7,8 @@ use std::process;
 
 use log::{error, info, trace};
 use tcslibgs::config::{
-    load_dh_configs, load_tcspecial_section, payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR,
+    load_config_version, load_dh_configs, load_tcspecial_section, payload_path_from_args,
+    PAYLOAD_CONFIG_PATH_VAR,
 };
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path};
@@ -118,15 +119,32 @@ fn main() {
             process::exit(1);
         }
     };
+    // The version the set states, which goes out in every beacon beside this
+    // build's: a ground station hearing a beacon is told which software is
+    // flying and which payload set it is serving.
+    let config_version = match load_config_version(&payload_path) {
+        Ok(version) => version,
+        Err(e) => {
+            error!("{}", e);
+            process::exit(1);
+        }
+    };
+
     eprintln!(
-        "Version {}, configuration {} md5 {}",
+        "Version {}, configuration {} version {} md5 {}",
         ConfigVersion::of_this_build(),
         payload_path,
+        config_version,
         digest
     );
 
     // Create command interpreter
-    let mut ci = match CommandInterpreter::new(tcspecial_config, payload_config, digest) {
+    let mut ci = match CommandInterpreter::new(
+        tcspecial_config,
+        payload_config,
+        config_version,
+        digest,
+    ) {
         Ok(ci) => ci,
         Err(e) => {
             error!("Error creating command interpreter: {}", e);

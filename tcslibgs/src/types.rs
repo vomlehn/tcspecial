@@ -871,6 +871,14 @@ pub struct PayloadConfig {
 }
 
 impl PayloadConfig {
+    /// The version this file states, as the three bytes a beacon carries.
+    ///
+    /// `None` for a file whose version is not one, two or three decimal
+    /// parts, which [`Self::check`] refuses.
+    pub fn config_version(&self) -> Option<crate::ConfigVersion> {
+        crate::ConfigVersion::of_text(&self.version)
+    }
+
     pub fn len(&self) -> usize {
         self.payloads.len()
     }
@@ -922,6 +930,21 @@ impl PayloadConfig {
     /// reported on.
     pub fn check(&self) -> (Vec<DHConfig>, Vec<Problem>) {
         let mut problems: Vec<Problem> = Vec::new();
+
+        // The version this file states, which every beacon carries as three
+        // bytes: see `crate::BeaconTelemetry`. A file whose version cannot be
+        // read as three decimal parts would be announced as something it is
+        // not, so it is refused here rather than rounded to nought.
+        if self.config_version().is_none() {
+            problems.push(Problem::section(
+                "version",
+                format!(
+                    "version \"{}\" is not one, two or three decimal parts, and a \
+                     payload set says its version in every beacon",
+                    self.version
+                ),
+            ));
+        }
 
         let mut seen: BTreeSet<&str> = BTreeSet::new();
         for group in &self.payload_groups {
@@ -2446,6 +2469,38 @@ payloads:
     /// The position is recorded as the list is read, so it is the same number
     /// in all three spellings of one set -- which a line number could not be,
     /// and which is what lets the three digest alike.
+    /// A set states its version in parts a beacon can carry.
+    ///
+    /// The version goes out in every beacon as three bytes, so a file whose
+    /// version is not one, two or three decimal parts is refused rather than
+    /// announced as something it is not.
+    #[test]
+    fn a_set_says_its_version_in_parts_a_beacon_can_carry() {
+        let with = |version: &str| {
+            format!(
+                "version: \"{version}\"\ndescription: one payload\npayloads:\n  \
+                 - dh_id: 0\n    name: p\n    type: device\n    path: /dev/null\n    \
+                 packet_size: 1\n"
+            )
+        };
+
+        for version in ["1.0", "2", "3.4.5"] {
+            payload(&with(version))
+                .to_dh_configs()
+                .unwrap_or_else(|e| panic!("{version}: {e}"));
+        }
+
+        for version in ["one", "1.0-draft", "1.2.3.4", "256.0"] {
+            let said = payload(&with(version))
+                .to_dh_configs()
+                .expect_err(version);
+            assert!(
+                said.contains("version") && said.contains(version),
+                "{version}: {said}"
+            );
+        }
+    }
+
     #[test]
     fn a_payload_knows_where_in_the_file_it_stood() {
         for (format, text) in two_payloads() {

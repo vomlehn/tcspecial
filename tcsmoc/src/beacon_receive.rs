@@ -270,7 +270,7 @@ fn beacon_last_received(at: Option<SystemTime>) -> String {
 /// payload set states, and the digest of the configuration file it read.
 ///
 /// ```text
-/// v: 0.1.0 config v: 1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
+/// v0.1.0 config v1.0.0 md5: 8d908f54a3d72d0704213113b92d958b
 /// ```
 ///
 /// Both versions are three decimal parts, as they go on the link -- a byte
@@ -287,7 +287,7 @@ pub(crate) fn what_it_read(
     config_version: tcslibgs::ConfigVersion,
     digest: tcslibgs::ConfigDigest,
 ) -> String {
-    format!("v: {version} config v: {config_version} md5: {digest}")
+    format!("v{version} config v{config_version} md5: {digest}")
 }
 
 /// What a beacon said, as the window shows it.
@@ -621,7 +621,7 @@ mod tests {
 
         // Each labelled, each version three decimal parts, and the digest hex
         // with nothing between the bytes.
-        let want = format!("v: 1.2.3 config v: 4.5.6 md5: {}", "ab".repeat(16));
+        let want = format!("v1.2.3 config v4.5.6 md5: {}", "ab".repeat(16));
         assert_eq!(beacon_message(&datagram), want);
 
         // And the answer to a CONNECT is written by the same function, so the

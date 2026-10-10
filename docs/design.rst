@@ -524,7 +524,7 @@ Requirement
 
 Requirement
     The MOC shows what the last beacon said as one line, each of the three
-    labelled: ``v: 0.1.0 config v: 1.0.0 md5:`` and the digest's sixteen
+    labelled: ``v0.1.0 config v1.0.0 md5:`` and the digest's sixteen
     bytes in hex with nothing between them. The answer to a ``CONNECT`` is
     written the same way; see `What Each End Read`_.
 
@@ -1303,7 +1303,7 @@ Requirement
 
 Requirement
     The answer is shown as one line, each of the three labelled:
-    ``v: 0.1.0 config v: 1.0.0 md5:`` and the digest in hex. The same three
+    ``v0.1.0 config v1.0.0 md5:`` and the digest in hex. The same three
     facts a beacon carries, written the same way by the same function, because
     the two are read against each other.
 

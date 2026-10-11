@@ -739,6 +739,21 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 33] {
     ]
 }
 
+/// A term of a link in these, apart from the ones `own` names.
+///
+/// For the two kinds that are not on a link -- a network address and a plain
+/// device file -- which have no rules of their own to refuse what belongs to
+/// another kind. Every other kind refuses them with
+/// [`reject_foreign_fields`], and these two were left ignoring them: a device
+/// payload could state a data rate, or a sensor's channels, and be read as a
+/// device payload that said nothing of the sort.
+pub(crate) fn a_link_term(g: &LinkTerms, own: &[&str]) -> Option<&'static str> {
+    type_specific_fields(g)
+        .into_iter()
+        .find(|(field, present)| *present && !own.contains(field))
+        .map(|(field, _)| field)
+}
+
 /// Reject any attribute that belongs to some other type of group.
 ///
 /// An attribute that does not apply is an error rather than being ignored, so

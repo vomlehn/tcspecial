@@ -746,7 +746,21 @@ mod tests {
             .recv_from(&mut buffer)
             .expect("the handler should send payload data once spoken to");
 
-        let running = dh.statistics();
+        // Waited for rather than read once. The conduit writes the ground and
+        // then takes the lock to count what it wrote, so a datagram can be in
+        // the ground's hands a few instructions before the count is: reading
+        // the statistics the moment recv_from returns failed about one run in
+        // a hundred, and only ever on a loaded machine.
+        let running = (0..100)
+            .map(|_| {
+                let stats = dh.statistics();
+                if stats.bytes_sent == 0 {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                stats
+            })
+            .find(|stats| stats.bytes_sent != 0)
+            .unwrap_or_else(|| dh.statistics());
         assert_ne!(
             running.bytes_sent, 0,
             "a running handler reported no bytes sent"

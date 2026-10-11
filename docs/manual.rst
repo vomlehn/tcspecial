@@ -616,6 +616,13 @@ otherwise produces a payload that looks configured and is not:
   does: a payload of one kind joining a group written for another is what this
   catches, and the error names the group when the group is where the attribute
   came from.
+* A **term of a link on a kind that is not on one**: a ``datarate`` or a
+  ``spi_mode`` or a set of ``lines`` on a network or device payload. Each kind
+  that *is* on a link refuses what belongs to another kind as its own terms are
+  read, and those two kinds have no terms of their own to read -- so a term
+  written on one of them used to be taken in and dropped, which is a payload
+  that looks configured and is not. A network payload's ``protocol`` is its
+  own kind's and is not a term of somebody else's link.
 * A **word that is not an attribute**. A misspelled ``oc_address`` is a
   payload with nowhere to send its data, and ignoring the word says nothing
   about it.

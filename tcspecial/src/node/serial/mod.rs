@@ -14,6 +14,11 @@
 //!
 //! See [`crate::endpoint`] for the traits.
 
+// The two-wire variant, which is one of a line's own terms rather than
+// an interface of its own -- so it nests here rather than sitting beside
+// this in node/.
+pub mod rs485;
+
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
@@ -77,7 +82,7 @@ impl SerialEndpoint {
             // controlling terminal of a process that opens it without this,
             // and then a read from a background process group raises SIGTTIN
             // and a hangup raises SIGHUP: a handler stopped or killed for
-            // reasons that have nothing to do with its payload.
+            // reasons that have nothing to do with its device.
             .custom_flags(libc::O_NOCTTY)
             .open(&config.path)?;
 
@@ -105,7 +110,7 @@ impl SerialEndpoint {
 
 /// Set the line's data rate, byte length and stop bits.
 ///
-/// Raw rather than canonical: a payload link carries bytes, and the line
+/// Raw rather than canonical: a device link carries bytes, and the line
 /// discipline's editing, echo and newline translation would corrupt them. No
 /// parity, because the configuration language has none to give -- a serial
 /// group states the rate, the stop bits and the byte length, and nothing about
@@ -147,8 +152,8 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
     // computed from the data, which is a protocol marking a frame rather than
     // checking one, and the flag that asks for it is Linux's own.
     terms.c_cflag |= parity_flags(config.parity.unwrap_or(Parity::None));
-    // Read and write both: a payload link is two-way, and a port that is not
-    // CLOCAL waits on carrier a payload link does not have.
+    // Read and write both: a device link is two-way, and a port that is not
+    // CLOCAL waits on carrier a device link does not have.
     terms.c_cflag |= libc::CREAD | libc::CLOCAL;
 
     if unsafe { libc::cfsetispeed(&mut terms, speed) } != 0
@@ -221,9 +226,9 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
     // two-wire bus. After the termios terms, because the mode is a property
     // of the port rather than of the line discipline and the driver wants the
     // line already set up; and refused rather than reported, for the reason
-    // endpoint_rs485::apply gives.
+    // serial::rs485::apply gives.
     if let Some(terms) = &config.rs485 {
-        crate::endpoint_rs485::apply(fd, what, terms)?;
+        crate::node::serial::rs485::apply(fd, what, terms)?;
     }
 
     Ok(())
@@ -411,7 +416,7 @@ mod tests {
             rs485: None,
         };
 
-        // No parity, which is what a payload link commonly runs and what a
+        // No parity, which is what a device link commonly runs and what a
         // pty will take: the port comes back with the bit disabled.
         let endpoint =
             SerialEndpoint::new("telemetry", &line(Parity::None)).expect("a pty takes none");
@@ -517,16 +522,16 @@ mod tests {
         let mut endpoint = SerialEndpoint::new("telemetry", &config)
             .unwrap_or_else(|e| panic!("{slave} would not open as a line: {e}"));
 
-        // What the payload's end writes, the handler's end reads. Raw terms
+        // What the device's end writes, the handler's end reads. Raw terms
         // were applied when the endpoint was opened, so these bytes are not
         // edited, echoed or translated on the way.
-        master.write_all(b"from the payload").expect("the far end writes");
+        master.write_all(b"from the device").expect("the far end writes");
         master.flush().ok();
 
         let mut buffer = [0u8; 64];
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut got = Vec::new();
-        while got.len() < b"from the payload".len() && std::time::Instant::now() < deadline {
+        while got.len() < b"from the device".len() && std::time::Instant::now() < deadline {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
                 _ => std::thread::sleep(std::time::Duration::from_millis(10)),
@@ -535,7 +540,7 @@ mod tests {
 
         assert_eq!(
             got,
-            b"from the payload",
+            b"from the device",
             "what came up the line was {:?}",
             String::from_utf8_lossy(&got)
         );

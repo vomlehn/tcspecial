@@ -71,7 +71,7 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
-        // to open is made to lead there; see payload_serial.
+        // to open is made to lead there; see node::serial.
         //
         // The line's terms do not come this way. A pty takes a data rate and
         // ignores it, so what the handler sets them to is between the handler

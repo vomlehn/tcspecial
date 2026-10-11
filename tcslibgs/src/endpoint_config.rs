@@ -31,7 +31,7 @@ use crate::node::iio::IioParams;
 use crate::node::gpio::GpioParams;
 use crate::node::rpmsg::RpmsgParams;
 use crate::node::i2c::I2cParams;
-use crate::endpoint_config_serial::SerialParams;
+use crate::node::serial::SerialParams;
 use crate::node::spi::SpiParams;
 
 // The per-kind types are named from here as well as from their own files, so
@@ -42,8 +42,8 @@ pub use crate::node::can::CanParams as CanGroupParams;
 pub use crate::node::iio::IioParams as IioGroupParams;
 pub use crate::node::gpio::GpioParams as GpioGroupParams;
 pub use crate::node::rpmsg::RpmsgParams as RpmsgGroupParams;
-pub use crate::endpoint_config_rs485::Rs485Params;
-pub use crate::endpoint_config_serial::{ByteLength, StopBits};
+pub use crate::node::serial::rs485::Rs485Params;
+pub use crate::node::serial::{ByteLength, StopBits};
 pub use crate::node::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 use crate::types::{
     CanConfig, EndpointConfig, GpioConfig, I2cConfig, IioConfig, RpmsgConfig, SerialConfig,
@@ -376,7 +376,7 @@ pub(crate) struct LinkTerms {
     /// [`GroupKind::stream`].
     pub(crate) stream: Option<StreamTerms>,
     /// Whether a start-stop line is a half-duplex RS-485 bus, and what its
-    /// turnaround is; see [`crate::endpoint_config_rs485`].
+    /// turnaround is; see [`crate::node::serial::rs485`].
     pub(crate) rs485: Option<Scalar>,
     pub(crate) rs485_rts_on_send: Option<Scalar>,
     pub(crate) rs485_delay_before_send_ms: Option<Scalar>,

@@ -24,7 +24,6 @@ mod grid;
 mod payload;
 mod payload_device;
 mod node;
-mod payload_serial;
 mod payload_tcp;
 mod payload_unix;
 mod pty;

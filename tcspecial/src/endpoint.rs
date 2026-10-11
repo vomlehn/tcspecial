@@ -29,7 +29,7 @@ use crate::node::gpio::GpioEndpoint;
 use crate::node::i2c::I2cEndpoint;
 use crate::node::iio::IioEndpoint;
 use crate::node::rpmsg::RpmsgEndpoint;
-use crate::endpoint_serial::SerialEndpoint;
+use crate::node::serial::SerialEndpoint;
 use crate::node::spi::SpiEndpoint;
 use crate::endpoint_tcp::TcpEndpoint;
 use crate::endpoint_udp::UdpEndpoint;

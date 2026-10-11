@@ -1,4 +1,4 @@
-//! A simulated payload at the far end of a serial line, by way of a pty.
+//! A simulated device at the far end of a serial line, by way of a pty.
 //!
 //! The one kind of hardware the simulator can honestly be. A pseudo-terminal
 //! is a pair: a master, which this end holds, and a slave, which is a device
@@ -15,7 +15,7 @@
 //!
 //! The slave's name is the kernel's to choose -- `/dev/pts/4` and the like --
 //! and the configuration names a port, so the path the handler was told to
-//! open is made a symbolic link to the slave for as long as the payload runs.
+//! open is made a symbolic link to the slave for as long as the device runs.
 //! A path that is anything other than a link the simulator made is left alone
 //! and reported: a simulator that unlinked `/dev/ttyS0` to stand in for it
 //! would be worse than one that could not.
@@ -33,13 +33,13 @@ use crate::payload::{
 };
 use crate::pty::SimulatedNode;
 
-/// Run serial payload simulation
+/// Run serial device simulation
 ///
 /// As every other kind: a packet every packet interval, in segments, from
 /// Start until Stop. What a handler reads is the slave side of the pty, which
 /// is a device file with a line discipline -- so the bytes arrive as bytes on
 /// a port, not as datagrams with edges.
-pub fn run_serial_payload(
+pub fn run_serial_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
@@ -73,7 +73,7 @@ pub fn run_serial_payload(
             }
         }
 
-        // And a packet of this payload's own. A segment is a write rather
+        // And a packet of this device's own. A segment is a write rather
         // than a datagram: a line has no edges, so what divides a packet for
         // a handler reading one is when the bytes arrive, which is what the
         // segment interval decides.
@@ -135,7 +135,7 @@ mod tests {
         ))
     }
 
-    fn payload_at(path: &Path, packet: u32, segment: u32) -> SimulatedPayload {
+    fn device_at(path: &Path, packet: u32, segment: u32) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Serial,
@@ -157,16 +157,16 @@ mod tests {
     }
 
     /// The configured path leads to a line a handler can open, and the data a
-    /// handler reads there is the packets the payload is producing.
+    /// handler reads there is the packets the device is producing.
     ///
     /// This is what the simulator could not do at all: a serial handler had no
     /// far end to talk to, so a tcspecial configuration with a line in it could
     /// be run only against real hardware.
     #[test]
-    fn a_serial_payload_is_a_line_the_configured_path_leads_to() {
+    fn a_serial_device_is_a_line_the_configured_path_leads_to() {
         let path = a_path("line");
-        let mut payload = payload_at(&path, 12, 5);
-        payload.start().expect("the payload starts");
+        let mut device = device_at(&path, 12, 5);
+        device.start().expect("the device starts");
 
         // Wait for the line to be there, as a handler started first would.
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -185,7 +185,7 @@ mod tests {
             slave.display()
         );
 
-        // Open it as the handler does, and read what the payload is sending.
+        // Open it as the handler does, and read what the device is sending.
         // Raw, so that nothing is waiting for a line of text: this is the
         // same thing SerialEndpoint does when it applies the configured
         // terms.
@@ -206,8 +206,8 @@ mod tests {
             }
         }
 
-        let stats = payload.stats();
-        payload.stop();
+        let stats = device.stats();
+        device.stop();
 
         assert!(
             got.len() >= 12,
@@ -216,11 +216,11 @@ mod tests {
         );
         assert!(
             stats.bytes_sent >= 12,
-            "the payload counted {} bytes sent",
+            "the device counted {} bytes sent",
             stats.bytes_sent
         );
 
-        // And the link goes when the payload does, rather than pointing at a
+        // And the link goes when the device does, rather than pointing at a
         // pty that no longer exists.
         assert!(
             !path.is_symlink(),

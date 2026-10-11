@@ -1,7 +1,7 @@
 //! RS-485 on a serial line: the half-duplex turnaround.
 //!
 //! **Experimental, and not yet supported.** The terms parse and reach a
-//! handler, and tcspecial asks the port for them; no payload set is shipped
+//! handler, and tcspecial asks the port for them; no configuration is shipped
 //! that uses them and nothing has been run against real RS-485 hardware.
 //!
 //! RS-485 is not another kind of link. It is the electrical layer under a
@@ -14,7 +14,7 @@
 //! bus either side of a transmission.
 //!
 //! So these are terms of the `serial` kind rather than a kind of their own.
-//! A payload on a four-wire RS-422 line states none of them and is unchanged;
+//! A device on a four-wire RS-422 line states none of them and is unchanged;
 //! one on a two-wire RS-485 bus states `rs485: true` and as much of the rest
 //! as its wiring needs.
 //!
@@ -29,7 +29,7 @@ use crate::endpoint_config::{bad, parse_flag, parse_u32, EndpointConfigResult, L
 
 /// What a line's RS-485 turnaround is set to.
 ///
-/// Carried to the handler, where `tcspecial::endpoint_rs485` asks the port
+/// Carried to the handler, where `tcspecial::node::serial::rs485` asks the port
 /// for it. Absent -- `None` on a [`crate::SerialConfig`] -- is a line that is
 /// not an RS-485 bus and is left exactly as it was before any of this
 /// existed.
@@ -66,7 +66,7 @@ pub struct Rs485Params {
 /// failed.
 pub const LONGEST_DELAY_MS: u32 = 1_000;
 
-/// What a serial payload said about RS-485, and what it must say to say
+/// What a serial device said about RS-485, and what it must say to say
 /// anything at all.
 ///
 /// `None` when the line is not an RS-485 bus, which is a line stating nothing
@@ -200,7 +200,7 @@ mod tests {
 
     /// A line that says nothing is not an RS-485 bus.
     ///
-    /// Which is what every payload set written before this existed says, and
+    /// Which is what every configuration written before this existed says, and
     /// what a four-wire line says: the mode is off and the port is left as it
     /// was.
     #[test]

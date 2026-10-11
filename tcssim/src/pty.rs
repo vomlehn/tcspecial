@@ -5,7 +5,7 @@
 //! behind it, and a handler opens it, sets it and reads it exactly as it would
 //! a port. And a SPI peripheral, where it is not: a pty carries the bytes and
 //! has no clock, so what the handler sets a real peripheral to has nowhere to
-//! go. See [`crate::payload_serial`] and [`crate::node::spi`] for what each
+//! go. See [`crate::node::serial`] and [`crate::node::spi`] for what each
 //! makes of that.
 //!
 //! What they share is here: opening the pty, taking the line discipline out of

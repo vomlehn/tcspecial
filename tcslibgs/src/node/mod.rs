@@ -23,3 +23,4 @@ pub mod can;
 pub mod gpio;
 pub mod iio;
 pub mod rpmsg;
+pub mod serial;

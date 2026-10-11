@@ -2,7 +2,7 @@
 //!
 //! The one kind of endpoint where the link itself says who is at the far end:
 //! a stream has to be accepted before anything passes either way. A stream
-//! payload therefore listens and the handler connects to it, which is also
+//! device therefore listens and the handler connects to it, which is also
 //! the only kind of endpoint that can be refused -- and refusal is ordinary
 //! rather than a fault, so it is waited out here.
 //!
@@ -83,8 +83,8 @@ impl TcpEndpoint {
 
     /// Connect as a client, retrying while refused.
     ///
-    /// See [`connect_retrying`]. A handler may be started before the payload
-    /// it reaches, and a payload that is not listening yet refuses rather than
+    /// See [`connect_retrying`]. A handler may be started before the device
+    /// it reaches, and a device that is not listening yet refuses rather than
     /// failing in any way that waiting cannot fix.
     pub fn connect_retrying(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
@@ -167,7 +167,7 @@ impl EndpointWritable for TcpEndpoint {
 /// Reach `addr`, retrying while the connection is refused.
 ///
 /// A refusal means nothing is listening yet, which is the ordinary case when a
-/// handler is started before the payload it serves: the simulated payload is a
+/// handler is started before the device it serves: the simulated device is a
 /// program someone has to press Start on. So the attempt is repeated, with the
 /// delay doubling from [`ENDPOINT_DELAY_INIT`] and never exceeding
 /// [`ENDPOINT_DELAY_MAX`], until [`ENDPOINT_CONNECT_BUDGET`] is spent.
@@ -176,10 +176,10 @@ impl EndpointWritable for TcpEndpoint {
 /// that cannot be reached, will not become right by being asked again, and
 /// repeating those would turn a clear fault into a slow one.
 ///
-/// `what` is the handler this is being done for, as the payload configuration
-/// names it: several handlers wait for several payloads at once, and an
+/// `what` is the handler this is being done for, as the device configuration
+/// names it: several handlers wait for several devices at once, and an
 /// address on its own leaves the log saying which address was refused without
-/// saying whose payload is missing.
+/// saying whose device is missing.
 pub(crate) fn connect_retrying<T>(
     what: &str,
     addr: &str,
@@ -206,7 +206,7 @@ pub(crate) fn connect_retrying<T>(
                 if left.is_zero() {
                     return Err(TcsError::Config(format!(
                         "{what}: cannot reach {addr}: connection refused for {:?}. \
-                         Nothing is listening there -- a simulated payload has to be \
+                         Nothing is listening there -- a simulated device has to be \
                          started before the handler that reaches it",
                         ENDPOINT_CONNECT_BUDGET
                     )));
@@ -227,8 +227,8 @@ mod tests {
 
     /// A refused connection is retried until the far end is listening.
     ///
-    /// This is the ordinary case: a handler may be started before the payload
-    /// it reaches, because the simulated payload is a program someone has to
+    /// This is the ordinary case: a handler may be started before the device
+    /// it reaches, because the simulated device is a program someone has to
     /// press Start on. The listener here appears after the first attempt must
     /// already have failed.
     #[test]
@@ -303,8 +303,8 @@ mod tests {
             message.contains("refused") && message.contains("started before"),
             "the error should say what to do about it, but said: {message}"
         );
-        // And which handler gave up: several wait for several payloads at
-        // once, so an address alone does not say whose payload is missing.
+        // And which handler gave up: several wait for several devices at
+        // once, so an address alone does not say whose device is missing.
         assert!(
             message.contains("imager"),
             "the error does not say which handler: {message}"

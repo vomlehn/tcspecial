@@ -3,6 +3,14 @@
 //! Work in progress: only the unix family is filled in, and the commented-out
 //! blocks below are the families still to be described.
 
+// The three transports this type covers. They nest here rather than sitting
+// beside network in node/, because the configuration already treats them as
+// one type with a protocol attribute -- a network node states which transport
+// it runs over, where every other type is addressed by what it is.
+pub mod tcp;
+pub mod udp;
+pub mod unix;
+
 use libc::{IPPROTO_TCP, IPPROTO_UDP, IPPROTO_SCTP, IPPROTO_UDPLITE};
 use socket2::{Domain, Type};
 use std::collections::BTreeMap;

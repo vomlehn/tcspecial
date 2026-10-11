@@ -1,8 +1,8 @@
 //! The UDP endpoint: one datagram socket, read and written by two conduits.
 //!
 //! Used for both sides of a handler. The OC side binds the address the ground
-//! was told to send to; the payload side binds the address its payload sends
-//! to, since a datagram payload is the end that speaks first. Either way the
+//! was told to send to; the device side binds the address its device sends
+//! to, since a datagram device is the end that speaks first. Either way the
 //! far end is learnt rather than configured -- a datagram's sender is the only
 //! statement of where it came from -- which is why a write before anything has
 //! been read is an error rather than a write of no bytes.
@@ -26,7 +26,7 @@ use crate::endpoint::{
 
 /// UDP endpoint for network communication
 pub struct UdpEndpoint {
-    /// The handler this endpoint belongs to, as the payload configuration
+    /// The handler this endpoint belongs to, as the device configuration
     /// names it, so that what this endpoint says of itself says which handler
     /// it is for.
     what: String,

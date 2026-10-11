@@ -1,4 +1,4 @@
-//! A simulated payload at the far end of a Unix-domain socket.
+//! A simulated device at the far end of a Unix-domain socket.
 //!
 //! The easiest of the kinds to stand in for: the simulator can simply be one.
 //! A Unix socket is a socket, so there is no emulation here and nothing the
@@ -9,9 +9,9 @@
 //! What a Unix socket does bring is a path, and which end owns it differs by
 //! protocol, because which end binds does:
 //!
-//! * A stream payload listens, as a TCP one does, so the simulator binds the
-//!   path the handler was told to connect to. The path is the payload's.
-//! * A datagram payload sends first, as a UDP one does, so the handler binds
+//! * A stream device listens, as a TCP one does, so the simulator binds the
+//!   path the handler was told to connect to. The path is the device's.
+//! * A datagram device sends first, as a UDP one does, so the handler binds
 //!   that path and the simulator binds one of its own beside it -- a datagram
 //!   socket needs a path of its own to be answered at, which a UDP one gets
 //!   for nothing from its port.
@@ -37,15 +37,15 @@ use crate::payload::{
     PayloadConfig, PayloadStats, Produce,
 };
 
-/// What a datagram payload's own path is called, given the handler's.
+/// What a datagram device's own path is called, given the handler's.
 ///
 /// Derived rather than configured: nothing in a tcspecial configuration names
-/// it, and nothing needs to -- the handler learns where its payload is from the
+/// it, and nothing needs to -- the handler learns where its device is from the
 /// first datagram, as it does over UDP. Beside the handler's path so that the
 /// two are plainly a pair when something goes wrong and somebody is looking at
 /// a directory.
 fn a_path_of_its_own(handler: &str) -> PathBuf {
-    PathBuf::from(format!("{handler}.payload"))
+    PathBuf::from(format!("{handler}.device"))
 }
 
 /// A socket bound at a path, which is removed with it.
@@ -103,20 +103,20 @@ fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
     }
 }
 
-/// Run Unix-domain stream payload simulation
+/// Run Unix-domain stream device simulation
 ///
 /// The simulator listens at the configured path and the handler connects to
 /// it, as for TCP. Nothing is sent until there is a connection to send it on,
 /// and from then on a packet goes every packet interval whether anything has
 /// been received or not.
-pub fn run_unix_stream_payload(
+pub fn run_unix_stream_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
     let path = PathBuf::from(&config.address);
     if let Err(e) = clear_a_dead_socket(&path) {
-        eprintln!("{}: failed to stand in for a Unix stream payload: {}", config.name, e);
+        eprintln!("{}: failed to stand in for a Unix stream device: {}", config.name, e);
         return;
     }
 
@@ -129,7 +129,7 @@ pub fn run_unix_stream_payload(
     };
     let _bound = BoundPath { path: path.clone() };
     listener.set_nonblocking(true).ok();
-    eprintln!("{}: a Unix stream payload is listening at {}", config.name, path.display());
+    eprintln!("{}: a Unix stream device is listening at {}", config.name, path.display());
 
     let mut connection: Option<UnixStream> = None;
     let mut rng = rand::thread_rng();
@@ -192,9 +192,9 @@ pub fn run_unix_stream_payload(
                 }
             }
 
-            // And hanging up, for a payload told to. Dropping the stream
+            // And hanging up, for a device told to. Dropping the stream
             // closes it, which the handler sees as the end of its link; the
-            // next pass listens again, so a payload that hung up is one that
+            // next pass listens again, so a device that hung up is one that
             // can be reconnected to rather than one that has gone for good.
             if hangs_up(&config, sent) {
                 eprintln!("{}: hanging up after {sent} packets", config.name);
@@ -207,13 +207,13 @@ pub fn run_unix_stream_payload(
     }
 }
 
-/// Run Unix-domain datagram payload simulation
+/// Run Unix-domain datagram device simulation
 ///
 /// The handler binds the configured path and this end sends to it, as for UDP
 /// and for the same reason: a datagram connect tells the far end nothing, and
-/// a payload produces data because it is running rather than because it was
+/// a device produces data because it is running rather than because it was
 /// asked. A path of its own is bound so that the handler can answer.
-pub fn run_unix_dgram_payload(
+pub fn run_unix_dgram_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
@@ -229,7 +229,7 @@ pub fn run_unix_dgram_payload(
     };
 
     if let Err(e) = clear_a_dead_socket(&mine) {
-        eprintln!("{}: failed to stand in for a Unix datagram payload: {}", config.name, e);
+        eprintln!("{}: failed to stand in for a Unix datagram device: {}", config.name, e);
         return;
     }
 
@@ -243,7 +243,7 @@ pub fn run_unix_dgram_payload(
     let _bound = BoundPath { path: mine.clone() };
     socket.set_nonblocking(true).ok();
     eprintln!(
-        "{}: a Unix datagram payload at {} is sending to {}",
+        "{}: a Unix datagram device at {} is sending to {}",
         config.name,
         mine.display(),
         handler.display()
@@ -322,7 +322,7 @@ mod tests {
         ))
     }
 
-    fn payload_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
+    fn device_at(path: &Path, protocol: PayloadProtocol) -> SimulatedPayload {
         SimulatedPayload::new(PayloadConfig {
             name: "DH0".to_string(),
             protocol,
@@ -343,15 +343,15 @@ mod tests {
         })
     }
 
-    /// A stream payload listens where the handler was told to connect, and
+    /// A stream device listens where the handler was told to connect, and
     /// sends once connected.
     #[test]
-    fn a_stream_payload_listens_and_sends_once_connected() {
+    fn a_stream_device_listens_and_sends_once_connected() {
         let path = a_path("stream");
         std::fs::remove_file(&path).ok();
 
-        let mut payload = payload_at(&path, PayloadProtocol::UnixStream);
-        payload.start().expect("the payload starts");
+        let mut device = device_at(&path, PayloadProtocol::UnixStream);
+        device.start().expect("the device starts");
 
         // Wait for the socket, as a handler started first would.
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -370,29 +370,29 @@ mod tests {
         let mut buf = [0u8; 64];
         while got.len() < 12 {
             let n = handler.read(&mut buf).expect("a segment");
-            assert_ne!(n, 0, "the payload closed the connection");
+            assert_ne!(n, 0, "the device closed the connection");
             got.extend_from_slice(&buf[..n]);
         }
 
-        let stats = payload.stats();
-        payload.stop();
+        let stats = device.stats();
+        device.stop();
 
         assert!(got.len() >= 12, "only {} bytes arrived", got.len());
         assert!(stats.bytes_sent >= 12, "{} bytes counted", stats.bytes_sent);
 
-        // The socket file goes with the payload, rather than being left for
+        // The socket file goes with the device, rather than being left for
         // the next run to clear.
         assert!(
             !path.exists(),
-            "{} outlived the payload",
+            "{} outlived the device",
             path.display()
         );
     }
 
-    /// A datagram payload sends to where the handler waits, unprompted, from a
+    /// A datagram device sends to where the handler waits, unprompted, from a
     /// path of its own so that it can be answered.
     #[test]
-    fn a_datagram_payload_sends_to_where_the_handler_waits() {
+    fn a_datagram_device_sends_to_where_the_handler_waits() {
         let path = a_path("dgram");
         std::fs::remove_file(&path).ok();
         std::fs::remove_file(a_path_of_its_own(&path.display().to_string())).ok();
@@ -403,8 +403,8 @@ mod tests {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("a read timeout");
 
-        let mut payload = payload_at(&path, PayloadProtocol::UnixDgram);
-        payload.start().expect("the payload starts");
+        let mut device = device_at(&path, PayloadProtocol::UnixDgram);
+        device.start().expect("the device starts");
 
         // Twelve bytes in fives, one datagram each, and nothing was said to
         // it first.
@@ -417,7 +417,7 @@ mod tests {
             from = who.as_pathname().map(|p| p.to_path_buf());
         }
 
-        payload.stop();
+        device.stop();
 
         let ended = sizes
             .iter()
@@ -433,7 +433,7 @@ mod tests {
         assert_eq!(
             from,
             Some(a_path_of_its_own(&path.display().to_string())),
-            "the payload sent from an unnamed socket, which cannot be answered"
+            "the device sent from an unnamed socket, which cannot be answered"
         );
 
         std::fs::remove_file(&path).ok();
@@ -452,7 +452,7 @@ mod tests {
         assert!(!path.exists(), "it was not cleared");
     }
 
-    /// A socket something is listening on is not taken: two payloads at one
+    /// A socket something is listening on is not taken: two devices at one
     /// path is a configuration to report.
     #[test]
     fn a_live_socket_is_not_taken() {

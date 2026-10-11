@@ -1,4 +1,4 @@
-//! A simulated payload at the far end of a stream.
+//! A simulated device at the far end of a stream.
 //!
 //! The handler connects and this end listens, which is what a stream allows:
 //! the connection itself says who is at the other end. Nothing is sent until
@@ -19,8 +19,8 @@ use crate::payload::{
     wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
-/// Run TCP payload simulation
-pub fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+/// Run a simulated device reached over TCP.
+pub fn run_tcp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
     let addr = format!("{}:{}", config.address, config.port);
 
     // Try to bind as server
@@ -96,9 +96,9 @@ pub fn run_tcp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
                 }
             }
 
-            // And hanging up, for a payload told to. Dropping the stream
+            // And hanging up, for a device told to. Dropping the stream
             // closes it, which the handler sees as the end of its link; the
-            // next pass listens again, so a payload that hung up is one that
+            // next pass listens again, so a device that hung up is one that
             // can be reconnected to rather than one that has gone for good.
             if hangs_up(&config, sent) {
                 eprintln!("{}: hanging up after {sent} packets", config.name);
@@ -120,11 +120,11 @@ mod tests {
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
 
-    fn payload_at(port: u16, triggered: bool, interval_ms: u32) -> SimulatedPayload {
-        faulty_payload_at(port, triggered, interval_ms, Faults::default())
+    fn device_at(port: u16, triggered: bool, interval_ms: u32) -> SimulatedPayload {
+        faulty_device_at(port, triggered, interval_ms, Faults::default())
     }
 
-    fn faulty_payload_at(
+    fn faulty_device_at(
         port: u16,
         triggered: bool,
         interval_ms: u32,
@@ -155,19 +155,19 @@ mod tests {
         socket.local_addr().expect("its address").port()
     }
 
-    /// A triggered payload answers a request and says nothing otherwise.
+    /// A triggered device answers a request and says nothing otherwise.
     ///
-    /// Which is the whole of what the kind means. A payload that answered on
+    /// Which is the whole of what the kind means. A device that answered on
     /// a clock as well would be two kinds at once, and the file that
     /// described it would have no way to say which rate was which.
     #[test]
-    fn a_triggered_payload_answers_a_request_and_nothing_else() {
+    fn a_triggered_device_answers_a_request_and_nothing_else() {
         let port = a_free_port();
-        // An interval is passed and must be ignored: for a triggered payload
+        // An interval is passed and must be ignored: for a triggered device
         // the simulator configuration may not state one, and this stands for
         // what a stale one would do.
-        let mut payload = payload_at(port, true, 50);
-        payload.start().expect("the payload starts");
+        let mut device = device_at(port, true, 50);
+        device.start().expect("the device starts");
 
         // Connect, as the handler does.
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -177,7 +177,7 @@ mod tests {
                 Err(_) if Instant::now() < deadline => {
                     std::thread::sleep(Duration::from_millis(10))
                 }
-                Err(e) => panic!("the payload never listened: {e}"),
+                Err(e) => panic!("the device never listened: {e}"),
             }
         };
         handler
@@ -188,7 +188,7 @@ mod tests {
         let mut buf = [0u8; 64];
         assert!(
             handler.read(&mut buf).is_err(),
-            "a triggered payload sent without being asked"
+            "a triggered device sent without being asked"
         );
 
         // Then a request, and exactly one packet of answer.
@@ -200,7 +200,7 @@ mod tests {
         let mut got = Vec::new();
         while got.len() < 12 {
             let n = handler.read(&mut buf).expect("an answer");
-            assert_ne!(n, 0, "the payload closed the connection");
+            assert_ne!(n, 0, "the device closed the connection");
             got.extend_from_slice(&buf[..n]);
         }
         assert_eq!(got.len(), 12, "a request was answered with {} bytes", got.len());
@@ -211,16 +211,16 @@ mod tests {
             .expect("a read timeout");
         assert!(
             handler.read(&mut buf).is_err(),
-            "a triggered payload answered a request it was not sent"
+            "a triggered device answered a request it was not sent"
         );
 
-        let stats = payload.stats();
-        payload.stop();
+        let stats = device.stats();
+        device.stop();
         assert_eq!(stats.packets_sent, 1, "one request, one packet");
         assert!(stats.packets_recv >= 1, "the request was not counted");
     }
 
-    /// Connect to the payload, as a handler does, waiting for it to listen.
+    /// Connect to the device, as a handler does, waiting for it to listen.
     fn connect_to(port: u16) -> TcpStream {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
@@ -229,24 +229,24 @@ mod tests {
                 Err(_) if Instant::now() < deadline => {
                     std::thread::sleep(Duration::from_millis(10))
                 }
-                Err(e) => panic!("the payload never listened: {e}"),
+                Err(e) => panic!("the device never listened: {e}"),
             }
         }
     }
 
-    /// A payload told to hang up after so many packets ends the link, and
+    /// A device told to hang up after so many packets ends the link, and
     /// listens again.
     ///
     /// The handler sees the end of its stream -- a read of nought bytes,
     /// which is not a timeout and not an error -- after the packets it was
-    /// promised. That it can then connect again is the other half: a payload
+    /// promised. That it can then connect again is the other half: a device
     /// that hung up is one whose handler has to reconnect, not one that has
     /// gone for the rest of the run, and a handler with no second chance
     /// could not be made to take it.
     #[test]
-    fn a_payload_hanging_up_ends_the_link_and_listens_again() {
+    fn a_device_hanging_up_ends_the_link_and_listens_again() {
         let port = a_free_port();
-        let mut payload = faulty_payload_at(
+        let mut device = faulty_device_at(
             port,
             false,
             20,
@@ -255,7 +255,7 @@ mod tests {
                 ..Faults::default()
             },
         );
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         let mut handler = connect_to(port);
         handler
@@ -274,7 +274,7 @@ mod tests {
             bytes += n;
             assert!(
                 bytes <= 24,
-                "a payload hanging up after two packets of twelve sent {bytes} bytes"
+                "a device hanging up after two packets of twelve sent {bytes} bytes"
             );
         }
         assert_eq!(bytes, 24, "the link ended before the two packets did");
@@ -287,18 +287,18 @@ mod tests {
         let n = second
             .read(&mut buf)
             .expect("a packet on the link that followed the hang-up");
-        assert_ne!(n, 0, "the payload hung up on a link it had just accepted");
+        assert_ne!(n, 0, "the device hung up on a link it had just accepted");
 
-        payload.stop();
+        device.stop();
     }
 
-    /// And a periodic payload on the same loop still sends on its own, which
+    /// And a periodic device on the same loop still sends on its own, which
     /// is what the mode has to leave alone.
     #[test]
-    fn a_periodic_payload_still_sends_unasked() {
+    fn a_periodic_device_still_sends_unasked() {
         let port = a_free_port();
-        let mut payload = payload_at(port, false, 50);
-        payload.start().expect("the payload starts");
+        let mut device = device_at(port, false, 50);
+        device.start().expect("the device starts");
 
         let deadline = Instant::now() + Duration::from_secs(5);
         let mut handler = loop {
@@ -307,7 +307,7 @@ mod tests {
                 Err(_) if Instant::now() < deadline => {
                     std::thread::sleep(Duration::from_millis(10))
                 }
-                Err(e) => panic!("the payload never listened: {e}"),
+                Err(e) => panic!("the device never listened: {e}"),
             }
         };
         handler
@@ -318,6 +318,6 @@ mod tests {
         let n = handler.read(&mut buf).expect("a packet, unasked");
         assert_ne!(n, 0);
 
-        payload.stop();
+        device.stop();
     }
 }

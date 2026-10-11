@@ -14,3 +14,4 @@ pub mod gpio;
 pub mod iio;
 pub mod rpmsg;
 pub mod serial;
+pub mod network;

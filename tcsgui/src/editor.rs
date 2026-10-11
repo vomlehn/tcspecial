@@ -137,21 +137,27 @@ impl Editor {
     fn persist(&mut self) {
         self.trouble = None;
 
-        // In whichever format the file's name asks for: a configuration may be
-        // written in YAML or XML, and which one is the extension's business.
-        let text = match self.document.to_text(&self.path) {
-            Ok(text) => text,
+        // Every file the document is written as: the top diagram and one per
+        // subdiagram, each in whichever format its name asks for.
+        let files = match self.document.files(&self.path) {
+            Ok(files) => files,
             Err(why) => {
                 self.trouble = Some(why);
                 return;
             }
         };
 
-        if let Err(why) = write_atomically(&self.path, text.as_bytes()) {
-            self.trouble = Some(describe(&why));
-            // The journal is not written either. A journal ahead of its
-            // document is the failure this whole ordering exists to avoid.
-            return;
+        // Each is written atomically, so none can be left half-written. What
+        // cannot be promised across several files is that they all change
+        // together: a power failure between two of them leaves one new and one
+        // old. The journal is what recovers from that -- it is written last
+        // and holds the whole history, so replaying it rebuilds every file --
+        // which is why a failure here stops before the journal is touched.
+        for (path, text) in &files {
+            if let Err(why) = write_atomically(path, text.as_bytes()) {
+                self.trouble = Some(describe(&why));
+                return;
+            }
         }
 
         match serde_yaml::to_string(&self.journal) {
@@ -201,6 +207,7 @@ mod tests {
         Edit::AddNode {
             name: name.to_string(),
             node_type: node_type.to_string(),
+            home: None,
         }
     }
 
@@ -368,6 +375,86 @@ mod tests {
         let recovered = Editor::recover(&path);
         assert_eq!(recovered.document().nodes.len(), 1);
         assert_eq!(recovered.undo_depth(), 1);
+    }
+
+    /// A subdiagram is written to a file of its own, beside the top diagram.
+    #[test]
+    fn a_subdiagram_is_written_to_its_own_file() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let mut editor = Editor::new(&path);
+
+        editor.edit(Edit::AddNode {
+            name: "cabin".into(),
+            node_type: "subdiagram".into(),
+            home: None,
+        });
+        editor.edit(Edit::AddNode {
+            name: "temp_fore".into(),
+            node_type: "i2c".into(),
+            home: Some("cabin".into()),
+        });
+        editor.edit(Edit::AddNode {
+            name: "moc".into(),
+            node_type: "moc".into(),
+            home: None,
+        });
+        // A link that crosses the boundary, which was asked for.
+        editor.edit(Edit::AddLink {
+            link: crate::journal::Link::new("cabin/temp_fore", "moc", None),
+        });
+        assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
+
+        let top = std::fs::read_to_string(&path).expect("the top diagram");
+        let inner =
+            std::fs::read_to_string(where_.path().join("cabin.yaml")).expect("the subdiagram");
+
+        // The top file names what it includes and holds its own nodes.
+        assert!(top.contains("include:\n  - cabin"), "{top}");
+        assert!(top.contains("name: moc"), "{top}");
+        assert!(
+            !top.contains("name: temp_fore"),
+            "the subdiagram's node is in the top file too: {top}"
+        );
+
+        // The subdiagram holds its node, and the crossing link is written
+        // where its source lives -- qualified at the far end only.
+        assert!(inner.contains("name: temp_fore"), "{inner}");
+        assert!(
+            inner.contains("{ from: temp_fore, to: moc }"),
+            "the crossing link should be plain at home and plain at the top, \
+             since moc has no subdiagram to qualify it with: {inner}"
+        );
+        assert!(
+            !top.contains("to: moc }"),
+            "the crossing link is written twice: {top}"
+        );
+    }
+
+    /// A subdiagram's own files are written whatever format the parent is.
+    #[test]
+    fn subdiagrams_follow_the_parent_into_xml() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.xml");
+        let mut editor = Editor::new(&path);
+
+        editor.edit(Edit::AddNode {
+            name: "cabin".into(),
+            node_type: "subdiagram".into(),
+            home: None,
+        });
+        editor.edit(Edit::AddNode {
+            name: "temp_fore".into(),
+            node_type: "i2c".into(),
+            home: Some("cabin".into()),
+        });
+
+        let top = std::fs::read_to_string(&path).expect("the top diagram");
+        let inner = std::fs::read_to_string(where_.path().join("cabin.xml"))
+            .expect("the subdiagram, in XML as its parent is");
+        assert!(top.contains("<include>cabin</include>"), "{top}");
+        assert!(inner.starts_with("<?xml"), "{inner}");
+        assert!(inner.contains("<name>temp_fore</name>"), "{inner}");
     }
 
     /// An XML name gets an XML file, and the history still works.

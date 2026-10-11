@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::journal::{Edit, Link};
 use crate::style::NodeType;
+use crate::subdiagram::{file_for, Home, Qualified};
 
 /// One node as the editor holds it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -38,6 +39,14 @@ pub struct Node {
     pub attributes: BTreeMap<String, String>,
     /// Where on the canvas. Nothing to do with the configuration.
     pub at: (i32, i32),
+    /// Which subdiagram this node lives in, or `None` for the top diagram.
+    ///
+    /// The editor holds one assembled document whatever it was read from, and
+    /// this is what says which file each node goes back to. It is also what
+    /// lets two subdiagrams each have a `temp_fore`: a node is known by its
+    /// name within its own home, and by `home/name` from outside.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Home,
     /// What somebody wrote about this node.
     ///
     /// Kept with the node and written out with it. A configuration is read by
@@ -117,12 +126,66 @@ impl Document {
         Document::default()
     }
 
+    /// The node this absolute name refers to.
+    ///
+    /// Absolute: `temp_fore` for a node of the top diagram and
+    /// `cabin/temp_fore` for one inside a subdiagram. That is how the editor
+    /// holds a name everywhere except in a file, where it is written relative
+    /// to the file it is in -- see [`Qualified::written_from`].
     pub fn node(&self, name: &str) -> Option<&Node> {
-        self.nodes.iter().find(|n| n.name == name)
+        let wanted = Qualified::parse(name);
+        self.nodes
+            .iter()
+            .find(|n| n.name == wanted.node && n.home == wanted.in_)
     }
 
     fn node_mut(&mut self, name: &str) -> Option<&mut Node> {
-        self.nodes.iter_mut().find(|n| n.name == name)
+        let wanted = Qualified::parse(name);
+        self.nodes
+            .iter_mut()
+            .find(|n| n.name == wanted.node && n.home == wanted.in_)
+    }
+
+    /// Every subdiagram the document holds, in the order they first appear.
+    ///
+    /// Taken from the nodes rather than kept in a list beside them: a list
+    /// could disagree with the nodes, and there is nothing a subdiagram is
+    /// except where some nodes live.
+    pub fn subdiagrams(&self) -> Vec<String> {
+        let mut found: Vec<String> = Vec::new();
+        for node in &self.nodes {
+            if let Some(home) = &node.home {
+                if !found.contains(home) {
+                    found.push(home.clone());
+                }
+            }
+        }
+        // And the boxes that stand for one, which may be there before anything
+        // has been put inside.
+        for node in &self.nodes {
+            if node.node_type == "subdiagram" && !found.contains(&node.name) {
+                found.push(node.name.clone());
+            }
+        }
+        found
+    }
+
+    /// The nodes that live in `home`.
+    pub fn nodes_in(&self, home: &Home) -> Vec<&Node> {
+        self.nodes.iter().filter(|n| &n.home == home).collect()
+    }
+
+    /// How many links cross into or out of `subdiagram`.
+    ///
+    /// What a closed box shows instead of its contents: the count of nodes
+    /// inside it and the count of connections that cross its edge are the two
+    /// things worth knowing about a diagram you are not looking at.
+    pub fn crossings(&self, subdiagram: &str) -> usize {
+        let inside = |name: &str| Qualified::parse(name).in_.as_deref() == Some(subdiagram);
+        self.links
+            .iter()
+            .filter(|l| inside(&l.from) != inside(&l.to))
+            .count()
     }
 
     /// Apply an edit.
@@ -139,13 +202,18 @@ impl Document {
     /// can be recovered.
     pub fn apply(&mut self, edit: &Edit) {
         match edit {
-            Edit::AddNode { name, node_type } => {
+            Edit::AddNode {
+                name,
+                node_type,
+                home,
+            } => {
                 self.nodes.push(Node {
                     name: name.clone(),
                     node_type: node_type.clone(),
                     attributes: BTreeMap::new(),
                     at: (0, 0),
                     comment: None,
+                    home: home.clone(),
                 });
             }
             Edit::RemoveNode { name, .. } => {
@@ -160,6 +228,7 @@ impl Document {
                 node_type,
                 attributes,
                 links,
+                home,
             } => {
                 self.nodes.push(Node {
                     name: name.clone(),
@@ -167,6 +236,7 @@ impl Document {
                     attributes: attributes.iter().cloned().collect(),
                     at: (0, 0),
                     comment: None,
+                    home: home.clone(),
                 });
                 for link in links {
                     if !self.links.iter().any(|l| l.same_connection(link)) {
@@ -248,13 +318,19 @@ impl Document {
     pub fn faults(&self) -> Vec<Fault> {
         let mut faults = Vec::new();
 
-        let mut seen: BTreeMap<&str, usize> = BTreeMap::new();
+        // By the name a link would have to use, not by the bare one: two
+        // subdiagrams may each hold a temp_fore, and they are two nodes
+        // because cabin/temp_fore and bay/temp_fore are two names. Counting
+        // bare names here would refuse the reuse a separate file is for.
+        let mut seen: BTreeMap<String, usize> = BTreeMap::new();
         for node in &self.nodes {
             if node.name.trim().is_empty() {
                 faults.push(Fault::NamelessNode { at: node.at });
                 continue;
             }
-            *seen.entry(node.name.as_str()).or_insert(0) += 1;
+            *seen
+                .entry(Qualified::of(&node.name, &node.home).absolute())
+                .or_insert(0) += 1;
 
             if !NodeType::ALL
                 .iter()
@@ -268,9 +344,7 @@ impl Document {
         }
         for (name, count) in seen {
             if count > 1 {
-                faults.push(Fault::DuplicateName {
-                    name: name.to_string(),
-                });
+                faults.push(Fault::DuplicateName { name });
             }
         }
 
@@ -307,32 +381,50 @@ impl Document {
         faults
     }
 
-    /// The document as a configuration file, in the format `path` asks for.
+    /// Every file this document is written as, and what goes in each.
     ///
-    /// The extension decides, which is the rule every configuration file in
-    /// this project follows: `.xml` is XML, `.yaml` and `.yml` are YAML, and
-    /// anything else is refused rather than guessed at. A guess is how a
-    /// misspelled extension becomes a file parsed as the wrong language.
-    pub fn to_text(&self, path: &std::path::Path) -> Result<String, String> {
-        match path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_lowercase())
-            .as_deref()
-        {
-            Some("yaml") | Some("yml") => Ok(self.to_yaml()),
-            Some("xml") => Ok(self.to_xml()),
-            Some(other) => Err(format!(
-                "{}: \".{other}\" is not a configuration file -- a name ending \
-                 in .yaml, .yml or .xml says how to read it",
-                path.display()
-            )),
-            None => Err(format!(
-                "{}: a configuration file's name says how to read it, and this \
-                 one has no .yaml, .yml or .xml on it",
-                path.display()
-            )),
+    /// The top diagram is `path`, and each subdiagram is a file beside it
+    /// named after itself, in the same format -- see
+    /// [`crate::subdiagram::file_for`]. The top file carries an `include` list
+    /// naming them, which is how the flight software is told what to read:
+    /// nothing is discovered by scanning a directory.
+    ///
+    /// A node is written in its own home's file. A link is written in the file
+    /// its source lives in, with names qualified only where they have to
+    /// travel, so a subdiagram's internal links read as plainly inside it as
+    /// they would if it were the whole configuration.
+    pub fn files(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<Vec<(std::path::PathBuf, String)>, String> {
+        let mut written = Vec::new();
+
+        // The top diagram, and the includes that say what else to read.
+        written.push((path.to_path_buf(), self.text_for(&None, path)?));
+
+        for name in self.subdiagrams() {
+            let home = Some(name.clone());
+            written.push((file_for(&name, path), self.text_for(&home, path)?));
         }
+        Ok(written)
+    }
+
+    /// One file's worth: the nodes at `home` and the links that start there.
+    fn text_for(&self, home: &Home, path: &std::path::Path) -> Result<String, String> {
+        match format_of(path)? {
+            Format::Yaml => Ok(self.to_yaml_for(home)),
+            Format::Xml => Ok(self.to_xml_for(home)),
+        }
+    }
+
+    /// The top diagram alone, in the format `path` asks for.
+    ///
+    /// For the tests, and for anything that wants one file's worth without
+    /// the subdiagrams beside it. [`Document::files`] is what the editor
+    /// writes through.
+    #[cfg(test)]
+    pub fn to_text(&self, path: &std::path::Path) -> Result<String, String> {
+        self.text_for(&None, path)
     }
 
     /// The document as XML.
@@ -341,12 +433,24 @@ impl Document {
     /// element and never an attribute, and a sequence is repeated sibling
     /// elements named for the field. A comment is an XML comment above the
     /// element it belongs to, which is where it is in the YAML as well.
+    #[cfg(test)]
     pub fn to_xml(&self) -> String {
+        self.to_xml_for(&None)
+    }
+
+    /// One home's nodes and links, as XML.
+    fn to_xml_for(&self, home: &Home) -> String {
         let mut out = String::new();
         out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         out.push_str("<configuration>\n    <version>2.0</version>\n");
 
-        for node in &self.nodes {
+        if home.is_none() {
+            for name in self.subdiagrams() {
+                out.push_str(&format!("    <include>{}</include>\n", escape(&name)));
+            }
+        }
+
+        for node in self.nodes_in(home) {
             if let Some(comment) = &node.comment {
                 for line in comment.lines() {
                     out.push_str(&format!("    <!-- {} -->\n", escape(line)));
@@ -371,21 +475,23 @@ impl Document {
             out.push_str("    </nodes>\n");
         }
 
-        for link in &self.links {
+        for link in self.links_from(home) {
             if let Some(comment) = &link.comment {
                 for line in comment.lines() {
                     out.push_str(&format!("    <!-- {} -->\n", escape(line)));
                 }
             }
+            let from = Qualified::parse(&link.from).written_from(home);
+            let to = Qualified::parse(&link.to).written_from(home);
             out.push_str("    <links>\n");
-            out.push_str(&format!("        <from>{}</from>\n", escape(&link.from)));
+            out.push_str(&format!("        <from>{}</from>\n", escape(&from)));
             match &link.input {
                 Some(input) => out.push_str(&format!(
                     "        <to>{}.{}</to>\n",
-                    escape(&link.to),
+                    escape(&to),
                     escape(input)
                 )),
-                None => out.push_str(&format!("        <to>{}</to>\n", escape(&link.to))),
+                None => out.push_str(&format!("        <to>{}</to>\n", escape(&to))),
             }
             out.push_str("    </links>\n");
         }
@@ -400,10 +506,31 @@ impl Document {
     /// entry carries its `type` and its attributes, and a `links` list. The
     /// canvas positions are written as well, under a key the flight software
     /// ignores, so that reopening the file finds the diagram as it was left.
+    #[cfg(test)]
     pub fn to_yaml(&self) -> String {
+        self.to_yaml_for(&None)
+    }
+
+    /// One home's nodes and links, as YAML.
+    fn to_yaml_for(&self, home: &Home) -> String {
         let mut out = String::new();
-        out.push_str("version: \"2.0\"\n\nnodes:\n");
-        for node in &self.nodes {
+        out.push_str("version: \"2.0\"\n");
+
+        // The subdiagrams this file pulls in, named rather than discovered.
+        // Only the top diagram has them: a subdiagram that included another
+        // would be a nesting this editor does not make.
+        if home.is_none() {
+            let included = self.subdiagrams();
+            if !included.is_empty() {
+                out.push_str("\ninclude:\n");
+                for name in &included {
+                    out.push_str(&format!("  - {name}\n"));
+                }
+            }
+        }
+
+        out.push_str("\nnodes:\n");
+        for node in self.nodes_in(home) {
             // Above the entry it belongs to, as a comment and not as a field:
             // this is what a person hand-editing the file expects to find, and
             // it is what they would have written themselves.
@@ -426,24 +553,68 @@ impl Document {
         }
 
         out.push_str("\nlinks:\n");
-        for link in &self.links {
+        for link in self.links_from(home) {
             if let Some(comment) = &link.comment {
                 for line in comment.lines() {
                     out.push_str(&format!("  # {line}\n"));
                 }
             }
+            let from = Qualified::parse(&link.from).written_from(home);
+            let to = Qualified::parse(&link.to).written_from(home);
             match &link.input {
                 Some(input) => out.push_str(&format!(
-                    "  - {{ from: {}, to: {}.{} }}\n",
-                    link.from, link.to, input
+                    "  - {{ from: {from}, to: {to}.{input} }}\n"
                 )),
-                None => out.push_str(&format!(
-                    "  - {{ from: {}, to: {} }}\n",
-                    link.from, link.to
-                )),
+                None => out.push_str(&format!("  - {{ from: {from}, to: {to} }}\n")),
             }
         }
         out
+    }
+
+    /// The links written in `home`'s file: the ones whose source lives there.
+    ///
+    /// By the source and not by both ends, so that every link is written
+    /// exactly once however far it reaches. A link written in both files it
+    /// touches would be read as two.
+    fn links_from(&self, home: &Home) -> Vec<&Link> {
+        self.links
+            .iter()
+            .filter(|l| &Qualified::parse(&l.from).in_ == home)
+            .collect()
+    }
+}
+
+/// Which language a file's name asks for.
+enum Format {
+    Yaml,
+    Xml,
+}
+
+/// The format `path` asks for, or why it asks for nothing.
+///
+/// The extension decides, which is the rule every configuration file in this
+/// project follows: anything that is neither .yaml, .yml nor .xml is refused
+/// rather than guessed at, because a guess is how a misspelled extension
+/// becomes a file parsed as the wrong language.
+fn format_of(path: &std::path::Path) -> Result<Format, String> {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .as_deref()
+    {
+        Some("yaml") | Some("yml") => Ok(Format::Yaml),
+        Some("xml") => Ok(Format::Xml),
+        Some(other) => Err(format!(
+            "{}: \".{other}\" is not a configuration file -- a name ending in \
+             .yaml, .yml or .xml says how to read it",
+            path.display()
+        )),
+        None => Err(format!(
+            "{}: a configuration file's name says how to read it, and this one \
+             has no .yaml, .yml or .xml on it",
+            path.display()
+        )),
     }
 }
 
@@ -475,6 +646,7 @@ pub fn thermostat_example() -> Document {
         document.apply(&Edit::AddNode {
             name: name.to_string(),
             node_type: node_type.to_string(),
+            home: None,
         });
         document.apply(&Edit::MoveNode {
             node: name.to_string(),
@@ -608,6 +780,7 @@ mod tests {
         Edit::AddNode {
             name: name.to_string(),
             node_type: node_type.to_string(),
+            home: None,
         }
     }
 
@@ -732,6 +905,7 @@ mod tests {
             node_type: node.node_type.clone(),
             attributes: node.attributes.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             links: vec![link.clone()],
+            home: None,
         };
 
         document.apply(&removal);
@@ -873,12 +1047,14 @@ mod tests {
                 node_type: "compute".into(),
                 attributes: Vec::new(),
                 links: vec![Link::new("a", "b", Some("in0"))],
+                home: None,
             },
             Edit::RestoreNode {
                 name: "d".into(),
                 node_type: "log".into(),
                 attributes: vec![("format".into(), "variable_ts_rc".into())],
                 links: Vec::new(),
+                home: None,
             },
             Edit::SetAttribute {
                 node: "a".into(),
@@ -1176,6 +1352,186 @@ mod tests {
                 link.from
             );
         }
+    }
+
+    /// A node placed in a subdiagram belongs to it, and is named through it.
+    #[test]
+    fn a_subdiagrams_nodes_are_its_own() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddNode {
+            name: "cabin".into(),
+            node_type: "subdiagram".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddNode {
+            name: "temp_fore".into(),
+            node_type: "i2c".into(),
+            home: Some("cabin".into()),
+        });
+        document.apply(&Edit::AddNode {
+            name: "moc".into(),
+            node_type: "moc".into(),
+            home: None,
+        });
+
+        assert_eq!(document.subdiagrams(), vec!["cabin".to_string()]);
+        assert_eq!(document.nodes_in(&None).len(), 2, "cabin and moc");
+        assert_eq!(document.nodes_in(&Some("cabin".into())).len(), 1);
+
+        // Named through its home from outside, plainly from inside.
+        assert!(document.node("cabin/temp_fore").is_some());
+        assert!(
+            document.node("temp_fore").is_none(),
+            "a subdiagram's node answered to a bare name from the top diagram"
+        );
+    }
+
+    /// Two subdiagrams may each hold a node of the same name.
+    ///
+    /// The reason names are qualified rather than globally unique: a
+    /// subdiagram is a separate file so it can be reused, and a uniqueness
+    /// rule would make including two copies impossible.
+    #[test]
+    fn the_same_name_in_two_subdiagrams_is_two_nodes() {
+        let mut document = Document::new();
+        for home in ["cabin", "bay"] {
+            document.apply(&Edit::AddNode {
+                name: home.into(),
+                node_type: "subdiagram".into(),
+                home: None,
+            });
+            document.apply(&Edit::AddNode {
+                name: "temp_fore".into(),
+                node_type: "i2c".into(),
+                home: Some(home.into()),
+            });
+        }
+
+        assert_eq!(document.nodes.len(), 4);
+        assert!(
+            document.faults().is_empty(),
+            "two subdiagrams with a like-named node are faulty: {:?}",
+            document.faults()
+        );
+        assert_ne!(
+            document.node("cabin/temp_fore").unwrap().home,
+            document.node("bay/temp_fore").unwrap().home
+        );
+    }
+
+    /// A link may cross a boundary, and is counted where it crosses.
+    #[test]
+    fn a_crossing_link_is_counted_against_the_subdiagram() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddNode {
+            name: "cabin".into(),
+            node_type: "subdiagram".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddNode {
+            name: "moc".into(),
+            node_type: "moc".into(),
+            home: None,
+        });
+        for name in ["temp_fore", "k_fore"] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: "i2c".into(),
+                home: Some("cabin".into()),
+            });
+        }
+
+        // One link inside, one crossing out.
+        document.apply(&Edit::AddLink {
+            link: Link::new("cabin/temp_fore", "cabin/k_fore", None),
+        });
+        document.apply(&Edit::AddLink {
+            link: Link::new("cabin/k_fore", "moc", None),
+        });
+
+        assert_eq!(
+            document.crossings("cabin"),
+            1,
+            "only the link leaving the subdiagram crosses it"
+        );
+        assert!(
+            document.faults().is_empty(),
+            "a crossing link is faulty: {:?}",
+            document.faults()
+        );
+    }
+
+    /// A crossing link is written once, in the file its source lives in.
+    ///
+    /// Written in both files it touches, it would be read back as two links;
+    /// written in neither, it would be lost.
+    #[test]
+    fn a_crossing_link_is_written_exactly_once() {
+        use std::path::Path;
+
+        let mut document = Document::new();
+        document.apply(&Edit::AddNode {
+            name: "cabin".into(),
+            node_type: "subdiagram".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddNode {
+            name: "moc".into(),
+            node_type: "moc".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddNode {
+            name: "temp_fore".into(),
+            node_type: "i2c".into(),
+            home: Some("cabin".into()),
+        });
+        document.apply(&Edit::AddLink {
+            link: Link::new("cabin/temp_fore", "moc", None),
+        });
+
+        let files = document.files(Path::new("/tmp/vehicle.yaml")).expect("files");
+        assert_eq!(files.len(), 2, "a top diagram and one subdiagram");
+
+        let written: usize = files
+            .iter()
+            .map(|(_, text)| text.matches("to: moc").count())
+            .sum();
+        assert_eq!(written, 1, "the crossing link was written {written} times");
+
+        // In the subdiagram's file, where its source lives, and plainly at
+        // this end because that is where it is at home.
+        let (_, inner) = files
+            .iter()
+            .find(|(path, _)| path.ends_with("cabin.yaml"))
+            .expect("the subdiagram's file");
+        assert!(inner.contains("{ from: temp_fore, to: moc }"), "{inner}");
+
+        // And the top file says what it includes.
+        let (_, top) = &files[0];
+        assert!(top.contains("include:\n  - cabin"), "{top}");
+    }
+
+    /// A link into a subdiagram that is not there dangles, and says so.
+    #[test]
+    fn a_link_into_a_subdiagram_that_is_absent_is_reported() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddNode {
+            name: "moc".into(),
+            node_type: "moc".into(),
+            home: None,
+        });
+        document.apply(&Edit::AddLink {
+            link: Link::new("moc", "cabin/temp_fore", None),
+        });
+
+        assert!(
+            document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::DanglingLink { .. })),
+            "{:?}",
+            document.faults()
+        );
     }
 
     /// Every fault can be shown to a person, and most point at a node.

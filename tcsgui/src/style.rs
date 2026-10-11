@@ -143,11 +143,13 @@ pub enum NodeType {
     Compute,
     Log,
     Moc,
+    /// A diagram of its own, kept in its own file and shown here as one box.
+    Subdiagram,
 }
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 12] = [
+    pub const ALL: [NodeType; 13] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -160,6 +162,7 @@ impl NodeType {
         NodeType::Compute,
         NodeType::Log,
         NodeType::Moc,
+        NodeType::Subdiagram,
     ];
 
     /// The word the configuration file uses, which is the word the editor
@@ -179,6 +182,7 @@ impl NodeType {
             NodeType::Compute => "compute",
             NodeType::Log => "log",
             NodeType::Moc => "moc",
+            NodeType::Subdiagram => "subdiagram",
         }
     }
 
@@ -305,6 +309,21 @@ impl NodeType {
                 weight: Wide,
                 size: (152, 64),
                 tint: Tint::Teal,
+            },
+            // A diagram of its own. Doubly outlined and the widest thing on
+            // the canvas, because it stands for a page rather than a device:
+            // the two outlines read as a box holding a box, which is what it
+            // is, and nothing else is this wide.
+            NodeType::Subdiagram => Appearance {
+                face: Face::Plain,
+                label_size: 13,
+                label_weight: 700,
+                label_italic: false,
+                outline: Rounded,
+                shading: Double,
+                weight: Wide,
+                size: (200, 88),
+                tint: Tint::Slate,
             },
             // Ends of the graph.
             NodeType::Log => Appearance {

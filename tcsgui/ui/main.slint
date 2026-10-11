@@ -39,8 +39,11 @@ export struct NodeView {
     faulty: bool,
     fault: string,
     selected: bool,
-    // What somebody wrote about this node, shown under it.
+    // What somebody wrote about this node, shown under it -- or, for a
+    // subdiagram that is closed, what is inside it.
     comment: string,
+    // Whether this node is a diagram of its own and can be opened.
+    openable: bool,
 }
 
 export struct LinkView {
@@ -99,6 +102,12 @@ component NodeShape inherits Rectangle {
     // Told once, when the gesture finishes: one edit for one drag, so undo
     // takes a node back to where it started rather than one pixel back.
     callback dragged(length, length);
+    // This node is a diagram of its own and somebody asked to see it.
+    callback open-requested();
+    // A link is being drawn: pressed on the handle of one node, released over
+    // another.
+    callback link-from();
+    callback link-to();
 
     // The error colour, and the only place in this file it appears.
     //
@@ -233,6 +242,100 @@ component NodeShape inherits Rectangle {
         }
     }
 
+    // The handle a link is drawn from: a small circle on the right edge,
+    // where a link leaves.
+    //
+    // A handle rather than a modifier key or a mode: a diagram is edited by
+    // people who use it rarely, and a thing that is visible is a thing that
+    // does not have to be remembered. On the right because a link is drawn
+    // left to right, which is the direction the canvas lays a graph out in.
+    out-handle := Rectangle {
+        x: root.width - 7px;
+        y: root.height / 2 - 7px;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        border-width: 1px;
+        border-color: ink;
+        background: out-touch.has-hover ? ink : white;
+
+        out-touch := TouchArea {
+            width: 100%;
+            height: 100%;
+            mouse-cursor: MouseCursor.crosshair;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down) {
+                    link-from();
+                }
+            }
+        }
+    }
+
+    // And where one arrives: the left edge. A release over this says which
+    // node the link reaches.
+    in-handle := Rectangle {
+        x: -7px;
+        y: root.height / 2 - 7px;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        border-width: 1px;
+        border-color: ink;
+        background: in-touch.has-hover ? ink : white;
+
+        in-touch := TouchArea {
+            width: 100%;
+            height: 100%;
+            mouse-cursor: MouseCursor.crosshair;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.up) {
+                    link-to();
+                }
+            }
+        }
+    }
+
+    // A subdiagram is opened from a mark in its own corner.
+    //
+    // Not a double press on the box: a single press already drags it, and a
+    // gesture that means one thing or another depending on timing is a
+    // gesture that does the wrong one under pressure. A mark that says
+    // "there is more in here" is also the only hint a closed box gives that
+    // it can be opened at all.
+    if node.openable: Rectangle {
+        x: root.width - 20px;
+        y: 6px;
+        width: 14px;
+        height: 14px;
+        border-width: 1px;
+        border-color: ink;
+        background: open-touch.has-hover ? ink.with-alpha(0.25) : transparent;
+
+        // Two narrow lines making a cross, which reads as "expand" without a
+        // word or an icon file.
+        Rectangle {
+            x: 3px;
+            y: 6px;
+            width: 8px;
+            height: 1px;
+            background: ink;
+        }
+        Rectangle {
+            x: 6px;
+            y: 3px;
+            width: 1px;
+            height: 8px;
+            background: ink;
+        }
+
+        open-touch := TouchArea {
+            width: 100%;
+            height: 100%;
+            mouse-cursor: MouseCursor.pointer;
+            clicked => { open-requested(); }
+        }
+    }
+
     // The area a drag is taken from, over the whole node so that a press
     // anywhere on it moves it.
     //
@@ -329,37 +432,43 @@ component LinkLine inherits Rectangle {
     }
 }
 
-export component MainWindow inherits Window {
-    title: "TCSpecial Configuration";
-    background: #fbfbfa;
-    min-width: 900px;
-    min-height: 600px;
-
+// The editing surface: a bar, a palette and a canvas.
+//
+// One component because there are two windows that need it -- the top diagram
+// and each open subdiagram -- and two copies of a canvas would be two places
+// for a drawing rule to be changed in. What differs between the windows is
+// only what they are given: a subdiagram's window is handed its own nodes and
+// its own name, and is otherwise this.
+component Surface inherits Rectangle {
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
-    // Every node type, for the palette down the side.
     in property <[NodeView]> palette: [];
 
     // How deep undo currently goes, shown rather than guessed at: a person
     // about to abandon an afternoon's work deserves to know how much of it is
-    // still reachable.
+    // still reachable. One history for the whole configuration, so every
+    // window shows the same two numbers.
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
-    // What the next press will take back, in words. A count says how much is
-    // reachable; this says what is about to happen, which is the question
-    // asked before pressing rather than after.
     in property <string> undo-label: "";
     in property <string> redo-label: "";
     // What went wrong with saving, if anything. The window's one red text.
     in property <string> trouble: "";
+    // What this surface is editing: empty for the top diagram, the
+    // subdiagram's name otherwise. Shown in the bar so that two windows side
+    // by side cannot be confused for one another.
+    in property <string> editing: "";
 
     callback undo-clicked();
     callback redo-clicked();
-    // Press a type in the palette to put one on the canvas. The name is the
-    // type's spelling, which is what Rust turns into a node.
     callback place-node(string);
-    // A node was dragged to a new place: its name, and how far it went.
     callback node-moved(string, length, length);
+    callback open-subdiagram(string);
+    // Drawing a link: pressed on one node, released on another.
+    callback link-started(string);
+    callback link-finished(string);
+
+    background: #fbfbfa;
 
     VerticalLayout {
         padding: 8px;
@@ -370,6 +479,12 @@ export component MainWindow inherits Window {
             spacing: 8px;
             min-height: 34px;
 
+            if editing != "": Text {
+                text: editing;
+                font-size: 13px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
             Button {
                 text: undo-label == "" ? "Undo" : "Undo " + undo-label;
                 enabled: undo-depth > 0;
@@ -457,8 +572,105 @@ export component MainWindow inherits Window {
                     node: n;
                     draggable: true;
                     dragged(dx, dy) => { node-moved(n.name, dx, dy); }
+                    open-requested => { open-subdiagram(n.name); }
+                    link-from => { link-started(n.name); }
+                    link-to => { link-finished(n.name); }
                 }
             }
         }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "TCSpecial Configuration";
+    background: #fbfbfa;
+    min-width: 900px;
+    min-height: 600px;
+
+    in property <[NodeView]> nodes: [];
+    in property <[LinkView]> links: [];
+    in property <[NodeView]> palette: [];
+    in property <int> undo-depth: 0;
+    in property <int> redo-depth: 0;
+    in property <string> undo-label: "";
+    in property <string> redo-label: "";
+    in property <string> trouble: "";
+
+    callback undo-clicked();
+    callback redo-clicked();
+    callback place-node(string);
+    callback node-moved(string, length, length);
+    callback open-subdiagram(string);
+    callback link-started(string);
+    callback link-finished(string);
+
+    Surface {
+        width: 100%;
+        height: 100%;
+        nodes: root.nodes;
+        links: root.links;
+        palette: root.palette;
+        undo-depth: root.undo-depth;
+        redo-depth: root.redo-depth;
+        undo-label: root.undo-label;
+        redo-label: root.redo-label;
+        trouble: root.trouble;
+        undo-clicked => { root.undo-clicked(); }
+        redo-clicked => { root.redo-clicked(); }
+        place-node(t) => { root.place-node(t); }
+        node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
+        open-subdiagram(n) => { root.open-subdiagram(n); }
+        link-started(n) => { root.link-started(n); }
+        link-finished(n) => { root.link-finished(n); }
+    }
+}
+
+// One open subdiagram.
+//
+// The same surface as the top diagram, given that subdiagram's nodes. Several
+// may be open at once, and they cannot disagree with each other or with the
+// top diagram: there is one document behind all of them, and each window is
+// redrawn from it after every edit.
+export component SubWindow inherits Window {
+    title: "TCSpecial Configuration -- " + root.editing;
+    background: #fbfbfa;
+    min-width: 760px;
+    min-height: 520px;
+
+    in property <string> editing: "";
+    in property <[NodeView]> nodes: [];
+    in property <[LinkView]> links: [];
+    in property <[NodeView]> palette: [];
+    in property <int> undo-depth: 0;
+    in property <int> redo-depth: 0;
+    in property <string> undo-label: "";
+    in property <string> redo-label: "";
+    in property <string> trouble: "";
+
+    callback undo-clicked();
+    callback redo-clicked();
+    callback place-node(string);
+    callback node-moved(string, length, length);
+    callback link-started(string);
+    callback link-finished(string);
+
+    Surface {
+        width: 100%;
+        height: 100%;
+        editing: root.editing;
+        nodes: root.nodes;
+        links: root.links;
+        palette: root.palette;
+        undo-depth: root.undo-depth;
+        redo-depth: root.redo-depth;
+        undo-label: root.undo-label;
+        redo-label: root.redo-label;
+        trouble: root.trouble;
+        undo-clicked => { root.undo-clicked(); }
+        redo-clicked => { root.redo-clicked(); }
+        place-node(t) => { root.place-node(t); }
+        node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
+        link-started(n) => { root.link-started(n); }
+        link-finished(n) => { root.link-finished(n); }
     }
 }

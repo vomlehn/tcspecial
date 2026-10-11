@@ -629,16 +629,21 @@ fn size_of(node_type: &str) -> (u32, u32) {
 /// are painted. Keeping them apart is what lets the accessibility test check
 /// the rules without knowing a single hex value.
 fn tint_of(tint: Tint) -> String {
+    // Harmonised rather than each chosen by eye: near-equal lightness and
+    // moderate chroma, so that no one of them shouts across a canvas holding
+    // all nine. Safe to tune only because colour is the redundant channel
+    // here -- the outline, weight, shading, size and type distinctions are
+    // what tell a type apart, and none of them is touched by this.
     match tint {
-        Tint::Slate => "#4a6572",
-        Tint::Teal => "#1b6e6a",
-        Tint::Amber => "#9a6700",
-        Tint::Violet => "#6b4ea8",
-        Tint::Olive => "#5c6b2f",
-        Tint::Indigo => "#2f4b8f",
-        Tint::Sand => "#8a6d3b",
-        Tint::Cyan => "#1f6f8b",
-        Tint::Grey => "#5a5a5a",
+        Tint::Slate => "#4b6382",
+        Tint::Teal => "#11706a",
+        Tint::Amber => "#8a6a12",
+        Tint::Violet => "#6a4fa3",
+        Tint::Olive => "#5c6b2a",
+        Tint::Indigo => "#37508f",
+        Tint::Sand => "#8a6136",
+        Tint::Cyan => "#1a6b85",
+        Tint::Grey => "#5b6065",
     }
     .to_string()
 }

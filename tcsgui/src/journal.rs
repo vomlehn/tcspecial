@@ -25,6 +25,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::subdiagram::Home;
+
 /// One change to the document, carrying what is needed to undo it.
 ///
 /// Deliberately coarse: a node moved on the canvas is one edit, not a hundred
@@ -34,7 +36,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Edit {
     /// A node was added. Undone by removing it.
-    AddNode { name: String, node_type: String },
+    ///
+    /// `home` is the subdiagram it was added to, or `None` for the top
+    /// diagram: a node placed in a subdiagram's window belongs to that
+    /// subdiagram's file, and undo has to put it back in the same one.
+    AddNode {
+        name: String,
+        node_type: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        home: Home,
+    },
     /// A node was removed, with everything it had, so that undo puts the same
     /// node back and not a fresh one of the same type.
     RemoveNode {
@@ -45,6 +56,8 @@ pub enum Edit {
         /// mention it -- leaving them would be a document that fails its own
         /// validation -- so undo has to restore those too.
         links: Vec<Link>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        home: Home,
     },
     /// An attribute was set. Both values, so the inverse is a lookup.
     ///
@@ -91,6 +104,8 @@ pub enum Edit {
         node_type: String,
         attributes: Vec<(String, String)>,
         links: Vec<Link>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        home: Home,
     },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
@@ -154,17 +169,23 @@ impl Edit {
     /// document's present state rather than of this edit.
     pub fn inverse(&self) -> Edit {
         match self {
-            Edit::AddNode { name, node_type } => Edit::RemoveNode {
+            Edit::AddNode {
+                name,
+                node_type,
+                home,
+            } => Edit::RemoveNode {
                 name: name.clone(),
                 node_type: node_type.clone(),
                 attributes: Vec::new(),
                 links: Vec::new(),
+                home: home.clone(),
             },
             Edit::RemoveNode {
                 name,
                 node_type,
                 attributes,
                 links,
+                home,
             } => {
                 // Undoing a removal is more than an addition: the attributes
                 // and the links come back as well. The caller applies this as
@@ -174,6 +195,7 @@ impl Edit {
                     node_type: node_type.clone(),
                     attributes: attributes.clone(),
                     links: links.clone(),
+                    home: home.clone(),
                 }
             }
             Edit::SetAttribute {
@@ -213,11 +235,13 @@ impl Edit {
                 node_type,
                 attributes,
                 links,
+                home,
             } => Edit::RemoveNode {
                 name: name.clone(),
                 node_type: node_type.clone(),
                 attributes: attributes.clone(),
                 links: links.clone(),
+                home: home.clone(),
             },
         }
     }
@@ -226,7 +250,14 @@ impl Edit {
     /// readable before it is pressed.
     pub fn describe(&self) -> String {
         match self {
-            Edit::AddNode { name, node_type } => format!("add {node_type} \"{name}\""),
+            Edit::AddNode {
+                name,
+                node_type,
+                home,
+            } => match home {
+                Some(home) => format!("add {node_type} \"{name}\" to \"{home}\""),
+                None => format!("add {node_type} \"{name}\""),
+            },
             Edit::RemoveNode { name, .. } => format!("remove \"{name}\""),
             Edit::RestoreNode { name, .. } => format!("restore \"{name}\""),
             Edit::SetAttribute { node, attribute, .. } => {
@@ -339,6 +370,7 @@ mod tests {
         Edit::AddNode {
             name: name.to_string(),
             node_type: "i2c".to_string(),
+            home: None,
         }
     }
 
@@ -449,6 +481,7 @@ mod tests {
                 Link::new("temp_fore", "k_fore", None),
                 Link::new("k_fore", "mean_temp", Some("in0")),
             ],
+            home: None,
         };
 
         match removal.inverse() {

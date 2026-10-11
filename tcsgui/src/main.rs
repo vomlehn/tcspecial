@@ -23,6 +23,7 @@ mod editor;
 mod journal;
 mod save;
 mod style;
+mod subdiagram;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -95,6 +96,9 @@ fn main() -> Result<(), slint::PlatformError> {
                 editor.edit(Edit::AddNode {
                     name: name.clone(),
                     node_type: node_type.to_string(),
+                    // The top diagram: a node placed from a subdiagram's own
+                    // window carries that window's home instead.
+                    home: None,
                 });
                 editor.edit(Edit::MoveNode {
                     node: name,
@@ -157,13 +161,33 @@ fn refresh(ui: &MainWindow, editor: &Editor) {
                 .iter()
                 .find(|f| f.node() == Some(node.name.as_str()))
                 .map(|f| f.describe());
+
+            // A subdiagram that is not open shows what is in it: how many
+            // nodes, and how many connections cross its edge. Those are the
+            // two things worth knowing about a diagram you are not looking
+            // at, and they are what "simplified" means here -- not a smaller
+            // drawing of the contents, which would be unreadable, but a count
+            // of them.
+            let summary = (node.node_type == "subdiagram").then(|| {
+                let inside = document.nodes_in(&Some(node.name.clone())).len();
+                let crossing = document.crossings(&node.name);
+                format!(
+                    "{inside} node{} · {crossing} crossing{}",
+                    if inside == 1 { "" } else { "s" },
+                    if crossing == 1 { "" } else { "s" }
+                )
+            });
+
             view_of(
                 &node.name,
                 &node.node_type,
                 node.at,
                 fault,
                 false,
-                node.comment.as_deref(),
+                // The summary where there is one, and what somebody wrote
+                // otherwise: a box standing for a page is better described by
+                // its contents than by a note about it.
+                summary.as_deref().or(node.comment.as_deref()),
             )
         })
         .collect();
@@ -463,10 +487,12 @@ mod tests {
         document.apply(&Edit::AddNode {
             name: "a".into(),
             node_type: "i2c".into(),
+            home: None,
         });
         document.apply(&Edit::AddNode {
             name: "b".into(),
             node_type: "compute".into(),
+            home: None,
         });
         document.apply(&Edit::MoveNode {
             node: "a".into(),

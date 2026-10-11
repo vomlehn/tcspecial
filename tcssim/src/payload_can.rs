@@ -394,11 +394,10 @@ mod tests {
         );
     }
 
-    /// A frame carries what the payload was asked to send, and a packet too
-    /// large for one is refused rather than split.
+    /// A frame carries what the payload sent, to another member of the bus.
     ///
-    /// Skipped where there is no virtual bus, and said so rather than passed
-    /// in silence.
+    /// Needs a bus, and says so rather than passing in silence where there is
+    /// none. What can be checked without one is beside this.
     #[test]
     fn a_frame_carries_what_the_payload_sends() {
         let Some(interface) = a_virtual_bus() else {
@@ -430,13 +429,61 @@ mod tests {
             .expect("the frame arrived at the other member");
         assert_eq!(&buf[..got], &[9, 8, 7]);
 
-        let said = match payload.send(&[0u8; 9]) {
-            Err(e) => e,
+    }
+
+    /// A member of the bus whose socket is not a bus at all.
+    ///
+    /// For the checks that happen before anything is sent, which need a
+    /// member and not a bus. They were written beside the test above and
+    /// gated with it, and so ran on no machine that had not been set up by
+    /// hand.
+    fn not_on_a_bus(fd: bool) -> BusMember {
+        BusMember {
+            // Writable, because the lengths that are not refused go on to be
+            // written: /dev/null takes them and says nothing.
+            socket: std::os::unix::io::OwnedFd::from(
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .open("/dev/null")
+                    .expect("a descriptor"),
+            ),
+            can_id: 1,
+            fd,
+        }
+    }
+
+    /// A packet larger than a frame is refused rather than split, and how
+    /// large that is follows from the kind of frame.
+    ///
+    /// Before the send is attempted, so this needs no bus. The payload
+    /// configuration refuses such a packet where the file is read, which is
+    /// what keeps it from reaching here in a real run; this is the stand-in's
+    /// own guard, for the trigger a file does not size.
+    #[test]
+    fn a_packet_larger_than_a_frame_is_refused() {
+        let classic = not_on_a_bus(false);
+
+        let said = match classic.send(&[0u8; 9]) {
+            Err(e) => format!("{e}"),
             Ok(n) => panic!("nine bytes went into an eight-byte frame as {n}"),
         };
         assert!(
-            format!("{said}").contains("will not fit"),
-            "the error should say it cannot be sent: {said}"
+            said.contains("will not fit") && said.contains("8"),
+            "the error should say it cannot be sent and how much a frame takes: {said}"
+        );
+
+        // The most each kind of frame carries, neither of them refused.
+        assert_eq!(classic.send(&[0u8; 8]).expect("a full frame"), 8);
+        let fd = not_on_a_bus(true);
+        assert_eq!(fd.send(&[0u8; 64]).expect("a full FD frame"), 64);
+
+        let said = match fd.send(&[0u8; 65]) {
+            Err(e) => format!("{e}"),
+            Ok(n) => panic!("sixty-five bytes went into a sixty-four-byte frame as {n}"),
+        };
+        assert!(
+            said.contains("64"),
+            "the error should say what an FD frame carries: {said}"
         );
     }
 

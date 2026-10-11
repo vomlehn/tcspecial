@@ -138,7 +138,7 @@ pub enum NodeType {
     Iio,
     Rpmsg,
     Network,
-    Pseudofile,
+    DeviceFile,
     Gpio,
     Compute,
     Log,
@@ -157,7 +157,7 @@ impl NodeType {
         NodeType::Iio,
         NodeType::Rpmsg,
         NodeType::Network,
-        NodeType::Pseudofile,
+        NodeType::DeviceFile,
         NodeType::Gpio,
         NodeType::Compute,
         NodeType::Log,
@@ -177,7 +177,7 @@ impl NodeType {
             NodeType::Iio => "iio",
             NodeType::Rpmsg => "rpmsg",
             NodeType::Network => "network",
-            NodeType::Pseudofile => "pseudofile",
+            NodeType::DeviceFile => "device_file",
             NodeType::Gpio => "gpio",
             NodeType::Compute => "compute",
             NodeType::Log => "log",
@@ -253,7 +253,7 @@ impl NodeType {
                 ("address", true),
                 ("port", true),
             ],
-            NodeType::Pseudofile => &[("path", true), ("group", false)],
+            NodeType::DeviceFile => &[("path", true), ("group", false)],
             NodeType::Gpio => &[
                 ("path", true),
                 ("lines", true),
@@ -293,7 +293,7 @@ impl NodeType {
             | NodeType::Iio
             | NodeType::Rpmsg
             | NodeType::Network
-            | NodeType::Pseudofile => "Devices",
+            | NodeType::DeviceFile => "Devices",
             NodeType::Gpio => "Driven",
             NodeType::Compute => "Computation",
             NodeType::Log | NodeType::Moc => "Ends of the graph",
@@ -390,7 +390,7 @@ impl NodeType {
                 size: (144, 56),
                 tint: Tint::Cyan,
             },
-            NodeType::Pseudofile => Appearance {
+            NodeType::DeviceFile => Appearance {
                 face: Face::Mono,
                 label_size: 10,
                 label_weight: 400,

@@ -65,7 +65,7 @@ Four words changed as well, and these requirements use the old ones throughout.
 What a requirement calls a **payload** is a **device** where it is hardware,
 and a **node** where the statement is about anything the configuration can name
 -- a device, a MOC link, or a compute element. Where it says *device* and means
-an entry in the filesystem, that is a **pseudofile**. Where it says **OC** it
+an entry in the filesystem, that is a **device file**. Where it says **OC** it
 means the **MOC**, the mission operations center. The requirements stand as
 written; ``manual.rst`` gives the vocabulary in force.
 

@@ -18,7 +18,7 @@ TCSpecial is **telemetry and control, special**. It connects the devices aboard
 a vehicle -- sensors, actuators, and whatever else arrives on an
 I\ :superscript:`2`\ C bus, a SPI link, a serial line, a CAN bus, a set of
 discrete lines, a sensor buffer, a channel to another processor core, a socket
-or a pseudofile -- to the places their data has to reach. Some of those places
+or a device file -- to the places their data has to reach. Some of those places
 are on the ground: a network link carries telemetry to the mission operations
 center, the **MOC**, and commands back. Others are aboard: software that takes
 what a device produces, computes something from it, remembers what it needs to
@@ -86,7 +86,7 @@ device
     were called *payloads*, which said what they were for rather than what they
     are, and said nothing at all about a device being driven rather than read.
 
-pseudofile
+device file
     A node reached as an entry in the filesystem -- ``/dev/urandom``, a named
     pipe, a file a program writes. The word *device* was used for this as well
     as for hardware, which made "device" ambiguous in exactly the places it had

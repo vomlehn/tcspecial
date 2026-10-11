@@ -156,7 +156,7 @@ node
     of type:
 
     *devices* -- ``i2c``, ``spi``, ``serial``, ``can``, ``gpio``, ``iio``,
-    ``rpmsg``, ``network``, ``pseudofile`` -- which are the interfaces real
+    ``rpmsg``, ``network``, ``device_file`` -- which are the interfaces real
     hardware arrives on. Each is what used to be called a payload endpoint, and
     the attributes are unchanged: a bus and an address, a chip and a set of
     lines, a path.

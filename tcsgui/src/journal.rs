@@ -65,6 +65,22 @@ pub enum Edit {
     AddLink { link: Link },
     /// A link was removed, carried whole for the same reason a node is.
     RemoveLink { link: Link },
+    /// What somebody wrote about a node was changed.
+    ///
+    /// A comment is part of the document and so part of the history: written
+    /// out with the node, undone like anything else, and never quietly
+    /// dropped. Both values, so the inverse is a lookup.
+    SetNodeComment {
+        node: String,
+        was: Option<String>,
+        now: Option<String>,
+    },
+    /// What somebody wrote about a connection was changed.
+    SetLinkComment {
+        link: Link,
+        was: Option<String>,
+        now: Option<String>,
+    },
     /// A node, its attributes and its links put back as they were.
     ///
     /// The inverse of a removal, and a variant of its own rather than a
@@ -94,6 +110,40 @@ pub struct Link {
     /// Which input of the destination, where the destination has more than
     /// one. `None` is a destination that takes a single input.
     pub input: Option<String>,
+    /// What somebody wrote about this connection.
+    ///
+    /// Not part of what makes one link the same connection as another -- see
+    /// [`Link::same_connection`] -- because a comment edited must not turn a
+    /// link into a different link that the old one is still beside.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+}
+
+impl Link {
+    /// Whether these name the same connection.
+    ///
+    /// The two ends and the input, and deliberately not the comment: a link is
+    /// identified by what it joins. Equality, which does include the comment,
+    /// is what the history compares -- an edit that changed a comment and an
+    /// edit that did not are different edits.
+    pub fn same_connection(&self, other: &Link) -> bool {
+        self.from == other.from && self.to == other.to && self.input == other.input
+    }
+
+    /// A link joining these, with nothing written about it.
+    ///
+    /// Used by the tests today, and by drawing a link on the canvas when that
+    /// lands -- which is why it is here rather than gated to the tests: the
+    /// one caller it is waiting for is the obvious one.
+    #[allow(dead_code)]
+    pub fn new(from: &str, to: &str, input: Option<&str>) -> Link {
+        Link {
+            from: from.to_string(),
+            to: to.to_string(),
+            input: input.map(|i| i.to_string()),
+            comment: None,
+        }
+    }
 }
 
 impl Edit {
@@ -148,6 +198,16 @@ impl Edit {
                 was: *now,
                 now: *was,
             },
+            Edit::SetNodeComment { node, was, now } => Edit::SetNodeComment {
+                node: node.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
+            Edit::SetLinkComment { link, was, now } => Edit::SetLinkComment {
+                link: link.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
             Edit::RestoreNode {
                 name,
                 node_type,
@@ -178,6 +238,17 @@ impl Edit {
                 format!("unlink \"{}\" from \"{}\"", link.from, link.to)
             }
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
+            Edit::SetNodeComment { node, now, .. } => match now {
+                Some(_) => format!("comment on \"{node}\""),
+                None => format!("remove the comment on \"{node}\""),
+            },
+            Edit::SetLinkComment { link, now, .. } => match now {
+                Some(_) => format!("comment on \"{}\" to \"{}\"", link.from, link.to),
+                None => format!(
+                    "remove the comment on \"{}\" to \"{}\"",
+                    link.from, link.to
+                ),
+            },
         }
     }
 }
@@ -375,16 +446,8 @@ mod tests {
             node_type: "compute".into(),
             attributes: vec![("function".into(), "to_kelvin".into())],
             links: vec![
-                Link {
-                    from: "temp_fore".into(),
-                    to: "k_fore".into(),
-                    input: None,
-                },
-                Link {
-                    from: "k_fore".into(),
-                    to: "mean_temp".into(),
-                    input: Some("in0".into()),
-                },
+                Link::new("temp_fore", "k_fore", None),
+                Link::new("k_fore", "mean_temp", Some("in0")),
             ],
         };
 
@@ -429,11 +492,7 @@ mod tests {
         let mut journal = Journal::new();
         journal.record(add("a"));
         journal.record(Edit::AddLink {
-            link: Link {
-                from: "a".into(),
-                to: "b".into(),
-                input: Some("in0".into()),
-            },
+            link: Link::new("a", "b", Some("in0")),
         });
         journal.undo();
 

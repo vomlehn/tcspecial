@@ -5,11 +5,17 @@
 //!
 //! **Nothing is told apart by colour alone.** Every node type differs from
 //! every other in at least two channels that are not colour -- its outline
-//! shape, how wide its border is, how its inside is shaded, and how large it
-//! is. A reader who sees no colour at all still sees nine distinguishable
-//! shapes, and a reader who sees colour gets the same information twice. Two
-//! channels rather than one on purpose: a single distinguishing channel is one
-//! print, one projector or one pair of eyes away from being no channel.
+//! shape, how wide its border is, how its inside is shaded, how large it is,
+//! and how its label is set. A reader who sees no colour at all still sees
+//! twelve distinguishable nodes, and a reader who sees colour gets the same
+//! information twice. Two channels rather than one on purpose: a single
+//! distinguishing channel is one print, one projector or one pair of eyes away
+//! from being no channel.
+//!
+//! Type is one of those channels. A label in a monospaced face, a heavier
+//! weight or an italic is a difference that survives a monochrome print and a
+//! reader who cannot pick the shape out at a small size, and it is read
+//! without being decoded -- which is more than can be said for a legend.
 //!
 //! **Red means something is wrong.** No node type, no selection, no hover and
 //! no link is red. It is reserved so that red anywhere on the canvas means an
@@ -59,6 +65,20 @@ pub enum Weight {
     Wide,
 }
 
+/// How a node's label is set.
+///
+/// The fifth channel, and the one that works at a size where a shape has
+/// stopped being legible. `Mono` is for the types whose attributes are
+/// addresses and register numbers -- a bus, a chip select -- because the file
+/// shows those in a monospaced column and the canvas should agree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Face {
+    /// The system's ordinary face.
+    Plain,
+    /// The system's monospaced face.
+    Mono,
+}
+
 /// What a node type looks like.
 ///
 /// `tint` is a hint and never the whole of the distinction. It is named rather
@@ -72,6 +92,12 @@ pub struct Appearance {
     /// The nominal width and height, in pixels, before a label widens it.
     /// Size is the fourth channel: a MOC link is visibly larger than a sensor.
     pub size: (u32, u32),
+    /// How the label is set: the face, its size in pixels, its weight, and
+    /// whether it is italic. The fifth channel.
+    pub face: Face,
+    pub label_size: u32,
+    pub label_weight: u32,
+    pub label_italic: bool,
     pub tint: Tint,
 }
 
@@ -169,6 +195,10 @@ impl NodeType {
         match self {
             // Buses: square, and told apart by shading and size.
             NodeType::I2c => Appearance {
+                face: Face::Mono,
+                label_size: 12,
+                label_weight: 700,
+                label_italic: false,
                 outline: Square,
                 shading: Solid,
                 weight: Narrow,
@@ -176,6 +206,10 @@ impl NodeType {
                 tint: Tint::Slate,
             },
             NodeType::Spi => Appearance {
+                face: Face::Mono,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: false,
                 outline: Square,
                 shading: Hatched,
                 weight: Narrow,
@@ -183,6 +217,10 @@ impl NodeType {
                 tint: Tint::Teal,
             },
             NodeType::Serial => Appearance {
+                face: Face::Mono,
+                label_size: 11,
+                label_weight: 400,
+                label_italic: true,
                 outline: Square,
                 shading: Open,
                 weight: Narrow,
@@ -190,6 +228,10 @@ impl NodeType {
                 tint: Tint::Amber,
             },
             NodeType::Can => Appearance {
+                face: Face::Mono,
+                label_size: 13,
+                label_weight: 700,
+                label_italic: false,
                 outline: Square,
                 shading: Double,
                 weight: Narrow,
@@ -197,6 +239,10 @@ impl NodeType {
                 tint: Tint::Violet,
             },
             NodeType::Iio => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: true,
                 outline: Square,
                 shading: Hatched,
                 weight: Wide,
@@ -204,6 +250,10 @@ impl NodeType {
                 tint: Tint::Olive,
             },
             NodeType::Rpmsg => Appearance {
+                face: Face::Mono,
+                label_size: 11,
+                label_weight: 700,
+                label_italic: true,
                 outline: Square,
                 shading: Solid,
                 weight: Wide,
@@ -211,6 +261,10 @@ impl NodeType {
                 tint: Tint::Indigo,
             },
             NodeType::Network => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 700,
+                label_italic: false,
                 outline: Square,
                 shading: Open,
                 weight: Wide,
@@ -218,6 +272,10 @@ impl NodeType {
                 tint: Tint::Cyan,
             },
             NodeType::Pseudofile => Appearance {
+                face: Face::Mono,
+                label_size: 10,
+                label_weight: 400,
+                label_italic: false,
                 outline: Square,
                 shading: Double,
                 weight: Wide,
@@ -226,6 +284,10 @@ impl NodeType {
             },
             // Driven rather than read, and shaped to say so.
             NodeType::Gpio => Appearance {
+                face: Face::Plain,
+                label_size: 13,
+                label_weight: 700,
+                label_italic: false,
                 outline: Keyed,
                 shading: Solid,
                 weight: Wide,
@@ -234,6 +296,10 @@ impl NodeType {
             },
             // Software aboard.
             NodeType::Compute => Appearance {
+                face: Face::Plain,
+                label_size: 13,
+                label_weight: 400,
+                label_italic: false,
                 outline: Rounded,
                 shading: Solid,
                 weight: Wide,
@@ -242,6 +308,10 @@ impl NodeType {
             },
             // Ends of the graph.
             NodeType::Log => Appearance {
+                face: Face::Plain,
+                label_size: 11,
+                label_weight: 400,
+                label_italic: false,
                 outline: Circle,
                 shading: Hatched,
                 weight: Narrow,
@@ -249,6 +319,10 @@ impl NodeType {
                 tint: Tint::Sand,
             },
             NodeType::Moc => Appearance {
+                face: Face::Plain,
+                label_size: 15,
+                label_weight: 700,
+                label_italic: true,
                 outline: Circle,
                 shading: Solid,
                 weight: Wide,
@@ -282,6 +356,12 @@ mod tests {
                 one.shading != two.shading,
                 one.weight != two.weight,
                 one.size != two.size,
+                // How the label is set, which is one channel however many
+                // properties carry it: a face, a size, a weight and an italic
+                // are all type, and counting them separately would let four
+                // typographic tweaks stand in for a shape.
+                (one.face, one.label_size, one.label_weight, one.label_italic)
+                    != (two.face, two.label_size, two.label_weight, two.label_italic),
             ]
             .iter()
             .filter(|differs| **differs)
@@ -331,6 +411,53 @@ mod tests {
                 "red",
                 "{} is tinted red, which is reserved for errors",
                 t.spelling()
+            );
+        }
+    }
+
+    /// Every label is set legibly.
+    ///
+    /// Type is a distinguishing channel, which makes it tempting to reach for
+    /// a six-pixel italic to tell two things apart. A distinction nobody can
+    /// read is not one, so there is a floor.
+    #[test]
+    fn no_label_is_too_small_to_read() {
+        for t in NodeType::ALL {
+            let a = t.appearance();
+            assert!(
+                a.label_size >= 10,
+                "{} sets its label at {}px",
+                t.spelling(),
+                a.label_size
+            );
+            assert!(
+                a.label_weight == 400 || a.label_weight == 700,
+                "{} asks for a weight no system face is sure to have: {}",
+                t.spelling(),
+                a.label_weight
+            );
+        }
+    }
+
+    /// A label fits the shape it is in.
+    ///
+    /// A type is only a channel while the text is inside the box: a fifteen
+    /// pixel label in a forty-eight pixel node leaves no room for the type
+    /// name under it, and a label that overflows is a label that gets elided
+    /// to nothing.
+    #[test]
+    fn every_label_fits_its_node() {
+        for t in NodeType::ALL {
+            let a = t.appearance();
+            // The name, the type beneath it, the padding, and a little room:
+            // whatever the face, a line takes about one and a third times its
+            // size.
+            let wanted = (a.label_size as f32 * 1.35) + 12.0 + 12.0;
+            assert!(
+                a.size.1 as f32 >= wanted,
+                "{} is {}px tall and its label wants {wanted:.0}px",
+                t.spelling(),
+                a.size.1
             );
         }
     }

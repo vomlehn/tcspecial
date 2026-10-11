@@ -31,7 +31,7 @@ use slint::{ModelRc, VecModel};
 
 use editor::Editor;
 use journal::Edit;
-use style::{NodeType, Outline, Shading, Tint, Weight, ERROR_TINT};
+use style::{Face, NodeType, Outline, Shading, Tint, Weight, ERROR_TINT};
 
 slint::include_modules!();
 
@@ -106,6 +106,37 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     }
 
+    {
+        let editor = editor.clone();
+        let handle = ui.as_weak();
+        ui.on_node_moved(move |name, dx, dy| {
+            let ui = handle.unwrap();
+            {
+                let mut editor = editor.borrow_mut();
+                // Where it was, from the document rather than from the window:
+                // the window has been drawing it offset by the drag, and the
+                // document is what the edit has to be relative to.
+                let was = match editor.document().node(&name) {
+                    Some(node) => node.at,
+                    None => return,
+                };
+                let now = (was.0 + dx.round() as i32, was.1 + dy.round() as i32);
+                // A drag that went nowhere is not an edit. Without this, every
+                // press on a node would put an entry in the history and undo
+                // would spend presses undoing nothing.
+                if now == was {
+                    return;
+                }
+                editor.edit(Edit::MoveNode {
+                    node: name.to_string(),
+                    was,
+                    now,
+                });
+            }
+            refresh(&ui, &editor.borrow());
+        });
+    }
+
     ui.run()
 }
 
@@ -126,7 +157,14 @@ fn refresh(ui: &MainWindow, editor: &Editor) {
                 .iter()
                 .find(|f| f.node() == Some(node.name.as_str()))
                 .map(|f| f.describe());
-            view_of(&node.name, &node.node_type, node.at, fault, false)
+            view_of(
+                &node.name,
+                &node.node_type,
+                node.at,
+                fault,
+                false,
+                node.comment.as_deref(),
+            )
         })
         .collect();
 
@@ -139,6 +177,7 @@ fn refresh(ui: &MainWindow, editor: &Editor) {
             let (fw, fh) = size_of(&from.node_type);
             let (_, th) = size_of(&to.node_type);
             Some(LinkView {
+                comment: link.comment.clone().unwrap_or_default().into(),
                 x1: (from.at.0 + fw as i32) as f32,
                 y1: (from.at.1 + fh as i32 / 2) as f32,
                 x2: to.at.0 as f32,
@@ -204,7 +243,7 @@ fn next_place(document: &document::Document) -> (i32, i32) {
 fn palette() -> ModelRc<NodeView> {
     let views: Vec<NodeView> = NodeType::ALL
         .iter()
-        .map(|t| view_of(t.spelling(), t.spelling(), (8, 2), None, false))
+        .map(|t| view_of(t.spelling(), t.spelling(), (8, 2), None, false, None))
         .collect();
     ModelRc::from(Rc::new(VecModel::from(views)))
 }
@@ -216,6 +255,7 @@ fn view_of(
     at: (i32, i32),
     fault: Option<String>,
     selected: bool,
+    comment: Option<&str>,
 ) -> NodeView {
     let appearance = NodeType::ALL
         .iter()
@@ -226,16 +266,31 @@ fn view_of(
     // is a shape no real type uses, and marked faulty. Showing it beats
     // refusing to open the file: a configuration written for a later build is
     // readable, and what cannot be placed is visibly what cannot be placed.
-    let (outline, shading, weight, size, tint) = match appearance {
-        Some(a) => (a.outline, a.shading, a.weight, a.size, tint_of(a.tint)),
-        None => (
-            Outline::Square,
-            Shading::Open,
-            Weight::Narrow,
-            (104u32, 40u32),
-            ERROR_TINT.to_string(),
-        ),
-    };
+    let (outline, shading, weight, size, tint, face, label_size, label_weight, label_italic) =
+        match appearance {
+            Some(a) => (
+                a.outline,
+                a.shading,
+                a.weight,
+                a.size,
+                tint_of(a.tint),
+                a.face,
+                a.label_size,
+                a.label_weight,
+                a.label_italic,
+            ),
+            None => (
+                Outline::Square,
+                Shading::Open,
+                Weight::Narrow,
+                (104u32, 40u32),
+                ERROR_TINT.to_string(),
+                Face::Plain,
+                11,
+                400,
+                true,
+            ),
+        };
 
     NodeView {
         name: name.into(),
@@ -262,10 +317,19 @@ fn view_of(
             Weight::Narrow => 1.0,
             Weight::Wide => 3.0,
         },
+        face: match face {
+            Face::Plain => "plain",
+            Face::Mono => "mono",
+        }
+        .into(),
+        label_size: label_size as f32,
+        label_weight: label_weight as i32,
+        label_italic,
         tint: colour(&tint),
         faulty: fault.is_some(),
         fault: fault.unwrap_or_default().into(),
         selected,
+        comment: comment.unwrap_or_default().into(),
     }
 }
 
@@ -383,7 +447,7 @@ mod tests {
     /// A type the build does not know is drawn, marked, and not crashed on.
     #[test]
     fn an_unknown_type_is_shown_as_a_fault() {
-        let view = view_of("mystery", "contraption", (0, 0), Some("unknown".into()), false);
+        let view = view_of("mystery", "contraption", (0, 0), Some("unknown".into()), false, None);
         assert!(view.faulty);
         assert_eq!(view.tint, colour(ERROR_TINT));
         assert_eq!(view.outline, "square");
@@ -415,11 +479,7 @@ mod tests {
             now: (300, 40),
         });
         document.apply(&Edit::AddLink {
-            link: Link {
-                from: "a".into(),
-                to: "b".into(),
-                input: Some("in0".into()),
-            },
+            link: Link::new("a", "b", Some("in0")),
         });
 
         let (width, height) = size_of("i2c");
@@ -427,6 +487,7 @@ mod tests {
             let from = document.node("a").unwrap();
             let to = document.node("b").unwrap();
             LinkView {
+                comment: "".into(),
                 x1: (from.at.0 + width as i32) as f32,
                 y1: (from.at.1 + height as i32 / 2) as f32,
                 x2: to.at.0 as f32,

@@ -137,7 +137,17 @@ impl Editor {
     fn persist(&mut self) {
         self.trouble = None;
 
-        if let Err(why) = write_atomically(&self.path, self.document.to_yaml().as_bytes()) {
+        // In whichever format the file's name asks for: a configuration may be
+        // written in YAML or XML, and which one is the extension's business.
+        let text = match self.document.to_text(&self.path) {
+            Ok(text) => text,
+            Err(why) => {
+                self.trouble = Some(why);
+                return;
+            }
+        };
+
+        if let Err(why) = write_atomically(&self.path, text.as_bytes()) {
             self.trouble = Some(describe(&why));
             // The journal is not written either. A journal ahead of its
             // document is the failure this whole ordering exists to avoid.
@@ -358,6 +368,42 @@ mod tests {
         let recovered = Editor::recover(&path);
         assert_eq!(recovered.document().nodes.len(), 1);
         assert_eq!(recovered.undo_depth(), 1);
+    }
+
+    /// An XML name gets an XML file, and the history still works.
+    #[test]
+    fn a_configuration_named_xml_is_written_as_xml() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("graph.xml");
+        let mut editor = Editor::new(&path);
+
+        editor.edit(add("temp_fore", "i2c"));
+        let written = std::fs::read_to_string(&path).expect("the file exists");
+        assert!(written.starts_with("<?xml"), "{written}");
+        assert!(written.contains("<type>i2c</type>"), "{written}");
+        assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
+
+        // And the history is beside it as it is for YAML, so undo reaches past
+        // a crash whichever format the configuration is written in.
+        editor.edit(add("temp_aft", "i2c"));
+        let recovered = Editor::recover(&path);
+        assert_eq!(recovered.undo_depth(), 2);
+        assert_eq!(recovered.document().nodes.len(), 2);
+    }
+
+    /// A name that says nothing about its format is refused, and said so.
+    #[test]
+    fn a_file_with_no_usable_extension_is_reported() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("graph.json");
+        let mut editor = Editor::new(&path);
+
+        editor.edit(add("a", "i2c"));
+        let said = editor.trouble().expect("this should be refused");
+        assert!(said.contains(".yaml"), "{said}");
+        // The edit is still in the document: the person at the keyboard has
+        // lost nothing but the saving, and can say where to put it.
+        assert_eq!(editor.document().nodes.len(), 1);
     }
 
     /// The journal sits beside the document it belongs to.

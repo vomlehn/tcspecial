@@ -59,7 +59,7 @@ pub struct PayloadConfig {
     ///
     /// Apart from `bus_address` because a CAN identifier is twenty-nine bits
     /// where an I2C address is ten, and because the two are compared against
-    /// different things. Experimental; see [`crate::payload_can`].
+    /// different things. Experimental; see [`crate::node::can`].
     pub can_id: u32,
     /// Whether a CAN payload's frames are CAN FD, which decides how much one
     /// carries.
@@ -118,7 +118,7 @@ pub enum PayloadProtocol {
     /// of its own: see [`crate::payload_unix`].
     UnixDgram,
     /// A payload on a CAN bus, which the simulator joins as another member of
-    /// the same bus: see [`crate::payload_can`]. Experimental.
+    /// the same bus: see [`crate::node::can`]. Experimental.
     Can,
     /// A sensor's sample buffer, which the simulator stands in for with a pty
     /// -- the samples but not the sysfs around them: see
@@ -226,7 +226,7 @@ impl SimulatedPayload {
                     crate::node::spi::run_spi_node(config, running, stats)
                 }
                 PayloadProtocol::Can => {
-                    crate::payload_can::run_can_payload(config, running, stats)
+                    crate::node::can::run_can_node(config, running, stats)
                 }
                 PayloadProtocol::Iio => {
                     crate::payload_iio::run_iio_payload(config, running, stats)

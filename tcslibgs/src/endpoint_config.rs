@@ -26,7 +26,7 @@ use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::endpoint_config_can::CanParams;
+use crate::node::can::CanParams;
 use crate::endpoint_config_iio::IioParams;
 use crate::endpoint_config_gpio::GpioParams;
 use crate::endpoint_config_rpmsg::RpmsgParams;
@@ -38,7 +38,7 @@ use crate::node::spi::SpiParams;
 // that a reader of a configuration document reaches everything it can hold
 // through the module that parses it.
 pub use crate::node::i2c::I2cParams as I2cGroupParams;
-pub use crate::endpoint_config_can::CanParams as CanGroupParams;
+pub use crate::node::can::CanParams as CanGroupParams;
 pub use crate::endpoint_config_iio::IioParams as IioGroupParams;
 pub use crate::endpoint_config_gpio::GpioParams as GpioGroupParams;
 pub use crate::endpoint_config_rpmsg::RpmsgParams as RpmsgGroupParams;
@@ -218,7 +218,7 @@ pub enum GroupKind {
     Serial(SerialParams),
     I2c(I2cParams),
     Spi(SpiParams),
-    /// Experimental; see [`crate::endpoint_config_can`].
+    /// Experimental; see [`crate::node::can`].
     Can(CanParams),
     /// Experimental; see [`crate::endpoint_config_iio`].
     Iio(IioParams),
@@ -313,7 +313,7 @@ pub enum EndpointLocation {
     /// interface, not a device file. Both are needed for the reason an I2C
     /// device needs both -- several payloads commonly share one bus and
     /// differ only in the identifier. Experimental; see
-    /// [`crate::endpoint_config_can`].
+    /// [`crate::node::can`].
     Can { interface: String, can_id: u32 },
 }
 
@@ -382,7 +382,7 @@ pub(crate) struct LinkTerms {
     pub(crate) rs485_delay_before_send_ms: Option<Scalar>,
     pub(crate) rs485_delay_after_send_ms: Option<Scalar>,
     /// Bits per second on a CAN bus, and whether its frames are CAN FD; see
-    /// [`crate::endpoint_config_can`].
+    /// [`crate::node::can`].
     pub(crate) bitrate: Option<Scalar>,
     pub(crate) can_fd: Option<Scalar>,
     /// What an IIO device is expected to be producing; see

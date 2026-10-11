@@ -22,7 +22,6 @@ use tcslibgs::{payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME};
 mod endpoint;
 mod grid;
 mod payload;
-mod payload_can;
 mod payload_device;
 mod payload_gpio;
 mod node;

@@ -9,12 +9,12 @@
 //! the configuration names. What arrives is frames, and a frame is its own
 //! length -- the controller delivers whole frames or nothing -- so a read
 //! hands up one frame's data and a write puts one packet into one frame.
-//! There is no fragmentation anywhere in CAN, which is why the payload
+//! There is no fragmentation anywhere in CAN, which is why the device
 //! configuration refuses a packet size a frame cannot carry rather than
 //! leaving it to be discovered here.
 //!
-//! The socket is filtered to the identifier the payload's frames carry.
-//! Without that a handler on a shared bus would read every other payload's
+//! The socket is filtered to the identifier the device's frames carry.
+//! Without that a handler on a shared bus would read every other device's
 //! traffic and count it as its own, which is the one thing a bus makes easy to
 //! get wrong. Its own frames are not received back, so a handler never reads
 //! the trigger it just sent.
@@ -27,7 +27,7 @@ use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{endpoint_config_can::frame_bytes, CanConfig, TcsError, TcsResult};
+use tcslibgs::{node::can::frame_bytes, CanConfig, TcsError, TcsResult};
 
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
@@ -35,7 +35,7 @@ use crate::endpoint::{
 
 /// A raw CAN socket, read and written by two conduits.
 pub struct CanEndpoint {
-    /// The handler this endpoint belongs to, as the payload configuration
+    /// The handler this endpoint belongs to, as the device configuration
     /// names it, so what the endpoint says of itself says which handler it is
     /// for.
     what: String,
@@ -67,7 +67,7 @@ impl CanEndpoint {
         // From here the descriptor is owned, so every path below closes it.
         let socket = unsafe { OwnedFd::from_raw_fd(fd) };
 
-        // Only this payload's frames. A bus carries everybody's.
+        // Only this device's frames. A bus carries everybody's.
         set_filter(what, socket.as_raw_fd(), config.can_id)?;
 
         if config.fd {
@@ -143,14 +143,14 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
     Ok(index)
 }
 
-/// Accept this payload's frames and nothing else on the bus.
+/// Accept this device's frames and nothing else on the bus.
 ///
 /// One filter, on the identifier and every bit of it. The extended-format
 /// flag is part of the identifier the kernel compares, so it goes in the mask
 /// as well: without it a base identifier would also match the extended frame
 /// with the same number, which is a different frame.
 fn set_filter(what: &str, fd: RawFd, can_id: u32) -> TcsResult<()> {
-    let id = if tcslibgs::endpoint_config_can::is_extended(can_id) {
+    let id = if tcslibgs::node::can::is_extended(can_id) {
         can_id | libc::CAN_EFF_FLAG
     } else {
         can_id
@@ -274,7 +274,7 @@ fn data_of(frame: &[u8], fd: bool) -> Option<(u32, usize)> {
 }
 
 /// Where a frame's data begins, which is the same offset in both structures:
-/// the identifier, the length, and the padding before the payload.
+/// the identifier, the length, and the padding before the device.
 const DATA_AT: usize = 8;
 
 impl EndpointWaitable for CanEndpoint {
@@ -330,7 +330,7 @@ impl EndpointWritable for CanEndpoint {
     /// A packet longer than a frame is refused rather than split: there is no
     /// fragmentation in CAN, so the far end would receive a frame and have no
     /// way of knowing the rest was coming. The configuration refuses such a
-    /// payload where the file is read, so reaching this means a trigger
+    /// device where the file is read, so reaching this means a trigger
     /// longer than a frame, which is the one write a file does not size.
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
         let room = self.frame_bytes();
@@ -344,7 +344,7 @@ impl EndpointWritable for CanEndpoint {
             )));
         }
 
-        let id = if tcslibgs::endpoint_config_can::is_extended(self.can_id) {
+        let id = if tcslibgs::node::can::is_extended(self.can_id) {
             self.can_id | libc::CAN_EFF_FLAG
         } else {
             self.can_id
@@ -372,7 +372,7 @@ impl EndpointWritable for CanEndpoint {
             };
         }
 
-        // What the payload got, not what the frame took: a conduit counts the
+        // What the device got, not what the frame took: a conduit counts the
         // bytes it moved, and the padding is the kernel's business.
         Ok(data.len())
     }
@@ -422,12 +422,12 @@ mod tests {
     /// would make one.
     ///
     /// The common failure by a distance: a virtual bus has to be created and
-    /// brought up, which needs root, so a payload set that runs on one
+    /// brought up, which needs root, so a device set that runs on one
     /// machine fails on the next -- and the message is the whole of what
     /// tells an operator which it is.
     #[test]
     fn an_interface_that_is_not_there_says_how_to_make_one() {
-        let said = interface_index("payload", "vcan-nonesuch")
+        let said = interface_index("device", "vcan-nonesuch")
             .expect_err("no such interface");
         let said = format!("{said}");
         assert!(
@@ -436,10 +436,10 @@ mod tests {
         );
     }
 
-    /// Opening a payload on an interface that is not there fails with that
+    /// Opening a device on an interface that is not there fails with that
     /// same message rather than a socket error.
     #[test]
-    fn a_payload_on_a_bus_that_is_not_there_is_reported() {
+    fn a_device_on_a_bus_that_is_not_there_is_reported() {
         let config = CanConfig {
             interface: "vcan-nonesuch".to_string(),
             can_id: 0x100,
@@ -448,7 +448,7 @@ mod tests {
             loopback: true,
         };
 
-        let said = match CanEndpoint::new("payload", &config) {
+        let said = match CanEndpoint::new("device", &config) {
             Err(e) => format!("{e}"),
             Ok(_) => panic!("this host has an interface called vcan-nonesuch"),
         };
@@ -458,7 +458,7 @@ mod tests {
         );
     }
 
-    /// A payload's frames carry what it was asked to send, over the kernel's
+    /// A device's frames carry what it was asked to send, over the kernel's
     /// virtual bus.
     ///
     /// The whole of the endpoint, where a bus exists to carry it: two sockets
@@ -485,11 +485,11 @@ mod tests {
         };
 
         let mut handler = CanEndpoint::new("handler", &config).expect("a socket on the bus");
-        let mut payload = CanEndpoint::new("payload", &config).expect("another socket on it");
+        let mut device = CanEndpoint::new("device", &config).expect("another socket on it");
 
-        // The payload sends; the handler reads what arrived.
+        // The device sends; the handler reads what arrived.
         assert_eq!(
-            payload.write(&[1, 2, 3, 4]).expect("a frame goes out"),
+            device.write(&[1, 2, 3, 4]).expect("a frame goes out"),
             4,
             "a write moves the packet, not the frame"
         );
@@ -516,7 +516,7 @@ mod tests {
     /// machine that had not been set up by hand -- which is most of them.
     fn not_on_a_bus(fd: bool) -> CanEndpoint {
         CanEndpoint {
-            what: "payload".to_string(),
+            what: "device".to_string(),
             // Writable, because the lengths that are not refused go on to
             // be written: /dev/null takes them and says nothing, which is
             // exactly what is wanted of a descriptor that is not a bus.

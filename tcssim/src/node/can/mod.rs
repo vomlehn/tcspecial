@@ -1,4 +1,4 @@
-//! A simulated payload on a CAN bus.
+//! A simulated device on a CAN bus.
 //!
 //! **Experimental, and not yet supported.** Run against the kernel's virtual
 //! bus and against no CAN controller.
@@ -6,9 +6,9 @@
 //! The one experimental kind whose stand-in is as faithful as a socket. A CAN
 //! controller carries every member's frames to every other member, so the
 //! simulator does not have to stand in for anything: it opens a socket on the
-//! same interface the handler is on, sends the payload's frames with the
-//! payload's identifier, and reads the handler's triggers off the same bus.
-//! Both ends are real, which is what lets a triggered payload work here where
+//! same interface the handler is on, sends the device's frames with the
+//! device's identifier, and reads the handler's triggers off the same bus.
+//! Both ends are real, which is what lets a triggered device work here where
 //! one on an I2C bus cannot -- nothing in user space can answer when a master
 //! addresses it, and on a bus of peers there is nothing to answer.
 //!
@@ -19,7 +19,7 @@
 //! for its kernel module.
 //!
 //! A frame is its own length and carries eight bytes, or sixty-four as CAN
-//! FD. A packet larger than that cannot be sent at all, which the payload
+//! FD. A packet larger than that cannot be sent at all, which the device
 //! configuration refuses where the file is read; the segment settings still
 //! apply, so a packet may be sent as several frames, each a segment.
 //!
@@ -38,13 +38,13 @@ use crate::payload::{
 };
 
 /// Where a frame's data begins in both of the kernel's frame structures: the
-/// identifier, the length, and the padding before the payload.
+/// identifier, the length, and the padding before the device.
 const DATA_AT: usize = 8;
 
 /// A socket on the bus, as this end of the link.
 struct BusMember {
     socket: OwnedFd,
-    /// The identifier this payload's frames carry, which is also the one the
+    /// The identifier this device's frames carry, which is also the one the
     /// handler sends its triggers with.
     can_id: u32,
     /// Whether frames are CAN FD, which decides the structure the kernel
@@ -53,11 +53,11 @@ struct BusMember {
 }
 
 impl BusMember {
-    /// Join the bus the handler is on, filtered to this payload's identifier.
+    /// Join the bus the handler is on, filtered to this device's identifier.
     ///
     /// Filtered for the same reason the handler filters: a bus carries
-    /// everybody's frames, and a payload that read the lot would answer
-    /// triggers meant for another payload on the same interface.
+    /// everybody's frames, and a device that read the lot would answer
+    /// triggers meant for another device on the same interface.
     fn join(config: &PayloadConfig) -> Result<Self, String> {
         let interface = config.address.clone();
         let index = index_of(&interface).ok_or_else(|| {
@@ -223,7 +223,7 @@ impl BusMember {
             return Err(io::Error::last_os_error());
         }
 
-        // The payload's bytes, not the frame's: what a simulated payload
+        // The device's bytes, not the frame's: what a simulated device
         // counts is what it sent, and the padding is the kernel's.
         Ok(data.len())
     }
@@ -268,13 +268,13 @@ fn index_of(interface: &str) -> Option<libc::c_uint> {
     }
 }
 
-/// Run a simulated payload on a CAN bus.
+/// Run a simulated device on a CAN bus.
 ///
 /// The same loop every other kind has: read whatever the handler sent, send a
 /// packet if one is due, wait out the rest of the interval. What differs is
 /// only that each segment is a frame, so a packet in four segments arrives at
 /// the handler as four frames.
-pub fn run_can_payload(
+pub fn run_can_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
@@ -295,7 +295,7 @@ pub fn run_can_payload(
         let pacing = Pacing::read(&config);
 
         // What the handler has put on the bus, which is a trigger for a
-        // payload that answers requests.
+        // device that answers requests.
         let mut buf = vec![0u8; 64];
         let asked = bus.receive(&mut buf);
         if asked > 0 {
@@ -372,21 +372,21 @@ mod tests {
             .find(|name| index_of(name).is_some() && is_up(name))
     }
 
-    /// A payload on the given bus, under the given identifier, sending a
+    /// A device on the given bus, under the given identifier, sending a
     /// packet every 50 ms.
     ///
     /// The identifier is a parameter rather than a constant because the tests
     /// here run as threads of one process and share the one bus the host has.
-    /// Two payloads on one identifier is the arrangement a configuration is
+    /// Two devices on one identifier is the arrangement a configuration is
     /// refused for, and for the same reason: each handler filters on that
     /// identifier and so reads the other's frames. A test asserting that
     /// nothing has arrived yet then sees a frame another test sent and fails
     /// intermittently, nowhere near the cause. So each test that touches the
-    /// bus takes an identifier of its own, and the payload and the handler
+    /// bus takes an identifier of its own, and the device and the handler
     /// within one test share it, which is how they talk at all.
-    fn payload_on(interface: &str, can_id: u32, triggered: bool) -> PayloadConfig {
+    fn device_on(interface: &str, can_id: u32, triggered: bool) -> PayloadConfig {
         PayloadConfig {
-            name: "can-payload".to_string(),
+            name: "can-device".to_string(),
             protocol: PayloadProtocol::Can,
             address: interface.to_string(),
             port: 0,
@@ -406,14 +406,14 @@ mod tests {
     }
 
     /// A bus that is not there is reported with the command that would make
-    /// one, and the payload stops rather than spinning.
+    /// one, and the device stops rather than spinning.
     ///
     /// The case every machine without a virtual bus is in, which is most of
-    /// them: making one needs root. A payload that said nothing would be a
+    /// them: making one needs root. A device that said nothing would be a
     /// panel with every counter at nought and no reason given.
     #[test]
     fn a_bus_that_is_not_there_says_how_to_make_one() {
-        let said = match BusMember::join(&payload_on("vcan-nonesuch", 0x200, false)) {
+        let said = match BusMember::join(&device_on("vcan-nonesuch", 0x200, false)) {
             Err(e) => e,
             Ok(_) => panic!("this host has an interface called vcan-nonesuch"),
         };
@@ -423,12 +423,12 @@ mod tests {
         );
     }
 
-    /// A frame carries what the payload sent, to another member of the bus.
+    /// A frame carries what the device sent, to another member of the bus.
     ///
     /// Needs a bus, and says so rather than passing in silence where there is
     /// none. What can be checked without one is beside this.
     #[test]
-    fn a_frame_carries_what_the_payload_sends() {
+    fn a_frame_carries_what_the_device_sends() {
         let Some(interface) = a_virtual_bus() else {
             eprintln!(
                 "skipped: no virtual CAN bus up on this host. Make one with \
@@ -437,15 +437,15 @@ mod tests {
             return;
         };
 
-        let payload =
-            BusMember::join(&payload_on(&interface, 0x201, false)).expect("a member of the bus");
+        let device =
+            BusMember::join(&device_on(&interface, 0x201, false)).expect("a member of the bus");
         let handler =
-            BusMember::join(&payload_on(&interface, 0x201, false)).expect("another member");
+            BusMember::join(&device_on(&interface, 0x201, false)).expect("another member");
 
         assert_eq!(
-            payload.send(&[9, 8, 7]).expect("a frame goes out"),
+            device.send(&[9, 8, 7]).expect("a frame goes out"),
             3,
-            "a send moves the payload's bytes, not the frame's"
+            "a send moves the device's bytes, not the frame's"
         );
 
         let mut buf = [0u8; 64];
@@ -486,7 +486,7 @@ mod tests {
     /// A packet larger than a frame is refused rather than split, and how
     /// large that is follows from the kind of frame.
     ///
-    /// Before the send is attempted, so this needs no bus. The payload
+    /// Before the send is attempted, so this needs no bus. The device
     /// configuration refuses such a packet where the file is read, which is
     /// what keeps it from reaching here in a real run; this is the stand-in's
     /// own guard, for the trigger a file does not size.
@@ -518,28 +518,28 @@ mod tests {
         );
     }
 
-    /// A triggered payload on a bus answers a request and says nothing
+    /// A triggered device on a bus answers a request and says nothing
     /// otherwise.
     ///
     /// Which is the thing a bus of peers can do and an I2C bus cannot: both
     /// ends here are sockets, so the simulator really does hear the handler
     /// ask.
     #[test]
-    fn a_triggered_payload_on_a_bus_answers_a_request() {
+    fn a_triggered_device_on_a_bus_answers_a_request() {
         let Some(interface) = a_virtual_bus() else {
             eprintln!("skipped: no virtual CAN bus up on this host");
             return;
         };
 
         // The handler's end, which asks.
-        let handler = BusMember::join(&payload_on(&interface, 0x202, false)).expect("a member");
+        let handler = BusMember::join(&device_on(&interface, 0x202, false)).expect("a member");
 
-        let mut config = payload_on(&interface, 0x202, true);
-        // A triggered payload sends when it is asked and at no rate of its
-        // own, which is what the payload configuration holds it to.
+        let mut config = device_on(&interface, 0x202, true);
+        // A triggered device sends when it is asked and at no rate of its
+        // own, which is what the device configuration holds it to.
         config.packet_interval_ms = Arc::new(AtomicU32::new(0));
-        let mut payload = SimulatedPayload::new(config);
-        payload.start().expect("the payload starts");
+        let mut device = SimulatedPayload::new(config);
+        device.start().expect("the device starts");
 
         // Nothing until it is asked.
         let mut buf = [0u8; 64];
@@ -547,7 +547,7 @@ mod tests {
         assert_eq!(
             handler.receive(&mut buf),
             0,
-            "a triggered payload sent without being asked"
+            "a triggered device sent without being asked"
         );
 
         // Asked, and the answer arrives.
@@ -563,6 +563,6 @@ mod tests {
             .expect("the request was answered");
         assert_eq!(got, 8, "one packet of the configured size");
 
-        payload.stop();
+        device.stop();
     }
 }

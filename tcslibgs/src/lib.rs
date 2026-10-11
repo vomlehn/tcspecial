@@ -19,6 +19,7 @@ pub mod endpoint_config;
 pub mod node;
 pub mod error;
 pub mod format;
+pub mod graph;
 pub mod parameters;
 pub mod protocol;
 /// The simulator's own configuration language.

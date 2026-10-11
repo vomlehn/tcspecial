@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <version>2.0</version>
+    <groups>
+        <name>cabin_temps</name>
+        <interval>3s</interval>
+    </groups>
     <!-- Forward bulkhead. Two bytes, signed, big endian. -->
     <nodes>
         <name>temp_fore</name>
@@ -9,7 +13,7 @@
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
-        <editor><at>40,40</at></editor>
+        <editor><x>40</x><y>40</y></editor>
     </nodes>
     <!-- Aft bulkhead; same part as temp_fore. -->
     <nodes>
@@ -19,7 +23,7 @@
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
-        <editor><at>40,160</at></editor>
+        <editor><x>40</x><y>160</y></editor>
     </nodes>
     <!-- Equipment bay. Three bytes, unsigned -- a different part, hence its -->
     <!-- own conversion. -->
@@ -31,7 +35,7 @@
         <path>/dev/spidev0.0</path>
         <read_size>3</read_size>
         <spi_mode>0</spi_mode>
-        <editor><at>40,280</at></editor>
+        <editor><x>40</x><y>280</y></editor>
     </nodes>
     <nodes>
         <name>k_fore</name>
@@ -40,7 +44,7 @@
         <function>to_kelvin</function>
         <offset>273.15</offset>
         <scale>0.0625</scale>
-        <editor><at>240,40</at></editor>
+        <editor><x>240</x><y>40</y></editor>
     </nodes>
     <nodes>
         <name>k_aft</name>
@@ -49,7 +53,7 @@
         <function>to_kelvin</function>
         <offset>273.15</offset>
         <scale>0.0625</scale>
-        <editor><at>240,160</at></editor>
+        <editor><x>240</x><y>160</y></editor>
     </nodes>
     <nodes>
         <name>k_bay</name>
@@ -58,14 +62,14 @@
         <function>to_kelvin</function>
         <offset>255.37</offset>
         <scale>0.0078</scale>
-        <editor><at>240,280</at></editor>
+        <editor><x>240</x><y>280</y></editor>
     </nodes>
     <nodes>
         <name>mean_temp</name>
         <type>compute</type>
         <function>mean</function>
         <inputs>in0,in1,in2</inputs>
-        <editor><at>460,160</at></editor>
+        <editor><x>460</x><y>160</y></editor>
     </nodes>
     <!-- setpoint is set from the ground; above and below are the two degrees -->
     <!-- either side that the heaters are switched at. -->
@@ -76,14 +80,14 @@
         <below>2.0</below>
         <function>hysteresis</function>
         <setpoint>293.15</setpoint>
-        <editor><at>660,240</at></editor>
+        <editor><x>660</x><y>240</y></editor>
     </nodes>
     <nodes>
         <name>moc</name>
         <type>moc</type>
         <address>10.0.0.1</address>
         <port>5000</port>
-        <editor><at>660,40</at></editor>
+        <editor><x>660</x><y>40</y></editor>
     </nodes>
     <!-- Three circuits, driven together. -->
     <nodes>
@@ -92,14 +96,14 @@
         <direction>output</direction>
         <lines>3,4,5</lines>
         <path>/dev/gpiochip0</path>
-        <editor><at>860,240</at></editor>
+        <editor><x>860</x><y>240</y></editor>
     </nodes>
     <nodes>
         <name>housekeeping</name>
         <type>log</type>
         <directory>/var/log/tcspecial</directory>
         <format>variable_ts_rc</format>
-        <editor><at>460,380</at></editor>
+        <editor><x>460</x><y>380</y></editor>
     </nodes>
     <links>
         <from>temp_fore</from>

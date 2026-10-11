@@ -10,10 +10,10 @@
 //! that open whichever kind a configuration asks for. Each kind itself lives
 //! in a file of its own, since they have nothing in common but these traits:
 //!
-//! * [`crate::endpoint_udp`] -- datagram sockets
-//! * [`crate::endpoint_tcp`] -- stream sockets
+//! * [`crate::node::network::udp`] -- datagram sockets
+//! * [`crate::node::network::tcp`] -- stream sockets
 //! * [`crate::endpoint_device`] -- device files
-//! * [`crate::endpoint_network`] -- the address family, socket type and
+//! * [`crate::node::network`] -- the address family, socket type and
 //!   protocol tables the two socket kinds draw on
 
 use std::io;
@@ -31,9 +31,9 @@ use crate::node::iio::IioEndpoint;
 use crate::node::rpmsg::RpmsgEndpoint;
 use crate::node::serial::SerialEndpoint;
 use crate::node::spi::SpiEndpoint;
-use crate::endpoint_tcp::TcpEndpoint;
-use crate::endpoint_udp::UdpEndpoint;
-use crate::endpoint_unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
+use crate::node::network::tcp::TcpEndpoint;
+use crate::node::network::udp::UdpEndpoint;
+use crate::node::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
 
 /// Trait for endpoints that can wait for events
 pub trait EndpointWaitable {

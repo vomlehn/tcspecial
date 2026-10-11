@@ -1,7 +1,7 @@
-//! A simulated payload that sends datagrams to where its handler waits.
+//! A simulated device that sends datagrams to where its handler waits.
 //!
 //! The one kind that has to speak first. A datagram connect sends nothing, so
-//! a payload waiting at an address is never spoken to, and a payload produces
+//! a device waiting at an address is never spoken to, and a device produces
 //! data because it is running rather than because it was asked -- so this end
 //! reaches out and the handler is the end that binds.
 //!
@@ -17,17 +17,17 @@ use crate::payload::{
     PayloadConfig, PayloadStats, Produce,
 };
 
-/// Run UDP payload simulation
+/// Run a simulated device reached over UDP.
 ///
-/// The payload speaks first and keeps speaking: from Start to Stop it sends a
+/// The device speaks first and keeps speaking: from Start to Stop it sends a
 /// packet every packet interval whether or not anything has been heard from
-/// the handler. That is what a payload does -- it produces data because it is
+/// the handler. That is what a device does -- it produces data because it is
 /// running, not because it was asked -- and it is why this end does not bind
 /// the handler's address but reaches out to it.
 ///
 /// It used to bind that address and answer whoever reached it, which meant
-/// nothing was ever sent: a handler reaches its payload by connecting, and a
-/// UDP connect sends nothing, so the payload heard nothing and stayed silent
+/// nothing was ever sent: a handler reaches its device by connecting, and a
+/// UDP connect sends nothing, so the device heard nothing and stayed silent
 /// while the handler waited for data that was waiting for it. Both ends sat
 /// there with Start pressed and every counter at zero.
 ///
@@ -35,15 +35,15 @@ use crate::payload::{
 /// is not there is reported: a send to a port nothing is bound to comes back
 /// refused instead of being quietly dropped, and the failed sends are what
 /// the window shows as nothing moving.
-pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+pub fn run_udp_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
     let handler = format!("{}:{}", config.address, config.port);
 
-    // What this end answers from. Nothing has to find the payload at a
+    // What this end answers from. Nothing has to find the device at a
     // particular port -- the handler learns where it is from the first packet
     // it gets -- so a file that says nothing gets any interface and whatever
     // port is free. A file that does say is obeyed: something outside the
     // simulation, a rule on a firewall or a capture being read afterwards,
-    // may need to know which socket the payload answers from.
+    // may need to know which socket the device answers from.
     let mine = format!(
         "{}:{}",
         config.own_address.as_deref().unwrap_or("0.0.0.0"),
@@ -53,7 +53,7 @@ pub fn run_udp_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: A
     let socket = match UdpSocket::bind(&mine) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("{}: failed to bind the UDP payload at {}: {}", config.name, mine, e);
+            eprintln!("{}: failed to bind the UDP device at {}: {}", config.name, mine, e);
             return;
         }
     };
@@ -133,20 +133,20 @@ mod tests {
     use tcslibgs::Timestamp;
     use std::time::Duration;
 
-    /// A UDP payload sends because it is running, not because it was asked.
+    /// A UDP device sends because it is running, not because it was asked.
     ///
     /// Nothing speaks to it here: the handler's end only waits at the address
-    /// the payload was configured to reach, and the packets arrive anyway.
-    /// That is the whole of what Start means, and it is what the payload did
+    /// the device was configured to reach, and the packets arrive anyway.
+    /// That is the whole of what Start means, and it is what the device did
     /// not do before -- it bound the handler's address and answered whoever
-    /// reached it, and since a handler reaches a UDP payload by connecting,
+    /// reached it, and since a handler reaches a UDP device by connecting,
     /// which sends nothing, it was never spoken to and never sent.
     ///
     /// The packet arrives as the segments the settings ask for, one datagram
     /// each, which is where the division is visible: three segments are three
     /// reads at the handler's end.
     #[test]
-    fn a_udp_payload_sends_unprompted_as_the_segments_asked_for() {
+    fn a_udp_device_sends_unprompted_as_the_segments_asked_for() {
         // The handler's end of the link, which is the end that waits.
         let handler = UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
         let at = handler.local_addr().expect("its address");
@@ -154,7 +154,7 @@ mod tests {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("a read timeout");
 
-        let mut payload = SimulatedPayload::new(PayloadConfig {
+        let mut device = SimulatedPayload::new(PayloadConfig {
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -172,7 +172,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
                     triggered: false,
         });
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         // Enough for two packets, whichever segment of one arrives first.
         let mut buf = [0u8; 64];
@@ -182,8 +182,8 @@ mod tests {
             datagrams.push((n, Instant::now()));
         }
 
-        let stats = payload.stats();
-        payload.stop();
+        let stats = device.stats();
+        device.stop();
 
         let sizes: Vec<usize> = datagrams.iter().map(|(n, _)| *n).collect();
 
@@ -214,12 +214,12 @@ mod tests {
         );
     }
 
-    /// A payload at the handler's address, with faults.
+    /// A device at the handler's address, with faults.
     fn faulty(at: std::net::SocketAddr, faults: Faults) -> SimulatedPayload {
         answering_from(at, faults, None, None)
     }
 
-    /// A payload at the handler's address, answering from the socket given.
+    /// A device at the handler's address, answering from the socket given.
     fn answering_from(
         at: std::net::SocketAddr,
         faults: Faults,
@@ -254,17 +254,17 @@ mod tests {
         (handler, at)
     }
 
-    /// What a payload says of itself says which payload it is.
+    /// What a device says of itself says which device it is.
     ///
-    /// A run of four payloads whose messages said only "failed to reach the
+    /// A run of four devices whose messages said only "failed to reach the
     /// handler" left the reader to work out which from the order they came
-    /// in. The name is the payload configuration's, which is the name every
+    /// in. The name is the device configuration's, which is the name every
     /// other part of the system uses for it -- a panel, a log line of
     /// tcspecial's, and the list a panel's Configuration button shows.
     #[test]
-    fn a_payload_says_which_payload_it_is() {
+    fn a_payload_says_which_device_it_is() {
         // Nothing is listening at this address and nothing will be, so the
-        // payload cannot reach a handler and says so.
+        // device cannot reach a handler and says so.
         let nowhere = UdpSocket::bind("127.0.0.1:0").expect("a port to take and give back");
         let at = nowhere.local_addr().expect("its address");
         drop(nowhere);
@@ -289,24 +289,24 @@ mod tests {
         };
 
         // The name reaches the thread that does the talking, which is the
-        // thing this is about: the configuration a payload is run from
+        // thing this is about: the configuration a device is run from
         // carries it, so every message in that thread can say it.
         assert_eq!(config.name, "serial-line");
-        let mut payload = SimulatedPayload::new(config);
-        assert_eq!(payload.name(), "serial-line");
-        payload.start().expect("the payload starts");
-        payload.stop();
+        let mut device = SimulatedPayload::new(config);
+        assert_eq!(device.name(), "serial-line");
+        device.start().expect("the device starts");
+        device.stop();
     }
 
-    /// A payload told which socket to answer from answers from it.
+    /// A device told which socket to answer from answers from it.
     ///
-    /// Nothing in the link needs it -- the handler learns where the payload
+    /// Nothing in the link needs it -- the handler learns where the device
     /// is from the first packet it gets -- but something outside the
     /// simulation may: a rule on a firewall, or a capture being read
     /// afterwards. The handler's end sees which socket a datagram came from,
     /// which is how this is checked.
     #[test]
-    fn a_payload_answers_from_the_socket_it_was_given() {
+    fn a_device_answers_from_the_socket_it_was_given() {
         let (handler, at) = handler_end(Duration::from_secs(5));
 
         // A port nothing else is on, found by binding and letting go.
@@ -314,21 +314,21 @@ mod tests {
         let mine = spare.local_addr().expect("its address").port();
         drop(spare);
 
-        let mut payload = answering_from(
+        let mut device = answering_from(
             at,
             Faults::default(),
             Some("127.0.0.1".to_string()),
             Some(mine),
         );
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         let mut buf = [0u8; 64];
         let (_, from) = handler.recv_from(&mut buf).expect("a packet");
-        payload.stop();
+        device.stop();
 
         assert_eq!(
             from.port(), mine,
-            "the payload answered from {} rather than the {mine} it was given",
+            "the device answered from {} rather than the {mine} it was given",
             from.port()
         );
     }
@@ -337,15 +337,15 @@ mod tests {
     ///
     /// Taken at the moment the packet goes rather than when the window next
     /// looks, which is what makes the panel's time the time of the transfer:
-    /// a time stamped by the refresh would creep forward on a payload that
+    /// a time stamped by the refresh would creep forward on a device that
     /// had stopped sending.
     #[test]
     fn a_sent_packet_is_timed_as_well_as_counted() {
         let (handler, at) = handler_end(Duration::from_secs(5));
-        let mut payload = faulty(at, Faults::default());
+        let mut device = faulty(at, Faults::default());
 
         let before = Timestamp::now();
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         let mut buf = [0u8; 64];
         handler.recv_from(&mut buf).expect("a packet");
@@ -353,7 +353,7 @@ mod tests {
         // moment between the two.
         let deadline = Instant::now() + Duration::from_secs(5);
         let sent = loop {
-            let sample = payload.stats().last_sent;
+            let sample = device.stats().last_sent;
             match sample.time {
                 Some(_) => break sample,
                 None if Instant::now() < deadline => {
@@ -363,7 +363,7 @@ mod tests {
             }
         };
         let after = Timestamp::now();
-        payload.stop();
+        device.stop();
 
         let went = sent.time.expect("a time, having just been matched");
         assert!(
@@ -381,24 +381,24 @@ mod tests {
         );
         assert_eq!(&buf[..sent.data().len()], sent.data(), "the sample is not the bytes that arrived");
         assert!(
-            payload.stats().last_recv.is_empty(),
-            "nothing was sent to this payload, so it has no received line"
+            device.stats().last_recv.is_empty(),
+            "nothing was sent to this device, so it has no received line"
         );
     }
 
     /// And when the last one arrived, which is the other row of the panel.
     ///
-    /// The handler's end learns where the payload is from the packet it gets,
+    /// The handler's end learns where the device is from the packet it gets,
     /// a datagram's sender being the only statement of where it came from, so
-    /// this is also the only order in which the two can be timed: the payload
+    /// this is also the only order in which the two can be timed: the device
     /// speaks, and then can be spoken to.
     #[test]
     fn a_received_packet_is_timed_too() {
         let (handler, at) = handler_end(Duration::from_secs(5));
-        let mut payload = faulty(at, Faults::default());
+        let mut device = faulty(at, Faults::default());
 
         let before = Timestamp::now();
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         let mut buf = [0u8; 64];
         let (_, from) = handler.recv_from(&mut buf).expect("a packet");
@@ -406,17 +406,17 @@ mod tests {
 
         let deadline = Instant::now() + Duration::from_secs(5);
         let received = loop {
-            let sample = payload.stats().last_recv;
+            let sample = device.stats().last_recv;
             match sample.time {
                 Some(_) => break sample,
                 None if Instant::now() < deadline => {
                     std::thread::sleep(Duration::from_millis(10))
                 }
-                None => panic!("the payload was spoken to and recorded no time"),
+                None => panic!("the device was spoken to and recorded no time"),
             }
         };
         let after = Timestamp::now();
-        payload.stop();
+        device.stop();
 
         let came = received.time.expect("a time, having just been matched");
         assert!(
@@ -431,7 +431,7 @@ mod tests {
         );
     }
 
-    /// Every packet dropped is a running payload that sends nothing.
+    /// Every packet dropped is a running device that sends nothing.
     ///
     /// Which is the point of the fault: the simulator is up, the handler is
     /// started, the link is fine, and the data does not come. Nothing is
@@ -439,26 +439,26 @@ mod tests {
     /// sent would make the statistics disagree with the handler's about what
     /// moved, and the statistics are what tell the two apart.
     #[test]
-    fn a_payload_dropping_everything_sends_nothing() {
+    fn a_device_dropping_everything_sends_nothing() {
         let (handler, at) = handler_end(Duration::from_millis(500));
-        let mut payload = faulty(
+        let mut device = faulty(
             at,
             Faults {
                 drop_percent: 100,
                 ..Faults::default()
             },
         );
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         // Many packet intervals' worth of waiting.
         let mut buf = [0u8; 64];
         let heard = handler.recv_from(&mut buf);
-        let stats = payload.stats();
-        payload.stop();
+        let stats = device.stats();
+        device.stop();
 
         assert!(
             heard.is_err(),
-            "a payload dropping every packet sent {:?}",
+            "a device dropping every packet sent {:?}",
             heard.map(|(n, _)| n)
         );
         assert_eq!(
@@ -478,14 +478,14 @@ mod tests {
     #[test]
     fn a_truncated_packet_arrives_short_of_its_size() {
         let (handler, at) = handler_end(Duration::from_secs(5));
-        let mut payload = faulty(
+        let mut device = faulty(
             at,
             Faults {
                 truncate_percent: 100,
                 ..Faults::default()
             },
         );
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         // A segment size equal to the packet size makes each packet one
         // datagram, so a datagram's length is a packet's length.
@@ -495,7 +495,7 @@ mod tests {
             let (n, _) = handler.recv_from(&mut buf).expect("a packet");
             lengths.push(n);
         }
-        payload.stop();
+        device.stop();
 
         assert!(
             lengths.iter().all(|&n| (1..12).contains(&n)),
@@ -504,23 +504,23 @@ mod tests {
         );
     }
 
-    /// A payload told to go quiet after so many packets goes quiet, and stays
+    /// A device told to go quiet after so many packets goes quiet, and stays
     /// that way.
     ///
     /// The link is still up and the handler is still waiting: what a stopped
     /// instrument looks like from the other end, and what a handler reporting
     /// no data has to be told apart from a handler that was never started.
     #[test]
-    fn a_payload_going_silent_sends_that_many_and_no_more() {
+    fn a_device_going_silent_sends_that_many_and_no_more() {
         let (handler, at) = handler_end(Duration::from_secs(5));
-        let mut payload = faulty(
+        let mut device = faulty(
             at,
             Faults {
                 silent_after: 3,
                 ..Faults::default()
             },
         );
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         let mut buf = [0u8; 64];
         for which in 1..=3 {
@@ -534,16 +534,16 @@ mod tests {
             .set_read_timeout(Some(Duration::from_millis(400)))
             .expect("a read timeout");
         let after = handler.recv_from(&mut buf);
-        let stats = payload.stats();
-        payload.stop();
+        let stats = device.stats();
+        device.stop();
 
         assert!(
             after.is_err(),
-            "a payload silent after three packets sent a fourth"
+            "a device silent after three packets sent a fourth"
         );
         assert_eq!(
             stats.packets_sent, 3,
-            "a payload silent after three packets sent {}",
+            "a device silent after three packets sent {}",
             stats.packets_sent
         );
     }
@@ -551,14 +551,14 @@ mod tests {
     /// Stop stops it. The sending is what Start began and what Stop ends, so
     /// nothing arrives afterwards however long the handler's end waits.
     #[test]
-    fn a_stopped_udp_payload_sends_nothing_more() {
+    fn a_stopped_udp_device_sends_nothing_more() {
         let handler = UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
         let at = handler.local_addr().expect("its address");
         handler
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("a read timeout");
 
-        let mut payload = SimulatedPayload::new(PayloadConfig {
+        let mut device = SimulatedPayload::new(PayloadConfig {
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Udp,
             address: at.ip().to_string(),
@@ -576,14 +576,14 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(50)),
                     triggered: false,
         });
-        payload.start().expect("the payload starts");
+        device.start().expect("the device starts");
 
         let mut buf = [0u8; 64];
         handler.recv_from(&mut buf).expect("a packet while running");
 
         // stop() does not return until the sending thread has joined, so
         // anything still in flight is already in the socket by now.
-        payload.stop();
+        device.stop();
         while handler.recv_from(&mut buf).is_ok() {}
 
         // Several packet intervals' worth of silence.
@@ -593,7 +593,7 @@ mod tests {
         let after_stop = handler.recv_from(&mut buf);
         assert!(
             after_stop.is_err(),
-            "a stopped payload sent {:?}",
+            "a stopped device sent {:?}",
             after_stop.map(|(n, _)| n)
         );
     }

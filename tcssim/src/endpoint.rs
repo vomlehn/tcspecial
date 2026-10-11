@@ -11,7 +11,7 @@
 //! that address.
 //!
 //! What a payload then does with the endpoint is in the file for its kind:
-//! [`crate::payload_tcp`], [`crate::payload_udp`], [`crate::payload_device`].
+//! [`crate::node::network::tcp`], [`crate::node::network::udp`], [`crate::payload_device`].
 
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;

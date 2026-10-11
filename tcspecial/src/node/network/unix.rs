@@ -1,10 +1,10 @@
 //! Unix-domain endpoints: sockets named by a path rather than an address.
 //!
 //! Two protocols, and they divide the way TCP and UDP divide. A stream is
-//! accepted, so the connection itself says who is at each end and the payload
+//! accepted, so the connection itself says who is at each end and the device
 //! is the end that listens. A datagram is not, so -- as over UDP, and for the
 //! same reason -- the handler is the end that waits at the configured path and
-//! the payload reaches out to it, a payload producing data because it is
+//! the device reaches out to it, a device producing data because it is
 //! running rather than because it was asked.
 //!
 //! What neither TCP nor UDP has is a file to tidy up. A Unix socket's address
@@ -31,19 +31,19 @@ use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
 };
-use crate::endpoint_tcp::connect_retrying;
+use crate::node::network::tcp::connect_retrying;
 
-/// A Unix-domain stream: the payload listens and the handler connects.
+/// A Unix-domain stream: the device listens and the handler connects.
 pub struct UnixStreamEndpoint {
     stream: UnixStream,
     _buffer: Vec<u8>,
 }
 
 impl UnixStreamEndpoint {
-    /// Connect to the payload's path, retrying while refused.
+    /// Connect to the device's path, retrying while refused.
     ///
     /// A refusal means nothing is listening there yet, which is the ordinary
-    /// case when a handler is started before its payload; see
+    /// case when a handler is started before its device; see
     /// [`connect_retrying`]. A path with no socket at all is a different
     /// matter and is not waited out: it will not become one by being asked
     /// again.
@@ -97,13 +97,13 @@ impl EndpointWritable for UnixStreamEndpoint {
     }
 }
 
-/// A Unix-domain datagram socket: the handler waits and the payload sends.
+/// A Unix-domain datagram socket: the handler waits and the device sends.
 ///
 /// The far end is learnt rather than configured, as it is over UDP: a
-/// datagram's sender is the only statement of where it came from. A payload's
+/// datagram's sender is the only statement of where it came from. A device's
 /// own path is its own business, so nothing here knows it until it writes.
 pub struct UnixDatagramEndpoint {
-    /// The handler this endpoint belongs to, as the payload configuration
+    /// The handler this endpoint belongs to, as the device configuration
     /// names it.
     what: String,
     socket: UnixDatagram,
@@ -187,13 +187,13 @@ impl EndpointWritable for UnixDatagramEndpoint {
                 ))
             })?;
 
-        // An unnamed sender has no path to be answered at. A payload that
+        // An unnamed sender has no path to be answered at. A device that
         // never bound one cannot be written to, which is worth saying rather
         // than failing as though the write itself had gone wrong.
         let path = peer.as_pathname().ok_or_else(|| {
             TcsError::Endpoint(format!(
                 "{}: the far end of this socket has no path of its own, so it cannot \
-                 be sent to: a datagram payload binds a path in order to be answered",
+                 be sent to: a datagram device binds a path in order to be answered",
                 self.what
             ))
         })?;
@@ -278,15 +278,15 @@ mod tests {
         }
     }
 
-    /// A stream endpoint connects to a payload that is listening, and carries
+    /// A stream endpoint connects to a device that is listening, and carries
     /// bytes both ways.
     #[test]
-    fn a_stream_endpoint_reaches_a_listening_payload() {
+    fn a_stream_endpoint_reaches_a_listening_device() {
         let path = a_path("stream");
         std::fs::remove_file(&path).ok();
 
-        // Standing in for tcssim: the payload listens at its path.
-        let payload = UnixListener::bind(&path).expect("the payload listens");
+        // Standing in for tcssim: the device listens at its path.
+        let device = UnixListener::bind(&path).expect("the device listens");
 
         let mut endpoint = UnixStreamEndpoint::connect_retrying(
             "beacon",
@@ -294,36 +294,36 @@ mod tests {
         )
         .expect("the handler connects");
 
-        let (mut accepted, _) = payload.accept().expect("the payload accepts");
+        let (mut accepted, _) = device.accept().expect("the device accepts");
 
-        accepted.write_all(b"from the payload").expect("it sends");
+        accepted.write_all(b"from the device").expect("it sends");
         let mut buffer = [0u8; 64];
         let mut got = Vec::new();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while got.len() < b"from the payload".len() && std::time::Instant::now() < deadline {
+        while got.len() < b"from the device".len() && std::time::Instant::now() < deadline {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
                 _ => std::thread::sleep(std::time::Duration::from_millis(10)),
             }
         }
-        assert_eq!(got, b"from the payload");
+        assert_eq!(got, b"from the device");
 
-        endpoint.write(b"to the payload").expect("the handler sends");
+        endpoint.write(b"to the device").expect("the handler sends");
         let mut back = [0u8; 64];
-        let n = accepted.read(&mut back).expect("the payload reads");
-        assert_eq!(&back[..n], b"to the payload");
+        let n = accepted.read(&mut back).expect("the device reads");
+        assert_eq!(&back[..n], b"to the device");
 
         std::fs::remove_file(&path).ok();
     }
 
-    /// A datagram endpoint binds its path, learns where the payload is from
+    /// A datagram endpoint binds its path, learns where the device is from
     /// the first datagram, and answers there.
     #[test]
-    fn a_datagram_endpoint_learns_where_its_payload_is() {
+    fn a_datagram_endpoint_learns_where_its_device_is() {
         let handler_path = a_path("dgram");
-        let payload_path = a_path("dgram-payload");
+        let device_path = a_path("dgram-device");
         std::fs::remove_file(&handler_path).ok();
-        std::fs::remove_file(&payload_path).ok();
+        std::fs::remove_file(&device_path).ok();
 
         let mut endpoint = UnixDatagramEndpoint::bind(
             "beacon",
@@ -337,12 +337,12 @@ mod tests {
             "it wrote somewhere without having been written to"
         );
 
-        // Standing in for tcssim: the payload binds a path of its own, so
+        // Standing in for tcssim: the device binds a path of its own, so
         // that it can be answered, and speaks first.
-        let payload = UnixDatagram::bind(&payload_path).expect("the payload binds");
-        payload
-            .send_to(b"from the payload", &handler_path)
-            .expect("the payload sends");
+        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+        device
+            .send_to(b"from the device", &handler_path)
+            .expect("the device sends");
 
         let mut buffer = [0u8; 64];
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -353,16 +353,16 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }
-        assert_eq!(&buffer[..got], b"from the payload");
+        assert_eq!(&buffer[..got], b"from the device");
 
         // And now it knows where to answer.
-        endpoint.write(b"to the payload").expect("the handler sends");
+        endpoint.write(b"to the device").expect("the handler sends");
         let mut back = [0u8; 64];
-        let (n, _) = payload.recv_from(&mut back).expect("the payload reads");
-        assert_eq!(&back[..n], b"to the payload");
+        let (n, _) = device.recv_from(&mut back).expect("the device reads");
+        assert_eq!(&back[..n], b"to the device");
 
         std::fs::remove_file(&handler_path).ok();
-        std::fs::remove_file(&payload_path).ok();
+        std::fs::remove_file(&device_path).ok();
     }
 
     /// A socket file left by a handler that was killed is replaced rather than

@@ -24,10 +24,7 @@ mod grid;
 mod payload;
 mod payload_device;
 mod node;
-mod payload_tcp;
-mod payload_unix;
 mod pty;
-mod payload_udp;
 
 use endpoint::{endpoint_description, payload_config_from};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};

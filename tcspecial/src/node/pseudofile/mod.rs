@@ -1,9 +1,22 @@
-//! The device endpoint: a device file, opened once and read and written.
+//! The pseudofile node: an entry in the filesystem, opened once and read and
+//! written.
 //!
-//! Neither bound nor connected -- opened. That is why a device handler was
-//! the only kind that ever worked while both ends of a network link were
-//! binding the same address: two opens of a device are fine where two binds
-//! of a socket are not.
+//! A pseudofile and not a device, which is the distinction this module is
+//! named for. "Device" meant two things here -- a piece of hardware on a bus,
+//! and an entry in the filesystem such as `/dev/urandom` or a named pipe --
+//! and it meant them in exactly the places that had to be exact. What this
+//! opens is the second thing. Hardware has a type of its own for whichever
+//! interface it arrives on.
+//!
+//! Neither bound nor connected -- opened. That is why a pseudofile handler was
+//! the only type that ever worked while both ends of a network link were
+//! binding the same address: two opens of a file are fine where two binds of a
+//! socket are not.
+//!
+//! The configuration still spells this type `device`, and the shipped sets
+//! still say so. That word changes with the version 2 schema, which has no
+//! reader yet; `design.rst` gives the new one. Renaming it here and not there
+//! would be a module whose name no configuration can ask for.
 //!
 //! See [`crate::endpoint`] for the traits.
 
@@ -20,7 +33,7 @@ use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
 };
 
-/// Device endpoint for device file I/O
+/// A node reached by opening a pseudofile.
 pub struct DeviceEndpoint {
     file: File,
     _buffer: Vec<u8>,

@@ -19,3 +19,4 @@ pub mod iio;
 pub mod rpmsg;
 pub mod serial;
 pub mod network;
+pub mod pseudofile;

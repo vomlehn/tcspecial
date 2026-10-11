@@ -11,7 +11,7 @@
 //!
 //! * [`crate::node::network::tcp`] -- a stream the handler connects to
 //! * [`crate::node::network::udp`] -- datagrams sent to where the handler waits
-//! * [`crate::payload_device`] -- a device, which produces rather than sends
+//! * [`crate::node::pseudofile`] -- a device, which produces rather than sends
 //! * [`crate::node::serial`] -- a line, which is a pty the configured path
 //!   leads to
 //! * [`crate::node::i2c`] -- a device on a bus, which is a chip of the
@@ -214,7 +214,7 @@ impl SimulatedPayload {
                 PayloadProtocol::Tcp => crate::node::network::tcp::run_tcp_node(config, running, stats),
                 PayloadProtocol::Udp => crate::node::network::udp::run_udp_node(config, running, stats),
                 PayloadProtocol::Device => {
-                    crate::payload_device::run_device_payload(config, running, stats)
+                    crate::node::pseudofile::run_pseudofile_node(config, running, stats)
                 }
                 PayloadProtocol::Serial => {
                     crate::node::serial::run_serial_node(config, running, stats)

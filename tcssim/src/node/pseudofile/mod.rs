@@ -1,9 +1,9 @@
-//! A simulated payload standing in for a device.
+//! A simulated device standing in for a pseudofile.
 //!
-//! Nothing is sent anywhere. A device is opened and read by tcspecial itself,
-//! so what there is to simulate is the production of data: a packet's worth
-//! appears every packet interval, segment by segment, and is counted. The
-//! pacing is the whole of the behaviour.
+//! Nothing is sent anywhere. A pseudofile is opened and read by tcspecial
+//! itself, so what there is to simulate is the production of data: a packet's
+//! worth appears every packet interval, segment by segment, and is counted.
+//! The pacing is the whole of the behaviour.
 //!
 //! See [`crate::payload`] for that pacing, which is common to every kind.
 
@@ -17,7 +17,7 @@ use crate::payload::{
 };
 
 /// Run device payload simulation (simulates /dev/urandom-like behavior)
-pub fn run_device_payload(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
+pub fn run_pseudofile_node(config: PayloadConfig, running: Arc<AtomicBool>, stats: Arc<std::sync::Mutex<PayloadStats>>) {
     let mut rng = rand::thread_rng();
     // Packets that have gone, which the faults that are counted rather than
     // random ask about.

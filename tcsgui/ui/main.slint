@@ -1,4 +1,4 @@
-import { Button, ScrollView, ListView } from "std-widgets.slint";
+import { Button, LineEdit, ScrollView } from "std-widgets.slint";
 
 // The two scales, stated once.
 //
@@ -89,6 +89,16 @@ export struct PaletteEntry {
     is-heading: bool,
 }
 
+// One field of the panel: an attribute of the selected node.
+export struct FieldView {
+    name: string,
+    value: string,
+    // Stated or not. A required attribute left empty is a fault, and the
+    // panel is where it is easiest to put right.
+    required: bool,
+    missing: bool,
+}
+
 export struct LinkView {
     // The route and the arrowhead, as SVG path data in canvas coordinates.
     //
@@ -147,6 +157,8 @@ component NodeShape inherits Rectangle {
     // Whether this one can be dragged. False in the palette, where a press
     // places a node rather than moving this one.
     in property <bool> draggable: false;
+    // Whether the panel is showing this one.
+    in property <bool> selected: false;
     // Told once, when the gesture finishes: one edit for one drag, so undo
     // takes a node back to where it started rather than one pixel back.
     callback dragged(length, length);
@@ -156,6 +168,8 @@ component NodeShape inherits Rectangle {
     // another.
     callback link-from();
     callback link-to();
+    // This node was pressed, so it is the one the panel should show.
+    callback chosen();
 
     // The error colour, and the only place in this file it appears.
     //
@@ -407,6 +421,13 @@ component NodeShape inherits Rectangle {
         enabled: draggable;
         mouse-cursor: draggable ? MouseCursor.grab : MouseCursor.default;
         pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                // Choosing and dragging are the same press: a node you have
+                // started to move is the node you are interested in, and
+                // making them separate gestures would mean pressing twice to
+                // do the obvious thing.
+                chosen();
+            }
             if (event.kind == PointerEventKind.up) {
                 dragged(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
             }
@@ -416,7 +437,7 @@ component NodeShape inherits Rectangle {
     // Selection, which is a third outline rather than a colour change: a
     // selected node and a faulty one must not be confusable, and a selected
     // faulty node has to show both.
-    if node.selected: Rectangle {
+    if selected: Rectangle {
         x: -4px;
         y: -4px;
         width: parent.width + 8px;
@@ -530,6 +551,15 @@ component Surface inherits Rectangle {
     // Drawing a link: pressed on one node, released on another.
     callback link-started(string);
     callback link-finished(string);
+    callback node-selected(string);
+    callback attribute-set(string, string, string);
+    callback comment-set(string, string);
+
+    // Which node the panel is showing, and what it holds.
+    in property <string> selected: "";
+    in property <string> selected-type: "";
+    in property <string> selected-comment: "";
+    in property <[FieldView]> fields: [];
 
     background: #fbfbfa;
 
@@ -632,7 +662,7 @@ component Surface inherits Rectangle {
                 }
             }
 
-            // The canvas.
+            // The canvas, with the panel beside it.
             canvas := Rectangle {
                 background: white;
                 border-width: 1px;
@@ -680,10 +710,94 @@ component Surface inherits Rectangle {
                 for n in nodes: NodeShape {
                     node: n;
                     draggable: true;
+                    selected: n.name == root.selected;
                     dragged(dx, dy) => { node-moved(n.name, dx, dy); }
                     open-requested => { open-subdiagram(n.name); }
                     link-from => { link-started(n.name); }
                     link-to => { link-finished(n.name); }
+                    chosen => { node-selected(n.name); }
+                }
+            }
+
+            // What the selected node says about itself.
+            //
+            // Beside the canvas rather than floating over it: a panel that
+            // covers the diagram makes you choose between seeing the node's
+            // settings and seeing where it sits, and both are wanted at once.
+            //
+            // The fields are the ones the type declares, shown whether or not
+            // they are filled in -- so placing an I2C device tells you it
+            // needs a bus and an address, instead of leaving you to know.
+            Rectangle {
+                width: 260px;
+                background: #f2f2f0;
+                border-width: 1px;
+                border-color: #d8d8d4;
+
+                if root.selected == "": Text {
+                    x: Space.step;
+                    y: Space.step;
+                    width: parent.width - Space.wide;
+                    text: "Press a node to see what it says about itself.";
+                    font-size: Type.small;
+                    font-italic: true;
+                    color: #9ca3af;
+                    wrap: word-wrap;
+                }
+
+                if root.selected != "": ScrollView {
+                    VerticalLayout {
+                        padding: Space.step;
+                        spacing: Space.tight;
+
+                        Text {
+                            text: root.selected;
+                            font-size: Type.strong;
+                            font-weight: Type.bold;
+                            height: 20px;
+                        }
+                        Text {
+                            text: root.selected-type;
+                            font-size: Type.small;
+                            color: #6b7280;
+                            height: 14px;
+                        }
+
+                        for f in fields: VerticalLayout {
+                            spacing: 1px;
+                            Text {
+                                // A required field says so, and says it in
+                                // red only when it is empty: red marks what
+                                // is wrong, not what matters.
+                                text: f.required ? f.name + " *" : f.name;
+                                font-size: Type.small;
+                                color: f.missing ? #c0392b : #6b7280;
+                                font-weight: f.missing ? Type.bold : Type.regular;
+                                height: 14px;
+                            }
+                            LineEdit {
+                                text: f.value;
+                                font-size: Type.body;
+                                edited => {
+                                    attribute-set(root.selected, f.name, self.text);
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "comment";
+                            font-size: Type.small;
+                            color: #6b7280;
+                            height: 14px;
+                        }
+                        LineEdit {
+                            text: root.selected-comment;
+                            font-size: Type.body;
+                            edited => { comment-set(root.selected, self.text); }
+                        }
+
+                        Rectangle { }
+                    }
                 }
             }
         }
@@ -704,6 +818,10 @@ export component MainWindow inherits Window {
     in property <string> undo-label: "";
     in property <string> redo-label: "";
     in property <string> trouble: "";
+    in property <string> selected: "";
+    in property <string> selected-type: "";
+    in property <string> selected-comment: "";
+    in property <[FieldView]> fields: [];
 
     callback undo-clicked();
     callback redo-clicked();
@@ -712,6 +830,9 @@ export component MainWindow inherits Window {
     callback open-subdiagram(string);
     callback link-started(string);
     callback link-finished(string);
+    callback node-selected(string);
+    callback attribute-set(string, string, string);
+    callback comment-set(string, string);
 
     Surface {
         width: 100%;
@@ -731,6 +852,13 @@ export component MainWindow inherits Window {
         open-subdiagram(n) => { root.open-subdiagram(n); }
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
+        selected: root.selected;
+        selected-type: root.selected-type;
+        selected-comment: root.selected-comment;
+        fields: root.fields;
+        node-selected(n) => { root.node-selected(n); }
+        attribute-set(n, a, v) => { root.attribute-set(n, a, v); }
+        comment-set(n, t) => { root.comment-set(n, t); }
     }
 }
 
@@ -755,6 +883,10 @@ export component SubWindow inherits Window {
     in property <string> undo-label: "";
     in property <string> redo-label: "";
     in property <string> trouble: "";
+    in property <string> selected: "";
+    in property <string> selected-type: "";
+    in property <string> selected-comment: "";
+    in property <[FieldView]> fields: [];
 
     callback undo-clicked();
     callback redo-clicked();
@@ -762,6 +894,9 @@ export component SubWindow inherits Window {
     callback node-moved(string, length, length);
     callback link-started(string);
     callback link-finished(string);
+    callback node-selected(string);
+    callback attribute-set(string, string, string);
+    callback comment-set(string, string);
 
     Surface {
         width: 100%;
@@ -781,5 +916,12 @@ export component SubWindow inherits Window {
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
+        selected: root.selected;
+        selected-type: root.selected-type;
+        selected-comment: root.selected-comment;
+        fields: root.fields;
+        node-selected(n) => { root.node-selected(n); }
+        attribute-set(n, a, v) => { root.attribute-set(n, a, v); }
+        comment-set(n, t) => { root.comment-set(n, t); }
     }
 }

@@ -186,6 +186,96 @@ impl NodeType {
         }
     }
 
+    /// What a node of this type says about itself.
+    ///
+    /// The attributes the configuration gives each type, in the order the
+    /// manual lists them, with the ones that must be stated marked. Two things
+    /// come of having them written down rather than inferred from what a node
+    /// happens to hold:
+    ///
+    /// the editor can show a node's fields before any of them are filled in,
+    /// so a person placing an I2C device is told it needs a bus and an address
+    /// rather than having to know; and a required attribute left empty is a
+    /// fault the editor can mark, which is the same check `tcsverify` makes on
+    /// the ground and tcspecial makes again aboard.
+    ///
+    /// Not exhaustive for `compute`, whose parameters depend on which function
+    /// it runs: those are whatever the function wants, so the editor takes
+    /// what it is given there and the validation belongs to the function.
+    pub fn attributes(self) -> &'static [(&'static str, bool)] {
+        match self {
+            NodeType::I2c => &[
+                ("path", true),
+                ("address", true),
+                ("group", false),
+                ("read_size", false),
+                ("ten_bit", false),
+                ("pec", false),
+                ("retries", false),
+                ("timeout", false),
+                ("bus_speed", false),
+            ],
+            NodeType::Spi => &[
+                ("path", true),
+                ("max_speed", true),
+                ("spi_mode", true),
+                ("group", false),
+                ("read_size", false),
+                ("bits_per_word", false),
+                ("bit_order", false),
+                ("cs_active", false),
+            ],
+            NodeType::Serial => &[
+                ("path", true),
+                ("datarate", false),
+                ("byte_length", false),
+                ("stop_bits", false),
+                ("parity", false),
+                ("group", false),
+            ],
+            NodeType::Can => &[
+                ("interface", true),
+                ("can_id", true),
+                ("bitrate", false),
+                ("can_fd", false),
+                ("loopback", false),
+                ("group", false),
+            ],
+            NodeType::Iio => &[
+                ("path", true),
+                ("channels", false),
+                ("sample_rate", false),
+                ("group", false),
+            ],
+            NodeType::Rpmsg => &[("path", true), ("service", true), ("group", false)],
+            NodeType::Network => &[
+                ("protocol", true),
+                ("address", true),
+                ("port", true),
+            ],
+            NodeType::Pseudofile => &[("path", true), ("group", false)],
+            NodeType::Gpio => &[
+                ("path", true),
+                ("lines", true),
+                ("direction", false),
+                ("edge", false),
+                ("bias", false),
+                ("debounce_us", false),
+                ("group", false),
+            ],
+            NodeType::Compute => &[
+                ("function", true),
+                ("inputs", false),
+                ("program", false),
+                ("timeout", false),
+                ("restart", false),
+            ],
+            NodeType::Log => &[("directory", true), ("format", true)],
+            NodeType::Moc => &[("address", true), ("port", true)],
+            NodeType::Subdiagram => &[("file", true)],
+        }
+    }
+
     /// Which family this type belongs to.
     ///
     /// The families are the shape grammar: square corners are hardware,
@@ -480,6 +570,44 @@ mod tests {
                 t.spelling(),
                 a.label_weight
             );
+        }
+    }
+
+    /// Every type says what it needs, and needs something.
+    ///
+    /// A type with no required attribute is a node that can be placed and
+    /// left meaning nothing -- which is a configuration the flight software
+    /// would refuse for reasons the editor could have given on the spot.
+    #[test]
+    fn every_type_states_what_it_requires() {
+        for t in NodeType::ALL {
+            let attributes = t.attributes();
+            assert!(!attributes.is_empty(), "{} says nothing", t.spelling());
+            assert!(
+                attributes.iter().any(|(_, required)| *required),
+                "{} requires nothing, so an empty one would be a node that \
+                 means nothing",
+                t.spelling()
+            );
+
+            // Required ones first, so the panel asks for what it must have
+            // before what it may.
+            let first_optional = attributes.iter().position(|(_, r)| !*r);
+            if let Some(at) = first_optional {
+                assert!(
+                    attributes[at..].iter().all(|(_, r)| !*r),
+                    "{}'s required attributes are not all first",
+                    t.spelling()
+                );
+            }
+
+            // And no attribute twice, which would give the panel two fields
+            // writing to one value.
+            let mut names: Vec<&str> = attributes.iter().map(|(n, _)| *n).collect();
+            names.sort_unstable();
+            let before = names.len();
+            names.dedup();
+            assert_eq!(before, names.len(), "{} lists one twice", t.spelling());
         }
     }
 

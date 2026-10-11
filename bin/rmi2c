@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# Remove the I2C stand-in bin/mki2c makes.
+#
+# The cleanup half of bin/mki2c, which calls this rather than carrying a copy,
+# as each of the other three pairs does: remaking a stand-in means removing the
+# old one first, and removing it is also worth doing on its own -- after a run,
+# or before leaving a host the way it was found.
+#
+# An i2c-stub adapter *is* the module, so removing it means unloading that.
+# That makes this the blunt one of the four: there is no way to take away one
+# chip and leave another, where bin/rmgpio and bin/rmiio each remove their own
+# device and leave the module alone.
+#
+# Note this takes the bus out from under anything using it. A tcssim still
+# writing that register bank loses it, so do not run this while one is up.
+
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "rmi2c: re-running under sudo, which is what unloading a module needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# i2c-dev is left alone whatever happens: it is built into most kernels and
+# every real adapter on the host is reached through it.
+if [ -d /sys/module/i2c_stub ]; then
+	echo "rmi2c: unloading i2c-stub"
+	modprobe -r i2c-stub
+else
+	echo "rmi2c: no i2c-stub loaded"
+fi
+
+echo "rmi2c: done"

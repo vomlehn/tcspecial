@@ -6,6 +6,7 @@
 PROJECT_NAME := tcspecial
 MOC_NAME := tcsmoc
 SIM_NAME := tcssim
+GUI_NAME := tcsgui
 DOCS_DIR := docs
 
 DESIGN=$(DOCS_DIR)/design.rst
@@ -35,7 +36,7 @@ RUST = .
 #
 # The sets live under tests/manual because running one is something a person
 # does at a terminal: each opens sockets or device nodes.
-TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
+TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial4
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
@@ -59,17 +60,19 @@ help:
 	@echo "  make build       - Build tcspecial"
 	@echo "  make buildmoc    - Build tcsmoc"
 	@echo "  make buildsim    - Build tcssim"
+	@echo "  make buildgui    - Build tcsgui"
 	@echo "  make test        - Run all tests"
 	@echo "  make run         - Run tcspecial"
 	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and tcssim"
 	@echo "  make runmocx     - As runmocy, on the XML configuration"
 	@echo "  make runsim      - Run tcssim alone"
+	@echo "  make rungui      - Run tcsgui on a configuration file"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload needs"
-	@echo "  make mkstubs     - Make the I2C, GPIO and IIO stand-ins their payloads need"
+	@echo "  make mkstubs     - Make every stand-in: I2C, GPIO, IIO and virtual CAN"
 	@echo "  make rmvcan      - Remove the virtual CAN buses"
-	@echo "  make rmstubs     - Remove the I2C, GPIO and IIO stand-ins"
+	@echo "  make rmstubs     - Remove every stand-in those made"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -107,6 +110,16 @@ buildsim:
 		set -eu; \
 		echo "Building the project..."; \
 		cd $(RUST) && cargo build $(RELEASE) --bin tcssim; \
+		echo "✓ Build complete" \
+	) 2>&1 | tee build.out
+
+# Build the configuration editor
+.PHONY: buildgui
+buildgui:
+	( \
+		set -eu; \
+		echo "Building the project..."; \
+		cd $(RUST) && cargo build $(RELEASE) --bin tcsgui; \
 		echo "✓ Build complete" \
 	) 2>&1 | tee build.out
 
@@ -221,26 +234,34 @@ runsim:
 mkvcan:
 	bin/mkvcan
 
-# Make the I2C, GPIO and IIO stand-ins their payloads need.
+# Make every stand-in a payload set may need.
 #
-# The three kinds the simulator cannot be the far end of: a device on a bus has
-# to answer when a master addresses it, a discrete line is a wire, and a
-# sensor's buffer is filled by the sensor. The kernel's i2c-stub, gpio-sim and
-# iio_dummy stand in -- a bank of registers, a chip whose lines are memory, and
-# a sensor with no sensor in it whose buffer a software trigger fills -- and
-# bin/mkstubs makes all three.
+# The four types the simulator cannot simply be the far end of: a device on a
+# bus has to answer when a master addresses it, a discrete line is a wire, a
+# sensor's buffer is filled by the sensor, and a CAN controller is a network
+# interface rather than a file. The kernel stands in for each, and there is one
+# script per type -- bin/mki2c, bin/mkgpio, bin/mkiio and bin/mkvcan -- because
+# a host that needs one commonly does not need the others, and one script that
+# made all four could fail on a type nobody had asked for.
+#
+# This target is the convenience of having them all: four commands, in any
+# order, each saying what it made. For one type alone, run its script, or the
+# mkvcan target above.
 #
 # Not a prerequisite of anything, for the reasons mkvcan is not, and for one
-# more: unlike the CAN tests, no test is gated on these. The scans that find a
-# stub are tested against a tree handed to them rather than the real one, so
-# they pass with no module loaded. This is for running a payload set that names
-# an I2C, GPIO or IIO payload.
+# more: apart from the CAN tests, no test is gated on these. The scans that
+# find a stub are tested against a tree handed to them rather than the real
+# one, so they pass with no module loaded. This is for running a payload set
+# that names an I2C, GPIO, IIO or CAN payload.
 #
-# It prints the numbers it made, which are assigned as devices appear and so
+# Each prints the numbers it made, which are assigned as devices appear and so
 # are not the same from one run to the next.
 .PHONY: mkstubs
 mkstubs:
-	bin/mkstubs
+	bin/mki2c
+	bin/mkgpio
+	bin/mkiio
+	bin/mkvcan
 
 # Put the host back the way it was found.
 #
@@ -248,19 +269,54 @@ mkstubs:
 # carrying a copy, so that undoing a stand-in is one command whether it is done
 # on its own or as the first half of remaking one.
 #
-# Neither is destructive beyond its own stand-in: rmvcan removes virtual CAN
-# interfaces and leaves the driver loaded, and rmstubs removes the chip and the
-# sensor this tree made -- by name, since a host's own sensors sit in the same
-# numbering -- and leaves another program's alone. Both take a stand-in
-# out from under anything using it, so neither is for a moment when a tcssim is
-# running.
+# One script per type again, and each is the cleanup half of its own mk script,
+# which calls it rather than carrying a copy -- so undoing a stand-in is the
+# same code whether it is done on its own or as the first half of remaking one.
+#
+# None is destructive beyond its own stand-in. rmvcan removes the virtual CAN
+# interfaces and leaves the driver loaded; rmgpio and rmiio remove the chip and
+# the sensor this tree made, by name, since a host's own sit in the same
+# numbering, and leave another program's alone. rmi2c is the blunt one: an
+# i2c-stub adapter *is* the module, so there is no way to take away one chip
+# and leave another.
+#
+# All of them take a stand-in out from under anything using it, so none is for
+# a moment when a tcssim is running. The rmstubs order is the reverse of
+# making them, which costs nothing and reads as undoing.
 .PHONY: rmvcan
 rmvcan:
 	bin/rmvcan
 
 .PHONY: rmstubs
 rmstubs:
-	bin/rmstubs
+	bin/rmvcan
+	bin/rmiio
+	bin/rmgpio
+	bin/rmi2c
+
+# Run the configuration editor.
+#
+# TCSGUI_FILE is the configuration to edit, and it need not exist yet: tcsgui
+# writes it as edits are made and keeps its history beside it, so starting on
+# a name that is not there is how a new configuration is begun.
+#
+# A name of its own rather than TCSPECIAL_CONFIG_FILE, which the run targets
+# use: that variable names a payload *set* -- a stem, with a tcspecial
+# configuration and a simulator file either side of it -- and this is one file
+# with its extension, because the extension is what says whether to write YAML
+# or XML.
+#
+#   make rungui TCSGUI_FILE=tests/manual/thermostat.yaml
+#   make rungui TCSGUI_FILE=tests/manual/thermostat.xml
+TCSGUI_FILE = tests/manual/thermostat.yaml
+
+.PHONY: rungui
+rungui:
+	( \
+		set -eu; \
+		echo "Running $(GUI_NAME) on $(TCSGUI_FILE)..."; \
+		cd $(RUST) && cargo run -q --bin tcsgui -- $(TCSGUI_FILE) \
+	)
 
 # Clean build artifacts
 .PHONY: clean

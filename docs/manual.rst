@@ -508,9 +508,9 @@ would be commanding a payload rather than reading it.
 
 The simulator moves lines through the kernel's ``gpio-sim``, which it finds
 rather than makes: loading the module and making a chip need root, and tcssim
-says so if there is none. ``make mkstubs`` makes one and prints the node it
+says so if there is none. ``bin/mkgpio`` makes one and prints the node it
 became, which is numbered as chips appear and so has to be read off the run
-rather than assumed. The packet and segment sizes mean nothing to a
+rather than assumed; ``bin/rmgpio`` takes it away again. The packet and segment sizes mean nothing to a
 simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its lines the other way every
 packet interval.
@@ -585,10 +585,10 @@ that is: ``iio_dummy``, a sensor with no sensor in it, whose buffer a software
 trigger fills on a timer. There is no simulator side to that one -- a buffer
 is a stream out of the device and an IIO payload cannot be triggered, so the
 dummy *is* the payload and tcspecial reads it, which makes it the more
-faithful of the two stand-ins. ``make mkstubs`` makes one, prints the node and
-the channel count to name in a payload set, and ``make rmstubs`` takes it
-away; a host's own sensors sit in the same numbering and are left alone, which
-is why the scripts go by name and not by number.
+faithful of the two stand-ins. ``bin/mkiio`` makes one, prints the node and
+the channel count to name in a payload set, and ``bin/rmiio`` takes it away;
+a host's own sensors sit in the same numbering and are left alone, which is
+why the scripts go by name and not by number.
 
 A Serial Payload
 ----------------
@@ -741,19 +741,22 @@ What stands in for the device is the kernel's ``i2c-stub``, an adapter whose
 chips are a bank of registers in memory: tcssim writes the bank and tcspecial
 reads it. The simulator finds that adapter rather than making one -- loading a
 module needs root -- and says how to make one if there is none.
-``bin/mkstubs`` makes it, and the GPIO and IIO stand-ins with it, so
+``bin/mki2c`` makes it. There is a script per type -- ``bin/mki2c``,
+``bin/mkgpio``, ``bin/mkiio`` and ``bin/mkvcan`` -- because a host that needs
+one commonly does not need the others, and each has an ``rm`` beside it that
+undoes exactly what it did. Where all of them are wanted,
 
 .. code-block:: console
 
    $ make mkstubs
 
-is the way to all three, and ``make rmstubs`` undoes it: the stub module
-unloaded, and the simulated chip and dummy sensor this tree made taken down
-while another program's is left alone. It prints the bus to name in a payload set, which is
+runs the four, and ``make rmstubs`` runs the four that undo them: the stub
+module unloaded, and the simulated chip and dummy sensor this tree made taken
+down while another program's is left alone. It prints the bus to name in a payload set, which is
 numbered as adapters appear and so is not the same from one run to the next.
 The stub's chips are fixed when the module is loaded, which is why the address
 is the script's argument rather than something a configuration can choose
-afterwards: ``./bin/mkstubs 0x50`` reloads it with a chip there.
+afterwards: ``./bin/mki2c 0x50`` reloads it with a chip there.
 
 A SPI Payload
 -------------
@@ -978,7 +981,8 @@ other file's stem.
   in for each with a pty and makes the path the file names a link to it while
   the payload runs. The bus is the one that needs something of the host: the
   kernel's I\ :superscript:`2`\ C stub, loaded at the address this set names,
-  which ``make mkstubs`` does and tcssim says how to do if it is not there.
+  which ``bin/mki2c`` does -- or ``make mkstubs``, which runs it along with the
+  other three -- and which tcssim says how to do if it is not there.
 
 The Simulator Configuration
 ===========================

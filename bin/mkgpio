@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# Make the kernel stand-in a simulated set of discrete lines needs.
+#
+# A discrete line is one of the payload types the simulator cannot simply be
+# the far end of: a line is a wire, and nothing in user space can drive one.
+# What the kernel offers instead is `gpio-sim`: a chip whose lines exist in
+# memory, with a file per line saying what the line is pulled to, so tcssim
+# writes that file and a handler watching the same chip sees an edge.
+#
+# The module is the kernel's and configuring it needs root, so tcssim does not
+# make a chip: it finds one and says how to make one if there is none. This is
+# that, as bin/mki2c, bin/mkiio and bin/mkvcan are for the other three.
+#
+# What it does not do is let the unit tests cover any more than they do now.
+# The scan that finds a chip is given the tree to look at -- see lines_of() in
+# tcssim/src/payload_gpio.rs -- so it passes with no module loaded and would
+# pass with one. This is for running a payload set that names a GPIO payload.
+#
+# Nothing here survives a reboot.
+
+set -euo pipefail
+
+# How many lines the simulated chip has.
+#
+# Eight because a set of discretes is a handful of them -- a deployment switch,
+# an arming line, an "alive" line -- and eight is the smallest round number
+# larger than a handful. Pass another where a set needs more:
+#   ./bin/mkgpio 16
+lines="${1:-8}"
+
+# What this script's own chip is called in configfs, and the bank under it.
+#
+# A name of its own so that cleanup can be its own and not everybody's: a
+# gpio-sim device another program made is left alone.
+sim_device="tcssim"
+sim_bank="bank0"
+
+configfs="/sys/kernel/config"
+gpio_sim="$configfs/gpio-sim"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "mkgpio: re-running under sudo, which is what loading a module needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# configfs is where a simulated chip is described. Mounted already on a
+# systemd host; mounted here if not, because the alternative is a mkdir that
+# fails with nothing to say why. Before the cleanup rather than after, because
+# the cleanup looks in there.
+if [ ! -d "$configfs/." ] || ! mountpoint -q "$configfs"; then
+	echo "mkgpio: mounting configfs on $configfs"
+	mount -t configfs none "$configfs"
+fi
+
+# Remove the chip a previous run left, which is bin/rmgpio and is called rather
+# than copied. By the directory this script is in, so that a tree moved or run
+# from elsewhere still finds its sibling; already root here, so rmgpio's own
+# check passes through.
+here="$(cd -- "$(dirname -- "$0")" && pwd)"
+"$here/rmgpio"
+
+modprobe gpio-sim
+
+echo "mkgpio: making a simulated chip of $lines lines"
+mkdir "$gpio_sim/$sim_device"
+mkdir "$gpio_sim/$sim_device/$sim_bank"
+echo "$lines" > "$gpio_sim/$sim_device/$sim_bank/num_lines"
+echo 1 > "$gpio_sim/$sim_device/live"
+
+# Which platform device it became, and which character device that is.
+#
+# Both are assigned as devices appear and neither is an identity, which is why
+# this reads them rather than assuming gpio-sim.0 and gpiochip0: the number a
+# payload set names has to be the number of the run it is in. dev_name is what
+# configfs says the device is called once it is live, and chip_name is the node
+# the bank became -- the same file lines_of() matches against.
+dev_name="$(cat "$gpio_sim/$sim_device/dev_name")"
+bank="/sys/devices/platform/$dev_name/$sim_bank"
+chip="$(cat "$bank/chip_name")"
+
+# The file a simulated payload writes. If this is missing the chip is live but
+# not usable, and saying so here beats a payload failing on it later.
+if [ ! -w "$bank/sim_gpio0/pull" ]; then
+	echo "mkgpio: $chip has no line files under $bank, which should not happen" >&2
+	exit 1
+fi
+
+echo "mkgpio: done"
+echo
+echo "  a GPIO payload:   path: /dev/$chip"
+echo "                    lines: 0-$((lines - 1)) are simulated"
+echo
+echo "The chip number is assigned as chips appear, so it can differ from one"
+echo "run of this to the next; a payload set that names it has to name this."

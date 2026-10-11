@@ -1,0 +1,191 @@
+#!/bin/bash
+#
+# Make the kernel stand-in a simulated IIO sensor needs.
+#
+# A sensor's buffer is one of the payload types the simulator cannot simply be
+# the far end of: a buffer is filled by the sensor, and user space is not a
+# sensor. What the kernel offers instead is `iio_dummy`: a sensor with no
+# sensor in it, whose buffer a software trigger fills on a timer.
+#
+# Unlike the I2C and GPIO stand-ins there is no simulator side to this one. A
+# buffer is a stream out of the device and an IIO payload cannot be triggered,
+# so the dummy *is* the payload and tcspecial reads it -- which makes it the
+# more faithful of the two things that can stand in for a sensor, the other
+# being the pty the tests use.
+#
+# The modules are the kernel's and configuring them needs root, so tcssim does
+# not make a sensor: it finds one and says how to make one if there is none.
+# This is that, as bin/mki2c, bin/mkgpio and bin/mkvcan are for the other
+# three.
+#
+# Nothing here survives a reboot.
+
+set -euo pipefail
+
+# How often the trigger fires, in Hz, and how many sample sets the buffer
+# holds. A hundred a second is faster than any payload interval worth setting
+# and slow enough to be nothing on a host; the length only has to be more than
+# a reader will fall behind by. Both can be passed:
+#   ./bin/mkiio 10
+#   ./bin/mkiio 10 256
+iio_rate="${1:-100}"
+iio_length="${2:-128}"
+
+# The dummy sensor and the trigger that fills its buffer, both named so that
+# this script can find what it made among whatever else the host has. A laptop
+# commonly has a real IIO device or two -- an ambient light sensor, an
+# accelerometer -- and those are not ours to touch, so nothing here goes by
+# device number: a device is ours if its name is this one.
+iio_device="tcssim"
+iio_trigger="tcssim-hr"
+
+configfs="/sys/kernel/config"
+iio_devices="$configfs/iio/devices/dummy"
+iio_triggers="$configfs/iio/triggers/hrtimer"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "mkiio: re-running under sudo, which is what loading a module needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# configfs is where a software device is described. Mounted already on a
+# systemd host; mounted here if not, because the alternative is a mkdir that
+# fails with nothing to say why. Before the cleanup rather than after, because
+# the cleanup looks in there.
+if [ ! -d "$configfs/." ] || ! mountpoint -q "$configfs"; then
+	echo "mkiio: mounting configfs on $configfs"
+	mount -t configfs none "$configfs"
+fi
+
+# Remove what a previous run left, which is bin/rmiio and is called rather than
+# copied. By the directory this script is in, so that a tree moved or run from
+# elsewhere still finds its sibling; already root here, so rmiio's own check
+# passes through.
+#
+# Before the modules are loaded, not after. rmiio unloads a module it leaves
+# holding nothing, which is the ordinary case here, so loading them first would
+# mean loading, unloading and loading again -- and a sensor cannot exist
+# without its module anyway, so there is nothing for rmiio to miss.
+here="$(cd -- "$(dirname -- "$0")" && pwd)"
+"$here/rmiio"
+
+# The configfs root for IIO comes from its own module, which the others do not
+# pull in; the dummy sensor is a software device and the hrtimer trigger a
+# software trigger, each registered by its module under that root.
+modprobe industrialio-configfs
+modprobe iio-trig-hrtimer
+modprobe iio_dummy
+
+# The trigger first, because a buffer with no trigger has nothing to fill it
+# and the device wants a trigger named before the buffer is enabled.
+echo "mkiio: making a software trigger at $iio_rate Hz"
+mkdir "$iio_triggers/$iio_trigger"
+
+# Its rate, where the trigger has one to set. A software trigger does; a
+# device's own trigger does not, which is why this is conditional rather than
+# assumed.
+trigger=""
+for dir in /sys/bus/iio/devices/trigger*; do
+	[ -r "$dir/name" ] || continue
+	if [ "$(cat "$dir/name")" = "$iio_trigger" ]; then
+		trigger="$dir"
+		break
+	fi
+done
+if [ -z "$trigger" ]; then
+	echo "mkiio: the trigger was made but is not listed, which should not" >&2
+	echo "mkiio: happen -- look in /sys/bus/iio/devices" >&2
+	exit 1
+fi
+if [ -w "$trigger/sampling_frequency" ]; then
+	echo "$iio_rate" > "$trigger/sampling_frequency"
+fi
+
+echo "mkiio: making a dummy sensor"
+mkdir "$iio_devices/$iio_device"
+
+# Which IIO device it became. By name, not by number: the number is assigned as
+# devices appear and a host's own sensors are in the same range.
+device=""
+for dir in /sys/bus/iio/devices/iio:device*; do
+	[ -r "$dir/name" ] || continue
+	if [ "$(cat "$dir/name")" = "$iio_device" ]; then
+		device="$dir"
+		break
+	fi
+done
+if [ -z "$device" ]; then
+	echo "mkiio: the dummy sensor was made but is not listed, which should" >&2
+	echo "mkiio: not happen -- look in /sys/bus/iio/devices" >&2
+	exit 1
+fi
+
+# Where the scan elements and the buffer controls are.
+#
+# Two layouts, and a recent kernel has both: a buffer used to be one per
+# device, with its switches in buffer/ and its channels in scan_elements/, and
+# is now one directory per buffer with both in it. Prefer the newer, because
+# the older pair are kept only for the first buffer and only for
+# compatibility.
+if [ -d "$device/buffer0" ] && compgen -G "$device/buffer0/*_en" > /dev/null; then
+	scan="$device/buffer0"
+	buffer="$device/buffer0"
+elif [ -d "$device/scan_elements" ]; then
+	scan="$device/scan_elements"
+	buffer="$device/buffer"
+else
+	echo "mkiio: $device has no buffer to enable, so the dummy was built" >&2
+	echo "mkiio: without one: a kernel needs CONFIG_IIO_SIMPLE_DUMMY_BUFFER" >&2
+	exit 1
+fi
+
+# Enable every channel the dummy offers, and the timestamp none of them.
+#
+# Every one rather than a named list, because which channels a dummy has is the
+# kernel's business and a list here would go stale. The timestamp is left off
+# deliberately: it is a scan element like the others, but switching it on adds
+# eight bytes and a padding rule to every sample set, and a reader told how
+# many channels there are would then be told something that does not describe
+# the bytes.
+channels=0
+for en in "$scan"/*_en; do
+	[ -e "$en" ] || continue
+	case "${en##*/}" in
+	in_timestamp_en) continue ;;
+	esac
+	echo 1 > "$en"
+	channels=$((channels + 1))
+done
+if [ "$channels" -eq 0 ]; then
+	echo "mkiio: $device offers no channels to enable, which should not happen" >&2
+	exit 1
+fi
+
+echo "$iio_trigger" > "$device/trigger/current_trigger"
+echo "$iio_length" > "$buffer/length"
+echo 1 > "$buffer/enable"
+
+# The node a handler opens, and the proof the buffer took.
+#
+# A buffer that refused to enable leaves the file reading 0, and an IIO
+# endpoint opening the node then polls something that will never be ready --
+# which is a far worse thing to discover later than here.
+node="${device##*/}"
+if [ "$(cat "$buffer/enable")" != "1" ]; then
+	echo "mkiio: $node has a buffer that will not enable" >&2
+	exit 1
+fi
+if [ ! -r "/dev/$node" ]; then
+	echo "mkiio: $node has no /dev/$node to read, so the buffer is there and" >&2
+	echo "mkiio: the character device is not" >&2
+	exit 1
+fi
+
+echo "mkiio: done"
+echo
+echo "  an IIO payload:   path: /dev/$node"
+echo "                    channels: $channels"
+echo "                    sample_rate: $iio_rate"
+echo
+echo "The device number is assigned as devices appear, so it can differ from"
+echo "one run of this to the next; a payload set that names it has to name this."

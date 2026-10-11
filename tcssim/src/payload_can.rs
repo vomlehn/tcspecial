@@ -13,10 +13,10 @@
 //! addresses it, and on a bus of peers there is nothing to answer.
 //!
 //! What the simulator cannot do is make the bus. A virtual one is created with
-//! `ip link add dev vcan0 type vcan` and brought up with `ip link set up
-//! vcan0`, both of which need root, so this finds the interface and says what
-//! would make one if it is not there -- as [`crate::payload_i2c`] does for its
-//! kernel module.
+//! `ip link add dev vcan0 type vcan` and brought up with `ip link set dev
+//! vcan0 up`, both of which need root, so this finds the interface and says
+//! what would make one if it is not there -- as [`crate::payload_i2c`] does
+//! for its kernel module.
 //!
 //! A frame is its own length and carries eight bytes, or sixty-four as CAN
 //! FD. A packet larger than that cannot be sent at all, which the payload
@@ -64,7 +64,7 @@ impl BusMember {
             format!(
                 "{}: this host has no interface called \"{interface}\". Make a virtual \
                  bus with \"ip link add dev {interface} type vcan\" and bring it up \
-                 with \"ip link set up {interface}\"",
+                 with \"ip link set dev {interface} up\"",
                 config.name
             )
         })?;
@@ -347,22 +347,51 @@ mod tests {
     use std::time::Duration;
     use tcslibgs::Faults;
 
-    /// The first virtual CAN interface this host has, if it has one.
+    /// Whether an interface is up, from the flags the kernel keeps for it.
+    ///
+    /// An interface that exists is not one a frame can go out on: `ip link
+    /// add` makes a virtual bus and leaves it down, and a socket bound to a
+    /// down bus binds without complaint and then fails the send with
+    /// `ENETDOWN`. The operational state says nothing either -- a virtual bus
+    /// has no carrier and reports "unknown" whether it is up or not -- so
+    /// this reads `IFF_UP` itself.
+    fn is_up(interface: &str) -> bool {
+        let Ok(flags) = std::fs::read_to_string(format!("/sys/class/net/{interface}/flags")) else {
+            return false;
+        };
+        let Ok(flags) = u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16) else {
+            return false;
+        };
+        flags & libc::IFF_UP as u32 != 0
+    }
+
+    /// The first virtual CAN interface this host has up, if it has one.
     fn a_virtual_bus() -> Option<String> {
         (0..4)
             .map(|n| format!("vcan{n}"))
-            .find(|name| index_of(name).is_some())
+            .find(|name| index_of(name).is_some() && is_up(name))
     }
 
-    /// A payload on the given bus, sending a packet every 50 ms.
-    fn payload_on(interface: &str, triggered: bool) -> PayloadConfig {
+    /// A payload on the given bus, under the given identifier, sending a
+    /// packet every 50 ms.
+    ///
+    /// The identifier is a parameter rather than a constant because the tests
+    /// here run as threads of one process and share the one bus the host has.
+    /// Two payloads on one identifier is the arrangement a configuration is
+    /// refused for, and for the same reason: each handler filters on that
+    /// identifier and so reads the other's frames. A test asserting that
+    /// nothing has arrived yet then sees a frame another test sent and fails
+    /// intermittently, nowhere near the cause. So each test that touches the
+    /// bus takes an identifier of its own, and the payload and the handler
+    /// within one test share it, which is how they talk at all.
+    fn payload_on(interface: &str, can_id: u32, triggered: bool) -> PayloadConfig {
         PayloadConfig {
             name: "can-payload".to_string(),
             protocol: PayloadProtocol::Can,
             address: interface.to_string(),
             port: 0,
             bus_address: 0,
-            can_id: 0x201,
+            can_id,
             can_fd: false,
             gpio_lines: Vec::new(),
             triggered,
@@ -384,7 +413,7 @@ mod tests {
     /// panel with every counter at nought and no reason given.
     #[test]
     fn a_bus_that_is_not_there_says_how_to_make_one() {
-        let said = match BusMember::join(&payload_on("vcan-nonesuch", false)) {
+        let said = match BusMember::join(&payload_on("vcan-nonesuch", 0x200, false)) {
             Err(e) => e,
             Ok(_) => panic!("this host has an interface called vcan-nonesuch"),
         };
@@ -402,14 +431,16 @@ mod tests {
     fn a_frame_carries_what_the_payload_sends() {
         let Some(interface) = a_virtual_bus() else {
             eprintln!(
-                "skipped: no virtual CAN bus on this host. Make one with \
-                 \"ip link add dev vcan0 type vcan; ip link set up vcan0\""
+                "skipped: no virtual CAN bus up on this host. Make one with \
+                 \"ip link add dev vcan0 type vcan; ip link set dev vcan0 up\""
             );
             return;
         };
 
-        let payload = BusMember::join(&payload_on(&interface, false)).expect("a member of the bus");
-        let handler = BusMember::join(&payload_on(&interface, false)).expect("another member");
+        let payload =
+            BusMember::join(&payload_on(&interface, 0x201, false)).expect("a member of the bus");
+        let handler =
+            BusMember::join(&payload_on(&interface, 0x201, false)).expect("another member");
 
         assert_eq!(
             payload.send(&[9, 8, 7]).expect("a frame goes out"),
@@ -496,14 +527,14 @@ mod tests {
     #[test]
     fn a_triggered_payload_on_a_bus_answers_a_request() {
         let Some(interface) = a_virtual_bus() else {
-            eprintln!("skipped: no virtual CAN bus on this host");
+            eprintln!("skipped: no virtual CAN bus up on this host");
             return;
         };
 
         // The handler's end, which asks.
-        let handler = BusMember::join(&payload_on(&interface, false)).expect("a member");
+        let handler = BusMember::join(&payload_on(&interface, 0x202, false)).expect("a member");
 
-        let mut config = payload_on(&interface, true);
+        let mut config = payload_on(&interface, 0x202, true);
         // A triggered payload sends when it is asked and at no rate of its
         // own, which is what the payload configuration holds it to.
         config.packet_interval_ms = Arc::new(AtomicU32::new(0));

@@ -66,6 +66,7 @@ help:
 	@echo "  make runsim      - Run tcssim alone"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
+	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload needs"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -196,6 +197,26 @@ runsim:
 		echo "Running $(SIM_NAME)..."; \
 		cd $(RUST) && RUST_LOG=$(RUST_LOG) PAYLOAD_SIM_YAML=$(TCSPECIAL_CONFIG_FILE)sim.yaml cargo run -q --bin tcssim -- $(TCSPECIAL_CONFIG_FILE).yaml \
 	)
+
+# Make the virtual CAN bus a CAN payload needs.
+#
+# A CAN controller is a network interface rather than a device file, so a host
+# with no CAN hardware has no bus at all and a CAN payload has nowhere to run.
+# mkvcan creates the kernel's virtual one -- removing any left from a previous
+# run first -- which is enough for both ends to be real: tcssim joins the bus
+# as one member and tcspecial's handler as another.
+#
+# Deliberately not a prerequisite of test or of the run targets. Creating an
+# interface needs root, and a target that asked for a password in the middle of
+# a build would be a surprise; the CAN tests skip where no bus is up rather
+# than fail, so not having run this costs a skipped test and not a broken one.
+#
+# Nothing it does survives a reboot, so it is run again after one. It also
+# takes the bus out from under anything already on it, which is why it is a
+# target of its own and not part of a run.
+.PHONY: mkvcan
+mkvcan:
+	bin/mkvcan
 
 # Clean build artifacts
 .PHONY: clean

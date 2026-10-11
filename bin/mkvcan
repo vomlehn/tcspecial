@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# Make the virtual CAN bus the CAN tests and the CAN payloads need.
+#
+# A CAN controller is a network interface, so a CAN payload is reached through
+# one rather than through a device file, and a host with no CAN hardware has
+# none at all. The kernel's vcan driver supplies one: a bus with no wire, no
+# bitrate and no carrier, whose members are the sockets bound to it. That is
+# enough for both ends to be real -- tcssim joins the bus as one member and
+# tcspecial's handler as another -- which is why the CAN kind is the one
+# experimental payload whose stand-in is as faithful as a socket.
+#
+# What neither program can do is make the bus: creating an interface needs
+# root, so they find it and say what would make one. This is that.
+#
+# Run it after each boot, or once with the interface made permanent by other
+# means; nothing here survives a reboot.
+
+set -euo pipefail
+
+# The bus to end up with, overridable as the first argument.
+#
+# vcan0 by default because that is the name the tests look for: a_virtual_bus()
+# in tcssim/src/payload_can.rs and tcspecial/src/endpoint_can.rs probes vcan0
+# through vcan3 and takes the first one that is up, so a bus under any other
+# name is a bus the tests will not find unless it is in that range.
+interface="${1:-vcan0}"
+
+# Everything below needs root. Re-exec rather than prefixing each command with
+# sudo, so that a password is asked for once instead of once per command.
+if [ "$(id -u)" -ne 0 ]; then
+	echo "mkvcan: re-running under sudo, which is what creating an interface needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# The driver. `ip link add ... type vcan` loads it on its own through the
+# rtnl-link-vcan alias, so this is belt and braces -- but it fails with a clear
+# message on a kernel built without vcan, where the ip command would instead
+# say only that it does not know the type.
+modprobe vcan
+
+# Remove every virtual CAN interface this host already has.
+#
+# Asked for as cleanup of the previous bus, and it is more than tidiness: a
+# vcan interface that exists but was never brought up binds a socket without
+# complaint and then fails the send with ENETDOWN, which is a confusing way to
+# discover a half-made bus. Deleting and remaking leaves no doubt about which
+# state the bus is in.
+#
+# Note this takes the bus out from under anything using it. A tcspecial or
+# tcssim still running on vcan0 loses its socket, so do not run this while one
+# of them is up.
+#
+# The -o form prints one interface per line as "<index>: <name>: <flags> ...",
+# so the name is the second colon-separated field; the sed strips the
+# "@parent" suffix that some link types carry, which vcan does not but which
+# costs nothing to allow for.
+existing="$(ip -o link show type vcan | awk -F': ' '{ print $2 }' | sed 's/@.*//')"
+if [ -n "$existing" ]; then
+	for old in $existing; do
+		echo "mkvcan: removing the existing $old"
+		ip link del dev "$old"
+	done
+else
+	echo "mkvcan: no virtual CAN interface to remove"
+fi
+
+# Make the bus and bring it up.
+#
+# Both halves are needed and the second is the one that gets forgotten: `ip
+# link add` leaves the interface down, and a down bus is the ENETDOWN case
+# above. Written as "set dev <name> up" rather than "set up <name>", which not
+# every version of ip parses the way it reads.
+echo "mkvcan: creating $interface"
+ip link add dev "$interface" type vcan
+ip link set dev "$interface" up
+
+# What the caller got, and the proof that it is up.
+#
+# A virtual bus has no carrier, so its operational state -- the second column
+# -- reads UNKNOWN however it is configured, exactly as the loopback
+# interface's does. The UP to look for is the flag in the angle brackets.
+echo "mkvcan: done"
+ip -brief link show type vcan

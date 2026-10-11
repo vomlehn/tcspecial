@@ -323,10 +323,33 @@ What it cannot do is make the bus: a virtual one needs
 .. code-block:: console
 
    $ sudo ip link add dev vcan0 type vcan
-   $ sudo ip link set up vcan0
+   $ sudo ip link set dev vcan0 up
 
 and tcssim says exactly that if the interface is not there, as it does for the
-I\ :superscript:`2`\ C stub module.
+I\ :superscript:`2`\ C stub module. ``bin/mkvcan`` runs both, after removing any
+virtual bus left from a previous run, so
+
+.. code-block:: console
+
+   $ make mkvcan
+
+is the shorter way to the same place. Either needs root -- the script asks for
+it through sudo -- and neither survives a reboot, so the bus is something a
+session makes again.
+
+The second command is the one that gets forgotten, and a bus made without it
+is worse than no bus at all: a socket binds to an interface that is down
+without complaint, and the send then fails with ``ENETDOWN``. So the tests
+take a bus that is down as no bus and skip, rather than fail in a way that
+reads as a bug in the endpoint. Note that a virtual bus has no carrier and so
+reports its operational state as ``UNKNOWN`` whether it is up or not, the way
+the loopback interface does -- the ``UP`` to look for is the flag ``ip link``
+prints in the angle brackets:
+
+.. code-block:: console
+
+   $ ip -brief link show type vcan
+   vcan0            UNKNOWN        <NOARP,UP,LOWER_UP>
 
 A GPIO Payload
 --------------

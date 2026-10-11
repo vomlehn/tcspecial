@@ -135,7 +135,7 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
         return Err(TcsError::Config(format!(
             "{what}: this host has no interface called \"{interface}\": {}. A virtual \
              bus is made with \"ip link add dev {interface} type vcan\" and brought up \
-             with \"ip link set up {interface}\"",
+             with \"ip link set dev {interface} up\"",
             io::Error::last_os_error()
         )));
     }
@@ -470,8 +470,8 @@ mod tests {
     fn a_frame_carries_a_packet_over_a_virtual_bus() {
         let Some(interface) = a_virtual_bus() else {
             eprintln!(
-                "skipped: no virtual CAN bus on this host. Make one with \
-                 \"ip link add dev vcan0 type vcan; ip link set up vcan0\""
+                "skipped: no virtual CAN bus up on this host. Make one with \
+                 \"ip link add dev vcan0 type vcan; ip link set dev vcan0 up\""
             );
             return;
         };
@@ -568,10 +568,28 @@ mod tests {
         );
     }
 
-    /// The first virtual CAN interface this host has, if it has one.
+    /// Whether an interface is up, from the flags the kernel keeps for it.
+    ///
+    /// An interface that exists is not one a frame can go out on: `ip link
+    /// add` makes a virtual bus and leaves it down, and a socket bound to a
+    /// down bus binds without complaint and then fails the send with
+    /// `ENETDOWN`. The operational state says nothing either -- a virtual bus
+    /// has no carrier and reports "unknown" whether it is up or not -- so
+    /// this reads `IFF_UP` itself.
+    fn is_up(interface: &str) -> bool {
+        let Ok(flags) = std::fs::read_to_string(format!("/sys/class/net/{interface}/flags")) else {
+            return false;
+        };
+        let Ok(flags) = u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16) else {
+            return false;
+        };
+        flags & libc::IFF_UP as u32 != 0
+    }
+
+    /// The first virtual CAN interface this host has up, if it has one.
     fn a_virtual_bus() -> Option<String> {
         (0..4)
             .map(|n| format!("vcan{n}"))
-            .find(|name| interface_index("probe", name).is_ok())
+            .find(|name| interface_index("probe", name).is_ok() && is_up(name))
     }
 }

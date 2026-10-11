@@ -14,6 +14,130 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
+TCSpecial is **telemetry and control, special**. It connects the devices aboard
+a vehicle -- sensors, actuators, and whatever else arrives on an
+I\ :superscript:`2`\ C bus, a SPI link, a serial line, a CAN bus, a set of
+discrete lines, a sensor buffer, a channel to another processor core, a socket
+or a pseudofile -- to the places their data has to reach. Some of those places
+are on the ground: a network link carries telemetry to the mission operations
+center, the **MOC**, and commands back. Others are aboard: software that takes
+what a device produces, computes something from it, remembers what it needs to
+remember, and sends the result on to the original device, to a different
+device, or to the MOC. Others again keep what they are given -- a log node
+records what reaches it, however many sources send to it, so that what happened
+can be reconstructed later rather than only watched as it goes past.
+
+Everything in that picture is a **node**, and what joins one node to another is
+a **link**. Neither is written in the software. Both are read from a
+configuration file at startup, which is the whole of the architecture: the
+program is a set of node types and a machine for moving data along declared
+links, and what a particular vehicle does is a file.
+
+What that buys
+--------------
+
+The reasons are given in the order TCSpecial ranks them. Where two designs
+compete, the earlier item wins, and this list is what an argument about them
+should cite.
+
+**Reliability.** The whole of what a vehicle will do is one artifact, and it is
+checked before any of it runs. Every link must name nodes that exist; a node
+that computes a mean must have its inputs bound, all of them; a set of discrete
+lines driven as outputs may not also be read as inputs. ``tcsverify`` performs
+those checks on the ground, against the same code that will perform them again
+aboard, so a configuration that does not make sense is refused on a desk rather
+than discovered in flight. What did fly is not a matter of memory either: the
+beacon carries a digest of the configuration the spacecraft read, so the ground
+can say which file is running. And a node can be reached only along a link
+somebody declared -- there is no ambient path by which data arrives somewhere
+nobody intended.
+
+**Ease of use.** One file says what the system does, and it says it in the
+words of the person who built the vehicle: a bus and an address, a chip and
+three line numbers, an interval, a setpoint. Reading the file tells you what is
+connected to what, which is the question actually asked of a telemetry system
+at three in the morning. There is no code to read to find out where a sensor's
+readings go.
+
+**Maintainability.** A node knows nothing about its neighbours. It is handed
+bytes and it produces bytes, and the links are somebody else's business, so a
+type of interface is one module with one job and a test of its own. Adding a
+type does not touch the machinery that moves data, and changing what a vehicle
+does does not touch either.
+
+**Flexibility and extensibility.** A new interface is a new node type; a new
+computation is a new function or a program of its own. Neither disturbs the
+graph. Rearranging a vehicle -- another sensor, a second heater circuit, the
+same readings sent somewhere new -- is an edit to a configuration file, not a
+build.
+
+The vocabulary
+--------------
+
+These words are used precisely throughout, and some of them replaced older ones
+that were used loosely.
+
+node
+    Anything the configuration can name and a link can join: a device, a MOC
+    link, or a compute element. The generic term.
+
+device
+    A node that is real hardware, reached over one of the interfaces. These
+    were called *payloads*, which said what they were for rather than what they
+    are, and said nothing at all about a device being driven rather than read.
+
+pseudofile
+    A node reached as an entry in the filesystem -- ``/dev/urandom``, a named
+    pipe, a file a program writes. The word *device* was used for this as well
+    as for hardware, which made "device" ambiguous in exactly the places it had
+    to be exact.
+
+MOC
+    The mission operations center, on the ground. A MOC node is a network link
+    carrying telemetry down and commands up. Earlier text calls this the OC.
+
+compute element
+    A node that transforms what it is given. It may keep state between
+    arrivals, which is what makes a control loop possible: an average over
+    time, a comparison against a setpoint, a filter that remembers.
+
+group
+    Devices that share one sampling interval, so that a set of sensors is read
+    as close to simultaneously as the hardware allows rather than each on a
+    clock of its own.
+
+log node
+    A node that records what reaches it rather than passing it on, built on the
+    same ``tcslog`` the telemetry log uses. Any number of sources may link into
+    one, so a flight's housekeeping is one log with the records interleaved as
+    they happened. Its directory and its record format are configured, and
+    every source must produce records that format can hold -- which is settled
+    when the configuration is loaded, so a log never has to refuse a record in
+    flight.
+
+link
+    A directed connection from one node to one or more destinations. A link
+    with several destinations is how one reading reaches both the ground and an
+    on-board computation; it is the "T" such an arrangement is usually drawn
+    as.
+
+command binding
+    A statement that a named command from the MOC sets a named attribute of a
+    node. It is how a setpoint reaches a control loop in flight.
+
+.. note::
+   **What runs today.** The architecture above is what TCSpecial is being
+   built into, and this manual describes it as the thing to configure against.
+   What is in flight-ready shape at the time of writing is narrower: a node may
+   be a device or a MOC link, and the links the software builds are the pair
+   that joins one device to one MOC link in each direction. Compute elements,
+   links with several destinations, groups with a shared interval, discrete
+   lines driven as outputs, and command bindings are specified in
+   ``design.rst`` and are being implemented in that order. Where this manual
+   describes something not yet running it says so in a note like this one, and
+   the rule this project has always followed applies: the description stands,
+   and a note records what is so today.
+
 Configuration File Formats
 ==========================
 A configuration file may be written in YAML or XML. Both describe the same
@@ -106,8 +230,8 @@ loaded -- a section that could never place a command interpreter is refused
 where it is read.
 
 What follows is the attributes every payload has, whatever it is, and then one
-section per kind of payload for the attributes only that kind has. A payload
-states its kind in ``type`` and is then held to that kind's attributes and no
+section per type of payload for the attributes only that type has. A payload
+states its type in ``type`` and is then held to that type's attributes and no
 others: a device stating a ``port``, or a network payload stating a ``path``,
 is refused.
 
@@ -117,10 +241,10 @@ Some of what follows is marked **experimental, not yet supported**. Each of
 those is written, parses, reaches a handler and has tests; none has been run
 against the hardware it describes, and none is shipped in a payload set. What
 is marked that way is: RS-485 on a serial line, and the ``can``, ``iio``,
-``rpmsg`` and ``gpio`` kinds of payload.
+``rpmsg`` and ``gpio`` types of payload.
 
 Read them as a statement of what the configuration will be rather than as a
-feature to rely on. They may change in ways the five supported kinds --
+feature to rely on. They may change in ways the five supported types --
 ``network``, ``device``, ``serial``, ``i2c`` and ``spi`` -- will not.
 
 Attributes Every Payload Has
@@ -150,7 +274,7 @@ well, which was a second identity for one payload to keep consistent by hand.
 An OC address and an OC port are given together or not at all, and a handler
 needs them before it can be started.
 
-The two kinds of payload
+The two types of payload
 ------------------------
 A payload either sends of its own accord or answers a request, and which it is
 decides where its timing is written down.
@@ -171,7 +295,7 @@ triggered payload may share a group for the settings it can use, but not one
 that states a rate.
 
 The interval is ``packet_interval_ms`` in whichever configuration states it --
-one name, in the place the payload's kind puts it. It was
+one name, in the place the payload's type puts it. It was
 ``trigger_interval_ms`` here; a file still using that name is told the name it
 has now.
 
@@ -232,7 +356,7 @@ states a trigger that a YAML one states with the format's own escapes.
 
 A file that mixes the two is refused rather than run, in either direction: a
 periodic payload carrying a trigger or an interval, or a triggered one with no
-interval, has not said which kind of payload it describes, and either guess
+interval, has not said which type of payload it describes, and either guess
 would operate it in a way nobody asked for.
 
 A datagram payload -- ``udp`` or ``unix_dgram`` -- cannot be triggered. Its
@@ -276,9 +400,9 @@ Nothing else: a plain device has no terms to be set and no address to be
 reached at. A device cannot be triggered -- tcspecial opens it and reads it,
 and there is nothing to write a request to.
 
-Three other kinds are reached through a device file too and are not devices in
+Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
-own, which is why each has a kind of its own below.
+own, which is why each has a type of its own below.
 
 A CAN Payload
 -------------
@@ -317,7 +441,7 @@ identifier, and the socket does not receive its own frames, so a handler never
 reads back the trigger it just sent.
 
 The simulator joins the same bus as another member of it, so both ends are
-real -- the only experimental kind whose stand-in is as faithful as a socket.
+real -- the only experimental type whose stand-in is as faithful as a socket.
 What it cannot do is make the bus: a virtual one needs
 
 .. code-block:: console
@@ -369,7 +493,7 @@ for changes.
    debounce_us    how long a line must be steady before a change counts.
                   Default none, and applied by the kernel
 
-This is the one kind whose payload data is made rather than carried. A line
+This is the one type whose payload data is made rather than carried. A line
 has no bytes: it is high or low, and what the ground wants is when it changed.
 So each change becomes a record of sixteen bytes -- eight of time in
 milliseconds since the epoch, four of line offset, four of the value it became
@@ -495,13 +619,13 @@ states them beside everything else it states, or takes them from its
                   synchronous lines only
    loopback       true | false, default false -- synchronous lines only
 
-What each kind of line may say is what the Linux driver for such a line can be
+What each type of line may say is what the Linux driver for such a line can be
 told, and nothing else: termios sets a parity per character on a start-stop
 line, and the kernel's generic HDLC takes a clock, a coding, a frame check and
-a loopback for a synchronous one. A payload stating the other kind's
+a loopback for a synchronous one. A payload stating the other type's
 attributes is refused.
 
-Both kinds write the frame check as ``parity``, which is what Linux calls both
+Both types write the frame check as ``parity``, which is what Linux calls both
 of them; the values say which is meant.
 
 Two things are worth knowing before setting a parity. A line is read back
@@ -556,7 +680,7 @@ point-to-point mode on a two-wire bus transmits into other transmitters. A
 line that will not take what the file asked for is refused rather than
 started. A simulated line is a pseudo-terminal, which will not take it at all,
 so a set meant to be run against tcssim does not state ``rs485`` -- as it
-states ``parity: none`` for the same kind of reason.
+states ``parity: none`` for the same type of reason.
 
 **A stream section**
 
@@ -581,7 +705,7 @@ where a read ends; a network payload's datagram is already a frame.
 
 ``tests/manual/tcspecial4.yaml`` is a worked example of a line, with its
 group, its terms and its stream rule, beside one payload of each of the other
-supported kinds; ``tcspecial4.xml`` is the same set in the other format.
+supported types; ``tcspecial4.xml`` is the same set in the other format.
 
 An I\ :superscript:`2`\ C Payload
 ---------------------------------
@@ -665,20 +789,20 @@ otherwise produces a payload that looks configured and is not:
   two payloads from one entry. The rule reaches no further than the file --
   two sets may name their payloads and their groups alike, and the shipped
   examples do.
-* An **attribute of another kind** -- a device payload stating ``protocol``,
+* An **attribute of another type** -- a device payload stating ``protocol``,
   ``address`` or ``port``, or a network payload stating ``path``. The check is
   made after the group has been laid under the payload, since an attribute
   inherited from a group reaches the payload just as one it states itself
-  does: a payload of one kind joining a group written for another is what this
+  does: a payload of one type joining a group written for another is what this
   catches, and the error names the group when the group is where the attribute
   came from.
-* A **term of a link on a kind that is not on one**: a ``datarate`` or a
-  ``spi_mode`` or a set of ``lines`` on a network or device payload. Each kind
-  that *is* on a link refuses what belongs to another kind as its own terms are
-  read, and those two kinds have no terms of their own to read -- so a term
+* A **term of a link on a type that is not on one**: a ``datarate`` or a
+  ``spi_mode`` or a set of ``lines`` on a network or device payload. Each type
+  that *is* on a link refuses what belongs to another type as its own terms are
+  read, and those two types have no terms of their own to read -- so a term
   written on one of them used to be taken in and dropped, which is a payload
   that looks configured and is not. A network payload's ``protocol`` is its
-  own kind's and is not a term of somebody else's link.
+  own type's and is not a term of somebody else's link.
 * A **word that is not an attribute**. A misspelled ``oc_address`` is a
   payload with nowhere to send its data, and ignoring the word says nothing
   about it.
@@ -704,7 +828,7 @@ otherwise produces a payload that looks configured and is not:
   so what is claimed there is the bus and the address together.
 
 The rule is over the handlers a file produced rather than the words that
-produced them, so it applies to every kind of payload alike.
+produced them, so it applies to every type of payload alike.
 
 An Example
 ----------
@@ -800,7 +924,7 @@ about how a stand-in for it behaves, each under the name of the file it came
 from.
 
 It shows nothing but what the files said. What a payload has actually done is
-on the panel itself, and only the attributes of that payload's own kind appear
+on the panel itself, and only the attributes of that payload's own type appear
 -- a device has no protocol and a bus no port -- along with only the faults
 that were asked for. Where a file stated nothing, the line says what the
 program will use instead rather than passing it off as a statement: a handler
@@ -830,23 +954,23 @@ for them in both spellings, and the pairing convention names them from the
 other file's stem.
 
 ``tcspecial1.yaml``
-  Four payloads of three kinds, which is what exercises the panels and the
+  Four payloads of three types, which is what exercises the panels and the
   grid. Every program falls back to this set when nothing names a file.
 
 ``tcspecial2.yaml``
-  Two payloads, one of each kind: one that sends of its own accord and one
+  Two payloads, one of each type: one that sends of its own accord and one
   that answers a request. The Makefile defaults to this set.
 
 ``tcspecial3.yaml``
   One payload, reached over a stream. It differs from set 2's first payload
   only in the transport, which is what makes it the set to debug a single link
-  against -- and what the kind and transport in a simulator configuration are
+  against -- and what the type and transport in a simulator configuration are
   there to tell apart.
 
 ``tcspecial4.yaml``
-  One payload of every supported kind -- a socket, a device file, a bus, a
+  One payload of every supported type -- a socket, a device file, a bus, a
   clocked link and a serial line -- which makes it both the set that exercises
-  a link's own terms and the set that reaches every kind at once.
+  a link's own terms and the set that reaches every type at once.
 
   Three of the five need nothing: a datagram is a socket, and the device file
   is ``/dev/urandom``, which is always a source of bytes. The line and the
@@ -871,7 +995,7 @@ simulating, and does without it if it is not there.
 
    simulated_payloads
      name                 the payload this one stands in for
-     type                 the kind of payload it is, as the tcspecial
+     type                 the type of payload it is, as the tcspecial
                           configuration says
      protocol             which transport, for a network payload
      payload_address      the socket the payload answers from, if this file
@@ -887,20 +1011,20 @@ required for that reason. The two files are joined by handler name and by
 nothing else -- and a name is what a set copied from another one keeps -- so a
 simulator configuration written for one set parses happily against another
 set's payloads, and the run that follows looks like a payload that never
-sends. Stating the kind here makes that pairing an error instead.
+sends. Stating the type here makes that pairing an error instead.
 
 .. code-block:: text
 
-   type                   the kind of payload this stands in for, in the
+   type                   the type of payload this stands in for, in the
                           tcspecial configuration's own word: network,
                           device, serial, i2c, spi, can, iio, rpmsg or
                           gpio. Must be what that configuration says
    protocol               which transport, for a network payload, and refused
-                          for any other kind. Must be what that configuration
+                          for any other type. Must be what that configuration
                           says
    payload_address        the socket the simulated payload answers from: a
                           host for a UDP payload, a path for a Unix datagram
-                          one. Optional, and only for those two kinds
+                          one. Optional, and only for those two types
    payload_port           the port it answers from. Optional, and refused for
                           a Unix datagram payload, which answers from a path
 
@@ -939,7 +1063,7 @@ have the simulator do something other than what the file asked for and say
 nothing: a payload asked through a misspelling to drop a tenth of its packets
 drops none, and looks exactly like one that was never asked.
 
-Neither the kind nor the transport is taken from this file: the tcspecial
+Neither the type nor the transport is taken from this file: the tcspecial
 configuration decides both, and a disagreement about either is an error naming
 the payload and what each file says of it. A group may carry them, like any
 other setting -- though payloads that share a rate need not share a transport,
@@ -1018,7 +1142,7 @@ meant to be left out.
 A simulated triggered payload sends one packet for each request it is sent and
 nothing otherwise. The segment settings still apply to it -- how a payload
 divides an answer is its own business however it was prompted -- but the packet
-interval does not, and is refused. Two kinds cannot be asked at all and are
+interval does not, and is refused. Two types cannot be asked at all and are
 refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.

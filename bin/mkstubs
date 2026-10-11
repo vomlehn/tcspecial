@@ -1,0 +1,174 @@
+#!/bin/bash
+#
+# Make the kernel stand-ins a simulated I2C device and a simulated GPIO chip
+# need.
+#
+# Two of the nine payload kinds are ones the simulator cannot simply be the far
+# end of. A serial line has a pty and a socket has another socket, but a device
+# on an I2C bus has to answer when a master addresses it, and a discrete line
+# is a wire -- nothing in user space is either. What the kernel offers instead
+# is a pair of modules:
+#
+#   i2c-stub   an adapter whose chips are a bank of registers in memory, so
+#              the bank is the payload: tcssim writes it and tcspecial reads it
+#   gpio-sim   a chip whose lines exist in memory, with a file per line saying
+#              what the line is pulled to, so tcssim writes that file and a
+#              handler watching the same chip sees an edge
+#
+# Both are the kernel's and configuring either needs root, so tcssim does not
+# make them: it finds them and says how to make one if there is none. This is
+# that, as bin/mkvcan is for the virtual CAN bus.
+#
+# What it does not do is let the unit tests cover any more than they do now.
+# The tests scan a tree handed to them rather than the real one -- see
+# find_stub() in tcssim/src/payload_i2c.rs and lines_of() in
+# tcssim/src/payload_gpio.rs -- so they pass with no module loaded and would
+# pass with one. This is for running a payload set that names an I2C or GPIO
+# payload, which is the part that needs the real thing.
+#
+# Nothing here survives a reboot.
+
+set -euo pipefail
+
+# The chip the I2C stub answers for, and how many lines the simulated chip has.
+#
+# 0x48 because that is the address every message in the source offers as the
+# example, so a configuration written from those messages works against this
+# without being told a different number. Eight lines because a set of
+# discretes is a handful of them -- a deployment switch, an arming line, an
+# "alive" line -- and eight is the smallest round number larger than a
+# handful.
+#
+# The stub's chips are fixed when the module is loaded, so an address given
+# here is applied by reloading it. That is why the address is worth passing:
+#   ./bin/mkstubs 0x50
+#   ./bin/mkstubs 0x50 16
+address="${1:-0x48}"
+lines="${2:-8}"
+
+# What this script's own simulated chip is called in configfs, and the bank
+# under it.
+#
+# A name of its own so that cleanup can be its own and not everybody's: a
+# gpio-sim device another program made is left alone, where unloading the
+# module would take it away. The I2C stub has no such luxury -- the module is
+# the adapter -- so that one is reloaded whole.
+sim_device="tcssim"
+sim_bank="bank0"
+
+configfs="/sys/kernel/config"
+gpio_sim="$configfs/gpio-sim"
+
+# What find_stub() in tcssim matches an adapter's name against. The same
+# string, because a stub this script made and a stub tcssim will not recognise
+# is worse than no stub at all.
+stub_name="SMBus stub driver"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "mkstubs: re-running under sudo, which is what loading a module needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# ---------------------------------------------------------------- the I2C stub
+
+# Reload rather than load. The stub's chips are fixed when the module is
+# loaded, so an address that differs from the loaded one can only be had by
+# unloading it first; and a reload is what makes running this twice with two
+# addresses do what it looks like it does.
+if [ -d /sys/module/i2c_stub ]; then
+	echo "mkstubs: unloading the i2c-stub already loaded"
+	modprobe -r i2c-stub
+fi
+
+# The character devices an adapter is reached through. Built into most
+# kernels, in which case modprobe succeeds and does nothing; a kernel with it
+# as a module needs it, because without it there is no /dev/i2c-N to open.
+modprobe i2c-dev
+
+echo "mkstubs: loading i2c-stub with a chip at $address"
+modprobe i2c-stub "chip_addr=$address"
+
+# Find what it became, the way tcssim finds it: the adapter whose name is the
+# stub's, lowest number first. Numeric names only -- some adapters are called
+# things like i2c-ELAN2097:00, which is not a number and not a stub.
+stub=""
+for dir in /sys/bus/i2c/devices/i2c-*; do
+	number="${dir##*/i2c-}"
+	case "$number" in
+	'' | *[!0-9]*) continue ;;
+	esac
+	[ -r "$dir/name" ] || continue
+	if [ "$(cat "$dir/name")" = "$stub_name" ]; then
+		if [ -z "$stub" ] || [ "$number" -lt "$stub" ]; then
+			stub="$number"
+		fi
+	fi
+done
+
+if [ -z "$stub" ]; then
+	echo "mkstubs: i2c-stub loaded but no adapter of its is listed, which should" >&2
+	echo "mkstubs: not happen -- look in /sys/bus/i2c/devices" >&2
+	exit 1
+fi
+
+# ------------------------------------------------------------ the GPIO stand-in
+
+# configfs is where a simulated chip is described. Mounted already on a
+# systemd host; mounted here if not, because the alternative is a mkdir that
+# fails with nothing to say why.
+if [ ! -d "$configfs/." ] || ! mountpoint -q "$configfs"; then
+	echo "mkstubs: mounting configfs on $configfs"
+	mount -t configfs none "$configfs"
+fi
+
+modprobe gpio-sim
+
+# Take down the chip a previous run of this script left, and only that one.
+#
+# A live device cannot be removed, and its bank cannot be removed before it is
+# not live, so the order matters: stop it, take the bank, take the device.
+if [ -d "$gpio_sim/$sim_device" ]; then
+	echo "mkstubs: removing the simulated chip left by a previous run"
+	if [ -w "$gpio_sim/$sim_device/live" ]; then
+		echo 0 > "$gpio_sim/$sim_device/live"
+	fi
+	[ -d "$gpio_sim/$sim_device/$sim_bank" ] && rmdir "$gpio_sim/$sim_device/$sim_bank"
+	rmdir "$gpio_sim/$sim_device"
+fi
+
+echo "mkstubs: making a simulated chip of $lines lines"
+mkdir "$gpio_sim/$sim_device"
+mkdir "$gpio_sim/$sim_device/$sim_bank"
+echo "$lines" > "$gpio_sim/$sim_device/$sim_bank/num_lines"
+echo 1 > "$gpio_sim/$sim_device/live"
+
+# Which platform device it became, and which character device that is.
+#
+# Both are assigned as devices appear and neither is an identity, which is why
+# this reads them rather than assuming gpio-sim.0 and gpiochip0: the number a
+# payload set names has to be the number of the run it is in. dev_name is what
+# configfs says the device is called once it is live, and chip_name is the node
+# the bank became -- the same file lines_of() matches against.
+dev_name="$(cat "$gpio_sim/$sim_device/dev_name")"
+bank="/sys/devices/platform/$dev_name/$sim_bank"
+chip="$(cat "$bank/chip_name")"
+
+# The file a simulated payload writes. If this is missing the chip is live but
+# not usable, and saying so here beats a payload failing on it later.
+if [ ! -w "$bank/sim_gpio0/pull" ]; then
+	echo "mkstubs: $chip has no line files under $bank, which should not happen" >&2
+	exit 1
+fi
+
+# ------------------------------------------------------------------ what to use
+
+echo "mkstubs: done"
+echo
+echo "  an I2C payload:   path: /dev/i2c-$stub"
+echo "                    bus_address: $address"
+echo
+echo "  a GPIO payload:   path: /dev/$chip"
+echo "                    lines: 0-$((lines - 1)) are simulated"
+echo
+echo "Both numbers are assigned as devices appear, so they can differ from one"
+echo "run of this to the next; a payload set that names them has to name these."

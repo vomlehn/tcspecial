@@ -17,8 +17,6 @@ pub mod config_digest;
 pub mod display;
 pub mod endpoint_config;
 pub mod node;
-pub mod endpoint_config_rs485;
-mod endpoint_config_serial;
 pub mod error;
 pub mod format;
 pub mod parameters;
@@ -40,14 +38,14 @@ pub use commands::*;
 // with the kind of group that states them and named from here as well, since
 // by the time a handler holds one it is no longer a matter of configuration
 // files.
-pub use endpoint_config_serial::{
+pub use node::serial::{
     ByteLength, ClockType, Encoding, FrameCheck, Parity, StopBits,
 };
 pub use node::can::CanParams;
 pub use node::gpio::{Bias, Edge as LineEdge, GpioParams};
 pub use node::iio::IioParams;
 pub use node::rpmsg::RpmsgParams;
-pub use endpoint_config_rs485::Rs485Params;
+pub use node::serial::rs485::Rs485Params;
 pub use node::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 pub use config::*;
 pub use display::{screen_height, Edge};

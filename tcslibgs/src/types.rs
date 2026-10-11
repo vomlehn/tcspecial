@@ -6,7 +6,7 @@ use crate::endpoint_config::{ByteList, Scalar};
 
 use serde::{Deserialize, Serialize};
 
-use crate::endpoint_config_serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
+use crate::node::serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
 use crate::node::spi::{BitOrder, CsActive, SpiMode};
 use crate::verify::Problem;
 use std::collections::{BTreeMap, BTreeSet};
@@ -723,7 +723,7 @@ pub struct SerialConfig {
     /// Applied rather than recorded, unlike the synchronous terms above: the
     /// kernel takes it through an ioctl on the same device file, which is the
     /// file a handler has open. Experimental; see
-    /// [`crate::endpoint_config_rs485`].
+    /// [`crate::node::serial::rs485`].
     #[serde(default)]
     pub rs485: Option<crate::Rs485Params>,
 }
@@ -1078,7 +1078,7 @@ pub(crate) fn link_params_of(
     let wire = link_terms_of(stated, group);
 
     match kind {
-        DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
+        DHType::Serial => crate::node::serial::group_kind_of(name, wire),
         DHType::I2c => crate::node::i2c::group_kind_of(name, wire),
         DHType::Spi => crate::node::spi::group_kind_of(name, wire),
         DHType::Can => crate::node::can::group_kind_of(name, wire),
@@ -1495,7 +1495,7 @@ pub struct DHGroupJson {
     pub cs_active: Option<Scalar>,
     /// Whether a start-stop line is a half-duplex RS-485 bus. Serial
     /// payloads only, and experimental; see
-    /// [`crate::endpoint_config_rs485`].
+    /// [`crate::node::serial::rs485`].
     #[serde(default)]
     pub rs485: Option<Scalar>,
     /// The logical level of RTS while an RS-485 line transmits.
@@ -1683,7 +1683,7 @@ pub struct DHConfigJson {
     pub cs_active: Option<Scalar>,
     /// Whether a start-stop line is a half-duplex RS-485 bus. Serial
     /// payloads only, and experimental; see
-    /// [`crate::endpoint_config_rs485`].
+    /// [`crate::node::serial::rs485`].
     #[serde(default)]
     pub rs485: Option<Scalar>,
     /// The logical level of RTS while an RS-485 line transmits.

@@ -85,12 +85,12 @@ fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
 
 /// Put the line open on `fd` into RS-485 mode, as `terms` asks.
 ///
-/// `what` is the handler's name, so a failure says which payload's line it
+/// `what` is the handler's name, so a failure says which device's line it
 /// was; see the endpoint factories, which pass it down for exactly this.
 ///
 /// Refused rather than reported and run. A line that will not take the mode
 /// is a line that drives the pair for as long as it is open, which on a bus
-/// is a payload that stops every other transmitter on it -- including the one
+/// is a device that stops every other transmitter on it -- including the one
 /// this handler is trying to read. The error says the mode was asked for and
 /// not taken, which is the fact that tells a wrong port from a wrong
 /// configuration.
@@ -264,7 +264,7 @@ mod tests {
         let said = format!("{said}");
         assert!(
             said.contains("line") && said.contains("RS-485"),
-            "the error should name the payload and the mode: {said}"
+            "the error should name the device and the mode: {said}"
         );
 
         unsafe {

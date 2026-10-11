@@ -6,6 +6,11 @@
 //! ends is a stream section, which a serial group shares with the stream
 //! network protocols rather than owning -- see [`crate::endpoint_config`].
 
+// The two-wire variant, which is one of a line's own terms rather than
+// an interface of its own -- so it nests here rather than sitting beside
+// this in node/.
+pub mod rs485;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -107,9 +112,9 @@ pub struct SerialParams {
     /// Data bits in each byte.
     pub byte_length: ByteLength,
     /// The half-duplex turnaround, for a line that is an RS-485 bus, and
-    /// `None` for one that is not; see [`crate::endpoint_config_rs485`].
-    pub rs485: Option<crate::endpoint_config_rs485::Rs485Params>,
-    /// Stream payload protocol attributes. Required: a serial port is a
+    /// `None` for one that is not; see [`crate::node::serial::rs485`].
+    pub rs485: Option<crate::node::serial::rs485::Rs485Params>,
+    /// Stream device protocol attributes. Required: a serial port is a
     /// stream, so there is always a rule for where one read ends.
     pub stream: StreamParams,
 }
@@ -165,7 +170,7 @@ impl fmt::Display for Parity {
 
 /// Whose clock a synchronous line's bits are on.
 ///
-/// The kernel's four, from `linux/hdlc/ioctl.h`: a payload link is commonly
+/// The kernel's four, from `linux/hdlc/ioctl.h`: a device link is commonly
 /// `external`, the equipment at the far end driving the clock, and
 /// `internal` where this end drives it. The two mixed settings exist because
 /// some links take their transmit clock from one place and their receive
@@ -451,7 +456,7 @@ pub(crate) fn group_kind_of(
     // The electrical layer under a start-stop line, which a two-wire bus
     // needs told and a four-wire line says nothing about. Read before the
     // stream section below, which takes the terms apart.
-    let rs485 = crate::endpoint_config_rs485::rs485_of(name, &g, asynchronous)?;
+    let rs485 = crate::node::serial::rs485::rs485_of(name, &g, asynchronous)?;
 
     // A serial port is a stream, so a read needs an end.
     let stream = g.stream.ok_or(EndpointConfigError::MissingGroupField {
@@ -485,7 +490,7 @@ pub(crate) fn group_kind_of(
         }
 
         // Absent is no parity, which is what a line was set to before this
-        // could be stated and what nearly every payload link uses.
+        // could be stated and what nearly every device link uses.
         let parity = match g.parity.as_ref() {
             Some(stated) => Some(parse_parity(name, stated)?),
             None => Some(Parity::None),

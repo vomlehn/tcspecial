@@ -12,7 +12,7 @@
 //! * [`crate::payload_tcp`] -- a stream the handler connects to
 //! * [`crate::payload_udp`] -- datagrams sent to where the handler waits
 //! * [`crate::payload_device`] -- a device, which produces rather than sends
-//! * [`crate::payload_serial`] -- a line, which is a pty the configured path
+//! * [`crate::node::serial`] -- a line, which is a pty the configured path
 //!   leads to
 //! * [`crate::node::i2c`] -- a device on a bus, which is a chip of the
 //!   kernel's `i2c-stub`
@@ -102,7 +102,7 @@ pub enum PayloadProtocol {
     Udp,
     Device,
     /// A serial line, which the simulator stands in for with a pty: see
-    /// [`crate::payload_serial`].
+    /// [`crate::node::serial`].
     Serial,
     /// A device on an I2C bus, which the simulator stands in for with the
     /// kernel's `i2c-stub`: see [`crate::node::i2c`].
@@ -217,7 +217,7 @@ impl SimulatedPayload {
                     crate::payload_device::run_device_payload(config, running, stats)
                 }
                 PayloadProtocol::Serial => {
-                    crate::payload_serial::run_serial_payload(config, running, stats)
+                    crate::node::serial::run_serial_node(config, running, stats)
                 }
                 PayloadProtocol::I2c => {
                     crate::node::i2c::run_i2c_node(config, running, stats)

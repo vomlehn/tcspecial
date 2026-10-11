@@ -15,7 +15,10 @@
 # copied from another one keeps the names.
 #
 # A serial payload takes no protocol and no address of its own: a line is
-# reached by its device and by nothing else.
+# reached by its device and by nothing else, and the same is true of a device
+# file, a bus and a clocked link. Only the network payload states a protocol,
+# and it states the one its own file states: the two are checked against each
+# other rather than one being taken from the other.
 #
 # Read as YAML because it is named .yaml. A simulator configuration chooses
 # its parser from its extension as every configuration file in this project
@@ -31,6 +34,36 @@ simulated_payloads:
   # the segments are where a handler's reading is exercised.
   - name: serial-line
     type: serial
+    packet_interval_ms: 500
+    segment_size: 4
+    segment_interval_ms: 100
+
+  # Once a second, whole. A datagram is delivered entire or not at all, so
+  # segments would describe something a socket does not do.
+  - name: udp-steady
+    type: network
+    protocol: udp
+    packet_interval_ms: 1000
+
+  # As fast as it will go, which for a device file means the handler sets the
+  # pace: /dev/urandom is never not ready, so there is nothing to wait for.
+  - name: random-device
+    type: device
+    packet_interval_ms: 0
+
+  # Twice a second, whole. A simulated bus is a register rather than a
+  # stream -- every master reads the same bank and bytes do not queue -- so a
+  # packet sent in pieces would be a packet partly overwritten before it was
+  # read, which is a property of the bus and not something to exercise here.
+  - name: bus-device
+    type: i2c
+    packet_interval_ms: 500
+
+  # Twice a second, in four-byte pieces, as the line is: a clocked link
+  # carries bytes, so a packet arriving in pieces is a thing a handler on one
+  # has to put back together.
+  - name: clocked-peripheral
+    type: spi
     packet_interval_ms: 500
     segment_size: 4
     segment_interval_ms: 100

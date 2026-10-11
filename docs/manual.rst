@@ -580,8 +580,8 @@ bytes as it asks for, so a transfer is already bounded and needs no rule for
 where a read ends; a network payload's datagram is already a frame.
 
 ``tests/manual/tcspecial4.yaml`` is a worked example of a line, with its
-group, its terms and its stream rule, and ``tcspecial4.xml`` is the same set
-in the other format.
+group, its terms and its stream rule, beside one payload of each of the other
+supported kinds; ``tcspecial4.xml`` is the same set in the other format.
 
 An I\ :superscript:`2`\ C Payload
 ---------------------------------
@@ -844,10 +844,17 @@ other file's stem.
   there to tell apart.
 
 ``tcspecial4.yaml``
-  One payload on a serial line, which is the set that exercises a link's own
-  terms. Running it needs nothing special: tcssim stands in for the line with
-  a pty and makes the device the file names a link to it while the payload
-  runs.
+  One payload of every supported kind -- a socket, a device file, a bus, a
+  clocked link and a serial line -- which makes it both the set that exercises
+  a link's own terms and the set that reaches every kind at once.
+
+  Three of the five need nothing: a datagram is a socket, and the device file
+  is ``/dev/urandom``, which is always a source of bytes. The line and the
+  clocked link need nothing either, in the sense that matters -- tcssim stands
+  in for each with a pty and makes the path the file names a link to it while
+  the payload runs. The bus is the one that needs something of the host: the
+  kernel's I\ :superscript:`2`\ C stub, loaded at the address this set names,
+  which ``make mkstubs`` does and tcssim says how to do if it is not there.
 
 The Simulator Configuration
 ===========================

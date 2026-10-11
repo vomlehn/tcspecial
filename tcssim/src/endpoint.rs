@@ -81,7 +81,7 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // kernel's i2c-stub is an adapter whose chips are a bank of registers
         // in memory, and every master on that bus reads and writes the same
         // bank. So the bank is the payload, and the simulator fills it; see
-        // payload_i2c. The bus the handler was told to open is made to lead to
+        // node::i2c. The bus the handler was told to open is made to lead to
         // the stub, as a line's path is made to lead to a pty.
         EndpointConfig::I2c(i2c) => (
             PayloadProtocol::I2c,

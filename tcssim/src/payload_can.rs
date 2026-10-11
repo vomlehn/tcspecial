@@ -15,7 +15,7 @@
 //! What the simulator cannot do is make the bus. A virtual one is created with
 //! `ip link add dev vcan0 type vcan` and brought up with `ip link set dev
 //! vcan0 up`, both of which need root, so this finds the interface and says
-//! what would make one if it is not there -- as [`crate::payload_i2c`] does
+//! what would make one if it is not there -- as [`crate::node::i2c`] does
 //! for its kernel module.
 //!
 //! A frame is its own length and carries eight bytes, or sixty-four as CAN

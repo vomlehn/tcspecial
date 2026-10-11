@@ -30,14 +30,14 @@ use crate::endpoint_config_can::CanParams;
 use crate::endpoint_config_iio::IioParams;
 use crate::endpoint_config_gpio::GpioParams;
 use crate::endpoint_config_rpmsg::RpmsgParams;
-use crate::endpoint_config_i2c::I2cParams;
+use crate::node::i2c::I2cParams;
 use crate::endpoint_config_serial::SerialParams;
 use crate::endpoint_config_spi::SpiParams;
 
 // The per-kind types are named from here as well as from their own files, so
 // that a reader of a configuration document reaches everything it can hold
 // through the module that parses it.
-pub use crate::endpoint_config_i2c::I2cParams as I2cGroupParams;
+pub use crate::node::i2c::I2cParams as I2cGroupParams;
 pub use crate::endpoint_config_can::CanParams as CanGroupParams;
 pub use crate::endpoint_config_iio::IioParams as IioGroupParams;
 pub use crate::endpoint_config_gpio::GpioParams as GpioGroupParams;

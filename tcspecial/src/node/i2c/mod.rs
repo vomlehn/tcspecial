@@ -54,19 +54,19 @@ const I2C_SMBUS_I2C_BLOCK_DATA: u32 = 8;
 /// takes several, which is what the simulator's segment size is for.
 const I2C_SMBUS_BLOCK_MAX: usize = 32;
 
-/// The register a payload's data is read from and written to.
+/// The register a device's data is read from and written to.
 ///
 /// SMBus transfers are addressed to a register within the device, and nothing
-/// in a payload configuration says which: a payload link is a stream of
+/// in a device configuration says which: a device link is a stream of
 /// bytes rather than a set of named values, so one register serves as the
 /// window onto it. Zero, by convention, and the simulator writes the same
 /// one.
-const PAYLOAD_REGISTER: u8 = 0;
+const DATA_REGISTER: u8 = 0;
 
 /// How transfers to this device are made.
 ///
 /// Asked of the adapter rather than assumed, because the two kinds of adapter
-/// a payload link meets cannot both be addressed the same way. A controller on
+/// a device link meets cannot both be addressed the same way. A controller on
 /// real hardware does raw I2C transfers, where a read is a read of the device
 /// and the bytes are whatever it sends. An SMBus-only adapter -- which is what
 /// the kernel's `i2c-stub` is, and so what a simulated bus is -- has no raw
@@ -76,7 +76,7 @@ const PAYLOAD_REGISTER: u8 = 0;
 enum Transfers {
     /// Raw I2C: a read is a read, and the device decides what it sends.
     Raw,
-    /// SMBus block transfers to [`PAYLOAD_REGISTER`], at most
+    /// SMBus block transfers to [`DATA_REGISTER`], at most
     /// [`I2C_SMBUS_BLOCK_MAX`] bytes at a time.
     BlockRegister,
 }
@@ -102,7 +102,7 @@ impl Transfers {
         Err(TcsError::Endpoint(format!(
             "{on} can do neither raw I2C transfers nor SMBus block transfers \
              (its adapter offers {funcs:#010X}), so there is no way to carry \
-             payload data over it"
+             device data over it"
         )))
     }
 }
@@ -116,7 +116,7 @@ struct SmbusTransfer {
     data: *mut SmbusData,
 }
 
-/// The payload of one SMBus transfer. A block carries its length in the first
+/// The device of one SMBus transfer. A block carries its length in the first
 /// byte, which is why this is one longer than the block maximum plus that.
 #[repr(C)]
 struct SmbusData {
@@ -140,11 +140,11 @@ impl I2cEndpoint {
     /// The order matters: ten-bit addressing is set before the address, since
     /// whether an address is in range at all depends on it. The address the
     /// configuration carries has already been checked against what the
-    /// specification reserves -- see `endpoint_config_i2c` -- so what can
+    /// specification reserves -- see `node::i2c` -- so what can
     /// still go wrong here is the bus, not the number.
     pub fn new(what: &str, config: &I2cConfig) -> TcsResult<Self> {
         // The handler's name and its bus together, because every complaint
-        // below is about both: which payload could not be reached, and the
+        // below is about both: which device could not be reached, and the
         // node it was to be reached over. One label, built once, so that the
         // name cannot be left off one message and put on the next.
         let on = format!("{what}: {}", config.bus);
@@ -191,14 +191,14 @@ impl I2cEndpoint {
         })
     }
 
-    /// One SMBus block transfer to or from [`PAYLOAD_REGISTER`].
+    /// One SMBus block transfer to or from [`DATA_REGISTER`].
     ///
     /// Returns the bytes moved. A block carries its own length, so a read says
     /// how much there was and a write says how much to take.
     fn block(&mut self, read_write: u8, bytes: &mut SmbusData) -> TcsResult<usize> {
         let mut transfer = SmbusTransfer {
             read_write,
-            command: PAYLOAD_REGISTER,
+            command: DATA_REGISTER,
             size: I2C_SMBUS_I2C_BLOCK_DATA,
             data: bytes as *mut SmbusData,
         };
@@ -326,7 +326,7 @@ mod tests {
     /// it carries a packet of any length in one transfer. SMBus block
     /// transfers where raw is not -- which is the case for the kernel's
     /// `i2c-stub`, and so for a simulated bus, whose adapter has no raw
-    /// transfer at all. An adapter with neither is of no use for payload data
+    /// transfer at all. An adapter with neither is of no use for device data
     /// and says so with its bitfield in hand, since that is the one fact that
     /// explains it.
     #[test]
@@ -347,7 +347,7 @@ mod tests {
         );
 
         // Half of block is not block: a bus that can be read and not written
-        // carries payload data in one direction only, which a conduit pair
+        // carries device data in one direction only, which a conduit pair
         // cannot use.
         for half in [I2C_FUNC_SMBUS_READ_I2C_BLOCK, I2C_FUNC_SMBUS_WRITE_I2C_BLOCK] {
             let e = match Transfers::of(half, "/dev/i2c-1") {
@@ -389,7 +389,7 @@ mod tests {
             "the complaint names neither the bus nor the address: {said}"
         );
         // And which handler it was for: a bus is shared, and an error naming
-        // only the node leaves the operator to work out whose payload it was.
+        // only the node leaves the operator to work out whose device it was.
         assert!(
             said.contains("instrument"),
             "the complaint does not say which handler: {said}"

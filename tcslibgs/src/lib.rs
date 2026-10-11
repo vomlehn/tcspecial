@@ -18,7 +18,7 @@ pub mod display;
 pub mod endpoint_config;
 pub mod endpoint_config_can;
 pub mod endpoint_config_gpio;
-pub mod endpoint_config_i2c;
+pub mod node;
 pub mod endpoint_config_iio;
 pub mod endpoint_config_rpmsg;
 pub mod endpoint_config_rs485;

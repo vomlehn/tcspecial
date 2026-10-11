@@ -32,6 +32,15 @@ pub enum About {
     SimPayload(String),
     /// A group of simulated payloads, by name.
     SimGroup(String),
+    /// A node of a version 2 configuration, by name.
+    ///
+    /// Here rather than in the graph module because this enum is about
+    /// *locating* a thing in a file, which is the same question whichever
+    /// version wrote it: the scanner that answers it looks for a name under a
+    /// section and does not care what the section means.
+    Node(String),
+    /// A group of a version 2 configuration, by name.
+    NodeGroup(String),
 }
 
 /// Something wrong with a configuration file.

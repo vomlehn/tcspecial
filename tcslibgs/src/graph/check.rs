@@ -12,6 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{Destination, Graph};
+use crate::verify::About;
 
 /// Something wrong with a configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +54,35 @@ pub enum Problem {
 }
 
 impl Problem {
+    /// What this problem is about, for working out which line to report it on.
+    ///
+    /// The same `About` version 1's problems use, because the question is the
+    /// same: where in the file is the thing called this. `tcsverify` scans the
+    /// text for it -- a line number cannot be had from a parsed document, and
+    /// carrying one through every struct here would put the file's shape into
+    /// types that exist so two formats can describe one thing.
+    pub fn about(&self) -> About {
+        match self {
+            Problem::DuplicateNode { name } => About::Node(name.clone()),
+            Problem::NamelessNode => About::Section("nodes"),
+            Problem::DuplicateGroup { name } => About::NodeGroup(name.clone()),
+            Problem::BadInterval { group, .. } => About::NodeGroup(group.clone()),
+            // A link's problem is reported on the node it leaves, which is
+            // where a reader looks: the links section says `from: a`, and `a`
+            // is what they will search for.
+            Problem::NoSuchNode { .. } => About::Section("links"),
+            Problem::SelfLink { node } => About::Node(node.clone()),
+            Problem::NoSuchGroup { node, .. } => About::Node(node.clone()),
+            Problem::IntervalInAGroup { node, .. } => About::Node(node.clone()),
+            Problem::InputBoundTwice { node, .. } => About::Node(node.clone()),
+            Problem::NoSuchTarget { .. } | Problem::NoAttributeNamed { .. } => {
+                About::Section("commands")
+            }
+            Problem::NotAMocLink { from } => About::Node(from.clone()),
+            Problem::Unconnected { node } => About::Node(node.clone()),
+        }
+    }
+
     /// What to print, one problem per line.
     pub fn describe(&self) -> String {
         match self {

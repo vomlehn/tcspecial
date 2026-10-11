@@ -11,14 +11,29 @@
 //! that run the files get them -- so a file this accepts is a file they
 //! accept, which is the only thing that makes a verifier worth running.
 //!
-//! What is checked:
+//! Which checks are run depends on the version the file says it is. The two
+//! versions describe different things, so there is no sense in running one's
+//! checks over the other's file: a version 2 configuration reported as a
+//! version 1 one would be a page of complaints about missing payloads, which
+//! hides the only thing worth saying about it.
+//!
+//! A version 2 configuration -- a graph of nodes:
+//!
+//! * that it reads, following the files it includes;
+//! * and that `tcslibgs::graph::Graph::check` finds nothing wrong with it,
+//!   which is the same code tcspecial runs aboard. This program adds the line
+//!   numbers and nothing else: a problem about a node is reported in the file
+//!   that node is written in, which is not always the file named on the
+//!   command line.
+//!
+//! A version 1 configuration -- a set of payloads, with a simulator file:
 //!
 //! * The tcspecial configuration file on its own: that it parses, that it
 //!   describes payloads, that every payload and group is settled by the rules
-//!   for its kind, and that no two payloads want one address or one device.
+//!   for its type, and that no two payloads want one address or one device.
 //! * The simulator file, if one is given: that it parses, and that it and the
-//! tcspecial configuration agree -- every payload simulated, every simulated
-//! payload a payload, and every setting one that payload can have.
+//!   tcspecial configuration agree -- every payload simulated, every simulated
+//!   payload a payload, and every setting one that payload can have.
 //!
 //! The second is checked against the first only when the first has no problems
 //! of its own. A tcspecial configuration that did not settle has no handlers to
@@ -135,8 +150,36 @@ impl Report {
 }
 
 /// Check a tcspecial configuration file, and a simulator file if there is one.
+///
+/// Which checks are run depends on the version the file says it is. The two
+/// versions describe different things -- version 1 a set of payloads with a
+/// simulator file beside it, version 2 a graph of nodes -- so there is nothing
+/// to share between the two paths but this function, which reads the version
+/// and takes one.
 pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
     let mut report = Report::default();
+
+    // Asked of the library rather than worked out here: one place knows how
+    // to read a version. A file that cannot be read at all answers "not
+    // version 2", and version 1's path reports it -- it has the better
+    // messages for a file that does not parse, having had them longer.
+    if tcslibgs::graph::is_version_2(payload_path) {
+        check_graph(payload_path, &mut report);
+        if let Some(sim_path) = sim_path {
+            // A version 2 configuration has no simulator file: what a node
+            // stands in for is the node's own business. Said rather than
+            // ignored, because a second file on the command line is a person
+            // expecting it to be read.
+            report.add(
+                sim_path,
+                crate::locate::THE_FILE_ITSELF,
+                "a version 2 configuration takes one file: what a node stands \
+                 in for is in the node, and there is no simulator file beside it"
+                    .to_string(),
+            );
+        }
+        return report;
+    }
 
     let handlers = check_payloads(payload_path, &mut report);
 
@@ -149,6 +192,61 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
     }
 
     report
+}
+
+/// Check a version 2 configuration: read it, then ask what is wrong with it.
+///
+/// The checking is `tcslibgs::graph::Graph::check`, which is the same code
+/// tcspecial runs aboard. This adds only the line numbers, which it gets the
+/// way version 1's problems get theirs: by scanning the text for the name the
+/// problem is about.
+fn check_graph(path: &Path, report: &mut Report) {
+    let graph = match tcslibgs::graph::Graph::load(path) {
+        Ok(graph) => graph,
+        Err(e) => {
+            // A file that would not load at all: reported from where the
+            // reader stopped if it said, and from the first line otherwise.
+            report.add(path, line_in_message(&e.to_string()), e.to_string());
+            return;
+        }
+    };
+
+    // Where each name is written, per file: a configuration made of several
+    // files has a node in one of them, and a problem about it belongs at that
+    // file's line and not at the top file's.
+    let mut located: Vec<(PathBuf, crate::locate::Where)> = Vec::new();
+    for file in &graph.files {
+        let Ok(format) = ConfigFormat::of_file(file) else {
+            continue;
+        };
+        let Ok(text) = std::fs::read_to_string(file) else {
+            continue;
+        };
+        located.push((file.clone(), crate::locate::Where::of(&text, format)));
+    }
+
+    for problem in graph.check() {
+        if !report.room() {
+            break;
+        }
+        let about = problem.about();
+
+        // The file the thing is in, where the problem is about a node; the
+        // top file otherwise, which is where the links and commands are.
+        let home = match &about {
+            tcslibgs::About::Node(name) => graph.homes.get(name).cloned(),
+            _ => None,
+        }
+        .unwrap_or_else(|| path.to_path_buf());
+
+        let line = located
+            .iter()
+            .find(|(file, _)| *file == home)
+            .map(|(_, where_)| where_.line_of(&about))
+            .unwrap_or(crate::locate::THE_FILE_ITSELF);
+
+        report.add(&home, line, problem.describe());
+    }
 }
 
 /// Check the tcspecial configuration file, and hand back what it describes.
@@ -239,6 +337,25 @@ fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
 /// parse, so nothing in it has a name yet to be found by. XML does not say,
 /// and a deserialization error -- a missing element, say -- has no position at
 /// all even in principle, so such a file is reported from its first line.
+/// The line a message mentions, if it mentions one.
+///
+/// A parse error carries its location in a field, and `line_of` reads it
+/// there. A graph that would not load reports through `TcsError::Config`,
+/// which is a sentence -- the path has been put in front of the parser's own
+/// words, which is worth more than the field was -- so the line is read back
+/// out of the text. "at line 7 column 5" is what both parsers write.
+fn line_in_message(message: &str) -> usize {
+    message
+        .split("at line ")
+        .nth(1)
+        .and_then(|rest| {
+            rest.split(|c: char| !c.is_ascii_digit())
+                .find(|piece| !piece.is_empty())
+        })
+        .and_then(|digits| digits.parse().ok())
+        .unwrap_or(THE_FILE_ITSELF)
+}
+
 fn line_of(e: &TcsError) -> usize {
     match e {
         TcsError::Yaml(e) => e.location().map_or(THE_FILE_ITSELF, |at| at.line()),
@@ -274,6 +391,178 @@ mod tests {
             payload: payload_path,
             sim: sim_path,
         }
+    }
+
+    /// A version 2 configuration in a temporary directory.
+    fn graph_written(extension: &str, text: &str) -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join(format!("vehicle{extension}"));
+        std::fs::write(&path, text).expect("written");
+        (dir, path)
+    }
+
+    const SOUND_GRAPH: &str = "\
+version: \"2.0\"
+groups:
+  - name: temps
+    interval: \"3s\"
+nodes:
+  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\" }
+  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
+links:
+  - { from: sensor, to: moc }
+";
+
+    /// A sound version 2 configuration is accepted in silence.
+    #[test]
+    fn a_sound_graph_is_accepted() {
+        let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
+        let report = verify(&path, None);
+        assert!(
+            !report.found_errors(),
+            "{:?}",
+            report.findings.iter().map(|f| f.to_string()).collect::<Vec<_>>()
+        );
+        assert_eq!(report.status(), 0);
+    }
+
+    /// The version decides which checks are run.
+    ///
+    /// A version 2 file reported as a version 1 one would be a list of
+    /// complaints about missing payloads, which is noise hiding the fact that
+    /// it is a different language.
+    #[test]
+    fn the_version_decides_which_checks_run() {
+        let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
+        let report = verify(&path, None);
+        assert!(!report.found_errors());
+
+        // And a version 1 file still goes down version 1's path.
+        let set = written(".yaml", GOOD, GOOD_SIM);
+        let report = verify(&set.payload, Some(&set.sim));
+        assert!(!report.found_errors(), "{:?}", report.findings);
+    }
+
+    /// Each problem a graph has is reported, with the line to look at.
+    #[test]
+    fn a_graphs_problems_are_reported_with_their_lines() {
+        let (_dir, path) = graph_written(
+            ".yaml",
+            "\
+version: \"2.0\"
+groups:
+  - name: temps
+    interval: soon
+nodes:
+  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\" }
+  - { name: a, type: spi, path: \"/dev/spidev0.0\" }
+  - { name: m, type: compute, function: mean, inputs: \"in0\" }
+links:
+  - { from: a, to: nowhere }
+",
+        );
+
+        let report = verify(&path, None);
+        let said: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
+        let all = said.join("\n");
+
+        assert!(all.contains("two nodes are called \"a\""), "{all}");
+        assert!(all.contains("no unit"), "{all}");
+        assert!(all.contains("there is no node called \"nowhere\""), "{all}");
+        assert_eq!(report.status(), 1);
+
+        // Every finding points at a line of the file rather than at line
+        // nought, which is what a reader is given to act on.
+        for finding in &report.findings {
+            assert!(finding.line >= 1, "{finding}");
+            assert_eq!(finding.file, path, "{finding}");
+        }
+    }
+
+    /// A problem about a node is reported in the file the node is in.
+    ///
+    /// A configuration made of several files has its nodes spread across them,
+    /// and a complaint pointing at the top file's line would send a reader to
+    /// the wrong page.
+    #[test]
+    fn a_problem_is_reported_in_the_file_it_is_in() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let top = dir.path().join("vehicle.yaml");
+        std::fs::write(
+            &top,
+            "version: \"2.0\"\ninclude:\n  - cabin\nnodes:\n  \
+             - { name: moc, type: moc }\nlinks:\n  - { from: moc, to: moc }\n",
+        )
+        .unwrap();
+        // The included file holds a node nothing links to.
+        std::fs::write(
+            dir.path().join("cabin.yaml"),
+            "version: \"2.0\"\nnodes:\n  - { name: lonely, type: i2c }\n",
+        )
+        .unwrap();
+
+        let report = verify(&top, None);
+        let lonely = report
+            .findings
+            .iter()
+            .find(|f| f.message.contains("lonely"))
+            .expect("the unconnected node should be reported");
+        assert!(
+            lonely.file.ends_with("cabin.yaml"),
+            "it should be reported in the file it is in, not {}",
+            lonely.file.display()
+        );
+        assert_eq!(lonely.line, 3, "{lonely}");
+    }
+
+    /// A version 2 configuration takes one file, and a second is said so.
+    #[test]
+    fn a_second_file_is_not_a_simulator_file_for_a_graph() {
+        let (dir, path) = graph_written(".yaml", SOUND_GRAPH);
+        let other = dir.path().join("setsim.yaml");
+        std::fs::write(&other, "version: \"1.0\"\n").unwrap();
+
+        let report = verify(&path, Some(&other));
+        let said = report
+            .findings
+            .iter()
+            .map(|f| f.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(said.contains("takes one file"), "{said}");
+    }
+
+    /// The same configuration in XML is checked the same way.
+    #[test]
+    fn a_graph_in_xml_is_checked_too() {
+        let (_dir, path) = graph_written(
+            ".xml",
+            "\
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<configuration>
+    <version>2.0</version>
+    <nodes><name>a</name><type>i2c</type><path>/dev/i2c-1</path></nodes>
+    <links><from>a</from><to>nowhere</to></links>
+</configuration>
+",
+        );
+
+        let report = verify(&path, None);
+        let said = report
+            .findings
+            .iter()
+            .map(|f| f.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(said.contains("nowhere"), "{said}");
+    }
+
+    /// A line mentioned in a message is the line reported.
+    #[test]
+    fn a_line_is_read_out_of_a_parsers_words() {
+        assert_eq!(line_in_message("x: YAML error: bad at line 7 column 5"), 7);
+        assert_eq!(line_in_message("nothing about a line"), THE_FILE_ITSELF);
+        assert_eq!(line_in_message(""), THE_FILE_ITSELF);
     }
 
     const GOOD: &str = "\

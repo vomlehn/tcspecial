@@ -371,6 +371,26 @@ struct JustTheVersion {
     version: Option<String>,
 }
 
+/// What version a file says it is, or nothing if it cannot be asked.
+///
+/// Nothing covers every way the question can fail to have an answer: a name
+/// that is not a configuration file, a file that cannot be read, one that does
+/// not parse, one that says no version at all. A caller choosing which checks
+/// to run wants one answer to all of those -- "not version 2" -- and the
+/// better complaint about an unreadable file belongs to whatever tries to read
+/// it properly.
+pub fn version_of(path: &Path) -> Option<String> {
+    let format = ConfigFormat::of_file(path).ok()?;
+    let text = std::fs::read_to_string(path).ok()?;
+    let said: JustTheVersion = format.parse(&text).ok()?;
+    said.version
+}
+
+/// Whether this file says it is the version this module reads.
+pub fn is_version_2(path: &Path) -> bool {
+    version_of(path).as_deref() == Some(VERSION)
+}
+
 /// Read one file and require it to be version 2.
 ///
 /// The version is checked here rather than in the checking, because a version 1

@@ -336,7 +336,21 @@ What is checked before anything runs
 
 The reliability argument for the whole design is that a graph is checkable, and
 ``tcsverify`` performs these checks on the ground against the same code that
-performs them again aboard:
+performs them again aboard. One command, on one file:
+
+.. code-block:: console
+
+   $ tcsverify tests/manual/thermostat.yaml
+   $ make verify TCSGUI_FILE=tests/manual/thermostat.yaml
+
+It prints one line per problem -- the file, the line to look at, and what is
+wrong -- and says nothing at all about a configuration it accepts. Which
+version a file is decides which checks are run: the two describe different
+things, so a version 1 file goes to the payload-set checks and a version 2 one
+to these. A configuration made of several files has each problem reported in
+the file it is in, which is not the file that was named on the command line.
+
+These are the checks:
 
 * every name a link mentions is a node that exists, and no two nodes share a
   name.

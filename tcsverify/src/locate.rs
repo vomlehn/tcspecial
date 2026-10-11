@@ -63,6 +63,8 @@ impl Where {
             About::Group(name) => ("payload_groups", name),
             About::SimPayload(name) => ("simulated_payloads", name),
             About::SimGroup(name) => ("simulated_payload_groups", name),
+            About::Node(name) => ("nodes", name),
+            About::NodeGroup(name) => ("groups", name),
         };
 
         self.entries
@@ -87,6 +89,20 @@ impl Where {
     fn note_section(&mut self, section: &str, line: usize) {
         self.sections.entry(section.to_string()).or_insert(line);
     }
+}
+
+/// The `name` of a flow mapping, given what is inside its braces.
+///
+/// A scan and not a parse, as everything here is: the file has already
+/// parsed, so the question is only where a name was written. Commas separate
+/// the entries and the first `name:` wins, which is the one a reader sees.
+fn flow_name(inside: &str) -> Option<&str> {
+    inside
+        .trim_end_matches('}')
+        .split(',')
+        .map(str::trim)
+        .find_map(|piece| piece.strip_prefix("name:"))
+        .map(unquoted)
 }
 
 /// What a YAML file says where.
@@ -122,6 +138,18 @@ fn yaml(text: &str) -> Where {
         let key = trimmed.strip_prefix("- ").unwrap_or(trimmed);
         if let Some(value) = key.strip_prefix("name:") {
             found.note(&section, unquoted(value), number);
+            continue;
+        }
+
+        // Or a name inside a flow mapping, which is how a version 2 file is
+        // commonly written: `- { name: temp_fore, type: i2c }` on one line.
+        // Without this such an entry is never found and a problem about it is
+        // reported from its section's line, which sends a reader to the top of
+        // a list rather than to the thing.
+        if let Some(inside) = key.strip_prefix('{') {
+            if let Some(name) = flow_name(inside) {
+                found.note(&section, name, number);
+            }
         }
     }
 

@@ -489,7 +489,16 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
         ),
         EndpointConfig::Gpio(gpio) => {
             let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
-            format!("gpio {} lines {}", gpio.path, offsets.join(","))
+            // Which way the lines go, because the offsets do not say: the
+            // same three numbers are three temperatures read or three heaters
+            // driven, and a log that did not say which is a log that cannot
+            // answer why nothing arrived.
+            format!(
+                "gpio {} lines {} ({})",
+                gpio.path,
+                offsets.join(","),
+                if gpio.direction.is_output() { "driven" } else { "read" }
+            )
         }
         EndpointConfig::Rpmsg(rpmsg) => {
             format!("rpmsg {} ({})", rpmsg.path, rpmsg.service)

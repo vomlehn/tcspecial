@@ -196,9 +196,11 @@ pub fn bind_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
-        // Discrete lines, watched for changes: the request is made once and
-        // the pair shares its descriptor, the kernel giving a line to one
-        // request at a time. See endpoint_gpio.
+        // Discrete lines, watched for changes or driven: the request is made
+        // once and the pair shares its descriptor, the kernel giving a line
+        // to one request at a time. Which half of the pair does anything
+        // follows from the configured direction, and the other half says so.
+        // See node/gpio.
         EndpointConfig::Gpio(gpio_config) => {
             let reader = GpioEndpoint::new(what, gpio_config)?;
             let writer = reader.try_clone()?;
@@ -306,9 +308,11 @@ pub fn connect_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
-        // Discrete lines, watched for changes: the request is made once and
-        // the pair shares its descriptor, the kernel giving a line to one
-        // request at a time. See endpoint_gpio.
+        // Discrete lines, watched for changes or driven: the request is made
+        // once and the pair shares its descriptor, the kernel giving a line
+        // to one request at a time. Which half of the pair does anything
+        // follows from the configured direction, and the other half says so.
+        // See node/gpio.
         EndpointConfig::Gpio(gpio_config) => {
             let reader = GpioEndpoint::new(what, gpio_config)?;
             let writer = reader.try_clone()?;

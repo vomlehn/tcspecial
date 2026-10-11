@@ -61,16 +61,23 @@ const GRID: i32 = 8;
 struct Views {
     top: slint::Weak<MainWindow>,
     open: BTreeMap<String, SubWindow>,
+    /// Which node each window's panel is showing, by the window's home.
+    ///
+    /// Per window, because two windows looking at two subdiagrams are looking
+    /// at two different nodes and a single selection would make one of them
+    /// follow the other.
+    chosen: Rc<RefCell<BTreeMap<String, String>>>,
 }
 
 impl Views {
     /// Draw every window from the document as it now is.
     fn refresh(&self, editor: &Editor) {
+        let chosen = self.chosen.borrow();
         if let Some(top) = self.top.upgrade() {
-            put(&top, editor, &None);
+            put(&top, editor, &None, chosen.get("").map(|s| s.as_str()));
         }
         for (name, window) in &self.open {
-            put_sub(window, editor, name);
+            put_sub(window, editor, name, chosen.get(name).map(|s| s.as_str()));
         }
     }
 }
@@ -95,7 +102,15 @@ fn main() -> Result<(), slint::PlatformError> {
     let views = Rc::new(RefCell::new(Views {
         top: ui.as_weak(),
         open: BTreeMap::new(),
+        chosen: Rc::new(RefCell::new(BTreeMap::new())),
     }));
+    // Which node the panel is showing, per window.
+    //
+    // Deliberately not in the document: what somebody is looking at is not
+    // something the vehicle flies, and an edit for it would make choosing a
+    // node undoable, which is not what undo is for.
+    let chosen: Rc<RefCell<BTreeMap<String, String>>> = Rc::new(RefCell::new(BTreeMap::new()));
+
     // Which node a link is being drawn from, while the gesture is running.
     // Nothing is recorded until it finishes on another node, so a drag that
     // ends nowhere leaves no trace.
@@ -103,7 +118,8 @@ fn main() -> Result<(), slint::PlatformError> {
 
     views.borrow().refresh(&editor.borrow());
 
-    wire(&ui, &editor, &views, &drawing, &None);
+    views.borrow_mut().chosen = chosen.clone();
+    wire(&ui, &editor, &views, &drawing, &chosen, &None);
 
     {
         // Opening a subdiagram. A window per subdiagram, made once and raised
@@ -128,8 +144,8 @@ fn main() -> Result<(), slint::PlatformError> {
             };
             window.set_editing(name.clone().into());
             window.set_palette(palette());
-            wire_sub(&window, &editor, &views, &drawing, &name);
-            put_sub(&window, &editor.borrow(), &name);
+            wire_sub(&window, &editor, &views, &drawing, &chosen, &name);
+            put_sub(&window, &editor.borrow(), &name, None);
             if let Err(e) = window.show() {
                 eprintln!("tcsgui: {name} cannot be shown: {e}");
                 return;
@@ -148,11 +164,13 @@ fn main() -> Result<(), slint::PlatformError> {
 /// and so want the same wiring; what differs is only the home they pass.
 macro_rules! wiring {
     ($name:ident, $window:ty, $put:ident) => {
+        #[allow(clippy::too_many_arguments)]
         fn $name(
             window: &$window,
             editor: &Rc<RefCell<Editor>>,
             views: &Rc<RefCell<Views>>,
             drawing: &Rc<RefCell<Option<String>>>,
+            chosen: &Rc<RefCell<BTreeMap<String, String>>>,
             home: &Home,
         ) {
             {
@@ -266,6 +284,77 @@ macro_rules! wiring {
                     views.borrow().refresh(&editor.borrow());
                 });
             }
+            {
+                // Choosing a node: the panel follows, and nothing is recorded.
+                let views = views.clone();
+                let editor = editor.clone();
+                let chosen = chosen.clone();
+                let home = home.clone();
+                window.on_node_selected(move |name| {
+                    chosen.borrow_mut().insert(
+                        home.clone().unwrap_or_default(),
+                        name.to_string(),
+                    );
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                // Typing into a field. The old value comes from the document,
+                // so the edit carries what it replaced and undo is a lookup.
+                let editor = editor.clone();
+                let views = views.clone();
+                let home = home.clone();
+                window.on_attribute_set(move |node, attribute, value| {
+                    {
+                        let mut editor = editor.borrow_mut();
+                        let absolute = Qualified::of(&node, &home).absolute();
+                        let was = editor
+                            .document()
+                            .node(&absolute)
+                            .and_then(|n| n.attributes.get(attribute.as_str()))
+                            .cloned();
+                        // An empty field clears the attribute rather than
+                        // setting it to nothing: absent and empty are
+                        // different things to a configuration.
+                        let now = (!value.trim().is_empty()).then(|| value.to_string());
+                        if was == now {
+                            return;
+                        }
+                        editor.edit(Edit::SetAttribute {
+                            node: absolute,
+                            attribute: attribute.to_string(),
+                            was,
+                            now,
+                        });
+                    }
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                let editor = editor.clone();
+                let views = views.clone();
+                let home = home.clone();
+                window.on_comment_set(move |node, text| {
+                    {
+                        let mut editor = editor.borrow_mut();
+                        let absolute = Qualified::of(&node, &home).absolute();
+                        let was = editor
+                            .document()
+                            .node(&absolute)
+                            .and_then(|n| n.comment.clone());
+                        let now = (!text.trim().is_empty()).then(|| text.to_string());
+                        if was == now {
+                            return;
+                        }
+                        editor.edit(Edit::SetNodeComment {
+                            node: absolute,
+                            was,
+                            now,
+                        });
+                    }
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
             let _ = window;
         }
     };
@@ -280,9 +369,17 @@ fn wire_sub(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
     drawing: &Rc<RefCell<Option<String>>>,
+    chosen: &Rc<RefCell<BTreeMap<String, String>>>,
     home: &str,
 ) {
-    wire_sub_inner(window, editor, views, drawing, &Some(home.to_string()));
+    wire_sub_inner(
+        window,
+        editor,
+        views,
+        drawing,
+        chosen,
+        &Some(home.to_string()),
+    );
 }
 
 /// Put the editor's state into the top window.
@@ -290,8 +387,13 @@ fn wire_sub(
 /// One function rather than a set of setters called from each place that
 /// changes something: a window refreshed in one place cannot be refreshed
 /// partly.
-fn put(ui: &MainWindow, editor: &Editor, home: &Home) {
+fn put(ui: &MainWindow, editor: &Editor, home: &Home, chosen: Option<&str>) {
     let (nodes, links) = views_of(editor, home);
+    let panel = panel_of(editor, home, chosen);
+    ui.set_selected(panel.0.clone().into());
+    ui.set_selected_type(panel.1.clone().into());
+    ui.set_selected_comment(panel.2.clone().into());
+    ui.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     ui.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
     ui.set_undo_depth(editor.undo_depth() as i32);
@@ -302,9 +404,14 @@ fn put(ui: &MainWindow, editor: &Editor, home: &Home) {
 }
 
 /// The same, for one open subdiagram.
-fn put_sub(window: &SubWindow, editor: &Editor, home: &str) {
+fn put_sub(window: &SubWindow, editor: &Editor, home: &str, chosen: Option<&str>) {
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home);
+    let panel = panel_of(editor, &home, chosen);
+    window.set_selected(panel.0.clone().into());
+    window.set_selected_type(panel.1.clone().into());
+    window.set_selected_comment(panel.2.clone().into());
+    window.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
     window.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
     window.set_undo_depth(editor.undo_depth() as i32);
@@ -312,6 +419,74 @@ fn put_sub(window: &SubWindow, editor: &Editor, home: &str) {
     window.set_undo_label(label(editor.journal().next_undo()));
     window.set_redo_label(label(editor.journal().next_redo()));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// What the panel shows: the chosen node, its type, its comment, its fields.
+///
+/// The fields are the ones the type declares rather than the ones the node
+/// happens to hold, so a node just placed asks for what it needs instead of
+/// showing nothing -- and an attribute the configuration does not know about,
+/// which a file written by a later build may carry, is shown after them rather
+/// than hidden.
+fn panel_of(
+    editor: &Editor,
+    home: &Home,
+    chosen: Option<&str>,
+) -> (String, String, String, Vec<FieldView>) {
+    let empty = (String::new(), String::new(), String::new(), Vec::new());
+    let chosen = match chosen {
+        Some(chosen) if !chosen.is_empty() => chosen,
+        _ => return empty,
+    };
+    let absolute = Qualified::of(chosen, home).absolute();
+    let node = match editor.document().node(&absolute) {
+        Some(node) => node,
+        // Chosen and then removed: the panel empties rather than showing a
+        // node that is not there.
+        None => return empty,
+    };
+
+    let declared = NodeType::ALL
+        .iter()
+        .find(|t| t.spelling() == node.node_type)
+        .map(|t| t.attributes())
+        .unwrap_or(&[]);
+
+    let mut fields: Vec<FieldView> = declared
+        .iter()
+        .map(|(name, required)| {
+            let value = node.attributes.get(*name).cloned().unwrap_or_default();
+            FieldView {
+                name: (*name).into(),
+                value: value.clone().into(),
+                required: *required,
+                missing: *required && value.trim().is_empty(),
+            }
+        })
+        .collect();
+
+    // Anything the node holds that its type does not declare. Shown rather
+    // than dropped: a file from a later build is readable, and an attribute
+    // nobody can see is one that gets written back out without anybody
+    // knowing it is there.
+    for (name, value) in &node.attributes {
+        if declared.iter().any(|(declared, _)| declared == name) {
+            continue;
+        }
+        fields.push(FieldView {
+            name: name.clone().into(),
+            value: value.clone().into(),
+            required: false,
+            missing: false,
+        });
+    }
+
+    (
+        node.name.clone(),
+        node.node_type.clone(),
+        node.comment.clone().unwrap_or_default(),
+        fields,
+    )
 }
 
 /// What an undo or redo will do, for the button to say.
@@ -768,6 +943,146 @@ mod tests {
         assert_eq!(view.tint, colour(ERROR_TINT));
         assert_eq!(view.outline, "square");
         assert_eq!(view.shading, "open");
+    }
+
+    /// The panel asks for what a type needs, filled in or not.
+    ///
+    /// A node just placed holds no attributes at all, and a panel showing
+    /// only what it holds would show nothing -- leaving the person who placed
+    /// it to know that an I2C device wants a bus and an address.
+    #[test]
+    fn the_panel_asks_for_what_the_type_needs() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        editor.edit(Edit::AddNode {
+            name: "temp_fore".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+
+        let (name, node_type, _, fields) = panel_of(&editor, &None, Some("temp_fore"));
+        assert_eq!(name, "temp_fore");
+        assert_eq!(node_type, "i2c");
+
+        let shown: Vec<String> = fields.iter().map(|f| f.name.to_string()).collect();
+        assert!(shown.contains(&"path".to_string()), "{shown:?}");
+        assert!(shown.contains(&"address".to_string()), "{shown:?}");
+
+        // The two it must have are marked, and marked missing while empty.
+        for wanted in ["path", "address"] {
+            let field = fields.iter().find(|f| f.name == wanted).unwrap();
+            assert!(field.required, "{wanted} should be required");
+            assert!(field.missing, "{wanted} is empty and should say so");
+        }
+        // And the optional ones are not marked missing merely for being
+        // empty: red marks what is wrong, not what is absent.
+        let optional = fields.iter().find(|f| f.name == "pec").unwrap();
+        assert!(!optional.required && !optional.missing);
+    }
+
+    /// Filling a required field clears its fault.
+    #[test]
+    fn a_filled_field_stops_being_missing() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        editor.edit(Edit::AddNode {
+            name: "temp_fore".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+        editor.edit(Edit::SetAttribute {
+            node: "temp_fore".into(),
+            attribute: "path".into(),
+            was: None,
+            now: Some("/dev/i2c-1".into()),
+        });
+
+        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_fore"));
+        let path = fields.iter().find(|f| f.name == "path").unwrap();
+        assert_eq!(path.value, "/dev/i2c-1");
+        assert!(!path.missing, "a filled field should not be marked missing");
+
+        // And the document agrees: the fault that was there is gone, and the
+        // one for the address it still lacks remains.
+        let faults = editor.faults();
+        assert!(!faults.iter().any(|f| matches!(
+            f,
+            document::Fault::MissingAttribute { attribute, .. } if attribute == "path"
+        )));
+        assert!(faults.iter().any(|f| matches!(
+            f,
+            document::Fault::MissingAttribute { attribute, .. } if attribute == "address"
+        )));
+    }
+
+    /// An attribute the build does not know about is shown, not dropped.
+    ///
+    /// A file written by a later build may carry one, and an attribute nobody
+    /// can see is one that gets written back out without anybody knowing it is
+    /// there.
+    #[test]
+    fn an_unrecognised_attribute_is_still_shown() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        editor.edit(Edit::AddNode {
+            name: "temp_fore".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+        editor.edit(Edit::SetAttribute {
+            node: "temp_fore".into(),
+            attribute: "future_thing".into(),
+            was: None,
+            now: Some("7".into()),
+        });
+
+        let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_fore"));
+        let extra = fields
+            .iter()
+            .find(|f| f.name == "future_thing")
+            .expect("the unknown attribute should be shown");
+        assert_eq!(extra.value, "7");
+        assert!(!extra.required);
+
+        // After the declared ones, so the panel asks for what it needs first.
+        let at = fields.iter().position(|f| f.name == "future_thing").unwrap();
+        assert_eq!(at, fields.len() - 1, "it should come last");
+    }
+
+    /// A node chosen and then removed leaves the panel empty.
+    #[test]
+    fn the_panel_empties_when_its_node_goes() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        editor.edit(Edit::AddNode {
+            name: "a".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+        assert_eq!(panel_of(&editor, &None, Some("a")).0, "a");
+
+        editor.edit(Edit::RemoveNode {
+            name: "a".into(),
+            node_type: "i2c".into(),
+            attributes: Vec::new(),
+            links: Vec::new(),
+            home: None,
+        });
+        let (name, _, _, fields) = panel_of(&editor, &None, Some("a"));
+        assert!(name.is_empty(), "the panel showed a node that is not there");
+        assert!(fields.is_empty());
+    }
+
+    /// Nothing chosen, nothing shown.
+    #[test]
+    fn the_panel_is_empty_until_something_is_chosen() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Editor::new(&where_.path().join("v.yaml"));
+        for chosen in [None, Some(""), Some("nothing-here")] {
+            let (name, _, _, fields) = panel_of(&editor, &None, chosen);
+            assert!(name.is_empty(), "{chosen:?}");
+            assert!(fields.is_empty(), "{chosen:?}");
+        }
     }
 
     /// A node lands on the grid, wherever it was dragged to.

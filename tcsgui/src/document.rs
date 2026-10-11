@@ -85,6 +85,12 @@ pub enum Fault {
     SelfLink { node: String },
     /// Two links into one input of one node.
     InputBoundTwice { node: String, input: String },
+    /// A required attribute with nothing in it.
+    ///
+    /// The same check `tcsverify` makes on the ground and tcspecial makes
+    /// again aboard, made here as the field is left empty -- which is the one
+    /// moment at which saying so costs nobody anything.
+    MissingAttribute { node: String, attribute: String },
 }
 
 impl Fault {
@@ -105,6 +111,9 @@ impl Fault {
             Fault::InputBoundTwice { node, input } => {
                 format!("two links arrive at \"{node}.{input}\"")
             }
+            Fault::MissingAttribute { attribute, .. } => {
+                format!("{attribute} is not set")
+            }
         }
     }
 
@@ -117,6 +126,7 @@ impl Fault {
             Fault::DanglingLink { from, .. } => Some(from),
             Fault::SelfLink { node } => Some(node),
             Fault::InputBoundTwice { node, .. } => Some(node),
+            Fault::MissingAttribute { node, .. } => Some(node),
         }
     }
 }
@@ -332,14 +342,36 @@ impl Document {
                 .entry(Qualified::of(&node.name, &node.home).absolute())
                 .or_insert(0) += 1;
 
-            if !NodeType::ALL
+            match NodeType::ALL
                 .iter()
-                .any(|t| t.spelling() == node.node_type)
+                .find(|t| t.spelling() == node.node_type)
             {
-                faults.push(Fault::UnknownType {
+                None => faults.push(Fault::UnknownType {
                     node: node.name.clone(),
                     node_type: node.node_type.clone(),
-                });
+                }),
+                Some(node_type) => {
+                    // What the type says it must have. An attribute present
+                    // and empty counts as missing: a person who cleared a
+                    // field meant to clear it, and a blank bus is no more
+                    // usable than an absent one.
+                    for (attribute, required) in node_type.attributes() {
+                        if !required {
+                            continue;
+                        }
+                        let given = node
+                            .attributes
+                            .get(*attribute)
+                            .map(|v| v.trim())
+                            .unwrap_or("");
+                        if given.is_empty() {
+                            faults.push(Fault::MissingAttribute {
+                                node: Qualified::of(&node.name, &node.home).absolute(),
+                                attribute: attribute.to_string(),
+                            });
+                        }
+                    }
+                }
             }
         }
         for (name, count) in seen {
@@ -933,9 +965,15 @@ mod tests {
         });
 
         assert_eq!(document.links[0].from, "temp_fore");
+        // Its own fault and not every fault: these nodes have no attributes
+        // filled in, which is a fault of its own and nothing to do with
+        // renaming.
         assert!(
-            document.faults().is_empty(),
-            "renaming left the document faulty: {:?}",
+            !document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::DanglingLink { .. })),
+            "renaming left a link dangling: {:?}",
             document.faults()
         );
     }
@@ -1409,8 +1447,11 @@ mod tests {
 
         assert_eq!(document.nodes.len(), 4);
         assert!(
-            document.faults().is_empty(),
-            "two subdiagrams with a like-named node are faulty: {:?}",
+            !document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::DuplicateName { .. })),
+            "two subdiagrams with a like-named node collided: {:?}",
             document.faults()
         );
         assert_ne!(
@@ -1455,8 +1496,11 @@ mod tests {
             "only the link leaving the subdiagram crosses it"
         );
         assert!(
-            document.faults().is_empty(),
-            "a crossing link is faulty: {:?}",
+            !document.faults().iter().any(|f| matches!(
+                f,
+                Fault::DanglingLink { .. } | Fault::SelfLink { .. }
+            )),
+            "a crossing link was taken for a broken one: {:?}",
             document.faults()
         );
     }

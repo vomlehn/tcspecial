@@ -25,3 +25,6 @@ build.out
 
 # Telemetry log segment files written by tcslog
 telemetry/
+
+# Resume command written by the SessionEnd hook
+claude-resume

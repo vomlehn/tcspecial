@@ -26,6 +26,7 @@ use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 use crate::endpoint_can::CanEndpoint;
 use crate::endpoint_device::DeviceEndpoint;
 use crate::endpoint_i2c::I2cEndpoint;
+use crate::endpoint_iio::IioEndpoint;
 use crate::endpoint_serial::SerialEndpoint;
 use crate::endpoint_spi::SpiEndpoint;
 use crate::endpoint_tcp::TcpEndpoint;
@@ -179,6 +180,13 @@ pub fn bind_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // A sensor's buffer: opened and read, and the writer it is paired
+        // with has nothing to write. See endpoint_iio.
+        EndpointConfig::Iio(iio_config) => {
+            let reader = IioEndpoint::new(what, iio_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
     }
 }
 
@@ -264,6 +272,13 @@ pub fn connect_endpoint_pair(
         // one, so both factories do the same thing with it.
         EndpointConfig::Can(can_config) => {
             let reader = CanEndpoint::new(what, can_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        // A sensor's buffer: opened and read, and the writer it is paired
+        // with has nothing to write. See endpoint_iio.
+        EndpointConfig::Iio(iio_config) => {
+            let reader = IioEndpoint::new(what, iio_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }

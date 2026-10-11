@@ -12,6 +12,7 @@ pub mod endpoint_device;
 pub mod endpoint_i2c;
 pub mod endpoint_network;
 pub mod endpoint_can;
+pub mod endpoint_iio;
 pub mod endpoint_rs485;
 pub mod endpoint_serial;
 pub mod endpoint_spi;

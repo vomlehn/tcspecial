@@ -18,6 +18,7 @@ pub mod display;
 pub mod endpoint_config;
 pub mod endpoint_config_can;
 pub mod endpoint_config_i2c;
+pub mod endpoint_config_iio;
 pub mod endpoint_config_rs485;
 mod endpoint_config_serial;
 pub mod endpoint_config_spi;
@@ -46,6 +47,7 @@ pub use endpoint_config_serial::{
     ByteLength, ClockType, Encoding, FrameCheck, Parity, StopBits,
 };
 pub use endpoint_config_can::CanParams;
+pub use endpoint_config_iio::IioParams;
 pub use endpoint_config_rs485::Rs485Params;
 pub use endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 pub use config::*;

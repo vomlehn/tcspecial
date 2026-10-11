@@ -192,6 +192,15 @@ fn the_shipped_payload_configs_load() {
                         dh.name.0
                     );
                 }
+                // A sensor's sample buffer; experimental, and no shipped set
+                // has one yet.
+                EndpointConfig::Iio(iio) => {
+                    assert!(
+                        !iio.path.is_empty(),
+                        "{file}: {} has no sample buffer",
+                        dh.name.0
+                    );
+                }
                 EndpointConfig::Spi(spi) => {
                     assert!(
                         !spi.path.is_empty(),

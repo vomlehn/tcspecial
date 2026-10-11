@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::endpoint_config_can::CanParams;
+use crate::endpoint_config_iio::IioParams;
 use crate::endpoint_config_i2c::I2cParams;
 use crate::endpoint_config_serial::SerialParams;
 use crate::endpoint_config_spi::SpiParams;
@@ -36,10 +37,13 @@ use crate::endpoint_config_spi::SpiParams;
 // through the module that parses it.
 pub use crate::endpoint_config_i2c::I2cParams as I2cGroupParams;
 pub use crate::endpoint_config_can::CanParams as CanGroupParams;
+pub use crate::endpoint_config_iio::IioParams as IioGroupParams;
 pub use crate::endpoint_config_rs485::Rs485Params;
 pub use crate::endpoint_config_serial::{ByteLength, StopBits};
 pub use crate::endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
-use crate::types::{CanConfig, EndpointConfig, I2cConfig, SerialConfig, SpiConfig};
+use crate::types::{
+    CanConfig, EndpointConfig, I2cConfig, IioConfig, SerialConfig, SpiConfig,
+};
 use crate::TcsError;
 
 // ---------------------------------------------------------------------------
@@ -178,6 +182,11 @@ pub(crate) fn endpoint_of(
                 "\"{what}\" names a device alone, but a device on an I2C bus needs the \
                  bus and the address on it"
             )),
+            GroupKind::Iio(iio) => Ok(EndpointConfig::Iio(IioConfig {
+                path: path.clone(),
+                channels: iio.channels,
+                sample_rate: iio.sample_rate,
+            })),
             GroupKind::Can(_) => Err(format!(
                 "\"{what}\" names a device file, but a CAN payload is on an interface \
                  and the identifier its frames carry"
@@ -194,6 +203,8 @@ pub enum GroupKind {
     Spi(SpiParams),
     /// Experimental; see [`crate::endpoint_config_can`].
     Can(CanParams),
+    /// Experimental; see [`crate::endpoint_config_iio`].
+    Iio(IioParams),
 }
 
 impl GroupKind {
@@ -204,6 +215,7 @@ impl GroupKind {
             GroupKind::I2c(_) => "i2c",
             GroupKind::Spi(_) => "spi",
             GroupKind::Can(_) => "can",
+            GroupKind::Iio(_) => "iio",
         }
     }
 
@@ -215,7 +227,9 @@ impl GroupKind {
     pub fn stream(&self) -> Option<&StreamParams> {
         match self {
             GroupKind::Serial(s) => Some(&s.stream),
-            GroupKind::I2c(_) | GroupKind::Spi(_) | GroupKind::Can(_) => None,
+            GroupKind::I2c(_) | GroupKind::Spi(_) | GroupKind::Can(_) | GroupKind::Iio(_) => {
+                None
+            }
         }
     }
 }
@@ -345,6 +359,10 @@ pub(crate) struct LinkTerms {
     /// [`crate::endpoint_config_can`].
     pub(crate) bitrate: Option<Scalar>,
     pub(crate) can_fd: Option<Scalar>,
+    /// What an IIO device is expected to be producing; see
+    /// [`crate::endpoint_config_iio`].
+    pub(crate) channels: Option<Scalar>,
+    pub(crate) sample_rate: Option<Scalar>,
 }
 
 /// Where one read of a line ends, as a file states it.
@@ -633,7 +651,7 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 25] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 27] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
@@ -665,6 +683,9 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 25] {
         // CAN.
         ("bitrate", g.bitrate.is_some()),
         ("can_fd", g.can_fd.is_some()),
+        // IIO.
+        ("channels", g.channels.is_some()),
+        ("sample_rate", g.sample_rate.is_some()),
         // SPI.
         ("max_speed", g.max_speed.is_some()),
         ("spi_mode", g.spi_mode.is_some()),

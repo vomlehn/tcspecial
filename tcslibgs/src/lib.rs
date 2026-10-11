@@ -16,7 +16,6 @@ pub mod config;
 pub mod config_digest;
 pub mod display;
 pub mod endpoint_config;
-pub mod endpoint_config_can;
 pub mod endpoint_config_gpio;
 pub mod node;
 pub mod endpoint_config_iio;
@@ -47,7 +46,7 @@ pub use commands::*;
 pub use endpoint_config_serial::{
     ByteLength, ClockType, Encoding, FrameCheck, Parity, StopBits,
 };
-pub use endpoint_config_can::CanParams;
+pub use node::can::CanParams;
 pub use endpoint_config_gpio::{Bias, Edge as LineEdge, GpioParams};
 pub use endpoint_config_iio::IioParams;
 pub use endpoint_config_rpmsg::RpmsgParams;

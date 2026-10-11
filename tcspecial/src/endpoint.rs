@@ -23,7 +23,7 @@ use std::os::unix::io::RawFd;
 use nix::poll::{poll, PollFd, PollFlags};
 use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 
-use crate::endpoint_can::CanEndpoint;
+use crate::node::can::CanEndpoint;
 use crate::endpoint_device::DeviceEndpoint;
 use crate::endpoint_gpio::GpioEndpoint;
 use crate::node::i2c::I2cEndpoint;

@@ -12,7 +12,6 @@ pub mod endpoint_device;
 pub mod endpoint_gpio;
 pub mod node;
 pub mod endpoint_network;
-pub mod endpoint_can;
 pub mod endpoint_iio;
 pub mod endpoint_rpmsg;
 pub mod endpoint_rs485;

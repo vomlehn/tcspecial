@@ -257,7 +257,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 out,
                 "  can_id           {:#x}, {}",
                 can.can_id,
-                if crate::endpoint_config_can::is_extended(can.can_id) {
+                if crate::node::can::is_extended(can.can_id) {
                     "extended"
                 } else {
                     "base"
@@ -267,7 +267,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 out,
                 "  can_fd           {}, so a frame carries up to {} bytes",
                 if can.fd { "yes" } else { "no" },
-                crate::endpoint_config_can::frame_bytes(can.fd)
+                crate::node::can::frame_bytes(can.fd)
             );
             // Recorded rather than applied, as an I2C bus speed is: said so
             // here, because a reader comparing this with the equipment is

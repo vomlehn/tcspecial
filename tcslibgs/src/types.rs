@@ -107,7 +107,7 @@ pub enum DHType {
     Spi,
     /// A handler whose payload is on a CAN bus.
     ///
-    /// Experimental; see [`crate::endpoint_config_can`].
+    /// Experimental; see [`crate::node::can`].
     Can,
     /// A handler whose payload is a sensor's buffered samples.
     ///
@@ -812,7 +812,7 @@ pub struct IioConfig {
 
 /// Configuration for an endpoint on a CAN bus
 ///
-/// Experimental; see [`crate::endpoint_config_can`] for what each term means
+/// Experimental; see [`crate::node::can`] for what each term means
 /// and which of them are applied.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanConfig {
@@ -1010,7 +1010,7 @@ fn link_of(
                 )
             })?;
         let can_id = crate::endpoint_config::parse_u32(name, "can_id", &can_id)
-            .and_then(|id| crate::endpoint_config_can::check_can_id(name, id))
+            .and_then(|id| crate::node::can::check_can_id(name, id))
             .map_err(|e| format!("{e}"))?;
 
         return crate::endpoint_config::endpoint_of(
@@ -1081,7 +1081,7 @@ pub(crate) fn link_params_of(
         DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
         DHType::I2c => crate::node::i2c::group_kind_of(name, wire),
         DHType::Spi => crate::node::spi::group_kind_of(name, wire),
-        DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
+        DHType::Can => crate::node::can::group_kind_of(name, wire),
         DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
         DHType::Rpmsg => crate::endpoint_config_rpmsg::group_kind_of(name, wire),
         DHType::Gpio => crate::endpoint_config_gpio::group_kind_of(name, wire),
@@ -1509,7 +1509,7 @@ pub struct DHGroupJson {
     pub rs485_delay_after_send_ms: Option<Scalar>,
     /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
     /// kernel's virtual bus. CAN payloads only, and experimental; see
-    /// [`crate::endpoint_config_can`].
+    /// [`crate::node::can`].
     #[serde(default)]
     pub interface: Option<String>,
     /// The identifier a CAN payload's frames carry. CAN payloads only.
@@ -1697,7 +1697,7 @@ pub struct DHConfigJson {
     pub rs485_delay_after_send_ms: Option<Scalar>,
     /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
     /// kernel's virtual bus. CAN payloads only, and experimental; see
-    /// [`crate::endpoint_config_can`].
+    /// [`crate::node::can`].
     #[serde(default)]
     pub interface: Option<String>,
     /// The identifier a CAN payload's frames carry. CAN payloads only.
@@ -2023,7 +2023,7 @@ impl DHConfigJson {
         // exactly. A payload whose packets will not fit in one is refused
         // here rather than found out a frame at a time at run time.
         if let EndpointConfig::Can(can) = &endpoint {
-            let room = crate::endpoint_config_can::frame_bytes(can.fd);
+            let room = crate::node::can::frame_bytes(can.fd);
             if let Some(packet_size) = packet_size {
                 if packet_size > room {
                     return Err(format!(

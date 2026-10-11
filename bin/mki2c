@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# Make the kernel stand-in a simulated I2C device needs.
+#
+# A device on an I2C bus is one of the payload types the simulator cannot
+# simply be the far end of. A serial line has a pty and a socket has another
+# socket, but a device on a bus has to answer when a master addresses it, and
+# nothing in user space can. What the kernel offers instead is `i2c-stub`: an
+# adapter whose chips are a bank of registers in memory, so the bank is the
+# payload -- tcssim writes it and tcspecial reads it.
+#
+# The module is the kernel's and loading it needs root, so tcssim does not make
+# the bus: it finds one and says how to make one if there is none. This is
+# that, as bin/mkgpio, bin/mkiio and bin/mkvcan are for the other three.
+#
+# What it does not do is let the unit tests cover any more than they do now.
+# The scan that finds a stub is given the tree to look at -- see find_stub() in
+# tcssim/src/payload_i2c.rs -- so it passes with no module loaded and would
+# pass with one. This is for running a payload set that names an I2C payload,
+# which is the part that needs the real thing.
+#
+# Nothing here survives a reboot.
+
+set -euo pipefail
+
+# The chip the stub answers for.
+#
+# 0x48 because that is the address every message in the source offers as the
+# example, so a configuration written from those messages works against this
+# without being told a different number.
+#
+# The stub's chips are fixed when the module is loaded, so an address given
+# here is applied by reloading it. That is why the address is worth passing:
+#   ./bin/mki2c 0x50
+address="${1:-0x48}"
+
+# What find_stub() in tcssim matches an adapter's name against. The same
+# string, because a stub this script made and a stub tcssim will not recognise
+# is worse than no stub at all.
+stub_name="SMBus stub driver"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "mki2c: re-running under sudo, which is what loading a module needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# Remove what a previous run left, which is bin/rmi2c and is called rather than
+# copied.
+#
+# Not only tidiness: the stub's chips are fixed when the module is loaded, so
+# an address differing from the loaded one can only be had by unloading it
+# first, and a reload is what makes running this twice with two addresses do
+# what it looks like it does.
+#
+# By the directory this script is in, so that a tree moved or run from
+# elsewhere still finds its sibling; already root here, so rmi2c's own check
+# passes through.
+here="$(cd -- "$(dirname -- "$0")" && pwd)"
+"$here/rmi2c"
+
+# The character devices an adapter is reached through. Built into most kernels,
+# in which case modprobe succeeds and does nothing; a kernel with it as a
+# module needs it, because without it there is no /dev/i2c-N to open.
+modprobe i2c-dev
+
+echo "mki2c: loading i2c-stub with a chip at $address"
+modprobe i2c-stub "chip_addr=$address"
+
+# Find what it became, the way tcssim finds it: the adapter whose name is the
+# stub's, lowest number first. Numeric names only -- some adapters are called
+# things like i2c-ELAN2097:00, which is not a number and not a stub.
+stub=""
+for dir in /sys/bus/i2c/devices/i2c-*; do
+	number="${dir##*/i2c-}"
+	case "$number" in
+	'' | *[!0-9]*) continue ;;
+	esac
+	[ -r "$dir/name" ] || continue
+	if [ "$(cat "$dir/name")" = "$stub_name" ]; then
+		if [ -z "$stub" ] || [ "$number" -lt "$stub" ]; then
+			stub="$number"
+		fi
+	fi
+done
+
+if [ -z "$stub" ]; then
+	echo "mki2c: i2c-stub loaded but no adapter of its is listed, which should" >&2
+	echo "mki2c: not happen -- look in /sys/bus/i2c/devices" >&2
+	exit 1
+fi
+
+echo "mki2c: done"
+echo
+echo "  an I2C payload:   path: /dev/i2c-$stub"
+echo "                    bus_address: $address"
+echo
+echo "The bus number is assigned as adapters appear, so it can differ from one"
+echo "run of this to the next; a payload set that names it has to name this."

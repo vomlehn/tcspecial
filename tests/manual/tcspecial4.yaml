@@ -92,10 +92,10 @@ payloads:
     oc_address: 127.0.0.1
     oc_port: 6402
 
-  # A device on a bus, at the address bin/mkstubs loads the kernel's stub
-  # with -- so this payload reaches the stand-in that script makes without
-  # being told a second number. The stub's chips are fixed when it is loaded,
-  # which is why the two have to agree.
+  # A device on a bus, at the address bin/mki2c loads the kernel's stub with
+  # -- so this payload reaches the stand-in that script makes without being
+  # told a second number. The stub's chips are fixed when it is loaded, which
+  # is why the two have to agree.
   #
   # The path is under /tmp for the reason the line's is: tcssim finds the stub
   # bus and makes this path lead to it while the payload runs, and it refuses

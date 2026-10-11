@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# Remove the GPIO stand-in bin/mkgpio makes.
+#
+# The cleanup half of bin/mkgpio, which calls this rather than carrying a copy,
+# as each of the other three pairs does: remaking a stand-in means removing the
+# old one first, and removing it is also worth doing on its own -- after a run,
+# or before leaving a host the way it was found.
+#
+# A gpio-sim chip is one device of a module that may hold others, so the chip
+# goes by name and the module stays unless nothing is left for it to hold.
+# bin/rmi2c cannot be so careful: there, the module is the adapter.
+#
+# Note this takes the lines out from under anything using them. A tcssim still
+# pulling them loses them, so do not run this while one is up.
+
+set -euo pipefail
+
+# The same names bin/mkgpio makes, because only what it made is this script's
+# to remove. A gpio-sim chip another program created is left alone.
+sim_device="tcssim"
+sim_bank="bank0"
+
+configfs="/sys/kernel/config"
+gpio_sim="$configfs/gpio-sim"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "rmgpio: re-running under sudo, which is what unloading a module needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# Take down this script's chip, if configfs is there to hold one at all: an
+# unmounted configfs or an absent directory is a host with no chip of ours on
+# it, which is the state being asked for.
+if [ -d "$gpio_sim/$sim_device" ]; then
+	echo "rmgpio: removing the simulated GPIO chip"
+
+	# A live device cannot be removed and its bank cannot go before it is not
+	# live, so the order matters: stop it, take the bank, take the device.
+	if [ -w "$gpio_sim/$sim_device/live" ]; then
+		echo 0 > "$gpio_sim/$sim_device/live"
+	fi
+	[ -d "$gpio_sim/$sim_device/$sim_bank" ] && rmdir "$gpio_sim/$sim_device/$sim_bank"
+	rmdir "$gpio_sim/$sim_device"
+else
+	echo "rmgpio: no simulated GPIO chip of ours to remove"
+fi
+
+# Unload the module only if it now holds nothing.
+#
+# Another program's chip is a reason to leave it loaded, and a loaded module
+# holding no chips costs nothing -- so this is tidiness where it is free and
+# restraint where it is not. The -r is allowed to fail for the same reason:
+# "in use" here means something arrived between the test and the call, which is
+# the other program's business and not an error in this one.
+if [ -d /sys/module/gpio_sim ]; then
+	if [ -z "$(ls -A "$gpio_sim" 2>/dev/null)" ]; then
+		echo "rmgpio: unloading gpio-sim, which now holds no chips"
+		modprobe -r gpio-sim || echo "rmgpio: gpio-sim is in use, so it stays loaded"
+	else
+		echo "rmgpio: gpio-sim holds another chip, so it stays loaded"
+	fi
+fi
+
+echo "rmgpio: done"

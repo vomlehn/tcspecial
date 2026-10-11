@@ -53,6 +53,17 @@ pub struct PayloadConfig {
     /// kinds that are not on one. Not the `port`, which a bus has not, and
     /// not the `address`, which for a bus is the bus itself.
     pub bus_address: u16,
+    /// What a CAN payload is on and what identifies it: the interface is the
+    /// `address` above, and this is the identifier its frames carry. Zero for
+    /// every other kind, no CAN frame being identified by nothing.
+    ///
+    /// Apart from `bus_address` because a CAN identifier is twenty-nine bits
+    /// where an I2C address is ten, and because the two are compared against
+    /// different things. Experimental; see [`crate::payload_can`].
+    pub can_id: u32,
+    /// Whether a CAN payload's frames are CAN FD, which decides how much one
+    /// carries.
+    pub can_fd: bool,
     /// Whether this payload answers requests rather than sending on its own.
     ///
     /// From the payload configuration, not the simulator's: which kind of
@@ -100,6 +111,9 @@ pub enum PayloadProtocol {
     /// A Unix-domain datagram socket, which the simulator sends to from a path
     /// of its own: see [`crate::payload_unix`].
     UnixDgram,
+    /// A payload on a CAN bus, which the simulator joins as another member of
+    /// the same bus: see [`crate::payload_can`]. Experimental.
+    Can,
 }
 
 /// Statistics for a payload
@@ -194,6 +208,9 @@ impl SimulatedPayload {
                 }
                 PayloadProtocol::Spi => {
                     crate::payload_spi::run_spi_payload(config, running, stats)
+                }
+                PayloadProtocol::Can => {
+                    crate::payload_can::run_can_payload(config, running, stats)
                 }
                 PayloadProtocol::UnixStream => {
                     crate::payload_unix::run_unix_stream_payload(config, running, stats)
@@ -583,6 +600,8 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 5000,
             bus_address: 0,
+            can_id: 0,
+            can_fd: false,
             triggered: false,
             faults,
             own_address: None,
@@ -939,6 +958,8 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 5000,
             bus_address: 0,
+            can_id: 0,
+            can_fd: false,
             faults: Default::default(),
             own_address: None,
             own_port: None,

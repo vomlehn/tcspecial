@@ -26,6 +26,7 @@ use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::endpoint_config_can::CanParams;
 use crate::endpoint_config_i2c::I2cParams;
 use crate::endpoint_config_serial::SerialParams;
 use crate::endpoint_config_spi::SpiParams;
@@ -34,10 +35,11 @@ use crate::endpoint_config_spi::SpiParams;
 // that a reader of a configuration document reaches everything it can hold
 // through the module that parses it.
 pub use crate::endpoint_config_i2c::I2cParams as I2cGroupParams;
+pub use crate::endpoint_config_can::CanParams as CanGroupParams;
 pub use crate::endpoint_config_rs485::Rs485Params;
 pub use crate::endpoint_config_serial::{ByteLength, StopBits};
 pub use crate::endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
-use crate::types::{EndpointConfig, I2cConfig, SerialConfig, SpiConfig};
+use crate::types::{CanConfig, EndpointConfig, I2cConfig, SerialConfig, SpiConfig};
 use crate::TcsError;
 
 // ---------------------------------------------------------------------------
@@ -124,6 +126,22 @@ pub(crate) fn endpoint_of(
                 kind.type_name()
             )),
         },
+        EndpointLocation::Can { interface, can_id } => match kind {
+            GroupKind::Can(can) => Ok(EndpointConfig::Can(CanConfig {
+                interface: interface.clone(),
+                can_id: *can_id,
+                fd: can.fd,
+                bitrate: can.bitrate,
+                loopback: can.loopback,
+            })),
+            // Only a CAN payload is located on an interface, so this is
+            // unreachable through the parser; an error rather than a panic,
+            // for the reason the bus arm above gives.
+            _ => Err(format!(
+                "\"{what}\" is on a CAN interface, which a {} link does not put it on",
+                kind.type_name()
+            )),
+        },
         // Every kind but a network address is located by a device node, and
         // which kind it is decides what else goes with it. They used all to
         // become a plain Device, which opened the right file and then talked
@@ -154,10 +172,15 @@ pub(crate) fn endpoint_of(
             })),
             // An I2C group's endpoints carry a bus and an address, which the
             // parser requires of them, so a device node alone in one is a
-            // shape it cannot produce.
+            // shape it cannot produce. A CAN payload is on an interface and
+            // not a path at all, for the same reason.
             GroupKind::I2c(_) => Err(format!(
                 "\"{what}\" names a device alone, but a device on an I2C bus needs the \
                  bus and the address on it"
+            )),
+            GroupKind::Can(_) => Err(format!(
+                "\"{what}\" names a device file, but a CAN payload is on an interface \
+                 and the identifier its frames carry"
             )),
         },
     }
@@ -169,6 +192,8 @@ pub enum GroupKind {
     Serial(SerialParams),
     I2c(I2cParams),
     Spi(SpiParams),
+    /// Experimental; see [`crate::endpoint_config_can`].
+    Can(CanParams),
 }
 
 impl GroupKind {
@@ -178,6 +203,7 @@ impl GroupKind {
             GroupKind::Serial(_) => "serial",
             GroupKind::I2c(_) => "i2c",
             GroupKind::Spi(_) => "spi",
+            GroupKind::Can(_) => "can",
         }
     }
 
@@ -189,7 +215,7 @@ impl GroupKind {
     pub fn stream(&self) -> Option<&StreamParams> {
         match self {
             GroupKind::Serial(s) => Some(&s.stream),
-            GroupKind::I2c(_) | GroupKind::Spi(_) => None,
+            GroupKind::I2c(_) | GroupKind::Spi(_) | GroupKind::Can(_) => None,
         }
     }
 }
@@ -241,6 +267,14 @@ pub enum EndpointLocation {
     /// Both are needed because two endpoints of one I2C group commonly sit
     /// on the same bus and differ only in which device the master addresses.
     I2c { bus: String, address: u16 },
+    /// A CAN interface and the identifier a payload's frames carry.
+    ///
+    /// An interface rather than a path: a CAN controller is a network
+    /// interface, not a device file. Both are needed for the reason an I2C
+    /// device needs both -- several payloads commonly share one bus and
+    /// differ only in the identifier. Experimental; see
+    /// [`crate::endpoint_config_can`].
+    Can { interface: String, can_id: u32 },
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +341,10 @@ pub(crate) struct LinkTerms {
     pub(crate) rs485_rts_on_send: Option<Scalar>,
     pub(crate) rs485_delay_before_send_ms: Option<Scalar>,
     pub(crate) rs485_delay_after_send_ms: Option<Scalar>,
+    /// Bits per second on a CAN bus, and whether its frames are CAN FD; see
+    /// [`crate::endpoint_config_can`].
+    pub(crate) bitrate: Option<Scalar>,
+    pub(crate) can_fd: Option<Scalar>,
 }
 
 /// Where one read of a line ends, as a file states it.
@@ -595,7 +633,7 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 23] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 25] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
@@ -624,6 +662,9 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 23] {
         ("retries", g.retries.is_some()),
         ("timeout", g.timeout.is_some()),
         ("bus_speed", g.bus_speed.is_some()),
+        // CAN.
+        ("bitrate", g.bitrate.is_some()),
+        ("can_fd", g.can_fd.is_some()),
         // SPI.
         ("max_speed", g.max_speed.is_some()),
         ("spi_mode", g.spi_mode.is_some()),

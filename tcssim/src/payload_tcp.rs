@@ -136,6 +136,8 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port,
             bus_address: 0,
+            can_id: 0,
+            can_fd: false,
             triggered,
             faults,
             own_address: None,

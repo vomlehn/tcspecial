@@ -487,6 +487,12 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
                 None => "synchronous".to_string(),
             }
         ),
+        EndpointConfig::Can(can) => format!(
+            "can {} id {:#x}, {}",
+            can.interface,
+            can.can_id,
+            if can.fd { "CAN FD" } else { "classic" }
+        ),
         EndpointConfig::I2c(i2c) => format!(
             "I2C device {:#04X} on bus {}{}",
             i2c.address,

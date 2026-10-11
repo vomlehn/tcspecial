@@ -1,4 +1,5 @@
-# The payloads tcsmoc controls and tcssim simulates: a serial line.
+# The payloads tcsmoc controls and tcssim simulates: one of every supported
+# kind.
 #
 # This set is what the payload language gained a serial type for. A line has
 # terms the other sets' payloads do not -- a data rate, a byte length, stop
@@ -10,6 +11,13 @@
 # file already had: the group carries everything about the line, and the
 # payload carries the one thing that tells one payload of a group from
 # another, which for a line is the device.
+#
+# The other four supported kinds were added beside it so that one set
+# exercises all five: a socket, a device file, a bus, a clocked link and the
+# line. Each is one payload and no more -- the point is that every kind is
+# reached, not that any one of them is covered thoroughly, which is what the
+# tests are for. The experimental kinds are not here: none is shipped in a
+# payload set until it has been run against the hardware it describes.
 version: "1.0"
 description: TCSpecial payload set 4
 
@@ -59,3 +67,56 @@ payloads:
     path: /tmp/tcspecial4-line
     oc_address: 127.0.0.1
     oc_port: 6400
+
+  # A datagram, which is what the other sets are mostly made of. No group,
+  # because there is one of it: a group earns its place where two payloads
+  # would otherwise repeat each other, as the line's does in the sets that
+  # have several lines.
+  - name: udp-steady
+    type: network
+    protocol: udp
+    address: localhost
+    port: 5400
+    packet_size: 12
+    oc_address: 127.0.0.1
+    oc_port: 6401
+
+  # A device file, read as it comes. /dev/urandom rather than a path under
+  # /tmp because this is the one kind needing no stand-in: the file is already
+  # a source of bytes, so there is nothing for tcssim to make and nothing for
+  # it to link.
+  - name: random-device
+    type: device
+    path: /dev/urandom
+    packet_size: 8
+    oc_address: 127.0.0.1
+    oc_port: 6402
+
+  # A device on a bus, at the address bin/mkstubs loads the kernel's stub
+  # with -- so this payload reaches the stand-in that script makes without
+  # being told a second number. The stub's chips are fixed when it is loaded,
+  # which is why the two have to agree.
+  #
+  # The path is under /tmp for the reason the line's is: tcssim finds the stub
+  # bus and makes this path lead to it while the payload runs, and it refuses
+  # to displace a real device node.
+  - name: bus-device
+    type: i2c
+    path: /tmp/tcspecial4-bus
+    address: 0x48
+    packet_size: 12
+    oc_address: 127.0.0.1
+    oc_port: 6403
+
+  # A peripheral on a clocked link. The rate and the mode are the two terms a
+  # SPI payload must state: no controller default is right for every
+  # peripheral, and a mismatched mode fails the way a mismatched data rate
+  # fails on a line.
+  - name: clocked-peripheral
+    type: spi
+    path: /tmp/tcspecial4-spi
+    max_speed: 1000000
+    spi_mode: 0
+    packet_size: 12
+    oc_address: 127.0.0.1
+    oc_port: 6404

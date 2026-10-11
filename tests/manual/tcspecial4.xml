@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- TCSpecial payload set 4, a serial line, in the payload configuration
-     language.
+<!-- TCSpecial payload set 4, one payload of every supported kind, in the
+     payload configuration language.
 
      Equivalent to tcspecial4.yaml. The YAML is the one to read: it carries
      the comments.
@@ -45,5 +45,42 @@
         <path>/tmp/tcspecial4-line</path>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6400</oc_port>
+    </payloads>
+    <payloads>
+        <name>udp-steady</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>localhost</address>
+        <port>5400</port>
+        <packet_size>12</packet_size>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6401</oc_port>
+    </payloads>
+    <payloads>
+        <name>random-device</name>
+        <type>device</type>
+        <path>/dev/urandom</path>
+        <packet_size>8</packet_size>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6402</oc_port>
+    </payloads>
+    <payloads>
+        <name>bus-device</name>
+        <type>i2c</type>
+        <path>/tmp/tcspecial4-bus</path>
+        <address>0x48</address>
+        <packet_size>12</packet_size>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6403</oc_port>
+    </payloads>
+    <payloads>
+        <name>clocked-peripheral</name>
+        <type>spi</type>
+        <path>/tmp/tcspecial4-spi</path>
+        <max_speed>1000000</max_speed>
+        <spi_mode>0</spi_mode>
+        <packet_size>12</packet_size>
+        <oc_address>127.0.0.1</oc_address>
+        <oc_port>6404</oc_port>
     </payloads>
 </payload>

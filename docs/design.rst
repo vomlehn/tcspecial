@@ -1603,11 +1603,16 @@ at the end of this section.
     are there to tell apart.
 
 ``tcspecial4.yaml``
-    One handler on a serial line, which is the set that exercises a link's own
-    terms -- a data rate, a framing, a rule for where a read ends -- and the
-    simulator's pty stand-in. It was written in a second language, there being
-    no words in a tcspecial configuration for a line; `Link Terms`_ are those
-    words, and the set is written here like every other.
+    One handler of every supported kind. It began as the set that exercises a
+    line's own terms -- a data rate, a framing, a rule for where a read ends --
+    and the simulator's pty stand-in, and it was written in a second language,
+    there being no words in a tcspecial configuration for a line; `Link Terms`_
+    are those words, and the set is written here like every other.
+
+    The other four kinds were added beside the line so that one set reaches
+    all five: a socket, a device file, a bus and a clocked link. One payload
+    each, no more -- a set is for running, and what covers a kind thoroughly
+    is its tests.
 
 A set is a pair of files: the tcspecial configuration and the simulator file
 beside it, each read by whichever programs need it.

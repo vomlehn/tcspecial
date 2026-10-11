@@ -192,6 +192,15 @@ fn the_shipped_payload_configs_load() {
                         dh.name.0
                     );
                 }
+                // Discrete lines; experimental, and no shipped set has any
+                // yet.
+                EndpointConfig::Gpio(gpio) => {
+                    assert!(
+                        !gpio.path.is_empty() && !gpio.lines.is_empty(),
+                        "{file}: {} watches no lines",
+                        dh.name.0
+                    );
+                }
                 // A channel to another core; experimental, and no shipped set
                 // has one yet.
                 EndpointConfig::Rpmsg(rpmsg) => {

@@ -45,6 +45,10 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
         EndpointConfig::Iio(iio) => format!("IIO {}", iio.path),
         EndpointConfig::Rpmsg(rpmsg) => format!("rpmsg {} ({})", rpmsg.path, rpmsg.service),
+        EndpointConfig::Gpio(gpio) => {
+            let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
+            format!("GPIO {} lines {}", gpio.path, offsets.join(","))
+        }
     }
 }
 

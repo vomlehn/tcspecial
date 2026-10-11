@@ -327,6 +327,42 @@ What it cannot do is make the bus: a virtual one needs
 and tcssim says exactly that if the interface is not there, as it does for the
 I\ :superscript:`2`\ C stub module.
 
+A GPIO Payload
+--------------
+``type: gpio``. **Experimental, not yet supported.** A set of discrete lines
+-- a deployment switch, an arming line, a payload's own "alive" line -- watched
+for changes.
+
+.. code-block:: text
+
+   path           the chip: /dev/gpiochip0
+   lines          the offsets watched, separated by commas or spaces,
+                  decimal or 0x. Required
+   edge           rising | falling | both, default both
+   bias           none | pull_up | pull_down, default none
+   debounce_us    how long a line must be steady before a change counts.
+                  Default none, and applied by the kernel
+
+This is the one kind whose payload data is made rather than carried. A line
+has no bytes: it is high or low, and what the ground wants is when it changed.
+So each change becomes a record of sixteen bytes -- eight of time in
+milliseconds since the epoch, four of line offset, four of the value it became
+-- and a ``packet_size`` must be a whole number of those, a packet that was
+part of a record being a reading nobody could use.
+
+Two payloads may watch one chip and may not watch one line: the kernel gives a
+line to one request at a time, so the second handler's start would fail.
+
+A GPIO payload cannot be triggered. Its lines are inputs, and driving one
+would be commanding a payload rather than reading it.
+
+The simulator moves lines through the kernel's ``gpio-sim``, which it finds
+rather than makes: loading the module and making a chip need root, and tcssim
+says so if there is none. The packet and segment sizes mean nothing to a
+simulated set of discretes, and neither do the faults -- there are no bytes to
+drop or corrupt; what it does is pull each of its lines the other way every
+packet interval.
+
 An rpmsg Payload
 ----------------
 ``type: rpmsg``. **Experimental, not yet supported.** Software on another core

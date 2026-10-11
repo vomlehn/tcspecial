@@ -24,6 +24,7 @@ mod grid;
 mod payload;
 mod payload_can;
 mod payload_device;
+mod payload_gpio;
 mod payload_i2c;
 mod payload_iio;
 mod payload_rpmsg;

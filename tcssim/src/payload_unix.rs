@@ -331,6 +331,7 @@ mod tests {
             bus_address: 0,
             can_id: 0,
             can_fd: false,
+            gpio_lines: Vec::new(),
             faults: Default::default(),
             own_address: None,
             own_port: None,

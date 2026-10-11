@@ -487,6 +487,10 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
                 None => "synchronous".to_string(),
             }
         ),
+        EndpointConfig::Gpio(gpio) => {
+            let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
+            format!("gpio {} lines {}", gpio.path, offsets.join(","))
+        }
         EndpointConfig::Rpmsg(rpmsg) => {
             format!("rpmsg {} ({})", rpmsg.path, rpmsg.service)
         }

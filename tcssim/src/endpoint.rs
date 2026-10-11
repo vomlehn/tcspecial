@@ -63,6 +63,11 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // -- there is no sysfs entry saying which service it is -- which the
         // handler's own check allows for; see payload_rpmsg.
         EndpointConfig::Rpmsg(rpmsg) => (PayloadProtocol::Rpmsg, rpmsg.path.clone(), 0, 0),
+        // Discrete lines, which nothing in user space can drive: what stands
+        // in is the kernel's gpio-sim, whose lines the simulator pulls one way
+        // and the other. Found rather than made, as the I2C stub is; see
+        // payload_gpio.
+        EndpointConfig::Gpio(gpio) => (PayloadProtocol::Gpio, gpio.path.clone(), 0, 0),
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
@@ -131,10 +136,18 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         _ => (0, false),
     };
 
+    // And which lines a set of discretes moves, which is the one thing a GPIO
+    // payload produces: not bytes a file sized.
+    let gpio_lines = match &dh.endpoint {
+        EndpointConfig::Gpio(gpio) => gpio.lines.clone(),
+        _ => Vec::new(),
+    };
+
     Ok(PayloadConfig {
         bus_address,
         can_id,
         can_fd,
+        gpio_lines,
         triggered: dh.mode.polling().is_some(),
         faults: sim.faults,
         // The socket this payload answers from, where the simulator file
@@ -181,6 +194,10 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
         EndpointConfig::Iio(iio) => format!("IIO {}", iio.path),
         EndpointConfig::Rpmsg(rpmsg) => format!("rpmsg {} ({})", rpmsg.path, rpmsg.service),
+        EndpointConfig::Gpio(gpio) => {
+            let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
+            format!("GPIO {} lines {}", gpio.path, offsets.join(","))
+        }
     }
 }
 

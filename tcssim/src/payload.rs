@@ -64,6 +64,12 @@ pub struct PayloadConfig {
     /// Whether a CAN payload's frames are CAN FD, which decides how much one
     /// carries.
     pub can_fd: bool,
+    /// Which lines a GPIO payload moves, and empty for every other kind.
+    ///
+    /// Not bytes and not a size: what a simulated set of discretes produces
+    /// is an edge on each of these every interval. Experimental; see
+    /// [`crate::payload_gpio`].
+    pub gpio_lines: Vec<u32>,
     /// Whether this payload answers requests rather than sending on its own.
     ///
     /// From the payload configuration, not the simulator's: which kind of
@@ -121,6 +127,9 @@ pub enum PayloadProtocol {
     /// An rpmsg channel to another core, which the simulator stands in for
     /// with a pty: see [`crate::payload_rpmsg`]. Experimental.
     Rpmsg,
+    /// A set of discrete lines, which the simulator moves through the
+    /// kernel's gpio-sim: see [`crate::payload_gpio`]. Experimental.
+    Gpio,
 }
 
 /// Statistics for a payload
@@ -224,6 +233,9 @@ impl SimulatedPayload {
                 }
                 PayloadProtocol::Rpmsg => {
                     crate::payload_rpmsg::run_rpmsg_payload(config, running, stats)
+                }
+                PayloadProtocol::Gpio => {
+                    crate::payload_gpio::run_gpio_payload(config, running, stats)
                 }
                 PayloadProtocol::UnixStream => {
                     crate::payload_unix::run_unix_stream_payload(config, running, stats)
@@ -615,6 +627,7 @@ mod tests {
             bus_address: 0,
             can_id: 0,
             can_fd: false,
+            gpio_lines: Vec::new(),
             triggered: false,
             faults,
             own_address: None,
@@ -973,6 +986,7 @@ mod tests {
             bus_address: 0,
             can_id: 0,
             can_fd: false,
+            gpio_lines: Vec::new(),
             faults: Default::default(),
             own_address: None,
             own_port: None,

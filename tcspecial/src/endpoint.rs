@@ -12,7 +12,7 @@
 //!
 //! * [`crate::node::network::udp`] -- datagram sockets
 //! * [`crate::node::network::tcp`] -- stream sockets
-//! * [`crate::endpoint_device`] -- device files
+//! * [`crate::node::pseudofile`] -- device files
 //! * [`crate::node::network`] -- the address family, socket type and
 //!   protocol tables the two socket kinds draw on
 
@@ -24,7 +24,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 
 use crate::node::can::CanEndpoint;
-use crate::endpoint_device::DeviceEndpoint;
+use crate::node::pseudofile::DeviceEndpoint;
 use crate::node::gpio::GpioEndpoint;
 use crate::node::i2c::I2cEndpoint;
 use crate::node::iio::IioEndpoint;

@@ -39,31 +39,19 @@ fi
 # say only that it does not know the type.
 modprobe vcan
 
-# Remove every virtual CAN interface this host already has.
+# Remove every virtual CAN interface this host already has, which is bin/rmvcan
+# and is called rather than copied.
 #
-# Asked for as cleanup of the previous bus, and it is more than tidiness: a
-# vcan interface that exists but was never brought up binds a socket without
-# complaint and then fails the send with ENETDOWN, which is a confusing way to
-# discover a half-made bus. Deleting and remaking leaves no doubt about which
-# state the bus is in.
+# More than tidiness: a vcan interface that exists but was never brought up
+# binds a socket without complaint and then fails the send with ENETDOWN, which
+# is a confusing way to discover a half-made bus. Removing and remaking leaves
+# no doubt about which state the bus is in.
 #
-# Note this takes the bus out from under anything using it. A tcspecial or
-# tcssim still running on vcan0 loses its socket, so do not run this while one
-# of them is up.
-#
-# The -o form prints one interface per line as "<index>: <name>: <flags> ...",
-# so the name is the second colon-separated field; the sed strips the
-# "@parent" suffix that some link types carry, which vcan does not but which
-# costs nothing to allow for.
-existing="$(ip -o link show type vcan | awk -F': ' '{ print $2 }' | sed 's/@.*//')"
-if [ -n "$existing" ]; then
-	for old in $existing; do
-		echo "mkvcan: removing the existing $old"
-		ip link del dev "$old"
-	done
-else
-	echo "mkvcan: no virtual CAN interface to remove"
-fi
+# By the directory this script is in, so that a tree moved or run from
+# elsewhere still finds its sibling; already root here, so rmvcan's own check
+# passes through.
+here="$(cd -- "$(dirname -- "$0")" && pwd)"
+"$here/rmvcan"
 
 # Make the bus and bring it up.
 #

@@ -335,7 +335,9 @@ virtual bus left from a previous run, so
 
 is the shorter way to the same place. Either needs root -- the script asks for
 it through sudo -- and neither survives a reboot, so the bus is something a
-session makes again.
+session makes again. ``make rmvcan`` removes the buses and leaves the driver
+loaded, which is both the undoing of ``make mkvcan`` and the first thing it
+does itself.
 
 The second command is the one that gets forgotten, and a bus made without it
 is worse than no bus at all: a socket binds to an interface that is down
@@ -453,6 +455,16 @@ The simulator stands in for the buffer with a pseudo-terminal, as it does for
 a serial line: the path the handler was told to open leads to it while the
 payload runs. What it does not stand in for is the ``sysfs`` half, the
 channels and the buffer -- which the handler does not touch either.
+
+A pty carries the bytes but is not a buffer, and the kernel offers something
+that is: ``iio_dummy``, a sensor with no sensor in it, whose buffer a software
+trigger fills on a timer. There is no simulator side to that one -- a buffer
+is a stream out of the device and an IIO payload cannot be triggered, so the
+dummy *is* the payload and tcspecial reads it, which makes it the more
+faithful of the two stand-ins. ``make mkstubs`` makes one, prints the node and
+the channel count to name in a payload set, and ``make rmstubs`` takes it
+away; a host's own sensors sit in the same numbering and are left alone, which
+is why the scripts go by name and not by number.
 
 A Serial Payload
 ----------------
@@ -605,13 +617,15 @@ What stands in for the device is the kernel's ``i2c-stub``, an adapter whose
 chips are a bank of registers in memory: tcssim writes the bank and tcspecial
 reads it. The simulator finds that adapter rather than making one -- loading a
 module needs root -- and says how to make one if there is none.
-``bin/mkstubs`` makes it, and the GPIO stand-in with it, so
+``bin/mkstubs`` makes it, and the GPIO and IIO stand-ins with it, so
 
 .. code-block:: console
 
    $ make mkstubs
 
-is the way to both. It prints the bus to name in a payload set, which is
+is the way to all three, and ``make rmstubs`` undoes it: the stub module
+unloaded, and the simulated chip and dummy sensor this tree made taken down
+while another program's is left alone. It prints the bus to name in a payload set, which is
 numbered as adapters appear and so is not the same from one run to the next.
 The stub's chips are fixed when the module is loaded, which is why the address
 is the script's argument rather than something a configuration can choose

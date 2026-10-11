@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# Remove the I2C, GPIO and IIO stand-ins bin/mkstubs makes.
+#
+# The cleanup half of bin/mkstubs, which calls this rather than carrying a copy,
+# as bin/mkvcan calls bin/rmvcan: remaking a stand-in means removing the old one
+# first, and removing it is also worth doing on its own -- after a run, or
+# before leaving a host the way it was found.
+#
+# The halves are not symmetrical, because what they stand on is not. An
+# i2c-stub adapter *is* the module, so removing it means unloading that; a
+# gpio-sim chip and a dummy sensor are each one device of a module that may hold
+# others, so the device goes and the module stays unless nothing is left for it
+# to hold.
+#
+# Note this takes a stand-in out from under anything using it. A tcssim still
+# writing that register bank or pulling those lines loses them, so do not run
+# this while one is up.
+
+set -euo pipefail
+
+# The same names bin/mkstubs makes, because only what it made is this script's
+# to remove. A gpio-sim chip another program created is left alone.
+sim_device="tcssim"
+sim_bank="bank0"
+
+iio_device="tcssim"
+iio_trigger="tcssim-hr"
+
+configfs="/sys/kernel/config"
+gpio_sim="$configfs/gpio-sim"
+iio_devices="$configfs/iio/devices/dummy"
+iio_triggers="$configfs/iio/triggers/hrtimer"
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "rmstubs: re-running under sudo, which is what unloading a module needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# ---------------------------------------------------------- the GPIO stand-in
+
+# Take down this script's chip, if configfs is there to hold one at all: an
+# unmounted configfs or an absent directory is a host with no chip of ours on
+# it, which is the state being asked for.
+if [ -d "$gpio_sim/$sim_device" ]; then
+	echo "rmstubs: removing the simulated GPIO chip"
+
+	# A live device cannot be removed and its bank cannot go before it is not
+	# live, so the order matters: stop it, take the bank, take the device.
+	if [ -w "$gpio_sim/$sim_device/live" ]; then
+		echo 0 > "$gpio_sim/$sim_device/live"
+	fi
+	[ -d "$gpio_sim/$sim_device/$sim_bank" ] && rmdir "$gpio_sim/$sim_device/$sim_bank"
+	rmdir "$gpio_sim/$sim_device"
+else
+	echo "rmstubs: no simulated GPIO chip of ours to remove"
+fi
+
+# Unload the module only if it now holds nothing.
+#
+# Another program's chip is a reason to leave it loaded, and a loaded module
+# holding no chips costs nothing -- so this is tidiness where it is free and
+# restraint where it is not. The -r is allowed to fail for the same reason:
+# "in use" here means something arrived between the test and the call, which is
+# the other program's business and not an error in this one.
+if [ -d /sys/module/gpio_sim ]; then
+	if [ -z "$(ls -A "$gpio_sim" 2>/dev/null)" ]; then
+		echo "rmstubs: unloading gpio-sim, which now holds no chips"
+		modprobe -r gpio-sim || echo "rmstubs: gpio-sim is in use, so it stays loaded"
+	else
+		echo "rmstubs: gpio-sim holds another chip, so it stays loaded"
+	fi
+fi
+
+# ----------------------------------------------------------- the IIO stand-in
+
+# Stop the buffer before taking the device, so that a reader holding the node
+# sees it end rather than having it pulled away mid-sample.
+#
+# By name again: a host's own sensors sit in the same numbering, and the one
+# this removes is the one bin/mkstubs named.
+for dir in /sys/bus/iio/devices/iio:device*; do
+	[ -r "$dir/name" ] || continue
+	[ "$(cat "$dir/name")" = "$iio_device" ] || continue
+	for buffer in "$dir/buffer0/enable" "$dir/buffer/enable"; do
+		if [ -w "$buffer" ]; then
+			echo 0 > "$buffer"
+			break
+		fi
+	done
+done
+
+if [ -d "$iio_devices/$iio_device" ]; then
+	echo "rmstubs: removing the dummy IIO sensor"
+	rmdir "$iio_devices/$iio_device"
+else
+	echo "rmstubs: no dummy IIO sensor of ours to remove"
+fi
+
+if [ -d "$iio_triggers/$iio_trigger" ]; then
+	echo "rmstubs: removing the software trigger"
+	rmdir "$iio_triggers/$iio_trigger"
+fi
+
+# As with gpio-sim: unload only what now holds nothing, and leave
+# industrialio-configfs and industrialio alone whatever happens. Those two are
+# how every real sensor on the host is reached, and this script's business is
+# its own sensor and not the subsystem.
+if [ -d /sys/module/iio_dummy ] && [ -z "$(ls -A "$iio_devices" 2>/dev/null)" ]; then
+	echo "rmstubs: unloading iio_dummy, which now holds no sensors"
+	modprobe -r iio_dummy || echo "rmstubs: iio_dummy is in use, so it stays loaded"
+fi
+if [ -d /sys/module/iio_trig_hrtimer ] && [ -z "$(ls -A "$iio_triggers" 2>/dev/null)" ]; then
+	echo "rmstubs: unloading iio-trig-hrtimer, which now holds no triggers"
+	modprobe -r iio-trig-hrtimer || echo "rmstubs: iio-trig-hrtimer is in use, so it stays loaded"
+fi
+
+# ----------------------------------------------------------- the I2C stand-in
+
+# The module is the adapter, so unloading it is the whole of removing it.
+# i2c-dev is left alone: it is built into most kernels and every real adapter
+# on the host is reached through it.
+if [ -d /sys/module/i2c_stub ]; then
+	echo "rmstubs: unloading i2c-stub"
+	modprobe -r i2c-stub
+else
+	echo "rmstubs: no i2c-stub loaded"
+fi
+
+echo "rmstubs: done"

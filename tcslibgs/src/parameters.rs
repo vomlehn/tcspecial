@@ -174,6 +174,39 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 );
             }
         }
+        EndpointConfig::Iio(iio) => {
+            let _ = writeln!(out, "  path             {}", iio.path);
+            // Both recorded rather than applied: a channel and a buffer are
+            // enabled through sysfs by whoever brought the sensor up, and
+            // said so here because a reader comparing this with the
+            // equipment is why they are kept.
+            match iio.channels {
+                Some(channels) => {
+                    let _ = writeln!(
+                        out,
+                        "  channels         {channels} enabled, recorded, not applied"
+                    );
+                }
+                None => {
+                    let _ = writeln!(
+                        out,
+                        "  channels         none stated, so the buffer is read as it comes"
+                    );
+                }
+            }
+            match iio.sample_rate {
+                Some(rate) => {
+                    let _ = writeln!(
+                        out,
+                        "  sample_rate      {rate} sample sets a second, recorded, not \
+                         applied"
+                    );
+                }
+                None => {
+                    let _ = writeln!(out, "  sample_rate      none stated");
+                }
+            }
+        }
         EndpointConfig::Can(can) => {
             let _ = writeln!(out, "  interface        {}", can.interface);
             let _ = writeln!(

@@ -487,6 +487,14 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
                 None => "synchronous".to_string(),
             }
         ),
+        EndpointConfig::Iio(iio) => format!(
+            "iio {}{}",
+            iio.path,
+            match iio.channels {
+                Some(channels) => format!(", {channels} channels"),
+                None => String::new(),
+            }
+        ),
         EndpointConfig::Can(can) => format!(
             "can {} id {:#x}, {}",
             can.interface,

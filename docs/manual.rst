@@ -327,6 +327,37 @@ What it cannot do is make the bus: a virtual one needs
 and tcssim says exactly that if the interface is not there, as it does for the
 I\ :superscript:`2`\ C stub module.
 
+An IIO Payload
+--------------
+``type: iio``. **Experimental, not yet supported.** A sensor's buffered
+samples, read from a character device: what a thermistor, an accelerometer or
+an ADC looks like on Linux.
+
+.. code-block:: text
+
+   path           the buffer: /dev/iio:device0
+   channels       how many channels are enabled. Recorded, not applied
+   sample_rate    sample sets a second the device is expected to produce.
+                  Recorded, not applied
+
+Both terms are optional, and both are recorded rather than applied: enabling
+a channel and a buffer is done through ``sysfs`` by whoever brought the sensor
+up, and a handler that wrote there would be reconfiguring a sensor other
+programs may be reading. What they are for is saying what the file expects, so
+a stream of samples nobody can account for can be held against it.
+
+A read hands over whole sample sets, as many as are ready, so there is no
+stream section: nothing has to say where a read ends.
+
+An IIO payload cannot be triggered. A buffer is a stream out of the sensor --
+there is nothing on that descriptor to write -- so a file asking for one is
+refused, as a datagram payload asking for one is.
+
+The simulator stands in for the buffer with a pseudo-terminal, as it does for
+a serial line: the path the handler was told to open leads to it while the
+payload runs. What it does not stand in for is the ``sysfs`` half, the
+channels and the buffer -- which the handler does not touch either.
+
 A Serial Payload
 ----------------
 ``type: serial``. A line, with terms that say how it is driven. A payload

@@ -2038,6 +2038,66 @@ be, settled before there is equipment to try it against. They may change,
 where the five supported kinds -- ``network``, ``device``, ``serial``, ``i2c``
 and ``spi`` -- will not.
 
+IIO Payloads: a Sensor's Buffer
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Experimental, not yet supported.**
+
+The kernel's Industrial I/O subsystem is what a sensor looks like on Linux. A
+program that wants a stream of samples enables the channels it cares about and
+a buffer, both through ``sysfs``, and then reads ``/dev/iio:deviceN``, which
+hands over packed sample sets as they become ready.
+
+That is a device file a handler reads, which is nearly a ``device`` payload.
+What makes it a kind of its own is that it is read-only and that what the
+samples mean depends on terms a ``device`` payload has no words for. The rules
+are in ``tcslibgs::endpoint_config_iio``, the endpoint in
+``tcspecial::endpoint_iio`` and the stand-in in ``tcssim::payload_iio``.
+
+Requirement
+    An IIO payload is located by a path, and states a number of ``channels``
+    and a ``sample_rate`` or neither. A payload that states neither is a
+    buffer read as it comes, which is a perfectly good thing to be; the terms
+    are for a file that knows what the sensor was set up to produce.
+
+Requirement
+    Both terms are recorded and not applied. Channels and buffers are enabled
+    through ``sysfs`` by whoever brought the sensor up, and a handler that
+    wrote there would be reconfiguring a sensor other programs may be
+    reading. Keeping them lets a stream of samples nobody can account for be
+    held against what the file expected.
+
+Requirement
+    Neither may be nought. A buffer with no channels enabled produces
+    nothing, and a payload that produces nothing is a payload nobody can
+    read.
+
+Requirement
+    An IIO payload has no stream section. A buffer read hands over whole
+    sample sets and never part of one, so there is nothing for a rule about
+    where a read ends to say.
+
+Requirement
+    An IIO payload cannot be triggered, and the refusal is in the payload
+    configuration rather than in the simulator. It is not that a stand-in
+    cannot hear a request: a sample buffer is a stream out of the sensor, so
+    there is nothing on that descriptor to write and nowhere for a trigger to
+    go. A datagram payload is refused in the same place for the same kind of
+    reason.
+
+Requirement
+    The endpoint refuses a write rather than attempting one, and says what an
+    IIO payload is. The write would fail anyway -- the device is opened for
+    reading -- but a driver's error says nothing about why, where this says
+    that a sensor's settings are in sysfs and not on this descriptor.
+
+Requirement
+    The stand-in is a pseudo-terminal, as a serial line's is, and stands in
+    for the data and not the ``sysfs`` around it. The kernel's ``iio_dummy``
+    module would be a sensor and is the wrong shape for this: it generates
+    values of its own, so a simulator file would decide nothing about what the
+    payload produced. What is missing from the stand-in is missing from the
+    handler too, which touches none of those attributes.
+
 CAN Payloads: a Bus of Peers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 **Experimental, not yet supported.**

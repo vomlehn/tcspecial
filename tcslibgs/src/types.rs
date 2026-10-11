@@ -109,6 +109,10 @@ pub enum DHType {
     ///
     /// Experimental; see [`crate::endpoint_config_can`].
     Can,
+    /// A handler whose payload is a sensor's buffered samples.
+    ///
+    /// Experimental; see [`crate::endpoint_config_iio`].
+    Iio,
 }
 
 /// Something one handler takes for itself, and so which no other may take.
@@ -168,6 +172,7 @@ fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
         },
         EndpointConfig::Device(device) => Claim::Path(device.path.clone()),
         EndpointConfig::Serial(serial) => Claim::Path(serial.path.clone()),
+        EndpointConfig::Iio(iio) => Claim::Path(iio.path.clone()),
         EndpointConfig::Spi(spi) => Claim::Path(spi.path.clone()),
         EndpointConfig::I2c(i2c) => Claim::OnBus {
             bus: i2c.bus.clone(),
@@ -321,6 +326,7 @@ impl DHType {
             DHType::I2c => "i2c",
             DHType::Spi => "spi",
             DHType::Can => "can",
+            DHType::Iio => "iio",
         }
     }
 
@@ -333,6 +339,7 @@ impl DHType {
             DHType::I2c,
             DHType::Spi,
             DHType::Can,
+            DHType::Iio,
         ]
         .into_iter()
         .find(|kind| kind.spelling() == text)
@@ -344,14 +351,14 @@ impl DHType {
     /// writes, and these words appear in errors people read.
     pub fn article(&self) -> &'static str {
         match self {
-            DHType::I2c => "an",
+            DHType::I2c | DHType::Iio => "an",
             _ => "a",
         }
     }
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device, serial, i2c, spi, or can".to_string()
+        "network, device, serial, i2c, spi, can, or iio".to_string()
     }
 }
 
@@ -708,6 +715,19 @@ pub struct SpiConfig {
     pub cs_active: CsActive,
 }
 
+/// Configuration for an endpoint that is a sensor's sample buffer
+///
+/// Experimental; see [`crate::endpoint_config_iio`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IioConfig {
+    /// The character device the buffer is read from: `/dev/iio:device0`.
+    pub path: String,
+    /// How many channels the file says are enabled, recorded not applied.
+    pub channels: Option<u32>,
+    /// How many sample sets a second it expects, recorded not applied.
+    pub sample_rate: Option<u32>,
+}
+
 /// Configuration for an endpoint on a CAN bus
 ///
 /// Experimental; see [`crate::endpoint_config_can`] for what each term means
@@ -752,6 +772,8 @@ pub enum EndpointConfig {
     Spi(SpiConfig),
     /// Experimental; see [`CanConfig`].
     Can(CanConfig),
+    /// Experimental; see [`IioConfig`].
+    Iio(IioConfig),
 }
 
 impl EndpointConfig {
@@ -769,6 +791,7 @@ impl EndpointConfig {
             EndpointConfig::I2c(_) => DHType::I2c,
             EndpointConfig::Spi(_) => DHType::Spi,
             EndpointConfig::Can(_) => DHType::Can,
+            EndpointConfig::Iio(_) => DHType::Iio,
         }
     }
 }
@@ -1001,6 +1024,8 @@ pub(crate) fn link_params_of(
         rs485_delay_after_send_ms: inherited!(rs485_delay_after_send_ms),
         bitrate: inherited!(bitrate),
         can_fd: inherited!(can_fd),
+        channels: inherited!(channels),
+        sample_rate: inherited!(sample_rate),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
             timeout: s.timeout,
@@ -1013,6 +1038,7 @@ pub(crate) fn link_params_of(
         DHType::I2c => crate::endpoint_config_i2c::group_kind_of(name, wire),
         DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
         DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
+        DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
         other => {
             return Err(format!(
                 "{} is not a kind of link this describes",
@@ -1383,6 +1409,13 @@ pub struct DHGroupJson {
     /// Whether a CAN payload's frames are CAN FD rather than classic CAN.
     #[serde(default)]
     pub can_fd: Option<Scalar>,
+    /// How many channels an IIO device has enabled. IIO payloads only, and
+    /// experimental; see [`crate::endpoint_config_iio`].
+    #[serde(default)]
+    pub channels: Option<Scalar>,
+    /// How many sample sets a second it is expected to produce.
+    #[serde(default)]
+    pub sample_rate: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1542,6 +1575,13 @@ pub struct DHConfigJson {
     /// Whether a CAN payload's frames are CAN FD rather than classic CAN.
     #[serde(default)]
     pub can_fd: Option<Scalar>,
+    /// How many channels an IIO device has enabled. IIO payloads only, and
+    /// experimental; see [`crate::endpoint_config_iio`].
+    #[serde(default)]
+    pub channels: Option<Scalar>,
+    /// How many sample sets a second it is expected to produce.
+    #[serde(default)]
+    pub sample_rate: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1774,7 +1814,11 @@ impl DHConfigJson {
             // A line, a bus and a peripheral, each of which carries
             // attributes of its own: a data rate, a slave address, a clock
             // mode. See link_of, which is where every rule about them lives.
-            kind @ (DHType::Serial | DHType::I2c | DHType::Spi | DHType::Can) => {
+            kind @ (DHType::Serial
+            | DHType::I2c
+            | DHType::Spi
+            | DHType::Can
+            | DHType::Iio) => {
                 link_of(&self.name, kind, self, group)?
             }
         };
@@ -1858,6 +1902,21 @@ impl DHConfigJson {
                              spoken -- which a triggered payload does not do"
                         ));
                     }
+                }
+
+                // A sample buffer is a stream out of a sensor: there is
+                // nothing on that descriptor to write, and what would change
+                // what it produces is in sysfs, which belongs to whoever
+                // brought the sensor up. So there is nowhere to send a
+                // trigger, and a file asking for one is corrected rather
+                // than run.
+                if kind == DHType::Iio {
+                    return Err(
+                        "an iio payload cannot be triggered: a sample buffer is read \
+                         and not written, so there is nowhere to send a trigger -- a \
+                         sensor's channels and rate are set through sysfs"
+                            .to_string(),
+                    );
                 }
 
                 let written = trigger.ok_or(
@@ -3654,6 +3713,81 @@ payloads:
             EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
             other => panic!("expected a serial endpoint, got {other:?}"),
         }
+    }
+
+    /// An IIO payload reaches a handler with what its buffer is expected to
+    /// hold.
+    #[test]
+    fn an_iio_payload_is_a_buffer_and_what_it_holds() {
+        let sensor = "    path: /dev/iio:device0\n    channels: 3\n    \
+                      sample_rate: 100\n    packet_size: 12\n";
+        let handlers = link("iio", sensor)
+            .expect("a sensor")
+            .to_dh_configs()
+            .expect("it becomes a handler");
+
+        match &handlers[0].endpoint {
+            EndpointConfig::Iio(iio) => {
+                assert_eq!(iio.path, "/dev/iio:device0");
+                assert_eq!(iio.channels, Some(3));
+                assert_eq!(iio.sample_rate, Some(100));
+            }
+            other => panic!("expected an IIO endpoint, got {other:?}"),
+        }
+        assert_eq!(handlers[0].endpoint.kind(), DHType::Iio);
+
+        // And a sensor that says only where it is, which is a buffer read as
+        // it comes.
+        let bare = link("iio", "    path: /dev/iio:device1\n    packet_size: 4\n")
+            .expect("a sensor")
+            .to_dh_configs()
+            .expect("it becomes a handler");
+        match &bare[0].endpoint {
+            EndpointConfig::Iio(iio) => {
+                assert_eq!(iio.channels, None);
+                assert_eq!(iio.sample_rate, None);
+            }
+            other => panic!("expected an IIO endpoint, got {other:?}"),
+        }
+    }
+
+    /// An IIO payload cannot be triggered: there is nowhere to send a
+    /// request.
+    ///
+    /// The refusal belongs here rather than in the simulator, as a datagram
+    /// payload's does: it is not that the stand-in cannot hear a trigger, it
+    /// is that a sample buffer has nothing to write to.
+    #[test]
+    fn an_iio_payload_cannot_be_triggered() {
+        let said = link(
+            "iio",
+            "    path: /dev/iio:device0\n    packet_size: 4\n    mode: triggered\n    \
+             trigger: \"READ\"\n    packet_interval_ms: 100\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("a sensor cannot be asked");
+        assert!(
+            said.contains("read and not written") && said.contains("sysfs"),
+            "the error should say why it cannot be asked: {said}"
+        );
+    }
+
+    /// What a sensor says belongs to a sensor and to no other kind of link.
+    #[test]
+    fn iio_terms_are_refused_on_a_kind_that_is_not_a_sensor() {
+        let said = link(
+            "spi",
+            "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n    \
+             packet_size: 4\n    channels: 2\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("a peripheral has no channels");
+        assert!(
+            said.contains("channels"),
+            "the error should name the term: {said}"
+        );
     }
 
     /// A CAN payload reaches a handler with its interface and identifier.

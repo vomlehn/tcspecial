@@ -114,6 +114,10 @@ pub enum PayloadProtocol {
     /// A payload on a CAN bus, which the simulator joins as another member of
     /// the same bus: see [`crate::payload_can`]. Experimental.
     Can,
+    /// A sensor's sample buffer, which the simulator stands in for with a pty
+    /// -- the samples but not the sysfs around them: see
+    /// [`crate::payload_iio`]. Experimental.
+    Iio,
 }
 
 /// Statistics for a payload
@@ -211,6 +215,9 @@ impl SimulatedPayload {
                 }
                 PayloadProtocol::Can => {
                     crate::payload_can::run_can_payload(config, running, stats)
+                }
+                PayloadProtocol::Iio => {
+                    crate::payload_iio::run_iio_payload(config, running, stats)
                 }
                 PayloadProtocol::UnixStream => {
                     crate::payload_unix::run_unix_stream_payload(config, running, stats)

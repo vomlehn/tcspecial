@@ -51,6 +51,12 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // which makes this the one experimental kind whose stand-in is as
         // faithful as a socket.
         EndpointConfig::Can(can) => (PayloadProtocol::Can, can.interface.clone(), 0, 0),
+        // A sensor's buffer the simulator can be: a pty's slave is a
+        // character device a handler reads the same way, so the path the
+        // handler was told to open is made to lead there. What it does not
+        // stand in for is the sysfs around it -- the channels and the buffer
+        // -- which a handler does not touch either; see payload_iio.
+        EndpointConfig::Iio(iio) => (PayloadProtocol::Iio, iio.path.clone(), 0, 0),
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
@@ -167,6 +173,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         EndpointConfig::I2c(i2c) => format!("I2C {} at {:#04X}", i2c.bus, i2c.address),
         EndpointConfig::Spi(spi) => format!("SPI {} {}", spi.path, spi.mode),
         EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
+        EndpointConfig::Iio(iio) => format!("IIO {}", iio.path),
     }
 }
 

@@ -14,6 +14,11 @@
 //! type would be nine copies of the same delegation with nine places for them
 //! to drift apart.
 //!
+//! [`ComputePort`] is the other adapter, and it is here rather than beside the
+//! computations for the same reason: it answers the same questions as
+//! [`EndpointPort`] -- what a refusal says, what a partial datum means -- and
+//! answers kept together are answers that stay the same.
+//!
 //! # What this decides
 //!
 //! Three things, and each is a reliability choice worth stating because the
@@ -34,9 +39,13 @@
 //! devices, and every endpoint turns a would-block into it. A port that
 //! reported those would bury the real faults in them.
 
+use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
 
+use tcslibgs::graph::Node;
 use tcslibgs::{EndpointConfig, TcsResult};
+
+use crate::node::compute::{self, Function};
 
 use crate::endpoint::{
     bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
@@ -302,6 +311,100 @@ impl Port for EndpointPort {
 
     fn produces(&self) -> bool {
         self.uses.produces()
+    }
+}
+
+/// A computation, as a node of the graph.
+///
+/// The whole of what this adds to a [`Function`] is somewhere to put a result
+/// until the fabric takes it. A function is handed one arrival at a time and
+/// says for itself when it has enough -- a mean over three sensors answers on
+/// the third -- so the result appears as a consequence of a delivery and not
+/// of a schedule, which is what [`Port::ready`] is for.
+pub struct ComputePort {
+    /// The node's name in the configuration, which every complaint names.
+    what: String,
+    /// What it computes.
+    function: Box<dyn Function>,
+    /// Results waiting to be taken.
+    ///
+    /// Normally at most one: the fabric takes a result as soon as the node
+    /// says it has one. A queue rather than a slot all the same, because the
+    /// alternative when a second result arrives before the first is taken is
+    /// to overwrite it -- a reading dropped where nothing says so, which is
+    /// the one outcome this project will not have.
+    ready: VecDeque<Vec<u8>>,
+}
+
+impl ComputePort {
+    /// Hold a computation that is already built.
+    pub fn of(what: &str, function: Box<dyn Function>) -> ComputePort {
+        ComputePort {
+            what: what.to_string(),
+            function,
+            ready: VecDeque::new(),
+        }
+    }
+
+    /// Build what this node's configuration asks for.
+    ///
+    /// `inputs` is what the routing found bound to the node, which a
+    /// computation over several of them needs: a mean cannot know it is
+    /// waiting for three until something tells it how many links arrive.
+    pub fn make(node: &Node, inputs: &[&str]) -> Result<ComputePort, String> {
+        Ok(ComputePort::of(&node.name, compute::make(node, inputs)?))
+    }
+
+    /// What this node computes, for a log line that says what is running.
+    pub fn function(&self) -> &str {
+        self.function.name()
+    }
+}
+
+impl Port for ComputePort {
+    fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        let Some(result) = self.ready.pop_front() else {
+            return Ok(0);
+        };
+
+        // A result that will not fit is reported and not cut down to size.
+        // Half of a number is a different number, and the queue keeps it so
+        // that a caller with a larger buffer can still have it.
+        if result.len() > buffer.len() {
+            let wanted = result.len();
+            self.ready.push_front(result);
+            return Err(format!(
+                "{}: the result of {} is {wanted} bytes and the buffer holds {}:                  part of a value is not a smaller value",
+                self.what,
+                self.function.name(),
+                buffer.len()
+            ));
+        }
+
+        buffer[..result.len()].copy_from_slice(&result);
+        Ok(result.len())
+    }
+
+    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<(), String> {
+        match self.function.give(input, data) {
+            Ok(Some(result)) => {
+                self.ready.push_back(result);
+                Ok(())
+            }
+            // Nothing to send yet: a function waiting for the rest of its
+            // inputs, or one that decided nothing needs to change. The
+            // ordinary answer, and not a failure.
+            Ok(None) => Ok(()),
+            Err(why) => Err(format!(
+                "{}: {} cannot use what arrived: {why}",
+                self.what,
+                self.function.name()
+            )),
+        }
+    }
+
+    fn ready(&self) -> bool {
+        !self.ready.is_empty()
     }
 }
 
@@ -651,6 +754,87 @@ mod tests {
 
         // And the descriptor a waiting loop would poll.
         assert!(port.io_fd() >= 0);
+    }
+
+    /// A computation holds its result until it is taken.
+    #[test]
+    fn a_computation_has_a_result_when_it_has_enough() {
+        use crate::node::compute::mean::Mean;
+
+        let mut port = ComputePort::of("mean_temp", Box::new(Mean::of(&["in0", "in1"]).unwrap()));
+        assert_eq!(port.function(), "mean");
+
+        // The first arrival is not a result: a mean of one of two sensors
+        // would be an average of a reading and nothing.
+        assert_eq!(port.give(Some("in0"), b"290.0"), Ok(()));
+        assert!(!port.ready(), "a mean of one input is not an average");
+        assert_eq!(port.take(&mut [0u8; 64]), Ok(0));
+
+        // The second is.
+        assert_eq!(port.give(Some("in1"), b"292.0"), Ok(()));
+        assert!(port.ready());
+
+        let mut buffer = [0u8; 64];
+        let got = port.take(&mut buffer).expect("the average");
+        assert_eq!(&buffer[..got], b"291");
+
+        // And it is gone once taken, rather than being handed out again.
+        assert!(!port.ready());
+        assert_eq!(port.take(&mut buffer), Ok(0));
+    }
+
+    /// A datum a computation cannot use is refused, naming both.
+    #[test]
+    fn a_datum_a_computation_cannot_use_is_refused() {
+        use crate::node::compute::mean::Mean;
+
+        let mut port = ComputePort::of("mean_temp", Box::new(Mean::of(&["in0"]).unwrap()));
+
+        let said = port
+            .give(Some("in0"), b"29x.15")
+            .expect_err("a reading that is not a number");
+        assert!(
+            said.contains("mean_temp") && said.contains("mean"),
+            "the complaint should name the node and the computation: {said}"
+        );
+    }
+
+    /// A result that will not fit is reported and kept, not cut down.
+    #[test]
+    fn a_result_too_large_for_the_buffer_is_kept() {
+        use crate::node::compute::mean::Mean;
+
+        let mut port = ComputePort::of("mean_temp", Box::new(Mean::of(&["in0"]).unwrap()));
+        port.give(Some("in0"), b"293.15").expect("a reading");
+        assert!(port.ready());
+
+        let said = port.take(&mut [0u8; 2]).expect_err("a buffer too small");
+        assert!(
+            said.contains("not a smaller value"),
+            "the complaint should say why it was not truncated: {said}"
+        );
+
+        // Still there, for a caller with room for it.
+        assert!(port.ready(), "the result should not have been thrown away");
+        let mut buffer = [0u8; 64];
+        let got = port.take(&mut buffer).expect("the result");
+        assert_eq!(&buffer[..got], b"293.15");
+    }
+
+    /// A device does not produce because something was delivered to it.
+    ///
+    /// The distinction [`Port::ready`] draws: an endpoint has data when its
+    /// device has data, which a write to it does not change.
+    #[test]
+    fn an_endpoint_is_never_ready_as_a_consequence_of_a_delivery() {
+        let (script, mut port) = port("moc", Use::Both);
+        script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
+
+        assert_eq!(port.give(None, b"1"), Ok(()));
+        assert!(
+            !port.ready(),
+            "a reading waiting on a socket is not a result of what was sent to it"
+        );
     }
 
     /// A device that must be asked is asked after each read.

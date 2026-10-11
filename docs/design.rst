@@ -336,7 +336,53 @@ ports
     fabric can move bytes to and from. One type for every interface rather than
     one per interface -- every endpoint already answers the same two traits, and
     a port per type would be nine copies of one delegation with nine places to
-    drift apart.
+    drift apart. A computation is a port of its own, holding what a function
+    produced until the fabric takes it.
+
+Requirement
+    A delivery that produces a result carries on from there, in the same pass.
+    Three sensors read on one interval must become three temperatures, an
+    average, a decision and a command to the heaters before the pass is over;
+    a fabric that stopped at the first delivery would leave a result sitting in
+    a computation until something else happened to read it, and a control loop
+    whose steps happen on different passes is a control loop whose delay
+    depends on the shape of the graph.
+
+Requirement
+    A node is asked whether it has a result rather than simply read after a
+    delivery. The two are different things: a sensor has a reading when its
+    group is due and a delivery does not change that, while a computation has
+    one *because* something arrived. Reading every destination instead would
+    cost a device read per delivery, and would take a command off a MOC link
+    and pass it on as though it were a result.
+
+Requirement
+    Delivery is breadth first. The three destinations of a "T" are all reached
+    before any of their own destinations are, so the ground has a reading
+    before an on-board computation over it begins -- the order an operator
+    watching telemetry expects, and the order that loses least when a later
+    step fails.
+
+Requirement
+    A result is passed on at most as far as there are nodes, and a cascade that
+    goes further is stopped and reported as a cycle. A path through a graph
+    with no cycle visits each node at most once. The links are checked for
+    cycles before any of this runs, so this is the backstop for a check that
+    was wrong rather than the rule itself -- and what it must not do is loop: a
+    fabric going round a cycle is a vehicle that has stopped reading its
+    sensors, with no telemetry to say why.
+
+Requirement
+    A computation that produces nothing produces no deliveries, and that is not
+    a failure. A function waiting for the rest of its inputs and one that
+    decided nothing needs to change give the same answer, and a relay
+    commanded to the state it is already in every three seconds is a relay
+    nobody could tell had stopped answering.
+
+Requirement
+    A result too large for the buffer it is asked for is reported and kept, not
+    cut to fit. Half of a number is a different number, and keeping it leaves
+    it there for a caller with room.
 
 Requirement
     A node is opened for the direction the configuration uses it in, and the

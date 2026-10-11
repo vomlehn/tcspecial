@@ -21,7 +21,7 @@
 //! taken. What must never happen is a failure that nobody hears about, so
 //! every one is counted and named.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 use super::route::Routes;
 
@@ -52,6 +52,25 @@ pub trait Port {
     /// Whether anything may be taken from it.
     fn produces(&self) -> bool {
         true
+    }
+
+    /// Whether this node has a result waiting as a consequence of what it was
+    /// just given.
+    ///
+    /// The difference between a node that produces on its own schedule and one
+    /// that produces because something arrived. A sensor is the first: it has
+    /// a reading when its group is due, and nothing a delivery does changes
+    /// that -- so the default here is `false` and a device never answers
+    /// otherwise. A computation is the second: a mean handed its third input
+    /// has an average to pass on *now*, and a pass that ended with the
+    /// delivery would leave it there until something else happened to read the
+    /// node.
+    ///
+    /// Asked rather than simply reading every destination after a delivery,
+    /// because reading a device is not free and reading a MOC link would take
+    /// a command off it and pass it on as though it were a result.
+    fn ready(&self) -> bool {
+        false
     }
 }
 
@@ -112,46 +131,106 @@ impl Fabric {
         self.nodes.contains_key(name)
     }
 
-    /// Hand `data` to every place `from`'s output goes.
+    /// Hand `data` to every place `from`'s output goes, and pass on whatever
+    /// that produces.
     ///
     /// Each destination is attempted whatever happened to the ones before it.
     /// A log that cannot be written must not stop the ground getting its
     /// telemetry: they are two destinations of one link, and the link is not
     /// a unit that succeeds or fails as a whole.
+    ///
+    /// A delivery that produces a result carries on from there, which is what
+    /// makes a chain of computations a chain: a reading delivered to a
+    /// converter becomes a temperature, which goes to the mean and the ground,
+    /// and the average goes to the thermostat, whose decision reaches the
+    /// heaters -- all of it from the one delivery of the one reading, and all
+    /// of it in the pass that read the sensor. A node is asked whether it has
+    /// a result ([`Port::ready`]) rather than simply read, because reading a
+    /// device is not free and reading a MOC link would take a command off it
+    /// and pass that on as though it were a result.
+    ///
+    /// Breadth first, so that the three destinations of a "T" are all reached
+    /// before any of their own destinations are. The ground gets a reading
+    /// before an on-board computation over it starts, which is the order an
+    /// operator watching telemetry would expect, and the order that loses
+    /// least if a later step fails.
     pub fn deliver(&mut self, from: &str, data: &[u8]) -> Moved {
         let mut moved = Moved::default();
 
-        // Cloned because the deliveries are borrowed from the table while the
-        // nodes are borrowed mutably from the same struct. A handful of names
-        // per datum is not the cost worth restructuring for.
-        let deliveries: Vec<_> = self.routes.from(from).to_vec();
+        // How far a result may be passed on. A path through a graph with no
+        // cycle in it visits each node at most once, so a cascade longer than
+        // the number of nodes has been round a cycle -- and the links are
+        // checked for cycles before any of this runs, which makes this the
+        // backstop for a check that was wrong rather than the rule itself.
+        // Stopped and named rather than left to run: a loop here would be a
+        // vehicle that stops reading its sensors.
+        let most = self.nodes.len().max(1);
 
-        for delivery in deliveries {
-            let Some(node) = self.nodes.get_mut(&delivery.to) else {
-                // A checked configuration has no such link. Counted rather
-                // than ignored, because the alternative is telemetry going
-                // quietly nowhere.
-                moved.refused.push((
-                    delivery.to.clone(),
-                    "there is no such node in this fabric".to_string(),
-                ));
-                continue;
-            };
+        let mut work: VecDeque<(String, Vec<u8>, usize)> =
+            VecDeque::from(vec![(from.to_string(), data.to_vec(), 0)]);
 
-            if !node.accepts() {
-                moved.refused.push((
-                    delivery.to.clone(),
-                    "this node takes nothing: it is read, not written".to_string(),
-                ));
-                continue;
-            }
+        while let Some((from, data, depth)) = work.pop_front() {
+            // Cloned because the deliveries are borrowed from the table while
+            // the nodes are borrowed mutably from the same struct. A handful
+            // of names per datum is not the cost worth restructuring for.
+            let deliveries: Vec<_> = self.routes.from(&from).to_vec();
 
-            match node.give(delivery.input.as_deref(), data) {
-                Ok(()) => {
-                    moved.delivered += 1;
-                    moved.bytes += data.len();
+            for delivery in deliveries {
+                let Some(node) = self.nodes.get_mut(&delivery.to) else {
+                    // A checked configuration has no such link. Counted
+                    // rather than ignored, because the alternative is
+                    // telemetry going quietly nowhere.
+                    moved.refused.push((
+                        delivery.to.clone(),
+                        "there is no such node in this fabric".to_string(),
+                    ));
+                    continue;
+                };
+
+                if !node.accepts() {
+                    moved.refused.push((
+                        delivery.to.clone(),
+                        "this node takes nothing: it is read, not written".to_string(),
+                    ));
+                    continue;
                 }
-                Err(why) => moved.refused.push((delivery.to.clone(), why)),
+
+                match node.give(delivery.input.as_deref(), &data) {
+                    Ok(()) => {
+                        moved.delivered += 1;
+                        moved.bytes += data.len();
+                    }
+                    Err(why) => {
+                        moved.refused.push((delivery.to.clone(), why));
+                        continue;
+                    }
+                }
+
+                if !node.ready() {
+                    continue;
+                }
+
+                if depth + 1 >= most {
+                    moved.refused.push((
+                        delivery.to.clone(),
+                        format!(
+                            "a result is still being passed on after {most} nodes,                              which is more than there are: the links must have a                              cycle in them"
+                        ),
+                    ));
+                    continue;
+                }
+
+                let mut buffer = vec![0u8; self.buffer];
+                match node.take(&mut buffer) {
+                    Ok(0) => {}
+                    Ok(n) => {
+                        buffer.truncate(n);
+                        work.push_back((delivery.to.clone(), buffer, depth + 1));
+                    }
+                    // A node that said it had a result and then did not give
+                    // one up. Counted, because the result is gone either way.
+                    Err(why) => moved.refused.push((delivery.to.clone(), why)),
+                }
             }
         }
 
@@ -335,6 +414,232 @@ mod tests {
         // away from the fan-out that feeds it.
         assert_eq!(moc.borrow().given.len(), 3);
         assert_eq!(log.borrow().given.len(), 3);
+    }
+
+    /// The worked example, computed end to end from three raw readings.
+    ///
+    /// The test this module exists for. Three sensors are read, and from those
+    /// three deliveries alone the converters produce temperatures, the ground
+    /// and the log get every one of them, the mean produces an average on the
+    /// third, the thermostat compares it with its setpoint, and the heaters
+    /// are asserted -- in the pass that read the sensors, with nothing else
+    /// driving it.
+    ///
+    /// The computations are built from the shipped configuration rather than
+    /// written here, so this is the example that is documented and not an
+    /// arrangement that resembles it.
+    #[test]
+    fn the_worked_example_computes_from_three_readings() {
+        use crate::runtime::port::ComputePort;
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let routes = Routes::of(&graph);
+
+        let mut fabric = Fabric::new(routes.clone(), 64);
+        for name in ["k_fore", "k_aft", "k_bay", "mean_temp", "thermostat"] {
+            let node = graph.node(name).expect("a node of the example");
+            let inputs = routes.inputs_of(name);
+            let port = ComputePort::make(node, &inputs)
+                .unwrap_or_else(|why| panic!("{name}: {why}"));
+            fabric.hold(name, Box::new(port));
+        }
+
+        let (moc, moc_port) = recorder();
+        let (log, log_port) = recorder();
+        let (heaters, heater_port) = recorder();
+        fabric.hold("moc", moc_port);
+        fabric.hold("housekeeping", log_port);
+        fabric.hold("heaters", heater_port);
+
+        // Three raw readings, each in its own part's format, all of them
+        // cold: 289.15, 289.15 and 287.3188 kelvin, whose average is more
+        // than two degrees below the setpoint of 293.15.
+        let mut moved = Moved::default();
+        moved.add(fabric.deliver("temp_fore", &[0x01, 0x00]));
+        moved.add(fabric.deliver("temp_aft", &[0x01, 0x00]));
+        moved.add(fabric.deliver("temp_bay", &[0x00, 0x10, 0x00]));
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+
+        // What the ground saw: three temperatures and the average.
+        let to_moc: Vec<String> = moc
+            .borrow()
+            .given
+            .iter()
+            .map(|(_, datum)| String::from_utf8_lossy(datum).to_string())
+            .collect();
+        assert_eq!(
+            to_moc,
+            vec!["289.15", "289.15", "287.3188", "288.5396"],
+            "the ground should have the three readings and their mean"
+        );
+
+        // The log saw the same three and the decision, which is the other
+        // leg of each "T".
+        assert_eq!(log.borrow().given.len(), 4, "{:?}", log.borrow().given);
+
+        // And the heaters were asserted, from the one pass.
+        let to_heaters: Vec<Vec<u8>> = heaters
+            .borrow()
+            .given
+            .iter()
+            .map(|(_, datum)| datum.clone())
+            .collect();
+        assert_eq!(
+            to_heaters,
+            vec![b"1".to_vec()],
+            "a cabin below the band should have its heaters on"
+        );
+    }
+
+    /// A decision that has not changed is not sent again.
+    ///
+    /// The other half of the cascade: a pass that produces nothing to pass on
+    /// is a pass with no deliveries in it, and that is correct rather than a
+    /// failure. A relay commanded to the state it is already in every three
+    /// seconds would be a relay nobody could tell had stopped answering.
+    #[test]
+    fn a_pass_that_changes_nothing_delivers_nothing_onward() {
+        use crate::runtime::port::ComputePort;
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let routes = Routes::of(&graph);
+
+        let mut fabric = Fabric::new(routes.clone(), 64);
+        for name in ["k_fore", "k_aft", "k_bay", "mean_temp", "thermostat"] {
+            let node = graph.node(name).expect("a node of the example");
+            let inputs = routes.inputs_of(name);
+            fabric.hold(
+                name,
+                Box::new(ComputePort::make(node, &inputs).expect("the computation")),
+            );
+        }
+        let (_, moc_port) = recorder();
+        let (_, log_port) = recorder();
+        let (heaters, heater_port) = recorder();
+        fabric.hold("moc", moc_port);
+        fabric.hold("housekeeping", log_port);
+        fabric.hold("heaters", heater_port);
+
+        // Two passes of the same cold readings. The first decides, the second
+        // decides the same thing.
+        for _ in 0..2 {
+            fabric.deliver("temp_fore", &[0x01, 0x00]);
+            fabric.deliver("temp_aft", &[0x01, 0x00]);
+            fabric.deliver("temp_bay", &[0x00, 0x10, 0x00]);
+        }
+
+        assert_eq!(
+            heaters.borrow().given.len(),
+            1,
+            "the heaters should have been commanded once, not once a pass"
+        );
+    }
+
+    /// A node that will not take what arrives stops that branch and no other.
+    ///
+    /// A computation refusing a datum is counted and the pass carries on:
+    /// the ground still gets the reading the computation could not use, which
+    /// is exactly the reading somebody will want to look at.
+    #[test]
+    fn a_computation_that_refuses_does_not_stop_the_telemetry() {
+        use crate::runtime::port::ComputePort;
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let routes = Routes::of(&graph);
+
+        let mut fabric = Fabric::new(routes.clone(), 64);
+        let node = graph.node("k_fore").expect("the converter");
+        fabric.hold(
+            "k_fore",
+            Box::new(ComputePort::make(node, &routes.inputs_of("k_fore")).expect("it builds")),
+        );
+        let (moc, moc_port) = recorder();
+        fabric.hold("moc", moc_port);
+
+        // Three bytes where the part's format is two: a bus that returned
+        // something else, or a sensor read wrongly.
+        let moved = fabric.deliver("temp_fore", &[0x01, 0x00, 0x00]);
+
+        assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
+        assert_eq!(moved.refused[0].0, "k_fore");
+        assert!(
+            moved.refused[0].1.contains("to_kelvin"),
+            "the complaint should name the computation: {}",
+            moved.refused[0].1
+        );
+        // Nothing reached the ground along that branch, and nothing was lost
+        // quietly: the refusal is in hand.
+        assert!(moc.borrow().given.is_empty());
+    }
+
+    /// A cycle in the links is stopped and named, not run.
+    ///
+    /// The links are checked for cycles before any of this runs, so reaching
+    /// this means the checking was wrong -- which is exactly when a backstop
+    /// earns its place. What it must not do is loop: a fabric going round a
+    /// cycle is a vehicle that has stopped reading its sensors, and no
+    /// telemetry would say why.
+    #[test]
+    fn a_cycle_is_stopped_and_named() {
+        use tcslibgs::graph::{Destinations, Link, Node};
+
+        /// A node that always has a result, which is what makes the cycle
+        /// turn.
+        struct Echo;
+
+        impl Port for Echo {
+            fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+                buffer[0] = 1;
+                Ok(1)
+            }
+
+            fn give(&mut self, _input: Option<&str>, _data: &[u8]) -> Result<(), String> {
+                Ok(())
+            }
+
+            fn ready(&self) -> bool {
+                true
+            }
+        }
+
+        let node = |name: &str| Node {
+            name: name.to_string(),
+            node_type: "compute".to_string(),
+            group: None,
+            attributes: Default::default(),
+            editor: None,
+        };
+        let link = |from: &str, to: &str| Link {
+            from: from.to_string(),
+            to: Destinations::of(vec![to.to_string()]),
+            comment: None,
+        };
+
+        let graph = Graph {
+            description: None,
+            groups: Vec::new(),
+            nodes: vec![node("a"), node("b")],
+            links: vec![link("a", "b"), link("b", "a")],
+            commands: Vec::new(),
+            files: Vec::new(),
+            homes: Default::default(),
+        };
+
+        let mut fabric = Fabric::new(Routes::of(&graph), 64);
+        fabric.hold("a", Box::new(Echo));
+        fabric.hold("b", Box::new(Echo));
+
+        let moved = fabric.deliver("a", &[1]);
+
+        assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
+        assert!(
+            moved.refused[0].1.contains("cycle"),
+            "the complaint should say what it is: {}",
+            moved.refused[0].1
+        );
     }
 
     /// One destination refusing does not stop the others.

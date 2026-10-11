@@ -25,10 +25,10 @@ use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 
 use crate::node::can::CanEndpoint;
 use crate::endpoint_device::DeviceEndpoint;
-use crate::endpoint_gpio::GpioEndpoint;
+use crate::node::gpio::GpioEndpoint;
 use crate::node::i2c::I2cEndpoint;
-use crate::endpoint_iio::IioEndpoint;
-use crate::endpoint_rpmsg::RpmsgEndpoint;
+use crate::node::iio::IioEndpoint;
+use crate::node::rpmsg::RpmsgEndpoint;
 use crate::endpoint_serial::SerialEndpoint;
 use crate::node::spi::SpiEndpoint;
 use crate::endpoint_tcp::TcpEndpoint;

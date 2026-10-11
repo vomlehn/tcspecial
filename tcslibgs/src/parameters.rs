@@ -211,7 +211,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             let _ = writeln!(
                 out,
                 "  max_message_bytes {} bytes{}",
-                crate::endpoint_config_rpmsg::message_bytes(rpmsg.max_message_bytes),
+                crate::node::rpmsg::message_bytes(rpmsg.max_message_bytes),
                 match rpmsg.max_message_bytes {
                     Some(_) => "",
                     None => ", which is what the usual transport leaves",

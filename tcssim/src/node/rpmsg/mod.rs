@@ -1,4 +1,4 @@
-//! A simulated payload that stands in for software on another core.
+//! A simulated device that stands in for software on another core.
 //!
 //! **Experimental, and not yet supported.** Run against a pseudo-terminal
 //! standing in for the channel, and against no remote processor.
@@ -6,7 +6,7 @@
 //! An rpmsg channel is a character device carrying whole messages both ways,
 //! and a pty is a character device carrying bytes both ways -- so the
 //! stand-in is [`crate::pty`] again, with the configured path led to the
-//! slave while the payload runs. The handler writes a message and reads an
+//! slave while the device runs. The handler writes a message and reads an
 //! answer exactly as it would on a real channel.
 //!
 //! Two things a pty is not. It has no entry under `/sys/class/rpmsg`, so the
@@ -16,9 +16,9 @@
 //! message boundaries: the kernel's rpmsg driver hands over one message per
 //! read, where a pty hands over whatever bytes are there. A packet sent as
 //! one write commonly arrives as one read, so the difference shows only where
-//! a payload writes faster than the handler reads.
+//! a device writes faster than the handler reads.
 //!
-//! Both directions, so a triggered payload works here: the simulator reads
+//! Both directions, so a triggered device works here: the simulator reads
 //! the handler's request off the same pty and answers it.
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
@@ -34,8 +34,8 @@ use crate::payload::{
 };
 use crate::pty::SimulatedNode;
 
-/// Run a simulated payload on an rpmsg channel.
-pub fn run_rpmsg_payload(
+/// Run a simulated device on an rpmsg channel.
+pub fn run_rpmsg_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
@@ -62,7 +62,7 @@ pub fn run_rpmsg_payload(
         let pacing = Pacing::read(&config);
 
         // Whatever the handler has sent down the channel, which is a request
-        // for a payload that answers them.
+        // for a device that answers them.
         let mut buf = vec![0u8; 4096];
         let mut asked = 0;
         if let Ok(n) = channel.master.read(&mut buf) {
@@ -144,8 +144,8 @@ mod tests {
         let dir = tempfile::tempdir().expect("a temporary directory");
         let path = dir.path().join("rpmsg0").display().to_string();
 
-        let mut payload = SimulatedPayload::new(channel_at(&path, false, 20));
-        payload.start().expect("the remote starts");
+        let mut device = SimulatedPayload::new(channel_at(&path, false, 20));
+        device.start().expect("the remote starts");
 
         let got = (0..100)
             .find_map(|_| {
@@ -160,7 +160,7 @@ mod tests {
             .expect("the remote sent a message");
         assert_eq!(got, 8, "one message of the configured size");
 
-        payload.stop();
+        device.stop();
     }
 
     /// A triggered remote answers a request and says nothing otherwise.
@@ -172,10 +172,10 @@ mod tests {
         let dir = tempfile::tempdir().expect("a temporary directory");
         let path = dir.path().join("rpmsg1").display().to_string();
 
-        // A triggered payload sends when it is asked and at no rate of its
-        // own, which is what the payload configuration holds it to.
-        let mut payload = SimulatedPayload::new(channel_at(&path, true, 0));
-        payload.start().expect("the remote starts");
+        // A triggered device sends when it is asked and at no rate of its
+        // own, which is what the device configuration holds it to.
+        let mut device = SimulatedPayload::new(channel_at(&path, true, 0));
+        device.start().expect("the remote starts");
 
         // The handler's end of the channel, once the stand-in has made it.
         let mut handler = (0..100)
@@ -209,7 +209,7 @@ mod tests {
             .expect("the request was answered");
         assert_eq!(answered, 8, "one message of the configured size");
 
-        payload.stop();
+        device.stop();
     }
 
     /// Reading a file without blocking, which the test above needs of the

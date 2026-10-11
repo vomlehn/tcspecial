@@ -68,7 +68,7 @@ pub struct PayloadConfig {
     ///
     /// Not bytes and not a size: what a simulated set of discretes produces
     /// is an edge on each of these every interval. Experimental; see
-    /// [`crate::payload_gpio`].
+    /// [`crate::node::gpio`].
     pub gpio_lines: Vec<u32>,
     /// Whether this payload answers requests rather than sending on its own.
     ///
@@ -122,13 +122,13 @@ pub enum PayloadProtocol {
     Can,
     /// A sensor's sample buffer, which the simulator stands in for with a pty
     /// -- the samples but not the sysfs around them: see
-    /// [`crate::payload_iio`]. Experimental.
+    /// [`crate::node::iio`]. Experimental.
     Iio,
     /// An rpmsg channel to another core, which the simulator stands in for
-    /// with a pty: see [`crate::payload_rpmsg`]. Experimental.
+    /// with a pty: see [`crate::node::rpmsg`]. Experimental.
     Rpmsg,
     /// A set of discrete lines, which the simulator moves through the
-    /// kernel's gpio-sim: see [`crate::payload_gpio`]. Experimental.
+    /// kernel's gpio-sim: see [`crate::node::gpio`]. Experimental.
     Gpio,
 }
 
@@ -229,13 +229,13 @@ impl SimulatedPayload {
                     crate::node::can::run_can_node(config, running, stats)
                 }
                 PayloadProtocol::Iio => {
-                    crate::payload_iio::run_iio_payload(config, running, stats)
+                    crate::node::iio::run_iio_node(config, running, stats)
                 }
                 PayloadProtocol::Rpmsg => {
-                    crate::payload_rpmsg::run_rpmsg_payload(config, running, stats)
+                    crate::node::rpmsg::run_rpmsg_node(config, running, stats)
                 }
                 PayloadProtocol::Gpio => {
-                    crate::payload_gpio::run_gpio_payload(config, running, stats)
+                    crate::node::gpio::run_gpio_node(config, running, stats)
                 }
                 PayloadProtocol::UnixStream => {
                     crate::payload_unix::run_unix_stream_payload(config, running, stats)

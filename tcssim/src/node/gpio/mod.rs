@@ -1,10 +1,10 @@
-//! A simulated payload that moves discrete lines.
+//! A simulated device that moves discrete lines.
 //!
 //! **Experimental, and not yet supported.** Written against the kernel's
 //! `gpio-sim` and run against no hardware; the scan below is what the tests
 //! here cover, as the I2C stand-in's is.
 //!
-//! A discrete line is the one kind of payload the simulator cannot simply be
+//! A discrete line is the one type of device the simulator cannot simply be
 //! the far end of. A serial line has a pty; a socket has another socket; a
 //! line is a wire, and nothing in user space can drive one. What the kernel
 //! offers instead is `gpio-sim`: a chip whose lines exist in memory, with a
@@ -16,9 +16,9 @@
 //! so the simulator does not make a chip: it finds one and says how to make
 //! one if there is none.
 //!
-//! What a simulated payload decides here is not bytes but a pattern. Every
-//! packet interval each of its lines is pulled the other way, so a payload
-//! watching one line produces one event an interval and a payload watching
+//! What a simulated device decides here is not bytes but a pattern. Every
+//! packet interval each of its lines is pulled the other way, so a device
+//! watching one line produces one event an interval and a device watching
 //! three produces three. The packet and segment sizes mean nothing to it --
 //! an event is sixteen bytes whatever a file says -- and neither do the
 //! faults, which alter bytes that do not exist here. Said plainly rather than
@@ -43,9 +43,9 @@ use crate::payload::{
 /// which is what a simulator writes.
 const SIM_DEVICES: &str = "/sys/devices/platform";
 
-/// How many bytes one line event takes as payload data, which is what this
+/// How many bytes one line event takes as device data, which is what this
 /// counts as having sent.
-const EVENT_BYTES: u64 = tcslibgs::endpoint_config_gpio::EVENT_BYTES as u64;
+const EVENT_BYTES: u64 = tcslibgs::node::gpio::EVENT_BYTES as u64;
 
 /// A simulated chip's line, as a path to write a pull to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,7 +111,7 @@ pub(crate) fn lines_of(devices: &Path, chip: &str, lines: &[u32]) -> Option<Vec<
 /// What to say when there is no simulated chip to be.
 ///
 /// The two commands that make one, as the I2C stand-in names its module: a
-/// payload set that runs on one machine and not the next is a set whose
+/// configuration that runs on one machine and not the next is a set whose
 /// kernel was set up differently, and the message is the whole of what says
 /// which.
 pub(crate) fn how_to_make_one(chip: &str) -> String {
@@ -119,12 +119,12 @@ pub(crate) fn how_to_make_one(chip: &str) -> String {
         "no simulated GPIO chip stands in for {chip}. Load the module with \
          \"modprobe gpio-sim\" and make a chip through configfs under \
          /sys/kernel/config/gpio-sim, which needs root; the chip's node has to be \
-         the one this payload names"
+         the one this device names"
     )
 }
 
-/// Run a simulated payload that moves discrete lines.
-pub fn run_gpio_payload(
+/// Run a simulated device that moves discrete lines.
+pub fn run_gpio_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
@@ -144,9 +144,9 @@ pub fn run_gpio_payload(
         let started = Instant::now();
         let pacing = Pacing::read(&config);
 
-        // Nothing is read: these are inputs, which is why a GPIO payload
-        // cannot be triggered. A payload whose interval is nought is a chip
-        // whose lines do not move, as a payload with no interval is silent
+        // Nothing is read: these are inputs, which is why a GPIO device
+        // cannot be triggered. A device whose interval is nought is a chip
+        // whose lines do not move, as a device with no interval is silent
         // everywhere else.
         if pacing.produces() {
             high = !high;
@@ -169,7 +169,7 @@ pub fn run_gpio_payload(
             if moved > 0 {
                 let mut guard = stats.lock().unwrap();
                 // One event per line moved, and an event is its own size:
-                // what this payload produces is not bytes a file chose.
+                // what this device produces is not bytes a file chose.
                 guard.bytes_sent += moved * EVENT_BYTES;
                 guard.a_packet_has_gone(pull.as_bytes());
             }
@@ -186,7 +186,7 @@ mod tests {
     /// A simulated chip is found by the node it became, not by its number.
     ///
     /// Which is the whole of the scan: a `gpio-sim` chip's node is numbered
-    /// as chips appear, so the number a payload set names is not an identity
+    /// as chips appear, so the number a device set names is not an identity
     /// -- the same reason the I2C stand-in scans for its adapter rather than
     /// assuming one.
     #[test]
@@ -229,7 +229,7 @@ mod tests {
 
     /// The message says how to make a chip, and which chip was wanted.
     ///
-    /// A payload set that runs on one machine and not the next is a set whose
+    /// A device set that runs on one machine and not the next is a set whose
     /// kernel was set up differently, and this is what says so rather than
     /// leaving a panel at nought with no reason.
     #[test]

@@ -111,16 +111,16 @@ pub enum DHType {
     Can,
     /// A handler whose payload is a sensor's buffered samples.
     ///
-    /// Experimental; see [`crate::endpoint_config_iio`].
+    /// Experimental; see [`crate::node::iio`].
     Iio,
     /// A handler whose payload is software on another core, reached over an
     /// rpmsg channel.
     ///
-    /// Experimental; see [`crate::endpoint_config_rpmsg`].
+    /// Experimental; see [`crate::node::rpmsg`].
     Rpmsg,
     /// A handler whose payload is a set of discrete lines.
     ///
-    /// Experimental; see [`crate::endpoint_config_gpio`].
+    /// Experimental; see [`crate::node::gpio`].
     Gpio,
 }
 
@@ -764,7 +764,7 @@ pub struct SpiConfig {
 
 /// Configuration for an endpoint that is a set of discrete lines
 ///
-/// Experimental; see [`crate::endpoint_config_gpio`].
+/// Experimental; see [`crate::node::gpio`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GpioConfig {
     /// The chip's character device: `/dev/gpiochip0`.
@@ -782,7 +782,7 @@ pub struct GpioConfig {
 
 /// Configuration for an endpoint that is an rpmsg channel
 ///
-/// Experimental; see [`crate::endpoint_config_rpmsg`].
+/// Experimental; see [`crate::node::rpmsg`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RpmsgConfig {
     /// The character device the channel is: `/dev/rpmsg0`.
@@ -793,13 +793,13 @@ pub struct RpmsgConfig {
     pub service: String,
     /// The greatest number of bytes one message carries, where the platform
     /// is not the usual one; see
-    /// [`crate::endpoint_config_rpmsg::USUAL_MESSAGE_BYTES`].
+    /// [`crate::node::rpmsg::USUAL_MESSAGE_BYTES`].
     pub max_message_bytes: Option<u32>,
 }
 
 /// Configuration for an endpoint that is a sensor's sample buffer
 ///
-/// Experimental; see [`crate::endpoint_config_iio`].
+/// Experimental; see [`crate::node::iio`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IioConfig {
     /// The character device the buffer is read from: `/dev/iio:device0`.
@@ -1082,9 +1082,9 @@ pub(crate) fn link_params_of(
         DHType::I2c => crate::node::i2c::group_kind_of(name, wire),
         DHType::Spi => crate::node::spi::group_kind_of(name, wire),
         DHType::Can => crate::node::can::group_kind_of(name, wire),
-        DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
-        DHType::Rpmsg => crate::endpoint_config_rpmsg::group_kind_of(name, wire),
-        DHType::Gpio => crate::endpoint_config_gpio::group_kind_of(name, wire),
+        DHType::Iio => crate::node::iio::group_kind_of(name, wire),
+        DHType::Rpmsg => crate::node::rpmsg::group_kind_of(name, wire),
+        DHType::Gpio => crate::node::gpio::group_kind_of(name, wire),
         other => {
             return Err(format!(
                 "{} is not a kind of link this describes",
@@ -1522,14 +1522,14 @@ pub struct DHGroupJson {
     #[serde(default)]
     pub can_fd: Option<Scalar>,
     /// How many channels an IIO device has enabled. IIO payloads only, and
-    /// experimental; see [`crate::endpoint_config_iio`].
+    /// experimental; see [`crate::node::iio`].
     #[serde(default)]
     pub channels: Option<Scalar>,
     /// How many sample sets a second it is expected to produce.
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
     /// The service name an rpmsg channel was announced with. rpmsg payloads
-    /// only, and experimental; see [`crate::endpoint_config_rpmsg`].
+    /// only, and experimental; see [`crate::node::rpmsg`].
     #[serde(default)]
     pub service: Option<Scalar>,
     /// The greatest number of bytes one rpmsg message carries.
@@ -1537,7 +1537,7 @@ pub struct DHGroupJson {
     pub max_message_bytes: Option<Scalar>,
     /// Which discrete lines a GPIO payload watches: offsets, separated by
     /// commas or spaces. GPIO payloads only, and experimental; see
-    /// [`crate::endpoint_config_gpio`].
+    /// [`crate::node::gpio`].
     #[serde(default)]
     pub lines: Option<Scalar>,
     /// Which changes of a line are events: rising, falling or both.
@@ -1710,14 +1710,14 @@ pub struct DHConfigJson {
     #[serde(default)]
     pub can_fd: Option<Scalar>,
     /// How many channels an IIO device has enabled. IIO payloads only, and
-    /// experimental; see [`crate::endpoint_config_iio`].
+    /// experimental; see [`crate::node::iio`].
     #[serde(default)]
     pub channels: Option<Scalar>,
     /// How many sample sets a second it is expected to produce.
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
     /// The service name an rpmsg channel was announced with. rpmsg payloads
-    /// only, and experimental; see [`crate::endpoint_config_rpmsg`].
+    /// only, and experimental; see [`crate::node::rpmsg`].
     #[serde(default)]
     pub service: Option<Scalar>,
     /// The greatest number of bytes one rpmsg message carries.
@@ -1725,7 +1725,7 @@ pub struct DHConfigJson {
     pub max_message_bytes: Option<Scalar>,
     /// Which discrete lines a GPIO payload watches: offsets, separated by
     /// commas or spaces. GPIO payloads only, and experimental; see
-    /// [`crate::endpoint_config_gpio`].
+    /// [`crate::node::gpio`].
     #[serde(default)]
     pub lines: Option<Scalar>,
     /// Which changes of a line are events: rising, falling or both.
@@ -2040,7 +2040,7 @@ impl DHConfigJson {
         // bytes anything sent, and an event is a fixed size: a packet that
         // was part of a record would be a reading nobody could use.
         if let EndpointConfig::Gpio(_) = &endpoint {
-            let event = crate::endpoint_config_gpio::EVENT_BYTES;
+            let event = crate::node::gpio::EVENT_BYTES;
             if let Some(packet_size) = packet_size {
                 if packet_size == 0 || packet_size % event != 0 {
                     return Err(format!(
@@ -2057,7 +2057,7 @@ impl DHConfigJson {
         // and rpmsg does not fragment: a payload whose packets are larger
         // would have every write refused by the driver.
         if let EndpointConfig::Rpmsg(rpmsg) = &endpoint {
-            let room = crate::endpoint_config_rpmsg::message_bytes(rpmsg.max_message_bytes);
+            let room = crate::node::rpmsg::message_bytes(rpmsg.max_message_bytes);
             if let Some(packet_size) = packet_size {
                 if packet_size > room as usize {
                     return Err(format!(

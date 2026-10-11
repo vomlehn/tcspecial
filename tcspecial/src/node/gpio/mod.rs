@@ -3,7 +3,7 @@
 //! **Experimental, and not yet supported.** Run against the kernel's
 //! simulated chip and against no hardware.
 //!
-//! This is the one endpoint whose payload data does not exist until it is
+//! This is the one endpoint whose device data does not exist until it is
 //! made. Every other kind carries bytes somebody sent; a discrete line has no
 //! bytes at all -- it is high or low, and what is worth telling the ground is
 //! when it changed. So the handler asks the chip for the configured lines with
@@ -17,8 +17,8 @@
 //! it is converted here, once, where the event is made.
 //!
 //! Nothing is written. These are inputs: a write would mean driving an output,
-//! which is commanding a payload rather than reading one, and the payload
-//! configuration refuses a triggered GPIO payload for the same reason.
+//! which is commanding a device rather than reading one, and the device
+//! configuration refuses a triggered GPIO device for the same reason.
 //!
 //! The kernel's structures are declared here, unlike the CAN endpoint's:
 //! `libc` has no GPIO character-device definitions. Their sizes are asserted
@@ -33,7 +33,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use nix::poll::PollFlags;
-use tcslibgs::{endpoint_config_gpio::EVENT_BYTES, Bias, GpioConfig, LineEdge, TcsError, TcsResult};
+use tcslibgs::{node::gpio::EVENT_BYTES, Bias, GpioConfig, LineEdge, TcsError, TcsResult};
 
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
@@ -141,7 +141,7 @@ struct LineEvent {
 
 /// A set of discrete lines, watched for changes.
 pub struct GpioEndpoint {
-    /// The handler this endpoint belongs to, as the payload configuration
+    /// The handler this endpoint belongs to, as the device configuration
     /// names it.
     what: String,
     /// The chip's character device, kept open: the line request belongs to it
@@ -297,7 +297,7 @@ fn ask_for_lines(
 /// One event as the bytes a conduit carries: the time, the line, the value.
 ///
 /// Little-endian, because the two ends of this link are the same machine --
-/// the handler makes these and the ground reads them, and a payload set that
+/// the handler makes these and the ground reads them, and a device set that
 /// crossed architectures would have said so somewhere.
 fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
     let mut record = [0u8; EVENT_BYTES];
@@ -379,14 +379,14 @@ impl EndpointWritable for GpioEndpoint {
     /// Nothing is written to a set of input lines.
     ///
     /// Reported rather than attempted, and the message says what a GPIO
-    /// payload is: these are inputs, and writing would mean driving an output
-    /// -- commanding a payload rather than reading one. A triggered GPIO
-    /// payload is refused where the file is read, so what reaches this is the
+    /// device is: these are inputs, and writing would mean driving an output
+    /// -- commanding a device rather than reading one. A triggered GPIO
+    /// device is refused where the file is read, so what reaches this is the
     /// ground sending data to a discrete.
     fn write(&mut self, _data: &[u8]) -> TcsResult<usize> {
         Err(TcsError::Endpoint(format!(
             "{}: the lines of {} are inputs, which are read and not written: driving \
-             one would be commanding a payload rather than reading it",
+             one would be commanding a device rather than reading it",
             self.what, self.path
         )))
     }
@@ -565,7 +565,7 @@ mod tests {
         };
         assert!(
             said.contains("read and not written") && said.contains("commanding"),
-            "the error should say what a GPIO payload is: {said}"
+            "the error should say what a GPIO device is: {said}"
         );
     }
 

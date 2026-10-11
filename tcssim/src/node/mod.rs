@@ -14,3 +14,6 @@
 pub mod i2c;
 pub mod spi;
 pub mod can;
+pub mod gpio;
+pub mod iio;
+pub mod rpmsg;

@@ -1,0 +1,704 @@
+//! The endpoints as nodes of the graph.
+//!
+//! [`crate::runtime::fabric`] moves bytes between things that satisfy
+//! [`Port`]: take what a node produced, give a node what arrived. An endpoint
+//! satisfies neither of those by itself -- it satisfies
+//! [`EndpointReadable`] and [`EndpointWritable`], which are a pair of halves
+//! with their own error type and their own idea of what a short write means.
+//! This is the piece between: one [`EndpointPort`] holding both halves of an
+//! opened endpoint and presenting them as one node.
+//!
+//! One type for every interface and not one per interface, because every
+//! endpoint already answers the same two traits. What differs between an i2c
+//! sensor and a socket to the ground is inside the endpoint, and a port per
+//! type would be nine copies of the same delegation with nine places for them
+//! to drift apart.
+//!
+//! # What this decides
+//!
+//! Three things, and each is a reliability choice worth stating because the
+//! quiet alternative is available in all three cases.
+//!
+//! *A datum is delivered whole or refused.* A write that moved some of the
+//! bytes is reported, naming how many moved. A sensor reading cut in half is
+//! not a smaller reading, it is a different number; and the ground reading a
+//! truncated record cannot tell that is what it has.
+//!
+//! *A write of nothing is a failure and not a success of zero bytes.* An
+//! endpoint answers `Ok(0)` where the kernel would have blocked -- a socket
+//! whose buffer is full, a far end not reading -- and the datum is then
+//! dropped. Counted as delivered it would be telemetry lost silently.
+//!
+//! *Nothing to read is not a failure.* `Ok(0)` from a read is the ordinary
+//! answer from a device that is not due, which on most passes is most
+//! devices, and every endpoint turns a would-block into it. A port that
+//! reported those would bury the real faults in them.
+
+use std::os::unix::io::RawFd;
+
+use tcslibgs::{EndpointConfig, TcsResult};
+
+use crate::endpoint::{
+    bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
+    WaitResult,
+};
+use crate::runtime::fabric::Port;
+use crate::runtime::route::Routes;
+
+/// Which way the graph uses a node.
+///
+/// Not a property of the interface: an i2c device can be read and written,
+/// and whether this one is depends on what the links say. A set of GPIO lines
+/// is the case where the interface has an opinion too -- see the `direction`
+/// of a GPIO node -- and the two must agree, which is what [`Use::of`] is
+/// for: it reads the graph, and opening the endpoint then says whether the
+/// device will stand for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Use {
+    /// Read and never written: a sensor, a switch.
+    Read,
+    /// Written and never read: a heater, a valve, a latch.
+    Driven,
+    /// Both: a link to the MOC, a channel to another core, a device that
+    /// answers what it is asked.
+    Both,
+}
+
+impl Use {
+    /// How this configuration uses the node, or why it does not.
+    ///
+    /// A node no link touches is refused rather than held as a port that does
+    /// nothing. A device opened and never read is a line held, a bus address
+    /// claimed and an operator told nothing: the usual cause is a node whose
+    /// links were deleted and whose declaration was left behind.
+    ///
+    /// `Graph::check` refuses such a configuration at load, where the
+    /// complaint can name the file and the line. This is the backstop, for
+    /// the running software reached by any other road.
+    pub fn of(routes: &Routes, node: &str) -> Result<Use, String> {
+        // Commands count as something read, and they are the case a table of
+        // links alone gets wrong: a thermostat commanded from the ground has
+        // a `commands` entry and no link out of the MOC node, so a MOC link
+        // judged by its links looks like a node that is only written -- and
+        // the setpoint would then never arrive.
+        let produces = routes.fan_out(node) > 0 || !routes.commands_on(node).is_empty();
+        let accepts = !routes.arriving_at(node).is_empty();
+
+        match (produces, accepts) {
+            (true, true) => Ok(Use::Both),
+            (true, false) => Ok(Use::Read),
+            (false, true) => Ok(Use::Driven),
+            (false, false) => Err(format!(
+                "no link touches \"{node}\", so there is nothing for it to do: \
+                 a device opened and never read holds its lines and says nothing"
+            )),
+        }
+    }
+
+    /// Whether anything may be taken from a node used this way.
+    pub fn produces(self) -> bool {
+        matches!(self, Use::Read | Use::Both)
+    }
+
+    /// Whether anything may be given to a node used this way.
+    pub fn accepts(self) -> bool {
+        matches!(self, Use::Driven | Use::Both)
+    }
+
+    /// How to say this in a complaint.
+    fn said(self) -> &'static str {
+        match self {
+            Use::Read => "read and not written",
+            Use::Driven => "driven and not read",
+            Use::Both => "read and written",
+        }
+    }
+}
+
+/// An opened endpoint, as a node of the graph.
+pub struct EndpointPort {
+    /// The node's name in the configuration, which every complaint names:
+    /// "cannot write" says nothing without it.
+    what: String,
+    /// The half a read goes to.
+    reader: Box<dyn EndpointReadable + Send>,
+    /// The half a write goes to, and a trigger.
+    writer: Box<dyn EndpointWritable + Send>,
+    /// Which way the graph uses it.
+    uses: Use,
+    /// What to write to make this device answer, where it must be asked.
+    ///
+    /// See [`EndpointPort::triggered_by`].
+    trigger: Option<Vec<u8>>,
+}
+
+impl EndpointPort {
+    /// Open what this configuration describes and hold it as one node.
+    ///
+    /// For a device: this end reaches out to it. See [`EndpointPort::bind`]
+    /// for the end something else reaches, which is what a MOC link is.
+    pub fn connect(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
+        let (reader, writer) = connect_endpoint_pair(what, config)?;
+        Ok(EndpointPort::of(what, reader, writer, uses))
+    }
+
+    /// Wait at the address this configuration describes, as one node.
+    ///
+    /// For a link to the MOC, which sends to an address it was told, so this
+    /// end binds it.
+    pub fn bind(what: &str, config: &EndpointConfig, uses: Use) -> TcsResult<EndpointPort> {
+        let (reader, writer) = bind_endpoint_pair(what, config)?;
+        Ok(EndpointPort::of(what, reader, writer, uses))
+    }
+
+    /// Hold halves that are already open.
+    ///
+    /// Both halves are kept whichever way the node is used, rather than the
+    /// unused one dropped. They are not independent: a UDP writer learns
+    /// where the far end is from what its reader received, so a socket that
+    /// kept only the half the links use today could not answer at all. And a
+    /// device that is only read today is one a command binding reaches
+    /// tomorrow, which is a configuration change and should not be a code
+    /// change. What [`Use`] decides is which half is *used*, not which is
+    /// held.
+    pub fn of(
+        what: &str,
+        reader: Box<dyn EndpointReadable + Send>,
+        writer: Box<dyn EndpointWritable + Send>,
+        uses: Use,
+    ) -> EndpointPort {
+        EndpointPort {
+            what: what.to_string(),
+            reader,
+            writer,
+            uses,
+            trigger: None,
+        }
+    }
+
+    /// Ask this device before reading it.
+    ///
+    /// Some devices answer when they are asked and not before: a sensor whose
+    /// reading is a register read, a payload that sends a frame when it gets
+    /// a command. The bytes that ask are written before each read.
+    ///
+    /// The order is read-then-ask and not ask-then-read, which is the part
+    /// worth knowing. A device asked and read in the same breath has had no
+    /// time to answer, so a reading taken that way is either nothing or the
+    /// answer to the *previous* question arriving by luck -- and a control
+    /// loop cannot tell those apart. So a pass takes whatever the last ask
+    /// produced and then asks again, which costs the first pass after a start
+    /// (it has nothing to take, which a read of no bytes already means) and
+    /// makes every later pass a reading of a known age: one interval.
+    pub fn triggered_by(mut self, trigger: Vec<u8>) -> EndpointPort {
+        self.trigger = Some(trigger);
+        self
+    }
+
+    /// Which way the graph uses this node.
+    pub fn uses(&self) -> Use {
+        self.uses
+    }
+
+    /// The descriptor a read waits on, for a loop that waits rather than
+    /// polls.
+    pub fn io_fd(&self) -> RawFd {
+        self.reader.io_fd()
+    }
+
+    /// Wait until there is something to read, a command, or the time is up.
+    pub fn wait_for_event(&self, cmd_fd: RawFd, timeout_ms: i32) -> TcsResult<WaitResult> {
+        self.reader.wait_for_event(cmd_fd, timeout_ms)
+    }
+
+    /// Write the whole of `data`, or say what happened instead.
+    fn write_all(&mut self, data: &[u8], doing: &str) -> Result<(), String> {
+        match self.writer.write(data) {
+            Ok(n) if n == data.len() => Ok(()),
+            Ok(0) => Err(format!(
+                "{}: the {doing} of {} bytes moved none of them and was dropped: \
+                 commonly a far end that is not reading, or a socket with \
+                 nowhere to send yet",
+                self.what,
+                data.len()
+            )),
+            Ok(n) => Err(format!(
+                "{}: the {doing} moved {n} of {} bytes, and part of a datum is \
+                 not a smaller datum",
+                self.what,
+                data.len()
+            )),
+            Err(e) => Err(format!("{}: the {doing} failed: {e}", self.what)),
+        }
+    }
+}
+
+impl Port for EndpointPort {
+    fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        if !self.uses.produces() {
+            return Err(format!(
+                "{}: nothing is read from this node -- the configuration has it \
+                 {}",
+                self.what,
+                self.uses.said()
+            ));
+        }
+
+        let got = self
+            .reader
+            .read(buffer)
+            .map_err(|e| format!("{}: the read failed: {e}", self.what));
+
+        // Asked after being read, and asked whether or not the read found
+        // anything: a device that answered nothing is a device that most
+        // wants asking again. The failure to ask is reported even where the
+        // read succeeded, because a reading taken now and no question asked
+        // is the last reading this node will ever produce.
+        match (got, self.trigger.take()) {
+            (got, None) => got,
+            (got, Some(trigger)) => {
+                let asked = self.write_all(&trigger, "trigger");
+                self.trigger = Some(trigger);
+                match (got, asked) {
+                    (Ok(n), Ok(())) => Ok(n),
+                    (Ok(_), Err(why)) => Err(why),
+                    // A read that failed is the worse news of the two, and
+                    // the one an operator is looking for.
+                    (Err(why), _) => Err(why),
+                }
+            }
+        }
+    }
+
+    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<(), String> {
+        if !self.uses.accepts() {
+            return Err(format!(
+                "{}: nothing is written to this node -- the configuration has it \
+                 {}",
+                self.what,
+                self.uses.said()
+            ));
+        }
+
+        // A device has one way in and does not name it. A link that named one
+        // was written for a computation and points at a device, which is a
+        // mis-wiring: refused rather than delivered anyway, because delivering
+        // it would make a file that says something it does not mean work by
+        // accident.
+        if let Some(input) = input {
+            return Err(format!(
+                "{}: a link arrives at the input \"{input}\", and a device has no \
+                 named inputs: only a computation does",
+                self.what
+            ));
+        }
+
+        self.write_all(data, "write")
+    }
+
+    fn accepts(&self) -> bool {
+        self.uses.accepts()
+    }
+
+    fn produces(&self) -> bool {
+        self.uses.produces()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+    use std::sync::{Arc, Mutex};
+
+    use tcslibgs::graph::Graph;
+    use tcslibgs::{TcsError, TcsResult};
+
+    use crate::endpoint::EndpointWaitable;
+
+    /// What a stand-in endpoint was asked to do, and what it will answer.
+    ///
+    /// A pair of halves with no kernel behind them. Everything this module
+    /// decides is about the two traits and not about any one interface, so
+    /// the tests are against the traits: a socket or a chip here would make
+    /// them tests of a socket or a chip.
+    #[derive(Default)]
+    struct Script {
+        /// What a read answers, in order. Each is a result, because "nothing
+        /// to read" and "the read failed" are the two cases the port must
+        /// tell apart.
+        to_read: Vec<TcsResult<Vec<u8>>>,
+        /// What was written, in order.
+        written: Vec<Vec<u8>>,
+        /// What a write answers: the bytes it claims to have moved, or a
+        /// failure. `None` is "all of them", which is the ordinary case.
+        write_answers: Vec<TcsResult<usize>>,
+    }
+
+    struct Half(Arc<Mutex<Script>>);
+
+    impl EndpointWaitable for Half {
+        fn io_fd(&self) -> RawFd {
+            // Not a descriptor anything is waited on here: the stand-in is
+            // read and written directly.
+            -1
+        }
+
+        fn wait_for_event(&self, _cmd_fd: RawFd, _timeout_ms: i32) -> TcsResult<WaitResult> {
+            Ok(WaitResult::IoReady)
+        }
+    }
+
+    impl EndpointReadable for Half {
+        fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize> {
+            let mut script = self.0.lock().expect("the script");
+            if script.to_read.is_empty() {
+                return Ok(0);
+            }
+            match script.to_read.remove(0) {
+                Ok(datum) => {
+                    buffer[..datum.len()].copy_from_slice(&datum);
+                    Ok(datum.len())
+                }
+                Err(e) => Err(e),
+            }
+        }
+    }
+
+    impl EndpointWritable for Half {
+        fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
+            let mut script = self.0.lock().expect("the script");
+            script.written.push(data.to_vec());
+            if script.write_answers.is_empty() {
+                return Ok(data.len());
+            }
+            script.write_answers.remove(0)
+        }
+    }
+
+    /// A port over a stand-in endpoint, and the script both halves share.
+    fn port(what: &str, uses: Use) -> (Arc<Mutex<Script>>, EndpointPort) {
+        let script = Arc::new(Mutex::new(Script::default()));
+        let port = EndpointPort::of(
+            what,
+            Box::new(Half(Arc::clone(&script))),
+            Box::new(Half(Arc::clone(&script))),
+            uses,
+        );
+        (script, port)
+    }
+
+    /// The shipped example, as the routing sees it.
+    fn thermostat() -> Routes {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        Routes::of(&Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads"))
+    }
+
+    /// The links say which way each node is used.
+    #[test]
+    fn the_links_say_which_way_a_node_is_used() {
+        let routes = thermostat();
+
+        // A sensor's output goes somewhere and nothing arrives at it.
+        assert_eq!(Use::of(&routes, "temp_fore"), Ok(Use::Read));
+        // The heaters are the other way round.
+        assert_eq!(Use::of(&routes, "heaters"), Ok(Use::Driven));
+        // The ground link of the shipped example is written and not read:
+        // telemetry goes to it, and the example declares no command binding
+        // yet -- see the commanded case below for the other half of this.
+        assert_eq!(Use::of(&routes, "moc"), Ok(Use::Driven));
+        // A log takes and produces nothing of its own.
+        assert_eq!(Use::of(&routes, "housekeeping"), Ok(Use::Driven));
+
+        assert!(Use::Read.produces() && !Use::Read.accepts());
+        assert!(Use::Driven.accepts() && !Use::Driven.produces());
+        assert!(Use::Both.accepts() && Use::Both.produces());
+    }
+
+    /// A MOC link commands arrive on is read, though no link leaves it.
+    ///
+    /// The case a table of links alone gets wrong. A command sets an
+    /// attribute rather than travelling a link, so the only statement that
+    /// anything arrives from the ground is the `commands` section -- and a
+    /// MOC link judged by its links would be opened as something only
+    /// written, with the setpoint never arriving and nothing saying so.
+    #[test]
+    fn a_commanded_ground_link_is_read_as_well() {
+        use tcslibgs::graph::{CommandBinding, Destinations, Link, Node};
+
+        let node = |name: &str, node_type: &str| Node {
+            name: name.to_string(),
+            node_type: node_type.to_string(),
+            group: None,
+            attributes: Default::default(),
+            editor: None,
+        };
+
+        let graph = Graph {
+            description: None,
+            groups: Vec::new(),
+            nodes: vec![
+                node("sensor", "i2c"),
+                node("thermostat", "compute"),
+                node("moc", "moc"),
+            ],
+            links: vec![Link {
+                from: "sensor".to_string(),
+                to: Destinations::of(vec!["moc".to_string()]),
+                comment: None,
+            }],
+            commands: vec![CommandBinding {
+                from: "moc".to_string(),
+                sets: "thermostat.setpoint".to_string(),
+            }],
+            files: Vec::new(),
+            homes: Default::default(),
+        };
+        let routes = Routes::of(&graph);
+
+        assert_eq!(
+            Use::of(&routes, "moc"),
+            Ok(Use::Both),
+            "a commanded ground link is read as well as written"
+        );
+        // And what the command sets, which is how the fabric will find the
+        // thermostat's setpoint.
+        let commanded = routes.commands_on("moc");
+        assert_eq!(commanded.len(), 1);
+        assert_eq!(commanded[0].node, "thermostat");
+        assert_eq!(commanded[0].attribute, "setpoint");
+    }
+
+    /// A node no link touches is refused, and the complaint says why.
+    #[test]
+    fn a_node_no_link_touches_is_refused() {
+        let routes = thermostat();
+        let said = Use::of(&routes, "left_over").expect_err("a node with no links");
+        assert!(
+            said.contains("left_over") && said.contains("nothing for it to do"),
+            "the complaint should name the node and say why: {said}"
+        );
+    }
+
+    /// What a device produces is taken, and nothing to read is not a failure.
+    #[test]
+    fn a_reading_is_taken_and_quiet_is_not_a_failure() {
+        let (script, mut port) = port("temp_fore", Use::Read);
+        script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
+
+        let mut buffer = [0u8; 64];
+        let got = port.take(&mut buffer).expect("the reading");
+        assert_eq!(&buffer[..got], b"293.15");
+
+        // And the pass after it, with the device not due.
+        assert_eq!(
+            port.take(&mut buffer),
+            Ok(0),
+            "a device with nothing to say has not failed"
+        );
+    }
+
+    /// A read that fails is reported, and names the node.
+    #[test]
+    fn a_read_that_fails_is_reported() {
+        let (script, mut port) = port("temp_fore", Use::Read);
+        script.lock().expect("the script").to_read =
+            vec![Err(TcsError::Endpoint("the bus did not answer".to_string()))];
+
+        let said = port
+            .take(&mut [0u8; 64])
+            .expect_err("a bus that did not answer");
+        assert!(
+            said.contains("temp_fore") && said.contains("did not answer"),
+            "the complaint should name the node and carry the reason: {said}"
+        );
+    }
+
+    /// What arrives at a driven node is written whole.
+    #[test]
+    fn a_command_is_written_whole() {
+        let (script, mut port) = port("heaters", Use::Driven);
+
+        assert_eq!(port.give(None, b"1"), Ok(()));
+        assert_eq!(script.lock().expect("the script").written, vec![b"1".to_vec()]);
+    }
+
+    /// A write that moved some of the bytes is a failure, and says how many.
+    ///
+    /// The quiet alternative is available here and is the reason this is
+    /// tested: the endpoint answered `Ok`, and a port that passed that on
+    /// would have the fabric count a truncated datum as delivered.
+    #[test]
+    fn a_part_written_datum_is_refused() {
+        let (script, mut port) = port("moc", Use::Both);
+        script.lock().expect("the script").write_answers = vec![Ok(3)];
+
+        let said = port
+            .give(None, b"293.15")
+            .expect_err("three bytes of a six-byte reading");
+        assert!(
+            said.contains("moved 3 of 6") && said.contains("not a smaller datum"),
+            "the complaint should say what was lost: {said}"
+        );
+    }
+
+    /// A write that moved nothing is a failure and not a success.
+    #[test]
+    fn a_write_of_nothing_is_a_failure() {
+        let (script, mut port) = port("moc", Use::Both);
+        script.lock().expect("the script").write_answers = vec![Ok(0)];
+
+        let said = port.give(None, b"293.15").expect_err("a datum dropped");
+        assert!(
+            said.contains("moved none of them") && said.contains("dropped"),
+            "the complaint should say the datum is gone: {said}"
+        );
+    }
+
+    /// A write that failed outright carries the endpoint's own reason.
+    #[test]
+    fn a_write_that_fails_carries_the_reason() {
+        let (script, mut port) = port("heaters", Use::Driven);
+        script.lock().expect("the script").write_answers = vec![Err(TcsError::Endpoint(
+            "cannot drive the lines of /dev/gpiochip0".to_string(),
+        ))];
+
+        let said = port.give(None, b"1").expect_err("a chip that refused");
+        assert!(
+            said.contains("heaters") && said.contains("/dev/gpiochip0"),
+            "the complaint should name the node and the chip: {said}"
+        );
+    }
+
+    /// Each direction refuses what the configuration does not use it for.
+    #[test]
+    fn a_node_refuses_the_direction_it_is_not_used_in() {
+        let (_, mut sensor) = port("temp_fore", Use::Read);
+        let said = sensor.give(None, b"1").expect_err("a write to a sensor");
+        assert!(
+            said.contains("read and not written"),
+            "the complaint should say which way it is used: {said}"
+        );
+        assert!(!sensor.accepts() && sensor.produces());
+
+        let (_, mut heaters) = port("heaters", Use::Driven);
+        let said = heaters
+            .take(&mut [0u8; 64])
+            .expect_err("a read of the heaters");
+        assert!(
+            said.contains("driven and not read"),
+            "the complaint should say which way it is used: {said}"
+        );
+        assert!(heaters.accepts() && !heaters.produces());
+    }
+
+    /// A named input arriving at a device is a mis-wiring, not a datum.
+    #[test]
+    fn a_named_input_on_a_device_is_refused() {
+        let (script, mut port) = port("heaters", Use::Driven);
+
+        let said = port
+            .give(Some("in0"), b"1")
+            .expect_err("a computation's input name on a device");
+        assert!(
+            said.contains("in0") && said.contains("no named inputs"),
+            "the complaint should name the input: {said}"
+        );
+        assert!(
+            script.lock().expect("the script").written.is_empty(),
+            "nothing should have been written"
+        );
+    }
+
+    /// A real endpoint, opened by the factory, moves bytes both ways.
+    ///
+    /// The one test here that opens something. Everything else is against the
+    /// traits, which is where this module's decisions are -- but `connect`
+    /// itself is a line of delegation that no trait test would exercise, and
+    /// a port that cannot open anything is of no use however well it
+    /// delegates. A named pipe stands in for the device: it needs no
+    /// hardware, no privileges and no network, and it is a device file as far
+    /// as the endpoint is concerned.
+    #[test]
+    fn a_device_file_opened_by_the_factory_carries_both_ways() {
+        use std::ffi::CString;
+        use tcslibgs::DeviceConfig;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("pipe");
+        let name = CString::new(path.to_str().expect("a path")).expect("a name");
+        // SAFETY: a path in a directory this test owns, and a mode.
+        assert_eq!(
+            unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
+            0,
+            "a named pipe: {}",
+            std::io::Error::last_os_error()
+        );
+
+        let config = EndpointConfig::Device(DeviceConfig {
+            path: path.to_string_lossy().to_string(),
+        });
+        let mut port = EndpointPort::connect("loopback", &config, Use::Both)
+            .expect("the pipe opens");
+
+        // Written and read back through the kernel, which is as much of a
+        // device as a pipe can be.
+        assert_eq!(port.give(None, b"293.15"), Ok(()));
+
+        let mut buffer = [0u8; 64];
+        let got = port.take(&mut buffer).expect("what was written");
+        assert_eq!(&buffer[..got], b"293.15");
+
+        // And the descriptor a waiting loop would poll.
+        assert!(port.io_fd() >= 0);
+    }
+
+    /// A device that must be asked is asked after each read.
+    #[test]
+    fn a_triggered_device_is_asked_after_it_is_read() {
+        let (script, port) = port("temp_bay", Use::Read);
+        let mut port = port.triggered_by(b"R".to_vec());
+        script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec()), Ok(b"43".to_vec())];
+
+        let mut buffer = [0u8; 64];
+
+        // A pass takes what is there and then asks. On a real device the
+        // first pass takes nothing, the question not having been asked yet;
+        // the stand-in answers at once, which is what lets the order be seen.
+        let got = port.take(&mut buffer).expect("a pass");
+        assert_eq!(&buffer[..got], b"42");
+        assert_eq!(
+            script.lock().expect("the script").written,
+            vec![b"R".to_vec()],
+            "the device should have been asked once"
+        );
+
+        // And the pass after it takes the answer to that question and asks
+        // again.
+        let got = port.take(&mut buffer).expect("a pass");
+        assert_eq!(&buffer[..got], b"43");
+        assert_eq!(script.lock().expect("the script").written.len(), 2);
+    }
+
+    /// A device that cannot be asked is reported, read or no read.
+    ///
+    /// The reading in hand is the last one this node will produce, so a pass
+    /// that took one and could not ask for the next has not succeeded.
+    #[test]
+    fn a_trigger_that_cannot_be_written_is_reported() {
+        let (script, port) = port("temp_bay", Use::Read);
+        let mut port = port.triggered_by(b"R".to_vec());
+        script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
+        script.lock().expect("the script").write_answers = vec![Err(TcsError::Endpoint(
+            "the bus will not take it".to_string(),
+        ))];
+
+        let said = port
+            .take(&mut [0u8; 64])
+            .expect_err("a device that cannot be asked");
+        assert!(
+            said.contains("trigger") && said.contains("will not take it"),
+            "the complaint should say the asking failed: {said}"
+        );
+    }
+}

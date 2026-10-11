@@ -223,6 +223,20 @@ component DHPanel inherits Rectangle {
 
 export enum MenuAction { ping, arm-restart, restart, query, query-dh, start-dh, stop-dh }
 
+// What a panel comes to, asked of a window that is never opened.
+//
+// A panel laid out alone reports what it wants; one in the grid is stretched
+// to its cell and reports what it was given. Its own component rather than a
+// hidden panel in MainWindow: a child of a window is something the window has
+// to make room for, whatever its visibility, and a panel parked in there had
+// a say in the window's size. Nothing here is shown -- Rust builds one, reads
+// the two lengths, and drops it.
+export component PanelProbe inherits Window {
+    probe := DHPanel { }
+    out property <length> panel-width: probe.preferred-width;
+    out property <length> panel-height: probe.preferred-height;
+}
+
 export component MainWindow inherits Window {
     title: "TCSpecial MOC Simulator";
     // Rust opens the window at the size the panel count calls for; these are
@@ -255,10 +269,28 @@ export component MainWindow inherits Window {
     // The data handlers, read from the tcspecial configuration file by Rust.
     in-out property <[DHInfo]> dh-model: [];
 
-    // How many panels to a row. Rust chooses this from the number of data
-    // handlers, picking the shape that leaves the window wider than tall but
-    // as near square as it can; see grid_shape() in main.rs.
-    in-out property <int> columns: 1;
+    // How many panels to a row, from the width the window actually has.
+    //
+    // Worked out here rather than handed over by Rust, because the answer
+    // changes while the program runs: a window dragged wider has room for
+    // another column and now uses it, where a count settled at startup left a
+    // wide window with a narrow grid and the panels scrolling under it.
+    //
+    // Never more columns than there are handlers, and never fewer than one.
+    // Rust opens the window wide enough for the columns the handler count
+    // calls for -- see columns_for in main.rs -- and because it opens it at
+    // exactly that many panels' width, gaps and chrome included, the count
+    // below comes out at the number asked for.
+    property <int> columns: Math.max(
+        1,
+        Math.min(
+            dh-model.length,
+            Math.floor(
+                (root.width - root.chrome-width + root.grid-spacing)
+                / (root.panel-width + root.grid-spacing)
+            )
+        )
+    );
 
     // One panel's height, which has to agree with PANEL_HEIGHT in main.rs:
     // Rust sizes the window by it and every panel claims at least this much.
@@ -268,19 +300,47 @@ export component MainWindow inherits Window {
     // in main.rs read off a window they open headlessly. It was 210 for a
     // long time against the 259 the panel then took, and the three rows of
     // data at the bottom of every panel paid the difference.
-    property <length> panel-height: 180px;
-    // And how wide. A panel is a tile of a fixed size rather than a box that
-    // takes what the row gives it: the window's floor is wider than a row of
-    // panels needs, and panels that stretched into the slack took it
-    // unequally -- the one with the longer name and address took it all --
-    // which says nothing about either payload. Matches PANEL_WIDTH in
-    // main.rs, which the_window_and_rust_agree_on_the_sizes checks.
-    property <length> panel-width: 256px;
+    // What the window is built from, and the one place each of these numbers
+    // exists.
+    //
+    // A panel's size is measured: `probe` is a panel of its own, laid out and
+    // never drawn, and what it says it wants is what a cell is made. It was a
+    // pair of numbers here and another pair in main.rs, and they disagreed --
+    // a panel was called 180 tall where its rows want 162, and 256 wide
+    // against the 255 they take.
+    //
+    // A panel in the grid cannot be asked instead: it is stretched to its
+    // cell, so it reports the size it was given. That stretching is what made
+    // the buttons fifty pixels tall -- every row of a panel states a floor
+    // rather than a height, so a panel given more than it needs hands the
+    // surplus to its rows.
+    in property <length> panel-width;
+    in property <length> panel-height;
 
-    // The gap between one panel and the next, which has to agree with
-    // GRID_SPACING in main.rs: the window opens tall enough for the gaps as
-    // well as the panels.
-    property <length> grid-spacing: 10px;
+    // The gap between one panel and the next, and what the window spends
+    // around the grid.
+    //
+    // The chrome is stated rather than measured, which the two panel figures
+    // above are not. It cannot be measured the same way: it is the window
+    // less the scrolling area, and a ScrollView reports a preferred size of
+    // its own that has nothing to do with what it holds -- 360x403 whatever
+    // the grid comes to. So this is one declared number in the file that owns
+    // the layout, read by Rust rather than copied into it, and
+    // `every_panels_data_is_inside_the_window` is what measures it: the
+    // window it opens has to have room for every panel and no more than a
+    // row to spare.
+    //
+    // Height: everything above and below the grid -- both group box
+    // headings, the command interpreter's controls, the row holding Quit, the
+    // padding round them all, and the grid's own padding inside the scrolling
+    // area. Width: the padding of the scrolling area and of the grid inside
+    // it. The width was 30 in main.rs and wanted 36, and the column gaps were
+    // left out of the window's width altogether, so a three-column grid stood
+    // twenty-six pixels wider than the area it scrolled in and the last
+    // column was cut off.
+    out property <length> grid-spacing: 10px;
+    out property <length> chrome-width: 36px;
+    out property <length> chrome-height: 369px;
 
     // Rows follow from the panel count and the column count.
     property <int> grid-rows: Math.max(1, Math.ceil(dh-model.length / Math.max(1, columns)));
@@ -552,32 +612,43 @@ export component MainWindow inherits Window {
             vertical-stretch: 1;
 
             scroll := ScrollView {
-                grid := GridBox {
-                    spacing: root.grid-spacing;
-                    // No height of its own. It used to claim grid-rows *
-                    // panel-height, which the panels then overran, and a
-                    // ScrollView centres content shorter than itself: that is
-                    // where the gap under the Data Handlers heading came
-                    // from, with the panels hanging off the bottom at the
-                    // same time. Each panel asks for the height it needs
-                    // instead, and the grid is as tall as they come to.
-                    for dh[i] in dh-model: DHPanel {
-                        min-height: root.panel-height;
-                        width: root.panel-width;
-                        row: Math.floor(i / Math.max(1, root.columns));
-                        col: Math.mod(i, Math.max(1, root.columns));
-                        dh-name: dh.name;
-                        dev-id: dh.dev-id;
-                        dh-config: dh.config;
-                        dh-status: dh.status;
-                        packet-size: dh.packet-size;
-                        oc-time: dh.oc-time;
-                        oc-data: dh.oc-data;
-                        packets-recv: dh.packets-recv;
-                        parameters: dh.parameters;
-                        enable-clicked => { enable-dh(i); }
-                        disable-clicked => { disable-dh(i); }
+                // The panels keep their own height, and the spare room goes
+                // under them.
+                //
+                // Without the Rectangle the grid takes the whole of the
+                // scrolling area and stretches its rows to fill it: a panel
+                // came out 275 tall where it wants 162, and its rows, which
+                // state floors rather than heights, shared out the surplus --
+                // which is how a Button ended up fifty pixels tall.
+                VerticalLayout {
+                    grid := GridBox {
+                            spacing: root.grid-spacing;
+                        // No height of its own. It used to claim grid-rows *
+                        // panel-height, which the panels then overran, and a
+                        // ScrollView centres content shorter than itself: that is
+                        // where the gap under the Data Handlers heading came
+                        // from, with the panels hanging off the bottom at the
+                        // same time. Each panel asks for the height it needs
+                        // instead, and the grid is as tall as they come to.
+                        for dh[i] in dh-model: DHPanel {
+                            min-height: root.panel-height;
+                            width: root.panel-width;
+                            row: Math.floor(i / Math.max(1, root.columns));
+                            col: Math.mod(i, Math.max(1, root.columns));
+                            dh-name: dh.name;
+                            dev-id: dh.dev-id;
+                            dh-config: dh.config;
+                            dh-status: dh.status;
+                            packet-size: dh.packet-size;
+                            oc-time: dh.oc-time;
+                            oc-data: dh.oc-data;
+                            packets-recv: dh.packets-recv;
+                            parameters: dh.parameters;
+                            enable-clicked => { enable-dh(i); }
+                            disable-clicked => { disable-dh(i); }
+                        }
                     }
+                    Rectangle { }
                 }
             }
         }

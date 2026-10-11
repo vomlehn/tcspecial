@@ -300,6 +300,7 @@ fn main() {
     }
 
     let ui = MainWindow::new().unwrap();
+    let sizes = grid::settle(&ui);
     let ui_weak = ui.as_weak();
 
     // One panel per payload, in a grid worked out from how many there are.
@@ -313,17 +314,16 @@ fn main() {
     ));
     ui.set_payload_model(ModelRc::from(model.clone()));
 
-    let shape = grid::grid_shape(configs.len());
-    ui.set_columns(shape.columns as i32);
-    ui.set_cell_width(grid::PANEL_WIDTH);
-    ui.set_cell_height(grid::PANEL_HEIGHT);
+    // What the markup says a panel and the chrome come to, asked for rather
+    // than written down here as well: see grid::Sizes.
+    let shape = grid::grid_shape(&sizes, configs.len());
     // Taller than the grid asks for where there is a third row to look
     // ahead for, and no taller than the payloads on hand need otherwise. It
     // is also why the window can open taller than it is wide, which the shape
     // itself never is: the shape rule chooses the grid, and the room rule
     // says how much of the window to give it.
     ui.window()
-        .set_size(grid::window_size(&shape, configs.len()));
+        .set_size(grid::window_size(&sizes, &shape, configs.len()));
 
     // Create simulated payloads
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> = Arc::new(Mutex::new(
@@ -484,14 +484,18 @@ mod tests {
 
         // The four payloads of tcspecial1.yaml, which is the set the document
         // describes.
-        let shape = grid::grid_shape(4);
-        let size = grid::window_size(&shape, 4);
+        // The fixture rather than a window: the Slint backend belongs to one
+        // thread and one test, and what keeps the fixture equal to the markup
+        // is the_markup_reports_the_sizes_the_tests_assume.
+        let sizes = grid::Sizes::for_tests();
+        let shape = grid::grid_shape(&sizes, 4);
+        let size = grid::window_size(&sizes, &shape, 4);
         let said = format!("{}x{}", size.width, size.height);
 
         assert_eq!(
             (shape.columns, shape.rows),
-            (2, 2),
-            "the document describes a two-by-two grid"
+            (3, 2),
+            "the document describes a row of three and a row of one"
         );
         assert!(
             text.contains(&said),
@@ -519,8 +523,8 @@ mod tests {
             Rc::new(VecModel::from(vec![payload_info_from(0, &dh, &settings)]));
 
         let ui = MainWindow::new().unwrap();
+        let _ = grid::settle(&ui);
         ui.set_payload_model(ModelRc::from(model.clone()));
-        ui.set_columns(1);
 
         // The handler the running program registers, over the payload the
         // files describe.
@@ -772,12 +776,39 @@ mod tests {
     /// Every panel, and each of the three rows of data it ends with, is
     /// inside the window tcssim opens for each shipped set.
     ///
-    /// Where `CHROME_HEIGHT` and `CHROME_WIDTH` come from. The window is
+    /// Where the chrome figures the markup states are checked. The window is
     /// opened here as main() opens it, through Slint's testing backend: no
     /// display and no event loop, but a real layout with real font metrics,
     /// so what this measures is what the window does. A panel scrolled out of
     /// sight is not merely off-screen, it is never built, so the count of
     /// panels found is part of the check.
+    /// The markup reports the sizes the grid tests do their arithmetic on.
+    ///
+    /// Nothing in the program compares the two -- it asks the markup and
+    /// believes it -- so this is the only thing standing between
+    /// `Sizes::for_tests` and a set of numbers that were true once. A panel
+    /// that grows a row is meant to fail here: the fixture is then wrong, and
+    /// so is whatever a test concluded from it.
+    ///
+    /// Not a test of its own: the backend belongs to one thread, so the tests
+    /// that need a window run from the one that starts it.
+    fn the_markup_reports_the_sizes_the_tests_assume() {
+        let ui = MainWindow::new().unwrap();
+        let _ = grid::settle(&ui);
+        assert_eq!(
+            grid::Sizes::of(&ui),
+            grid::Sizes::for_tests(),
+            "the window reports sizes the tests were written against other \
+             numbers for"
+        );
+    }
+
+    /// The padding the panel's layout keeps inside its border, as
+    /// `ui/main.slint` states it. The one figure this test needs from the
+    /// markup that it cannot measure: it is the gap that is meant to be
+    /// under the last row, as against the slack that is not.
+    const PANEL_PADDING: f32 = 4.0;
+
     #[test]
     fn every_panels_data_is_inside_the_window() {
         use i_slint_backend_testing as testing;
@@ -827,14 +858,12 @@ mod tests {
             let panels = rows.len();
 
             let ui = MainWindow::new().unwrap();
+            let sizes = grid::settle(&ui);
             ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(rows))));
 
             // Opened as main() opens it, floor and all.
-            let shape = grid::grid_shape(panels);
-            ui.set_columns(shape.columns as i32);
-            ui.set_cell_width(grid::PANEL_WIDTH);
-            ui.set_cell_height(grid::PANEL_HEIGHT);
-            ui.window().set_size(grid::window_size(&shape, panels));
+            let shape = grid::grid_shape(&sizes, panels);
+            ui.window().set_size(grid::window_size(&sizes, &shape, panels));
             ui.show().unwrap();
 
             let window = ui.window().size().to_logical(1.0);
@@ -862,14 +891,14 @@ mod tests {
             // that: a set of fewer payloads than the window looks ahead for
             // opens only as tall as those payloads need.
             let rows = grid::rows_of_room(shape.rows, panels);
-            let wanted = grid::height_for_rows(rows) - grid::CHROME_HEIGHT;
+            let wanted = grid::height_for_rows(&sizes, rows) - sizes.chrome_height;
             assert!(
                 area.size().height >= wanted,
                 "{set}: the panels have {} of the {wanted} that {rows} rows need",
                 area.size().height
             );
             assert!(
-                area.size().height < wanted + grid::PANEL_HEIGHT,
+                area.size().height < wanted + sizes.panel_height,
                 "{set}: the panels have {}, room for a row more than the {rows} wanted",
                 area.size().height
             );
@@ -890,6 +919,153 @@ mod tests {
                     window.width
                 );
             }
+
+            // Nothing in a panel stands on anything else, and nothing is
+            // left over at the end of one.
+            //
+            // The three faults this answers were all in one panel at once.
+            // The row of buttons was given a height of twenty-four where a
+            // Button in this style is thirty-two, and a layout that cannot
+            // shrink a child does not clip it: the buttons hung six pixels
+            // below their row and drew across the "Sent:" line under it. The
+            // panel was given two hundred and ten where its rows take a
+            // hundred and seventy-six, and since every row states a height
+            // the slack could go nowhere but the bottom, leaving a band of
+            // nothing under the packet count. And the grid was centred in a
+            // scrolling area taller than itself, so the spare row the window
+            // keeps room for showed half above the panels and half below.
+            //
+            // Measured rather than reasoned about: each is a number this
+            // backend reports, and each was found by reading them.
+            let rows = [
+                "PayloadPanel::controls-row",
+                "PayloadPanel::sent-row",
+                "PayloadPanel::recv-row",
+                "PayloadPanel::packets-row",
+            ];
+            let geometry = |id: &str| -> Vec<(f32, f32)> {
+                ElementHandle::find_by_element_id(&ui, id)
+                    .map(|e| (e.absolute_position().y, e.size().height))
+                    .collect()
+            };
+
+            // Gathered once and not once per panel: finding elements walks
+            // the whole tree, and a set of sixteen panels did so sixteen
+            // times over, which cost the suite a minute and a half.
+            let placed: Vec<Vec<(f32, f32)>> = rows.iter().map(|id| geometry(id)).collect();
+            let sent_rows = geometry("PayloadPanel::sent-row");
+            let buttons: Vec<(Option<String>, f32, f32)> =
+                ElementHandle::find_by_element_type_name(&ui, "Button")
+                    .map(|b| {
+                        (
+                            b.accessible_label().map(|l| l.to_string()),
+                            b.absolute_position().y,
+                            b.absolute_position().y + b.size().height,
+                        )
+                    })
+                    .collect();
+            let panels_found: Vec<(f32, f32)> =
+                ElementHandle::find_by_element_type_name(&ui, "PayloadPanel")
+                    .map(|e| (e.absolute_position().y, e.size().height))
+                    .collect();
+
+            // No row overlaps the one below it. The buttons are measured
+            // rather than their row, because it was the buttons that
+            // overflowed while the row reported the height it was told.
+            for (n, (top, panel_height)) in panels_found.iter().copied().enumerate() {
+                let bottom = top + panel_height;
+                let mut lowest = top;
+                for (which, id) in rows.iter().enumerate() {
+                    let (y, height) = placed[which][n];
+                    assert!(
+                        y >= lowest,
+                        "{set}: panel {n}'s {id} starts at {y}, above the {lowest} \
+                         the row before it reaches"
+                    );
+                    lowest = y + height;
+                }
+
+                let (sent, _) = sent_rows[n];
+                for (label, head, foot) in buttons.iter() {
+                    if *head >= top && *foot <= bottom {
+                        assert!(
+                            *foot <= sent,
+                            "{set}: panel {n}'s {label:?} button reaches {foot}, over \
+                             the \"Sent:\" row at {sent}"
+                        );
+                    }
+                }
+
+                // And the last row ends where the panel does, but for the
+                // padding it keeps: a panel taller than its rows shows the
+                // difference as a gap under the packet count.
+                let (y, height) = placed[rows.len() - 1][n];
+                let spare = bottom - (y + height);
+                assert!(
+                    spare <= PANEL_PADDING + 1.0,
+                    "{set}: panel {n} has {spare} pixels below its packet count, \
+                     where {PANEL_PADDING} of padding is all it keeps"
+                );
+            }
+
+            // The grid reflows when the window is resized.
+            //
+            // The column count is the window's own, worked out from the width
+            // it has rather than handed over once at startup: a window
+            // dragged wider is meant to fit another column and use it. This
+            // drags it and counts the columns by how many panels share the
+            // top row.
+            //
+            // Done last in the case, because it leaves the window a different
+            // size than it was opened at.
+            let columns_now = |ui: &MainWindow| -> usize {
+                let tops: Vec<f32> = ElementHandle::find_by_element_type_name(ui, "PayloadPanel")
+                    .map(|e| e.absolute_position().y)
+                    .collect();
+                let first = tops.iter().copied().fold(f32::MAX, f32::min);
+                tops.iter().filter(|y| (**y - first).abs() < 1.0).count()
+            };
+
+            let opened = columns_now(&ui);
+            assert_eq!(
+                opened,
+                grid::columns_for(panels),
+                "{set}: opened with {opened} columns where {} were asked for",
+                grid::columns_for(panels)
+            );
+
+            if panels >= 2 {
+                // One panel's width narrower than two panels need, so the
+                // count has to come down.
+                let narrow = sizes.panel_width + sizes.chrome_width;
+                ui.window().set_size(slint::LogicalSize::new(narrow, window.height));
+                assert_eq!(
+                    columns_now(&ui),
+                    1,
+                    "{set}: a window one panel wide did not come down to one column"
+                );
+
+                // And wide enough for every panel in a row, so it goes up.
+                let wide = panels as f32 * sizes.panel_width + sizes.chrome_width;
+                ui.window().set_size(slint::LogicalSize::new(wide, window.height));
+                assert_eq!(
+                    columns_now(&ui),
+                    panels,
+                    "{set}: a window {panels} panels wide did not use the room"
+                );
+            }
+
+            // The grid starts where the area it scrolls in starts, so the
+            // room the window keeps for a row not yet filled is all below the
+            // panels rather than half of it above them.
+            assert!(
+                grid.absolute_position().y <= area.absolute_position().y + 1.0,
+                "{set}: the grid starts at {}, {} below the {} the scrolling \
+                 area starts at",
+                grid.absolute_position().y,
+                grid.absolute_position().y - area.absolute_position().y,
+                area.absolute_position().y
+            );
 
             for what in [
                 "PayloadPanel",
@@ -933,6 +1109,7 @@ mod tests {
 
         // The backend is up and this thread owns its windows, so the other
         // checks that need one run from here.
+        the_markup_reports_the_sizes_the_tests_assume();
         the_panel_shows_the_time_and_bytes_it_was_given();
         each_panel_says_which_payload_of_the_set_it_is();
         the_params_button_shows_what_both_files_said();
@@ -1165,7 +1342,10 @@ mod tests {
                 payload_path.display()
             );
 
-            let shape = grid::grid_shape(panels.len());
+            // The shape rule and not the sizes, so there is no window to
+            // ask: a grid that holds its panels does so whatever a panel
+            // comes to.
+            let shape = grid::grid_shape(&grid::Sizes::for_tests(), panels.len());
             assert!(
                 shape.columns * shape.rows >= panels.len(),
                 "{} does not fit its grid",
@@ -1201,8 +1381,8 @@ mod tests {
 
         let shown = |info: PayloadInfo| {
             let ui = MainWindow::new().unwrap();
+            let _ = grid::settle(&ui);
             ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![info]))));
-            ui.set_columns(1);
             ui.show().unwrap();
             (
                 lines_from(&ui, "Sent: "),
@@ -1282,15 +1462,15 @@ mod tests {
         let settings = sim(1000, 1000, 12);
 
         let ui = MainWindow::new().unwrap();
+        let sizes = grid::settle(&ui);
         ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
             payload_info_from(0, &first, &settings),
             payload_info_from(1, &second, &settings),
         ]))));
         // Opened as main() opens it for two payloads, so both panels are laid
         // out: a panel scrolled out of sight is never built at all.
-        let shape = grid::grid_shape(2);
-        ui.set_columns(i32::try_from(shape.columns).unwrap());
-        ui.window().set_size(grid::window_size(&shape, 2));
+        let shape = grid::grid_shape(&sizes, 2);
+        ui.window().set_size(grid::window_size(&sizes, &shape, 2));
         ui.show().unwrap();
 
         let shown: Vec<String> = ElementHandle::find_by_element_type_name(&ui, "Text")
@@ -1323,10 +1503,10 @@ mod tests {
         let dh = handler("DH0");
         let sim = sim(1000, 1000, 12);
         let ui = MainWindow::new().unwrap();
+        let _ = grid::settle(&ui);
         ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
             payload_info_from(0, &dh, &sim),
         ]))));
-        ui.set_columns(1);
         ui.show().unwrap();
 
         // Every line of text the window has laid out.

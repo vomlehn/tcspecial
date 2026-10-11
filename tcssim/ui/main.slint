@@ -182,11 +182,17 @@ component PayloadPanel inherits Rectangle {
             }
         }
 
-        // Combine multiple inputs on same row
+        // The two sizes, side by side.
+        //
+        // A floor rather than a height, as the row of buttons below is: a
+        // SpinBox is thirty pixels tall in this style and a row told to be
+        // twenty-two did not shrink it, it let it hang six pixels over the
+        // row beneath. And a spacing, which was nought: every label sat
+        // against the box it names and every box against the next label.
         HorizontalLayout {
-            height: 22px;
-            spacing: 0px;
-            Text { text: "Pkt:"; vertical-alignment: top; font-size: 9px; }
+            min-height: 30px;
+            spacing: 6px;
+            Text { text: "Pkt:"; vertical-alignment: center; font-size: 9px; }
             SpinBox {
                 value: packet-size;
                 minimum: 1;
@@ -204,7 +210,7 @@ component PayloadPanel inherits Rectangle {
                     }
                 }
             }
-            Text { text: "Seg:"; vertical-alignment: top; font-size: 9px; }
+            Text { text: "Seg:"; vertical-alignment: center; font-size: 9px; }
             SpinBox {
                 value: segment-size;
                 minimum: 1;
@@ -225,16 +231,16 @@ component PayloadPanel inherits Rectangle {
         }
 
         HorizontalLayout {
-            height: 22px;
-            spacing: 0px;
-            Text { text: "Pkt Int:"; vertical-alignment: top; font-size: 9px; }
+            min-height: 30px;
+            spacing: 6px;
+            Text { text: "Pkt Int:"; vertical-alignment: center; font-size: 9px; }
             SpinBox {
                 value: packet-interval;
                 minimum: 0;
                 maximum: 10000;
                 edited(v) => { packet-interval-edited(v); }
             }
-            Text { text: "Seg Int:"; vertical-alignment: top; font-size: 9px; }
+            Text { text: "Seg Int:"; vertical-alignment: center; font-size: 9px; }
             SpinBox {
                 value: segment-interval;
                 minimum: 0;
@@ -243,9 +249,13 @@ component PayloadPanel inherits Rectangle {
             }
         }
 
-        HorizontalLayout {
-            height: 24px;
-            spacing: 2px;
+        // A floor rather than a height. A Button is as tall as the style
+        // makes it -- thirty-two pixels here -- and a row told to be
+        // twenty-four did not shrink the buttons, it let them hang six pixels
+        // over the row below and draw across the "Sent:" line.
+        controls-row := HorizontalLayout {
+            min-height: 32px;
+            spacing: 6px;
             // One button, labelled with what pressing it will do. There were
             // two, Start and Stop, and either was pressable whatever the
             // payload was already doing: a Stop on a payload that was not
@@ -329,6 +339,22 @@ component PayloadPanel inherits Rectangle {
     }
 }
 
+// What a panel comes to, asked of a window that is never opened.
+//
+// A panel laid out alone reports what it wants; one in the grid is stretched
+// to its cell and reports what it was given, so the grid cannot be asked.
+//
+// Its own component, and deliberately not a hidden panel inside MainWindow.
+// A child of a window is something the window has to make room for, whatever
+// its visibility, so a panel parked in there had a say in the window's size
+// and the window came up refusing to be resized. Nothing here is ever shown:
+// Rust builds one, reads the two lengths, and drops it.
+export component PanelProbe inherits Window {
+    probe := PayloadPanel { }
+    out property <length> panel-width: probe.preferred-width;
+    out property <length> panel-height: probe.preferred-height;
+}
+
 export component MainWindow inherits Window {
     title: "TCSpecial Payload Simulator";
     background: white;
@@ -336,18 +362,37 @@ export component MainWindow inherits Window {
     // One row of panels and the chrome, which is the least the window is ever
     // opened at -- a tcspecial configuration of one payload. How much more it
     // opens at is Rust's to say: see rows_of_room() in grid.rs.
-    min-height: 302px;
+    //
+    // The two lengths rather than a number: this was 302px when a panel was
+    // 210 tall, and stayed 302 when the panel became 176.
+    min-height: root.panel-height + root.chrome-height;
+    min-width: root.panel-width + root.chrome-width;
 
     // The simulated payloads, read from the configuration files by Rust.
     in-out property <[PayloadInfo]> payload-model: [];
 
-    // The shape of the grid, and the size of one panel in it. Rust works the
-    // shape out from how many payloads there are: wider than tall, and as near
-    // square as that allows. The window is sized to match, so these are the
-    // one description of the layout rather than a second one to keep in step.
-    in property <int> columns: 1;
-    in property <length> cell-width: 320px;
-    in property <length> cell-height: 210px;
+    // How many panels to a row, from the width the window actually has.
+    //
+    // Worked out here rather than handed over by Rust, because the answer
+    // changes while the program runs: a window dragged wider has room for
+    // another column and now uses it, where a count settled at startup left a
+    // wide window with a narrow grid and the panels scrolling under it.
+    //
+    // Never more columns than there are payloads -- a fourth column for three
+    // payloads is an empty one -- and never fewer than one, which is what an
+    // empty configuration gets.
+    //
+    // Rust opens the window wide enough for the columns it means to have; see
+    // grid::columns_for. Because it sizes the window to exactly that many
+    // panels' width plus the chrome, the floor below comes out at the same
+    // number it asked for.
+    property <int> columns: Math.max(
+        1,
+        Math.min(
+            payload-model.length,
+            Math.floor((root.width - root.chrome-width) / root.panel-width)
+        )
+    );
 
     // One callback for the one button a panel has. Which way a press goes is
     // Rust's to decide, from the status the button's own label comes from.
@@ -355,11 +400,34 @@ export component MainWindow inherits Window {
     callback config-payload(int, int, int, int, int);
     callback quit-clicked();
 
-    VerticalLayout {
+    // What a panel comes to, measured by PanelProbe and handed over.
+    //
+    // These were constants in grid.rs as well, kept in step with this file by
+    // hand, and the keeping went wrong in three ways at once: a panel was
+    // called 210 tall where its rows take 176, which showed as a band of
+    // nothing under the packet count; 320 wide where it wants 328, so the
+    // widest row was squeezed; and when the height was corrected the cell
+    // default and the window's own floor were left behind, which clipped the
+    // last row of a one-panel window. There is one of each number now, and it
+    // is measured.
+    in property <length> panel-width;
+    in property <length> panel-height;
+
+    // Everything the window needs besides the panels: the padding round the
+    // whole of it, the heading, the row holding the quit button, and the
+    // grid's own padding inside the scrolling area.
+    out property <length> chrome-width: outer.padding * 2 + grid.padding * 2;
+    out property <length> chrome-height: outer.padding * 2
+        + heading.height
+        + quit-row.height
+        + grid.padding * 2;
+
+
+    outer := VerticalLayout {
         padding: 4px;
         spacing: 0px;
 
-        Text {
+        heading := Text {
             text: "Simulated Payloads";
             font-size: 18px;
             height: 28px;
@@ -368,47 +436,63 @@ export component MainWindow inherits Window {
         }
 
         scroll := ScrollView {
-            grid := GridBox {
-                spacing: 0px;
-                height: payload-model.length == 0
-                    ? 0px
-                    : Math.ceil(payload-model.length / columns) * cell-height;
+            // The panels keep to the top of the scrolling area.
+            //
+            // The area is commonly taller than the grid: the window opens
+            // with room for a row the payloads may not fill, which
+            // rows_of_room() in grid.rs asks for on purpose. That spare room
+            // was being split above and below the grid, because a scrolling
+            // area centres content shorter than itself -- so a window with
+            // five panels in two rows showed a hundred and thirteen pixels of
+            // nothing above the first panel and as much below the last. The
+            // spare room belongs under the panels, where it reads as room for
+            // a row that has not arrived rather than as a gap.
+            //
+            // The Rectangle is what holds it there: a child of a layout with
+            // no height of its own takes what is left over, and the grid,
+            // which states its height, takes none of it.
+            VerticalLayout {
+                    grid := GridBox {
+                    spacing: 0px;
+                    height: payload-model.length == 0
+                        ? 0px
+                        : Math.ceil(payload-model.length / columns) * panel-height;
 
-                for p[i] in payload-model: PayloadPanel {
-                    row: Math.floor(i / columns);
-                    col: Math.mod(i, columns);
-                    // A minimum rather than a size: the window opens at
-                    // exactly this, and the layout stretches the panels if it
-                    // is made larger. Below it the two spin boxes on a row
-                    // stop fitting side by side.
-                    min-width: cell-width;
-                    min-height: cell-height;
+                    for p[i] in payload-model: PayloadPanel {
+                        row: Math.floor(i / columns);
+                        col: Math.mod(i, columns);
+                        // A minimum rather than a size: the window opens at
+                        // exactly this, and the layout stretches the panels if it
+                        // is made larger. Below it the two spin boxes on a row
+                        // stop fitting side by side.
+                        min-width: panel-width;
+                        min-height: panel-height;
 
-                    payload-name: p.name;
-                    dev-id: p.dev-id;
-                    payload-config: p.config;
-                    payload-status: p.status;
-                    packet-size: p.packet-size;
-                    segment-size: p.segment-size;
-                    packet-interval: p.packet-interval;
-                    segment-interval: p.segment-interval;
-                    last-sent-time: p.last-sent-time;
-                    last-sent-data: p.last-sent-data;
-                    last-recv-time: p.last-recv-time;
-                    last-recv-data: p.last-recv-data;
-                    packets-sent: p.packets-sent;
-                    packets-recv: p.packets-recv;
-                    parameters: p.parameters;
-                    sizes-problem: p.sizes-problem;
-                    triggered: p.triggered;
+                        payload-name: p.name;
+                        dev-id: p.dev-id;
+                        payload-config: p.config;
+                        payload-status: p.status;
+                        packet-size: p.packet-size;
+                        segment-size: p.segment-size;
+                        packet-interval: p.packet-interval;
+                        segment-interval: p.segment-interval;
+                        last-sent-time: p.last-sent-time;
+                        last-sent-data: p.last-sent-data;
+                        last-recv-time: p.last-recv-time;
+                        last-recv-data: p.last-recv-data;
+                        packets-sent: p.packets-sent;
+                        packets-recv: p.packets-recv;
+                        parameters: p.parameters;
+                        sizes-problem: p.sizes-problem;
+                        triggered: p.triggered;
 
-                    transfer-clicked => { transfer-payload(i); }
+                        transfer-clicked => { transfer-payload(i); }
 
-                    // An edit changes the model, so the spin box keeps showing
-                    // it, and then tells Rust the whole set for this payload.
-                    packet-size-edited(v) => {
-                        payload-model[i].packet-size = v;
-                        config-payload(i, v, p.segment-size, p.packet-interval, p.segment-interval);
+                        // An edit changes the model, so the spin box keeps showing
+                        // it, and then tells Rust the whole set for this payload.
+                        packet-size-edited(v) => {
+                            payload-model[i].packet-size = v;
+                            config-payload(i, v, p.segment-size, p.packet-interval, p.segment-interval);
                     }
                     segment-size-edited(v) => {
                         payload-model[i].segment-size = v;
@@ -422,11 +506,13 @@ export component MainWindow inherits Window {
                         payload-model[i].segment-interval = v;
                         config-payload(i, p.packet-size, p.segment-size, p.packet-interval, v);
                     }
+                    }
                 }
+                Rectangle { }
             }
         }
 
-        HorizontalLayout {
+        quit-row := HorizontalLayout {
             height: 40px;
             Rectangle { }
             Button {

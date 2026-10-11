@@ -3537,18 +3537,27 @@ Requirement
     once on the way past, and the panel says so where the parameters are shown.
 
 The panels are laid out in a grid whose shape follows from how many there are.
-The window is kept wider than it is tall, and among the shapes that satisfy
-that, the one nearest square is chosen; tcssim opens the window at the size
-that shape asks for. This is not the rule tcsmoc follows -- that one fills a
-row of three at a time, for the reasons given there -- but it comes to the same
-thing for the counts the shipped sets have, and tcssim's panels have always
-filled a row before starting another: its chrome is short enough that a column
-of two panels is taller than wide, and so was never a candidate.
+A row is filled before another is started under it, three panels across, which
+is the rule tcsmoc follows and for the same reasons given there.
 
-The four payloads of tcspecial1.yaml give a two-by-two grid in a 664x722
-window. The size is the one ``window_size`` gives, which a test reads out of
-this document so that the number here cannot quietly stop being the one the
-program opens at.
+It replaced one that kept the window wider than tall and chose the shape
+nearest square among those that were. The claim here used to be that the two
+rules came to the same thing for the counts the shipped sets have. They did
+not: five payloads went into two columns and three rows, because a 680x620
+window is squarer than a 1062x476 one, so the set went down the window instead
+of across it. Squareness was never the thing wanted either -- it was a proxy
+for a window that fits a screen, and a column count says that directly.
+
+How many columns there are is worked out in the window rather than handed over
+by Rust, from the width the window has at the time, so dragging a window wider
+reflows the grid into the room that appeared. Rust opens the window wide enough
+for the columns the payload count calls for, and because it opens it at exactly
+that many panels' width plus the chrome, the window arrives at the same count.
+
+The four payloads of tcspecial1.yaml give a row of three and a row of one in a
+1062x668 window. The size is the one ``window_size`` gives, which a test reads
+out of this document so that the number here cannot quietly stop being the one
+the program opens at.
 
 
 
@@ -4079,7 +4088,7 @@ window.
 
 So the shape follows from the count alone: three handlers are one row of three,
 and the four of the shipped tcspecial1.yaml are a row of three and a row of
-one, in a 798x929 window. A test reads that size out of this document and
+one, in a 821x875 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcssim.
 
 This replaced a rule that chose the shape nearest square among those at least

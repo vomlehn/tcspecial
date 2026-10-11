@@ -2015,6 +2015,22 @@ Requirement
     ``datarate`` on a peripheral are each refused.
 
 Requirement
+    A term of a link is refused on the two kinds that are not on one: a
+    network address and a plain device file. Every other kind refuses what
+    belongs to another kind as its own rules are asked, and these two have no
+    rules to ask -- so a term written on one of them was read and dropped. A
+    device payload could state a data rate, or a sensor's channels, and be
+    read as a device payload that had said nothing of the sort: a
+    misspelling that configured nothing and reported nothing. A network
+    payload's ``protocol`` is a term of its own kind and is allowed.
+
+Requirement
+    Such a term is refused whether the payload stated it or took it from its
+    group, and the error says which. The two are fixed differently: a line is
+    deleted from the payload, or a payload is in a group that was not written
+    for it.
+
+Requirement
     A term a payload does not state is taken from the group it names, exactly
     as every other attribute of a payload is. A term reaches the link the same
     way whichever of the two stated it, so both are checked the same way.

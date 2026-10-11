@@ -1075,6 +1075,37 @@ pub(crate) fn link_params_of(
     stated: &DHConfigJson,
     group: Option<&DHGroupJson>,
 ) -> Result<crate::endpoint_config::GroupKind, String> {
+    let wire = link_terms_of(stated, group);
+
+    match kind {
+        DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
+        DHType::I2c => crate::endpoint_config_i2c::group_kind_of(name, wire),
+        DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
+        DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
+        DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
+        DHType::Rpmsg => crate::endpoint_config_rpmsg::group_kind_of(name, wire),
+        DHType::Gpio => crate::endpoint_config_gpio::group_kind_of(name, wire),
+        other => {
+            return Err(format!(
+                "{} is not a kind of link this describes",
+                other.spelling()
+            ))
+        }
+    }
+    .map_err(|e| format!("{e}"))
+}
+
+/// The terms a payload states about its link, with its group laid under it.
+///
+/// Apart from [`link_params_of`] because two callers want them. That one asks
+/// the rules for the payload's own kind what they mean; the other asks only
+/// whether any of them was stated at all, for the two kinds that are not on a
+/// link and so have no rules to refuse one -- see
+/// [`DHConfigJson::to_dh_config_in`].
+fn link_terms_of(
+    stated: &DHConfigJson,
+    group: Option<&DHGroupJson>,
+) -> crate::endpoint_config::LinkTerms {
     // Each attribute as the payload states it, or as the group it names does.
     // The same inheritance every other attribute of a payload gets.
     macro_rules! inherited {
@@ -1127,22 +1158,7 @@ pub(crate) fn link_params_of(
         }),
     };
 
-    match kind {
-        DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
-        DHType::I2c => crate::endpoint_config_i2c::group_kind_of(name, wire),
-        DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
-        DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
-        DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
-        DHType::Rpmsg => crate::endpoint_config_rpmsg::group_kind_of(name, wire),
-        DHType::Gpio => crate::endpoint_config_gpio::group_kind_of(name, wire),
-        other => {
-            return Err(format!(
-                "{} is not a kind of link this describes",
-                other.spelling()
-            ))
-        }
-    }
-    .map_err(|e| format!("{e}"))
+    wire
 }
 
 /// Payload configuration file structure
@@ -1914,6 +1930,43 @@ impl DHConfigJson {
         } else {
             &[foreign, can_only].concat()
         };
+
+        // And the terms of a link, for the two kinds that are not on one. Every
+        // other kind refuses what belongs to another kind as its own rules are
+        // asked -- see link_params_of -- and these two have no rules to ask,
+        // so a term written on one of them used to be read and dropped: a
+        // device payload stating a data rate, or a network payload stating a
+        // sensor's channels, looked configured and was not. A network
+        // payload's own `protocol` is a term of its kind and is allowed.
+        if matches!(kind, DHType::Network | DHType::Device) {
+            let allowed: &[&str] = match kind {
+                DHType::Network => &["protocol"],
+                _ => &[],
+            };
+            let ours = link_terms_of(self, group);
+            if let Some(field) = crate::endpoint_config::a_link_term(&ours, allowed) {
+                // Where it came from, as above: one line is deleted from the
+                // payload, and the other means a payload is in a group that
+                // was not written for it.
+                let mine = link_terms_of(self, None);
+                let whence = match (
+                    crate::endpoint_config::a_link_term(&mine, allowed),
+                    group,
+                ) {
+                    (None, Some(group)) => {
+                        format!(", which it takes from group \"{}\"", group.name)
+                    }
+                    _ => String::new(),
+                };
+                return Err(format!(
+                    "payload \"{}\" is {} {} payload, so {field}{whence} does not \
+                     apply to it",
+                    self.name,
+                    kind.article(),
+                    kind.spelling()
+                ));
+            }
+        }
 
         if let Some((field, stated, _)) = foreign.iter().find(|(_, _, present)| *present) {
             // Where it came from, because the two are fixed differently: one
@@ -3900,6 +3953,99 @@ payloads:
             EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
             other => panic!("expected a serial endpoint, got {other:?}"),
         }
+    }
+
+    /// A term of a link is refused on the two kinds that are not on one.
+    ///
+    /// Every other kind refuses what belongs to another kind as its own rules
+    /// are asked, and these two have no rules to ask -- so a term written on
+    /// one of them was read and dropped. A device payload could state a data
+    /// rate, or a sensor's channels, and be read as a device payload that had
+    /// said nothing of the sort: a misspelling that configured nothing and
+    /// reported nothing.
+    #[test]
+    fn a_link_term_is_refused_on_a_kind_that_is_not_on_a_link() {
+        // One term from each kind of link, on each kind that is not one.
+        for term in [
+            "datarate: 9600",
+            "stop_bits: 1",
+            "pec: true",
+            "max_speed: 1000000",
+            "can_fd: true",
+            "channels: 2",
+            "service: payload",
+            "lines: 0",
+            "rs485: true",
+        ] {
+            let said = link(
+                "device",
+                &format!("    path: /dev/urandom\n    packet_size: 1\n    {term}\n"),
+            )
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("a device file is not a link");
+            let field = term.split(':').next().expect("a term");
+            assert!(
+                said.contains(field) && said.contains("device payload"),
+                "the error should name the term and the kind: {said}"
+            );
+
+            let said = link(
+                "network",
+                &format!(
+                    "    protocol: udp\n    address: localhost\n    port: 5000\n    \
+                     packet_size: 8\n    {term}\n"
+                ),
+            )
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("a network address is not a link");
+            assert!(
+                said.contains(field) && said.contains("network payload"),
+                "the error should name the term and the kind: {said}"
+            );
+        }
+    }
+
+    /// A network payload's own transport is not a term of somebody else's
+    /// link.
+    ///
+    /// The one term in that table that belongs to the network kind, so the
+    /// rule above has to let it through: refusing it would refuse every
+    /// network payload there is.
+    #[test]
+    fn a_network_payloads_transport_is_its_own() {
+        let fine = link(
+            "network",
+            "    protocol: udp\n    address: localhost\n    port: 5000\n    \
+             packet_size: 8\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect("a network payload states its transport");
+        assert_eq!(fine[0].endpoint.kind(), DHType::Network);
+    }
+
+    /// A term a payload takes from its group is refused as one it states, and
+    /// the error says which.
+    ///
+    /// The two are fixed differently: a line is deleted from the payload, or
+    /// a payload is in a group that was not written for it.
+    #[test]
+    fn a_link_term_from_a_group_names_the_group() {
+        let text = "version: \"1.0\"\ndescription: a device in a serial group\n\
+                    payload_groups:\n  - name: lines\n    datarate: 9600\n\
+                    payloads:\n  - name: p\n    type: device\n    group: lines\n    \
+                    path: /dev/urandom\n    packet_size: 1\n";
+        let said = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(text)
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("a device payload in a group written for a line");
+        assert!(
+            said.contains("datarate") && said.contains("group \"lines\""),
+            "the error should name the term and where it came from: {said}"
+        );
     }
 
     /// A GPIO payload reaches a handler with the lines it watches and how.

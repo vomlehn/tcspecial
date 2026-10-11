@@ -137,50 +137,91 @@ const DEFAULT_SIM_CONFIG_PATH: &str = "tests/manual/tcspecial1sim.yaml";
 /// What one column of the grid takes, and the height of everything above and
 /// below the grid.
 ///
-/// These are used only to choose how large the window opens; the grid itself
-/// lays the panels out at the width they ask for. They have to agree with
-/// `ui/main.slint`, which sizes the grid with the same panel height.
+/// The sizes the window is built from, as the markup reports them.
 ///
-/// What a panel's widest row takes with `GRID_SPACING` beside it, which is
-/// what the testing backend reports in
-/// `every_panels_data_is_inside_the_window`. That row is the three buttons:
-/// side by side they are wider than any line of text in the panel. This was
-/// 320 -- a nominal figure, with a comment claiming the panels stretched to
-/// fill whatever it gave them, which they do not -- and then 206 for a row
-/// whose last button said Config. Spelling that out as Configuration, which
-/// is what tcssim's says, took 41 pixels more than the panel had: a row that
-/// does not fit keeps its buttons at their own width and hangs them over the
-/// edge onto the panel beside it.
-const PANEL_WIDTH: f32 = 256.0;
-/// What a panel's contents come to: the sum of the floors its rows declare,
-/// measured through Slint's testing backend rather than guessed, by
-/// `every_panels_data_is_inside_the_window`. This was 210 against the 259 the
-/// panel took when its two readings each sat in a group box of their own, so
-/// the window opened too small for every row and the three rows of data at
-/// the bottom of each panel went over the edge. It went 162 to 180 when the
-/// panels gained the line saying what the ground itself received, which is
-/// the row and the spacing above it. Those readings are labelled
-/// lines now, which is most of the difference.
-const PANEL_HEIGHT: f32 = 180.0;
-/// Everything above and below the grid: both group box headings, the command
-/// interpreter's own controls, the row holding Quit, and the padding around
-/// them all, and the grid's own padding inside the scrolling area. Measured
-/// the same way, and the estimate it replaces was 272 against the 346 it
-/// really takes.
-const CHROME_HEIGHT: f32 = 369.0;
-
-/// The gap between one panel and the next, matching `spacing` on the grid in
-/// the window. The window has to open tall enough for the gaps as well as the
-/// panels.
-const GRID_SPACING: f32 = 10.0;
-
-/// What the window spends around the grid, across.
+/// Asked for rather than declared here as well. `ui/main.slint` lays out a
+/// panel of its own and hands over what it came to, and states the gap between
+/// panels and what the window spends around the grid. This module does
+/// arithmetic on those four and keeps no copy of them.
 ///
-/// The padding of the scrolling area the panels sit in and of the grid
-/// inside it. Measured through the testing backend like everything else
-/// here: a window of exactly `columns * PANEL_WIDTH` put the last column's
-/// buttons thirty pixels past its own edge.
-const GRID_MARGINS: f32 = 30.0;
+/// It kept copies until recently, and every one of them was wrong: a panel was
+/// called 180 tall where its rows want 162 and 256 wide where they take 255,
+/// and the margin round the grid was called 30 where it is 36 -- and the gaps
+/// between columns were left out of the window's width altogether, so a
+/// three-column grid stood twenty-six pixels wider than the area it scrolled
+/// in and the rightmost column was cut off.
+///
+/// What is measured and what is merely stated differs between them, and the
+/// markup says which: a panel is measured, the chrome cannot be.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Sizes {
+    panel_width: f32,
+    panel_height: f32,
+    grid_spacing: f32,
+    chrome_width: f32,
+    chrome_height: f32,
+}
+
+impl Sizes {
+    /// What the window says about itself.
+    ///
+    /// Read before the window is sized, which works because a preferred size
+    /// is a layout question: what a panel wants is known without laying the
+    /// window out, where what it got is not.
+    fn of(ui: &MainWindow) -> Self {
+        // A panel's size comes from a window of its own -- see PanelProbe in
+        // ui/main.slint -- built, read and dropped here and never shown. The
+        // rest comes from the real window, which knows its own padding.
+        let probe = PanelProbe::new().expect("a window to measure a panel in");
+        let sizes = Self {
+            panel_width: probe.get_panel_width(),
+            panel_height: probe.get_panel_height(),
+            grid_spacing: ui.get_grid_spacing(),
+            chrome_width: ui.get_chrome_width(),
+            chrome_height: ui.get_chrome_height(),
+        };
+
+        // What the window lays the grid out by, so the cells are the size the
+        // measurement says.
+        ui.set_panel_width(sizes.panel_width);
+        ui.set_panel_height(sizes.panel_height);
+        sizes
+    }
+
+    /// Measure a panel and tell the window what it came to.
+    ///
+    /// Every window needs this before it lays anything out: the grid's cells
+    /// are the panel size, so one that was never told comes up with cells of
+    /// nought and builds no panels at all.
+    fn settle(ui: &MainWindow) -> Self {
+        Self::of(ui)
+    }
+
+    /// The sizes the shipped window reports, for tests with no window to ask.
+    ///
+    /// The shape rule does not depend on what a panel comes to, so a test of
+    /// that rule needs numbers rather than the numbers.
+    /// `the_markup_reports_the_sizes_the_tests_assume` keeps these from
+    /// drifting away from the markup they were read off.
+    #[cfg(test)]
+    fn for_tests() -> Self {
+        Self {
+            panel_width: 255.0,
+            panel_height: 162.0,
+            grid_spacing: 10.0,
+            chrome_width: 36.0,
+            chrome_height: 369.0,
+        }
+    }
+
+    /// How wide a window holding `columns` columns of panels is, gaps and all.
+    fn width_for_columns(&self, columns: usize) -> f32 {
+        let columns = columns.max(1);
+        columns as f32 * self.panel_width
+            + (columns - 1) as f32 * self.grid_spacing
+            + self.chrome_width
+    }
+}
 
 /// How many rows of panels the window looks ahead for.
 ///
@@ -206,16 +247,18 @@ fn rows_of_room(rows: usize, panels: usize) -> usize {
 /// One row of them is the window's `min-height`, the least it is ever opened
 /// at; `rows_of_room` says how many rows a particular tcspecial configuration
 /// opens with.
-fn height_for_rows(rows: usize) -> f32 {
+fn height_for_rows(sizes: &Sizes, rows: usize) -> f32 {
     let rows = rows.max(1);
-    rows as f32 * PANEL_HEIGHT + (rows - 1) as f32 * GRID_SPACING + CHROME_HEIGHT
+    rows as f32 * sizes.panel_height
+        + (rows - 1) as f32 * sizes.grid_spacing
+        + sizes.chrome_height
 }
 
 /// The size the window opens at for a grid of `shape` holding `panels`.
-fn window_size(shape: &GridShape, panels: usize) -> LogicalSize {
+fn window_size(sizes: &Sizes, shape: &GridShape, panels: usize) -> LogicalSize {
     LogicalSize::new(
         shape.width,
-        height_for_rows(rows_of_room(shape.rows, panels)),
+        height_for_rows(sizes, rows_of_room(shape.rows, panels)),
     )
 }
 
@@ -250,8 +293,8 @@ const CONTROLS_WIDTH: f32 = 700.0;
 /// saying what the ground itself received took two rows from 680 to 716, and
 /// a floor fixed at 700 would have left the shipped four-panel set taller
 /// than wide.
-fn min_window_width() -> f32 {
-    CONTROLS_WIDTH.max(height_for_rows(2))
+fn min_window_width(sizes: &Sizes) -> f32 {
+    CONTROLS_WIDTH.max(height_for_rows(sizes, 2))
 }
 
 /// How the grid of data handler panels is shaped, and the window size that
@@ -271,6 +314,16 @@ struct GridShape {
 /// widen the window past 1280 before the grid had earned it.
 const MAX_COLUMNS: usize = 3;
 
+/// How many columns `panels` handlers are laid out in.
+///
+/// A row is filled before another is started under it, up to [`MAX_COLUMNS`]
+/// across. The window works the same count back out of the width it was
+/// given, so that resizing reflows the grid; see `columns` in
+/// `ui/main.slint`.
+fn columns_for(panels: usize) -> usize {
+    panels.clamp(1, MAX_COLUMNS)
+}
+
 /// Choose the grid shape for `panels` data handlers.
 ///
 /// A row is filled before another is started under it, up to [`MAX_COLUMNS`]
@@ -288,10 +341,10 @@ const MAX_COLUMNS: usize = 3;
 /// The window is no longer always wider than it is tall: ten panels or more
 /// are four rows of a three-wide grid, which is taller than 960. They scroll,
 /// as too many panels always have.
-fn grid_shape(panels: usize) -> GridShape {
+fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
     // An empty configuration still has to produce a window.
     let panels = panels.max(1);
-    let columns = panels.min(MAX_COLUMNS);
+    let columns = columns_for(panels);
     let rows = panels.div_ceil(columns);
 
     GridShape {
@@ -301,12 +354,13 @@ fn grid_shape(panels: usize) -> GridShape {
         // what the command interpreter's controls need is wider than a single
         // panel, so one and two panels both open at it.
         //
-        // GRID_MARGINS because a window as wide as its panels is not wide
-        // enough: the grid sits inside a scrolling area with padding of its
-        // own, and the last column's buttons went over the edge by exactly
-        // that much.
-        width: (columns as f32 * PANEL_WIDTH + GRID_MARGINS).max(min_window_width()),
-        height: height_for_rows(rows),
+        // The chrome and the column gaps are both in it: the grid sits in a
+        // scrolling area with padding of its own and keeps a gap between one
+        // panel and the next, and a window as wide as its panels alone put the
+        // last column's buttons over the edge -- thirty pixels for the padding
+        // that was allowed for, and twenty more for two gaps that were not.
+        width: sizes.width_for_columns(columns).max(min_window_width(sizes)),
+        height: height_for_rows(sizes, rows),
     }
 }
 
@@ -782,6 +836,8 @@ fn main() {
     eprintln!("Loaded {} data handler configurations", dh_configs.len());
 
     let ui = MainWindow::new().unwrap();
+
+    let _ = Sizes::settle(&ui);
     let ui_weak = ui.as_weak();
 
     // And the simulator file beside it, for the panels to show. Loosely: the
@@ -818,7 +874,10 @@ fn main() {
     // Shape the grid, and open the window at the size that shape wants. The
     // window cannot work this out for itself: it would need the panel count
     // before the model is set.
-    let shape = grid_shape(dh_configs.len());
+    // What the markup says a panel and the chrome come to, asked for rather
+    // than written down here as well: see Sizes.
+    let sizes = Sizes::of(&ui);
+    let shape = grid_shape(&sizes, dh_configs.len());
     eprintln!(
         "{} data handlers in a {}x{} grid, window {}x{}",
         dh_configs.len(),
@@ -827,13 +886,12 @@ fn main() {
         shape.width,
         shape.height
     );
-    ui.set_columns(i32::try_from(shape.columns).unwrap_or(1));
     // Taller than the grid asks for where there is a third row to look ahead
     // for, and no taller than the panels on hand need otherwise. It is also
     // why the window can open taller than it is wide, which the shape itself
     // never is: the shape rule chooses the grid, and the room rule says how
     // much of the window to give it.
-    ui.window().set_size(window_size(&shape, dh_configs.len()));
+    ui.window().set_size(window_size(&sizes, &shape, dh_configs.len()));
 
     // Start tcspecial and tcssim subprocesses first, each reading the payload
     // file tcsmoc read, so all three describe the same payloads.
@@ -2317,10 +2375,12 @@ mod tests {
             let panels = rows.len();
 
             let ui = MainWindow::new().unwrap();
+
+            let _ = Sizes::settle(&ui);
             ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(rows))));
-            let shape = grid_shape(panels);
-            ui.set_columns(i32::try_from(shape.columns).unwrap());
-            ui.window().set_size(window_size(&shape, panels));
+            let sizes = Sizes::of(&ui);
+            let shape = grid_shape(&sizes, panels);
+            ui.window().set_size(window_size(&sizes, &shape, panels));
             ui.show().unwrap();
 
             let widths: Vec<f32> = ElementHandle::find_by_element_type_name(&ui, "DHPanel")
@@ -2359,10 +2419,12 @@ mod tests {
                 .collect();
 
             let ui = MainWindow::new().unwrap();
+
+            let _ = Sizes::settle(&ui);
             ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(rows))));
-            let shape = grid_shape(panels);
-            ui.set_columns(i32::try_from(shape.columns).unwrap());
-            ui.window().set_size(window_size(&shape, panels));
+            let sizes = Sizes::of(&ui);
+            let shape = grid_shape(&sizes, panels);
+            ui.window().set_size(window_size(&sizes, &shape, panels));
             ui.show().unwrap();
 
             // One per panel, in the model's order: the name is the first text
@@ -2465,12 +2527,14 @@ mod tests {
             let panels = rows.len();
 
             let ui = MainWindow::new().unwrap();
+
+            let _ = Sizes::settle(&ui);
             ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(rows))));
 
             // Opened as main() opens it, room rule and all.
-            let shape = grid_shape(panels);
-            ui.set_columns(i32::try_from(shape.columns).unwrap());
-            ui.window().set_size(window_size(&shape, panels));
+            let sizes = Sizes::of(&ui);
+            let shape = grid_shape(&sizes, panels);
+            ui.window().set_size(window_size(&sizes, &shape, panels));
             ui.show().unwrap();
 
             let window = ui.window().size().to_logical(1.0);
@@ -2498,20 +2562,33 @@ mod tests {
             // window is wide enough for that to happen with nothing running
             // off its own edge, so this is what notices -- spelling Config
             // out as Configuration wanted 41 pixels the panel had not got.
-            let panels_across: Vec<(f32, f32)> =
+            // Across and down both, which it did not used to be. A button
+            // was matched to a panel by its left edge alone, and the Quit
+            // button -- which is in no panel, below the grid -- sat in the
+            // column of the last one: it passed while the window happened to
+            // be narrow enough for its right edge to fall inside that column,
+            // and failed the moment the window got wider.
+            let panel_rects: Vec<(f32, f32, f32, f32)> =
                 ElementHandle::find_by_element_type_name(&ui, "DHPanel")
                     .map(|panel| {
                         let left = panel.absolute_position().x;
-                        (left, left + panel.size().width)
+                        let top = panel.absolute_position().y;
+                        (left, left + panel.size().width, top, top + panel.size().height)
                     })
                     .collect();
             for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
                 let left = button.absolute_position().x;
                 let right = left + button.size().width;
-                // The command interpreter's own buttons are in no panel.
-                let Some(&(panel_left, panel_right)) = panels_across
-                    .iter()
-                    .find(|(panel_left, panel_right)| left >= *panel_left && left < *panel_right)
+                let top = button.absolute_position().y;
+                // The command interpreter's own buttons, and Quit, are in no
+                // panel.
+                let Some(&(panel_left, panel_right, _, _)) =
+                    panel_rects.iter().find(|(left_edge, right_edge, top_edge, bottom_edge)| {
+                        left >= *left_edge
+                            && left < *right_edge
+                            && top >= *top_edge
+                            && top < *bottom_edge
+                    })
                 else {
                     continue;
                 };
@@ -2546,12 +2623,103 @@ mod tests {
                 grid.size().height,
                 area.size().height
             );
+            // And across, which was never checked and was wrong: the window's
+            // width allowed for the padding round the grid but not for the
+            // gaps between its columns, so a three-column grid stood
+            // twenty-six pixels wider than the area it scrolled in and the
+            // rightmost column was cut off along its edge.
+            assert!(
+                grid.size().width <= area.size().width,
+                "{what}: the grid is {} wide in an area {} wide",
+                grid.size().width,
+                area.size().width
+            );
+
+            // The fixture the shape tests reason about is the window's own.
+            the_markup_reports_the_sizes_the_tests_assume(&ui);
+
+            // A panel is the size it asked for, and its rows are the sizes
+            // they asked for.
+            //
+            // This is the fault the sizes being written down twice produced
+            // here. Every row of a panel states a floor rather than a height,
+            // and the grid took the whole of the scrolling area and stretched
+            // its rows to fill it: a panel came out 275 tall where it wants
+            // 162, and the rows shared out the surplus until a Button stood
+            // fifty pixels tall. tcssim had the same disease the other way
+            // round -- its rows state heights, so the surplus could only
+            // gather at the bottom, which showed as a band under the packet
+            // count.
+            for (n, panel) in ElementHandle::find_by_element_type_name(&ui, "DHPanel")
+                .enumerate()
+            {
+                assert!(
+                    (panel.size().height - sizes.panel_height).abs() <= 1.0,
+                    "{what}: panel {n} is {} tall where a panel wants {}",
+                    panel.size().height,
+                    sizes.panel_height
+                );
+            }
+            for button in ElementHandle::find_by_element_type_name(&ui, "Button") {
+                assert!(
+                    button.size().height <= 40.0,
+                    "{what}: the {:?} button is {} tall, which is a stretched \
+                     row rather than a button",
+                    button.accessible_label(),
+                    button.size().height
+                );
+            }
+
+            // The grid opens with the columns asked for, and reflows when
+            // the window is resized.
+            //
+            // The count is the window's own, worked out from the width it has
+            // rather than handed over once at startup, so a window dragged
+            // wider fits another column and uses it. Counted by how many
+            // panels share the top row.
+            //
+            // Last in the case, because it leaves the window a different size
+            // than it was opened at.
+            let columns_now = |ui: &MainWindow| -> usize {
+                let tops: Vec<f32> = ElementHandle::find_by_element_type_name(ui, "DHPanel")
+                    .map(|e| e.absolute_position().y)
+                    .collect();
+                let first = tops.iter().copied().fold(f32::MAX, f32::min);
+                tops.iter().filter(|y| (**y - first).abs() < 1.0).count()
+            };
+
+            let opened = columns_now(&ui);
+            assert_eq!(
+                opened,
+                columns_for(panels),
+                "{what}: opened with {opened} columns where {} were asked for",
+                columns_for(panels)
+            );
+
+            if panels >= 2 {
+                let narrow = sizes.width_for_columns(1);
+                ui.window()
+                    .set_size(LogicalSize::new(narrow, window_height));
+                assert_eq!(
+                    columns_now(&ui),
+                    1,
+                    "{what}: a window one panel wide did not come down to one column"
+                );
+
+                let wide = sizes.width_for_columns(panels);
+                ui.window().set_size(LogicalSize::new(wide, window_height));
+                assert_eq!(
+                    columns_now(&ui),
+                    panels,
+                    "{what}: a window {panels} panels wide did not use the room"
+                );
+            }
 
             // Room for as many rows as the rule says, and no more than
             // that: a configuration of fewer panels than the window looks
             // ahead for opens only as tall as those panels need.
             let rows = rows_of_room(shape.rows, panels);
-            let wanted = height_for_rows(rows) - CHROME_HEIGHT;
+            let wanted = height_for_rows(&sizes, rows) - sizes.chrome_height;
             assert!(
                 area.size().height >= wanted,
                 "{what}: the panels have {} of the {wanted} that {rows} rows \
@@ -2559,7 +2727,7 @@ mod tests {
                 area.size().height
             );
             assert!(
-                area.size().height < wanted + PANEL_HEIGHT,
+                area.size().height < wanted + sizes.panel_height,
                 "{what}: the panels have {}, room for a row more than the \
                  {rows} wanted",
                 area.size().height
@@ -2825,8 +2993,8 @@ mod tests {
 
         let shown = |info: DHInfo| {
             let ui = MainWindow::new().unwrap();
+            let _ = Sizes::settle(&ui);
             ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(vec![info]))));
-            ui.set_columns(1);
             ui.show().unwrap();
             ElementHandle::find_by_element_type_name(&ui, "Text")
                 .filter_map(|e| e.accessible_label())
@@ -2921,6 +3089,8 @@ mod tests {
         use i_slint_backend_testing::ElementHandle;
 
         let ui = MainWindow::new().unwrap();
+
+        let _ = Sizes::settle(&ui);
         ui.show().unwrap();
 
         let on_screen = |ui: &MainWindow| -> Vec<String> {
@@ -2987,10 +3157,10 @@ mod tests {
         // Without the simulator file, which is the case this program has to
         // handle: it controls payloads and does not simulate them.
         let ui = MainWindow::new().unwrap();
+        let _ = Sizes::settle(&ui);
         ui.set_dh_model(ModelRc::from(Rc::new(VecModel::from(vec![dh_info_from(
             0, dh, None,
         )]))));
-        ui.set_columns(1);
         ui.show().unwrap();
 
         let on_screen = |ui: &MainWindow| -> Vec<String> {
@@ -3045,8 +3215,8 @@ mod tests {
 
         // The four handlers of tcspecial1.yaml, which is the set the document
         // describes.
-        let shape = grid_shape(4);
-        let size = window_size(&shape, 4);
+        let shape = grid_shape(&Sizes::for_tests(), 4);
+        let size = window_size(&Sizes::for_tests(), &shape, 4);
         let said = format!("{}x{}", size.width, size.height);
 
         assert_eq!(
@@ -3061,35 +3231,29 @@ mod tests {
         );
     }
 
-    /// The sizes in the window and the ones Rust works them out from.
+    /// The markup reports the sizes the tests do their arithmetic on.
     ///
-    /// Three numbers in `ui/main.slint` are the same numbers as here: the two
-    /// floors the window may not go below, and the height the grid claims per
-    /// row. Nothing but the comments on them has ever said so, and a window
-    /// that disagrees goes wrong quietly -- it opens at a size its own layout
-    /// will not keep, or claims room per row that the opening size did not
-    /// allow for.
-    #[test]
-    fn the_window_and_rust_agree_on_the_sizes() {
-        let window = Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
-        let source = std::fs::read_to_string(&window).unwrap();
-
-        for (what, expected) in [
-            ("min-width", min_window_width()),
-            // The least the window is ever opened at: one row of panels.
-            ("min-height", height_for_rows(1)),
-            ("panel-height", PANEL_HEIGHT),
-            ("panel-width", PANEL_WIDTH),
-            ("grid-spacing", GRID_SPACING),
-        ] {
-            let said = format!("{}: {}px;", what, expected);
-            assert!(
-                source.contains(&said),
-                "{} does not say {:?}",
-                window.display(),
-                said
-            );
-        }
+    /// There used to be a test here comparing three numbers in
+    /// `ui/main.slint` against three constants in this file, by reading the
+    /// markup as text and looking for "panel-height: 180px;". It was the right
+    /// idea and it could only ever catch the copies going out of step, not
+    /// their being wrong together -- which they were: a panel is 162 tall and
+    /// 255 wide, and both files said otherwise in the same words.
+    ///
+    /// There is nothing to compare now. The markup measures a panel and states
+    /// the chrome, Rust reads both, and the only number written twice is the
+    /// fixture the tests below do arithmetic on. This is what keeps that
+    /// honest. A panel that gains a row is meant to fail here.
+    ///
+    /// Not a test of its own: the Slint backend belongs to one thread, so the
+    /// checks that need a window run from the one that starts it.
+    fn the_markup_reports_the_sizes_the_tests_assume(ui: &MainWindow) {
+        assert_eq!(
+            Sizes::of(ui),
+            Sizes::for_tests(),
+            "the window reports sizes the tests were written against other \
+             numbers for"
+        );
     }
 
     /// The status line in the window and the strings Rust sets it to.
@@ -3520,7 +3684,10 @@ mod tests {
     #[test]
     fn a_row_holds_up_to_three_panels() {
         for panels in 1..=COUNTS {
-            let shape = grid_shape(panels);
+            // The shape rule and not the sizes, so there is no window
+            // to ask: how many columns a count gets does not depend on
+            // what a panel comes to.
+            let shape = grid_shape(&Sizes::for_tests(), panels);
 
             assert_eq!(
                 shape.columns,
@@ -3548,7 +3715,10 @@ mod tests {
     #[test]
     fn the_grid_is_wider_than_tall_while_it_fits_two_rows() {
         for panels in 1..=(MAX_COLUMNS * 2) {
-            let shape = grid_shape(panels);
+            // The shape rule and not the sizes, so there is no window
+            // to ask: how many columns a count gets does not depend on
+            // what a panel comes to.
+            let shape = grid_shape(&Sizes::for_tests(), panels);
             assert!(
                 shape.width >= shape.height,
                 "{panels} panels gives {}x{}, taller than wide",
@@ -3562,7 +3732,10 @@ mod tests {
     #[test]
     fn the_grid_holds_every_panel_and_no_empty_row() {
         for panels in 1..=COUNTS {
-            let shape = grid_shape(panels);
+            // The shape rule and not the sizes, so there is no window
+            // to ask: how many columns a count gets does not depend on
+            // what a panel comes to.
+            let shape = grid_shape(&Sizes::for_tests(), panels);
             assert!(
                 shape.columns * shape.rows >= panels,
                 "{panels} panels do not fit in {}x{}",
@@ -3593,7 +3766,8 @@ mod tests {
             .unwrap_or_else(|e| panic!("{} failed to load: {e}", path.display()));
         assert_eq!(dh_configs.len(), 4, "{} has moved on", path.display());
 
-        let shape = grid_shape(dh_configs.len());
+        // The shape rule and not the sizes, so there is no window to ask.
+        let shape = grid_shape(&Sizes::for_tests(), dh_configs.len());
         assert_eq!(
             (shape.columns, shape.rows),
             (3, 2),
@@ -3614,7 +3788,7 @@ mod tests {
     /// An unreadable or empty configuration still produces a window.
     #[test]
     fn no_panels_still_has_a_shape() {
-        let shape = grid_shape(0);
+        let shape = grid_shape(&Sizes::for_tests(), 0);
         assert_eq!(shape.columns, 1);
         assert_eq!(shape.rows, 1);
         assert!(shape.width >= shape.height);

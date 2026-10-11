@@ -69,6 +69,7 @@ help:
 	@echo "  make rungui      - Run tcsgui on a configuration file"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
+	@echo "  make verify      - Check one version 2 configuration"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload needs"
 	@echo "  make mkstubs     - Make every stand-in: I2C, GPIO, IIO and virtual CAN"
 	@echo "  make rmvcan      - Remove the virtual CAN buses"
@@ -293,6 +294,22 @@ rmstubs:
 	bin/rmiio
 	bin/rmgpio
 	bin/rmi2c
+
+# Check one version 2 configuration.
+#
+# One file and not a pair: a version 2 configuration has no simulator file
+# beside it -- what a node stands in for is the node's own business -- so this
+# names the file itself rather than a stem the way the runverify targets do.
+#
+# The same TCSGUI_FILE the editor takes, so that checking what was just edited
+# is the same name in both commands.
+.PHONY: verify
+verify:
+	( \
+		set -eu; \
+		echo "Checking $(TCSGUI_FILE)..."; \
+		cd $(RUST) && cargo run -q --bin tcsverify -- $(TCSGUI_FILE) \
+	)
 
 # Run the configuration editor.
 #

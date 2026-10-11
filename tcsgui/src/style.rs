@@ -186,6 +186,31 @@ impl NodeType {
         }
     }
 
+    /// Which family this type belongs to.
+    ///
+    /// The families are the shape grammar: square corners are hardware,
+    /// rounded are software aboard, a circle is an end of the graph, a keyed
+    /// rectangle is an interface that is driven, and a page is a diagram of
+    /// its own. The palette shows them under these headings, which is how the
+    /// grammar gets taught -- a flat list of thirteen shapes hides the pattern
+    /// that would make them learnable.
+    pub fn family(self) -> &'static str {
+        match self {
+            NodeType::I2c
+            | NodeType::Spi
+            | NodeType::Serial
+            | NodeType::Can
+            | NodeType::Iio
+            | NodeType::Rpmsg
+            | NodeType::Network
+            | NodeType::Pseudofile => "Devices",
+            NodeType::Gpio => "Driven",
+            NodeType::Compute => "Computation",
+            NodeType::Log | NodeType::Moc => "Ends of the graph",
+            NodeType::Subdiagram => "Pages",
+        }
+    }
+
     /// How this type is drawn.
     ///
     /// The groupings are meant to be learnable rather than arbitrary: square
@@ -477,6 +502,47 @@ mod tests {
                 "{} is {}px tall and its label wants {wanted:.0}px",
                 t.spelling(),
                 a.size.1
+            );
+        }
+    }
+
+    /// Every family's members share the outline that defines it.
+    ///
+    /// The families are only worth showing if they mean something, and what
+    /// they mean is the shape: a reader who learns that square is hardware has
+    /// learned it for all eight of them or for none.
+    #[test]
+    fn a_family_shares_one_outline() {
+        use std::collections::BTreeMap;
+
+        let mut outlines: BTreeMap<&str, Vec<Outline>> = BTreeMap::new();
+        for t in NodeType::ALL {
+            outlines
+                .entry(t.family())
+                .or_default()
+                .push(t.appearance().outline);
+        }
+        for (family, mut shapes) in outlines {
+            shapes.sort_by_key(|o| format!("{o:?}"));
+            shapes.dedup();
+            assert_eq!(
+                shapes.len(),
+                1,
+                "{family} is drawn with {} different outlines",
+                shapes.len()
+            );
+        }
+    }
+
+    /// Every type is in a family, and every family has a name worth reading.
+    #[test]
+    fn every_type_belongs_somewhere() {
+        for t in NodeType::ALL {
+            let family = t.family();
+            assert!(!family.is_empty(), "{} is in no family", t.spelling());
+            assert!(
+                family.chars().next().unwrap().is_uppercase(),
+                "{family} is a heading and should read as one"
             );
         }
     }

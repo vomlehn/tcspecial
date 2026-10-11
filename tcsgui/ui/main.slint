@@ -46,13 +46,29 @@ export struct NodeView {
     openable: bool,
 }
 
+// One row of the palette: a family's heading, or a type to place.
+//
+// Headings in the list rather than a nested model: Slint's `for` takes one
+// model, and a list with a flag in it is simpler to build and to read than a
+// model of models.
+export struct PaletteEntry {
+    heading: string,
+    node: NodeView,
+    is-heading: bool,
+}
+
 export struct LinkView {
-    // The two ends, already in canvas coordinates: the window draws, and
-    // where things are is Rust's business.
-    x1: length,
-    y1: length,
-    x2: length,
-    y2: length,
+    // The route and the arrowhead, as SVG path data in canvas coordinates.
+    //
+    // Computed in Rust -- see route.rs -- because a route is arithmetic, and
+    // arithmetic in a layout language is hard to read and impossible to test.
+    // Two paths because one is stroked and the other filled, and a Path takes
+    // one of each.
+    route: string,
+    head: string,
+    // Where the label goes, which is the only geometry the markup still needs.
+    label-x: length,
+    label-y: length,
     // A link into a named input is drawn wide, one into a node's only input
     // narrow. A second channel beside the label, so a crowded diagram can be
     // read without tracing every line to its end.
@@ -368,67 +384,70 @@ component NodeShape inherits Rectangle {
     }
 }
 
-// One link, drawn as a line between its two ends.
+// One link: its route and the arrow at the end of it.
 //
-// A Path with a MoveTo and a LineTo, which draws a line at any angle and takes
-// a stroke width -- the wide and narrow weights asked for. A rotated Rectangle
-// was tried first and a Rectangle has no rotation.
+// Both are path data from Rust, in canvas coordinates, so this spans the whole
+// canvas and gives its Paths a viewbox the same size -- one coordinate, one
+// pixel. The alternative was a bounding box per link and the arithmetic to go
+// with it, which is what route.rs now holds and tests instead.
 //
-// The Path is placed at the bounding box of the two ends and given a viewbox
-// the same size, so a coordinate in the box is a pixel on the screen. A
-// vertical or horizontal link has a box of no width or no height, which would
-// be a viewbox that divides by nothing, so each is held at one pixel least.
+// Stroked and filled are two Paths because Slint gives one Path one of each,
+// and an arrowhead wants to be filled while a line wants to be stroked.
 component LinkLine inherits Rectangle {
     in property <LinkView> link;
-    in property <color> ink: #555555;
+    in property <color> ink: #6b7280;
 
-    property <length> left: min(link.x1, link.x2);
-    property <length> top: min(link.y1, link.y2);
-    property <length> box-width: max(1px, abs(link.x2 - link.x1));
-    property <length> box-height: max(1px, abs(link.y2 - link.y1));
-
+    width: 100%;
+    height: 100%;
     background: transparent;
 
     line := Path {
-        x: left;
-        y: top;
-        width: box-width;
-        height: box-height;
+        width: 100%;
+        height: 100%;
         viewbox-x: 0;
         viewbox-y: 0;
-        viewbox-width: box-width / 1px;
-        viewbox-height: box-height / 1px;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: link.route;
         stroke: ink;
-        stroke-width: link.wide ? 3px : 1px;
+        // The wide and narrow weights: a link into a named input is wide, so
+        // a crowded diagram can be read without tracing every line to its
+        // end.
+        stroke-width: link.wide ? 2.5px : 1.25px;
+        fill: transparent;
+    }
 
-        MoveTo {
-            x: (link.x1 - left) / 1px;
-            y: (link.y1 - top) / 1px;
-        }
-        LineTo {
-            x: (link.x2 - left) / 1px;
-            y: (link.y2 - top) / 1px;
-        }
+    // Which way the data goes. Implied before this by which end the line left,
+    // which is to say not said at all: a reader had to open the file.
+    head := Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: link.head;
+        fill: ink;
     }
 
     // Which input the link arrives at, where it says so. Text rather than
     // only a line weight, because a name is what the configuration file will
     // show and the two should agree.
     if link.label != "": Text {
-        x: (link.x1 + link.x2) / 2;
-        y: (link.y1 + link.y2) / 2 - 14px;
+        x: link.label-x;
+        y: link.label-y - 14px;
         text: link.label;
-        font-size: 9px;
+        font-size: 10px;
         color: ink;
     }
     // And what somebody wrote about the connection, under the line.
     if link.comment != "": Text {
-        x: (link.x1 + link.x2) / 2;
-        y: (link.y1 + link.y2) / 2 + 4px;
+        x: link.label-x;
+        y: link.label-y + 4px;
         text: link.comment;
-        font-size: 9px;
+        font-size: 10px;
         font-italic: true;
-        color: #555555;
+        color: #6b7280;
     }
 }
 
@@ -442,7 +461,7 @@ component LinkLine inherits Rectangle {
 component Surface inherits Rectangle {
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
-    in property <[NodeView]> palette: [];
+    in property <[PaletteEntry]> palette: [];
 
     // How deep undo currently goes, shown rather than guessed at: a person
     // about to abandon an afternoon's work deserves to know how much of it is
@@ -538,17 +557,30 @@ component Surface inherits Rectangle {
                             height: 18px;
                         }
                         for p in palette: Rectangle {
-                            height: 54px;
+                            height: p.is-heading ? 22px : 56px;
                             background: transparent;
-                            NodeShape {
-                                node: p;
+
+                            // A family's heading. Quiet: it is there to group
+                            // the shapes below it, not to be read first.
+                            if p.is-heading: Text {
+                                x: 0;
+                                y: 6px;
+                                text: p.heading;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: #6b7280;
+                            }
+
+                            if !p.is-heading: NodeShape {
+                                node: p.node;
                             }
                             // The whole row, so the hit area is the row and
                             // not only the shape: a circle's corners are not
                             // part of the circle, and a press there should
                             // still place one.
-                            TouchArea {
-                                clicked => { place-node(p.node-type); }
+                            if !p.is-heading: TouchArea {
+                                mouse-cursor: MouseCursor.pointer;
+                                clicked => { place-node(p.node.node-type); }
                             }
                         }
                         Rectangle { }
@@ -563,6 +595,39 @@ component Surface inherits Rectangle {
                 border-color: #d8d8d4;
                 horizontal-stretch: 1;
                 clip: true;
+
+                // A faint grid, which the nodes snap to.
+                //
+                // It gives the surface some depth and makes the alignment
+                // visible -- a diagram whose nodes line up looks deliberate,
+                // and a grid is what says they are lined up rather than
+                // nearly. Coarse on purpose: a dot at every snap would be
+                // thousands of elements and a texture rather than a guide.
+                for n in 24: Rectangle {
+                    x: n * 64px;
+                    y: 0;
+                    width: 1px;
+                    height: 100%;
+                    background: #f3f4f6;
+                }
+                for n in 16: Rectangle {
+                    x: 0;
+                    y: n * 64px;
+                    width: 100%;
+                    height: 1px;
+                    background: #f3f4f6;
+                }
+
+                // An empty canvas looks broken rather than new, so it says
+                // which way out.
+                if nodes.length == 0: Text {
+                    x: 24px;
+                    y: 24px;
+                    text: "Press a node type on the left to place one.";
+                    font-size: 12px;
+                    font-italic: true;
+                    color: #9ca3af;
+                }
 
                 // Links under nodes, so a line never crosses a label.
                 for l in links: LinkLine {
@@ -589,7 +654,7 @@ export component MainWindow inherits Window {
 
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
-    in property <[NodeView]> palette: [];
+    in property <[PaletteEntry]> palette: [];
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -640,7 +705,7 @@ export component SubWindow inherits Window {
     in property <string> editing: "";
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
-    in property <[NodeView]> palette: [];
+    in property <[PaletteEntry]> palette: [];
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";

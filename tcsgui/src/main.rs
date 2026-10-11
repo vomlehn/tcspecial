@@ -21,6 +21,7 @@
 mod document;
 mod editor;
 mod journal;
+mod route;
 mod save;
 mod style;
 mod subdiagram;
@@ -401,10 +402,14 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
             };
 
             LinkView {
-                x1,
-                y1,
-                x2,
-                y2,
+                // The route and the arrow, worked out where they can be
+                // tested: see route.rs.
+                route: route::route(x1, y1, x2, y2).into(),
+                head: route::arrow(x2, y2).into(),
+                // The label goes at the middle of the run, which for an
+                // orthogonal route is the middle of its vertical segment.
+                label_x: (x1 + x2) / 2.0,
+                label_y: (y1 + y2) / 2.0,
                 wide: link.input.is_some(),
                 label: label.into(),
                 comment: link.comment.clone().unwrap_or_default().into(),
@@ -491,17 +496,34 @@ fn snap((x, y): (i32, i32)) -> (i32, i32) {
     (round(x), round(y))
 }
 
-/// One of every node type, drawn as the canvas draws it.
+/// One of every node type, under its family's heading.
 ///
-/// The palette is built from the same table the canvas uses, so a shape in the
-/// list is the shape on the canvas rather than a picture of one that may drift
-/// away from it.
-fn palette() -> ModelRc<NodeView> {
-    let views: Vec<NodeView> = NodeType::ALL
-        .iter()
-        .map(|t| view_of(t.spelling(), t.spelling(), (8, 2), None, false, None))
-        .collect();
-    ModelRc::from(Rc::new(VecModel::from(views)))
+/// Built from the same table the canvas uses, so a shape in the list is the
+/// shape on the canvas rather than a picture of one that may drift away from
+/// it. Grouped because the families *are* the shape grammar -- square is
+/// hardware, rounded is software aboard, a circle is an end of the graph -- and
+/// a flat list of thirteen shapes hides the pattern that would make them
+/// learnable.
+fn palette() -> ModelRc<PaletteEntry> {
+    let mut entries: Vec<PaletteEntry> = Vec::new();
+    let mut family = "";
+
+    for t in NodeType::ALL {
+        if t.family() != family {
+            family = t.family();
+            entries.push(PaletteEntry {
+                heading: family.into(),
+                node: view_of("", "", (0, 0), None, false, None),
+                is_heading: true,
+            });
+        }
+        entries.push(PaletteEntry {
+            heading: "".into(),
+            node: view_of(t.spelling(), t.spelling(), (8, 2), None, false, None),
+            is_heading: false,
+        });
+    }
+    ModelRc::from(Rc::new(VecModel::from(entries)))
 }
 
 /// What a node of this type looks like, as the window wants it.
@@ -645,11 +667,16 @@ mod tests {
     #[test]
     fn the_palette_offers_every_node_type() {
         let palette = palette();
-        assert_eq!(palette.row_count(), NodeType::ALL.len());
-
-        let offered: Vec<String> = (0..palette.row_count())
-            .map(|i| palette.row_data(i).unwrap().node_type.to_string())
+        let rows: Vec<PaletteEntry> = (0..palette.row_count())
+            .map(|i| palette.row_data(i).unwrap())
             .collect();
+
+        let offered: Vec<String> = rows
+            .iter()
+            .filter(|r| !r.is_heading)
+            .map(|r| r.node.node_type.to_string())
+            .collect();
+        assert_eq!(offered.len(), NodeType::ALL.len());
         for t in NodeType::ALL {
             assert!(
                 offered.contains(&t.spelling().to_string()),
@@ -657,6 +684,28 @@ mod tests {
                 t.spelling()
             );
         }
+
+        // Grouped, and every shape sits under a heading rather than above the
+        // first one.
+        assert!(rows[0].is_heading, "the palette does not start with a family");
+        let headings: Vec<String> = rows
+            .iter()
+            .filter(|r| r.is_heading)
+            .map(|r| r.heading.to_string())
+            .collect();
+        for t in NodeType::ALL {
+            assert!(
+                headings.contains(&t.family().to_string()),
+                "{} has no heading in the palette",
+                t.family()
+            );
+        }
+        // And no family appears twice, which would mean the table had gone out
+        // of family order and the palette was showing it as two groups.
+        let mut once = headings.clone();
+        once.sort();
+        once.dedup();
+        assert_eq!(once.len(), headings.len(), "a family is listed twice");
     }
 
     /// Nothing in the palette is red.
@@ -670,7 +719,11 @@ mod tests {
         let error = colour(ERROR_TINT);
         let palette = palette();
         for i in 0..palette.row_count() {
-            let view = palette.row_data(i).unwrap();
+            let row = palette.row_data(i).unwrap();
+            if row.is_heading {
+                continue;
+            }
+            let view = row.node;
             assert!(!view.faulty, "a palette entry is marked faulty");
             assert_ne!(
                 view.tint, error,
@@ -902,25 +955,56 @@ mod tests {
             link: Link::new("a", "b", Some("in0")),
         });
 
-        let (width, height) = size_of("i2c");
-        let view = {
-            let from = document.node("a").unwrap();
-            let to = document.node("b").unwrap();
-            LinkView {
-                comment: "".into(),
-                x1: (from.at.0 + width as i32) as f32,
-                y1: (from.at.1 + height as i32 / 2) as f32,
-                x2: to.at.0 as f32,
-                y2: (to.at.1 + size_of("compute").1 as i32 / 2) as f32,
-                wide: true,
-                label: "in0".into(),
-            }
-        };
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut editor = Editor::new(&where_.path().join("v.yaml"));
+        for edit in [
+            Edit::AddNode {
+                name: "a".into(),
+                node_type: "i2c".into(),
+                home: None,
+            },
+            Edit::AddNode {
+                name: "b".into(),
+                node_type: "compute".into(),
+                home: None,
+            },
+            Edit::MoveNode {
+                node: "a".into(),
+                was: (0, 0),
+                now: (8, 24),
+            },
+            Edit::MoveNode {
+                node: "b".into(),
+                was: (0, 0),
+                now: (304, 40),
+            },
+            Edit::AddLink {
+                link: Link::new("a", "b", Some("in0")),
+            },
+        ] {
+            editor.edit(edit);
+        }
+
+        let (_, links) = views_of(&editor, &None);
+        assert_eq!(links.len(), 1);
+        let view = &links[0];
 
         // It starts at the right edge of the source and ends at the left edge
         // of the destination, so the line does not cross either shape.
-        assert_eq!(view.x1, (10 + width as i32) as f32);
-        assert_eq!(view.x2, 300.0);
+        let (width, _) = size_of("i2c");
+        assert!(
+            view.route.starts_with(&format!("M {}.0", 8 + width as i32)),
+            "{}",
+            view.route
+        );
+        let (_, target_height) = size_of("compute");
+        let arrives = 40 + target_height as i32 / 2;
+        assert!(
+            view.route.ends_with(&format!("304.0 {arrives}.0")),
+            "{}",
+            view.route
+        );
+        assert!(view.head.ends_with('Z'), "there should be an arrowhead");
         assert!(view.wide, "a link into a named input is drawn wide");
     }
 

@@ -67,7 +67,9 @@ help:
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload needs"
-	@echo "  make mkstubs     - Make the I2C and GPIO stand-ins their payloads need"
+	@echo "  make mkstubs     - Make the I2C, GPIO and IIO stand-ins their payloads need"
+	@echo "  make rmvcan      - Remove the virtual CAN buses"
+	@echo "  make rmstubs     - Remove the I2C, GPIO and IIO stand-ins"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -219,24 +221,46 @@ runsim:
 mkvcan:
 	bin/mkvcan
 
-# Make the I2C and GPIO stand-ins their payloads need.
+# Make the I2C, GPIO and IIO stand-ins their payloads need.
 #
-# The two kinds the simulator cannot be the far end of: a device on a bus has
-# to answer when a master addresses it and a discrete line is a wire, and user
-# space is neither. The kernel's i2c-stub and gpio-sim stand in -- a bank of
-# registers and a chip whose lines are memory -- and bin/mkstubs makes both.
+# The three kinds the simulator cannot be the far end of: a device on a bus has
+# to answer when a master addresses it, a discrete line is a wire, and a
+# sensor's buffer is filled by the sensor. The kernel's i2c-stub, gpio-sim and
+# iio_dummy stand in -- a bank of registers, a chip whose lines are memory, and
+# a sensor with no sensor in it whose buffer a software trigger fills -- and
+# bin/mkstubs makes all three.
 #
 # Not a prerequisite of anything, for the reasons mkvcan is not, and for one
 # more: unlike the CAN tests, no test is gated on these. The scans that find a
 # stub are tested against a tree handed to them rather than the real one, so
 # they pass with no module loaded. This is for running a payload set that names
-# an I2C or GPIO payload.
+# an I2C, GPIO or IIO payload.
 #
-# It prints the bus and chip numbers it made, which are assigned as devices
-# appear and so are not the same from one run to the next.
+# It prints the numbers it made, which are assigned as devices appear and so
+# are not the same from one run to the next.
 .PHONY: mkstubs
 mkstubs:
 	bin/mkstubs
+
+# Put the host back the way it was found.
+#
+# The cleanup halves of the two targets above, which call these rather than
+# carrying a copy, so that undoing a stand-in is one command whether it is done
+# on its own or as the first half of remaking one.
+#
+# Neither is destructive beyond its own stand-in: rmvcan removes virtual CAN
+# interfaces and leaves the driver loaded, and rmstubs removes the chip and the
+# sensor this tree made -- by name, since a host's own sensors sit in the same
+# numbering -- and leaves another program's alone. Both take a stand-in
+# out from under anything using it, so neither is for a moment when a tcssim is
+# running.
+.PHONY: rmvcan
+rmvcan:
+	bin/rmvcan
+
+.PHONY: rmstubs
+rmstubs:
+	bin/rmstubs
 
 # Clean build artifacts
 .PHONY: clean

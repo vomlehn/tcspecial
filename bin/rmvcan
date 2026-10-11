@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# Remove the virtual CAN buses bin/mkvcan makes.
+#
+# The cleanup half of bin/mkvcan, which calls this rather than carrying a copy:
+# remaking the bus means removing the old one first, and removing it is also
+# something worth doing on its own -- after a run, or before leaving a host the
+# way it was found.
+#
+# What it does not do is unload the vcan driver. A loaded driver with no
+# interface of its own costs nothing and is not what makes a bus, so there is
+# nothing to undo there; a kernel is left with the module and no buses.
+#
+# Note this takes the bus out from under anything using it. A tcspecial or
+# tcssim still running on vcan0 loses its socket, so do not run this while one
+# of them is up.
+
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+	echo "rmvcan: re-running under sudo, which is what removing an interface needs"
+	exec sudo -- "$0" "$@"
+fi
+
+# Every virtual CAN interface this host has, whoever made it.
+#
+# All of them rather than one by name, because the question this answers is
+# "leave no virtual bus", and because mkvcan remakes the one it wants
+# immediately afterwards.
+#
+# The -o form prints one interface per line as "<index>: <name>: <flags> ...",
+# so the name is the second colon-separated field; the sed strips the "@parent"
+# suffix that some link types carry, which vcan does not but which costs
+# nothing to allow for.
+existing="$(ip -o link show type vcan | awk -F': ' '{ print $2 }' | sed 's/@.*//')"
+if [ -z "$existing" ]; then
+	echo "rmvcan: no virtual CAN interface to remove"
+	exit 0
+fi
+
+for old in $existing; do
+	echo "rmvcan: removing $old"
+	ip link del dev "$old"
+done

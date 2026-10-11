@@ -39,6 +39,7 @@ pub use commands::*;
 // with the kind of group that states them and named from here as well, since
 // by the time a handler holds one it is no longer a matter of configuration
 // files.
+pub use endpoint_config::Scalar;
 pub use node::serial::{
     ByteLength, ClockType, Encoding, FrameCheck, Parity, StopBits,
 };

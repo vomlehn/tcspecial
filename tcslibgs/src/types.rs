@@ -105,6 +105,10 @@ pub enum DHType {
     I2c,
     /// A handler whose payload is a SPI peripheral.
     Spi,
+    /// A handler whose payload is on a CAN bus.
+    ///
+    /// Experimental; see [`crate::endpoint_config_can`].
+    Can,
 }
 
 /// Something one handler takes for itself, and so which no other may take.
@@ -122,6 +126,9 @@ enum Claim {
     /// a Unix socket is named by. One kind of claim for all of them, since
     /// what collides is the path and not what opens it.
     Path(String),
+    /// A payload on a CAN interface. The bus is shared by design; the
+    /// identifier its frames carry is not.
+    OnCanBus { interface: String, can_id: u32 },
     /// A device on a bus. The bus is shared by design; the address on it is
     /// not.
     OnBus { bus: String, address: u16 },
@@ -166,6 +173,14 @@ fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
             bus: i2c.bus.clone(),
             address: i2c.address,
         },
+        // A CAN bus is shared by design, like an I2C bus, and what one
+        // payload takes on it is an identifier: two payloads answering to one
+        // identifier on one interface are two handlers reading each other's
+        // frames.
+        EndpointConfig::Can(can) => Claim::OnCanBus {
+            interface: can.interface.clone(),
+            can_id: can.can_id,
+        },
     };
     claims.push((payload, format!("{}'s payload", dh.name.0)));
 
@@ -188,6 +203,9 @@ fn claim_text(claim: &Claim) -> String {
         Claim::Port { host, port } => format!("{host}:{port}"),
         Claim::Path(path) => path.clone(),
         Claim::OnBus { bus, address } => format!("address {address:#04X} on {bus}"),
+        Claim::OnCanBus { interface, can_id } => {
+            format!("can_id {can_id:#x} on {interface}")
+        }
     }
 }
 
@@ -302,6 +320,7 @@ impl DHType {
             DHType::Serial => "serial",
             DHType::I2c => "i2c",
             DHType::Spi => "spi",
+            DHType::Can => "can",
         }
     }
 
@@ -313,6 +332,7 @@ impl DHType {
             DHType::Serial,
             DHType::I2c,
             DHType::Spi,
+            DHType::Can,
         ]
         .into_iter()
         .find(|kind| kind.spelling() == text)
@@ -331,7 +351,7 @@ impl DHType {
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device, serial, i2c, or spi".to_string()
+        "network, device, serial, i2c, spi, or can".to_string()
     }
 }
 
@@ -688,6 +708,29 @@ pub struct SpiConfig {
     pub cs_active: CsActive,
 }
 
+/// Configuration for an endpoint on a CAN bus
+///
+/// Experimental; see [`crate::endpoint_config_can`] for what each term means
+/// and which of them are applied.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CanConfig {
+    /// The network interface the controller is: `can0`, or `vcan0` for the
+    /// kernel's virtual bus.
+    pub interface: String,
+    /// The identifier this payload's frames carry, which the handler filters
+    /// on and sends its triggers with.
+    pub can_id: u32,
+    /// Whether frames are CAN FD, which is also what lets a packet be longer
+    /// than eight bytes.
+    pub fd: bool,
+    /// Bits per second, recorded rather than applied: a bitrate belongs to
+    /// the interface and is set where it is brought up.
+    pub bitrate: Option<u32>,
+    /// Whether the controller loops frames back to other sockets on this
+    /// host, which is what lets tcssim stand in for the payload.
+    pub loopback: bool,
+}
+
 /// What a data handler does its payload I/O on, and so what kind it is.
 ///
 /// One variant per kind of endpoint, each carrying what that kind needs to be
@@ -707,6 +750,8 @@ pub enum EndpointConfig {
     Serial(SerialConfig),
     I2c(I2cConfig),
     Spi(SpiConfig),
+    /// Experimental; see [`CanConfig`].
+    Can(CanConfig),
 }
 
 impl EndpointConfig {
@@ -723,6 +768,7 @@ impl EndpointConfig {
             EndpointConfig::Serial(_) => DHType::Serial,
             EndpointConfig::I2c(_) => DHType::I2c,
             EndpointConfig::Spi(_) => DHType::Spi,
+            EndpointConfig::Can(_) => DHType::Can,
         }
     }
 }
@@ -827,6 +873,42 @@ fn link_of(
 ) -> Result<EndpointConfig, String> {
     let kind_params = link_params_of(name, kind, stated, group)?;
 
+    // A CAN payload is on a network interface rather than at a path, and is
+    // addressed by the identifier its frames carry. Both are needed for the
+    // reason a device on an I2C bus needs both: the bus is shared, and the
+    // identifier is what tells one payload on it from another.
+    if kind == DHType::Can {
+        let interface = stated
+            .interface
+            .clone()
+            .or_else(|| group.and_then(|g| g.interface.clone()))
+            .ok_or_else(|| {
+                format!(
+                    "payload \"{name}\" is a can payload, so it needs the interface its \
+                     bus is reached through"
+                )
+            })?;
+        let can_id = stated
+            .can_id
+            .clone()
+            .or_else(|| group.and_then(|g| g.can_id.clone()))
+            .ok_or_else(|| {
+                format!(
+                    "payload \"{name}\" is on a CAN bus, so it needs the can_id its \
+                     frames carry"
+                )
+            })?;
+        let can_id = crate::endpoint_config::parse_u32(name, "can_id", &can_id)
+            .and_then(|id| crate::endpoint_config_can::check_can_id(name, id))
+            .map_err(|e| format!("{e}"))?;
+
+        return crate::endpoint_config::endpoint_of(
+            name,
+            &crate::endpoint_config::EndpointLocation::Can { interface, can_id },
+            &kind_params,
+        );
+    }
+
     // Where it is. A line and a peripheral are a device node; a device on a
     // bus is the bus and the address on it, which is what tells one device on
     // a bus from another.
@@ -917,6 +999,8 @@ pub(crate) fn link_params_of(
         rs485_rts_on_send: inherited!(rs485_rts_on_send),
         rs485_delay_before_send_ms: inherited!(rs485_delay_before_send_ms),
         rs485_delay_after_send_ms: inherited!(rs485_delay_after_send_ms),
+        bitrate: inherited!(bitrate),
+        can_fd: inherited!(can_fd),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
             timeout: s.timeout,
@@ -928,6 +1012,7 @@ pub(crate) fn link_params_of(
         DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
         DHType::I2c => crate::endpoint_config_i2c::group_kind_of(name, wire),
         DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
+        DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
         other => {
             return Err(format!(
                 "{} is not a kind of link this describes",
@@ -1284,6 +1369,20 @@ pub struct DHGroupJson {
     /// Milliseconds it holds the bus after its last.
     #[serde(default)]
     pub rs485_delay_after_send_ms: Option<Scalar>,
+    /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
+    /// kernel's virtual bus. CAN payloads only, and experimental; see
+    /// [`crate::endpoint_config_can`].
+    #[serde(default)]
+    pub interface: Option<String>,
+    /// The identifier a CAN payload's frames carry. CAN payloads only.
+    #[serde(default)]
+    pub can_id: Option<Scalar>,
+    /// Bits per second on a CAN bus, recorded rather than applied.
+    #[serde(default)]
+    pub bitrate: Option<Scalar>,
+    /// Whether a CAN payload's frames are CAN FD rather than classic CAN.
+    #[serde(default)]
+    pub can_fd: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1429,6 +1528,20 @@ pub struct DHConfigJson {
     /// Milliseconds it holds the bus after its last.
     #[serde(default)]
     pub rs485_delay_after_send_ms: Option<Scalar>,
+    /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
+    /// kernel's virtual bus. CAN payloads only, and experimental; see
+    /// [`crate::endpoint_config_can`].
+    #[serde(default)]
+    pub interface: Option<String>,
+    /// The identifier a CAN payload's frames carry. CAN payloads only.
+    #[serde(default)]
+    pub can_id: Option<Scalar>,
+    /// Bits per second on a CAN bus, recorded rather than applied.
+    #[serde(default)]
+    pub bitrate: Option<Scalar>,
+    /// Whether a CAN payload's frames are CAN FD rather than classic CAN.
+    #[serde(default)]
+    pub can_fd: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1584,12 +1697,44 @@ impl DHConfigJson {
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
                 ("port", self.port.is_some(), port.is_some()),
             ],
+            // A CAN payload is on an interface: it has no path, no host and
+            // no port, and a frame is its own length so it has no stream
+            // rule either.
+            DHType::Can => &[
+                ("protocol", self.protocol.is_some(), protocol.is_some()),
+                ("address", self.address.is_some(), address.is_some()),
+                ("port", self.port.is_some(), port.is_some()),
+                ("path", self.path.is_some(), path.is_some()),
+                ("stream", self.stream.is_some(), stream),
+            ],
             _ => &[
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
                 ("address", self.address.is_some(), address.is_some()),
                 ("port", self.port.is_some(), port.is_some()),
             ],
         };
+        // And the two attributes that locate a CAN payload, which belong to
+        // no other kind: a line stating an interface has been written for a
+        // bus it is not on.
+        let on_a_can_bus = kind == DHType::Can;
+        let can_only: &[(&str, bool, bool)] = &[
+            (
+                "interface",
+                self.interface.is_some(),
+                self.interface.is_some() || group.is_some_and(|g| g.interface.is_some()),
+            ),
+            (
+                "can_id",
+                self.can_id.is_some(),
+                self.can_id.is_some() || group.is_some_and(|g| g.can_id.is_some()),
+            ),
+        ];
+        let foreign: &[(&str, bool, bool)] = if on_a_can_bus {
+            foreign
+        } else {
+            &[foreign, can_only].concat()
+        };
+
         if let Some((field, stated, _)) = foreign.iter().find(|(_, _, present)| *present) {
             // Where it came from, because the two are fixed differently: one
             // line is deleted from the payload, and the other means a payload
@@ -1629,10 +1774,28 @@ impl DHConfigJson {
             // A line, a bus and a peripheral, each of which carries
             // attributes of its own: a data rate, a slave address, a clock
             // mode. See link_of, which is where every rule about them lives.
-            kind @ (DHType::Serial | DHType::I2c | DHType::Spi) => {
+            kind @ (DHType::Serial | DHType::I2c | DHType::Spi | DHType::Can) => {
                 link_of(&self.name, kind, self, group)?
             }
         };
+
+        // A CAN frame is its own length and there is no fragmentation: a
+        // classic frame carries eight bytes and an FD frame sixty-four,
+        // exactly. A payload whose packets will not fit in one is refused
+        // here rather than found out a frame at a time at run time.
+        if let EndpointConfig::Can(can) = &endpoint {
+            let room = crate::endpoint_config_can::frame_bytes(can.fd);
+            if let Some(packet_size) = packet_size {
+                if packet_size > room {
+                    return Err(format!(
+                        "payload \"{}\": packet_size {packet_size} will not fit in a \
+                         {} frame, which carries {room} bytes",
+                        self.name,
+                        if can.fd { "CAN FD" } else { "classic CAN" }
+                    ));
+                }
+            }
+        }
 
         // Half an OC address is a mistake rather than a configuration: a
         // handler given a port and no address, or the reverse, cannot be
@@ -3491,6 +3654,134 @@ payloads:
             EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
             other => panic!("expected a serial endpoint, got {other:?}"),
         }
+    }
+
+    /// A CAN payload reaches a handler with its interface and identifier.
+    ///
+    /// Which is the whole of where it is: a CAN controller is a network
+    /// interface rather than a device file, and the identifier its frames
+    /// carry is what tells one payload on a shared bus from another.
+    #[test]
+    fn a_can_payload_is_an_interface_and_an_identifier() {
+        let bus = "    interface: vcan0\n    can_id: 0x123\n    bitrate: 500000\n    \
+                   packet_size: 8\n";
+        let handlers = link("can", bus)
+            .expect("a payload on a CAN bus")
+            .to_dh_configs()
+            .expect("it becomes a handler");
+
+        match &handlers[0].endpoint {
+            EndpointConfig::Can(can) => {
+                assert_eq!(can.interface, "vcan0");
+                assert_eq!(can.can_id, 0x123);
+                assert!(!can.fd, "classic CAN unless the file says otherwise");
+                assert_eq!(can.bitrate, Some(500_000));
+                assert!(can.loopback, "and looped back, which is what the kernel does");
+            }
+            other => panic!("expected a CAN endpoint, got {other:?}"),
+        }
+        assert_eq!(handlers[0].endpoint.kind(), DHType::Can);
+    }
+
+    /// A CAN payload needs both halves of where it is.
+    #[test]
+    fn a_can_payload_without_an_interface_or_an_id_is_refused() {
+        for (missing, stated) in [
+            ("interface", "    can_id: 1\n    packet_size: 8\n"),
+            ("can_id", "    interface: vcan0\n    packet_size: 8\n"),
+        ] {
+            let said = link("can", stated)
+                .expect("it parses")
+                .to_dh_configs()
+                .expect_err("half of where it is");
+            assert!(
+                said.contains(missing),
+                "the error should name what is missing: {said}"
+            );
+        }
+    }
+
+    /// A packet no frame can carry is refused where the file is read.
+    ///
+    /// There is no fragmentation in CAN: a classic frame carries eight bytes
+    /// and an FD frame sixty-four, so a payload whose packets are larger
+    /// would be a handler that could never send one.
+    #[test]
+    fn a_packet_larger_than_a_frame_is_refused() {
+        let said = link(
+            "can",
+            "    interface: vcan0\n    can_id: 1\n    packet_size: 12\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("twelve bytes in an eight-byte frame");
+        assert!(
+            said.contains("12") && said.contains("8"),
+            "the error should say the packet and the frame: {said}"
+        );
+
+        // And the same payload in FD frames is fine, which is what the flag
+        // is for.
+        let fd = link(
+            "can",
+            "    interface: vcan0\n    can_id: 1\n    can_fd: true\n    packet_size: 12\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect("sixty-four bytes of room");
+        assert_eq!(fd[0].packet_size, 12);
+    }
+
+    /// Two payloads may share a CAN bus and may not share an identifier.
+    ///
+    /// A bus is shared by design -- the reason an I2C payload claims its
+    /// address rather than its bus -- and two handlers filtering on one
+    /// identifier would each read the other's frames.
+    #[test]
+    fn a_can_bus_is_shared_and_an_identifier_is_not() {
+        let two = |first: u32, second: u32| {
+            format!(
+                "version: \"1.0\"\ndescription: two payloads on one bus\npayloads:\n  \
+                 - name: a\n    type: can\n    interface: vcan0\n    can_id: {first}\n    \
+                 packet_size: 8\n  - name: b\n    type: can\n    interface: vcan0\n    \
+                 can_id: {second}\n    packet_size: 8\n"
+            )
+        };
+
+        let apart = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(&two(1, 2))
+            .expect("it parses")
+            .to_dh_configs()
+            .expect("two identifiers on one bus");
+        no_two_handlers_claim_one_thing(&apart).expect("a bus is shared by design");
+
+        // Refused where the file is read, the collision rule being one of the
+        // rules a file is held to.
+        let said = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(&two(1, 1))
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("two handlers reading each other's frames");
+        assert!(
+            said.contains("vcan0") && said.contains("0x1"),
+            "the error should name the bus and the identifier: {said}"
+        );
+    }
+
+    /// An interface belongs to a CAN payload and to no other kind.
+    #[test]
+    fn an_interface_is_refused_on_a_kind_that_is_not_a_can_bus() {
+        let said = link(
+            "device",
+            "    path: /dev/urandom\n    packet_size: 1\n    interface: vcan0\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("a device file is not a CAN interface");
+        assert!(
+            said.contains("interface"),
+            "the error should name the attribute: {said}"
+        );
     }
 
     /// The turnaround belongs to a line and to no other kind.

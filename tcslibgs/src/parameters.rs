@@ -174,6 +174,48 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 );
             }
         }
+        EndpointConfig::Can(can) => {
+            let _ = writeln!(out, "  interface        {}", can.interface);
+            let _ = writeln!(
+                out,
+                "  can_id           {:#x}, {}",
+                can.can_id,
+                if crate::endpoint_config_can::is_extended(can.can_id) {
+                    "extended"
+                } else {
+                    "base"
+                }
+            );
+            let _ = writeln!(
+                out,
+                "  can_fd           {}, so a frame carries up to {} bytes",
+                if can.fd { "yes" } else { "no" },
+                crate::endpoint_config_can::frame_bytes(can.fd)
+            );
+            // Recorded rather than applied, as an I2C bus speed is: said so
+            // here, because a reader comparing this with the equipment is
+            // the whole reason it is kept.
+            match can.bitrate {
+                Some(bitrate) => {
+                    let _ = writeln!(
+                        out,
+                        "  bitrate          {bitrate} bit/s, recorded, not applied"
+                    );
+                }
+                None => {
+                    let _ = writeln!(
+                        out,
+                        "  bitrate          none stated, so whatever the interface was \
+                         brought up at"
+                    );
+                }
+            }
+            let _ = writeln!(
+                out,
+                "  loopback         {}",
+                if can.loopback { "yes" } else { "no" }
+            );
+        }
         EndpointConfig::I2c(i2c) => {
             let _ = writeln!(out, "  bus              {}", i2c.bus);
             let _ = writeln!(out, "  address          {:#04X}", i2c.address);

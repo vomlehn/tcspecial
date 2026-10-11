@@ -44,6 +44,13 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
             (protocol, net.address.clone(), net.port, 0)
         }
         EndpointConfig::Device(dev) => (PayloadProtocol::Device, dev.path.clone(), 0, 0),
+        // A bus the simulator can simply be on: a CAN controller carries
+        // every member's frames to every other, so the simulator opens a
+        // socket on the same interface and sends the payload's frames with
+        // the payload's identifier. Nothing has to stand in for anything --
+        // which makes this the one experimental kind whose stand-in is as
+        // faithful as a socket.
+        EndpointConfig::Can(can) => (PayloadProtocol::Can, can.interface.clone(), 0, 0),
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
@@ -104,8 +111,18 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         }
     }
 
+    // What a CAN payload is identified by, which no other kind has: taken
+    // from the endpoint rather than from `bus_address`, a CAN identifier
+    // being twenty-nine bits where an I2C address is ten.
+    let (can_id, can_fd) = match &dh.endpoint {
+        EndpointConfig::Can(can) => (can.can_id, can.fd),
+        _ => (0, false),
+    };
+
     Ok(PayloadConfig {
         bus_address,
+        can_id,
+        can_fd,
         triggered: dh.mode.polling().is_some(),
         faults: sim.faults,
         // The socket this payload answers from, where the simulator file
@@ -149,6 +166,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         }
         EndpointConfig::I2c(i2c) => format!("I2C {} at {:#04X}", i2c.bus, i2c.address),
         EndpointConfig::Spi(spi) => format!("SPI {} {}", spi.path, spi.mode),
+        EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
     }
 }
 

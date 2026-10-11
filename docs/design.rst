@@ -2038,6 +2038,79 @@ be, settled before there is equipment to try it against. They may change,
 where the five supported kinds -- ``network``, ``device``, ``serial``, ``i2c``
 and ``spi`` -- will not.
 
+CAN Payloads: a Bus of Peers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Experimental, not yet supported.**
+
+A CAN controller is a network interface rather than a device file, so a CAN
+payload is located by an interface and by the identifier its frames carry.
+Both ends of the link are sockets on that interface, which is what makes this
+the one experimental kind whose stand-in is as faithful as a socket: a bus
+carries every member's frames to every other member, so the simulator joins
+the bus rather than standing in for something on it.
+
+The rules are in ``tcslibgs::endpoint_config_can``, the endpoint in
+``tcspecial::endpoint_can`` and the stand-in in ``tcssim::payload_can``.
+
+Requirement
+    A CAN payload states an ``interface`` and a ``can_id``, and neither is
+    optional. The interface is where the bus is; the identifier is what tells
+    one payload on a shared bus from another, as an address tells one device
+    on an I\ :superscript:`2`\ C bus from another.
+
+Requirement
+    A CAN payload states no ``path``, ``address``, ``port`` or ``protocol``,
+    and an ``interface`` or a ``can_id`` on any other kind is refused. A
+    controller is not a device file and not a host and port, and a line that
+    named an interface would be a line written for a bus it is not on.
+
+Requirement
+    Two payloads may share an interface and may not share an identifier. A
+    bus is shared by design -- the reason an I\ :superscript:`2`\ C payload
+    claims its address rather than its bus -- and two handlers filtering on
+    one identifier would each read the other's frames and count them as its
+    own.
+
+Requirement
+    A ``packet_size`` a frame cannot carry is refused where the file is read.
+    A classic frame carries eight bytes and a CAN FD frame sixty-four, both
+    exactly, and CAN does not fragment: a payload whose packets are larger
+    would be a handler that could never send one, discovered a frame at a
+    time at run time rather than when the file was read.
+
+Requirement
+    The identifier's format follows from its value. The base range is eleven
+    bits and the extended range twenty-nine, and the two do not overlap, so a
+    file stating both a value and a format would have two answers to one
+    question. An identifier above the extended range is refused.
+
+Requirement
+    A handler's socket is filtered to its payload's identifier. A bus carries
+    everybody's traffic, and a handler that read the lot would count another
+    payload's frames as its own -- which is the one thing a bus makes easy to
+    get wrong.
+
+Requirement
+    The bitrate is recorded and not applied, as an I\ :superscript:`2`\ C
+    bus speed is. A CAN interface's bitrate is set where the interface is
+    brought up, by the platform or by ``ip link``, and a handler that opens a
+    socket on it cannot change it; keeping it lets the bus a file describes be
+    checked against the equipment.
+
+Requirement
+    A CAN payload may be triggered. Both ends are peers on the bus, so a
+    simulated payload really does hear the handler ask -- which a payload on
+    an I\ :superscript:`2`\ C bus cannot, the request there being the
+    master's own read. The trigger goes out with the payload's own identifier,
+    and the socket does not receive its own frames, so a handler never reads
+    back the trigger it just sent.
+
+Requirement
+    The simulator finds the bus and does not make one. Creating a virtual bus
+    and bringing it up need root, so a simulated payload whose interface is
+    not there says so and names the two commands that would make one -- as the
+    I\ :superscript:`2`\ C stand-in does for its kernel module.
+
 Serial Payloads: a Line
 ^^^^^^^^^^^^^^^^^^^^^^^
 A serial payload states which kind of line it describes, and what else it may

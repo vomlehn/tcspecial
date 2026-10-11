@@ -279,6 +279,54 @@ Three other kinds are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
 own, which is why each has a kind of its own below.
 
+A CAN Payload
+-------------
+``type: can``. **Experimental, not yet supported.** A payload on a CAN bus,
+which is not a device file at all: a CAN controller is a network interface,
+and a payload on it is addressed by the identifier its frames carry.
+
+.. code-block:: text
+
+   interface      the controller: can0, or vcan0 for the kernel's virtual bus
+   can_id         the identifier this payload's frames carry, decimal or 0x
+   bitrate        bits per second. Recorded, not applied: a bitrate belongs
+                  to the interface and is set where it is brought up
+   can_fd         true | false, default false -- CAN FD frames rather than
+                  classic CAN, which is also what lets a packet be longer
+                  than eight bytes
+   loopback       true | false, default true -- whether the controller gives
+                  frames to other sockets on this host, which is what lets
+                  tcssim stand in for the payload
+
+Both halves of where it is are required. Several payloads commonly share one
+bus and differ only in the identifier, which is the arrangement an
+I\ :superscript:`2`\ C payload has, so two payloads may name one ``interface``
+and may not share a ``can_id``: two handlers filtering on one identifier would
+each read the other's frames.
+
+A frame is its own length and carries eight bytes, or sixty-four as CAN FD,
+and CAN does not fragment -- so a ``packet_size`` larger than a frame is
+refused where the file is read rather than discovered a frame at a time. The
+segment settings still apply: a packet may go as several frames, each a
+segment.
+
+A CAN payload may be triggered, unlike a payload on an
+I\ :superscript:`2`\ C bus. The handler sends its trigger with the same
+identifier, and the socket does not receive its own frames, so a handler never
+reads back the trigger it just sent.
+
+The simulator joins the same bus as another member of it, so both ends are
+real -- the only experimental kind whose stand-in is as faithful as a socket.
+What it cannot do is make the bus: a virtual one needs
+
+.. code-block:: console
+
+   $ sudo ip link add dev vcan0 type vcan
+   $ sudo ip link set up vcan0
+
+and tcssim says exactly that if the interface is not there, as it does for the
+I\ :superscript:`2`\ C stub module.
+
 A Serial Payload
 ----------------
 ``type: serial``. A line, with terms that say how it is driven. A payload

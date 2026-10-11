@@ -142,6 +142,8 @@ mod tests {
             address: path.display().to_string(),
             port: 0,
             bus_address: 0,
+            can_id: 0,
+            can_fd: false,
             faults: Default::default(),
             own_address: None,
             own_port: None,

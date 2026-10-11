@@ -23,6 +23,7 @@ use std::os::unix::io::RawFd;
 use nix::poll::{poll, PollFd, PollFlags};
 use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 
+use crate::endpoint_can::CanEndpoint;
 use crate::endpoint_device::DeviceEndpoint;
 use crate::endpoint_i2c::I2cEndpoint;
 use crate::endpoint_serial::SerialEndpoint;
@@ -168,6 +169,16 @@ pub fn bind_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // A CAN controller is an interface rather than a file, so this is a
+        // socket -- but one socket, shared by the pair, as a device file is:
+        // a second socket on the bus would be a second member of it with a
+        // filter of its own. Neither bound to an address nor connected to
+        // one, so both factories do the same thing with it.
+        EndpointConfig::Can(can_config) => {
+            let reader = CanEndpoint::new(what, can_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
     }
 }
 
@@ -243,6 +254,16 @@ pub fn connect_endpoint_pair(
         }
         EndpointConfig::Spi(spi_config) => {
             let reader = SpiEndpoint::new(what, spi_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        // A CAN controller is an interface rather than a file, so this is a
+        // socket -- but one socket, shared by the pair, as a device file is:
+        // a second socket on the bus would be a second member of it with a
+        // filter of its own. Neither bound to an address nor connected to
+        // one, so both factories do the same thing with it.
+        EndpointConfig::Can(can_config) => {
+            let reader = CanEndpoint::new(what, can_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }

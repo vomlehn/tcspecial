@@ -42,6 +42,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         }
         EndpointConfig::I2c(i2c) => format!("I2C {} at {:#04X}", i2c.bus, i2c.address),
         EndpointConfig::Spi(spi) => format!("SPI {} {}", spi.path, spi.mode),
+        EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
     }
 }
 

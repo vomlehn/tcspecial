@@ -25,6 +25,7 @@ use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 
 use crate::endpoint_can::CanEndpoint;
 use crate::endpoint_device::DeviceEndpoint;
+use crate::endpoint_gpio::GpioEndpoint;
 use crate::endpoint_i2c::I2cEndpoint;
 use crate::endpoint_iio::IioEndpoint;
 use crate::endpoint_rpmsg::RpmsgEndpoint;
@@ -195,6 +196,14 @@ pub fn bind_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // Discrete lines, watched for changes: the request is made once and
+        // the pair shares its descriptor, the kernel giving a line to one
+        // request at a time. See endpoint_gpio.
+        EndpointConfig::Gpio(gpio_config) => {
+            let reader = GpioEndpoint::new(what, gpio_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
     }
 }
 
@@ -294,6 +303,14 @@ pub fn connect_endpoint_pair(
         // messages both ways. See endpoint_rpmsg.
         EndpointConfig::Rpmsg(rpmsg_config) => {
             let reader = RpmsgEndpoint::new(what, rpmsg_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        // Discrete lines, watched for changes: the request is made once and
+        // the pair shares its descriptor, the kernel giving a line to one
+        // request at a time. See endpoint_gpio.
+        EndpointConfig::Gpio(gpio_config) => {
+            let reader = GpioEndpoint::new(what, gpio_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }

@@ -28,6 +28,7 @@ use thiserror::Error;
 
 use crate::endpoint_config_can::CanParams;
 use crate::endpoint_config_iio::IioParams;
+use crate::endpoint_config_gpio::GpioParams;
 use crate::endpoint_config_rpmsg::RpmsgParams;
 use crate::endpoint_config_i2c::I2cParams;
 use crate::endpoint_config_serial::SerialParams;
@@ -39,12 +40,14 @@ use crate::endpoint_config_spi::SpiParams;
 pub use crate::endpoint_config_i2c::I2cParams as I2cGroupParams;
 pub use crate::endpoint_config_can::CanParams as CanGroupParams;
 pub use crate::endpoint_config_iio::IioParams as IioGroupParams;
+pub use crate::endpoint_config_gpio::GpioParams as GpioGroupParams;
 pub use crate::endpoint_config_rpmsg::RpmsgParams as RpmsgGroupParams;
 pub use crate::endpoint_config_rs485::Rs485Params;
 pub use crate::endpoint_config_serial::{ByteLength, StopBits};
 pub use crate::endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 use crate::types::{
-    CanConfig, EndpointConfig, I2cConfig, IioConfig, RpmsgConfig, SerialConfig, SpiConfig,
+    CanConfig, EndpointConfig, GpioConfig, I2cConfig, IioConfig, RpmsgConfig, SerialConfig,
+    SpiConfig,
 };
 use crate::TcsError;
 
@@ -189,6 +192,13 @@ pub(crate) fn endpoint_of(
                 channels: iio.channels,
                 sample_rate: iio.sample_rate,
             })),
+            GroupKind::Gpio(gpio) => Ok(EndpointConfig::Gpio(GpioConfig {
+                path: path.clone(),
+                lines: gpio.lines.clone(),
+                edge: gpio.edge,
+                bias: gpio.bias,
+                debounce_us: gpio.debounce_us,
+            })),
             GroupKind::Rpmsg(rpmsg) => Ok(EndpointConfig::Rpmsg(RpmsgConfig {
                 path: path.clone(),
                 service: rpmsg.service.clone(),
@@ -214,6 +224,8 @@ pub enum GroupKind {
     Iio(IioParams),
     /// Experimental; see [`crate::endpoint_config_rpmsg`].
     Rpmsg(RpmsgParams),
+    /// Experimental; see [`crate::endpoint_config_gpio`].
+    Gpio(GpioParams),
 }
 
 impl GroupKind {
@@ -226,6 +238,7 @@ impl GroupKind {
             GroupKind::Can(_) => "can",
             GroupKind::Iio(_) => "iio",
             GroupKind::Rpmsg(_) => "rpmsg",
+            GroupKind::Gpio(_) => "gpio",
         }
     }
 
@@ -241,7 +254,8 @@ impl GroupKind {
             | GroupKind::Spi(_)
             | GroupKind::Can(_)
             | GroupKind::Iio(_)
-            | GroupKind::Rpmsg(_) => None,
+            | GroupKind::Rpmsg(_)
+            | GroupKind::Gpio(_) => None,
         }
     }
 }
@@ -379,6 +393,12 @@ pub(crate) struct LinkTerms {
     /// see [`crate::endpoint_config_rpmsg`].
     pub(crate) service: Option<Scalar>,
     pub(crate) max_message_bytes: Option<Scalar>,
+    /// Which discrete lines a payload watches and how; see
+    /// [`crate::endpoint_config_gpio`].
+    pub(crate) lines: Option<Scalar>,
+    pub(crate) edge: Option<Scalar>,
+    pub(crate) bias: Option<Scalar>,
+    pub(crate) debounce_us: Option<Scalar>,
 }
 
 /// Where one read of a line ends, as a file states it.
@@ -667,7 +687,7 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 29] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 33] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
@@ -705,6 +725,11 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 29] {
         // rpmsg.
         ("service", g.service.is_some()),
         ("max_message_bytes", g.max_message_bytes.is_some()),
+        // GPIO.
+        ("lines", g.lines.is_some()),
+        ("edge", g.edge.is_some()),
+        ("bias", g.bias.is_some()),
+        ("debounce_us", g.debounce_us.is_some()),
         // SPI.
         ("max_speed", g.max_speed.is_some()),
         ("spi_mode", g.spi_mode.is_some()),

@@ -174,6 +174,37 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 );
             }
         }
+        EndpointConfig::Gpio(gpio) => {
+            let _ = writeln!(out, "  path             {}", gpio.path);
+            let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
+            let _ = writeln!(out, "  lines            {}", offsets.join(", "));
+            let _ = writeln!(
+                out,
+                "  edge             {}",
+                match gpio.edge {
+                    crate::LineEdge::Rising => "rising",
+                    crate::LineEdge::Falling => "falling",
+                    crate::LineEdge::Both => "both",
+                }
+            );
+            let _ = writeln!(
+                out,
+                "  bias             {}",
+                match gpio.bias {
+                    crate::Bias::None => "none, so the board holds them",
+                    crate::Bias::PullUp => "pull_up",
+                    crate::Bias::PullDown => "pull_down",
+                }
+            );
+            match gpio.debounce_us {
+                Some(us) => {
+                    let _ = writeln!(out, "  debounce_us      {us} us");
+                }
+                None => {
+                    let _ = writeln!(out, "  debounce_us      none, so every change is an event");
+                }
+            }
+        }
         EndpointConfig::Rpmsg(rpmsg) => {
             let _ = writeln!(out, "  path             {}", rpmsg.path);
             let _ = writeln!(out, "  service          {}", rpmsg.service);

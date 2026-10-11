@@ -118,6 +118,10 @@ pub enum DHType {
     ///
     /// Experimental; see [`crate::endpoint_config_rpmsg`].
     Rpmsg,
+    /// A handler whose payload is a set of discrete lines.
+    ///
+    /// Experimental; see [`crate::endpoint_config_gpio`].
+    Gpio,
 }
 
 /// Something one handler takes for itself, and so which no other may take.
@@ -138,6 +142,12 @@ enum Claim {
     /// A payload on a CAN interface. The bus is shared by design; the
     /// identifier its frames carry is not.
     OnCanBus { interface: String, can_id: u32 },
+    /// One line of a GPIO chip. The chip is shared by design; a line is given
+    /// to one request at a time.
+    OnChip { chip: String, line: u32 },
+    /// Nothing, for a kind whose claims are made one at a time: a GPIO
+    /// payload claims a line at a time and has no single claim of its own.
+    None,
     /// A device on a bus. The bus is shared by design; the address on it is
     /// not.
     OnBus { bus: String, address: u16 },
@@ -164,6 +174,9 @@ pub fn one_host(address: &str) -> String {
 fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
     let mut claims = Vec::new();
 
+    // What the payload side takes. One claim for every kind but GPIO, which
+    // takes a line at a time: a chip is shared the way a bus is, and several
+    // payloads commonly watch lines of one chip.
     let payload = match &dh.endpoint {
         EndpointConfig::Network(net) => match net.protocol {
             // A Unix socket is named by a file rather than by a port.
@@ -192,8 +205,28 @@ fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
             interface: can.interface.clone(),
             can_id: can.can_id,
         },
+        // A line at a time, and the chip not at all: two payloads may watch
+        // lines of one chip and may not watch one line, the kernel giving a
+        // line to one request at a time -- so the second handler's start
+        // would fail.
+        EndpointConfig::Gpio(gpio) => {
+            for line in &gpio.lines {
+                claims.push((
+                    Claim::OnChip {
+                        chip: gpio.path.clone(),
+                        line: *line,
+                    },
+                    format!("{}'s line {line}", dh.name.0),
+                ));
+            }
+            // Its claims are made above, so there is no single one to make
+            // here.
+            Claim::None
+        }
     };
-    claims.push((payload, format!("{}'s payload", dh.name.0)));
+    if payload != Claim::None {
+        claims.push((payload, format!("{}'s payload", dh.name.0)));
+    }
 
     if let Some(oc) = &dh.oc {
         claims.push((
@@ -217,6 +250,10 @@ fn claim_text(claim: &Claim) -> String {
         Claim::OnCanBus { interface, can_id } => {
             format!("can_id {can_id:#x} on {interface}")
         }
+        Claim::OnChip { chip, line } => format!("line {line} on {chip}"),
+        // Never in an error: a payload with no single claim makes its claims
+        // one at a time, and each of those is named above.
+        Claim::None => "nothing".to_string(),
     }
 }
 
@@ -334,6 +371,7 @@ impl DHType {
             DHType::Can => "can",
             DHType::Iio => "iio",
             DHType::Rpmsg => "rpmsg",
+            DHType::Gpio => "gpio",
         }
     }
 
@@ -348,6 +386,7 @@ impl DHType {
             DHType::Can,
             DHType::Iio,
             DHType::Rpmsg,
+            DHType::Gpio,
         ]
         .into_iter()
         .find(|kind| kind.spelling() == text)
@@ -366,7 +405,7 @@ impl DHType {
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device, serial, i2c, spi, can, iio, or rpmsg".to_string()
+        "network, device, serial, i2c, spi, can, iio, rpmsg, or gpio".to_string()
     }
 }
 
@@ -723,6 +762,24 @@ pub struct SpiConfig {
     pub cs_active: CsActive,
 }
 
+/// Configuration for an endpoint that is a set of discrete lines
+///
+/// Experimental; see [`crate::endpoint_config_gpio`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GpioConfig {
+    /// The chip's character device: `/dev/gpiochip0`.
+    pub path: String,
+    /// The offsets of the lines watched, in the order the file gave them.
+    pub lines: Vec<u32>,
+    /// Which changes of a line are events.
+    pub edge: crate::LineEdge,
+    /// What holds a line nothing is driving.
+    pub bias: crate::Bias,
+    /// How long a line must be steady before a change counts, in
+    /// microseconds, where the file asks for it.
+    pub debounce_us: Option<u32>,
+}
+
 /// Configuration for an endpoint that is an rpmsg channel
 ///
 /// Experimental; see [`crate::endpoint_config_rpmsg`].
@@ -801,6 +858,8 @@ pub enum EndpointConfig {
     Iio(IioConfig),
     /// Experimental; see [`RpmsgConfig`].
     Rpmsg(RpmsgConfig),
+    /// Experimental; see [`GpioConfig`].
+    Gpio(GpioConfig),
 }
 
 impl EndpointConfig {
@@ -820,6 +879,7 @@ impl EndpointConfig {
             EndpointConfig::Can(_) => DHType::Can,
             EndpointConfig::Iio(_) => DHType::Iio,
             EndpointConfig::Rpmsg(_) => DHType::Rpmsg,
+            EndpointConfig::Gpio(_) => DHType::Gpio,
         }
     }
 }
@@ -1056,6 +1116,10 @@ pub(crate) fn link_params_of(
         sample_rate: inherited!(sample_rate),
         service: inherited!(service),
         max_message_bytes: inherited!(max_message_bytes),
+        lines: inherited!(lines),
+        edge: inherited!(edge),
+        bias: inherited!(bias),
+        debounce_us: inherited!(debounce_us),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
             timeout: s.timeout,
@@ -1070,6 +1134,7 @@ pub(crate) fn link_params_of(
         DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
         DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
         DHType::Rpmsg => crate::endpoint_config_rpmsg::group_kind_of(name, wire),
+        DHType::Gpio => crate::endpoint_config_gpio::group_kind_of(name, wire),
         other => {
             return Err(format!(
                 "{} is not a kind of link this describes",
@@ -1454,6 +1519,21 @@ pub struct DHGroupJson {
     /// The greatest number of bytes one rpmsg message carries.
     #[serde(default)]
     pub max_message_bytes: Option<Scalar>,
+    /// Which discrete lines a GPIO payload watches: offsets, separated by
+    /// commas or spaces. GPIO payloads only, and experimental; see
+    /// [`crate::endpoint_config_gpio`].
+    #[serde(default)]
+    pub lines: Option<Scalar>,
+    /// Which changes of a line are events: rising, falling or both.
+    #[serde(default)]
+    pub edge: Option<Scalar>,
+    /// What holds a line nothing is driving: none, pull_up or pull_down.
+    #[serde(default)]
+    pub bias: Option<Scalar>,
+    /// How long a line must be steady before a change counts, in
+    /// microseconds.
+    #[serde(default)]
+    pub debounce_us: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1627,6 +1707,21 @@ pub struct DHConfigJson {
     /// The greatest number of bytes one rpmsg message carries.
     #[serde(default)]
     pub max_message_bytes: Option<Scalar>,
+    /// Which discrete lines a GPIO payload watches: offsets, separated by
+    /// commas or spaces. GPIO payloads only, and experimental; see
+    /// [`crate::endpoint_config_gpio`].
+    #[serde(default)]
+    pub lines: Option<Scalar>,
+    /// Which changes of a line are events: rising, falling or both.
+    #[serde(default)]
+    pub edge: Option<Scalar>,
+    /// What holds a line nothing is driving: none, pull_up or pull_down.
+    #[serde(default)]
+    pub bias: Option<Scalar>,
+    /// How long a line must be steady before a change counts, in
+    /// microseconds.
+    #[serde(default)]
+    pub debounce_us: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1864,7 +1959,8 @@ impl DHConfigJson {
             | DHType::Spi
             | DHType::Can
             | DHType::Iio
-            | DHType::Rpmsg) => {
+            | DHType::Rpmsg
+            | DHType::Gpio) => {
                 link_of(&self.name, kind, self, group)?
             }
         };
@@ -1882,6 +1978,23 @@ impl DHConfigJson {
                          {} frame, which carries {room} bytes",
                         self.name,
                         if can.fd { "CAN FD" } else { "classic CAN" }
+                    ));
+                }
+            }
+        }
+
+        // A GPIO payload's packets are events this handler makes rather than
+        // bytes anything sent, and an event is a fixed size: a packet that
+        // was part of a record would be a reading nobody could use.
+        if let EndpointConfig::Gpio(_) = &endpoint {
+            let event = crate::endpoint_config_gpio::EVENT_BYTES;
+            if let Some(packet_size) = packet_size {
+                if packet_size == 0 || packet_size % event != 0 {
+                    return Err(format!(
+                        "payload \"{}\": packet_size {packet_size} is not a whole \
+                         number of {event}-byte line events, which is what a gpio \
+                         payload's packets are made of",
+                        self.name
                     ));
                 }
             }
@@ -1964,6 +2077,18 @@ impl DHConfigJson {
                              spoken -- which a triggered payload does not do"
                         ));
                     }
+                }
+
+                // Discrete lines are inputs: writing one would be driving
+                // an output, which is commanding a payload rather than
+                // asking it for data. So there is nowhere to send a trigger.
+                if kind == DHType::Gpio {
+                    return Err(
+                        "a gpio payload cannot be triggered: its lines are inputs, \
+                         and driving one would be commanding a payload rather than \
+                         reading it"
+                            .to_string(),
+                    );
                 }
 
                 // A sample buffer is a stream out of a sensor: there is
@@ -3775,6 +3900,108 @@ payloads:
             EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
             other => panic!("expected a serial endpoint, got {other:?}"),
         }
+    }
+
+    /// A GPIO payload reaches a handler with the lines it watches and how.
+    #[test]
+    fn a_gpio_payload_is_a_chip_and_the_lines_it_watches() {
+        let discretes = "    path: /dev/gpiochip0\n    lines: 3, 7\n    edge: rising\n    \
+                         bias: pull_up\n    debounce_us: 5000\n    packet_size: 32\n";
+        let handlers = link("gpio", discretes)
+            .expect("a set of discretes")
+            .to_dh_configs()
+            .expect("it becomes a handler");
+
+        match &handlers[0].endpoint {
+            EndpointConfig::Gpio(gpio) => {
+                assert_eq!(gpio.path, "/dev/gpiochip0");
+                assert_eq!(gpio.lines, vec![3, 7]);
+                assert_eq!(gpio.edge, crate::LineEdge::Rising);
+                assert_eq!(gpio.bias, crate::Bias::PullUp);
+                assert_eq!(gpio.debounce_us, Some(5000));
+            }
+            other => panic!("expected a GPIO endpoint, got {other:?}"),
+        }
+        assert_eq!(handlers[0].endpoint.kind(), DHType::Gpio);
+    }
+
+    /// A packet that is not a whole number of events is refused.
+    ///
+    /// What a GPIO payload produces is records this handler makes, each of a
+    /// fixed size, so a packet that was part of one would be a reading nobody
+    /// could use.
+    #[test]
+    fn a_gpio_packet_is_whole_events() {
+        let said = link(
+            "gpio",
+            "    path: /dev/gpiochip0\n    lines: 0\n    packet_size: 12\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("three quarters of an event");
+        assert!(
+            said.contains("16-byte line events"),
+            "the error should say what a packet is made of: {said}"
+        );
+
+        // One event, and several, are both whole numbers of them.
+        for size in [16usize, 160] {
+            let good = link(
+                "gpio",
+                &format!("    path: /dev/gpiochip0\n    lines: 0\n    packet_size: {size}\n"),
+            )
+            .expect("it parses")
+            .to_dh_configs()
+            .expect("a whole number of events");
+            assert_eq!(good[0].packet_size, size);
+        }
+    }
+
+    /// Two payloads may watch one chip and may not watch one line.
+    #[test]
+    fn a_chip_is_shared_and_a_line_is_not() {
+        let two = |first: &str, second: &str| {
+            format!(
+                "version: \"1.0\"\ndescription: two sets of discretes\npayloads:\n  \
+                 - name: a\n    type: gpio\n    path: /dev/gpiochip0\n    lines: {first}\n    \
+                 packet_size: 16\n  - name: b\n    type: gpio\n    path: /dev/gpiochip0\n    \
+                 lines: {second}\n    packet_size: 16\n"
+            )
+        };
+
+        let apart = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(&two("0, 1", "2, 3"))
+            .expect("it parses")
+            .to_dh_configs()
+            .expect("different lines of one chip");
+        no_two_handlers_claim_one_thing(&apart).expect("a chip is shared by design");
+
+        let said = ConfigFormat::Yaml
+            .parse::<PayloadConfig>(&two("0, 1", "1, 2"))
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("two payloads watching line 1");
+        assert!(
+            said.contains("line 1") && said.contains("/dev/gpiochip0"),
+            "the error should name the line and the chip: {said}"
+        );
+    }
+
+    /// A GPIO payload cannot be triggered: its lines are inputs.
+    #[test]
+    fn a_gpio_payload_cannot_be_triggered() {
+        let said = link(
+            "gpio",
+            "    path: /dev/gpiochip0\n    lines: 0\n    packet_size: 16\n    \
+             mode: triggered\n    trigger: \"READ\"\n    packet_interval_ms: 100\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("a discrete cannot be asked");
+        assert!(
+            said.contains("inputs") && said.contains("commanding"),
+            "the error should say why it cannot be asked: {said}"
+        );
     }
 
     /// An rpmsg payload reaches a handler with its channel and its service.

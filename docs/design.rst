@@ -2038,6 +2038,94 @@ be, settled before there is equipment to try it against. They may change,
 where the five supported kinds -- ``network``, ``device``, ``serial``, ``i2c``
 and ``spi`` -- will not.
 
+GPIO Payloads: Discrete Lines
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Experimental, not yet supported.**
+
+Not every payload is a stream of data. A deployment switch, an arming line, a
+thermostat's output: each is one wire that is high or low, and what the ground
+wants to know is when it changed. Linux offers those through a chip's
+character device, where a program asks for a set of lines with edge detection
+and then reads events.
+
+The rules are in ``tcslibgs::endpoint_config_gpio``, the endpoint in
+``tcspecial::endpoint_gpio`` and the stand-in in ``tcssim::payload_gpio``.
+
+Requirement
+    A GPIO payload states a ``path`` and the ``lines`` it watches, and may
+    state the ``edge``, the ``bias`` and a ``debounce_us``. Offsets are
+    separated by commas or spaces and written in decimal or hexadecimal,
+    because a file written for a board copies them out of a schematic in
+    whichever form the schematic used.
+
+Requirement
+    A payload names at least one line, names none of them twice, and names no
+    more than the kernel's limit of 64 on one request. A payload watching no
+    lines has nothing to report, and one watching a line twice would report
+    every change of it twice.
+
+Requirement
+    This is the one kind whose payload data is made rather than carried, so
+    its shape is settled here: each event becomes a record of sixteen bytes
+    -- eight of time, four of line offset, four of value. The time is
+    milliseconds since the UNIX epoch, which is what every other time in this
+    project is, so a line's change and a telemetry response can be read
+    against each other; the kernel's own timestamp is nanoseconds on a
+    monotonic clock, which says nothing to a ground station.
+
+Requirement
+    A ``packet_size`` that is not a whole number of records is refused. A
+    packet that was part of a record would be a reading nobody could use.
+
+Requirement
+    A chip is shared and a line is not. Several payloads commonly watch lines
+    of one chip, as several devices sit on one bus, and the kernel gives a
+    line to one request at a time -- so two payloads naming one line are two
+    handlers of which the second could not start.
+
+Requirement
+    A GPIO payload cannot be triggered. Its lines are inputs: there is nothing
+    to write a request to, and driving one would be commanding a payload
+    rather than reading it. The endpoint refuses a write with that sentence,
+    as the IIO endpoint does with its own.
+
+Requirement
+    The request names the handler as its consumer. A line held by something
+    unnamed is the hardest kind of conflict to find, and ``gpioinfo`` shows
+    the name beside the line.
+
+Requirement
+    The line request's descriptor is read without waiting. A read gathers
+    every event that is waiting, so a blocking descriptor would have it wait
+    for the next one after collecting the last -- a conduit stopped until a
+    line happened to change again, holding the events it had already
+    gathered.
+
+Requirement
+    The kernel's structures are declared in the endpoint and their sizes
+    asserted against the kernel's own. ``libc`` has no GPIO character-device
+    definitions, and a structure of the wrong size is an ioctl that reads past
+    what it was handed -- which nothing else in a test would notice.
+
+Requirement
+    The simulator moves lines through ``gpio-sim``, which it finds rather than
+    makes. Nothing in user space can drive a wire, so what stands in is a chip
+    whose lines exist in memory with a file per line saying what it is pulled
+    to; loading the module and making a chip need root, so a payload whose
+    chip is not there says how to make one -- as the I2C stand-in does.
+
+Requirement
+    A simulated chip is found by the node it became and not by its number. A
+    ``gpio-sim`` chip's node is numbered as chips appear, exactly as an
+    ``i2c-stub`` adapter's bus is, so the number a payload set names is not an
+    identity.
+
+Requirement
+    The packet and segment sizes and the faults mean nothing to a simulated
+    set of discretes, and it says so rather than appearing to obey them. There
+    are no bytes to size, drop, corrupt or truncate: what it produces is an
+    edge on each of its lines every packet interval.
+
 rpmsg Payloads: Another Core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 **Experimental, not yet supported.**

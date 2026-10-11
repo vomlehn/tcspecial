@@ -16,10 +16,7 @@ pub mod config;
 pub mod config_digest;
 pub mod display;
 pub mod endpoint_config;
-pub mod endpoint_config_gpio;
 pub mod node;
-pub mod endpoint_config_iio;
-pub mod endpoint_config_rpmsg;
 pub mod endpoint_config_rs485;
 mod endpoint_config_serial;
 pub mod error;
@@ -47,9 +44,9 @@ pub use endpoint_config_serial::{
     ByteLength, ClockType, Encoding, FrameCheck, Parity, StopBits,
 };
 pub use node::can::CanParams;
-pub use endpoint_config_gpio::{Bias, Edge as LineEdge, GpioParams};
-pub use endpoint_config_iio::IioParams;
-pub use endpoint_config_rpmsg::RpmsgParams;
+pub use node::gpio::{Bias, Edge as LineEdge, GpioParams};
+pub use node::iio::IioParams;
+pub use node::rpmsg::RpmsgParams;
 pub use endpoint_config_rs485::Rs485Params;
 pub use node::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 pub use config::*;

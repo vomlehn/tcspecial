@@ -27,9 +27,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::node::can::CanParams;
-use crate::endpoint_config_iio::IioParams;
-use crate::endpoint_config_gpio::GpioParams;
-use crate::endpoint_config_rpmsg::RpmsgParams;
+use crate::node::iio::IioParams;
+use crate::node::gpio::GpioParams;
+use crate::node::rpmsg::RpmsgParams;
 use crate::node::i2c::I2cParams;
 use crate::endpoint_config_serial::SerialParams;
 use crate::node::spi::SpiParams;
@@ -39,9 +39,9 @@ use crate::node::spi::SpiParams;
 // through the module that parses it.
 pub use crate::node::i2c::I2cParams as I2cGroupParams;
 pub use crate::node::can::CanParams as CanGroupParams;
-pub use crate::endpoint_config_iio::IioParams as IioGroupParams;
-pub use crate::endpoint_config_gpio::GpioParams as GpioGroupParams;
-pub use crate::endpoint_config_rpmsg::RpmsgParams as RpmsgGroupParams;
+pub use crate::node::iio::IioParams as IioGroupParams;
+pub use crate::node::gpio::GpioParams as GpioGroupParams;
+pub use crate::node::rpmsg::RpmsgParams as RpmsgGroupParams;
 pub use crate::endpoint_config_rs485::Rs485Params;
 pub use crate::endpoint_config_serial::{ByteLength, StopBits};
 pub use crate::node::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
@@ -220,11 +220,11 @@ pub enum GroupKind {
     Spi(SpiParams),
     /// Experimental; see [`crate::node::can`].
     Can(CanParams),
-    /// Experimental; see [`crate::endpoint_config_iio`].
+    /// Experimental; see [`crate::node::iio`].
     Iio(IioParams),
-    /// Experimental; see [`crate::endpoint_config_rpmsg`].
+    /// Experimental; see [`crate::node::rpmsg`].
     Rpmsg(RpmsgParams),
-    /// Experimental; see [`crate::endpoint_config_gpio`].
+    /// Experimental; see [`crate::node::gpio`].
     Gpio(GpioParams),
 }
 
@@ -386,15 +386,15 @@ pub(crate) struct LinkTerms {
     pub(crate) bitrate: Option<Scalar>,
     pub(crate) can_fd: Option<Scalar>,
     /// What an IIO device is expected to be producing; see
-    /// [`crate::endpoint_config_iio`].
+    /// [`crate::node::iio`].
     pub(crate) channels: Option<Scalar>,
     pub(crate) sample_rate: Option<Scalar>,
     /// Which rpmsg channel a payload is, and how much one message carries;
-    /// see [`crate::endpoint_config_rpmsg`].
+    /// see [`crate::node::rpmsg`].
     pub(crate) service: Option<Scalar>,
     pub(crate) max_message_bytes: Option<Scalar>,
     /// Which discrete lines a payload watches and how; see
-    /// [`crate::endpoint_config_gpio`].
+    /// [`crate::node::gpio`].
     pub(crate) lines: Option<Scalar>,
     pub(crate) edge: Option<Scalar>,
     pub(crate) bias: Option<Scalar>,

@@ -12,7 +12,7 @@
 //! sensor; the knobs that would change what it produces are in `sysfs`, and a
 //! handler that wrote there would be reconfiguring a sensor other programs may
 //! be reading. So this endpoint refuses writes rather than failing at them,
-//! and the payload configuration refuses a triggered IIO payload: there is
+//! and the device configuration refuses a triggered IIO device: there is
 //! nowhere to send a request.
 //!
 //! Opened read-only for the same reason. A read-write open of a buffer
@@ -34,7 +34,7 @@ use crate::endpoint::{
 
 /// A sensor's sample buffer, open for reading.
 pub struct IioEndpoint {
-    /// The handler this endpoint belongs to, as the payload configuration
+    /// The handler this endpoint belongs to, as the device configuration
     /// names it, so what the endpoint says of itself says which handler it is
     /// for.
     what: String,
@@ -52,7 +52,7 @@ impl IioEndpoint {
     /// are sampled belong to whoever brought the sensor up, which is why the
     /// configuration records them rather than applying them. What this can
     /// say is whether the device is there and readable, which is the failure
-    /// a payload set gets wrong.
+    /// a device set gets wrong.
     pub fn new(what: &str, config: &IioConfig) -> TcsResult<Self> {
         let file = OpenOptions::new()
             .read(true)
@@ -76,7 +76,7 @@ impl IioEndpoint {
 
     /// A second endpoint on the same open buffer.
     ///
-    /// One open description, as a device payload has: the conduit that reads
+    /// One open description, as a pseudofile node has: the conduit that reads
     /// the buffer and the conduit that would write it share it, and the
     /// second one has nothing to write.
     pub fn try_clone(&self) -> TcsResult<Self> {
@@ -119,11 +119,11 @@ impl EndpointWritable for IioEndpoint {
     ///
     /// Reported rather than attempted. The write would fail anyway -- the
     /// device is open for reading -- but the error a driver gives says
-    /// nothing about why, where this says what an IIO payload is: a stream
+    /// nothing about why, where this says what an IIO device is: a stream
     /// out of a sensor, with its settings in sysfs and not on this
     /// descriptor.
     ///
-    /// A triggered IIO payload is refused where the file is read, so nothing
+    /// A triggered IIO device is refused where the file is read, so nothing
     /// reaches this in a run that got as far as starting: what does reach it
     /// is the ground sending data to a sensor, which is a command that should
     /// be reported rather than quietly dropped.
@@ -191,7 +191,7 @@ mod tests {
         assert_eq!(&buffer[..got], &[0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00]);
     }
 
-    /// A write says what an IIO payload is rather than failing at a
+    /// A write says what an IIO device is rather than failing at a
     /// descriptor.
     #[test]
     fn a_sample_buffer_refuses_a_write() {
@@ -212,7 +212,7 @@ mod tests {
         };
         assert!(
             said.contains("read and not written") && said.contains("sysfs"),
-            "the error should say what an IIO payload is: {said}"
+            "the error should say what an IIO device is: {said}"
         );
     }
 }

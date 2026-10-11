@@ -6,12 +6,12 @@
 //! What Linux gives user space for an rpmsg channel is a character device that
 //! carries whole messages: a write is one message to the remote, and a read
 //! hands over one message from it. Both directions, so unlike a sample buffer
-//! this payload can be triggered -- the handler writes a request and the
+//! this device can be triggered -- the handler writes a request and the
 //! remote answers.
 //!
 //! The one thing worth doing beyond opening it is checking which channel it
 //! is. A node's number is assigned as channels announce themselves, so
-//! `/dev/rpmsg0` is whichever came first, and a payload set that names a node
+//! `/dev/rpmsg0` is whichever came first, and a device set that names a node
 //! may be pointed at another core's channel after a change in boot order --
 //! the same hazard an I2C stub adapter has. The kernel says what a node is:
 //! `/sys/class/rpmsg/<node>/name` holds the service name the remote announced.
@@ -29,7 +29,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
 
 use nix::poll::PollFlags;
-use tcslibgs::{endpoint_config_rpmsg::message_bytes, RpmsgConfig, TcsError, TcsResult};
+use tcslibgs::{node::rpmsg::message_bytes, RpmsgConfig, TcsError, TcsResult};
 
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
@@ -43,7 +43,7 @@ const RPMSG_CLASS: &str = "/sys/class/rpmsg";
 
 /// An rpmsg channel, open both ways.
 pub struct RpmsgEndpoint {
-    /// The handler this endpoint belongs to, as the payload configuration
+    /// The handler this endpoint belongs to, as the device configuration
     /// names it.
     what: String,
     file: File,
@@ -176,7 +176,7 @@ mod tests {
     fn a_channel_that_is_not_there_is_reported() {
         let config = RpmsgConfig {
             path: "/dev/rpmsg-nonesuch".to_string(),
-            service: "payload".to_string(),
+            service: "device".to_string(),
             max_message_bytes: None,
         };
 
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn a_node_the_kernel_says_nothing_about_is_left_alone() {
         let class = tempfile::tempdir().expect("an empty class directory");
-        is_that_service("remote", class.path(), "/tmp/a-pty-slave", "payload")
+        is_that_service("remote", class.path(), "/tmp/a-pty-slave", "device")
             .expect("a stand-in is not a mismatch");
     }
 
@@ -274,7 +274,7 @@ mod tests {
             "remote",
             &RpmsgConfig {
                 path: name,
-                service: "payload".to_string(),
+                service: "device".to_string(),
                 max_message_bytes: Some(16),
             },
         )

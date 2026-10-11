@@ -44,6 +44,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         EndpointConfig::Spi(spi) => format!("SPI {} {}", spi.path, spi.mode),
         EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
         EndpointConfig::Iio(iio) => format!("IIO {}", iio.path),
+        EndpointConfig::Rpmsg(rpmsg) => format!("rpmsg {} ({})", rpmsg.path, rpmsg.service),
     }
 }
 

@@ -192,6 +192,15 @@ fn the_shipped_payload_configs_load() {
                         dh.name.0
                     );
                 }
+                // A channel to another core; experimental, and no shipped set
+                // has one yet.
+                EndpointConfig::Rpmsg(rpmsg) => {
+                    assert!(
+                        !rpmsg.path.is_empty() && !rpmsg.service.is_empty(),
+                        "{file}: {} has no rpmsg channel",
+                        dh.name.0
+                    );
+                }
                 // A sensor's sample buffer; experimental, and no shipped set
                 // has one yet.
                 EndpointConfig::Iio(iio) => {

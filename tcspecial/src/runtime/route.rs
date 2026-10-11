@@ -21,6 +21,15 @@ use std::collections::BTreeMap;
 
 use tcslibgs::graph::{Destination, Graph};
 
+/// What a command from the ground sets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Commanded {
+    /// The node whose attribute it sets.
+    pub node: String,
+    /// Which attribute: a setpoint, a rate, a limit.
+    pub attribute: String,
+}
+
 /// One place a node's output is delivered.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Delivery {
@@ -45,6 +54,16 @@ pub struct Routes {
     /// computes a mean has to be told that its three inputs are bound before
     /// it starts, and has to know which arrival is `in0`.
     sources: BTreeMap<(String, String), String>,
+    /// What a command arriving on each MOC link sets, by the link's name.
+    ///
+    /// Kept here with the links because it is the same question in the same
+    /// table: where does what arrives at this node go. A command is not a
+    /// datum on a link -- it sets an attribute rather than being passed on --
+    /// but a MOC link that commands arrive on is a node something is read
+    /// from, and nothing else in the configuration says so. A thermostat
+    /// whose setpoint comes from the ground has a `commands` entry and no
+    /// link out of the ground at all.
+    commands: BTreeMap<String, Vec<Commanded>>,
 }
 
 impl Routes {
@@ -74,6 +93,20 @@ impl Routes {
                 if let Some(input) = input {
                     routes.sources.insert((node, input), link.from.clone());
                 }
+            }
+        }
+
+        for binding in &graph.commands {
+            let Destination { node, input } = binding.target();
+            // An attribute is what a command sets, and a binding that named
+            // none is what the checking refuses the configuration for. Left
+            // out rather than guessed at here.
+            if let Some(attribute) = input {
+                routes
+                    .commands
+                    .entry(binding.from.clone())
+                    .or_default()
+                    .push(Commanded { node, attribute });
             }
         }
 
@@ -115,6 +148,34 @@ impl Routes {
     /// How many places take this node's output.
     pub fn fan_out(&self, node: &str) -> usize {
         self.from(node).len()
+    }
+
+    /// What a command arriving on this node sets.
+    ///
+    /// Empty for every node but a MOC link, and for a MOC link that nothing
+    /// is commanded through.
+    pub fn commands_on(&self, node: &str) -> &[Commanded] {
+        self.commands.get(node).map_or(&[], Vec::as_slice)
+    }
+
+    /// Every node whose output arrives here, in order and once each.
+    ///
+    /// The question a node asks about itself: is anything delivered to me.
+    /// A device that nothing delivers to is one that is only read, and that
+    /// decides which half of its endpoint the running software uses -- see
+    /// [`crate::runtime::port::Use`]. Walked rather than tabulated because it
+    /// is asked once per node at startup, where [`Routes::from`] is asked once
+    /// per datum.
+    pub fn arriving_at(&self, node: &str) -> Vec<&str> {
+        // Each source once, which the table gives for nothing: it is keyed by
+        // the node the output leaves, so a node delivering here twice -- two
+        // legs of one fan-out into two inputs of this node -- is one key and
+        // one answer.
+        self.deliveries
+            .iter()
+            .filter(|(_, deliveries)| deliveries.iter().any(|d| d.to == node))
+            .map(|(from, _)| from.as_str())
+            .collect()
     }
 }
 
@@ -186,6 +247,30 @@ mod tests {
         assert_eq!(from_sensor[0].to, "k_fore");
         assert_eq!(from_sensor[0].input, None);
         assert_eq!(routes.fan_out("temp_fore"), 1);
+    }
+
+    /// The table answers the other direction too: what arrives here.
+    ///
+    /// Which is what decides whether a node's endpoint is opened to be read,
+    /// to be driven, or both -- see [`crate::runtime::port::Use`].
+    #[test]
+    fn what_arrives_at_a_node_is_asked_the_other_way_round() {
+        let routes = Routes::of(&thermostat());
+
+        // The three converted readings and the thermostat's decision all go
+        // into the log, each named once.
+        let mut into_log = routes.arriving_at("housekeeping");
+        into_log.sort();
+        assert_eq!(into_log, vec!["k_aft", "k_bay", "k_fore", "thermostat"]);
+
+        // A sensor is the start of a path and nothing arrives at it.
+        assert!(routes.arriving_at("temp_fore").is_empty());
+        // And a name the configuration does not have.
+        assert!(routes.arriving_at("nobody").is_empty());
+
+        // Three links into three named inputs are three sources.
+        let into_mean = routes.arriving_at("mean_temp");
+        assert_eq!(into_mean, vec!["k_aft", "k_bay", "k_fore"], "{into_mean:?}");
     }
 
     /// A node nothing leaves has no deliveries, and asking is cheap.

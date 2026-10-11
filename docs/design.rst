@@ -301,6 +301,104 @@ so the arrangement is deliberately strict:
   computation can be proved as a program and later moved into the catalogue
   without the configuration changing shape.
 
+Running a graph
+---------------
+
+Four pieces, and the first three open nothing. That is on purpose: they are the
+arithmetic of the graph, they can be tested against a configuration with no
+vehicle present, and a fault in any of them would otherwise look like a fault
+in a device.
+
+routing
+    The links, turned into a table once at startup: for each node, where its
+    output goes, and which link fills each of its named inputs. A link is
+    written the way a person wants to write one -- from a node to one or more
+    destinations -- and that is not the shape running software wants, which is
+    "this node has produced bytes, where do they go". Answering that by walking
+    every link would be a scan per datum.
+
+schedule
+    When each group is next read. A group's clock runs from the time a read was
+    *due* and not from the time it happened, so a pass that ran late does not
+    push the next one later -- a reading every three seconds stays every three
+    seconds rather than drifting by the cost of the work.
+
+fabric
+    What holds the nodes and moves the bytes, using the other two. Delivery is
+    attempted per destination and the failures are counted rather than raised:
+    a log that cannot be written must not stop the ground getting its
+    telemetry, and a heater that will not take a command must not stop the next
+    reading being taken. What must never happen is a failure nobody hears
+    about, so every one is counted and named.
+
+ports
+    The piece that does open something: an endpoint, presented as a node the
+    fabric can move bytes to and from. One type for every interface rather than
+    one per interface -- every endpoint already answers the same two traits, and
+    a port per type would be nine copies of one delegation with nine places to
+    drift apart.
+
+Requirement
+    A node is opened for the direction the configuration uses it in, and the
+    other direction is refused. The links say which: a node whose output goes
+    somewhere is read, a node things are delivered to is written, and a node
+    that is both is both. The refusal names which way the configuration has it,
+    because the fault is in the file and not in the attempt.
+
+Requirement
+    A MOC link that a command binding arrives on is read as well as written,
+    though no link leaves it. A command sets an attribute rather than
+    travelling a link, so the ``commands`` section is the only statement that
+    anything arrives from the ground -- and a ground link judged by its links
+    alone would be opened as something only written, with a setpoint that never
+    arrives and nothing saying so.
+
+Requirement
+    A node no link touches is refused. A device opened and never read holds its
+    lines or claims its bus address and says nothing; the usual cause is a node
+    whose links were deleted and whose declaration was left behind. The
+    configuration checks say so on the ground, and the port says so again
+    aboard.
+
+Requirement
+    A datum is delivered whole or refused. A write that moved some of the bytes
+    is reported, naming how many moved, and a write that moved none of them is
+    a failure and not a success of zero bytes. A reading cut in half is not a
+    smaller reading, it is a different number, and the ground cannot tell a
+    truncated record from a short one.
+
+Requirement
+    Nothing to read is not a failure. A read of no bytes is the ordinary answer
+    from a device that is not due, which on most passes is most devices. A port
+    that reported those would bury the real faults among them.
+
+Requirement
+    Both halves of an endpoint are kept whichever direction the graph uses.
+    They are not independent -- a UDP writer learns where the far end is from
+    what its reader received -- and a device that is only read today is one a
+    command binding reaches tomorrow, which should be a configuration change
+    and not a code change.
+
+Requirement
+    A link that names an input of a device is refused rather than delivered
+    anyway. Only a computation has named inputs; a device has one way in and
+    does not name it. Delivering it would make a file that says something it
+    does not mean work by accident.
+
+Requirement
+    A device that must be asked before it answers is asked after it is read,
+    not before. Asked and read in the same breath, a device has had no time to
+    answer, so what comes back is either nothing or the answer to the previous
+    question arriving by luck -- and a control loop cannot tell those apart. A
+    pass takes what the last question produced and then asks again, which costs
+    the first pass after a start and makes every later reading one of a known
+    age: one interval.
+
+Requirement
+    A question that could not be asked is reported even when the reading
+    succeeded. The reading in hand is the last one that node will produce, so a
+    pass that took one and could not ask for the next has not succeeded.
+
 Configuration
 -------------
 

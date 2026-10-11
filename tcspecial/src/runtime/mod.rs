@@ -10,12 +10,15 @@
 //! * [`schedule`] says when a group of devices is next read, so that readings
 //!   which will be compared with one another are taken together.
 //! * [`fabric`] holds the nodes and moves the bytes, using the other two.
+//! * [`port`] is the one piece that does open something: it presents an
+//!   opened endpoint as a node the fabric can move bytes to and from.
 //!
-//! Neither opens anything. They are the arithmetic of the graph, and they are
-//! separate from the moving of bytes on purpose: both can be tested against a
-//! configuration with no vehicle present, where a fault in either would
-//! otherwise look like a fault in a device.
+//! The first two open nothing. They are the arithmetic of the graph, and they
+//! are separate from the moving of bytes on purpose: both can be tested
+//! against a configuration with no vehicle present, where a fault in either
+//! would otherwise look like a fault in a device.
 
 pub mod fabric;
+pub mod port;
 pub mod route;
 pub mod schedule;

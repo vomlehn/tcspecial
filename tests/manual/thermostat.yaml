@@ -1,84 +1,88 @@
 version: "2.0"
 
+groups:
+  - name: "cabin_temps"
+    interval: "3s"
+
 nodes:
   # Forward bulkhead. Two bytes, signed, big endian.
   - name: temp_fore
     type: i2c
-    address: 0x48
-    group: cabin_temps
-    path: /dev/i2c-1
-    read_size: 2
-    editor: { at: [40, 40] }
+    address: "0x48"
+    group: "cabin_temps"
+    path: "/dev/i2c-1"
+    read_size: "2"
+    editor: { x: 40, y: 40 }
   # Aft bulkhead; same part as temp_fore.
   - name: temp_aft
     type: i2c
-    address: 0x49
-    group: cabin_temps
-    path: /dev/i2c-1
-    read_size: 2
-    editor: { at: [40, 160] }
+    address: "0x49"
+    group: "cabin_temps"
+    path: "/dev/i2c-1"
+    read_size: "2"
+    editor: { x: 40, y: 160 }
   # Equipment bay. Three bytes, unsigned -- a different part, hence its
   # own conversion.
   - name: temp_bay
     type: spi
-    group: cabin_temps
-    max_speed: 1000000
-    path: /dev/spidev0.0
-    read_size: 3
-    spi_mode: 0
-    editor: { at: [40, 280] }
+    group: "cabin_temps"
+    max_speed: "1000000"
+    path: "/dev/spidev0.0"
+    read_size: "3"
+    spi_mode: "0"
+    editor: { x: 40, y: 280 }
   - name: k_fore
     type: compute
-    format: i16_be
-    function: to_kelvin
-    offset: 273.15
-    scale: 0.0625
-    editor: { at: [240, 40] }
+    format: "i16_be"
+    function: "to_kelvin"
+    offset: "273.15"
+    scale: "0.0625"
+    editor: { x: 240, y: 40 }
   - name: k_aft
     type: compute
-    format: i16_be
-    function: to_kelvin
-    offset: 273.15
-    scale: 0.0625
-    editor: { at: [240, 160] }
+    format: "i16_be"
+    function: "to_kelvin"
+    offset: "273.15"
+    scale: "0.0625"
+    editor: { x: 240, y: 160 }
   - name: k_bay
     type: compute
-    format: u24_be
-    function: to_kelvin
-    offset: 255.37
-    scale: 0.0078
-    editor: { at: [240, 280] }
+    format: "u24_be"
+    function: "to_kelvin"
+    offset: "255.37"
+    scale: "0.0078"
+    editor: { x: 240, y: 280 }
   - name: mean_temp
     type: compute
-    function: mean
-    inputs: in0,in1,in2
-    editor: { at: [460, 160] }
+    function: "mean"
+    inputs: "in0,in1,in2"
+    editor: { x: 460, y: 160 }
   # setpoint is set from the ground; above and below are the two degrees
   # either side that the heaters are switched at.
   - name: thermostat
     type: compute
-    above: 2.0
-    below: 2.0
-    function: hysteresis
-    setpoint: 293.15
-    editor: { at: [660, 240] }
+    above: "2.0"
+    below: "2.0"
+    function: "hysteresis"
+    setpoint: "293.15"
+    editor: { x: 660, y: 240 }
   - name: moc
     type: moc
-    address: 10.0.0.1
-    port: 5000
-    editor: { at: [660, 40] }
+    address: "10.0.0.1"
+    port: "5000"
+    editor: { x: 660, y: 40 }
   # Three circuits, driven together.
   - name: heaters
     type: gpio
-    direction: output
-    lines: 3,4,5
-    path: /dev/gpiochip0
-    editor: { at: [860, 240] }
+    direction: "output"
+    lines: "3,4,5"
+    path: "/dev/gpiochip0"
+    editor: { x: 860, y: 240 }
   - name: housekeeping
     type: log
-    directory: /var/log/tcspecial
-    format: variable_ts_rc
-    editor: { at: [460, 380] }
+    directory: "/var/log/tcspecial"
+    format: "variable_ts_rc"
+    editor: { x: 460, y: 380 }
 
 links:
   - { from: temp_fore, to: k_fore }

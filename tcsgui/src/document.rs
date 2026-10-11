@@ -63,6 +63,15 @@ pub struct Node {
 pub struct Document {
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
+    /// The groups, by name, each with the interval it reads on.
+    ///
+    /// A group is one of the four things a configuration is made of and it was
+    /// missing here: nodes could say `group: cabin_temps` and nothing declared
+    /// what that group was, so the editor wrote a configuration the flight
+    /// reader refuses. Found by the version 2 checker on the shipped example,
+    /// which is what a checker is for.
+    #[serde(default)]
+    pub groups: BTreeMap<String, String>,
 }
 
 /// Something wrong with the document, and what it is attached to.
@@ -85,6 +94,13 @@ pub enum Fault {
     SelfLink { node: String },
     /// Two links into one input of one node.
     InputBoundTwice { node: String, input: String },
+    /// A node in a group the configuration does not declare.
+    ///
+    /// The group owns the interval, so a node in one that is not there is a
+    /// node with no interval at all.
+    NoSuchGroup { node: String, group: String },
+    /// A group nothing is in, which reads nothing on its interval.
+    EmptyGroup { group: String },
     /// A required attribute with nothing in it.
     ///
     /// The same check `tcsverify` makes on the ground and tcspecial makes
@@ -114,6 +130,12 @@ impl Fault {
             Fault::MissingAttribute { attribute, .. } => {
                 format!("{attribute} is not set")
             }
+            Fault::NoSuchGroup { group, .. } => {
+                format!("there is no group \"{group}\"")
+            }
+            Fault::EmptyGroup { group } => {
+                format!("group \"{group}\" has no nodes in it")
+            }
         }
     }
 
@@ -127,6 +149,8 @@ impl Fault {
             Fault::SelfLink { node } => Some(node),
             Fault::InputBoundTwice { node, .. } => Some(node),
             Fault::MissingAttribute { node, .. } => Some(node),
+            Fault::NoSuchGroup { node, .. } => Some(node),
+            Fault::EmptyGroup { .. } => None,
         }
     }
 }
@@ -380,6 +404,31 @@ impl Document {
             }
         }
 
+        // A node's group must be declared, and a declared group must hold
+        // something.
+        for node in &self.nodes {
+            let Some(group) = node.attributes.get("group") else {
+                continue;
+            };
+            if !self.groups.contains_key(group.trim()) {
+                faults.push(Fault::NoSuchGroup {
+                    node: Qualified::of(&node.name, &node.home).absolute(),
+                    group: group.clone(),
+                });
+            }
+        }
+        for group in self.groups.keys() {
+            let used = self
+                .nodes
+                .iter()
+                .any(|n| n.attributes.get("group").map(|g| g.trim()) == Some(group.as_str()));
+            if !used {
+                faults.push(Fault::EmptyGroup {
+                    group: group.clone(),
+                });
+            }
+        }
+
         let mut bound: BTreeMap<(&str, &str), usize> = BTreeMap::new();
         for link in &self.links {
             if link.from == link.to {
@@ -482,6 +531,18 @@ impl Document {
             }
         }
 
+        if home.is_none() {
+            for (name, interval) in &self.groups {
+                out.push_str("    <groups>\n");
+                out.push_str(&format!("        <name>{}</name>\n", escape(name)));
+                out.push_str(&format!(
+                    "        <interval>{}</interval>\n",
+                    escape(interval)
+                ));
+                out.push_str("    </groups>\n");
+            }
+        }
+
         for node in self.nodes_in(home) {
             if let Some(comment) = &node.comment {
                 for line in comment.lines() {
@@ -501,7 +562,7 @@ impl Document {
                 ));
             }
             out.push_str(&format!(
-                "        <editor><at>{},{}</at></editor>\n",
+                "        <editor><x>{}</x><y>{}</y></editor>\n",
                 node.at.0, node.at.1
             ));
             out.push_str("    </nodes>\n");
@@ -561,6 +622,19 @@ impl Document {
             }
         }
 
+        // The groups, which only the top file declares: a group is a property
+        // of the whole configuration rather than of one page of it.
+        if home.is_none() && !self.groups.is_empty() {
+            out.push_str("\ngroups:\n");
+            for (name, interval) in &self.groups {
+                out.push_str(&format!(
+                    "  - name: {}\n    interval: {}\n",
+                    quoted(name),
+                    quoted(interval)
+                ));
+            }
+        }
+
         out.push_str("\nnodes:\n");
         for node in self.nodes_in(home) {
             // Above the entry it belongs to, as a comment and not as a field:
@@ -576,10 +650,19 @@ impl Document {
                 node.name, node.node_type
             ));
             for (attribute, value) in &node.attributes {
-                out.push_str(&format!("    {attribute}: {value}\n"));
+                // Quoted, which is not fussiness. A YAML reader turns 0x48
+                // into the integer 72 and 2.0 into 2 before anything sees the
+                // text, where an XML reader hands over what was written -- so
+                // the same configuration in the two formats would read
+                // differently, and the digest of one would not match the
+                // other. Quoting keeps the spelling the person wrote.
+                out.push_str(&format!("    {attribute}: {}\n", quoted(value)));
             }
+            // Two named numbers rather than a list, and the same shape in
+            // XML: a reader of either format wants one struct, and `at: [x,
+            // y]` in YAML against `<at>x,y</at>` in XML would be two.
             out.push_str(&format!(
-                "    editor: {{ at: [{}, {}] }}\n",
+                "    editor: {{ x: {}, y: {} }}\n",
                 node.at.0, node.at.1
             ));
         }
@@ -650,6 +733,17 @@ fn format_of(path: &std::path::Path) -> Result<Format, String> {
     }
 }
 
+/// A value as YAML, spelled as it was written.
+///
+/// Every value is quoted rather than only the ones that need it. Deciding
+/// which need it means knowing YAML's whole scalar grammar -- 0x48, 2.0, yes,
+/// no, null, ~, 08, 1:30 are all values a reader would transform -- and a rule
+/// with that many exceptions is one that will be wrong about the next one. A
+/// quote on every value is uniform and cannot be wrong.
+fn quoted(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 /// XML's five, so that a comment or a value containing one of them is still
 /// the document it was.
 ///
@@ -701,6 +795,11 @@ pub fn thermostat_example() -> Document {
             now: Some(comment.to_string()),
         });
     };
+
+    // The group the three sensors share, which is the point of the example:
+    // readings that will be averaged are taken as close to together as the
+    // hardware allows.
+    document.groups.insert("cabin_temps".to_string(), "3s".to_string());
 
     place(&mut document, "temp_fore", "i2c", (40, 40));
     set(&mut document, "temp_fore", "path", "/dev/i2c-1");
@@ -1357,7 +1456,7 @@ mod tests {
             );
             for (attribute, value) in &node.attributes {
                 assert!(
-                    yaml.contains(&format!("{attribute}: {value}")),
+                    yaml.contains(&format!("{attribute}: \"{value}\"")),
                     "{}.{attribute} is missing from the YAML",
                     node.name
                 );
@@ -1622,7 +1721,9 @@ mod tests {
         let yaml = document.to_yaml();
         assert!(yaml.contains("version: \"2.0\""), "{yaml}");
         assert!(yaml.contains("type: i2c"), "{yaml}");
-        assert!(yaml.contains("address: 0x48"), "{yaml}");
+        // Quoted: a YAML reader would otherwise turn 0x48 into 72. See
+        // `quoted`.
+        assert!(yaml.contains("address: \"0x48\""), "{yaml}");
         assert!(
             yaml.contains("{ from: temp_fore, to: mean_temp.in0 }"),
             "a link into a named input is written as one: {yaml}"

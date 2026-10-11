@@ -26,7 +26,7 @@ use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 use crate::endpoint_can::CanEndpoint;
 use crate::endpoint_device::DeviceEndpoint;
 use crate::endpoint_gpio::GpioEndpoint;
-use crate::endpoint_i2c::I2cEndpoint;
+use crate::node::i2c::I2cEndpoint;
 use crate::endpoint_iio::IioEndpoint;
 use crate::endpoint_rpmsg::RpmsgEndpoint;
 use crate::endpoint_serial::SerialEndpoint;

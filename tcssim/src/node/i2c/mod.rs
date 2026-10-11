@@ -1,18 +1,18 @@
-//! A simulated payload on an I2C bus, by way of the kernel's `i2c-stub`.
+//! A simulated device on an I2C bus, by way of the kernel's `i2c-stub`.
 //!
 //! A bus is the one kind of endpoint the simulator cannot simply be the far
 //! end of. A serial line has a pty; a socket has another socket; a device on
 //! a bus has to answer an address when a master addresses it, and nothing in
 //! user space can. What the kernel offers instead is `i2c-stub`: an adapter
 //! whose chips are a bank of registers in memory. Every master on that bus
-//! reads and writes the same bank, so the bank is the payload -- tcspecial
+//! reads and writes the same bank, so the bank is the device -- tcspecial
 //! reads what the simulator has written into it.
 //!
 //! That makes a simulated bus a register rather than a stream, and the
 //! difference shows: bytes do not queue. A handler reads whatever is in the
 //! register now, so it may read one packet twice or miss one entirely,
 //! depending on how its polling falls against the packet interval. Which is
-//! also true of a real sensor read over I2C, and is why a payload link over a
+//! also true of a real sensor read over I2C, and is why a device link over a
 //! bus is a different thing from one over a line.
 //!
 //! The stub is a kernel module and loading it needs root, so the simulator does
@@ -53,8 +53,8 @@ const I2C_SMBUS_I2C_BLOCK_DATA: u32 = 8;
 /// packet can be on this kind of endpoint.
 pub(crate) const I2C_SMBUS_BLOCK_MAX: usize = 32;
 
-/// The register the payload's data goes into: the same one tcspecial reads.
-const PAYLOAD_REGISTER: u8 = 0;
+/// The register the device's data goes into: the same one tcspecial reads.
+const DATA_REGISTER: u8 = 0;
 
 /// One SMBus transfer, as `linux/i2c-dev.h` describes it.
 #[repr(C)]
@@ -75,15 +75,15 @@ struct SimulatedBus {
     bus: File,
     /// The path a handler was told to open, which is a link to the stub.
     named: PathBuf,
-    /// Whether the link is this payload's to remove.
+    /// Whether the link is this device's to remove.
     linked: bool,
 }
 
 impl SimulatedBus {
     /// Find a stub bus, point `path` at it, and address the chip.
     ///
-    /// `what` is the payload's name, so that what the stand-in says of itself
-    /// says which payload it belongs to.
+    /// `what` is the device's name, so that what the stand-in says of itself
+    /// says which device it belongs to.
     fn open(what: &str, path: &str, address: u16) -> Result<Self, String> {
         let stub = find_stub(Path::new(I2C_ADAPTERS))?;
         let named = PathBuf::from(path);
@@ -134,7 +134,7 @@ impl SimulatedBus {
         Ok(simulated)
     }
 
-    /// Write one byte to the payload register and require it to be taken.
+    /// Write one byte to the data register and require it to be taken.
     ///
     /// `ENXIO` here means the stub has no chip at this address: it was loaded
     /// with others, or with none. The remedy is in the message, because
@@ -204,11 +204,11 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
     }
 }
 
-/// One SMBus block write to the payload register.
+/// One SMBus block write to the data register.
 fn block_write(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
     let mut transfer = SmbusTransfer {
         read_write: I2C_SMBUS_WRITE,
-        command: PAYLOAD_REGISTER,
+        command: DATA_REGISTER,
         size: I2C_SMBUS_I2C_BLOCK_DATA,
         data: bytes as *mut SmbusData,
     };
@@ -221,15 +221,15 @@ fn block_write(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Run I2C payload simulation
+/// Run a simulated device on an I2C bus.
 ///
 /// As every other kind: a packet every packet interval, in segments, from
 /// Start until Stop. A segment here is one SMBus block transfer into the
 /// chip's register bank, so no segment can exceed
 /// [`I2C_SMBUS_BLOCK_MAX`] and the segment size is capped at it rather than
-/// refused -- a packet size is a property of the payload, and a bus that
+/// refused -- a packet size is a property of the device, and a bus that
 /// carries thirty-two bytes at a time is a property of SMBus.
-pub fn run_i2c_payload(
+pub fn run_i2c_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
@@ -299,7 +299,7 @@ pub fn run_i2c_payload(
         wait_out_packet(&pacing, started, &running);
     }
 
-    // The link goes with the payload; see SimulatedBus::drop.
+    // The link goes with the device; see SimulatedBus::drop.
     drop(bus);
 }
 

@@ -1053,7 +1053,7 @@ fn link_of(
                 .unwrap_or(false);
             crate::endpoint_config::EndpointLocation::I2c {
                 bus: path,
-                address: crate::endpoint_config_i2c::parse_i2c_address(name, &address, ten_bit)
+                address: crate::node::i2c::parse_i2c_address(name, &address, ten_bit)
                     .map_err(|e| format!("{e}"))?,
             }
         }
@@ -1079,7 +1079,7 @@ pub(crate) fn link_params_of(
 
     match kind {
         DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
-        DHType::I2c => crate::endpoint_config_i2c::group_kind_of(name, wire),
+        DHType::I2c => crate::node::i2c::group_kind_of(name, wire),
         DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
         DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
         DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
@@ -4728,7 +4728,7 @@ payloads:
     // -- a bus and what sits on it ------------------------------------------
 
     /// One peripheral on a bus, with the given terms.
-    fn bus(terms: &str) -> Result<crate::endpoint_config_i2c::I2cParams, String> {
+    fn bus(terms: &str) -> Result<crate::node::i2c::I2cParams, String> {
         match link_terms("i2c", &format!("    path: /dev/i2c-1\n{terms}"))? {
             crate::endpoint_config::GroupKind::I2c(i2c) => Ok(i2c),
             other => panic!("{other:?}"),

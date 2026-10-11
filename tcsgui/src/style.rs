@@ -247,7 +247,7 @@ impl NodeType {
             },
             NodeType::Serial => Appearance {
                 face: Face::Mono,
-                label_size: 11,
+                label_size: 10,
                 label_weight: 400,
                 label_italic: true,
                 outline: Square,
@@ -258,7 +258,7 @@ impl NodeType {
             },
             NodeType::Can => Appearance {
                 face: Face::Mono,
-                label_size: 13,
+                label_size: 14,
                 label_weight: 700,
                 label_italic: false,
                 outline: Square,
@@ -280,7 +280,7 @@ impl NodeType {
             },
             NodeType::Rpmsg => Appearance {
                 face: Face::Mono,
-                label_size: 11,
+                label_size: 10,
                 label_weight: 700,
                 label_italic: true,
                 outline: Square,
@@ -314,7 +314,7 @@ impl NodeType {
             // Driven rather than read, and shaped to say so.
             NodeType::Gpio => Appearance {
                 face: Face::Plain,
-                label_size: 13,
+                label_size: 14,
                 label_weight: 700,
                 label_italic: false,
                 outline: Keyed,
@@ -326,7 +326,7 @@ impl NodeType {
             // Software aboard.
             NodeType::Compute => Appearance {
                 face: Face::Plain,
-                label_size: 13,
+                label_size: 14,
                 label_weight: 400,
                 label_italic: false,
                 outline: Rounded,
@@ -341,7 +341,7 @@ impl NodeType {
             // is, and nothing else is this wide.
             NodeType::Subdiagram => Appearance {
                 face: Face::Plain,
-                label_size: 13,
+                label_size: 14,
                 label_weight: 700,
                 label_italic: false,
                 outline: Rounded,
@@ -353,7 +353,7 @@ impl NodeType {
             // Ends of the graph.
             NodeType::Log => Appearance {
                 face: Face::Plain,
-                label_size: 11,
+                label_size: 12,
                 label_weight: 400,
                 label_italic: false,
                 outline: Circle,
@@ -364,7 +364,7 @@ impl NodeType {
             },
             NodeType::Moc => Appearance {
                 face: Face::Plain,
-                label_size: 15,
+                label_size: 16,
                 label_weight: 700,
                 label_italic: true,
                 outline: Circle,
@@ -479,6 +479,26 @@ mod tests {
                 "{} asks for a weight no system face is sure to have: {}",
                 t.spelling(),
                 a.label_weight
+            );
+        }
+    }
+
+    /// Every label size is a step on the scale.
+    ///
+    /// The sizes were 9, 10, 11, 12, 13 and 15 pixels, each chosen when the
+    /// type it belonged to was added. Four steps is enough to tell thirteen
+    /// types apart -- the accessibility test above proves it, since it still
+    /// passes -- and a window built from a scale looks composed where one
+    /// built from whatever was wanted at the time looks assembled.
+    #[test]
+    fn every_label_size_is_on_the_scale() {
+        const SCALE: [u32; 4] = [10, 12, 14, 16];
+        for t in NodeType::ALL {
+            let size = t.appearance().label_size;
+            assert!(
+                SCALE.contains(&size),
+                "{} is set at {size}px, which is not a step on {SCALE:?}",
+                t.spelling()
             );
         }
     }

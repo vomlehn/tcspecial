@@ -1,5 +1,37 @@
 import { Button, ScrollView, ListView } from "std-widgets.slint";
 
+// The two scales, stated once.
+//
+// Every padding, gap and text size in this window comes from here. They were
+// literals before -- 4, 6, 8 and 10 pixels of padding, six different text
+// sizes -- each chosen when the piece it was in got written, which is how a
+// window comes to look assembled rather than designed. A scale also answers
+// the question a literal provokes: "why is this one different" has an answer
+// when the answer is "it is the next step up".
+export global Space {
+    // Four steps, doubling. Enough for every gap this window needs and few
+    // enough to be remembered.
+    out property <length> tight: 4px;
+    out property <length> step: 8px;
+    out property <length> wide: 16px;
+    out property <length> room: 24px;
+}
+
+export global Type {
+    // Four steps. The per-node label sizes are not from here -- they are a
+    // channel for telling node types apart and live in style.rs -- but
+    // everything the window says in its own voice is.
+    out property <length> small: 10px;
+    out property <length> body: 12px;
+    out property <length> strong: 14px;
+    out property <length> title: 18px;
+
+    // And the two weights a system face is sure to have.
+    out property <int> regular: 400;
+    out property <int> bold: 700;
+}
+
+
 // What a node looks like on the canvas, and the rules the looks obey.
 //
 // Two rules, and both are enforced in Rust as well -- see style.rs, whose
@@ -157,8 +189,20 @@ component NodeShape inherits Rectangle {
     body := Rectangle {
         width: 100%;
         height: 100%;
-        border-width: node.border;
+        // A hover state everywhere one is possible. The handles and the open
+        // mark had one and the node itself did not, which reads as half
+        // finished -- and a surface that answers the pointer is a surface
+        // whose parts look pressable before they are pressed.
+        border-width: grip.has-hover ? node.border + 1px : node.border;
         border-color: ink;
+
+        // While it is being dragged, a node lifts off the canvas. Not
+        // decoration: a drag that has started and a press that has not look
+        // identical otherwise, and the one thing a person wants to know
+        // mid-gesture is whether the thing is moving.
+        drop-shadow-blur: grip.pressed ? 12px : 0px;
+        drop-shadow-color: grip.pressed ? #00000033 : transparent;
+        drop-shadow-offset-y: grip.pressed ? 3px : 0px;
         border-radius: node.outline == "circle"
             ? self.width / 2
             : node.outline == "rounded"
@@ -214,7 +258,7 @@ component NodeShape inherits Rectangle {
     // on hover: a diagram whose shapes have to be remembered is a diagram that
     // is read wrongly under pressure.
     VerticalLayout {
-        padding: 6px;
+        padding: Space.tight;
         spacing: 1px;
         alignment: center;
 
@@ -230,7 +274,7 @@ component NodeShape inherits Rectangle {
         Text {
             text: node.node-type;
             font-family: node.face == "mono" ? "monospace" : "";
-            font-size: 9px;
+            font-size: Type.small;
             horizontal-alignment: center;
             overflow: elide;
         }
@@ -240,7 +284,7 @@ component NodeShape inherits Rectangle {
         // finds is a note nobody wrote.
         if node.comment != "": Text {
             text: node.comment;
-            font-size: 9px;
+            font-size: Type.small;
             font-italic: true;
             color: #555555;
             horizontal-alignment: center;
@@ -251,7 +295,7 @@ component NodeShape inherits Rectangle {
         if node.faulty: Text {
             text: node.fault;
             color: error-ink;
-            font-size: 9px;
+            font-size: Type.small;
             font-italic: true;
             horizontal-alignment: center;
             wrap: word-wrap;
@@ -437,7 +481,7 @@ component LinkLine inherits Rectangle {
         x: link.label-x;
         y: link.label-y - 14px;
         text: link.label;
-        font-size: 10px;
+        font-size: Type.small;
         color: ink;
     }
     // And what somebody wrote about the connection, under the line.
@@ -445,7 +489,7 @@ component LinkLine inherits Rectangle {
         x: link.label-x;
         y: link.label-y + 4px;
         text: link.comment;
-        font-size: 10px;
+        font-size: Type.small;
         font-italic: true;
         color: #6b7280;
     }
@@ -490,18 +534,18 @@ component Surface inherits Rectangle {
     background: #fbfbfa;
 
     VerticalLayout {
-        padding: 8px;
-        spacing: 8px;
+        padding: Space.step;
+        spacing: Space.step;
 
         // The bar: what can be taken back, and anything wrong.
         bar := HorizontalLayout {
-            spacing: 8px;
+            spacing: Space.step;
             min-height: 34px;
 
             if editing != "": Text {
                 text: editing;
-                font-size: 13px;
-                font-weight: 700;
+                font-size: Type.strong;
+                font-weight: Type.bold;
                 vertical-alignment: center;
             }
             Button {
@@ -516,7 +560,7 @@ component Surface inherits Rectangle {
             }
             Text {
                 text: undo-depth + " edits can be undone";
-                font-size: 11px;
+                font-size: Type.body;
                 vertical-alignment: center;
             }
             // Saving needs no button: every edit is written as it is made.
@@ -524,7 +568,7 @@ component Surface inherits Rectangle {
             Text {
                 text: trouble == "" ? "saved" : trouble;
                 color: trouble == "" ? #2d6a4f : #c0392b;
-                font-size: 11px;
+                font-size: Type.body;
                 font-weight: trouble == "" ? 400 : 700;
                 vertical-alignment: center;
                 wrap: no-wrap;
@@ -535,7 +579,7 @@ component Surface inherits Rectangle {
         }
 
         HorizontalLayout {
-            spacing: 8px;
+            spacing: Space.step;
 
             // The palette: one of every node type, drawn as it will be drawn
             // on the canvas, so that what a shape means can be looked up
@@ -548,12 +592,12 @@ component Surface inherits Rectangle {
 
                 palette-list := ScrollView {
                     VerticalLayout {
-                        padding: 8px;
-                        spacing: 6px;
+                        padding: Space.step;
+                        spacing: Space.step;
                         Text {
                             text: "Node types";
-                            font-size: 11px;
-                            font-weight: 700;
+                            font-size: Type.body;
+                            font-weight: Type.bold;
                             height: 18px;
                         }
                         for p in palette: Rectangle {
@@ -566,8 +610,8 @@ component Surface inherits Rectangle {
                                 x: 0;
                                 y: 6px;
                                 text: p.heading;
-                                font-size: 10px;
-                                font-weight: 700;
+                                font-size: Type.small;
+                                font-weight: Type.bold;
                                 color: #6b7280;
                             }
 
@@ -621,10 +665,10 @@ component Surface inherits Rectangle {
                 // An empty canvas looks broken rather than new, so it says
                 // which way out.
                 if nodes.length == 0: Text {
-                    x: 24px;
-                    y: 24px;
+                    x: Space.room;
+                    y: Space.room;
                     text: "Press a node type on the left to place one.";
-                    font-size: 12px;
+                    font-size: Type.body;
                     font-italic: true;
                     color: #9ca3af;
                 }

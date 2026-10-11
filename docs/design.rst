@@ -57,9 +57,11 @@ endpoint
 
 endpoint kind
     What an endpoint is made of, and so what locates it and what else must be
-    said about it. There are five: ``network``, ``device``, ``serial``,
-    ``i2c`` and ``spi``. A kind is not a protocol -- a network endpoint carries
-    the protocol it runs over, and no other kind is addressed that way.
+    said about it. Five are supported -- ``network``, ``device``, ``serial``,
+    ``i2c`` and ``spi`` -- and four more are experimental: ``can``, ``iio``,
+    ``rpmsg`` and ``gpio``. A kind is not a protocol -- a network endpoint
+    carries the protocol it runs over, and no other kind is addressed that
+    way.
 
 device
     An endpoint that is a device file, opened and read as it comes. Not the
@@ -67,7 +69,7 @@ device
     peripheral are all reached through device files and are none of them a
     device endpoint, because each has terms of its own that a plain device has
     not. A device *file* is the thing in the filesystem; a device *endpoint* is
-    one of the five kinds.
+    one kind among the nine.
 
 bus
     A device that several devices are reached through, each by an address on
@@ -352,7 +354,9 @@ Start a data handler.
 +================+============+===========+====================================+
 | START_DH_CM    | Name       | Type      | Description                        |
 |                +------------+-----------+------------------------------------+
-|                | type       | DHType    | Type of DH, network or device      |
+|                | type       | DHType    | Which kind the handler is, which   |
+|                |            |           | must be the kind its configuration |
+|                |            |           | gives it                           |
 |                +------------+-----------+------------------------------------+
 |                | name       | DHName    | Which handler to start, as the     |
 |                |            |           | configuration names it. If the DH  |
@@ -432,6 +436,11 @@ The statistics are:
 * Number of write operations completed successfull
   
 * Number of write operations that returned an error
+
+* Number of triggers sent to a triggered payload, and the number that would
+  not go -- counted apart from the writes above and from each other, because a
+  payload that is answering, one that has gone away, and a handler that has
+  stopped asking are three states that one count could not tell apart
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
@@ -921,11 +930,12 @@ check is made before the handler's state is looked at, so a mis-named START_DH
 is refused whether or not the handler happens to be running.
 
 Requirement
-    An endpoint is of one of five kinds: ``network``, ``device``, ``serial``,
-    ``i2c`` or ``spi``. The kind decides what locates the endpoint and what
-    terms it is opened on, and a handler carries both: a serial line's framing,
-    the address of a device on a bus, and a SPI peripheral's clock are as much
-    a part of where the payload is as the name of the file.
+    An endpoint is of one kind: ``network``, ``device``, ``serial``, ``i2c`` or
+    ``spi``, or one of the experimental ``can``, ``iio``, ``rpmsg`` and
+    ``gpio``. The kind decides what locates the endpoint and what terms it is
+    opened on, and a handler carries both: a serial line's framing, the address
+    of a device on a bus, and a SPI peripheral's clock are as much a part of
+    where the payload is as the name of the file.
 
 A serial line, an I2C device and a SPI peripheral are all reached through
 device files, and all three used to become device endpoints on the way to
@@ -1228,10 +1238,12 @@ Requirement
 
 Endpoints Opened Through Device Files
 "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Four of the five endpoint kinds are opened through an entry in ``/dev``. Which
-kind an entry is depends on what is at the end of it, and not on the entry's
-name: the name says where to look, and the kind says what else must be said
-about it and which implementation opens it.
+Most of the endpoint kinds are opened through an entry in ``/dev``. Which kind
+an entry is depends on what is at the end of it, and not on the entry's name:
+the name says where to look, and the kind says what else must be said about it
+and which implementation opens it. The two that are not device files at all
+are ``network``, which is a socket at an address, and the experimental
+``can``, which is a socket on an interface.
 
 **Endpoints Opened Through Device Files**
 
@@ -3173,7 +3185,9 @@ Requirement
 Which Kinds Can Be Simulated
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 A simulated payload has to be whatever is at the far end of its handler's
-payload endpoint, and the five kinds of endpoint are not equally easy to be.
+payload endpoint, and the kinds of endpoint are not equally easy to be. The
+experimental kinds are covered where each of them is: a CAN bus of peers, a
+sensor's buffer, a channel to another core and a set of discrete lines.
 
 Requirement
     A simulated payload of a network endpoint is a socket of the configured

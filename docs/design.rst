@@ -2442,10 +2442,44 @@ Requirement
     handlers of which the second could not start.
 
 Requirement
-    A GPIO payload cannot be triggered. Its lines are inputs: there is nothing
-    to write a request to, and driving one would be commanding a payload
-    rather than reading it. The endpoint refuses a write with that sentence,
-    as the IIO endpoint does with its own.
+    A set of lines states its direction, and the default is ``input``. A set
+    of discretes is more often something read -- a deployment switch, an
+    arming line -- than something driven, and a line requested as an input is
+    one the kernel will not write, so the direction decides the request and
+    cannot be deduced from anything else the file says.
+
+Requirement
+    ``edge``, ``bias`` and ``debounce_us`` are refused on an output rather
+    than ignored. They are about watching a line, an output has no edges to
+    report and nothing to debounce, and a file that states one of them for a
+    driven line is saying something it does not mean -- commonly a set of
+    lines whose direction was changed and whose other terms were left as they
+    were. The refusal names the term that was missed.
+
+Requirement
+    A GPIO payload cannot be triggered, and only one of a read and a write is
+    open to it. An input refuses a write -- there is nothing to write a
+    request to, and driving one would be commanding a payload rather than
+    reading it, as the IIO endpoint says of its own. An output refuses a read:
+    a driven line reports nothing, so reading one would be reporting what this
+    node itself asked for, and a configuration that said ``output`` where it
+    meant ``input`` is told so rather than left waiting for events that never
+    come. Each refusal names the direction that would allow what was tried.
+
+Requirement
+    Driven lines are driven together, to the one state, by a value on a link
+    -- the text ``1`` or ``0``, and nothing else. There is nothing in the
+    configuration to say which line of a set is which, so a pattern would
+    have no meaning; and three heater circuits switched one at a time would be
+    three thermal states of a vehicle on the way to the one asked for. A datum
+    that is neither ``1`` nor ``0`` is refused and not guessed at, because what
+    is on the other end of an output is a heater or a valve.
+
+Requirement
+    The bits and the mask of a set-values call are indexed by a line's place
+    in the request and not by its offset on the chip, which is how the v2
+    interface counts. Every line of the request appears in the mask whichever
+    way they are going: a mask of zero is a call that says nothing.
 
 Requirement
     The request names the handler as its consumer. A line held by something

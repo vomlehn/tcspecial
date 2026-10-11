@@ -769,9 +769,12 @@ pub struct SpiConfig {
 pub struct GpioConfig {
     /// The chip's character device: `/dev/gpiochip0`.
     pub path: String,
-    /// The offsets of the lines watched, in the order the file gave them.
+    /// The offsets of the lines, in the order the file gave them.
     pub lines: Vec<u32>,
-    /// Which changes of a line are events.
+    /// Whether they are watched or driven.
+    pub direction: crate::node::gpio::Direction,
+    /// Which changes of a line are events. Only meaningful on lines that are
+    /// watched, and refused on lines that are driven.
     pub edge: crate::LineEdge,
     /// What holds a line nothing is driving.
     pub bias: crate::Bias,
@@ -1151,6 +1154,7 @@ fn link_terms_of(
         edge: inherited!(edge),
         bias: inherited!(bias),
         debounce_us: inherited!(debounce_us),
+        direction: inherited!(direction),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
             timeout: s.timeout,
@@ -1550,6 +1554,9 @@ pub struct DHGroupJson {
     /// microseconds.
     #[serde(default)]
     pub debounce_us: Option<Scalar>,
+    /// Whether a set of discrete lines is read or driven.
+    #[serde(default)]
+    pub direction: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1738,6 +1745,9 @@ pub struct DHConfigJson {
     /// microseconds.
     #[serde(default)]
     pub debounce_us: Option<Scalar>,
+    /// Whether a set of discrete lines is read or driven.
+    #[serde(default)]
+    pub direction: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,

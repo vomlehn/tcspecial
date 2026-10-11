@@ -481,17 +481,27 @@ A GPIO Payload
 --------------
 ``type: gpio``. **Experimental, not yet supported.** A set of discrete lines
 -- a deployment switch, an arming line, a payload's own "alive" line -- watched
-for changes.
+for changes, or a set of circuits driven: a heater, a valve, a latch.
 
 .. code-block:: text
 
    path           the chip: /dev/gpiochip0
-   lines          the offsets watched, separated by commas or spaces,
-                  decimal or 0x. Required
-   edge           rising | falling | both, default both
-   bias           none | pull_up | pull_down, default none
+   lines          the offsets, separated by commas or spaces, decimal
+                  or 0x. Required
+   direction      input | output, default input
+   edge           rising | falling | both, default both. Inputs only
+   bias           none | pull_up | pull_down, default none. Inputs only
    debounce_us    how long a line must be steady before a change counts.
-                  Default none, and applied by the kernel
+                  Default none, applied by the kernel, inputs only
+
+The direction is not something a set of lines can be both of: a line
+requested as an input is one the kernel will not write, and one requested as
+an output produces no edges to read. So it is stated, and stating it is what
+lets a file be refused for driving something it said it would watch. The
+three watching terms are refused outright on an output rather than ignored:
+an edge or a debounce on a line nothing reads is a file saying something it
+does not mean, and the usual cause is a set of lines whose direction was
+changed and whose other words were left as they were.
 
 This is the one type whose payload data is made rather than carried. A line
 has no bytes: it is high or low, and what the ground wants is when it changed.
@@ -503,8 +513,22 @@ part of a record being a reading nobody could use.
 Two payloads may watch one chip and may not watch one line: the kernel gives a
 line to one request at a time, so the second handler's start would fail.
 
-A GPIO payload cannot be triggered. Its lines are inputs, and driving one
-would be commanding a payload rather than reading it.
+Driven lines are driven together, to the same state. What arrives is a value
+as everything on a link is -- the text ``1`` to assert and ``0`` to unassert,
+which is what the hysteresis compute element emits -- and anything else is
+refused rather than taken for one of them: the thing on the other end is a
+heater, and a datum that cannot be read is not guessed at. The lines are a
+set and not a pattern because there is nothing in the file to say which line
+is which, and because three heater circuits switched one at a time would be
+three thermal states of a vehicle on the way to the one that was asked for.
+The kernel counts them by their place in the request, so lines ``3,4,5``
+named in that order are the low three bits of the call that drives them.
+
+A GPIO payload cannot be triggered, and a read and a write are not both open
+to it: an input refuses a write, because driving one would be commanding a
+payload rather than reading it, and an output refuses a read, because
+reporting a line this node itself drove would be reporting its own voice.
+Each refusal says which direction does allow it.
 
 The simulator moves lines through the kernel's ``gpio-sim``, which it finds
 rather than makes: loading the module and making a chip need root, and tcssim

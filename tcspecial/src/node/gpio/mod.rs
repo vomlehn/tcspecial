@@ -33,7 +33,10 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use nix::poll::PollFlags;
-use tcslibgs::{node::gpio::EVENT_BYTES, Bias, GpioConfig, LineEdge, TcsError, TcsResult};
+use tcslibgs::{
+    node::gpio::{Direction, EVENT_BYTES},
+    Bias, GpioConfig, LineEdge, TcsError, TcsResult,
+};
 
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable, WaitResult,
@@ -50,10 +53,29 @@ const GPIO_V2_GET_LINE_IOCTL: libc::c_ulong = 0xc250_b407;
 
 /// Line flags, from `enum gpio_v2_line_flag`.
 const GPIO_V2_LINE_FLAG_INPUT: u64 = 1 << 2;
+const GPIO_V2_LINE_FLAG_OUTPUT: u64 = 1 << 3;
 const GPIO_V2_LINE_FLAG_EDGE_RISING: u64 = 1 << 4;
 const GPIO_V2_LINE_FLAG_EDGE_FALLING: u64 = 1 << 5;
 const GPIO_V2_LINE_FLAG_BIAS_PULL_UP: u64 = 1 << 8;
 const GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN: u64 = 1 << 9;
+
+/// `GPIO_V2_LINE_SET_VALUES_IOCTL`, which is `_IOWR(0xB4, 0x0F, struct
+/// gpio_v2_line_values)` -- sixteen bytes of two `u64`.
+const GPIO_V2_LINE_SET_VALUES_IOCTL: libc::c_ulong = 0xc010_b40f;
+
+/// What a line is driven to, and which lines the request is about.
+///
+/// `gpio_v2_line_values`: the bits of `bits` are the values, the bits of
+/// `mask` say which lines they apply to. Both are indexed by the line's place
+/// in the request rather than by its offset on the chip, which is the one
+/// thing about this structure that is easy to get wrong -- lines 3, 4 and 5 of
+/// a chip are bits 0, 1 and 2 here.
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+struct LineValues {
+    bits: u64,
+    mask: u64,
+}
 
 /// `GPIO_V2_LINE_ATTR_ID_DEBOUNCE`.
 const GPIO_V2_LINE_ATTR_ID_DEBOUNCE: u32 = 3;
@@ -147,8 +169,15 @@ pub struct GpioEndpoint {
     /// The chip's character device, kept open: the line request belongs to it
     /// for as long as it lives.
     _chip: File,
-    /// The request's own descriptor, which the events are read from.
+    /// The request's own descriptor, which the events are read from and the
+    /// line states driven through.
     lines: File,
+    /// Whether these lines are read or driven, which decides which of a read
+    /// and a write is the one that makes sense here.
+    direction: Direction,
+    /// How many lines the request holds, which is how wide the mask is when
+    /// they are driven: the kernel counts them by their place in the request.
+    count: usize,
     /// Where the chip is, for the error that says a write has nowhere to go.
     path: String,
 }
@@ -174,6 +203,8 @@ impl GpioEndpoint {
             what: what.to_string(),
             _chip: chip,
             lines,
+            direction: config.direction,
+            count: config.lines.len(),
             path: config.path.clone(),
         })
     }
@@ -188,6 +219,8 @@ impl GpioEndpoint {
             what: self.what.clone(),
             _chip: self._chip.try_clone()?,
             lines: self.lines.try_clone()?,
+            direction: self.direction,
+            count: self.count,
             path: self.path.clone(),
         })
     }
@@ -225,7 +258,14 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
         Bias::PullDown => GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN,
     };
 
-    request.config.flags = GPIO_V2_LINE_FLAG_INPUT | edges | bias;
+    // Driven lines ask for none of the watching terms, which the
+    // configuration refuses to state for them: an output has no edges to
+    // report and nothing to debounce.
+    request.config.flags = if config.direction.is_output() {
+        GPIO_V2_LINE_FLAG_OUTPUT
+    } else {
+        GPIO_V2_LINE_FLAG_INPUT | edges | bias
+    };
 
     // The debounce the kernel does, where the file asked for one, applied to
     // every line of the request: a mask with a bit per line.
@@ -294,6 +334,45 @@ fn ask_for_lines(
     Ok(unsafe { File::from_raw_fd(request.fd) })
 }
 
+/// What arrived, as the state the lines are to be driven to.
+///
+/// The text `1` to assert and `0` to unassert, which is what a compute
+/// element's decision looks like on a link, and what a ground station can
+/// send by hand. Anything else is refused rather than taken for one of them:
+/// the thing on the other end of this is a heater or a valve, and a datum
+/// that cannot be read is not guessed at.
+fn state_of(what: &str, data: &[u8]) -> TcsResult<bool> {
+    match std::str::from_utf8(data).map(str::trim) {
+        Ok("1") => Ok(true),
+        Ok("0") => Ok(false),
+        Ok(other) => Err(TcsError::Endpoint(format!(
+            "{what}: \"{other}\" is neither 1 nor 0, and these lines drive \
+             something: a value that cannot be read is not guessed at"
+        ))),
+        Err(_) => Err(TcsError::Endpoint(format!(
+            "{what}: what arrived is not text, so it is not 1 or 0"
+        ))),
+    }
+}
+
+/// What the kernel is asked for: every line of the request at the one state.
+///
+/// Indexed by a line's place in the request and not by its offset on the
+/// chip, which is how the v2 interface counts: lines 3, 7 and 11 asked for in
+/// that order are bits 0, 1 and 2 here. The mask says which bits were meant,
+/// so every line of the request is set in it whichever way they are going.
+fn values_for(count: usize, wanted: bool) -> LineValues {
+    let mask = if count >= u64::BITS as usize {
+        u64::MAX
+    } else {
+        (1u64 << count) - 1
+    };
+    LineValues {
+        bits: if wanted { mask } else { 0 },
+        mask,
+    }
+}
+
 /// One event as the bytes a conduit carries: the time, the line, the value.
 ///
 /// Little-endian, because the two ends of this link are the same machine --
@@ -334,7 +413,20 @@ impl EndpointReadable for GpioEndpoint {
     /// As many as the buffer has room for: the kernel hands over whole
     /// events, and each becomes one record, so a buffer that cannot hold
     /// another record is where this stops.
+    ///
+    /// Input lines only. A driven line has no edges to report, so a read of
+    /// one is a configuration that said output where it meant input, and is
+    /// told so rather than left waiting for events that never come.
     fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize> {
+        if self.direction.is_output() {
+            return Err(TcsError::Endpoint(format!(
+                "{}: the lines of {} are driven, and a driven line reports \
+                 nothing: reading one would be reporting what this node itself \
+                 asked for. Leave direction unsaid, or say input, to read them",
+                self.what, self.path
+            )));
+        }
+
         let mut filled = 0;
 
         while filled + EVENT_BYTES <= buffer.len() {
@@ -376,19 +468,51 @@ impl EndpointReadable for GpioEndpoint {
 }
 
 impl EndpointWritable for GpioEndpoint {
-    /// Nothing is written to a set of input lines.
+    /// Drive every line of the request to what arrived.
     ///
-    /// Reported rather than attempted, and the message says what a GPIO
-    /// device is: these are inputs, and writing would mean driving an output
-    /// -- commanding a device rather than reading one. A triggered GPIO
-    /// device is refused where the file is read, so what reaches this is the
-    /// ground sending data to a discrete.
-    fn write(&mut self, _data: &[u8]) -> TcsResult<usize> {
-        Err(TcsError::Endpoint(format!(
-            "{}: the lines of {} are inputs, which are read and not written: driving \
-             one would be commanding a device rather than reading it",
-            self.what, self.path
-        )))
+    /// A value and not a pattern: the lines of one node are driven together,
+    /// to the same state. Three heater circuits switched one at a time would
+    /// be three different thermal states of a vehicle on the way to the one
+    /// that was asked for, and the configuration has no way to say which line
+    /// is which -- they are a set, named by offsets in the order the file gave
+    /// them.
+    ///
+    /// What arrives is a value as everything on a link is: see [`state_of`]
+    /// for how it is read and [`values_for`] for what the kernel is then
+    /// asked.
+    fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
+        if !self.direction.is_output() {
+            return Err(TcsError::Endpoint(format!(
+                "{}: the lines of {} are inputs, which are read and not written: \
+                 driving one would be commanding a device rather than reading \
+                 it. Say direction: output to drive them",
+                self.what, self.path
+            )));
+        }
+
+        let values = values_for(self.count, state_of(&self.what, data)?);
+
+        // SAFETY: a structure laid out as the kernel's own -- the tests below
+        // hold it to the kernel's size -- living across a call on a descriptor
+        // this owns.
+        let result = unsafe {
+            libc::ioctl(
+                self.lines.as_raw_fd(),
+                GPIO_V2_LINE_SET_VALUES_IOCTL,
+                &values,
+            )
+        };
+        if result < 0 {
+            return Err(TcsError::Endpoint(format!(
+                "{}: cannot drive the lines of {}: {}",
+                self.what,
+                self.path,
+                std::io::Error::last_os_error()
+            )));
+        }
+
+        // The whole of what arrived, which is what a caller counts as sent.
+        Ok(data.len())
     }
 }
 
@@ -409,10 +533,12 @@ mod tests {
         assert_eq!(mem::size_of::<LineConfig>(), 272);
         assert_eq!(mem::size_of::<LineRequest>(), 592);
         assert_eq!(mem::size_of::<LineEvent>(), 48);
+        assert_eq!(mem::size_of::<LineValues>(), 16);
 
         // And the alignment the kernel's 64-bit fields need.
         assert_eq!(mem::align_of::<LineRequest>(), 8);
         assert_eq!(mem::align_of::<LineEvent>(), 8);
+        assert_eq!(mem::align_of::<LineValues>(), 8);
     }
 
     /// A request asks for the lines the file named, as inputs, with the edges
@@ -420,6 +546,7 @@ mod tests {
     #[test]
     fn a_request_asks_for_what_the_file_said() {
         let config = GpioConfig {
+            direction: Direction::Input,
             path: "/dev/gpiochip0".to_string(),
             lines: vec![3, 7, 11],
             edge: LineEdge::Falling,
@@ -465,6 +592,7 @@ mod tests {
         let request = request_for(
             "discretes",
             &GpioConfig {
+                direction: Direction::Input,
                 path: "/dev/gpiochip0".to_string(),
                 lines: vec![0],
                 edge: LineEdge::Both,
@@ -525,6 +653,7 @@ mod tests {
         let said = match GpioEndpoint::new(
             "discretes",
             &GpioConfig {
+                direction: Direction::Input,
                 path: "/dev/gpiochip-nonesuch".to_string(),
                 lines: vec![0],
                 edge: LineEdge::Both,
@@ -556,6 +685,8 @@ mod tests {
             // by the endpoint from here.
             _chip: unsafe { File::from_raw_fd(fds[1]) },
             lines: unsafe { File::from_raw_fd(fds[0]) },
+            direction: Direction::Input,
+            count: 1,
             path: "/dev/gpiochip0".to_string(),
         };
 
@@ -593,6 +724,8 @@ mod tests {
             // SAFETY: as above.
             _chip: unsafe { File::from_raw_fd(libc::dup(fds[1])) },
             lines: unsafe { File::from_raw_fd(fds[0]) },
+            direction: Direction::Input,
+            count: 1,
             path: "/dev/gpiochip0".to_string(),
         };
 
@@ -631,5 +764,143 @@ mod tests {
         unsafe {
             libc::close(fds[1]);
         }
+    }
+
+    /// A driven set of lines asks for the output flag and nothing else.
+    ///
+    /// None of the watching terms, which the configuration refuses to state
+    /// for an output: an edge reported from a line this node drives would be
+    /// this node hearing its own voice.
+    #[test]
+    fn driven_lines_ask_only_to_be_driven() {
+        let request = request_for(
+            "heaters",
+            &GpioConfig {
+                direction: Direction::Output,
+                path: "/dev/gpiochip0".to_string(),
+                lines: vec![17, 18, 19],
+                // What the parser leaves here when the file says output, and
+                // what must not reach the request.
+                edge: LineEdge::Both,
+                bias: Bias::None,
+                debounce_us: None,
+            },
+        )
+        .expect("a request");
+
+        assert_eq!(
+            request.config.flags, GPIO_V2_LINE_FLAG_OUTPUT,
+            "a driven line asks to be driven and nothing more"
+        );
+        assert_eq!(request.num_lines, 3);
+        assert_eq!(&request.offsets[..3], &[17, 18, 19]);
+        assert_eq!(request.config.num_attrs, 0);
+    }
+
+    /// The bits and the mask count lines by their place in the request.
+    #[test]
+    fn the_values_are_indexed_by_place_in_the_request() {
+        // Three lines asserted: the low three bits, whatever their offsets on
+        // the chip are.
+        let on = values_for(3, true);
+        assert_eq!(on.mask, 0b111);
+        assert_eq!(on.bits, 0b111);
+
+        // And unasserted: the same lines meant, all of them low. A mask of
+        // zero would be a call that said nothing.
+        let off = values_for(3, false);
+        assert_eq!(off.mask, 0b111);
+        assert_eq!(off.bits, 0);
+
+        // One line, and the most the interface allows: no shift that falls
+        // off the end of the word.
+        assert_eq!(values_for(1, true).mask, 1);
+        assert_eq!(values_for(64, true).mask, u64::MAX);
+    }
+
+    /// What a decision looks like arriving, and what else does not.
+    #[test]
+    fn a_state_is_one_or_zero_and_nothing_else() {
+        assert!(state_of("heaters", b"1").expect("asserted"));
+        assert!(!state_of("heaters", b"0").expect("unasserted"));
+
+        // As the compute elements emit them, a line's worth at a time.
+        assert!(state_of("heaters", b"1\n").expect("asserted"));
+
+        for refused in [&b"on"[..], b"true", b"2", b"", b"1 0", &[0xff]] {
+            let said = match state_of("heaters", refused) {
+                Err(e) => format!("{e}"),
+                Ok(state) => panic!(
+                    "{:?} was taken for {state}",
+                    String::from_utf8_lossy(refused)
+                ),
+            };
+            assert!(
+                said.contains("heaters"),
+                "the refusal should name the node: {said}"
+            );
+        }
+    }
+
+    /// A driven set of lines refuses a read, and says which way to fix it.
+    #[test]
+    fn a_set_of_driven_lines_refuses_a_read() {
+        let mut fds = [0 as RawFd; 2];
+        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
+
+        let mut endpoint = GpioEndpoint {
+            what: "heaters".to_string(),
+            // SAFETY: both descriptors are the pipe's, just made, and owned
+            // by the endpoint from here.
+            _chip: unsafe { File::from_raw_fd(fds[1]) },
+            lines: unsafe { File::from_raw_fd(fds[0]) },
+            direction: Direction::Output,
+            count: 3,
+            path: "/dev/gpiochip0".to_string(),
+        };
+
+        let said = match endpoint.read(&mut [0u8; 64]) {
+            Err(e) => format!("{e}"),
+            Ok(n) => panic!("a set of driven lines gave {n} bytes"),
+        };
+        assert!(
+            said.contains("driven") && said.contains("input"),
+            "the error should say which direction reads: {said}"
+        );
+    }
+
+    /// A write to a driven set reaches the kernel, which is as far as a test
+    /// without a chip can see.
+    ///
+    /// A pipe is not a line request, so the ioctl is refused -- the point is
+    /// that the refusal comes from the kernel and names the chip, rather than
+    /// the endpoint turning the write away itself as an input would.
+    #[test]
+    fn a_write_to_driven_lines_is_attempted() {
+        let mut fds = [0 as RawFd; 2];
+        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
+
+        let mut endpoint = GpioEndpoint {
+            what: "heaters".to_string(),
+            // SAFETY: as above.
+            _chip: unsafe { File::from_raw_fd(fds[1]) },
+            lines: unsafe { File::from_raw_fd(fds[0]) },
+            direction: Direction::Output,
+            count: 3,
+            path: "/dev/gpiochip0".to_string(),
+        };
+
+        let said = match endpoint.write(b"1") {
+            Err(e) => format!("{e}"),
+            Ok(n) => panic!("a pipe took a line request's ioctl, and {n} bytes"),
+        };
+        assert!(
+            said.contains("cannot drive") && said.contains("/dev/gpiochip0"),
+            "the error should be the kernel's, and name the chip: {said}"
+        );
+        assert!(
+            !said.contains("read and not written"),
+            "a driven line is not refused for being an input: {said}"
+        );
     }
 }

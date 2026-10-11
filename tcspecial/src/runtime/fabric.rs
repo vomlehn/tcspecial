@@ -330,8 +330,11 @@ mod tests {
                 (Some("in2".to_string()), vec![3]),
             ]
         );
-        // And the ground got all three as well, which is the other leg.
+        // And the ground and the log got all three as well, which are the
+        // other two legs: a fan-in on one destination does not take anything
+        // away from the fan-out that feeds it.
         assert_eq!(moc.borrow().given.len(), 3);
+        assert_eq!(log.borrow().given.len(), 3);
     }
 
     /// One destination refusing does not stop the others.

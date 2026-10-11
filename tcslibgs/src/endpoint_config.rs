@@ -198,6 +198,7 @@ pub(crate) fn endpoint_of(
                 edge: gpio.edge,
                 bias: gpio.bias,
                 debounce_us: gpio.debounce_us,
+                direction: gpio.direction,
             })),
             GroupKind::Rpmsg(rpmsg) => Ok(EndpointConfig::Rpmsg(RpmsgConfig {
                 path: path.clone(),
@@ -399,6 +400,9 @@ pub(crate) struct LinkTerms {
     pub(crate) edge: Option<Scalar>,
     pub(crate) bias: Option<Scalar>,
     pub(crate) debounce_us: Option<Scalar>,
+    /// Whether a set of discrete lines is read or driven. See
+    /// `node::gpio::Direction`.
+    pub(crate) direction: Option<Scalar>,
 }
 
 /// Where one read of a line ends, as a file states it.
@@ -694,7 +698,7 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 33] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 34] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
@@ -737,6 +741,7 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 33] {
         ("edge", g.edge.is_some()),
         ("bias", g.bias.is_some()),
         ("debounce_us", g.debounce_us.is_some()),
+        ("direction", g.direction.is_some()),
         // SPI.
         ("max_speed", g.max_speed.is_some()),
         ("spi_mode", g.spi_mode.is_some()),

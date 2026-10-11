@@ -66,12 +66,50 @@ pub enum Bias {
     PullDown,
 }
 
-/// What a GPIO payload's lines are set to.
+/// Whether the lines are read or driven.
+///
+/// Not a thing a set of lines can be both of. A line requested as an input
+/// and written to is a line the kernel refuses to write, and one requested as
+/// an output produces no edges to read -- so which it is has to be stated,
+/// and stating it is what lets a configuration be refused for driving
+/// something it declared it would watch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Direction {
+    /// Watched: changes on these lines are events. The default, because a set
+    /// of discretes is more often something read -- a deployment switch, an
+    /// arming line -- than something driven.
+    #[default]
+    Input,
+    /// Driven: what arrives sets these lines.
+    Output,
+}
+
+impl Direction {
+    /// The direction this word asks for.
+    pub fn of(name: &str) -> Result<Direction, String> {
+        match name {
+            "input" => Ok(Direction::Input),
+            "output" => Ok(Direction::Output),
+            other => Err(format!(
+                "direction: \"{other}\" is neither input nor output"
+            )),
+        }
+    }
+
+    /// Whether these lines are driven.
+    pub fn is_output(self) -> bool {
+        self == Direction::Output
+    }
+}
+
+/// What a GPIO node's lines are set to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GpioParams {
-    /// The offsets of the lines this payload watches, in the order the file
-    /// gave them.
+    /// The offsets of the lines, in the order the file gave them.
     pub lines: Vec<u32>,
+    /// Whether they are read or driven.
+    pub direction: Direction,
     /// Which changes are events.
     pub edge: Edge,
     /// What holds the lines.
@@ -135,7 +173,12 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
 
 /// What a GPIO payload says about its lines, and what it must say.
 pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
-    reject_foreign_fields(name, "gpio", &g, &["lines", "edge", "bias", "debounce_us"])?;
+    reject_foreign_fields(
+        name,
+        "gpio",
+        &g,
+        &["lines", "edge", "bias", "debounce_us", "direction"],
+    )?;
 
     // An event is its own length, so there is nothing for a rule about where
     // a read ends to say.
@@ -190,8 +233,39 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         None => None,
     };
 
+    let direction = match g.direction.as_ref() {
+        Some(stated) => Direction::of(&stated.as_str().to_ascii_lowercase())
+            .map_err(|why| bad(name, &why))?,
+        None => Direction::Input,
+    };
+
+    // Terms that only mean something for lines being watched. Refused rather
+    // than ignored on an output: an edge or a debounce on a line nothing reads
+    // is a file saying something it does not mean, and the usual cause is a
+    // set of lines whose direction was changed and whose other terms were left
+    // as they were.
+    if direction.is_output() {
+        for (term, given) in [
+            ("edge", g.edge.is_some()),
+            ("bias", g.bias.is_some()),
+            ("debounce_us", g.debounce_us.is_some()),
+        ] {
+            if given {
+                return Err(bad(
+                    name,
+                    &format!(
+                        "{term} is about watching a line, and these lines are \
+                         driven: an output has no edges to report and nothing \
+                         to debounce"
+                    ),
+                ));
+            }
+        }
+    }
+
     Ok(GroupKind::Gpio(GpioParams {
         lines,
+        direction,
         edge,
         bias,
         debounce_us,
@@ -211,6 +285,7 @@ mod tests {
                 "edge" => g.edge = value,
                 "bias" => g.bias = value,
                 "debounce_us" => g.debounce_us = value,
+                "direction" => g.direction = value,
                 "datarate" => g.datarate = value,
                 other => panic!("{other} is not a term this test states"),
             }
@@ -233,6 +308,7 @@ mod tests {
             params(&[("lines", "0, 1, 5")]),
             GpioParams {
                 lines: vec![0, 1, 5],
+                direction: Direction::Input,
                 edge: Edge::Both,
                 bias: Bias::None,
                 debounce_us: None,
@@ -316,6 +392,67 @@ mod tests {
         assert!(
             format!("{said}").contains("datarate"),
             "the error should name the term: {said}"
+        );
+    }
+
+    /// Lines are watched unless the file says they are driven.
+    #[test]
+    fn lines_are_watched_unless_the_file_says_driven() {
+        assert_eq!(params(&[("lines", "0")]).direction, Direction::Input);
+        assert_eq!(
+            params(&[("lines", "0"), ("direction", "input")]).direction,
+            Direction::Input
+        );
+        assert_eq!(
+            params(&[("lines", "17, 18, 19"), ("direction", "output")]).direction,
+            Direction::Output
+        );
+
+        // However the file capitalised it, as the other words of a link are
+        // read.
+        assert_eq!(
+            params(&[("lines", "0"), ("direction", "OUTPUT")]).direction,
+            Direction::Output
+        );
+
+        let said = group_kind_of("discretes", terms(&[("lines", "0"), ("direction", "both")]))
+            .expect_err("a direction that is neither");
+        assert!(
+            format!("{said}").contains("neither input nor output"),
+            "the error should say what the choices are: {said}"
+        );
+    }
+
+    /// A driven line may not also say how it is watched.
+    ///
+    /// Each of the watching terms separately, because the usual cause is a
+    /// set of lines turned into outputs with the rest of its words left as
+    /// they were, and the one that was missed is the one worth naming.
+    #[test]
+    fn a_driven_line_says_nothing_about_watching() {
+        for (term, value) in [("edge", "rising"), ("bias", "pull_up"), ("debounce_us", "5000")] {
+            let said = group_kind_of(
+                "heaters",
+                terms(&[("lines", "17"), ("direction", "output"), (term, value)]),
+            )
+            .expect_err("a watching term on a driven line");
+            let said = format!("{said}");
+            assert!(
+                said.contains(term) && said.contains("driven"),
+                "the error should name the term and say why: {said}"
+            );
+        }
+
+        // And an output that says nothing else is what a heater looks like.
+        assert_eq!(
+            params(&[("lines", "17, 18, 19"), ("direction", "output")]),
+            GpioParams {
+                lines: vec![17, 18, 19],
+                direction: Direction::Output,
+                edge: Edge::Both,
+                bias: Bias::None,
+                debounce_us: None,
+            }
         );
     }
 

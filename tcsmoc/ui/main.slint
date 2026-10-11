@@ -63,8 +63,12 @@ component DHPanel inherits Rectangle {
         // its own glyphs rather than refuse -- and PANEL_HEIGHT would be a
         // guess about font metrics instead of the sum of these, which
         // every_panels_data_is_inside_the_window measures.
-        HorizontalLayout {
+        // The name and the status, with a gap between them: the row set no
+        // spacing, so "tcp-stream (dev id 0)" ended at the pixel "Unknown"
+        // began at and the two read as one string.
+        header-row := HorizontalLayout {
             min-height: 20px;
+            spacing: 4px;
             // The name and the number of the payload, which is its place in
             // the payload configuration -- the first payload the file
             // describes is 0. Nothing states it: the file's order is what
@@ -81,15 +85,19 @@ component DHPanel inherits Rectangle {
             }
         }
 
-        HorizontalLayout {
-            height: 12px;
+        // A floor rather than a height. Twelve pixels is three short of what
+        // a line of this text takes, and a row that cannot shrink its text
+        // does not refuse -- it clips it, which reads as a font that sits too
+        // low rather than as a row that is too short.
+        config-row := HorizontalLayout {
+            min-height: 12px;
             Text {
                 text: "Config: " + dh-config;
                 font-size: 11px;
             }
         }
 
-        HorizontalLayout {
+        size-row := HorizontalLayout {
             min-height: 16px;
             // No packet interval: how often a payload produces a packet is a
             // property of a simulation rather than of a payload, so it lives in

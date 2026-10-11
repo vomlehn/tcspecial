@@ -9,6 +9,7 @@ pub mod config;
 pub mod dh;
 pub mod endpoint;
 pub mod node;
+pub mod runtime;
 pub mod conduit;
 pub mod telemetry_log;
 

@@ -57,6 +57,12 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // stand in for is the sysfs around it -- the channels and the buffer
         // -- which a handler does not touch either; see payload_iio.
         EndpointConfig::Iio(iio) => (PayloadProtocol::Iio, iio.path.clone(), 0, 0),
+        // A channel to another core, which a pty stands in for both ways: a
+        // handler writes a message and reads an answer, and that is what a
+        // pty carries. What it does not reproduce is the channel's identity
+        // -- there is no sysfs entry saying which service it is -- which the
+        // handler's own check allows for; see payload_rpmsg.
+        EndpointConfig::Rpmsg(rpmsg) => (PayloadProtocol::Rpmsg, rpmsg.path.clone(), 0, 0),
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
@@ -174,6 +180,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         EndpointConfig::Spi(spi) => format!("SPI {} {}", spi.path, spi.mode),
         EndpointConfig::Can(can) => format!("CAN {} id {:#x}", can.interface, can.can_id),
         EndpointConfig::Iio(iio) => format!("IIO {}", iio.path),
+        EndpointConfig::Rpmsg(rpmsg) => format!("rpmsg {} ({})", rpmsg.path, rpmsg.service),
     }
 }
 

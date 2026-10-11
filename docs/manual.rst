@@ -327,6 +327,40 @@ What it cannot do is make the bus: a virtual one needs
 and tcssim says exactly that if the interface is not there, as it does for the
 I\ :superscript:`2`\ C stub module.
 
+An rpmsg Payload
+----------------
+``type: rpmsg``. **Experimental, not yet supported.** Software on another core
+of the same package -- a real-time core beside the Linux one -- reached over
+an rpmsg channel, which Linux presents as a character device carrying whole
+messages both ways.
+
+.. code-block:: text
+
+   path              the channel: /dev/rpmsg0
+   service           the name the remote announced the channel with. Required
+   max_message_bytes the greatest a message may be, where the transport is
+                     not the usual one. Default 496, which is what 512-byte
+                     buffers leave after the rpmsg header
+
+The service name is required because a node's number is not an identity: it
+is assigned as channels announce themselves, so ``/dev/rpmsg0`` is whichever
+came first and may be another core's channel after a change in boot order.
+tcspecial reads ``/sys/class/rpmsg/<node>/name`` and refuses a node that is
+not the channel the file asked for. Where the kernel publishes no name --
+and a simulated channel has none to publish -- nothing is refused.
+
+A read hands over one whole message, so there is no stream section. rpmsg does
+not fragment, so a ``packet_size`` larger than one message is refused where
+the file is read.
+
+An rpmsg payload may be triggered: the channel carries both directions, so the
+handler writes a request and the remote answers.
+
+The simulator stands in for the channel with a pseudo-terminal. What a pty is
+not is a message boundary -- the rpmsg driver hands over one message per read
+where a pty hands over whatever bytes are there -- which shows only where a
+payload writes faster than the handler reads.
+
 An IIO Payload
 --------------
 ``type: iio``. **Experimental, not yet supported.** A sensor's buffered

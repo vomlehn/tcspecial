@@ -174,6 +174,19 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 );
             }
         }
+        EndpointConfig::Rpmsg(rpmsg) => {
+            let _ = writeln!(out, "  path             {}", rpmsg.path);
+            let _ = writeln!(out, "  service          {}", rpmsg.service);
+            let _ = writeln!(
+                out,
+                "  max_message_bytes {} bytes{}",
+                crate::endpoint_config_rpmsg::message_bytes(rpmsg.max_message_bytes),
+                match rpmsg.max_message_bytes {
+                    Some(_) => "",
+                    None => ", which is what the usual transport leaves",
+                }
+            );
+        }
         EndpointConfig::Iio(iio) => {
             let _ = writeln!(out, "  path             {}", iio.path);
             // Both recorded rather than applied: a channel and a buffer are

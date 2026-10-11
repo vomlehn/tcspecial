@@ -113,6 +113,11 @@ pub enum DHType {
     ///
     /// Experimental; see [`crate::endpoint_config_iio`].
     Iio,
+    /// A handler whose payload is software on another core, reached over an
+    /// rpmsg channel.
+    ///
+    /// Experimental; see [`crate::endpoint_config_rpmsg`].
+    Rpmsg,
 }
 
 /// Something one handler takes for itself, and so which no other may take.
@@ -173,6 +178,7 @@ fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
         EndpointConfig::Device(device) => Claim::Path(device.path.clone()),
         EndpointConfig::Serial(serial) => Claim::Path(serial.path.clone()),
         EndpointConfig::Iio(iio) => Claim::Path(iio.path.clone()),
+        EndpointConfig::Rpmsg(rpmsg) => Claim::Path(rpmsg.path.clone()),
         EndpointConfig::Spi(spi) => Claim::Path(spi.path.clone()),
         EndpointConfig::I2c(i2c) => Claim::OnBus {
             bus: i2c.bus.clone(),
@@ -327,6 +333,7 @@ impl DHType {
             DHType::Spi => "spi",
             DHType::Can => "can",
             DHType::Iio => "iio",
+            DHType::Rpmsg => "rpmsg",
         }
     }
 
@@ -340,6 +347,7 @@ impl DHType {
             DHType::Spi,
             DHType::Can,
             DHType::Iio,
+            DHType::Rpmsg,
         ]
         .into_iter()
         .find(|kind| kind.spelling() == text)
@@ -358,7 +366,7 @@ impl DHType {
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device, serial, i2c, spi, can, or iio".to_string()
+        "network, device, serial, i2c, spi, can, iio, or rpmsg".to_string()
     }
 }
 
@@ -715,6 +723,23 @@ pub struct SpiConfig {
     pub cs_active: CsActive,
 }
 
+/// Configuration for an endpoint that is an rpmsg channel
+///
+/// Experimental; see [`crate::endpoint_config_rpmsg`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RpmsgConfig {
+    /// The character device the channel is: `/dev/rpmsg0`.
+    pub path: String,
+    /// The service name the remote announced it with, which is what
+    /// identifies the channel: a node's number is assigned as channels
+    /// appear.
+    pub service: String,
+    /// The greatest number of bytes one message carries, where the platform
+    /// is not the usual one; see
+    /// [`crate::endpoint_config_rpmsg::USUAL_MESSAGE_BYTES`].
+    pub max_message_bytes: Option<u32>,
+}
+
 /// Configuration for an endpoint that is a sensor's sample buffer
 ///
 /// Experimental; see [`crate::endpoint_config_iio`].
@@ -774,6 +799,8 @@ pub enum EndpointConfig {
     Can(CanConfig),
     /// Experimental; see [`IioConfig`].
     Iio(IioConfig),
+    /// Experimental; see [`RpmsgConfig`].
+    Rpmsg(RpmsgConfig),
 }
 
 impl EndpointConfig {
@@ -792,6 +819,7 @@ impl EndpointConfig {
             EndpointConfig::Spi(_) => DHType::Spi,
             EndpointConfig::Can(_) => DHType::Can,
             EndpointConfig::Iio(_) => DHType::Iio,
+            EndpointConfig::Rpmsg(_) => DHType::Rpmsg,
         }
     }
 }
@@ -1026,6 +1054,8 @@ pub(crate) fn link_params_of(
         can_fd: inherited!(can_fd),
         channels: inherited!(channels),
         sample_rate: inherited!(sample_rate),
+        service: inherited!(service),
+        max_message_bytes: inherited!(max_message_bytes),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
             timeout: s.timeout,
@@ -1039,6 +1069,7 @@ pub(crate) fn link_params_of(
         DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
         DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
         DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
+        DHType::Rpmsg => crate::endpoint_config_rpmsg::group_kind_of(name, wire),
         other => {
             return Err(format!(
                 "{} is not a kind of link this describes",
@@ -1416,6 +1447,13 @@ pub struct DHGroupJson {
     /// How many sample sets a second it is expected to produce.
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
+    /// The service name an rpmsg channel was announced with. rpmsg payloads
+    /// only, and experimental; see [`crate::endpoint_config_rpmsg`].
+    #[serde(default)]
+    pub service: Option<Scalar>,
+    /// The greatest number of bytes one rpmsg message carries.
+    #[serde(default)]
+    pub max_message_bytes: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1582,6 +1620,13 @@ pub struct DHConfigJson {
     /// How many sample sets a second it is expected to produce.
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
+    /// The service name an rpmsg channel was announced with. rpmsg payloads
+    /// only, and experimental; see [`crate::endpoint_config_rpmsg`].
+    #[serde(default)]
+    pub service: Option<Scalar>,
+    /// The greatest number of bytes one rpmsg message carries.
+    #[serde(default)]
+    pub max_message_bytes: Option<Scalar>,
     /// Where one read of a stream ends. Stream links only.
     #[serde(default)]
     pub stream: Option<StreamJson>,
@@ -1818,7 +1863,8 @@ impl DHConfigJson {
             | DHType::I2c
             | DHType::Spi
             | DHType::Can
-            | DHType::Iio) => {
+            | DHType::Iio
+            | DHType::Rpmsg) => {
                 link_of(&self.name, kind, self, group)?
             }
         };
@@ -1836,6 +1882,22 @@ impl DHConfigJson {
                          {} frame, which carries {room} bytes",
                         self.name,
                         if can.fd { "CAN FD" } else { "classic CAN" }
+                    ));
+                }
+            }
+        }
+
+        // An rpmsg message goes in a buffer the transport fixes the size of,
+        // and rpmsg does not fragment: a payload whose packets are larger
+        // would have every write refused by the driver.
+        if let EndpointConfig::Rpmsg(rpmsg) = &endpoint {
+            let room = crate::endpoint_config_rpmsg::message_bytes(rpmsg.max_message_bytes);
+            if let Some(packet_size) = packet_size {
+                if packet_size > room as usize {
+                    return Err(format!(
+                        "payload \"{}\": packet_size {packet_size} will not fit in an \
+                         rpmsg message, which carries {room} bytes",
+                        self.name
                     ));
                 }
             }
@@ -3713,6 +3775,83 @@ payloads:
             EndpointConfig::Serial(serial) => assert_eq!(serial.rs485, None),
             other => panic!("expected a serial endpoint, got {other:?}"),
         }
+    }
+
+    /// An rpmsg payload reaches a handler with its channel and its service.
+    #[test]
+    fn an_rpmsg_payload_is_a_node_and_the_service_it_should_be() {
+        let channel = "    path: /dev/rpmsg0\n    service: payload-telemetry\n    \
+                       packet_size: 64\n";
+        let handlers = link("rpmsg", channel)
+            .expect("a channel")
+            .to_dh_configs()
+            .expect("it becomes a handler");
+
+        match &handlers[0].endpoint {
+            EndpointConfig::Rpmsg(rpmsg) => {
+                assert_eq!(rpmsg.path, "/dev/rpmsg0");
+                assert_eq!(rpmsg.service, "payload-telemetry");
+                assert_eq!(rpmsg.max_message_bytes, None, "the usual transport");
+            }
+            other => panic!("expected an rpmsg endpoint, got {other:?}"),
+        }
+        assert_eq!(handlers[0].endpoint.kind(), DHType::Rpmsg);
+
+        // The service is what identifies a channel, so a payload without one
+        // is refused: a node's number is assigned as channels appear.
+        let said = link("rpmsg", "    path: /dev/rpmsg0\n    packet_size: 8\n")
+            .expect("it parses")
+            .to_dh_configs()
+            .expect_err("a channel with no service");
+        assert!(
+            said.contains("service"),
+            "the error should name what is missing: {said}"
+        );
+    }
+
+    /// A packet no message can carry is refused where the file is read.
+    #[test]
+    fn a_packet_larger_than_an_rpmsg_message_is_refused() {
+        let said = link(
+            "rpmsg",
+            "    path: /dev/rpmsg0\n    service: payload\n    packet_size: 600\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect_err("six hundred bytes in a 496-byte message");
+        assert!(
+            said.contains("600") && said.contains("496"),
+            "the error should say the packet and the message: {said}"
+        );
+
+        // And a platform with larger buffers says so, which makes it fit.
+        let larger = link(
+            "rpmsg",
+            "    path: /dev/rpmsg0\n    service: payload\n    \
+             max_message_bytes: 2048\n    packet_size: 600\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect("room for it");
+        assert_eq!(larger[0].packet_size, 600);
+    }
+
+    /// An rpmsg payload may be triggered: the channel carries both
+    /// directions.
+    #[test]
+    fn an_rpmsg_payload_may_be_triggered() {
+        let asked = link(
+            "rpmsg",
+            "    path: /dev/rpmsg0\n    service: payload\n    packet_size: 8\n    \
+             mode: triggered\n    trigger: \"READ\"\n    packet_interval_ms: 100\n",
+        )
+        .expect("it parses")
+        .to_dh_configs()
+        .expect("a channel may be asked");
+        assert!(
+            asked[0].mode.polling().is_some(),
+            "an rpmsg payload that answers requests"
+        );
     }
 
     /// An IIO payload reaches a handler with what its buffer is expected to

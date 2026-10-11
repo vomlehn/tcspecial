@@ -27,6 +27,7 @@ use crate::endpoint_can::CanEndpoint;
 use crate::endpoint_device::DeviceEndpoint;
 use crate::endpoint_i2c::I2cEndpoint;
 use crate::endpoint_iio::IioEndpoint;
+use crate::endpoint_rpmsg::RpmsgEndpoint;
 use crate::endpoint_serial::SerialEndpoint;
 use crate::endpoint_spi::SpiEndpoint;
 use crate::endpoint_tcp::TcpEndpoint;
@@ -187,6 +188,13 @@ pub fn bind_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // A channel to another core: a character device carrying whole
+        // messages both ways. See endpoint_rpmsg.
+        EndpointConfig::Rpmsg(rpmsg_config) => {
+            let reader = RpmsgEndpoint::new(what, rpmsg_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
     }
 }
 
@@ -279,6 +287,13 @@ pub fn connect_endpoint_pair(
         // with has nothing to write. See endpoint_iio.
         EndpointConfig::Iio(iio_config) => {
             let reader = IioEndpoint::new(what, iio_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        // A channel to another core: a character device carrying whole
+        // messages both ways. See endpoint_rpmsg.
+        EndpointConfig::Rpmsg(rpmsg_config) => {
+            let reader = RpmsgEndpoint::new(what, rpmsg_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }

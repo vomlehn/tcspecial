@@ -2038,6 +2038,62 @@ be, settled before there is equipment to try it against. They may change,
 where the five supported kinds -- ``network``, ``device``, ``serial``, ``i2c``
 and ``spi`` -- will not.
 
+rpmsg Payloads: Another Core
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Experimental, not yet supported.**
+
+A flight computer is commonly one package with cores of more than one kind in
+it, and the payload is then software on another core rather than anything on a
+wire. Linux talks to it over rpmsg: the remote announces a named channel,
+Linux makes a character device for it, and the two ends exchange whole
+messages through that device.
+
+The rules are in ``tcslibgs::endpoint_config_rpmsg``, the endpoint in
+``tcspecial::endpoint_rpmsg`` and the stand-in in ``tcssim::payload_rpmsg``.
+
+Requirement
+    An rpmsg payload states a ``path`` and a ``service``, and the service is
+    required. A node's number is not an identity: it is assigned as channels
+    announce themselves, so the node a file names can be another core's
+    channel after a change in boot order -- the hazard an I2C stub adapter
+    has with its bus number.
+
+Requirement
+    The handler holds the node it opened against that service, where the
+    kernel will say. ``/sys/class/rpmsg/<node>/name`` is the name the remote
+    announced; a node that is not the channel the file asked for is refused
+    rather than exchanged with, because the alternative is a handler trading
+    telemetry with the wrong software.
+
+Requirement
+    Where the kernel publishes no name, nothing is refused. A stand-in has no
+    ``sysfs`` entry and no node number to move, and the check exists to catch
+    a number that moved.
+
+Requirement
+    A ``packet_size`` larger than one message is refused where the file is
+    read. rpmsg messages go in buffers whose size the transport fixes -- 496
+    bytes after the header on the usual virtio transport -- and rpmsg does not
+    fragment, so the remote would receive the first part of a packet with no
+    way of knowing the rest was coming. A platform with other buffers states
+    ``max_message_bytes``.
+
+Requirement
+    An rpmsg payload has no stream section: a read hands over one whole
+    message and never part of one.
+
+Requirement
+    An rpmsg payload may be triggered. The channel carries both directions, so
+    the handler writes a request and the remote answers -- which is what an
+    IIO payload cannot do and a CAN payload can.
+
+Requirement
+    The stand-in is a pseudo-terminal, which carries the bytes both ways and
+    keeps no message boundaries. A payload that writes faster than the handler
+    reads will therefore have two messages arrive as one read, where the real
+    driver would hand over one per read; said here because it is the one way
+    the stand-in differs from the thing.
+
 IIO Payloads: a Sensor's Buffer
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 **Experimental, not yet supported.**

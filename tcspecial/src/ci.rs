@@ -487,6 +487,9 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
                 None => "synchronous".to_string(),
             }
         ),
+        EndpointConfig::Rpmsg(rpmsg) => {
+            format!("rpmsg {} ({})", rpmsg.path, rpmsg.service)
+        }
         EndpointConfig::Iio(iio) => format!(
             "iio {}{}",
             iio.path,

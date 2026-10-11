@@ -118,6 +118,9 @@ pub enum PayloadProtocol {
     /// -- the samples but not the sysfs around them: see
     /// [`crate::payload_iio`]. Experimental.
     Iio,
+    /// An rpmsg channel to another core, which the simulator stands in for
+    /// with a pty: see [`crate::payload_rpmsg`]. Experimental.
+    Rpmsg,
 }
 
 /// Statistics for a payload
@@ -218,6 +221,9 @@ impl SimulatedPayload {
                 }
                 PayloadProtocol::Iio => {
                     crate::payload_iio::run_iio_payload(config, running, stats)
+                }
+                PayloadProtocol::Rpmsg => {
+                    crate::payload_rpmsg::run_rpmsg_payload(config, running, stats)
                 }
                 PayloadProtocol::UnixStream => {
                     crate::payload_unix::run_unix_stream_payload(config, running, stats)

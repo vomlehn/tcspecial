@@ -207,7 +207,7 @@ impl Sizes {
     fn for_tests() -> Self {
         Self {
             panel_width: 255.0,
-            panel_height: 162.0,
+            panel_height: 165.0,
             grid_spacing: 10.0,
             chrome_width: 36.0,
             chrome_height: 369.0,

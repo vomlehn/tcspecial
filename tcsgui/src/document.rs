@@ -38,6 +38,15 @@ pub struct Node {
     pub attributes: BTreeMap<String, String>,
     /// Where on the canvas. Nothing to do with the configuration.
     pub at: (i32, i32),
+    /// What somebody wrote about this node.
+    ///
+    /// Kept with the node and written out with it. A configuration is read by
+    /// people under pressure, and why a sensor is at address 0x49 is not
+    /// deducible from the fact that it is -- so there has to be somewhere to
+    /// say it, and that somewhere has to survive the editor rewriting the
+    /// file, which it does after every edit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 }
 
 /// The whole of what is being edited.
@@ -136,6 +145,7 @@ impl Document {
                     node_type: node_type.clone(),
                     attributes: BTreeMap::new(),
                     at: (0, 0),
+                    comment: None,
                 });
             }
             Edit::RemoveNode { name, .. } => {
@@ -156,9 +166,10 @@ impl Document {
                     node_type: node_type.clone(),
                     attributes: attributes.iter().cloned().collect(),
                     at: (0, 0),
+                    comment: None,
                 });
                 for link in links {
-                    if !self.links.contains(link) {
+                    if !self.links.iter().any(|l| l.same_connection(link)) {
                         self.links.push(link.clone());
                     }
                 }
@@ -197,16 +208,31 @@ impl Document {
                 }
             }
             Edit::AddLink { link } => {
-                if !self.links.contains(link) {
+                // By connection and not by equality: adding a link that is
+                // already there with a comment on it must not make a second,
+                // commentless copy of the same connection.
+                if !self.links.iter().any(|l| l.same_connection(link)) {
                     self.links.push(link.clone());
                 }
             }
             Edit::RemoveLink { link } => {
-                self.links.retain(|l| l != link);
+                self.links.retain(|l| !l.same_connection(link));
             }
             Edit::MoveNode { node, now, .. } => {
                 if let Some(node) = self.node_mut(node) {
                     node.at = *now;
+                }
+            }
+            Edit::SetNodeComment { node, now, .. } => {
+                if let Some(node) = self.node_mut(node) {
+                    node.comment = now.clone();
+                }
+            }
+            Edit::SetLinkComment { link, now, .. } => {
+                if let Some(existing) =
+                    self.links.iter_mut().find(|l| l.same_connection(link))
+                {
+                    existing.comment = now.clone();
                 }
             }
         }
@@ -281,6 +307,93 @@ impl Document {
         faults
     }
 
+    /// The document as a configuration file, in the format `path` asks for.
+    ///
+    /// The extension decides, which is the rule every configuration file in
+    /// this project follows: `.xml` is XML, `.yaml` and `.yml` are YAML, and
+    /// anything else is refused rather than guessed at. A guess is how a
+    /// misspelled extension becomes a file parsed as the wrong language.
+    pub fn to_text(&self, path: &std::path::Path) -> Result<String, String> {
+        match path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase())
+            .as_deref()
+        {
+            Some("yaml") | Some("yml") => Ok(self.to_yaml()),
+            Some("xml") => Ok(self.to_xml()),
+            Some(other) => Err(format!(
+                "{}: \".{other}\" is not a configuration file -- a name ending \
+                 in .yaml, .yml or .xml says how to read it",
+                path.display()
+            )),
+            None => Err(format!(
+                "{}: a configuration file's name says how to read it, and this \
+                 one has no .yaml, .yml or .xml on it",
+                path.display()
+            )),
+        }
+    }
+
+    /// The document as XML.
+    ///
+    /// The same conventions the shipped XML sets use: every value is a child
+    /// element and never an attribute, and a sequence is repeated sibling
+    /// elements named for the field. A comment is an XML comment above the
+    /// element it belongs to, which is where it is in the YAML as well.
+    pub fn to_xml(&self) -> String {
+        let mut out = String::new();
+        out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        out.push_str("<configuration>\n    <version>2.0</version>\n");
+
+        for node in &self.nodes {
+            if let Some(comment) = &node.comment {
+                for line in comment.lines() {
+                    out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+                }
+            }
+            out.push_str("    <nodes>\n");
+            out.push_str(&format!("        <name>{}</name>\n", escape(&node.name)));
+            out.push_str(&format!(
+                "        <type>{}</type>\n",
+                escape(&node.node_type)
+            ));
+            for (attribute, value) in &node.attributes {
+                out.push_str(&format!(
+                    "        <{attribute}>{}</{attribute}>\n",
+                    escape(value)
+                ));
+            }
+            out.push_str(&format!(
+                "        <editor><at>{},{}</at></editor>\n",
+                node.at.0, node.at.1
+            ));
+            out.push_str("    </nodes>\n");
+        }
+
+        for link in &self.links {
+            if let Some(comment) = &link.comment {
+                for line in comment.lines() {
+                    out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+                }
+            }
+            out.push_str("    <links>\n");
+            out.push_str(&format!("        <from>{}</from>\n", escape(&link.from)));
+            match &link.input {
+                Some(input) => out.push_str(&format!(
+                    "        <to>{}.{}</to>\n",
+                    escape(&link.to),
+                    escape(input)
+                )),
+                None => out.push_str(&format!("        <to>{}</to>\n", escape(&link.to))),
+            }
+            out.push_str("    </links>\n");
+        }
+
+        out.push_str("</configuration>\n");
+        out
+    }
+
     /// The document as a configuration file.
     ///
     /// Written in the shape `design.rst` specifies: a `nodes` list where each
@@ -291,6 +404,14 @@ impl Document {
         let mut out = String::new();
         out.push_str("version: \"2.0\"\n\nnodes:\n");
         for node in &self.nodes {
+            // Above the entry it belongs to, as a comment and not as a field:
+            // this is what a person hand-editing the file expects to find, and
+            // it is what they would have written themselves.
+            if let Some(comment) = &node.comment {
+                for line in comment.lines() {
+                    out.push_str(&format!("  # {line}\n"));
+                }
+            }
             out.push_str(&format!(
                 "  - name: {}\n    type: {}\n",
                 node.name, node.node_type
@@ -306,6 +427,11 @@ impl Document {
 
         out.push_str("\nlinks:\n");
         for link in &self.links {
+            if let Some(comment) = &link.comment {
+                for line in comment.lines() {
+                    out.push_str(&format!("  # {line}\n"));
+                }
+            }
             match &link.input {
                 Some(input) => out.push_str(&format!(
                     "  - {{ from: {}, to: {}.{} }}\n",
@@ -319,6 +445,159 @@ impl Document {
         }
         out
     }
+}
+
+/// XML's five, so that a comment or a value containing one of them is still
+/// the document it was.
+///
+/// A name with an ampersand in it is unlikely and a comment with one is not:
+/// "sampled at 1Hz & logged" is the sort of thing somebody writes, and an
+/// unescaped ampersand makes the file unreadable rather than merely wrong.
+fn escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+/// The worked example from `design.rst`: a cabin thermostat.
+///
+/// Built here rather than written out by hand in two formats, so that the
+/// shipped `tests/manual/thermostat.yaml` and `.xml` are what this editor
+/// writes and not an approximation of it. `the_shipped_example_is_what_the_editor_writes`
+/// is what keeps the files and this agreeing.
+#[cfg(test)]
+pub fn thermostat_example() -> Document {
+    let mut document = Document::new();
+
+    let place = |document: &mut Document, name: &str, node_type: &str, at: (i32, i32)| {
+        document.apply(&Edit::AddNode {
+            name: name.to_string(),
+            node_type: node_type.to_string(),
+        });
+        document.apply(&Edit::MoveNode {
+            node: name.to_string(),
+            was: (0, 0),
+            now: at,
+        });
+    };
+    let set = |document: &mut Document, node: &str, attribute: &str, value: &str| {
+        document.apply(&Edit::SetAttribute {
+            node: node.to_string(),
+            attribute: attribute.to_string(),
+            was: None,
+            now: Some(value.to_string()),
+        });
+    };
+    let note = |document: &mut Document, node: &str, comment: &str| {
+        document.apply(&Edit::SetNodeComment {
+            node: node.to_string(),
+            was: None,
+            now: Some(comment.to_string()),
+        });
+    };
+
+    place(&mut document, "temp_fore", "i2c", (40, 40));
+    set(&mut document, "temp_fore", "path", "/dev/i2c-1");
+    set(&mut document, "temp_fore", "address", "0x48");
+    set(&mut document, "temp_fore", "group", "cabin_temps");
+    set(&mut document, "temp_fore", "read_size", "2");
+    note(
+        &mut document,
+        "temp_fore",
+        "Forward bulkhead. Two bytes, signed, big endian.",
+    );
+
+    place(&mut document, "temp_aft", "i2c", (40, 160));
+    set(&mut document, "temp_aft", "path", "/dev/i2c-1");
+    set(&mut document, "temp_aft", "address", "0x49");
+    set(&mut document, "temp_aft", "group", "cabin_temps");
+    set(&mut document, "temp_aft", "read_size", "2");
+    note(&mut document, "temp_aft", "Aft bulkhead; same part as temp_fore.");
+
+    place(&mut document, "temp_bay", "spi", (40, 280));
+    set(&mut document, "temp_bay", "path", "/dev/spidev0.0");
+    set(&mut document, "temp_bay", "max_speed", "1000000");
+    set(&mut document, "temp_bay", "spi_mode", "0");
+    set(&mut document, "temp_bay", "group", "cabin_temps");
+    set(&mut document, "temp_bay", "read_size", "3");
+    note(
+        &mut document,
+        "temp_bay",
+        "Equipment bay. Three bytes, unsigned -- a different part, hence its\nown conversion.",
+    );
+
+    for (name, at, format, scale, offset) in [
+        ("k_fore", (240, 40), "i16_be", "0.0625", "273.15"),
+        ("k_aft", (240, 160), "i16_be", "0.0625", "273.15"),
+        ("k_bay", (240, 280), "u24_be", "0.0078", "255.37"),
+    ] {
+        place(&mut document, name, "compute", at);
+        set(&mut document, name, "function", "to_kelvin");
+        set(&mut document, name, "format", format);
+        set(&mut document, name, "scale", scale);
+        set(&mut document, name, "offset", offset);
+    }
+
+    place(&mut document, "mean_temp", "compute", (460, 160));
+    set(&mut document, "mean_temp", "function", "mean");
+    set(&mut document, "mean_temp", "inputs", "in0,in1,in2");
+
+    place(&mut document, "thermostat", "compute", (660, 240));
+    set(&mut document, "thermostat", "function", "hysteresis");
+    set(&mut document, "thermostat", "setpoint", "293.15");
+    set(&mut document, "thermostat", "above", "2.0");
+    set(&mut document, "thermostat", "below", "2.0");
+    note(
+        &mut document,
+        "thermostat",
+        "setpoint is set from the ground; above and below are the two degrees\neither side that the heaters are switched at.",
+    );
+
+    place(&mut document, "moc", "moc", (660, 40));
+    set(&mut document, "moc", "address", "10.0.0.1");
+    set(&mut document, "moc", "port", "5000");
+
+    place(&mut document, "heaters", "gpio", (860, 240));
+    set(&mut document, "heaters", "path", "/dev/gpiochip0");
+    set(&mut document, "heaters", "direction", "output");
+    set(&mut document, "heaters", "lines", "3,4,5");
+    note(&mut document, "heaters", "Three circuits, driven together.");
+
+    place(&mut document, "housekeeping", "log", (460, 380));
+    set(&mut document, "housekeeping", "directory", "/var/log/tcspecial");
+    set(&mut document, "housekeeping", "format", "variable_ts_rc");
+
+    let link = |document: &mut Document, from: &str, to: &str, input: Option<&str>| {
+        document.apply(&Edit::AddLink {
+            link: Link::new(from, to, input),
+        });
+    };
+
+    link(&mut document, "temp_fore", "k_fore", None);
+    link(&mut document, "temp_aft", "k_aft", None);
+    link(&mut document, "temp_bay", "k_bay", None);
+
+    // The "T": each converted reading goes to the ground, into the mean, and
+    // into the log.
+    for (from, input) in [("k_fore", "in0"), ("k_aft", "in1"), ("k_bay", "in2")] {
+        link(&mut document, from, "moc", None);
+        link(&mut document, from, "mean_temp", Some(input));
+        link(&mut document, from, "housekeeping", None);
+    }
+
+    link(&mut document, "mean_temp", "moc", None);
+    link(&mut document, "mean_temp", "thermostat", None);
+    link(&mut document, "thermostat", "heaters", None);
+    link(&mut document, "thermostat", "housekeeping", None);
+    document.apply(&Edit::SetLinkComment {
+        link: Link::new("thermostat", "heaters", None),
+        was: None,
+        now: Some("asserted below the setpoint, unasserted above it".to_string()),
+    });
+
+    document
 }
 
 #[cfg(test)]
@@ -349,11 +628,7 @@ mod tests {
                 now: Some("0x48".into()),
             },
             Edit::AddLink {
-                link: Link {
-                    from: "temp_fore".into(),
-                    to: "k_fore".into(),
-                    input: None,
-                },
+                link: Link::new("temp_fore", "k_fore", None),
             },
             Edit::MoveNode {
                 node: "k_fore".into(),
@@ -396,11 +671,7 @@ mod tests {
             now: Some("0x48".into()),
         });
         document.apply(&Edit::AddLink {
-            link: Link {
-                from: "a".into(),
-                to: "b".into(),
-                input: Some("in0".into()),
-            },
+            link: Link::new("a", "b", Some("in0")),
         });
 
         let edits = [
@@ -427,11 +698,7 @@ mod tests {
                 now: (10, 10),
             },
             Edit::RemoveLink {
-                link: Link {
-                    from: "a".into(),
-                    to: "b".into(),
-                    input: Some("in0".into()),
-                },
+                link: Link::new("a", "b", Some("in0")),
             },
         ];
 
@@ -454,11 +721,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&add("a", "i2c"));
         document.apply(&add("b", "compute"));
-        let link = Link {
-            from: "a".into(),
-            to: "b".into(),
-            input: None,
-        };
+        let link = Link::new("a", "b", None);
         document.apply(&Edit::AddLink { link: link.clone() });
 
         // As the window would build it: the removal carries what is being
@@ -487,11 +750,7 @@ mod tests {
         document.apply(&add("a", "i2c"));
         document.apply(&add("b", "compute"));
         document.apply(&Edit::AddLink {
-            link: Link {
-                from: "a".into(),
-                to: "b".into(),
-                input: Some("in0".into()),
-            },
+            link: Link::new("a", "b", Some("in0")),
         });
 
         document.apply(&Edit::RenameNode {
@@ -524,11 +783,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&add("a", "i2c"));
         document.apply(&Edit::AddLink {
-            link: Link {
-                from: "a".into(),
-                to: "nowhere".into(),
-                input: None,
-            },
+            link: Link::new("a", "nowhere", None),
         });
         assert!(
             document.faults().iter().any(|f| matches!(f, Fault::DanglingLink { .. })),
@@ -551,11 +806,7 @@ mod tests {
         document.apply(&add("m", "compute"));
         for from in ["a", "b"] {
             document.apply(&Edit::AddLink {
-                link: Link {
-                    from: from.into(),
-                    to: "m".into(),
-                    input: Some("in0".into()),
-                },
+                link: Link::new(from, "m", Some("in0")),
             });
         }
         assert!(
@@ -566,6 +817,365 @@ mod tests {
             "{:?}",
             document.faults()
         );
+    }
+
+    /// Every kind of edit undoes itself, and the list cannot go stale.
+    ///
+    /// The `match` is the point of this test as much as the assertions are: it
+    /// has an arm per variant and no wildcard, so a variant added later stops
+    /// the build here until somebody puts it in `every_variant` below. A test
+    /// that enumerated the variants in a list would simply go quiet instead.
+    #[test]
+    fn every_kind_of_edit_undoes_itself() {
+        fn exhaustive(edit: &Edit) {
+            match edit {
+                Edit::AddNode { .. } => (),
+                Edit::RemoveNode { .. } => (),
+                Edit::RestoreNode { .. } => (),
+                Edit::SetAttribute { .. } => (),
+                Edit::RenameNode { .. } => (),
+                Edit::AddLink { .. } => (),
+                Edit::RemoveLink { .. } => (),
+                Edit::SetNodeComment { .. } => (),
+                Edit::SetLinkComment { .. } => (),
+                Edit::MoveNode { .. } => (),
+            }
+        }
+
+        // A document with something in it to edit, so that every variant has
+        // a target: an edit applied to nothing is an edit that trivially
+        // round-trips and proves nothing.
+        let furnished = || {
+            let mut document = Document::new();
+            document.apply(&add("a", "i2c"));
+            document.apply(&add("b", "compute"));
+            document.apply(&Edit::SetAttribute {
+                node: "a".into(),
+                attribute: "address".into(),
+                was: None,
+                now: Some("0x48".into()),
+            });
+            document.apply(&Edit::AddLink {
+                link: Link::new("a", "b", Some("in0")),
+            });
+            document.apply(&Edit::SetNodeComment {
+                node: "a".into(),
+                was: None,
+                now: Some("the fore sensor".into()),
+            });
+            document
+        };
+
+        let every_variant = vec![
+            add("c", "spi"),
+            Edit::RemoveNode {
+                name: "b".into(),
+                node_type: "compute".into(),
+                attributes: Vec::new(),
+                links: vec![Link::new("a", "b", Some("in0"))],
+            },
+            Edit::RestoreNode {
+                name: "d".into(),
+                node_type: "log".into(),
+                attributes: vec![("format".into(), "variable_ts_rc".into())],
+                links: Vec::new(),
+            },
+            Edit::SetAttribute {
+                node: "a".into(),
+                attribute: "address".into(),
+                was: Some("0x48".into()),
+                now: Some("0x49".into()),
+            },
+            Edit::RenameNode {
+                was: "a".into(),
+                now: "temp_fore".into(),
+            },
+            Edit::AddLink {
+                link: Link::new("b", "a", None),
+            },
+            Edit::RemoveLink {
+                link: Link::new("a", "b", Some("in0")),
+            },
+            Edit::SetNodeComment {
+                node: "a".into(),
+                was: Some("the fore sensor".into()),
+                now: Some("the fore sensor, 0x49 after the rework".into()),
+            },
+            Edit::SetLinkComment {
+                link: Link::new("a", "b", Some("in0")),
+                was: None,
+                now: Some("raw counts, not kelvin".into()),
+            },
+            Edit::MoveNode {
+                node: "a".into(),
+                was: (0, 0),
+                now: (120, 80),
+            },
+        ];
+
+        for edit in &every_variant {
+            exhaustive(edit);
+
+            let mut document = furnished();
+            let before = document.clone();
+            document.apply(edit);
+            document.apply(&edit.inverse());
+            assert_eq!(
+                document,
+                before,
+                "{} did not undo cleanly",
+                edit.describe()
+            );
+
+            // And an undo followed by a redo lands where the edit did, which
+            // is the other half of what undo has to mean.
+            let mut document = furnished();
+            document.apply(edit);
+            let after_edit = document.clone();
+            document.apply(&edit.inverse());
+            document.apply(edit);
+            assert_eq!(
+                document,
+                after_edit,
+                "{} did not redo cleanly",
+                edit.describe()
+            );
+        }
+    }
+
+    /// A comment survives being written, and belongs to its own object.
+    #[test]
+    fn comments_are_kept_on_nodes_and_on_links() {
+        let mut document = Document::new();
+        document.apply(&add("temp_fore", "i2c"));
+        document.apply(&add("k_fore", "compute"));
+        document.apply(&Edit::AddLink {
+            link: Link::new("temp_fore", "k_fore", None),
+        });
+        document.apply(&Edit::SetNodeComment {
+            node: "temp_fore".into(),
+            was: None,
+            now: Some("0x49 after the rework; see ECR-114".into()),
+        });
+        document.apply(&Edit::SetLinkComment {
+            link: Link::new("temp_fore", "k_fore", None),
+            was: None,
+            now: Some("raw counts, not kelvin".into()),
+        });
+
+        let yaml = document.to_yaml();
+        assert!(
+            yaml.contains("# 0x49 after the rework; see ECR-114"),
+            "the node's comment is not in the file: {yaml}"
+        );
+        assert!(
+            yaml.contains("# raw counts, not kelvin"),
+            "the link's comment is not in the file: {yaml}"
+        );
+
+        let xml = document.to_xml();
+        assert!(xml.contains("<!-- 0x49 after the rework; see ECR-114 -->"), "{xml}");
+        assert!(xml.contains("<!-- raw counts, not kelvin -->"), "{xml}");
+    }
+
+    /// A comment on a link is not part of which link it is.
+    ///
+    /// The trap this guards: if a comment were part of a link's identity, then
+    /// commenting on a link and then removing it would leave the original
+    /// uncommented link behind, and the diagram would show two.
+    #[test]
+    fn commenting_on_a_link_does_not_make_a_second_one() {
+        let mut document = Document::new();
+        document.apply(&add("a", "i2c"));
+        document.apply(&add("b", "compute"));
+        document.apply(&Edit::AddLink {
+            link: Link::new("a", "b", None),
+        });
+        document.apply(&Edit::SetLinkComment {
+            link: Link::new("a", "b", None),
+            was: None,
+            now: Some("why this goes here".into()),
+        });
+        assert_eq!(document.links.len(), 1);
+
+        // Adding it again, as a drag that ended where it started might,
+        // leaves the comment alone rather than replacing the link with a bare
+        // one.
+        document.apply(&Edit::AddLink {
+            link: Link::new("a", "b", None),
+        });
+        assert_eq!(document.links.len(), 1);
+        assert_eq!(
+            document.links[0].comment.as_deref(),
+            Some("why this goes here"),
+            "adding an existing link dropped what was written about it"
+        );
+
+        // And removing it needs no comment to match.
+        document.apply(&Edit::RemoveLink {
+            link: Link::new("a", "b", None),
+        });
+        assert!(document.links.is_empty());
+    }
+
+    /// A multi-line comment stays several lines, in both formats.
+    #[test]
+    fn a_comment_of_several_lines_is_written_as_several() {
+        let mut document = Document::new();
+        document.apply(&add("a", "i2c"));
+        document.apply(&Edit::SetNodeComment {
+            node: "a".into(),
+            was: None,
+            now: Some("two things:\nthe second one".into()),
+        });
+
+        let yaml = document.to_yaml();
+        assert!(yaml.contains("  # two things:"), "{yaml}");
+        assert!(yaml.contains("  # the second one"), "{yaml}");
+    }
+
+    /// The format follows the file's name.
+    #[test]
+    fn the_extension_decides_the_format() {
+        use std::path::Path;
+
+        let mut document = Document::new();
+        document.apply(&add("a", "i2c"));
+
+        let yaml = document.to_text(Path::new("graph.yaml")).expect("yaml");
+        assert!(yaml.starts_with("version:"), "{yaml}");
+        assert_eq!(
+            document.to_text(Path::new("graph.yml")).expect("yml"),
+            yaml,
+            "the two YAML extensions wrote different files"
+        );
+
+        let xml = document.to_text(Path::new("graph.xml")).expect("xml");
+        assert!(xml.starts_with("<?xml"), "{xml}");
+
+        // And anything else is refused rather than guessed at.
+        let said = document
+            .to_text(Path::new("graph.json"))
+            .expect_err("an unknown extension should be refused");
+        assert!(said.contains(".yaml"), "{said}");
+        let said = document
+            .to_text(Path::new("graph"))
+            .expect_err("no extension should be refused");
+        assert!(said.contains("no .yaml"), "{said}");
+    }
+
+    /// The five characters XML cannot carry raw.
+    #[test]
+    fn a_comment_with_markup_in_it_is_still_a_comment() {
+        let mut document = Document::new();
+        document.apply(&add("a", "i2c"));
+        document.apply(&Edit::SetNodeComment {
+            node: "a".into(),
+            was: None,
+            now: Some("sampled at 1Hz & logged <always>".into()),
+        });
+
+        let xml = document.to_xml();
+        assert!(xml.contains("&amp;"), "an ampersand went in raw: {xml}");
+        assert!(xml.contains("&lt;always&gt;"), "{xml}");
+    }
+
+    /// The shipped example is what this editor writes.
+    ///
+    /// Two files, the same configuration in each, as every example in this
+    /// repository is kept. Compared rather than described, so an example
+    /// cannot quietly stop being what the program produces -- which is the
+    /// failure that makes an example worse than none.
+    ///
+    /// Set TCSGUI_WRITE_EXAMPLE to regenerate them after a deliberate change
+    /// to the format.
+    #[test]
+    fn the_shipped_example_is_what_the_editor_writes() {
+        use std::path::Path;
+
+        let document = thermostat_example();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+
+        for (name, written) in [
+            ("tests/manual/thermostat.yaml", document.to_yaml()),
+            ("tests/manual/thermostat.xml", document.to_xml()),
+        ] {
+            let path = root.join(name);
+
+            if std::env::var("TCSGUI_WRITE_EXAMPLE").is_ok() {
+                std::fs::write(&path, &written).expect("the example is writable");
+                continue;
+            }
+
+            let shipped = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+                panic!(
+                    "{}: {e}. Run the tests with TCSGUI_WRITE_EXAMPLE=1 to \
+                     write the examples out",
+                    path.display()
+                )
+            });
+            assert_eq!(
+                shipped,
+                written,
+                "{} is not what the editor writes any more",
+                path.display()
+            );
+        }
+    }
+
+    /// The two shipped formats describe the same configuration.
+    ///
+    /// Not a comparison of the text, which differs, but of what each says:
+    /// the same nodes with the same attributes and the same links. The YAML
+    /// and the XML of an example drifting apart is the thing this catches.
+    #[test]
+    fn the_two_shipped_formats_say_the_same_thing() {
+        let document = thermostat_example();
+        let yaml = document.to_yaml();
+        let xml = document.to_xml();
+
+        for node in &document.nodes {
+            assert!(yaml.contains(&format!("name: {}", node.name)), "{}", node.name);
+            assert!(
+                xml.contains(&format!("<name>{}</name>", node.name)),
+                "{} is missing from the XML",
+                node.name
+            );
+            for (attribute, value) in &node.attributes {
+                assert!(
+                    yaml.contains(&format!("{attribute}: {value}")),
+                    "{}.{attribute} is missing from the YAML",
+                    node.name
+                );
+                assert!(
+                    xml.contains(&format!("<{attribute}>{value}</{attribute}>")),
+                    "{}.{attribute} is missing from the XML",
+                    node.name
+                );
+            }
+            if let Some(comment) = &node.comment {
+                let first = comment.lines().next().unwrap();
+                assert!(yaml.contains(first), "a comment is missing from the YAML");
+                assert!(xml.contains(first), "a comment is missing from the XML");
+            }
+        }
+
+        for link in &document.links {
+            let to = match &link.input {
+                Some(input) => format!("{}.{}", link.to, input),
+                None => link.to.clone(),
+            };
+            assert!(
+                yaml.contains(&format!("from: {}, to: {to}", link.from)),
+                "{} to {to} is missing from the YAML",
+                link.from
+            );
+            assert!(
+                xml.contains(&format!("<to>{to}</to>")),
+                "{} to {to} is missing from the XML",
+                link.from
+            );
+        }
     }
 
     /// Every fault can be shown to a person, and most point at a node.
@@ -606,11 +1216,7 @@ mod tests {
         });
         document.apply(&add("mean_temp", "compute"));
         document.apply(&Edit::AddLink {
-            link: Link {
-                from: "temp_fore".into(),
-                to: "mean_temp".into(),
-                input: Some("in0".into()),
-            },
+            link: Link::new("temp_fore", "mean_temp", Some("in0")),
         });
 
         let yaml = document.to_yaml();

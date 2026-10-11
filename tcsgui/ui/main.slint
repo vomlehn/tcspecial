@@ -28,11 +28,19 @@ export struct NodeView {
     // solid | hatched | open | double
     shading: string,
     border: length,
+    // How the label is set: the fifth channel that is not colour. A face, a
+    // size, a weight and an italic, chosen per type in style.rs.
+    face: string,
+    label-size: length,
+    label-weight: int,
+    label-italic: bool,
     tint: color,
     // Something is wrong with this node. The one thing drawn in red.
     faulty: bool,
     fault: string,
     selected: bool,
+    // What somebody wrote about this node, shown under it.
+    comment: string,
 }
 
 export struct LinkView {
@@ -47,6 +55,8 @@ export struct LinkView {
     // read without tracing every line to its end.
     wide: bool,
     label: string,
+    // What somebody wrote about this connection.
+    comment: string,
 }
 
 // Diagonal hatching, drawn with narrow lines inside whatever shape asks for
@@ -83,6 +93,12 @@ component Hatching inherits Rectangle {
 // is an interface that is driven rather than read.
 component NodeShape inherits Rectangle {
     in property <NodeView> node;
+    // Whether this one can be dragged. False in the palette, where a press
+    // places a node rather than moving this one.
+    in property <bool> draggable: false;
+    // Told once, when the gesture finishes: one edit for one drag, so undo
+    // takes a node back to where it started rather than one pixel back.
+    callback dragged(length, length);
 
     // The error colour, and the only place in this file it appears.
     //
@@ -93,8 +109,18 @@ component NodeShape inherits Rectangle {
 
     property <color> ink: node.faulty ? error-ink : node.tint;
 
-    x: node.x;
-    y: node.y;
+    // While a drag is running the node follows the pointer by this much, and
+    // the document still says where it was: nothing is recorded until the
+    // gesture ends.
+    property <length> drag-x: draggable && grip.pressed
+        ? grip.mouse-x - grip.pressed-x
+        : 0px;
+    property <length> drag-y: draggable && grip.pressed
+        ? grip.mouse-y - grip.pressed-y
+        : 0px;
+
+    x: node.x + drag-x;
+    y: node.y + drag-y;
     width: node.width;
     height: node.height;
     background: transparent;
@@ -169,14 +195,29 @@ component NodeShape inherits Rectangle {
 
         Text {
             text: node.name;
-            font-size: 12px;
-            font-weight: 700;
+            font-family: node.face == "mono" ? "monospace" : "";
+            font-size: node.label-size;
+            font-weight: node.label-weight;
+            font-italic: node.label-italic;
             horizontal-alignment: center;
             overflow: elide;
         }
         Text {
             text: node.node-type;
+            font-family: node.face == "mono" ? "monospace" : "";
             font-size: 9px;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+        // What somebody wrote about this node. Shown rather than hidden behind
+        // a hover: a note explaining why a sensor is at an odd address is
+        // worth reading before the address is changed, and a note nobody
+        // finds is a note nobody wrote.
+        if node.comment != "": Text {
+            text: node.comment;
+            font-size: 9px;
+            font-italic: true;
+            color: #555555;
             horizontal-alignment: center;
             overflow: elide;
         }
@@ -189,6 +230,23 @@ component NodeShape inherits Rectangle {
             font-italic: true;
             horizontal-alignment: center;
             wrap: word-wrap;
+        }
+    }
+
+    // The area a drag is taken from, over the whole node so that a press
+    // anywhere on it moves it.
+    //
+    // Last so it is above the shape and the label; a TouchArea under them
+    // would be a node that can only be dragged by its edges.
+    grip := TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: draggable;
+        mouse-cursor: draggable ? MouseCursor.grab : MouseCursor.default;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.up) {
+                dragged(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+            }
         }
     }
 
@@ -260,6 +318,15 @@ component LinkLine inherits Rectangle {
         font-size: 9px;
         color: ink;
     }
+    // And what somebody wrote about the connection, under the line.
+    if link.comment != "": Text {
+        x: (link.x1 + link.x2) / 2;
+        y: (link.y1 + link.y2) / 2 + 4px;
+        text: link.comment;
+        font-size: 9px;
+        font-italic: true;
+        color: #555555;
+    }
 }
 
 export component MainWindow inherits Window {
@@ -291,6 +358,8 @@ export component MainWindow inherits Window {
     // Press a type in the palette to put one on the canvas. The name is the
     // type's spelling, which is what Rust turns into a node.
     callback place-node(string);
+    // A node was dragged to a new place: its name, and how far it went.
+    callback node-moved(string, length, length);
 
     VerticalLayout {
         padding: 8px;
@@ -386,6 +455,8 @@ export component MainWindow inherits Window {
                 }
                 for n in nodes: NodeShape {
                     node: n;
+                    draggable: true;
+                    dragged(dx, dy) => { node-moved(n.name, dx, dy); }
                 }
             }
         }

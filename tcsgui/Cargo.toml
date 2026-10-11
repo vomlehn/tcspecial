@@ -1,0 +1,24 @@
+[package]
+name = "tcsgui"
+version = "0.1.0"
+edition = "2021"
+description = "TCSpecial graphical configuration editor"
+build = "build.rs"
+
+[dependencies]
+tcslibgs = { path = "../tcslibgs" }
+slint = "1.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+libc = "0.2"
+
+[dev-dependencies]
+# Lays the window out headlessly, so a test can measure it rather than a
+# person looking at it. The same backend tcsmoc and tcssim are tested through.
+i-slint-backend-testing = "1.18"
+# Directories a test can fill and have cleaned up after it, which is what the
+# saving tests need: they write real files and then go looking at them.
+tempfile = "3.27.0"
+
+[build-dependencies]
+slint-build = "1.3"

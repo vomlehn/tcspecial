@@ -67,6 +67,7 @@ help:
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload needs"
+	@echo "  make mkstubs     - Make the I2C and GPIO stand-ins their payloads need"
 	@echo "  make check       - cargo check, clippy, and a format check"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
@@ -217,6 +218,25 @@ runsim:
 .PHONY: mkvcan
 mkvcan:
 	bin/mkvcan
+
+# Make the I2C and GPIO stand-ins their payloads need.
+#
+# The two kinds the simulator cannot be the far end of: a device on a bus has
+# to answer when a master addresses it and a discrete line is a wire, and user
+# space is neither. The kernel's i2c-stub and gpio-sim stand in -- a bank of
+# registers and a chip whose lines are memory -- and bin/mkstubs makes both.
+#
+# Not a prerequisite of anything, for the reasons mkvcan is not, and for one
+# more: unlike the CAN tests, no test is gated on these. The scans that find a
+# stub are tested against a tree handed to them rather than the real one, so
+# they pass with no module loaded. This is for running a payload set that names
+# an I2C or GPIO payload.
+#
+# It prints the bus and chip numbers it made, which are assigned as devices
+# appear and so are not the same from one run to the next.
+.PHONY: mkstubs
+mkstubs:
+	bin/mkstubs
 
 # Clean build artifacts
 .PHONY: clean

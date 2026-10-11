@@ -382,7 +382,9 @@ would be commanding a payload rather than reading it.
 
 The simulator moves lines through the kernel's ``gpio-sim``, which it finds
 rather than makes: loading the module and making a chip need root, and tcssim
-says so if there is none. The packet and segment sizes mean nothing to a
+says so if there is none. ``make mkstubs`` makes one and prints the node it
+became, which is numbered as chips appear and so has to be read off the run
+rather than assumed. The packet and segment sizes mean nothing to a
 simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its lines the other way every
 packet interval.
@@ -598,6 +600,22 @@ eight data bits, most significant first, followed by an acknowledge bit.
 
 Such a payload cannot be triggered by a simulated stand-in: the master's own
 read is the request, and a second master on the bus cannot see it.
+
+What stands in for the device is the kernel's ``i2c-stub``, an adapter whose
+chips are a bank of registers in memory: tcssim writes the bank and tcspecial
+reads it. The simulator finds that adapter rather than making one -- loading a
+module needs root -- and says how to make one if there is none.
+``bin/mkstubs`` makes it, and the GPIO stand-in with it, so
+
+.. code-block:: console
+
+   $ make mkstubs
+
+is the way to both. It prints the bus to name in a payload set, which is
+numbered as adapters appear and so is not the same from one run to the next.
+The stub's chips are fixed when the module is loaded, which is why the address
+is the script's argument rather than something a configuration can choose
+afterwards: ``./bin/mkstubs 0x50`` reloads it with a chip there.
 
 A SPI Payload
 -------------

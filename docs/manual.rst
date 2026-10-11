@@ -130,7 +130,8 @@ Attributes Every Payload Has
    name           the handler's name, which commands address it by and the
                   panels show
    group          the group to take unstated attributes from, if any
-   type           network | device | serial | i2c | spi
+   type           network | device | serial | i2c | spi, or one of the
+                  experimental can | iio | rpmsg | gpio
    packet_size    bytes in one packet
    oc_address     the host this handler exchanges payload data with the
                   OC on, which is always UDP
@@ -830,8 +831,8 @@ sends. Stating the kind here makes that pairing an error instead.
 
    type                   the kind of payload this stands in for, in the
                           tcspecial configuration's own word: network,
-                          device, serial, i2c, or spi. Must be what that
-                          configuration says
+                          device, serial, i2c, spi, can, iio, rpmsg or
+                          gpio. Must be what that configuration says
    protocol               which transport, for a network payload, and refused
                           for any other kind. Must be what that configuration
                           says

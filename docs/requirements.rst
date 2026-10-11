@@ -36,6 +36,13 @@ software does not do what a requirement says. The requirement stands as
 written: a note records what is so today, and is not an amendment. What each
 of them does instead is described in ``design.rst``.
 
+Where a note calls something **experimental**, it means what ``design.rst``
+and ``manual.rst`` mean by it: written, parsing, reaching a handler and tested,
+but never run against the hardware it describes and in no shipped payload set.
+Five things are in that state, all of them kinds of payload interface:
+RS-485 on a serial line, and the ``can``, ``iio``, ``rpmsg`` and ``gpio``
+kinds.
+
 The name of the project is TCSpecial
 ====================================
 
@@ -88,8 +95,10 @@ DH_UDP must implement DH and use UDP to send telemetry to tcslib
 .. note::
    Implemented differently. There is no ``DH_UDP``. A handler's endpoints are
    per kind -- ``UdpEndpoint``, ``TcpEndpoint``, ``SerialEndpoint``,
-   ``I2cEndpoint``, ``SpiEndpoint``, ``DeviceEndpoint``, and the Unix socket
-   pair -- and a handler's OC endpoint is UDP whichever kind its payload is.
+   ``I2cEndpoint``, ``SpiEndpoint``, ``DeviceEndpoint``, the Unix socket pair,
+   and the experimental ``CanEndpoint``, ``IioEndpoint``, ``RpmsgEndpoint``
+   and ``GpioEndpoint`` -- and a handler's OC endpoint is UDP whichever kind
+   its payload is.
 
 CI must support the following functions for implementing commands: ping(), exit(), status(), config(), start_dh(), stop_dh(), status_dh()
 
@@ -153,9 +162,9 @@ CI must support a STATUS command that sends telemetry containing status to groun
 
 .. note::
    Not implemented. There is no STATUS command for the interpreter as a
-   whole. QUERY_DH answers for one handler -- its statistics -- and
-   QUERY_DH_SAMPLE for what it last sent and received; a ground station asks
-   about every handler by asking about each.
+   whole. QUERY_DH answers for one handler -- what state it is in and what it
+   has moved -- and QUERY_DH_SAMPLE for what it last sent and received; a
+   ground station asks about every handler by asking about each.
 
 Tcspecial includes zero or more components named Data Handler (DH)
 ------------------------------------------------------------------

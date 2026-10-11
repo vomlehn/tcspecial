@@ -29,7 +29,6 @@ mod node;
 mod payload_iio;
 mod payload_rpmsg;
 mod payload_serial;
-mod payload_spi;
 mod payload_tcp;
 mod payload_unix;
 mod pty;

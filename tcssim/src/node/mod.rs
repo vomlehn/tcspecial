@@ -12,3 +12,4 @@
 //! dummy rather than anything here.
 
 pub mod i2c;
+pub mod spi;

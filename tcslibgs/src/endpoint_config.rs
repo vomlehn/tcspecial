@@ -32,7 +32,7 @@ use crate::endpoint_config_gpio::GpioParams;
 use crate::endpoint_config_rpmsg::RpmsgParams;
 use crate::node::i2c::I2cParams;
 use crate::endpoint_config_serial::SerialParams;
-use crate::endpoint_config_spi::SpiParams;
+use crate::node::spi::SpiParams;
 
 // The per-kind types are named from here as well as from their own files, so
 // that a reader of a configuration document reaches everything it can hold
@@ -44,7 +44,7 @@ pub use crate::endpoint_config_gpio::GpioParams as GpioGroupParams;
 pub use crate::endpoint_config_rpmsg::RpmsgParams as RpmsgGroupParams;
 pub use crate::endpoint_config_rs485::Rs485Params;
 pub use crate::endpoint_config_serial::{ByteLength, StopBits};
-pub use crate::endpoint_config_spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
+pub use crate::node::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 use crate::types::{
     CanConfig, EndpointConfig, GpioConfig, I2cConfig, IioConfig, RpmsgConfig, SerialConfig,
     SpiConfig,

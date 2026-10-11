@@ -19,10 +19,40 @@ an operations center (OC) and conduiting
 telemetry`from the payloads to the OC. This document sets for
 requirements for its operation
 
+What TCSpecial is for
+---------------------
+
+TCSpecial is **telemetry and control, special**: it connects the devices aboard
+a vehicle, on whatever interface each arrives on, to the mission operations
+center on the ground and to compute elements aboard that act on what the
+devices produce. The connections are read from a configuration file rather than
+written in the software. ``manual.rst`` opens with the architecture and the
+reasons for it; ``design.rst`` specifies it.
+
+The ranked quality attributes
+-----------------------------
+
+Four attributes, in order. The order is the point: where two designs satisfy
+the requirements differently, the earlier attribute decides, and an argument
+about such a choice should cite this list rather than taste.
+
+1. **Reliability.** The vehicle is not reachable for repair. A mechanism that
+   can fail in a new way loses to a rigid one that cannot, and a fault found
+   when a configuration is loaded beats the same fault found in flight.
+2. **Ease of use.** An operator under time pressure must be able to read what
+   the system does and say what it will do next. Clarity of the configuration
+   and of what the programs report counts as a requirement, not a courtesy.
+3. **Maintainability.** The software outlives the people who wrote it. One
+   concern per module, a test per claim, and a written reason for anything that
+   is not obvious.
+4. **Flexibility and extensibility.** New interfaces, new computations and new
+   vehicle arrangements must be reachable without disturbing what already
+   flies -- but never at the cost of the three above.
+
 About the names and the notes
 -----------------------------
 
-The requirements below are as they were written, with two kinds of change.
+The requirements below are as they were written, with two types of change.
 
 The names are the ones the software goes by. Three were settled differently
 after this was written: the spacecraft process is **tcspecial**, not
@@ -30,6 +60,14 @@ after this was written: the spacecraft process is **tcspecial**, not
 the testing GUI became two programs, **tcsmoc** for the ground and **tcssim**
 for the payloads, rather than one ``tcstest``. A third test program,
 **tcsverify**, checks the configuration files without running any of them.
+
+Four words changed as well, and these requirements use the old ones throughout.
+What a requirement calls a **payload** is a **device** where it is hardware,
+and a **node** where the statement is about anything the configuration can name
+-- a device, a MOC link, or a compute element. Where it says *device* and means
+an entry in the filesystem, that is a **pseudofile**. Where it says **OC** it
+means the **MOC**, the mission operations center. The requirements stand as
+written; ``manual.rst`` gives the vocabulary in force.
 
 A ``Not implemented`` or ``Implemented differently`` note says where the
 software does not do what a requirement says. The requirement stands as
@@ -39,9 +77,9 @@ of them does instead is described in ``design.rst``.
 Where a note calls something **experimental**, it means what ``design.rst``
 and ``manual.rst`` mean by it: written, parsing, reaching a handler and tested,
 but never run against the hardware it describes and in no shipped payload set.
-Five things are in that state, all of them kinds of payload interface:
+Five things are in that state, all of them types of payload interface:
 RS-485 on a serial line, and the ``can``, ``iio``, ``rpmsg`` and ``gpio``
-kinds.
+types.
 
 The name of the project is TCSpecial
 ====================================
@@ -71,7 +109,7 @@ TCSpecial must have a trait named Command Interpreter (CI) that parses commands 
    there is one command interpreter and nothing has needed a second
    implementation of it. The traits in tcspecial are at the layer below --
    ``EndpointWaitable``, ``EndpointReadable``, ``EndpointWritable`` -- where
-   there really are many implementations, one per kind of endpoint.
+   there really are many implementations, one per type of endpoint.
 
 TCSpecial must have a trait named data handler (DH) that is called by CI to process commands
 ============================================================================================
@@ -94,10 +132,10 @@ DH_UDP must implement DH and use UDP to send telemetry to tcslib
 
 .. note::
    Implemented differently. There is no ``DH_UDP``. A handler's endpoints are
-   per kind -- ``UdpEndpoint``, ``TcpEndpoint``, ``SerialEndpoint``,
+   per type -- ``UdpEndpoint``, ``TcpEndpoint``, ``SerialEndpoint``,
    ``I2cEndpoint``, ``SpiEndpoint``, ``DeviceEndpoint``, the Unix socket pair,
    and the experimental ``CanEndpoint``, ``IioEndpoint``, ``RpmsgEndpoint``
-   and ``GpioEndpoint`` -- and a handler's OC endpoint is UDP whichever kind
+   and ``GpioEndpoint`` -- and a handler's OC endpoint is UDP whichever type
    its payload is.
 
 CI must support the following functions for implementing commands: ping(), exit(), status(), config(), start_dh(), stop_dh(), status_dh()

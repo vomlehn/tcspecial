@@ -46,21 +46,21 @@ Terminology
 
 These words are used in one sense each, here and in the code. Several of them
 had been used in two, which is why they are written down: "device" in
-particular had been both a kind of endpoint and a protocol beside TCP and UDP.
+particular had been both a type of endpoint and a protocol beside TCP and UDP.
 
 endpoint
     One end of the path a data handler's data travels. A handler has two: the
     OC endpoint, where the ground's data arrives and leaves, and the payload
-    endpoint, where the payload's does. An endpoint is of exactly one kind, and
-    the kind decides what is needed to open it and what terms it is operated
+    endpoint, where the payload's does. An endpoint is of exactly one type, and
+    the type decides what is needed to open it and what terms it is operated
     on.
 
-endpoint kind
+endpoint type
     What an endpoint is made of, and so what locates it and what else must be
     said about it. Five are supported -- ``network``, ``device``, ``serial``,
     ``i2c`` and ``spi`` -- and four more are experimental: ``can``, ``iio``,
-    ``rpmsg`` and ``gpio``. A kind is not a protocol -- a network endpoint
-    carries the protocol it runs over, and no other kind is addressed that
+    ``rpmsg`` and ``gpio``. A type is not a protocol -- a network endpoint
+    carries the protocol it runs over, and no other type is addressed that
     way.
 
 device
@@ -69,7 +69,7 @@ device
     peripheral are all reached through device files and are none of them a
     device endpoint, because each has terms of its own that a plain device has
     not. A device *file* is the thing in the filesystem; a device *endpoint* is
-    one kind among the nine.
+    one type among the nine.
 
 bus
     A device that several devices are reached through, each by an address on
@@ -117,6 +117,317 @@ simulator configuration file
     a packet and how it divides one into segments. Properties of a simulation
     rather than of a payload, which is why they are not in the payload
     configuration.
+
+The Node Architecture
+=====================
+
+What this supersedes
+--------------------
+
+TCSpecial began as a set of data handlers, each one a fixed pair: a payload
+endpoint at one end, an OC endpoint at the other, and a conduit in each
+direction between them. ``dh.rs`` says so in its own fields -- one
+``ground_to_payload`` and one ``payload_to_ground`` -- and that is the whole of
+the topology the software could express. It served while every payload's data
+went to the ground and nowhere else.
+
+It cannot express a control loop. Three sensors whose readings are averaged and
+compared against a setpoint, with the comparison driving heaters, needs a
+reading to reach two places at once, needs three readings to arrive at one
+place, needs something aboard that remembers a setpoint, and needs a set of
+discrete lines to be driven rather than read. None of those is a type of
+endpoint; all of them are shapes of connection.
+
+So the fixed pair is replaced by a graph the configuration describes. A data
+handler is no longer a thing: what it did -- joining a device to the ground in
+both directions -- is two links, and the software that moved its bytes is the
+machinery that moves bytes along any link.
+
+The four concepts
+-----------------
+
+Deliberately four, and no more. Each is a thing an engineer already thinks
+about, which is the ease-of-use argument; each is checkable before anything
+runs, which is the reliability one.
+
+node
+    Anything the configuration names. A node has a name unique across the
+    configuration, a type, and the attributes its type requires. Three families
+    of type:
+
+    *devices* -- ``i2c``, ``spi``, ``serial``, ``can``, ``gpio``, ``iio``,
+    ``rpmsg``, ``network``, ``pseudofile`` -- which are the interfaces real
+    hardware arrives on. Each is what used to be called a payload endpoint, and
+    the attributes are unchanged: a bus and an address, a chip and a set of
+    lines, a path.
+
+    *MOC links* -- ``moc`` -- a network link carrying telemetry to the ground
+    and commands back. This is what the OC endpoint was.
+
+    *compute elements* -- ``compute`` -- software that transforms what arrives.
+
+    *sinks* -- ``log`` -- somewhere data is kept rather than passed on. See
+    `The logging node`_.
+
+group
+    A set of devices read on one interval, so that readings which will be
+    compared with one another are taken as close to together as the hardware
+    allows. A device in no group is read on its own interval, as every payload
+    was.
+
+    The interval belongs to the group and not to its members. A member may not
+    state one: two sensors in a group with intervals of their own would be a
+    configuration whose own description disagrees with itself, and it is
+    refused.
+
+link
+    A directed connection from one node to one or more destinations. One
+    destination is the ordinary case. Several is how a reading reaches the
+    ground and an on-board computation at once -- the arrangement usually drawn
+    as a "T" -- and it is a property of the link rather than a node of its own,
+    because a node that only copied its input would be a type to implement,
+    test, configure and get wrong for no gain.
+
+    Where a destination takes more than one input, the link names which: a mean
+    over three sensors is three links into three named inputs, and a
+    configuration that leaves one unbound is refused rather than averaging two
+    numbers and a zero.
+
+command binding
+    A statement that a named command from the MOC sets a named attribute of a
+    node. A setpoint arrives this way. The binding is in the configuration, so
+    what the ground is able to change in flight is written down and checkable,
+    rather than being whatever the compute element happens to accept.
+
+The logging node
+----------------
+
+``type: log`` records what reaches it, built on ``tcslog`` -- the same library
+the telemetry log already uses, so a log node is a generalisation of something
+the software does rather than a new mechanism to trust. Two attributes:
+
+.. code-block:: text
+
+   directory      where the log's segment files are written
+   format         fixed: <n> | variable_simple | variable_ts_rc
+
+It is the first node with no fixed number of inputs. Any number of sources may
+link into one log, which is the point of it: a flight's housekeeping is one log
+holding what several devices produced, and a reader of that log wants the
+records interleaved as they happened rather than a file per sensor. A node with
+named inputs, like a mean over three sensors, is the other case and is checked
+the other way.
+
+What "any number" does not mean is any *type*. A source is accepted only if its
+records fit the format the log was opened with, and the three formats accept
+different things:
+
+``fixed: <n>``
+    Every record holds exactly ``n`` bytes and no data header is written, which
+    is the most compact log and the one whose length cannot change for the life
+    of the log. A source is compatible only if every record it produces is
+    exactly ``n`` bytes -- a device read in fixed-size packets, a computation
+    with a fixed-width result. A source whose records vary is refused, naming
+    the source, the log and the two lengths.
+
+``variable_simple``
+    Records of nought to ``tcslog::RecSize::MAX`` bytes, each with a four-byte
+    length header. Any source whose largest record fits is compatible. Suited
+    to data that already carries its own timestamp.
+
+``variable_ts_rc``
+    As ``variable_simple``, and the header also carries the time the record was
+    written and its position in the session. The format to choose when the
+    question asked of the log later will be *when*, which for a control loop it
+    usually is.
+
+The compatibility is settled when the configuration is loaded, not when a
+record is written. A log that would have to refuse a record in flight is a log
+that loses telemetry at the moment telemetry is worth most, so the arrangement
+is refused on the ground instead: either every source fits the format or the
+configuration does not load.
+
+A log with no source links into it records nothing, and is named at load for the
+same reason a node with no outbound link is -- a configuration that cannot do
+anything is more likely a mistake than an intention.
+
+.. code-block:: yaml
+
+   nodes:
+     - { name: housekeeping, type: log, directory: /var/log/tcspecial,
+         format: variable_ts_rc }
+
+   links:
+     - { from: k_fore, to: [moc, mean_temp.in0, housekeeping] }
+     - { from: k_aft, to: [moc, mean_temp.in1, housekeeping] }
+     - { from: k_bay, to: [moc, mean_temp.in2, housekeeping] }
+     - { from: thermostat, to: [heaters, housekeeping] }
+
+That is the thermostat's three converted readings and what the comparison
+decided, in one log, in the order they happened -- which is what reconstructing
+the loop's behaviour afterwards requires, and what a log per sensor could not
+give.
+
+Compute elements
+----------------
+
+Two of them, and the difference is where the code lives.
+
+A **built-in** names a function compiled into tcspecial: ``to_kelvin``,
+``mean``, ``hysteresis`` and the rest of a catalogue that grows as flights need
+it. These are the ones to prefer. They are written in Rust, tested with the
+rest of the software, cannot fail to start, and cost nothing to call.
+
+An **external process** names a program. tcspecial starts it, writes what
+arrives on its standard input and reads results from its standard output. It
+buys a computation that can be written in anything and changed without
+rebuilding the flight software, which is why it is here; it costs a process to
+supervise, and that is a new way to fail. Reliability outranks the flexibility,
+so the arrangement is deliberately strict:
+
+* the program is started when the configuration is loaded, not at the first
+  datum, so a program that cannot be executed is a configuration fault found on
+  the ground.
+* every result has a deadline. A program that has not answered within its
+  ``timeout`` is treated as having failed, not waited for.
+* a failed or exited program does not silently swallow data. Its link is
+  **refused**: what would have gone into it is dropped, counted, and reported
+  in telemetry, so the ground sees a computation stop rather than seeing
+  plausible numbers that are stale.
+* restarting is bounded and declared. ``restart: never`` is the default for a
+  node in a control path, because a heater driven by a computation that
+  restarts under load is worse than a heater driven by nothing.
+* a built-in and an external process are interchangeable in the graph, so a
+  computation can be proved as a program and later moved into the catalogue
+  without the configuration changing shape.
+
+Configuration
+-------------
+
+One logical configuration, which may be written as several files.
+
+The top file may carry an ``include`` list naming others; their contents are
+merged into it. Nothing is discovered by scanning a directory: what is read is
+what a file names, so the set of files that make up a configuration is itself
+written down. The digest the beacon carries is taken over the whole set, so the
+ground can say which configuration is flying rather than which top file is.
+
+A small vehicle needs no split and should not have one. Where a split earns its
+place, the useful seam is who owns a file and how often it changes, not what
+type of data is in it:
+
+.. code-block:: text
+
+   platform.yaml   what hardware exists and how it is reached -- bus,
+                   address, chip, lines, paths. Changes when the vehicle does.
+   graph.yaml      nodes, groups, links, command bindings. Changes when the
+                   control strategy does.
+   tuning.yaml     setpoints, intervals, thresholds: the values the MOC may
+                   also change in flight.
+
+This is version 2 of the payload configuration, and it does not read version 1.
+A clean break rather than two parsers: the two schemas describe different
+things, and a reader that accepted both would be two sets of rules to keep
+correct for as long as the software lives. The shipped sets are converted with
+it.
+
+What is checked before anything runs
+------------------------------------
+
+The reliability argument for the whole design is that a graph is checkable, and
+``tcsverify`` performs these checks on the ground against the same code that
+performs them again aboard:
+
+* every name a link mentions is a node that exists, and no two nodes share a
+  name.
+* every input of every destination is bound exactly once. None missing, none
+  twice. A node that takes any number of them -- a log -- is exempt from the
+  count and not from the rest: it must have at least one source, and every
+  source must suit its format.
+* no cycle, unless a node on it declares itself a loop and states what breaks
+  the cycle -- a control loop is a cycle on purpose, and an accidental one is a
+  configuration that would run forever on its own output.
+* direction agrees with the type. A set of discrete lines driven as outputs is
+  not also read; a sensor buffer is not written; a node with no outbound link
+  produces data nobody reads and is named as such.
+* every device in a group is readable on the group's interval, and no member
+  states an interval of its own.
+* every command binding names an attribute its node will accept, and a
+  attribute no binding mentions cannot be set from the ground.
+* every external process can be executed, and every one of them has a timeout.
+* every source of a log produces records the log's format can hold, which for
+  ``fixed: <n>`` means records of exactly ``n`` bytes from every one of them.
+
+Example: a cabin thermostat
+---------------------------
+
+Three temperature sensors, two on an I\ :superscript:`2`\ C bus and one on a
+SPI link, each producing a different format. All three are read together every
+three seconds. Each reading is converted to kelvin, and each converted reading
+goes to two places: down to the MOC, and into a mean. The mean goes to the MOC
+as well, and into a comparison against a setpoint the ground sets. More than
+two degrees above it, three heater lines are unasserted; more than two below,
+they are asserted.
+
+.. code-block:: yaml
+
+   version: "2.0"
+   description: Cabin thermostat
+
+   groups:
+     - name: cabin_temps
+       interval: 3s
+
+   nodes:
+     - { name: temp_fore, type: i2c, group: cabin_temps,
+         path: /dev/i2c-1, address: 0x48, read_size: 2 }
+     - { name: temp_aft, type: i2c, group: cabin_temps,
+         path: /dev/i2c-1, address: 0x49, read_size: 2 }
+     - { name: temp_bay, type: spi, group: cabin_temps,
+         path: /dev/spidev0.0, max_speed: 1000000, spi_mode: 0, read_size: 3 }
+
+     - { name: k_fore, type: compute, function: to_kelvin,
+         params: { format: i16_be, scale: 0.0625, offset: 273.15 } }
+     - { name: k_aft, type: compute, function: to_kelvin,
+         params: { format: i16_be, scale: 0.0625, offset: 273.15 } }
+     - { name: k_bay, type: compute, function: to_kelvin,
+         params: { format: u24_be, scale: 0.0078, offset: 255.37 } }
+
+     - { name: mean_temp, type: compute, function: mean, inputs: [in0, in1, in2] }
+     - { name: thermostat, type: compute, function: hysteresis,
+         params: { setpoint: 293.15, above: 2.0, below: 2.0 } }
+
+     - { name: moc, type: moc, address: 10.0.0.1, port: 5000 }
+     - { name: heaters, type: gpio, direction: output,
+         path: /dev/gpiochip0, lines: [3, 4, 5] }
+
+   links:
+     - { from: temp_fore, to: k_fore }
+     - { from: temp_aft, to: k_aft }
+     - { from: temp_bay, to: k_bay }
+
+     - { from: k_fore, to: [moc, mean_temp.in0] }
+     - { from: k_aft, to: [moc, mean_temp.in1] }
+     - { from: k_bay, to: [moc, mean_temp.in2] }
+
+     - { from: mean_temp, to: [moc, thermostat] }
+     - { from: thermostat, to: heaters }
+
+   commands:
+     - { from: moc, sets: thermostat.setpoint }
+
+Several things in that file are refusals waiting to happen, which is the point.
+Drop one of the three links into ``mean_temp`` and the configuration is refused
+for an unbound input rather than averaging over a reading that never arrives.
+Give ``temp_aft`` an interval of its own and it is refused for disagreeing with
+its group. Remove ``direction: output`` from ``heaters`` and it is refused for
+being written to as an input. None of those is discovered in flight.
+
+What the cycle costs is also visible in the file rather than in the code. One
+group interval governs the whole loop: the sensors are read, the conversions
+run, the mean is taken and the comparison made once every three seconds,
+because that is what ``cabin_temps`` says and everything downstream of it is
+driven by arrival rather than by a clock of its own.
 
 Features
 ========
@@ -271,8 +582,8 @@ Commands cause generation of one or more telemetry responses. Every response
 contains a success failure and may contain additional parameter values
 
 Every response carries a header before whatever else it says: the sequence
-number of the command it answers, which kind of response it is, the status,
-and the time the spacecraft made it. The tables below list what each kind
+number of the command it answers, which type of response it is, the status,
+and the time the spacecraft made it. The tables below list what each type
 adds to that.
 
 Requirement
@@ -354,8 +665,8 @@ Start a data handler.
 +================+============+===========+====================================+
 | START_DH_CM    | Name       | Type      | Description                        |
 |                +------------+-----------+------------------------------------+
-|                | type       | DHType    | Which kind the handler is, which   |
-|                |            |           | must be the kind its configuration |
+|                | type       | DHType    | Which type the handler is, which   |
+|                |            |           | must be the type its configuration |
 |                |            |           | gives it                           |
 |                +------------+-----------+------------------------------------+
 |                | name       | DHName    | Which handler to start, as the     |
@@ -626,7 +937,7 @@ Requirement
 
 Two of them used to carry a time of their own, PING and the beacon, and the
 other eight carried none; the header carries it for all of them now, and a
-header is built one way so that a kind of telemetry added later cannot be the
+header is built one way so that a type of telemetry added later cannot be the
 ninth.
 
 Requirement
@@ -914,7 +1225,7 @@ Requirement
     rather than the path.
 
 Requirement
-    A START_DH naming a kind that is not the handler's kind is refused with
+    A START_DH naming a type that is not the handler's type is refused with
     ``InvalidParameter``, and starts nothing. The ground and the spacecraft
     read the same configuration file, so a mismatch is not a handler to be
     started differently: it is the two ends disagreeing about what that file
@@ -922,7 +1233,7 @@ Requirement
     endpoint the configuration describes while the ground believed it had
     started something else.
 
-The kind a START_DH carries is worked out from the endpoint by one mapping,
+The type a START_DH carries is worked out from the endpoint by one mapping,
 ``EndpointConfig::kind``, which both ends use: the ground to say what it is
 asking for and the spacecraft to check what was asked. Two copies of it would
 be two chances for the ground to ask for something the spacecraft refuses. The
@@ -930,9 +1241,9 @@ check is made before the handler's state is looked at, so a mis-named START_DH
 is refused whether or not the handler happens to be running.
 
 Requirement
-    An endpoint is of one kind: ``network``, ``device``, ``serial``, ``i2c`` or
+    An endpoint is of one type: ``network``, ``device``, ``serial``, ``i2c`` or
     ``spi``, or one of the experimental ``can``, ``iio``, ``rpmsg`` and
-    ``gpio``. The kind decides what locates the endpoint and what terms it is
+    ``gpio``. The type decides what locates the endpoint and what terms it is
     opened on, and a handler carries both: a serial line's framing, the address
     of a device on a bus, and a SPI peripheral's clock are as much a part of
     where the payload is as the name of the file.
@@ -943,7 +1254,7 @@ being started -- which opened the right file and then talked to it on whatever
 terms it had been left on: a line at the wrong rate, a peripheral in the wrong
 mode. An I2C endpoint could not be started at all, there being nowhere in a
 handler's configuration to put the address of a device on a bus. Each is its
-own kind now, and tcspecial has an endpoint implementation for each.
+own type now, and tcspecial has an endpoint implementation for each.
 
 Requirement
     A data handler binds the UDP address its configuration gives as
@@ -1238,9 +1549,9 @@ Requirement
 
 Endpoints Opened Through Device Files
 "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Most of the endpoint kinds are opened through an entry in ``/dev``. Which kind
+Most of the endpoint types are opened through an entry in ``/dev``. Which type
 an entry is depends on what is at the end of it, and not on the entry's name:
-the name says where to look, and the kind says what else must be said about it
+the name says where to look, and the type says what else must be said about it
 and which implementation opens it. The two that are not device files at all
 are ``network``, which is a socket at an address, and the experimental
 ``can``, which is a socket on an interface.
@@ -1248,7 +1559,7 @@ are ``network``, which is a socket at an address, and the experimental
 **Endpoints Opened Through Device Files**
 
 +----------------+-------------------------------+--------------------------+
-| Name           | What is there                 | Endpoint kind            |
+| Name           | What is there                 | Endpoint type            |
 +================+===============================+==========================+
 | /dev/ttyS0     | Serial port, RS-232 or RS-422 | ``serial``: the line's   |
 |                |                               | rate and framing are     |
@@ -1270,7 +1581,7 @@ are ``network``, which is a socket at an address, and the experimental
 
 A ``device`` endpoint is the last of these and only that: a file opened and
 read as it comes. The other three are device files too, and were device
-endpoints until each was given a kind of its own, which is what let their terms
+endpoints until each was given a type of its own, which is what let their terms
 reach the handler that opens them.
 
 
@@ -1588,30 +1899,30 @@ below by its YAML, and each exists in both formats; see the requirement
 at the end of this section.
 
 ``tcspecial1.yaml``
-    Four handlers of three kinds, which is what exercises the panels and the
+    Four handlers of three types, which is what exercises the panels and the
     grid. It is also what every program falls back to when nothing names a
     file.
 
 ``tcspecial2.yaml``
-    Two handlers, one of each kind of payload: one that sends of its own
+    Two handlers, one of each type of payload: one that sends of its own
     accord and one that answers a request. The Makefile defaults to this set.
 
 ``tcspecial3.yaml``
     One handler, reached over a stream, which is what a single link is
     debugged against. It differs from set 2's first handler only in the
-    transport, which is what the kind and transport stated in a simulator file
+    transport, which is what the type and transport stated in a simulator file
     are there to tell apart.
 
 ``tcspecial4.yaml``
-    One handler of every supported kind. It began as the set that exercises a
+    One handler of every supported type. It began as the set that exercises a
     line's own terms -- a data rate, a framing, a rule for where a read ends --
     and the simulator's pty stand-in, and it was written in a second language,
     there being no words in a tcspecial configuration for a line; `Link Terms`_
     are those words, and the set is written here like every other.
 
-    The other four kinds were added beside the line so that one set reaches
+    The other four types were added beside the line so that one set reaches
     all five: a socket, a device file, a bus and a clocked link. One payload
-    each, no more -- a set is for running, and what covers a kind thoroughly
+    each, no more -- a set is for running, and what covers a type thoroughly
     is its tests.
 
 A set is a pair of files: the tcspecial configuration and the simulator file
@@ -1748,12 +2059,12 @@ Requirement
 
 How a Payload Is Made to Send
 -----------------------------
-Payloads are generally one of two kinds, and which kind a payload is decides
+Payloads are generally one of two types, and which type a payload is decides
 where the timing of it is written down.
 
 Requirement
     A payload is periodic or triggered, and says which. A file that says
-    neither describes a periodic payload, which is both the commoner kind and
+    neither describes a periodic payload, which is both the commoner type and
     what every tcspecial configuration written before there was a mode
     describes.
 
@@ -1782,7 +2093,7 @@ Requirement
 
 Requirement
     The interval is ``packet_interval_ms`` in whichever file states it. One
-    name, in the file the payload's kind puts it in: the rate a triggered
+    name, in the file the payload's type puts it in: the rate a triggered
     payload is asked at is the rate its packets come back at, so calling it
     something else in one file would be two names for one thing. It was
     ``trigger_interval_ms`` in the payload configuration section, and a file
@@ -1954,17 +2265,17 @@ Requirement
     ``auto-send``.
 
 Requirement
-    An attribute of another kind of payload is an error. A device payload
+    An attribute of another type of payload is an error. A device payload
     stating a protocol, an address or a port, or a network payload stating a
     path, has written something nothing will read -- and a payload that looks
     configured and is not is worse than one that is refused. A link's own
-    terms are refused the same way, by the rules for its kind: see
+    terms are refused the same way, by the rules for its type: see
     `Link Terms`_.
 
 Requirement
     The check is made after a group has been laid under a payload, because an
     attribute inherited from a group reaches the payload exactly as one it
-    states itself does. A payload of one kind joining a group written for
+    states itself does. A payload of one type joining a group written for
     another is the case this catches.
 
 Requirement
@@ -1992,7 +2303,7 @@ Requirement
     A Unix socket collides by its path. It is named by a file rather than by a
     port, so its port means nothing here, and a device handler opening that
     same path is the same collision from the other side. Every path is one
-    kind of claim for that reason, whichever kind of handler opens it.
+    type of claim for that reason, whichever type of handler opens it.
 
 Requirement
     A bus is shared and a place on it is not. Several devices on one
@@ -2016,30 +2327,30 @@ error reported.
 
 Link Terms
 ----------
-Three kinds of payload are on a link of their own -- a serial line, a device
+Three types of payload are on a link of their own -- a serial line, a device
 on an I2C bus, a peripheral on a SPI bus -- and each has terms that say how
 that link is driven: a data rate, an address on a bus, the shape of a clock.
 A payload states them beside everything else it states, and may take any of
 them from its group as it takes the rest.
 
-The rules are in ``tcslibgs::endpoint_config`` and the per-kind modules beside
+The rules are in ``tcslibgs::endpoint_config`` and the per-type modules beside
 it, and are asked of a payload by ``types::link_params_of``.
 
 Requirement
-    A term that belongs to another kind of link is an error rather than
+    A term that belongs to another type of link is an error rather than
     something ignored, so that a misspelled or misplaced term is reported
     where it was written. ``pec`` on a line, ``cs_active`` on a bus, and
     ``datarate`` on a peripheral are each refused.
 
 Requirement
-    A term of a link is refused on the two kinds that are not on one: a
-    network address and a plain device file. Every other kind refuses what
-    belongs to another kind as its own rules are asked, and these two have no
+    A term of a link is refused on the two types that are not on one: a
+    network address and a plain device file. Every other type refuses what
+    belongs to another type as its own rules are asked, and these two have no
     rules to ask -- so a term written on one of them was read and dropped. A
     device payload could state a data rate, or a sensor's channels, and be
     read as a device payload that had said nothing of the sort: a
     misspelling that configured nothing and reported nothing. A network
-    payload's ``protocol`` is a term of its own kind and is allowed.
+    payload's ``protocol`` is a term of its own type and is allowed.
 
 Requirement
     Such a term is refused whether the payload stated it or took it from its
@@ -2060,7 +2371,7 @@ Requirement
 What Is Experimental
 ^^^^^^^^^^^^^^^^^^^^
 Some of what follows is **experimental and not yet supported**: RS-485 on a
-serial line, and the ``can``, ``iio``, ``rpmsg`` and ``gpio`` kinds of
+serial line, and the ``can``, ``iio``, ``rpmsg`` and ``gpio`` types of
 payload. Each is written, parses, reaches a handler and has tests of its
 rules; none has been run against the hardware it describes, and no shipped
 payload set uses one.
@@ -2068,7 +2379,7 @@ payload set uses one.
 The requirements for them are written the way every other requirement here is,
 because that is what they are for: a statement of what the configuration will
 be, settled before there is equipment to try it against. They may change,
-where the five supported kinds -- ``network``, ``device``, ``serial``, ``i2c``
+where the five supported types -- ``network``, ``device``, ``serial``, ``i2c``
 and ``spi`` -- will not.
 
 GPIO Payloads: Discrete Lines
@@ -2098,7 +2409,7 @@ Requirement
     every change of it twice.
 
 Requirement
-    This is the one kind whose payload data is made rather than carried, so
+    This is the one type whose payload data is made rather than carried, so
     its shape is settled here: each event becomes a record of sixteen bytes
     -- eight of time, four of line offset, four of value. The time is
     milliseconds since the UNIX epoch, which is what every other time in this
@@ -2124,7 +2435,7 @@ Requirement
 
 Requirement
     The request names the handler as its consumer. A line held by something
-    unnamed is the hardest kind of conflict to find, and ``gpioinfo`` shows
+    unnamed is the hardest type of conflict to find, and ``gpioinfo`` shows
     the name beside the line.
 
 Requirement
@@ -2163,7 +2474,7 @@ rpmsg Payloads: Another Core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 **Experimental, not yet supported.**
 
-A flight computer is commonly one package with cores of more than one kind in
+A flight computer is commonly one package with cores of more than one type in
 it, and the payload is then software on another core rather than anything on a
 wire. Linux talks to it over rpmsg: the remote announces a named channel,
 Linux makes a character device for it, and the two ends exchange whole
@@ -2225,7 +2536,7 @@ a buffer, both through ``sysfs``, and then reads ``/dev/iio:deviceN``, which
 hands over packed sample sets as they become ready.
 
 That is a device file a handler reads, which is nearly a ``device`` payload.
-What makes it a kind of its own is that it is read-only and that what the
+What makes it a type of its own is that it is read-only and that what the
 samples mean depends on terms a ``device`` payload has no words for. The rules
 are in ``tcslibgs::endpoint_config_iio``, the endpoint in
 ``tcspecial::endpoint_iio`` and the stand-in in ``tcssim::payload_iio``.
@@ -2258,7 +2569,7 @@ Requirement
     configuration rather than in the simulator. It is not that a stand-in
     cannot hear a request: a sample buffer is a stream out of the sensor, so
     there is nothing on that descriptor to write and nowhere for a trigger to
-    go. A datagram payload is refused in the same place for the same kind of
+    go. A datagram payload is refused in the same place for the same type of
     reason.
 
 Requirement
@@ -2282,7 +2593,7 @@ CAN Payloads: a Bus of Peers
 A CAN controller is a network interface rather than a device file, so a CAN
 payload is located by an interface and by the identifier its frames carry.
 Both ends of the link are sockets on that interface, which is what makes this
-the one experimental kind whose stand-in is as faithful as a socket: a bus
+the one experimental type whose stand-in is as faithful as a socket: a bus
 carries every member's frames to every other member, so the simulator joins
 the bus rather than standing in for something on it.
 
@@ -2297,7 +2608,7 @@ Requirement
 
 Requirement
     A CAN payload states no ``path``, ``address``, ``port`` or ``protocol``,
-    and an ``interface`` or a ``can_id`` on any other kind is refused. A
+    and an ``interface`` or a ``can_id`` on any other type is refused. A
     controller is not a device file and not a host and port, and a line that
     named an interface would be a line written for a bus it is not on.
 
@@ -2350,11 +2661,11 @@ Requirement
 
 Serial Payloads: a Line
 ^^^^^^^^^^^^^^^^^^^^^^^
-A serial payload states which kind of line it describes, and what else it may
+A serial payload states which type of line it describes, and what else it may
 say follows from that.
 
 Requirement
-    A serial payload states ``asynchronous``. The two kinds of line are read
+    A serial payload states ``asynchronous``. The two types of line are read
     differently all the way down -- a start-stop line delimits every byte for
     itself, a synchronous one carries its bits on a clock -- so a group that
     did not say would be guessed at, and a line read as the wrong one of the
@@ -2367,12 +2678,12 @@ Requirement
     bits are on a clock has nothing for one to delimit.
 
 Requirement
-    What each kind of line may say beyond that is what the Linux driver for
+    What each type of line may say beyond that is what the Linux driver for
     such a line can be told, and nothing else. Termios sets a parity per
     character on a start-stop line; the kernel's generic HDLC takes a clock, a
     coding, a frame check and a loopback for a synchronous one, from
     ``sync_serial_settings`` and ``raw_hdlc_proto`` in
-    ``linux/hdlc/ioctl.h``. A payload stating the other kind's is refused.
+    ``linux/hdlc/ioctl.h``. A payload stating the other type's is refused.
 
 Requirement
     A synchronous payload states ``clock_type``. The two ends must agree about
@@ -2382,10 +2693,10 @@ Requirement
     rate the far end is expected to clock.
 
 Requirement
-    Both kinds write the frame check as ``parity``, which is the name the
+    Both types write the frame check as ``parity``, which is the name the
     Linux driver uses for both: per character on a start-stop line, and a CRC
     over a frame on a synchronous one. The values say which is meant, and the
-    error that refuses a value lists the ones that kind offers.
+    error that refuses a value lists the ones that type offers.
 
 Requirement
     A line is read back after it is set, and a parity the port did not take is
@@ -2413,9 +2724,9 @@ obliged to stop driving the pair the instant it has finished. The turnaround
 is a few bit times -- a write returns before the last bit has left the shift
 register -- so Linux does it in the UART driver, told through ``TIOCSRS485``.
 
-RS-485 is not a kind of link. It is the electrical layer under a start-stop
+RS-485 is not a type of link. It is the electrical layer under a start-stop
 line: the same termios terms, the same framing, the same device file. So these
-are terms of the ``serial`` kind, in ``tcslibgs::endpoint_config_rs485``, and a
+are terms of the ``serial`` type, in ``tcslibgs::endpoint_config_rs485``, and a
 payload on a four-wire line states none of them and is unchanged.
 
 Requirement
@@ -2496,7 +2807,7 @@ Requirement
 +---------------+----------+--------------------------------------------------+
 | stream        | Yes      | Stream payload protocol attributes, below        |
 +---------------+----------+--------------------------------------------------+
-| packet_size   | No       | Bytes in one packet. Shared by every kind of     |
+| packet_size   | No       | Bytes in one packet. Shared by every type of     |
 |               |          | payload, and listed with the rest above          |
 +---------------+----------+--------------------------------------------------+
 
@@ -2530,7 +2841,7 @@ to complete a transfer.
 +---------------+----------+--------------------------------------------------+
 | bus_speed     | No       | Bus clock rate in Hz. Recorded, not applied      |
 +---------------+----------+--------------------------------------------------+
-| packet_size   | No       | Bytes in one packet. Shared by every kind of     |
+| packet_size   | No       | Bytes in one packet. Shared by every type of     |
 |               |          | payload, and listed with the rest above          |
 +---------------+----------+--------------------------------------------------+
 
@@ -2601,7 +2912,7 @@ framing bits. What a payload carries is the shape of the clock and of a word.
 | cs_active     | No       | Chip select asserted ``low`` or ``high``.        |
 |               |          | Default ``low``                                  |
 +---------------+----------+--------------------------------------------------+
-| packet_size   | No       | Bytes in one packet. Shared by every kind of     |
+| packet_size   | No       | Bytes in one packet. Shared by every type of     |
 |               |          | payload, and listed with the rest above          |
 +---------------+----------+--------------------------------------------------+
 
@@ -2674,7 +2985,7 @@ same value may be written ``8`` or ``"8"`` without changing its meaning.
 **Value syntax**
 
 +---------------+--------------------------------------------------------------+
-| Kind          | Syntax                                                       |
+| Type          | Syntax                                                       |
 +===============+==============================================================+
 | Whole number  | Decimal, or hexadecimal with an ``0x`` prefix                |
 +---------------+--------------------------------------------------------------+
@@ -2818,13 +3129,13 @@ that the two files can be checked against each other.
 +---------------------+--------+---------------------------------------------+
 | Attribute           | Type   | Meaning                                     |
 +=====================+========+=============================================+
-| type                | string | The kind of payload this stands in for, in  |
+| type                | string | The type of payload this stands in for, in  |
 |                     |        | the payload configuration's own word:       |
 |                     |        | ``network``, ``device``, ``serial``,        |
 |                     |        | ``i2c``, or ``spi``                         |
 +---------------------+--------+---------------------------------------------+
 | protocol            | string | Which transport, for a network payload.     |
-|                     |        | Refused for every other kind                |
+|                     |        | Refused for every other type                |
 +---------------------+--------+---------------------------------------------+
 
 **The payload's own end of the link**, which nothing else states:
@@ -2879,14 +3190,14 @@ Requirement
     A simulated triggered payload has no packet interval, and stating one is
     an error. It sends when tcspecial asks and at no rate of its own, so an
     interval here would govern nothing -- and a file that gave one has not
-    understood which kind of payload it is simulating. The segment settings
+    understood which type of payload it is simulating. The segment settings
     still apply: how a payload divides an answer is its own business whichever
     way it was prompted.
 
 Requirement
     A simulated triggered payload sends one packet for each request it is
     sent, and nothing otherwise. A payload that answered on a clock as well
-    would be two kinds at once, and no file could say which rate was which.
+    would be two types at once, and no file could say which rate was which.
 
 Requirement
     The simulator refuses a triggered payload it cannot hear a request on.
@@ -2907,27 +3218,27 @@ payload that never sends. So each simulated payload says what it stands in
 for, and the statement is compared rather than used.
 
 Requirement
-    A simulated payload states the kind of payload it stands in for, and a
+    A simulated payload states the type of payload it stands in for, and a
     network payload the transport as well. Neither is taken from this file:
     the payload configuration decides both, and a payload that stated neither
     could not be checked against anything.
 
 Requirement
-    The two files cannot disagree about a payload's kind or its transport. A
+    The two files cannot disagree about a payload's type or its transport. A
     disagreement is an error naming the payload and what each file says of it,
     rather than one file overriding the other: both describe the one payload,
     so a disagreement means one of them is not the file that was meant.
 
 Requirement
     A transport is stated by a network payload and refused for every other
-    kind. A line, a bus or a peripheral is not reached by a transport, so one
+    type. A line, a bus or a peripheral is not reached by a transport, so one
     stated for it would govern nothing.
 
 Requirement
-    The kind and the transport are written in the same words the payload
+    The type and the transport are written in the same words the payload
     configuration uses, and the error that refuses a word that is neither
     lists the words that would have worked. The spellings are one table read
-    from both files, so the two cannot come to disagree about what a kind is
+    from both files, so the two cannot come to disagree about what a type is
     called.
 
 Requirement
@@ -2971,7 +3282,7 @@ Requirement
     datagram payload a path beside the handler's.
 
 Requirement
-    A group may carry the kind and the transport, like every other setting a
+    A group may carry the type and the transport, like every other setting a
     payload does not state. A group whose payloads are not all reached the
     same way leaves them with the payloads: the shipped ``tcspecial1sim.yaml``
     has two payloads sharing a rate that do not share a transport.
@@ -3033,7 +3344,7 @@ Requirement
 Requirement
     The simulator refuses a fault the payload could not have. Only a stream
     has a connection to close, so ``close_after`` is refused for every other
-    kind; only a triggered payload is asked for anything, so
+    type; only a triggered payload is asked for anything, so
     ``ignore_trigger_percent`` is refused for a periodic one. Either would
     otherwise sit in the file looking as though it governed something.
 
@@ -3183,15 +3494,15 @@ silently short.
 Requirement
     Every data handler of the tcspecial configuration has a simulated payload
     naming it, and every simulated payload names a data handler of the
-    tcspecial configuration. Either kind of mismatch is reported rather than
+    tcspecial configuration. Either type of mismatch is reported rather than
     simulated around, because a misspelled name is otherwise indistinguishable
     from a payload deliberately left out.
 
-Which Kinds Can Be Simulated
+Which Types Can Be Simulated
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 A simulated payload has to be whatever is at the far end of its handler's
-payload endpoint, and the kinds of endpoint are not equally easy to be. The
-experimental kinds are covered where each of them is: a CAN bus of peers, a
+payload endpoint, and the types of endpoint are not equally easy to be. The
+experimental types are covered where each of them is: a CAN bus of peers, a
 sensor's buffer, a channel to another core and a set of discrete lines.
 
 Requirement
@@ -3257,7 +3568,7 @@ Requirement
     out.
 
 Nothing in user space can answer an address on a bus, which is why this is the
-one kind of simulated payload that is not the far end of anything. It has two
+one type of simulated payload that is not the far end of anything. It has two
 consequences worth stating.
 
 The first is that a bus is a register and not a stream. Bytes do not queue: a
@@ -3307,18 +3618,18 @@ Requirement
 
 The narrowness is the point. A terminal is what a stand-in is, and a handler
 that accepted any node it could open would open a wrongly configured path
-confidently -- which is the fault the kinds were separated to prevent.
+confidently -- which is the fault the types were separated to prevent.
 
 What such a link tests is a handler's reading and writing of a peripheral and
 the pacing of a payload that produces data in blocks. What it cannot test is
 whether the peripheral would stand being clocked that way, which is a question
 for the peripheral.
 
-So every kind of endpoint, and every protocol of the network kind, can be
+So every type of endpoint, and every protocol of the network type, can be
 simulated. The stand-ins are not all of one quality, and that is the thing to
 keep in view rather than the coverage: a socket is a socket and a pty is a
 line in all but its rate, while a bus is a register bank that every master
-shares and a SPI peripheral is a pty with no clock behind it. Each kind's own
+shares and a SPI peripheral is a pty with no clock behind it. Each type's own
 file says which it is.
 
 Requirement
@@ -3376,7 +3687,7 @@ Requirement
     it.
 
 Requirement
-    Every panel of a row is the same width, whatever kind of payload it is
+    Every panel of a row is the same width, whatever type of payload it is
     for.
 
 The items go by their text going empty rather than by each of them being
@@ -3387,7 +3698,7 @@ came out 196 and 458 pixels wide -- the triggered one taking every pixel of
 slack in the row and the other sitting at its minimum, which says nothing
 about either payload and reads as a window that has gone wrong. Empty text
 draws nothing, so the line still shows no label and no reading. A test
-measures the widths of a mixed row and of a row of each kind alone.
+measures the widths of a mixed row and of a row of each type alone.
 
 Requirement
     A payload keeps the same sample of a transfer that a data handler keeps:
@@ -3513,7 +3824,7 @@ Requirement
     configured value from an observed one.
 
 Requirement
-    Only the attributes of the payload's own kind are shown, and only the
+    Only the attributes of the payload's own type are shown, and only the
     faults that were asked for. A device has no protocol and a bus no port;
     six faults of nought say less about a payload than the one that was set.
 
@@ -3703,7 +4014,7 @@ Requirement
 Two links because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure. A ``RESTART`` waiting behind a payload's
 statistics is a spacecraft that cannot be rescued while it is busy, and the
-two kinds of command are unlike in every way that matters: one is rare,
+two types of command are unlike in every way that matters: one is rare,
 urgent, and about the vehicle, the other routine, bulky, and about an
 instrument. Missions divide them for the same reason, often between different
 operators with different authority.
@@ -3723,7 +4034,7 @@ Requirement
     command that went unanswered.
 
 Requirement
-    The table is a match over every kind of command, not a rule with a
+    The table is a match over every type of command, not a rule with a
     default. A command added later is placed deliberately, by someone who has
     to decide, rather than by whichever side of a default it fell on.
 
@@ -3758,7 +4069,7 @@ Requirement
     Both sockets are bound as the interpreter is created, before either loop
     runs, so a port already in use is reported where every other
     configuration error is -- at startup, naming itself -- rather than when
-    the first command of that kind arrives.
+    the first command of that type arrives.
 
 Requirement
     A command that arrives on the link it does not belong on is refused with

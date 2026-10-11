@@ -426,12 +426,19 @@ impl Scalar {
     /// A scalar as a file would have spelled it.
     ///
     /// For the rules' own tests, which ask a rule what it makes of a term
-    /// without a file to put it in.
-    pub(crate) fn of(text: impl Into<String>) -> Self {
+    /// without a file to put it in -- and for anything building a
+    /// configuration rather than reading one.
+    pub fn of(text: impl Into<String>) -> Self {
         Scalar(text.into())
     }
 
-    pub(crate) fn as_str(&self) -> &str {
+    /// The text, trimmed.
+    ///
+    /// Public because a version 2 node's attributes are these, and a node's
+    /// attributes are public: a caller handed a `Graph` has to be able to read
+    /// what a node says about itself. They were crate-private while the only
+    /// readers were the version 1 rules in this crate, which is no longer so.
+    pub fn as_str(&self) -> &str {
         self.0.trim()
     }
 }

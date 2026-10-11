@@ -7,6 +7,9 @@
 //!
 //! See `tcslibgs::node` for why there are three trees rather than one.
 
+// Computation aboard, which is a node type like any other: it is named in
+// the configuration, it takes what arrives and it hands something on.
+pub mod compute;
 pub mod i2c;
 pub mod spi;
 pub mod can;

@@ -7,7 +7,7 @@ use crate::endpoint_config::{ByteList, Scalar};
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config_serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
-use crate::endpoint_config_spi::{BitOrder, CsActive, SpiMode};
+use crate::node::spi::{BitOrder, CsActive, SpiMode};
 use crate::verify::Problem;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -1080,7 +1080,7 @@ pub(crate) fn link_params_of(
     match kind {
         DHType::Serial => crate::endpoint_config_serial::group_kind_of(name, wire),
         DHType::I2c => crate::node::i2c::group_kind_of(name, wire),
-        DHType::Spi => crate::endpoint_config_spi::group_kind_of(name, wire),
+        DHType::Spi => crate::node::spi::group_kind_of(name, wire),
         DHType::Can => crate::endpoint_config_can::group_kind_of(name, wire),
         DHType::Iio => crate::endpoint_config_iio::group_kind_of(name, wire),
         DHType::Rpmsg => crate::endpoint_config_rpmsg::group_kind_of(name, wire),
@@ -4889,7 +4889,7 @@ payloads:
     // -- a peripheral -------------------------------------------------------
 
     /// One peripheral with the given terms.
-    fn peripheral(terms: &str) -> Result<crate::endpoint_config_spi::SpiParams, String> {
+    fn peripheral(terms: &str) -> Result<crate::node::spi::SpiParams, String> {
         match link_terms("spi", &format!("    path: /dev/spidev0.0\n{terms}"))? {
             crate::endpoint_config::GroupKind::Spi(spi) => Ok(spi),
             other => panic!("{other:?}"),

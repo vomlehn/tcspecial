@@ -18,3 +18,4 @@
 //! two-wire variant that is one of its own terms.
 
 pub mod i2c;
+pub mod spi;

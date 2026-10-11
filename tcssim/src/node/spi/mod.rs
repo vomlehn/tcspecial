@@ -1,4 +1,4 @@
-//! A simulated payload standing in for a SPI peripheral.
+//! A simulated device standing in for a SPI peripheral.
 //!
 //! The one kind with nothing to be. A serial line has a pty, which is a line
 //! in everything but its rate. A device on a bus has the kernel's `i2c-stub`,
@@ -14,7 +14,7 @@
 //! opens this finds a node that will not take its terms and says so.
 //!
 //! What that tests is the handler's reading and writing of a peripheral, and
-//! the pacing of a payload that produces data in blocks. What it cannot test
+//! the pacing of a device that produces data in blocks. What it cannot test
 //! is whether the peripheral would stand being clocked that way, which is a
 //! question for the peripheral.
 //!
@@ -31,13 +31,13 @@ use crate::payload::{
 };
 use crate::pty::SimulatedNode;
 
-/// Run SPI payload simulation
+/// Run a simulated device on a SPI link.
 ///
 /// As every other kind: a packet every packet interval, in segments, from
 /// Start until Stop. A segment is one write, which is as near as a stand-in
 /// gets to a transfer: a real peripheral answers a transfer the controller
 /// starts, and this one simply has the bytes ready.
-pub fn run_spi_payload(
+pub fn run_spi_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
@@ -128,15 +128,15 @@ mod tests {
     }
 
     /// The configured path leads to a node the handler can open, and the data
-    /// there is the packets the payload is producing.
+    /// there is the packets the device is producing.
     ///
     /// Which is all a stand-in for a peripheral can offer: the bytes, in their
     /// segments, at their pace. Nothing here says anything about a clock,
     /// because there is nothing here that has one.
     #[test]
-    fn a_spi_payload_is_a_node_the_configured_path_leads_to() {
+    fn a_spi_device_is_a_node_the_configured_path_leads_to() {
         let path = a_path();
-        let mut payload = SimulatedPayload::new(PayloadConfig {
+        let mut simulated = SimulatedPayload::new(PayloadConfig {
             name: "DH0".to_string(),
             protocol: PayloadProtocol::Spi,
             address: path.display().to_string(),
@@ -154,7 +154,7 @@ mod tests {
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
                     triggered: false,
         });
-        payload.start().expect("the payload starts");
+        simulated.start().expect("the device starts");
 
         let deadline = Instant::now() + Duration::from_secs(5);
         while !path.is_symlink() && Instant::now() < deadline {
@@ -189,13 +189,13 @@ mod tests {
             }
         }
 
-        let stats = payload.stats();
-        payload.stop();
+        let stats = simulated.stats();
+        simulated.stop();
 
         assert!(got.len() >= 12, "only {} bytes arrived", got.len());
         assert!(
             stats.bytes_sent >= 12,
-            "the payload counted {} bytes sent",
+            "the device counted {} bytes sent",
             stats.bytes_sent
         );
         assert!(

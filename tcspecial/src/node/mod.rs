@@ -8,3 +8,4 @@
 //! See `tcslibgs::node` for why there are three trees rather than one.
 
 pub mod i2c;
+pub mod spi;

@@ -72,7 +72,7 @@ enum Clocking {
 /// but not for the same purpose: there it is part of setting the line to the
 /// terms the configuration gives, and here there are no terms -- it is only
 /// the discipline that would otherwise sit between the two ends of a link
-/// carrying payload data.
+/// carrying device data.
 fn make_raw(fd: RawFd, on: &str) -> TcsResult<()> {
     let mut terms: libc::termios = unsafe { std::mem::zeroed() };
     if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
@@ -113,7 +113,7 @@ impl SpiEndpoint {
     /// Open the device and set the controller to the configured terms.
     pub fn new(what: &str, config: &SpiConfig) -> TcsResult<Self> {
         // The handler's name and its node together, because every complaint
-        // below is about both: which payload could not be reached, and the
+        // below is about both: which device could not be reached, and the
         // node it was to be reached over. One label, built once, so that the
         // name cannot be left off one message and put on the next.
         let on = format!("{what}: {}", config.path);
@@ -126,7 +126,7 @@ impl SpiEndpoint {
             // controlling terminal of a process that opens it without this,
             // and then a read from a background process group raises SIGTTIN
             // and a hangup raises SIGHUP: a handler stopped or killed for
-            // reasons that have nothing to do with its payload.
+            // reasons that have nothing to do with its device.
             .custom_flags(libc::O_NOCTTY)
             .open(&config.path)
             .map_err(|e| TcsError::Endpoint(format!("{on} cannot be opened: {e}")))?;
@@ -143,7 +143,7 @@ impl SpiEndpoint {
                 // The one term that means anything on a terminal: take the
                 // line discipline out of the way. Left canonical, the
                 // discipline holds bytes back until a newline arrives, and
-                // payload data has no lines in it -- so a handler would sit on
+                // device data has no lines in it -- so a handler would sit on
                 // a read that never returned while the bytes it wanted were
                 // being edited on its behalf.
                 make_raw(fd, &on)?;
@@ -386,7 +386,7 @@ mod tests {
             said.contains(&config.path) && said.contains("mode"),
             "the complaint names neither the device nor what was being set: {said}"
         );
-        // And which handler it was for, as the payload configuration names it.
+        // And which handler it was for, as the device configuration names it.
         assert!(
             said.contains("instrument"),
             "the complaint does not say which handler: {said}"

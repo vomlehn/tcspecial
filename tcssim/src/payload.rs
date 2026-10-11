@@ -16,7 +16,7 @@
 //!   leads to
 //! * [`crate::node::i2c`] -- a device on a bus, which is a chip of the
 //!   kernel's `i2c-stub`
-//! * [`crate::payload_spi`] -- a peripheral, which is a pty again: the bytes
+//! * [`crate::node::spi`] -- a peripheral, which is a pty again: the bytes
 //!   of one, and none of its clocking
 //! * [`crate::payload_unix`] -- a Unix-domain socket of either flavour, which
 //!   the simulator simply is
@@ -109,7 +109,7 @@ pub enum PayloadProtocol {
     I2c,
     /// A SPI peripheral, which the simulator stands in for with a pty -- the
     /// bytes but not the clocking, there being nothing that emulates a
-    /// peripheral: see [`crate::payload_spi`].
+    /// peripheral: see [`crate::node::spi`].
     Spi,
     /// A Unix-domain stream, which the simulator listens at: see
     /// [`crate::payload_unix`].
@@ -223,7 +223,7 @@ impl SimulatedPayload {
                     crate::node::i2c::run_i2c_node(config, running, stats)
                 }
                 PayloadProtocol::Spi => {
-                    crate::payload_spi::run_spi_payload(config, running, stats)
+                    crate::node::spi::run_spi_node(config, running, stats)
                 }
                 PayloadProtocol::Can => {
                     crate::payload_can::run_can_payload(config, running, stats)

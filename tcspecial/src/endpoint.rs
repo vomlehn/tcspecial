@@ -30,7 +30,7 @@ use crate::node::i2c::I2cEndpoint;
 use crate::endpoint_iio::IioEndpoint;
 use crate::endpoint_rpmsg::RpmsgEndpoint;
 use crate::endpoint_serial::SerialEndpoint;
-use crate::endpoint_spi::SpiEndpoint;
+use crate::node::spi::SpiEndpoint;
 use crate::endpoint_tcp::TcpEndpoint;
 use crate::endpoint_udp::UdpEndpoint;
 use crate::endpoint_unix::{UnixDatagramEndpoint, UnixStreamEndpoint};

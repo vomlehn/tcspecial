@@ -76,7 +76,7 @@ impl IioEndpoint {
 
     /// A second endpoint on the same open buffer.
     ///
-    /// One open description, as a pseudofile node has: the conduit that reads
+    /// One open description, as a device file node has: the conduit that reads
     /// the buffer and the conduit that would write it share it, and the
     /// second one has nothing to write.
     pub fn try_clone(&self) -> TcsResult<Self> {

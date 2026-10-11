@@ -17,7 +17,7 @@ pub use ci::*;
 pub use config::*;
 pub use dh::*;
 pub use endpoint::*;
-pub use node::pseudofile::*;
+pub use node::device_file::*;
 pub use node::i2c::*;
 pub use node::network::*;
 pub use node::serial::*;

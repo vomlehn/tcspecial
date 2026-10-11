@@ -382,6 +382,8 @@ impl EndpointWritable for CanEndpoint {
 mod tests {
     use super::*;
 
+    use std::fs::OpenOptions;
+
     /// The data of both frames begins where this writes it.
     ///
     /// The one piece of the kernel's layout this module relies on: an
@@ -506,35 +508,63 @@ mod tests {
         assert_eq!(&buffer[..got], &[1, 2, 3, 4]);
     }
 
+    /// An endpoint whose socket is not a bus at all.
+    ///
+    /// For the checks that happen before anything is written, which need a
+    /// constructed endpoint and not a bus. They were gated on a virtual bus
+    /// because they were written beside the test above, and so ran on no
+    /// machine that had not been set up by hand -- which is most of them.
+    fn not_on_a_bus(fd: bool) -> CanEndpoint {
+        CanEndpoint {
+            what: "payload".to_string(),
+            // Writable, because the lengths that are not refused go on to
+            // be written: /dev/null takes them and says nothing, which is
+            // exactly what is wanted of a descriptor that is not a bus.
+            socket: OwnedFd::from(
+                OpenOptions::new()
+                    .write(true)
+                    .open("/dev/null")
+                    .expect("a descriptor"),
+            ),
+            can_id: 1,
+            fd,
+        }
+    }
+
     /// A packet longer than a frame is refused rather than split.
+    ///
+    /// Before the write is attempted, so the descriptor here need not be a
+    /// bus: what is being tested is which lengths are turned away, and what
+    /// happens to the ones that are not is the bus test's business.
     #[test]
     fn a_packet_longer_than_a_frame_is_refused() {
-        let Some(interface) = a_virtual_bus() else {
-            eprintln!("skipped: no virtual CAN bus on this host");
-            return;
+        let mut classic = not_on_a_bus(false);
+
+        let said = match classic.write(&[0u8; 9]) {
+            Err(e) => format!("{e}"),
+            Ok(n) => panic!("nine bytes went into an eight-byte frame as {n}"),
         };
-
-        let mut endpoint = CanEndpoint::new(
-            "payload",
-            &CanConfig {
-                interface,
-                can_id: 1,
-                fd: false,
-                bitrate: None,
-                loopback: true,
-            },
-        )
-        .expect("a socket on the bus");
-
-        let said = format!(
-            "{}",
-            endpoint
-                .write(&[0u8; 9])
-                .expect_err("nine bytes in an eight-byte frame")
-        );
         assert!(
-            said.contains("does not fragment"),
-            "the error should say why it cannot be split: {said}"
+            said.contains("does not fragment") && said.contains("classic CAN"),
+            "the error should say why it cannot be split, and of which frame: {said}"
+        );
+
+        // Eight is the most a classic frame carries, and is not refused.
+        assert_eq!(classic.write(&[0u8; 8]).expect("a full frame"), 8);
+
+        // The room is the kind's, not a constant: the same nine bytes are
+        // nothing to an FD frame, and sixty-five are too many for one.
+        let mut fd = not_on_a_bus(true);
+        assert_eq!(fd.write(&[0u8; 9]).expect("room in an FD frame"), 9);
+        assert_eq!(fd.write(&[0u8; 64]).expect("a full FD frame"), 64);
+
+        let said = match fd.write(&[0u8; 65]) {
+            Err(e) => format!("{e}"),
+            Ok(n) => panic!("sixty-five bytes went into a sixty-four-byte frame as {n}"),
+        };
+        assert!(
+            said.contains("CAN FD") && said.contains("64"),
+            "the error should say which frame and how much it carries: {said}"
         );
     }
 

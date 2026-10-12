@@ -24,14 +24,16 @@
         <address>127.0.0.1</address>
         <port>5100</port>
         <group>every_second</group>
-        <editor><x>40</x><y>120</y></editor>
+        <!-- In the payload working pane, the right-hand quarter of the
+             editor's canvas -->
+        <editor><x>744</x><y>160</y></editor>
     </nodes>
     <nodes>
         <name>moc</name>
         <type>moc</type>
         <address>127.0.0.1</address>
         <port>5000</port>
-        <editor><x>360</x><y>40</y></editor>
+        <editor><x>24</x><y>40</y></editor>
     </nodes>
     <links>
         <from>payload</from>

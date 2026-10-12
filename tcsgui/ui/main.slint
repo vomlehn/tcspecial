@@ -237,8 +237,11 @@ component NodeShape inherits Rectangle {
             drop-shadow-blur: grip.pressed ? 12px : 0px;
             drop-shadow-color: grip.pressed ? #00000033 : transparent;
             drop-shadow-offset-y: grip.pressed ? 3px : 0px;
+            // Half the shorter side, not half the width: every node is one
+            // width now, so an end of the graph is wider than it is tall and
+            // half its width would be a radius larger than the shape.
             border-radius: node.outline == "circle"
-                ? self.width / 2
+                ? min(self.width, self.height) / 2
                 : node.outline == "rounded"
                     ? self.height / 4
                     : 0px;
@@ -553,7 +556,66 @@ component LinkLine inherits Rectangle {
     }
 }
 
-// The editing surface: a bar, a palette and a canvas.
+// One selection pane: a heading, and one of every node type it offers.
+//
+// There are two of these -- the vehicle selection pane and the payload
+// selection pane -- and they are the same list of the same shapes drawn the
+// same way. A component rather than the markup twice, because two copies of a
+// list are two places a row's height or a heading's weight gets changed in.
+component SelectionPane inherits Rectangle {
+    in property <string> heading: "";
+    in property <[PaletteEntry]> palette: [];
+    callback place-node(string);
+
+    background: #f2f2f0;
+    border-width: 1px;
+    border-color: #d8d8d4;
+
+    ScrollView {
+        VerticalLayout {
+            padding: Space.step;
+            spacing: Space.step;
+            Text {
+                text: root.heading;
+                font-size: Type.body;
+                font-weight: Type.bold;
+                height: 18px;
+            }
+            // A row as tall as the shape in it. A fixed height clipped the
+            // taller shapes into the row below them, which made a list of
+            // fourteen types read as a list of ten and a tangle.
+            for p in root.palette: Rectangle {
+                height: p.is-heading ? 22px : p.node.height + Space.step;
+                background: transparent;
+
+                // A family's heading. Quiet: it is there to group the shapes
+                // below it, not to be read first.
+                if p.is-heading: Text {
+                    x: 0;
+                    y: 6px;
+                    text: p.heading;
+                    font-size: Type.small;
+                    font-weight: Type.bold;
+                    color: #6b7280;
+                }
+
+                if !p.is-heading: NodeShape {
+                    node: p.node;
+                }
+                // The whole row, so the hit area is the row and not only the
+                // shape: a rounded end's corners are not part of the shape,
+                // and a press there should still place one.
+                if !p.is-heading: TouchArea {
+                    mouse-cursor: MouseCursor.pointer;
+                    clicked => { root.place-node(p.node.node-type); }
+                }
+            }
+            Rectangle { }
+        }
+    }
+}
+
+// The editing surface: a bar, two selection panes and two working panes.
 //
 // One component because there are two windows that need it -- the top diagram
 // and each open subdiagram -- and two copies of a canvas would be two places
@@ -563,7 +625,17 @@ component LinkLine inherits Rectangle {
 component Surface inherits Rectangle {
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
-    in property <[PaletteEntry]> palette: [];
+    // The two selection panes' contents, and the two working panes' geometry.
+    //
+    // All four come from Rust -- see style.rs and main.rs -- because which
+    // types are payloads and where the divider falls are facts about a
+    // configuration rather than about a window, and they are checked by tests
+    // there. Stating the divider in this file as well would be stating it
+    // twice.
+    in property <[PaletteEntry]> vehicle-palette: [];
+    in property <[PaletteEntry]> payload-palette: [];
+    in property <length> divider: 0px;
+    in property <length> working-width: 0px;
 
     // How deep undo currently goes, shown rather than guessed at: a person
     // about to abandon an afternoon's work deserves to know how much of it is
@@ -584,6 +656,8 @@ component Surface inherits Rectangle {
     callback redo-clicked();
     callback place-node(string);
     callback node-moved(string, length, length);
+    // The divider between the two working panes was dragged by this much.
+    callback divider-moved(length);
     callback open-subdiagram(string);
     // Drawing a link: pressed on one node, released on another.
     callback link-started(string);
@@ -648,54 +722,34 @@ component Surface inherits Rectangle {
         HorizontalLayout {
             spacing: Space.step;
 
-            // The palette: one of every node type, drawn as it will be drawn
-            // on the canvas, so that what a shape means can be looked up
-            // rather than remembered.
-            Rectangle {
+            // The two selection panes: one of every node type, drawn as it
+            // will be drawn on the canvas, so that what a shape means can be
+            // looked up rather than remembered.
+            //
+            // Two of them because the canvas has two working panes, and a
+            // shape's pane is decided by which list it came from: everything
+            // the vehicle carries is a payload and goes on the right, and the
+            // rest of the graph goes on the left. A single list would leave
+            // that rule to be discovered by placing something and watching
+            // where it lands.
+            VerticalLayout {
                 width: 180px;
-                background: #f2f2f0;
-                border-width: 1px;
-                border-color: #d8d8d4;
+                spacing: Space.step;
 
-                palette-list := ScrollView {
-                    VerticalLayout {
-                        padding: Space.step;
-                        spacing: Space.step;
-                        Text {
-                            text: "Node types";
-                            font-size: Type.body;
-                            font-weight: Type.bold;
-                            height: 18px;
-                        }
-                        for p in palette: Rectangle {
-                            height: p.is-heading ? 22px : 56px;
-                            background: transparent;
-
-                            // A family's heading. Quiet: it is there to group
-                            // the shapes below it, not to be read first.
-                            if p.is-heading: Text {
-                                x: 0;
-                                y: 6px;
-                                text: p.heading;
-                                font-size: Type.small;
-                                font-weight: Type.bold;
-                                color: #6b7280;
-                            }
-
-                            if !p.is-heading: NodeShape {
-                                node: p.node;
-                            }
-                            // The whole row, so the hit area is the row and
-                            // not only the shape: a circle's corners are not
-                            // part of the circle, and a press there should
-                            // still place one.
-                            if !p.is-heading: TouchArea {
-                                mouse-cursor: MouseCursor.pointer;
-                                clicked => { place-node(p.node.node-type); }
-                            }
-                        }
-                        Rectangle { }
-                    }
+                SelectionPane {
+                    heading: "Vehicle node types";
+                    palette: root.vehicle-palette;
+                    vertical-stretch: 1;
+                    place-node(t) => { root.place-node(t); }
+                }
+                SelectionPane {
+                    heading: "Payload node types";
+                    palette: root.payload-palette;
+                    // The taller share: ten of the fourteen types are
+                    // payloads, and a pane that scrolls through ten rows four
+                    // at a time is a pane nobody finds the tenth in.
+                    vertical-stretch: 2;
+                    place-node(t) => { root.place-node(t); }
                 }
             }
 
@@ -727,6 +781,103 @@ component Surface inherits Rectangle {
                     width: 100%;
                     height: 1px;
                     background: #f3f4f6;
+                }
+
+                // The two working panes.
+                //
+                // The divider is at a fixed place in the coordinates the file
+                // holds and not at three quarters of the window. A node's
+                // pane decides what it is allowed to be, so it must not
+                // change when somebody resizes a window: the same
+                // configuration opened on a laptop and on a desk has to show
+                // the same two panes, or a payload would become a vehicle
+                // node by being looked at on a smaller screen.
+                // The line itself follows the pointer while the handle is
+                // held, and the divider settles when the gesture ends: one
+                // change for one gesture, as a node's drag is. The grip is a
+                // sibling and not a child, so its coordinates stay where the
+                // line was for as long as the gesture lasts -- an offset
+                // measured in a frame the offset moves cancels itself, which
+                // is a mistake this file has made once already.
+                Rectangle {
+                    x: divider + (divider-grip.pressed
+                        ? divider-grip.mouse-x - divider-grip.pressed-x
+                        : 0px);
+                    y: 0;
+                    width: divider-grip.has-hover || divider-grip.pressed ? 2px : 1px;
+                    height: 100%;
+                    background: divider-grip.has-hover || divider-grip.pressed
+                        ? #6b7280
+                        : #cbcdd1;
+
+                    // The handle: a grooved pill halfway down the line. A line
+                    // that can be dragged and one that cannot look identical
+                    // without it, and a control nobody can see is a control
+                    // nobody uses.
+                    Rectangle {
+                        x: -6px;
+                        y: parent.height / 2 - 20px;
+                        width: 13px;
+                        height: 40px;
+                        border-radius: 6px;
+                        border-width: 1px;
+                        border-color: divider-grip.has-hover || divider-grip.pressed
+                            ? #6b7280
+                            : #b4b7bd;
+                        background: divider-grip.pressed ? #e8e9eb : white;
+
+                        for groove in 3: Rectangle {
+                            x: 4px;
+                            y: 14px + groove * 6px;
+                            width: 5px;
+                            height: 1px;
+                            background: #9ca3af;
+                        }
+                    }
+                }
+
+                // What a press lands on. Wider than the line, because a line
+                // a pixel wide is a line nobody can hit; before the nodes in
+                // this file, so that a node held against the divider takes a
+                // press on itself rather than losing it to the divider.
+                divider-grip := TouchArea {
+                    x: divider - 7px;
+                    y: 0;
+                    width: 15px;
+                    height: 100%;
+                    mouse-cursor: MouseCursor.col-resize;
+                    pointer-event(event) => {
+                        if (event.kind == PointerEventKind.up) {
+                            divider-moved(self.mouse-x - self.pressed-x);
+                        }
+                    }
+                }
+                // Beyond the right-hand edge of the working area, which is
+                // nowhere a node can be put. Shaded rather than left white,
+                // because a bound that cannot be seen is a bound that feels
+                // like the drag sticking.
+                Rectangle {
+                    x: working-width;
+                    y: 0;
+                    width: max(0px, parent.width - working-width);
+                    height: 100%;
+                    background: #f6f6f4;
+                }
+                // And which pane is which. Named, because the rule about what
+                // may go where is worth one word at the top of each.
+                Text {
+                    x: Space.step;
+                    y: Space.tight;
+                    text: "vehicle";
+                    font-size: Type.small;
+                    color: #9ca3af;
+                }
+                Text {
+                    x: divider + Space.step;
+                    y: Space.tight;
+                    text: "payload";
+                    font-size: Type.small;
+                    color: #9ca3af;
                 }
 
                 // An empty canvas looks broken rather than new, so it says
@@ -844,12 +995,31 @@ component Surface inherits Rectangle {
 export component MainWindow inherits Window {
     title: "TCSpecial Configuration";
     background: #fbfbfa;
-    min-width: 900px;
+    // Wide enough for both working panes, both selection panes and the
+    // panel, which is what the preferred width is: 960 of working area, 180
+    // of selection panes, 260 of panel and the gaps between them. The
+    // minimum is smaller because a window that cannot be made to fit a
+    // screen is a window that cannot be used on it -- squeezed, the right of
+    // the payload working pane goes off the edge, which is a nuisance rather
+    // than a failure.
+    min-width: 1000px;
     min-height: 600px;
+    preferred-width: 1440px;
+    preferred-height: 820px;
 
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
-    in property <[PaletteEntry]> palette: [];
+    // The two selection panes' contents, and the two working panes' geometry.
+    //
+    // All four come from Rust -- see style.rs and main.rs -- because which
+    // types are payloads and where the divider falls are facts about a
+    // configuration rather than about a window, and they are checked by tests
+    // there. Stating the divider in this file as well would be stating it
+    // twice.
+    in property <[PaletteEntry]> vehicle-palette: [];
+    in property <[PaletteEntry]> payload-palette: [];
+    in property <length> divider: 0px;
+    in property <length> working-width: 0px;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -864,6 +1034,8 @@ export component MainWindow inherits Window {
     callback redo-clicked();
     callback place-node(string);
     callback node-moved(string, length, length);
+    // The divider between the two working panes was dragged by this much.
+    callback divider-moved(length);
     callback open-subdiagram(string);
     callback link-started(string);
     callback link-finished(string);
@@ -876,7 +1048,10 @@ export component MainWindow inherits Window {
         height: 100%;
         nodes: root.nodes;
         links: root.links;
-        palette: root.palette;
+        vehicle-palette: root.vehicle-palette;
+        payload-palette: root.payload-palette;
+        divider: root.divider;
+        working-width: root.working-width;
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
         undo-label: root.undo-label;
@@ -886,6 +1061,7 @@ export component MainWindow inherits Window {
         redo-clicked => { root.redo-clicked(); }
         place-node(t) => { root.place-node(t); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
+        divider-moved(dx) => { root.divider-moved(dx); }
         open-subdiagram(n) => { root.open-subdiagram(n); }
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
@@ -908,13 +1084,28 @@ export component MainWindow inherits Window {
 export component SubWindow inherits Window {
     title: "TCSpecial Configuration -- " + root.editing;
     background: #fbfbfa;
-    min-width: 760px;
+    // The same two working panes as the top diagram, so the same room: a
+    // subdiagram is a page of one configuration and its payloads go on the
+    // same side of it.
+    min-width: 1000px;
     min-height: 520px;
+    preferred-width: 1440px;
+    preferred-height: 760px;
 
     in property <string> editing: "";
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
-    in property <[PaletteEntry]> palette: [];
+    // The two selection panes' contents, and the two working panes' geometry.
+    //
+    // All four come from Rust -- see style.rs and main.rs -- because which
+    // types are payloads and where the divider falls are facts about a
+    // configuration rather than about a window, and they are checked by tests
+    // there. Stating the divider in this file as well would be stating it
+    // twice.
+    in property <[PaletteEntry]> vehicle-palette: [];
+    in property <[PaletteEntry]> payload-palette: [];
+    in property <length> divider: 0px;
+    in property <length> working-width: 0px;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -929,6 +1120,8 @@ export component SubWindow inherits Window {
     callback redo-clicked();
     callback place-node(string);
     callback node-moved(string, length, length);
+    // The divider between the two working panes was dragged by this much.
+    callback divider-moved(length);
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
@@ -941,7 +1134,10 @@ export component SubWindow inherits Window {
         editing: root.editing;
         nodes: root.nodes;
         links: root.links;
-        palette: root.palette;
+        vehicle-palette: root.vehicle-palette;
+        payload-palette: root.payload-palette;
+        divider: root.divider;
+        working-width: root.working-width;
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
         undo-label: root.undo-label;
@@ -951,6 +1147,7 @@ export component SubWindow inherits Window {
         redo-clicked => { root.redo-clicked(); }
         place-node(t) => { root.place-node(t); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
+        divider-moved(dx) => { root.divider-moved(dx); }
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
         selected: root.selected;

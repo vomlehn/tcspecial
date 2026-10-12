@@ -218,38 +218,11 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 }
             );
         }
+        // A path and nothing else: which channels are enabled and how fast
+        // the device samples are set through sysfs by whoever brought the
+        // sensor up, so a payload says neither.
         EndpointConfig::Iio(iio) => {
             let _ = writeln!(out, "  path             {}", iio.path);
-            // Both recorded rather than applied: a channel and a buffer are
-            // enabled through sysfs by whoever brought the sensor up, and
-            // said so here because a reader comparing this with the
-            // equipment is why they are kept.
-            match iio.channels {
-                Some(channels) => {
-                    let _ = writeln!(
-                        out,
-                        "  channels         {channels} enabled, recorded, not applied"
-                    );
-                }
-                None => {
-                    let _ = writeln!(
-                        out,
-                        "  channels         none stated, so the buffer is read as it comes"
-                    );
-                }
-            }
-            match iio.sample_rate {
-                Some(rate) => {
-                    let _ = writeln!(
-                        out,
-                        "  sample_rate      {rate} sample sets a second, recorded, not \
-                         applied"
-                    );
-                }
-                None => {
-                    let _ = writeln!(out, "  sample_rate      none stated");
-                }
-            }
         }
         EndpointConfig::Can(can) => {
             let _ = writeln!(out, "  interface        {}", can.interface);
@@ -269,24 +242,6 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 if can.fd { "yes" } else { "no" },
                 crate::node::can::frame_bytes(can.fd)
             );
-            // Recorded rather than applied, as an I2C bus speed is: said so
-            // here, because a reader comparing this with the equipment is
-            // the whole reason it is kept.
-            match can.bitrate {
-                Some(bitrate) => {
-                    let _ = writeln!(
-                        out,
-                        "  bitrate          {bitrate} bit/s, recorded, not applied"
-                    );
-                }
-                None => {
-                    let _ = writeln!(
-                        out,
-                        "  bitrate          none stated, so whatever the interface was \
-                         brought up at"
-                    );
-                }
-            }
             let _ = writeln!(
                 out,
                 "  loopback         {}",

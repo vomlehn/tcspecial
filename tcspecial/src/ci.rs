@@ -503,14 +503,10 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
         EndpointConfig::Rpmsg(rpmsg) => {
             format!("rpmsg {} ({})", rpmsg.path, rpmsg.service)
         }
-        EndpointConfig::Iio(iio) => format!(
-            "iio {}{}",
-            iio.path,
-            match iio.channels {
-                Some(channels) => format!(", {channels} channels"),
-                None => String::new(),
-            }
-        ),
+        // A path and nothing else: what is in the buffer is settled through
+        // sysfs by whoever brought the sensor up, so a payload says nothing
+        // about it.
+        EndpointConfig::Iio(iio) => format!("iio {}", iio.path),
         EndpointConfig::Can(can) => format!(
             "can {} id {:#x}, {}",
             can.interface,

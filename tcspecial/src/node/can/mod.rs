@@ -444,7 +444,6 @@ mod tests {
             interface: "vcan-nonesuch".to_string(),
             can_id: 0x100,
             fd: false,
-            bitrate: None,
             loopback: true,
         };
 
@@ -480,7 +479,6 @@ mod tests {
             interface: interface.clone(),
             can_id: 0x321,
             fd: false,
-            bitrate: None,
             loopback: true,
         };
 

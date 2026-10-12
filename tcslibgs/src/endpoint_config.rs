@@ -140,7 +140,6 @@ pub(crate) fn endpoint_of(
                 interface: interface.clone(),
                 can_id: *can_id,
                 fd: can.fd,
-                bitrate: can.bitrate,
                 loopback: can.loopback,
             })),
             // Only a CAN payload is located on an interface, so this is
@@ -187,10 +186,8 @@ pub(crate) fn endpoint_of(
                 "\"{what}\" names a device alone, but a device on an I2C bus needs the \
                  bus and the address on it"
             )),
-            GroupKind::Iio(iio) => Ok(EndpointConfig::Iio(IioConfig {
+            GroupKind::Iio(_) => Ok(EndpointConfig::Iio(IioConfig {
                 path: path.clone(),
-                channels: iio.channels,
-                sample_rate: iio.sample_rate,
             })),
             GroupKind::Gpio(gpio) => Ok(EndpointConfig::Gpio(GpioConfig {
                 path: path.clone(),
@@ -362,7 +359,6 @@ pub(crate) struct LinkTerms {
     pub(crate) pec: Option<Scalar>,
     pub(crate) retries: Option<Scalar>,
     pub(crate) timeout: Option<Scalar>,
-    pub(crate) bus_speed: Option<Scalar>,
     // A peripheral on one.
     pub(crate) max_speed: Option<Scalar>,
     /// Which of the four SPI modes a peripheral is clocked in.
@@ -384,12 +380,9 @@ pub(crate) struct LinkTerms {
     pub(crate) rs485_delay_after_send_ms: Option<Scalar>,
     /// Bits per second on a CAN bus, and whether its frames are CAN FD; see
     /// [`crate::node::can`].
-    pub(crate) bitrate: Option<Scalar>,
     pub(crate) can_fd: Option<Scalar>,
     /// What an IIO device is expected to be producing; see
     /// [`crate::node::iio`].
-    pub(crate) channels: Option<Scalar>,
-    pub(crate) sample_rate: Option<Scalar>,
     /// Which rpmsg channel a payload is, and how much one message carries;
     /// see [`crate::node::rpmsg`].
     pub(crate) service: Option<Scalar>,
@@ -710,7 +703,7 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 34] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 30] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
@@ -738,13 +731,8 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 34] {
         ("pec", g.pec.is_some()),
         ("retries", g.retries.is_some()),
         ("timeout", g.timeout.is_some()),
-        ("bus_speed", g.bus_speed.is_some()),
         // CAN.
-        ("bitrate", g.bitrate.is_some()),
         ("can_fd", g.can_fd.is_some()),
-        // IIO.
-        ("channels", g.channels.is_some()),
-        ("sample_rate", g.sample_rate.is_some()),
         // rpmsg.
         ("service", g.service.is_some()),
         ("max_message_bytes", g.max_message_bytes.is_some()),

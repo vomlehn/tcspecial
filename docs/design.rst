@@ -2729,6 +2729,28 @@ Requirement
     ``datarate`` on a peripheral are each refused.
 
 Requirement
+    A payload documents and takes only keywords whose values it can set
+    through the interface it uses. A value a file states and nothing applies
+    is worse than no keyword at all: the file looks configured, a reader
+    believes what it says, and the equipment is doing something else. Four
+    words went for that reason -- ``bus_speed``, ``bitrate``, ``channels`` and
+    ``sample_rate``. Each said something true about the equipment and none of
+    them could be set by a program that opens the interface: a bus clock
+    belongs to the controller the platform configures, a CAN bitrate to the
+    interface as it is brought up, and a sensor's channels and rate to the
+    ``sysfs`` entries whoever brought the sensor up wrote. A file that states
+    one is refused by name and told why, as a file writing
+    ``trigger_interval_ms`` is told the name that has now.
+
+    The one place this rule is not yet kept is a synchronous serial line,
+    whose ``clock_type``, ``encoding`` and ``loopback`` are recorded and not
+    applied -- the kernel drives such a line through a network interface of
+    its own rather than through the terms of a device file, so a handler that
+    opens a path cannot set them. Either those terms go the way of the four
+    above, or they are applied through that interface; see the requirement
+    below, which records what is so today.
+
+Requirement
     A term of a link is refused on the two types that are not on one: a
     network address and a plain device file. Every other type refuses what
     belongs to another type as its own rules are asked, and these two have no
@@ -2958,29 +2980,18 @@ hands over packed sample sets as they become ready.
 
 That is a device file a handler reads, which is nearly a ``device-file``
 payload.
-What makes it a type of its own is that it is read-only and that what the
-samples mean depends on terms a ``device-file`` payload has no words for. The
-rules
-are in ``tcslibgs::endpoint_config_iio``, the endpoint in
-``tcspecial::endpoint_iio`` and the stand-in in ``tcssim::payload_iio``.
+What makes it a type of its own is that it is read-only. The rules are in
+``tcslibgs::node::iio``, the endpoint in ``tcspecial::node::iio`` and the
+stand-in in ``tcssim::node::iio``.
 
 Requirement
-    An IIO payload is located by a path, and states a number of ``channels``
-    and a ``sample_rate`` or neither. A payload that states neither is a
-    buffer read as it comes, which is a perfectly good thing to be; the terms
-    are for a file that knows what the sensor was set up to produce.
-
-Requirement
-    Both terms are recorded and not applied. Channels and buffers are enabled
-    through ``sysfs`` by whoever brought the sensor up, and a handler that
-    wrote there would be reconfiguring a sensor other programs may be
-    reading. Keeping them lets a stream of samples nobody can account for be
-    held against what the file expected.
-
-Requirement
-    Neither may be nought. A buffer with no channels enabled produces
-    nothing, and a payload that produces nothing is a payload nobody can
-    read.
+    An IIO payload is located by a path and states nothing else. It took two
+    terms once -- a number of ``channels`` and a ``sample_rate`` -- and both
+    were recorded and never applied: channels and buffers are enabled through
+    ``sysfs`` by whoever brought the sensor up, and a handler that wrote there
+    would be reconfiguring a sensor other programs may be reading. A payload
+    documents and takes only what it can set, so a file that states either is
+    refused and told which word and why.
 
 Requirement
     An IIO payload has no stream section. A buffer read hands over whole
@@ -3062,11 +3073,11 @@ Requirement
     get wrong.
 
 Requirement
-    The bitrate is recorded and not applied, as an I\ :superscript:`2`\ C
-    bus speed is. A CAN interface's bitrate is set where the interface is
+    A CAN payload states no ``bitrate``. It is set where the interface is
     brought up, by the platform or by ``ip link``, and a handler that opens a
-    socket on it cannot change it; keeping it lets the bus a file describes be
-    checked against the equipment.
+    socket on it cannot change it -- so a file stating one would be stating a
+    value nothing applies. What a socket *can* set it does state: the frame
+    format and the loopback.
 
 Requirement
     A CAN payload may be triggered. Both ends are peers on the bus, so a
@@ -3262,8 +3273,6 @@ to complete a transfer.
 +---------------+----------+--------------------------------------------------+
 | timeout       | No       | How long a transfer waits before it fails        |
 +---------------+----------+--------------------------------------------------+
-| bus_speed     | No       | Bus clock rate in Hz. Recorded, not applied      |
-+---------------+----------+--------------------------------------------------+
 | packet_size   | No       | Bytes in one packet. Shared by every type of     |
 |               |          | payload, and listed with the rest above          |
 +---------------+----------+--------------------------------------------------+
@@ -3297,18 +3306,11 @@ Requirement
     was asked for can both be reported.
 
 Requirement
-    The bus clock rate is recorded rather than applied. It belongs to the bus
+    An I2C payload states no ``bus_speed``. The bus clock belongs to the
     controller, which the platform configures from the device tree or from
-    ACPI, and a program holding one open cannot change it.
-
-The last requirement is the one place where this type departs from the others,
-and it is worth saying why the attribute exists at all given that writing it
-changes nothing. A bus runs at one rate for every device on it, so the rate is
-not a payload's to choose. It is still worth stating, because a device that
-cannot keep up with the bus it has been wired to fails in ways that are hard to
-read from the symptoms. Recording the rate a payload expects lets that be checked
-against the platform at startup and reported plainly, rather than inferred later
-from corrupted transfers.
+    ACPI, and a program holding an endpoint open cannot change it -- so a file
+    stating one would be stating a value nothing applies. It was a term once,
+    recorded and never applied, and is refused by name now.
 
 SPI Payloads: a Peripheral
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

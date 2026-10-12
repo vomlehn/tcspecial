@@ -148,8 +148,6 @@ mod tests {
     fn a_buffer_that_is_not_there_is_reported() {
         let config = IioConfig {
             path: "/dev/iio:device-nonesuch".to_string(),
-            channels: Some(2),
-            sample_rate: Some(100),
         };
 
         let said = match IioEndpoint::new("sensor", &config) {
@@ -180,8 +178,6 @@ mod tests {
             "sensor",
             &IioConfig {
                 path: file.path().display().to_string(),
-                channels: Some(2),
-                sample_rate: None,
             },
         )
         .expect("the buffer opens");
@@ -200,8 +196,6 @@ mod tests {
             "sensor",
             &IioConfig {
                 path: file.path().display().to_string(),
-                channels: None,
-                sample_rate: None,
             },
         )
         .expect("the buffer opens");

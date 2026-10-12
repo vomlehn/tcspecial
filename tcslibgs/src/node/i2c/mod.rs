@@ -36,14 +36,6 @@ pub struct I2cParams {
     /// How long a transfer waits before it fails, rounded up to the 10 ms
     /// the bus driver keeps it in.
     pub timeout: Option<Duration>,
-    /// Bus clock rate in Hz, as the file recorded it.
-    ///
-    /// Recorded, never applied: the rate belongs to the bus controller, which
-    /// the platform configures from the device tree or from ACPI, and a
-    /// program holding an endpoint open cannot change it. Keeping it lets the
-    /// rate a group expects be checked against the platform and reported
-    /// plainly, rather than inferred later from corrupted transfers.
-    pub bus_speed: Option<u32>,
 }
 
 impl I2cParams {
@@ -137,7 +129,7 @@ pub(crate) fn group_kind_of(
         name,
         "i2c",
         &g,
-        &["ten_bit", "pec", "retries", "timeout", "bus_speed"],
+        &["ten_bit", "pec", "retries", "timeout"],
     )?;
     reject_stream(name, "i2c", g.stream.is_some())?;
 
@@ -154,25 +146,10 @@ pub(crate) fn group_kind_of(
         None => None,
     };
 
-    // Recorded, not applied: see I2cParams::bus_speed. A rate of zero
-    // is still rejected, because a file that records one is making a
-    // claim about the platform and zero is not a claim.
-    let bus_speed = match g.bus_speed.as_ref() {
-        Some(s) => {
-            let hz = parse_u32(name, "bus_speed", s)?;
-            if hz == 0 {
-                return Err(bad(name, "bus_speed must be greater than zero"));
-            }
-            Some(hz)
-        }
-        None => None,
-    };
-
     Ok(GroupKind::I2c(I2cParams {
         ten_bit,
         pec,
         retries,
         timeout,
-        bus_speed,
     }))
 }

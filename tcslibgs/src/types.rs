@@ -826,11 +826,11 @@ pub struct RpmsgConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IioConfig {
     /// The character device the buffer is read from: `/dev/iio:device0`.
+    ///
+    /// All there is. Which channels are enabled and how fast the device
+    /// samples are set through `sysfs` by whoever brought the sensor up, so a
+    /// payload says neither: see [`crate::node::iio`].
     pub path: String,
-    /// How many channels the file says are enabled, recorded not applied.
-    pub channels: Option<u32>,
-    /// How many sample sets a second it expects, recorded not applied.
-    pub sample_rate: Option<u32>,
 }
 
 /// Configuration for an endpoint on a CAN bus
@@ -848,9 +848,6 @@ pub struct CanConfig {
     /// Whether frames are CAN FD, which is also what lets a packet be longer
     /// than eight bytes.
     pub fd: bool,
-    /// Bits per second, recorded rather than applied: a bitrate belongs to
-    /// the interface and is set where it is brought up.
-    pub bitrate: Option<u32>,
     /// Whether the controller loops frames back to other sockets on this
     /// host, which is what lets tcssim stand in for the payload.
     pub loopback: bool,
@@ -1131,6 +1128,58 @@ pub(crate) fn kind_of_terms(
     .map_err(|e| format!("{e}"))
 }
 
+impl DHConfigJson {
+    /// A term this payload states that nothing can apply, if it states one.
+    ///
+    /// Four words were terms once and are not any more: `bus_speed`,
+    /// `bitrate`, `channels` and `sample_rate`. Each said something true about
+    /// the equipment and none of them could be set by a program that opens the
+    /// interface -- a bus clock belongs to the controller the platform
+    /// configures, a CAN bitrate to the interface as it is brought up, and a
+    /// sensor's channels and rate to the `sysfs` entries whoever brought the
+    /// sensor up wrote. A payload documents and takes only what it can set, so
+    /// they are gone.
+    ///
+    /// Refused by name rather than left unknown. A file that states one wrote
+    /// something that was right once, and the useful answer says which word
+    /// and why -- as a file writing `trigger_interval_ms` is told the name that
+    /// has now.
+    fn a_term_nothing_applies(
+        &self,
+        group: Option<&DHGroupJson>,
+    ) -> Option<(&'static str, &'static str)> {
+        let stated = |mine: &Option<Scalar>, theirs: fn(&DHGroupJson) -> bool| {
+            mine.is_some() || group.is_some_and(theirs)
+        };
+
+        [
+            (
+                "bus_speed",
+                stated(&self.bus_speed, |g| g.bus_speed.is_some()),
+                "a bus clock belongs to the controller, which the platform                  configures from the device tree or from ACPI",
+            ),
+            (
+                "bitrate",
+                stated(&self.bitrate, |g| g.bitrate.is_some()),
+                "a CAN bitrate belongs to the interface and is set where it is                  brought up, by the platform or by ip link",
+            ),
+            (
+                "channels",
+                stated(&self.channels, |g| g.channels.is_some()),
+                "which channels of a sensor are enabled is set through sysfs by                  whoever brought the sensor up",
+            ),
+            (
+                "sample_rate",
+                stated(&self.sample_rate, |g| g.sample_rate.is_some()),
+                "how fast a sensor samples is set through sysfs by whoever                  brought the sensor up",
+            ),
+        ]
+        .into_iter()
+        .find(|(_, present, _)| *present)
+        .map(|(field, _, why)| (field, why))
+    }
+}
+
 /// The terms a payload states about its link, with its group laid under it.
 ///
 /// Apart from [`link_params_of`] because two callers want them. That one asks
@@ -1167,7 +1216,6 @@ fn link_terms_of(
         pec: inherited!(pec),
         retries: inherited!(retries),
         timeout: inherited!(timeout),
-        bus_speed: inherited!(bus_speed),
         max_speed: inherited!(max_speed),
         spi_mode: inherited!(spi_mode),
         bits_per_word: inherited!(bits_per_word),
@@ -1177,10 +1225,7 @@ fn link_terms_of(
         rs485_rts_on_send: inherited!(rs485_rts_on_send),
         rs485_delay_before_send_ms: inherited!(rs485_delay_before_send_ms),
         rs485_delay_after_send_ms: inherited!(rs485_delay_after_send_ms),
-        bitrate: inherited!(bitrate),
         can_fd: inherited!(can_fd),
-        channels: inherited!(channels),
-        sample_rate: inherited!(sample_rate),
         service: inherited!(service),
         max_message_bytes: inherited!(max_message_bytes),
         lines: inherited!(lines),
@@ -1508,8 +1553,7 @@ pub struct DHGroupJson {
     /// How long an I2C transfer waits.
     #[serde(default)]
     pub timeout: Option<Scalar>,
-    /// The clock rate of an I2C bus, recorded rather than set: the platform
-    /// is what sets it.
+    /// No longer a term: see [`DHConfigJson::a_term_nothing_applies`].
     #[serde(default)]
     pub bus_speed: Option<Scalar>,
     /// The fastest a SPI peripheral may be clocked. SPI payloads only.
@@ -1552,17 +1596,15 @@ pub struct DHGroupJson {
     /// The identifier a CAN payload's frames carry. CAN payloads only.
     #[serde(default)]
     pub can_id: Option<Scalar>,
-    /// Bits per second on a CAN bus, recorded rather than applied.
+    /// No longer a term: see [`DHConfigJson::a_term_nothing_applies`].
     #[serde(default)]
     pub bitrate: Option<Scalar>,
     /// Whether a CAN payload's frames are CAN FD rather than classic CAN.
     #[serde(default)]
     pub can_fd: Option<Scalar>,
-    /// How many channels an IIO device has enabled. IIO payloads only, and
-    /// experimental; see [`crate::node::iio`].
+    /// No longer terms: see [`DHConfigJson::a_term_nothing_applies`].
     #[serde(default)]
     pub channels: Option<Scalar>,
-    /// How many sample sets a second it is expected to produce.
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
     /// The service name an rpmsg channel was announced with. rpmsg payloads
@@ -1699,8 +1741,7 @@ pub struct DHConfigJson {
     /// How long an I2C transfer waits.
     #[serde(default)]
     pub timeout: Option<Scalar>,
-    /// The clock rate of an I2C bus, recorded rather than set: the platform
-    /// is what sets it.
+    /// No longer a term: see [`DHConfigJson::a_term_nothing_applies`].
     #[serde(default)]
     pub bus_speed: Option<Scalar>,
     /// The fastest a SPI peripheral may be clocked. SPI payloads only.
@@ -1743,17 +1784,15 @@ pub struct DHConfigJson {
     /// The identifier a CAN payload's frames carry. CAN payloads only.
     #[serde(default)]
     pub can_id: Option<Scalar>,
-    /// Bits per second on a CAN bus, recorded rather than applied.
+    /// No longer a term: see [`DHConfigJson::a_term_nothing_applies`].
     #[serde(default)]
     pub bitrate: Option<Scalar>,
     /// Whether a CAN payload's frames are CAN FD rather than classic CAN.
     #[serde(default)]
     pub can_fd: Option<Scalar>,
-    /// How many channels an IIO device has enabled. IIO payloads only, and
-    /// experimental; see [`crate::node::iio`].
+    /// No longer terms: see [`DHConfigJson::a_term_nothing_applies`].
     #[serde(default)]
     pub channels: Option<Scalar>,
-    /// How many sample sets a second it is expected to produce.
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
     /// The service name an rpmsg channel was announced with. rpmsg payloads
@@ -1930,6 +1969,18 @@ impl DHConfigJson {
         // kinds that are not on a link at all are told so here. A bus and a
         // peripheral are told by the rules for their kind, which have always
         // refused one: a master clocks exactly the bytes it asks for.
+        // A word that was a term once and is not any more, before anything
+        // else is read: a file that states one is told which word and why,
+        // rather than having the value taken and never applied.
+        if let Some((field, why)) = self.a_term_nothing_applies(group) {
+            return Err(format!(
+                "payload \"{}\": {field} is not a term any more -- {why}, so nothing \
+                 here could apply what the file says. A payload states only what it \
+                 can set",
+                self.name
+            ));
+        }
+
         let stream = self.stream.is_some() || group.is_some_and(|g| g.stream.is_some());
         let foreign: &[(&str, bool, bool)] = match kind {
             DHType::Network => &[
@@ -4034,7 +4085,6 @@ payloads:
             "pec: true",
             "max_speed: 1000000",
             "can_fd: true",
-            "channels: 2",
             "service: payload",
             "lines: 0",
             "rs485: true",
@@ -4289,39 +4339,38 @@ payloads:
         );
     }
 
-    /// An IIO payload reaches a handler with what its buffer is expected to
-    /// hold.
+    /// An IIO payload reaches a handler as the buffer it is, and no more.
+    ///
+    /// A path and nothing else. It took two terms once -- how many channels
+    /// were enabled and how fast the device samples -- and neither could be
+    /// applied by a program that opens the character device, so a payload
+    /// states neither and a file that states one is refused.
     #[test]
-    fn an_iio_payload_is_a_buffer_and_what_it_holds() {
-        let sensor = "    path: /dev/iio:device0\n    channels: 3\n    \
-                      sample_rate: 100\n    packet_size: 12\n";
-        let handlers = link("iio", sensor)
+    fn an_iio_payload_is_a_buffer_and_nothing_else() {
+        let handlers = link("iio", "    path: /dev/iio:device0\n    packet_size: 12\n")
             .expect("a sensor")
             .to_dh_configs()
             .expect("it becomes a handler");
 
         match &handlers[0].endpoint {
-            EndpointConfig::Iio(iio) => {
-                assert_eq!(iio.path, "/dev/iio:device0");
-                assert_eq!(iio.channels, Some(3));
-                assert_eq!(iio.sample_rate, Some(100));
-            }
+            EndpointConfig::Iio(iio) => assert_eq!(iio.path, "/dev/iio:device0"),
             other => panic!("expected an IIO endpoint, got {other:?}"),
         }
         assert_eq!(handlers[0].endpoint.kind(), DHType::Iio);
 
-        // And a sensor that says only where it is, which is a buffer read as
-        // it comes.
-        let bare = link("iio", "    path: /dev/iio:device1\n    packet_size: 4\n")
-            .expect("a sensor")
+        for term in ["channels: 3", "sample_rate: 100"] {
+            let said = link(
+                "iio",
+                &format!("    path: /dev/iio:device0\n    packet_size: 12\n    {term}\n"),
+            )
+            .expect("it parses")
             .to_dh_configs()
-            .expect("it becomes a handler");
-        match &bare[0].endpoint {
-            EndpointConfig::Iio(iio) => {
-                assert_eq!(iio.channels, None);
-                assert_eq!(iio.sample_rate, None);
-            }
-            other => panic!("expected an IIO endpoint, got {other:?}"),
+            .expect_err("a term nothing can apply");
+            let field = term.split(':').next().expect("a term");
+            assert!(
+                said.contains(field) && said.contains("sysfs"),
+                "the complaint should name the term and say why: {said}"
+            );
         }
     }
 
@@ -4371,8 +4420,7 @@ payloads:
     /// carry is what tells one payload on a shared bus from another.
     #[test]
     fn a_can_payload_is_an_interface_and_an_identifier() {
-        let bus = "    interface: vcan0\n    can_id: 0x123\n    bitrate: 500000\n    \
-                   packet_size: 8\n";
+        let bus = "    interface: vcan0\n    can_id: 0x123\n    packet_size: 8\n";
         let handlers = link("can", bus)
             .expect("a payload on a CAN bus")
             .to_dh_configs()
@@ -4383,7 +4431,6 @@ payloads:
                 assert_eq!(can.interface, "vcan0");
                 assert_eq!(can.can_id, 0x123);
                 assert!(!can.fd, "classic CAN unless the file says otherwise");
-                assert_eq!(can.bitrate, Some(500_000));
                 assert!(can.loopback, "and looped back, which is what the kernel does");
             }
             other => panic!("expected a CAN endpoint, got {other:?}"),
@@ -4808,14 +4855,13 @@ payloads:
     fn a_bus_reads_its_terms() {
         let i2c = bus(
             "    ten_bit: false\n    pec: true\n    retries: 3\n    timeout: 50ms\n    \
-             bus_speed: 400000\n    address: 0x48\n",
+             address: 0x48\n",
         )
         .expect("every term of a bus");
         assert!(!i2c.ten_bit);
         assert!(i2c.pec);
         assert_eq!(i2c.retries, 3);
         assert_eq!(i2c.timeout, Some(Duration::from_millis(50)));
-        assert_eq!(i2c.bus_speed, Some(400_000));
     }
 
     #[test]
@@ -4827,7 +4873,6 @@ payloads:
         assert!(!i2c.pec);
         assert_eq!(i2c.retries, 0);
         assert_eq!(i2c.timeout, None);
-        assert_eq!(i2c.bus_speed, None);
     }
 
     #[test]
@@ -5096,7 +5141,7 @@ payloads:
                     payloads:\n  \
                     - name: a\n    type: i2c\n    path: /dev/i2c-0\n    \
                     address: 0x2A\n    pec: true\n    retries: 2\n    \
-                    bus_speed: 400000\n    packet_size: 8\n  \
+                    packet_size: 8\n  \
                     - name: b\n    type: spi\n    path: /dev/spidev1.0\n    \
                     max_speed: 8000000\n    spi_mode: 1\n    bit_order: lsb\n    \
                     packet_size: 8\n";
@@ -5111,7 +5156,6 @@ payloads:
     <address>0x2A</address>
     <pec>true</pec>
     <retries>2</retries>
-    <bus_speed>400000</bus_speed>
     <packet_size>8</packet_size>
   </payloads>
   <payloads>

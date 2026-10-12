@@ -422,7 +422,6 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
         "pec" => terms.pec = value,
         "retries" => terms.retries = value,
         "timeout" => terms.timeout = value,
-        "bus_speed" => terms.bus_speed = value,
         // A peripheral on a SPI bus.
         "max_speed" => terms.max_speed = value,
         "spi_mode" => terms.spi_mode = value,
@@ -435,11 +434,7 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
         "rs485_delay_before_send_ms" => terms.rs485_delay_before_send_ms = value,
         "rs485_delay_after_send_ms" => terms.rs485_delay_after_send_ms = value,
         // A CAN bus.
-        "bitrate" => terms.bitrate = value,
         "can_fd" => terms.can_fd = value,
-        // A sensor's buffer.
-        "channels" => terms.channels = value,
-        "sample_rate" => terms.sample_rate = value,
         // A channel to another core.
         "service" => terms.service = value,
         "max_message_bytes" => terms.max_message_bytes = value,

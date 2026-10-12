@@ -213,7 +213,6 @@ impl NodeType {
                 ("pec", false),
                 ("retries", false),
                 ("timeout", false),
-                ("bus_speed", false),
             ],
             NodeType::Spi => &[
                 ("path", true),
@@ -236,15 +235,12 @@ impl NodeType {
             NodeType::Can => &[
                 ("interface", true),
                 ("can_id", true),
-                ("bitrate", false),
                 ("can_fd", false),
                 ("loopback", false),
                 ("group", false),
             ],
             NodeType::Iio => &[
                 ("path", true),
-                ("channels", false),
-                ("sample_rate", false),
                 ("group", false),
             ],
             NodeType::Rpmsg => &[("path", true), ("service", true), ("group", false)],

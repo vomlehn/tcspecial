@@ -25,7 +25,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::endpoint_config::{bad, parse_flag, parse_u32, EndpointConfigResult, GroupKind, LinkTerms};
+use crate::endpoint_config::{bad, parse_flag, EndpointConfigResult, GroupKind, LinkTerms};
 use crate::endpoint_config::reject_foreign_fields;
 use crate::endpoint_config::reject_stream;
 
@@ -37,14 +37,6 @@ pub struct CanParams {
     /// Applied: the socket is told to accept and send FD frames, which is
     /// also what lets a packet be longer than eight bytes.
     pub fd: bool,
-    /// Bits per second on the bus.
-    ///
-    /// Recorded rather than applied, as an I2C bus speed is: a CAN
-    /// interface's bitrate belongs to the interface and is set when it is
-    /// brought up, by the platform or by `ip link`, and a handler that opens a
-    /// socket on it cannot change it. Kept so that the bus a file describes
-    /// can be checked against the equipment.
-    pub bitrate: Option<u32>,
     /// Whether the controller loops frames back to every socket on the host.
     ///
     /// Applied. On by default in the kernel, which is what lets two programs
@@ -114,22 +106,12 @@ pub fn check_can_id(name: &str, can_id: u32) -> EndpointConfigResult<u32> {
 /// simulator uses, and classic frames and loopback are what a bus does
 /// unless a file says otherwise.
 pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<GroupKind> {
-    reject_foreign_fields(name, "can", &g, &["bitrate", "can_fd", "loopback"])?;
+    reject_foreign_fields(name, "can", &g, &["can_fd", "loopback"])?;
 
     // A frame is its own length, so there is nothing for a stream rule to
     // say: the reason a bus has none either.
     reject_stream(name, "can", g.stream.is_some())?;
 
-    let bitrate = match g.bitrate.as_ref() {
-        Some(stated) => {
-            let bitrate = parse_u32(name, "bitrate", stated)?;
-            if bitrate == 0 {
-                return Err(bad(name, "bitrate must be greater than zero"));
-            }
-            Some(bitrate)
-        }
-        None => None,
-    };
 
     let fd = parse_flag(name, "can_fd", g.can_fd.as_ref())?.unwrap_or(false);
 
@@ -139,7 +121,6 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
 
     Ok(GroupKind::Can(CanParams {
         fd,
-        bitrate,
         loopback,
     }))
 }
@@ -154,7 +135,6 @@ mod tests {
         for (field, value) in stated {
             let value = Some(Scalar::of(*value));
             match *field {
-                "bitrate" => g.bitrate = value,
                 "can_fd" => g.can_fd = value,
                 "loopback" => g.loopback = value,
                 "datarate" => g.datarate = value,
@@ -171,38 +151,35 @@ mod tests {
         }
     }
 
-    /// A bus that states nothing is classic CAN, looped back, at whatever
-    /// rate the interface was brought up at.
+    /// A bus that states nothing is classic CAN, looped back.
     #[test]
     fn a_bus_that_states_nothing_is_classic_can() {
         assert_eq!(
             params(&[]),
             CanParams {
                 fd: false,
-                bitrate: None,
                 loopback: true,
             }
         );
     }
 
-    /// Each term is read, and a rate of nought is refused.
+    /// Each term a socket can set is read.
+    ///
+    /// Two of them, and both are applied: the frame format through
+    /// `CAN_RAW_FD_FRAMES` and the loopback through `CAN_RAW_LOOPBACK`. The
+    /// bitrate used to be a third and is not a term any more -- it belongs to
+    /// the interface and is set where it is brought up, so nothing here could
+    /// apply what a file said.
     #[test]
     fn what_a_bus_may_say_about_itself() {
         assert_eq!(
-            params(&[("bitrate", "500000"), ("can_fd", "true"), ("loopback", "false")]),
+            params(&[("can_fd", "true"), ("loopback", "false")]),
             CanParams {
                 fd: true,
-                bitrate: Some(500_000),
                 loopback: false,
             }
         );
 
-        let said = group_kind_of("payload", terms(&[("bitrate", "0")]))
-            .expect_err("a bus at no bits per second");
-        assert!(
-            format!("{said}").contains("bitrate"),
-            "the error should name the term: {said}"
-        );
     }
 
     /// A term of another kind of link is refused here as everywhere.

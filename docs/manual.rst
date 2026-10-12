@@ -428,8 +428,6 @@ interface, and a payload on it is addressed by the identifier its frames carry.
 
    interface      the controller: can0, or vcan0 for the kernel's virtual bus
    can_id         the identifier this payload's frames carry, decimal or 0x
-   bitrate        bits per second. Recorded, not applied: a bitrate belongs
-                  to the interface and is set where it is brought up
    can_fd         true | false, default false -- CAN FD frames rather than
                   classic CAN, which is also what lets a packet be longer
                   than eight bytes
@@ -596,15 +594,13 @@ an ADC looks like on Linux.
 .. code-block:: text
 
    path           the buffer: /dev/iio:device0
-   channels       how many channels are enabled. Recorded, not applied
-   sample_rate    sample sets a second the device is expected to produce.
-                  Recorded, not applied
 
-Both terms are optional, and both are recorded rather than applied: enabling
-a channel and a buffer is done through ``sysfs`` by whoever brought the sensor
-up, and a handler that wrote there would be reconfiguring a sensor other
-programs may be reading. What they are for is saying what the file expects, so
-a stream of samples nobody can account for can be held against it.
+That is the whole of it: an IIO payload has no terms of its own. Which
+channels are enabled and how fast the device samples are set through ``sysfs``
+by whoever brought the sensor up -- a handler that wrote there would be
+reconfiguring a sensor other programs may be reading -- so a payload says
+neither. It said both once, as ``channels`` and ``sample_rate``, recorded and
+never applied; a file that still states one is refused by name and told why.
 
 A read hands over whole sample sets, as many as are ready, so there is no
 stream section: nothing has to say where a read ends.
@@ -761,8 +757,6 @@ same bus and differ only in which device the master addresses.
    retries        how many times the master tries a transfer
    timeout        a whole number with a unit: 50ms, 2s. Rounded up to a
                   multiple of 10 ms by the kernel
-   bus_speed      recorded, not applied: the bus clock belongs to the
-                  controller and is set by the platform
 
 With seven-bit addressing the usable addresses are 0x08 through 0x77: the
 specification reserves 0x00 through 0x07 and 0x78 through 0x7F, so no device

@@ -70,6 +70,46 @@ struct Views {
 }
 
 impl Views {
+    /// Say which node a window's panel is showing, and nothing else.
+    ///
+    /// Apart from [`Views::refresh`] because choosing a node must not rebuild
+    /// the canvas. Rebuilding it replaces every element on it, including the
+    /// one the pointer is pressing -- and a press is how a node is chosen, so
+    /// a full redraw there destroyed the element mid-gesture and the drag that
+    /// had just begun went with it. A dragged node sat exactly where it was
+    /// and nothing said why.
+    ///
+    /// Nothing on the canvas needs rebuilding for a selection anyway: a node
+    /// is drawn as chosen by comparing its name with the window's `selected`,
+    /// so setting that one property is the whole of it.
+    fn chose(&self, editor: &Editor, home: &Home) {
+        let chosen = self.chosen.borrow();
+        match home {
+            None => {
+                if let Some(top) = self.top.upgrade() {
+                    let panel = panel_of(editor, &None, chosen.get("").map(|s| s.as_str()));
+                    top.set_selected(panel.0.clone().into());
+                    top.set_selected_type(panel.1.clone().into());
+                    top.set_selected_comment(panel.2.clone().into());
+                    top.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
+                }
+            }
+            Some(home) => {
+                if let Some(window) = self.open.get(home) {
+                    let panel = panel_of(
+                        editor,
+                        &Some(home.clone()),
+                        chosen.get(home).map(|s| s.as_str()),
+                    );
+                    window.set_selected(panel.0.clone().into());
+                    window.set_selected_type(panel.1.clone().into());
+                    window.set_selected_comment(panel.2.clone().into());
+                    window.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
+                }
+            }
+        }
+    }
+
     /// Draw every window from the document as it now is.
     fn refresh(&self, editor: &Editor) {
         let chosen = self.chosen.borrow();
@@ -295,7 +335,11 @@ macro_rules! wiring {
                         home.clone().unwrap_or_default(),
                         name.to_string(),
                     );
-                    views.borrow().refresh(&editor.borrow());
+                    // The panel only: choosing a node is the same press that
+                    // starts dragging it, and rebuilding the canvas here
+                    // would replace the element the pointer is holding. See
+                    // Views::chose.
+                    views.borrow().chose(&editor.borrow(), &home);
                 });
             }
             {
@@ -1334,22 +1378,161 @@ mod tests {
         assert!(FIRST_PLACE.0 > 0 && FIRST_PLACE.1 > 0);
     }
 
-    /// A node follows the pointer, and the move it reports is the one made.
+    /// What needs a window, which is one test because only one may have one.
     ///
-    /// Pressed, moved and released through the window, because that is the one
-    /// way to find out: a drag is markup, so the arithmetic that places a node
-    /// while the pointer is down cannot be tested by calling anything. What
-    /// this caught is worth saying -- the offset was measured against the
-    /// node's own `TouchArea`, which moves with the node, so the delta
-    /// cancelled itself and a dragged node went nowhere.
+    /// One test per binary may start the testing backend, and its windows
+    /// belong to the thread that made them -- so these are functions called in
+    /// order rather than tests of their own, as tcsmoc's window tests are.
     #[test]
+    fn what_a_window_shows_and_what_a_gesture_does() {
+        i_slint_backend_testing::init_integration_test_with_system_time();
+
+        dragging_a_node_moves_it();
+        a_node_follows_the_pointer_and_reports_where_it_went();
+    }
+
+    /// Dragging a node moves it, all the way into the document.
+    ///
+    /// Pressed, moved and released through the window, and then the document
+    /// is read: a drag is markup wired to a handler, so nothing short of the
+    /// whole path says whether dragging works. It is the one gesture that
+    /// cannot be tried any other way, and it was broken twice over -- once in
+    /// the arithmetic that places a node while the pointer is down, and once
+    /// by the canvas being rebuilt under the pointer when the same press
+    /// chose the node.
+    fn dragging_a_node_moves_it() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        // An editor on a file of this test's own: tcsgui saves as it edits,
+        // and a test that wrote into the repository would be a test that
+        // rewrote whatever it was pointed at.
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::recover(
+            &where_.path().join("graph.yaml"),
+        )));
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "temp_fore".to_string(),
+            node_type: "i2c".to_string(),
+            home: None,
+        });
+        // Somewhere on the canvas rather than in its corner: a node at the
+        // origin is a node whose own position cannot be told from the
+        // canvas's.
+        editor.borrow_mut().edit(Edit::MoveNode {
+            node: "temp_fore".to_string(),
+            was: (0, 0),
+            now: (120, 88),
+        });
+        let was = editor
+            .borrow()
+            .document()
+            .node("temp_fore")
+            .expect("the node")
+            .at;
+
+        let ui = MainWindow::new().expect("a window");
+        ui.set_palette(palette());
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        views.borrow_mut().chosen = chosen.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+
+        ui.show().expect("the window shows");
+
+        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+            .next()
+            .expect("the window has a canvas");
+        let at = canvas.absolute_position();
+        let (width, height) = size_of("i2c");
+
+        // The middle of the node, which is where a person presses.
+        let from = slint::LogicalPosition::new(
+            at.x + was.0 as f32 + width as f32 / 2.0,
+            at.y + was.1 as f32 + height as f32 / 2.0,
+        );
+        let by = (64.0, 40.0);
+
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: from });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+
+        // A pointer sends a stream of small movements, not one jump, and a
+        // drag has to add up to the same thing either way: an offset measured
+        // in a frame the offset itself moves loses a little on every step, so
+        // a single jump and a hundred steps are two different tests.
+        let steps = 8;
+        for step in 1..=steps {
+            let part = step as f32 / steps as f32;
+            ui.window().dispatch_event(WindowEvent::PointerMoved {
+                position: slint::LogicalPosition::new(
+                    from.x + by.0 * part,
+                    from.y + by.1 * part,
+                ),
+            });
+        }
+
+        // It follows the pointer while the gesture is running, which is the
+        // half a person sees: a drag that only moved the node on release
+        // would look like a drag that was doing nothing.
+        // The one on the canvas, the others being the palette's.
+        let drawn = testing::ElementHandle::find_by_element_id(&ui, "NodeShape::moving")
+            .find(|handle| handle.absolute_position().x >= at.x)
+            .expect("a node draws its parts in a container that the drag moves");
+        let followed = drawn.absolute_position();
+        assert!(
+            (followed.x - (at.x + was.0 as f32 + by.0)).abs() < 1.0
+                && (followed.y - (at.y + was.1 as f32 + by.1)).abs() < 1.0,
+            "mid-drag the node is drawn at ({}, {}), not ({}, {})",
+            followed.x,
+            followed.y,
+            at.x + was.0 as f32 + by.0,
+            at.y + was.1 as f32 + by.1
+        );
+
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: slint::LogicalPosition::new(from.x + by.0, from.y + by.1),
+            button: PointerEventButton::Left,
+        });
+
+        // And the document says so, which is what is saved and what undo
+        // takes back.
+        let now = editor
+            .borrow()
+            .document()
+            .node("temp_fore")
+            .expect("the node")
+            .at;
+        assert_eq!(
+            now,
+            (was.0 + by.0 as i32, was.1 + by.1 as i32),
+            "a node dragged by {by:?} from {was:?} is at {now:?}"
+        );
+    }
+
+    /// The markup alone reports the move it was given.
+    ///
+    /// Apart from the one above because it fails differently: this says the
+    /// drag arithmetic is wrong, where that says the gesture does not reach
+    /// the document. The offset used to be measured against the node's own
+    /// `TouchArea`, which moves with the node, so the delta cancelled itself
+    /// -- and this reported (0, 0) for every drag.
     fn a_node_follows_the_pointer_and_reports_where_it_went() {
         use i_slint_backend_testing as testing;
         use slint::platform::{PointerEventButton, WindowEvent};
         use std::cell::Cell;
         use std::rc::Rc;
-
-        testing::init_integration_test_with_system_time();
 
         let window = MainWindow::new().expect("a window");
         let at = (120, 90);

@@ -863,11 +863,26 @@ Within a session the divider is one position in the document's own
 coordinates, shared by every window, and not three quarters of whatever window
 it is drawn in. Which pane a node is in says what it is allowed to be, so a
 divider that moved with the window would make a payload into a vehicle node by
-being looked at on a smaller screen. For the same reason opening a file moves
-nothing: a node the file puts on the wrong side stays where the file put it
-until somebody drags it, and then it comes home. An editor that silently
-rewrote positions would be an editor that changed a file by being pointed at
-it.
+being looked at on a smaller screen.
+
+Reading a configuration puts every node in the pane its type belongs to. A
+payload the file draws in the vehicle working pane is a drawing that
+contradicts the rule the editor enforces everywhere else, and a reader has to
+be told which of the two to believe; the commonest source of one is a file
+written before the canvas was divided at all. A node that has to move keeps its
+height and takes the near edge of its own pane, which is the smallest move that
+obeys the rule, and steps down the grid from there if that would land it on top
+of another -- a file with its payloads in a row would otherwise come up as one
+payload with the rest hidden behind it.
+
+That is a change to the document, so it is worth saying what it is not. It is
+not an edit: nothing goes into the history, because undoing it would put a node
+back somewhere the editor refuses to put one. And it writes nothing -- the file
+is byte for byte what it was until something is actually edited, at which point
+the corrected positions are written along with everything else, because every
+edit rewrites the whole file. Opening a configuration to look at it is not
+editing it, and an editor that rewrote a file under version control by being
+pointed at it would be an editor nobody could point at anything.
 
 Every node is drawn the same width. Nodes of four widths in a column have no
 edge to line up on, and a diagram built from them looks approximate however

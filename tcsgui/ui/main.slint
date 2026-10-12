@@ -100,14 +100,16 @@ export struct FieldView {
 }
 
 export struct LinkView {
-    // The route and the arrowhead, as SVG path data in canvas coordinates.
+    // The route, the arrowhead at its end, and the marker in the middle of its
+    // longest run, as SVG path data in canvas coordinates.
     //
     // Computed in Rust -- see route.rs -- because a route is arithmetic, and
     // arithmetic in a layout language is hard to read and impossible to test.
-    // Two paths because one is stroked and the other filled, and a Path takes
-    // one of each.
+    // Three paths because one is stroked and the others filled, and a Path
+    // takes one of each.
     route: string,
     head: string,
+    marker: string,
     // Where the label goes, which is the only geometry the markup still needs.
     label-x: length,
     label-y: length,
@@ -512,6 +514,21 @@ component LinkLine inherits Rectangle {
         viewbox-width: self.width / 1px;
         viewbox-height: self.height / 1px;
         commands: link.head;
+        fill: ink;
+    }
+
+    // And again out in the middle of the run, where there is room to see it.
+    // The head sits where the line meets a node, which is the one place a
+    // diagram is already crowded and the one place two links between the same
+    // pair of nodes look alike; this is what tells them apart at a glance.
+    if link.marker != "": Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: link.marker;
         fill: ink;
     }
 

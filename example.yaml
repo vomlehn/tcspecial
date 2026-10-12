@@ -1,0 +1,67 @@
+version: "2.0"
+description: One payload on a UDP link, its telemetry going to the ground
+
+# How often the payload is read.
+#
+# The interval belongs to a group and not to a node: a node that stated one of
+# its own would be stating a value nothing applies, the schedule being by
+# group. A group of one is how a single node gets an interval.
+groups:
+  - name: "every_second"
+    interval: "1s"
+
+nodes:
+  # The payload: software or a device that sends a datagram a second.
+  #
+  # tcspecial binds this address and the payload sends to it. That is the way
+  # round a datagram link has to work: a UDP connect sends nothing, so a
+  # payload waiting to be reached would hear nothing and -- producing data
+  # because it is running rather than because it was asked -- would have
+  # nowhere to send it. The payload speaks first, and tcspecial learns where
+  # it is from the datagram that arrives.
+  #
+  # The second is the payload's own: nothing here makes it send. What this
+  # file says is that the link is read once a second, which is what it is
+  # worth reading if that is how often it has something new to say.
+  - name: payload
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5100"
+    group: "every_second"
+    editor: { x: 40, y: 120 }
+
+  # The ground. tcspecial waits at this address for a ground station to speak
+  # to it, and sends telemetry back where the datagrams came from.
+  - name: moc
+    type: moc
+    address: "127.0.0.1"
+    port: "5000"
+    editor: { x: 360, y: 40 }
+
+links:
+  # Up: every datagram the payload sends goes to the ground as it arrives.
+  - { from: payload, to: moc }
+  # And down: what the ground sends reaches the payload.
+  - { from: moc, to: payload }
+
+# Running this one
+# ----------------
+#
+#   make run TCSPECIAL_CONFIG_FILE=example      # or: tcspecial example.yaml
+#
+# Both ends have to announce themselves once, because tcspecial binds both
+# addresses and a datagram's sender is the only statement of where it came
+# from. So the first thing each end sends is what tells tcspecial where to
+# answer, and until then a datum going that way is refused and counted --
+# which is reported rather than hidden:
+#
+#   payload: the write failed: ... nothing has been received on this socket
+#   yet, so there is no address to send to
+#
+# A session, with two sockets standing in for the two ends:
+#
+#   the ground sends to 127.0.0.1:5000   -- now telemetry has somewhere to go
+#   the payload sends to 127.0.0.1:5100  -- now commands have somewhere to go
+#   ... and from then on every datagram the payload sends reaches the ground,
+#   and everything the ground sends reaches the payload.

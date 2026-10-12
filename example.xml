@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- One payload on a UDP link, its telemetry going to the ground.
+
+     Equivalent to example.yaml -- a configuration may be written in either
+     format, and both of this one are kept. The YAML is the one to read: it
+     carries the comments, including how to run it.
+
+     Conventions, which are what XML and YAML agree on:
+       - every value is a child element, never an attribute
+       - a sequence is repeated sibling elements named for the field,
+         and the repeats must be contiguous
+       - an absent optional field is simply an omitted element -->
+<configuration>
+    <version>2.0</version>
+    <description>One payload on a UDP link, its telemetry going to the ground</description>
+    <groups>
+        <name>every_second</name>
+        <interval>1s</interval>
+    </groups>
+    <nodes>
+        <name>payload</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5100</port>
+        <group>every_second</group>
+        <editor><x>40</x><y>120</y></editor>
+    </nodes>
+    <nodes>
+        <name>moc</name>
+        <type>moc</type>
+        <address>127.0.0.1</address>
+        <port>5000</port>
+        <editor><x>360</x><y>40</y></editor>
+    </nodes>
+    <links>
+        <from>payload</from>
+        <to>moc</to>
+    </links>
+    <links>
+        <from>moc</from>
+        <to>payload</to>
+    </links>
+</configuration>

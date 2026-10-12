@@ -48,7 +48,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 
 use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::Node;
-use tcslibgs::{EndpointConfig, TcsResult};
+use tcslibgs::{EndpointConfig, TcsError, TcsResult};
 
 use crate::node::compute::{self, Function};
 use crate::node::log::LogNode;
@@ -302,6 +302,16 @@ impl EndpointPort {
         }
     }
 
+    /// What an endpoint said, without this node's name in it twice.
+    ///
+    /// Every endpoint names the node it belongs to, and so does the line a
+    /// refusal is reported on, so the plain text of an error read
+    /// "payload: the write failed: ... payload: nothing has been received".
+    /// The name is worth saying once.
+    fn plainly(&self, e: TcsError) -> String {
+        format!("{e}").replacen(&format!("{}: ", self.what), "", 1)
+    }
+
     /// Write the whole of `data`, or say what happened instead.
     fn write_all(&mut self, data: &[u8], doing: &str) -> Result<(), String> {
         match self.writer.write(data) {
@@ -319,7 +329,11 @@ impl EndpointPort {
                 self.what,
                 data.len()
             )),
-            Err(e) => Err(format!("{}: the {doing} failed: {e}", self.what)),
+            Err(e) => Err(format!(
+                "{}: the {doing} failed: {}",
+                self.what,
+                self.plainly(e)
+            )),
         }
     }
 }
@@ -354,7 +368,7 @@ impl Port for EndpointPort {
             Ok(true) => self
                 .reader
                 .read(&mut buffer[..want])
-                .map_err(|e| format!("{}: the read failed: {e}", self.what)),
+                .map_err(|e| format!("{}: the read failed: {}", self.what, self.plainly(e))),
             Ok(false) => Ok(0),
             Err(why) => Err(why),
         };
@@ -856,6 +870,12 @@ mod tests {
         assert!(
             said.contains("heaters") && said.contains("/dev/gpiochip0"),
             "the complaint should name the node and the chip: {said}"
+        );
+        assert_eq!(
+            said.matches("heaters").count(),
+            1,
+            "the node is named once: every endpoint names the node it belongs \
+             to, and so does the line this is reported on -- {said}"
         );
     }
 

@@ -75,7 +75,15 @@ pub fn asked_to_stop() -> bool {
 /// log with the news that it is working.
 fn report(moved: &Moved) {
     for (node, why) in &moved.refused {
-        warn!("{node}: {why}");
+        // The node once. A refusal from a port already opens with the node's
+        // name -- it is the one fact every complaint in this program carries
+        // -- and a line that said it twice reads as though two things went
+        // wrong.
+        if why.starts_with(&format!("{node}: ")) {
+            warn!("{why}");
+        } else {
+            warn!("{node}: {why}");
+        }
     }
 }
 

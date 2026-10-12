@@ -415,7 +415,7 @@ groups:
   - name: temps
     interval: \"3s\"
 nodes:
-  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\" }
+  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\" }
   - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
 links:
   - { from: sensor, to: moc }

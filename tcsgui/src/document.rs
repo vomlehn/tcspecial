@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::journal::{Edit, Link};
 use crate::pane::{confine, is_payload, size_of};
+use tcslibgs::endpoint_config::Scalar;
 use crate::style::NodeType;
 use crate::subdiagram::{file_for, Home, Qualified};
 
@@ -88,6 +89,13 @@ pub struct Document {
     /// file back without it would be deleting something somebody wrote.
     #[serde(default)]
     pub description: Option<String>,
+    /// The simulator's configuration, where this session was given one.
+    ///
+    /// A second file and a second thing: how fast a *simulated* payload
+    /// produces packets and what it does wrong, none of which is a property of
+    /// the payload. See `sim.rs`, which says why it is not on the canvas.
+    #[serde(default)]
+    pub simulator: Option<crate::sim::Simulator>,
     /// What tcspecial itself is configured with: where commands are taken,
     /// where beacons go, where the telemetry log is written.
     ///
@@ -134,6 +142,45 @@ pub struct GroupField {
     pub differs: bool,
 }
 
+/// What the flight software would make of this node, or what is wrong with
+/// what it says.
+///
+/// The editor's node turned into the schema's and handed to the rules that
+/// have been tested against real buses. A conversion and not a second set of
+/// rules: a bus address is refused here for exactly what it would be refused
+/// for aboard, in the same words, which is the whole reason the editor can say
+/// anything useful about a value at all.
+fn reach_of_node(node: &Node) -> Result<(), String> {
+    let theirs = tcslibgs::graph::Node {
+        name: node.name.clone(),
+        node_type: node.node_type.clone(),
+        group: node
+            .attributes
+            .get("group")
+            .map(|group| group.trim().to_string())
+            .filter(|group| !group.is_empty()),
+        attributes: node
+            .attributes
+            .iter()
+            .filter(|(attribute, value)| {
+                // The group is a field of the schema rather than one of the
+                // attributes, and an empty value is one nobody has answered:
+                // neither belongs in what the rules are shown.
+                *attribute != "group" && !value.trim().is_empty()
+            })
+            .map(|(attribute, value)| (attribute.clone(), Scalar::of(value.as_str())))
+            .collect(),
+        editor: None,
+    };
+
+    // Only the nodes that are opened. A computation and a log have rules of
+    // their own, and this would tell them they are not interfaces.
+    if !theirs.is_payload() && theirs.node_type != "moc" {
+        return Ok(());
+    }
+    tcslibgs::graph::reach::reach_of(&theirs).map(|_| ())
+}
+
 /// Whether a node names this group.
 fn in_group(node: &Node, group: &str) -> bool {
     node.attributes.get("group").map(|g| g.trim()) == Some(group)
@@ -166,14 +213,24 @@ pub enum Fault {
     NoSuchGroup { node: String, group: String },
     /// A group nothing is in, which reads nothing on its interval.
     EmptyGroup { group: String },
-    /// A configuration with no tcspecial section at all.
+    /// A node whose attributes do not hold together.
     ///
-    /// Required: nothing in a graph says where commands are taken or where
-    /// beacons go until this does. The editor can hold a configuration
-    /// without one -- it has to be able to hold anything -- and says so.
-    NoTcspecial,
-    /// One of tcspecial's own parameters, required and not stated.
-    MissingTcspecial { attribute: String },
+    /// Not a node that is unfinished. The editor is lazy about what has been
+    /// entered and strict about what it says: a bus address of `0xZZ` is
+    /// wrong whatever else is missing, and an attribute belonging to another
+    /// type is wrong on this one. Absence is checked on the ground and aboard,
+    /// where the complaint can name the file and the line -- see
+    /// `tcslibgs::graph::check::Problem::BadNode`.
+    ///
+    /// `why` is the reason in the words of the rules that have been tested
+    /// against real buses, so the editor says what `tcsverify` will say.
+    BadNode { node: String, why: String },
+    /// A tcspecial section whose parameters do not hold together.
+    ///
+    /// Strict in the same way and for the same reason: a beacon address that
+    /// is not a multicast group is wrong as soon as it is typed, and an
+    /// unanswered parameter is not wrong at all yet.
+    BadTcspecial { why: String },
     /// A link delivering into a payload that is read and states no trigger.
     ///
     /// The same rule `tcsverify` applies on the ground and tcspecial applies
@@ -182,12 +239,6 @@ pub enum Fault {
     /// the link is drawn, which is the moment at which saying so costs
     /// nobody anything.
     UntriggeredInput { node: String, from: String },
-    /// A required attribute with nothing in it.
-    ///
-    /// The same check `tcsverify` makes on the ground and tcspecial makes
-    /// again aboard, made here as the field is left empty -- which is the one
-    /// moment at which saying so costs nobody anything.
-    MissingAttribute { node: String, attribute: String },
 }
 
 impl Fault {
@@ -208,17 +259,10 @@ impl Fault {
             Fault::InputBoundTwice { node, input } => {
                 format!("two links arrive at \"{node}.{input}\"")
             }
-            Fault::MissingAttribute { attribute, .. } => {
-                format!("{attribute} is not set")
-            }
-            Fault::NoTcspecial => {
-                "this configuration does not say what tcspecial is configured \
-                 with: see Edit tcspecial parameters"
-                    .to_string()
-            }
-            Fault::MissingTcspecial { attribute } => {
-                format!("tcspecial {attribute} is not set")
-            }
+            // The reason names the node already: reach_of's complaints are
+            // written to be read on their own.
+            Fault::BadNode { why, .. } => why.clone(),
+            Fault::BadTcspecial { why } => format!("tcspecial: {why}"),
             Fault::UntriggeredInput { from, .. } => {
                 format!("nothing is written to this: \"{from}\" has nowhere to go")
             }
@@ -240,15 +284,16 @@ impl Fault {
             Fault::DanglingLink { from, .. } => Some(from),
             Fault::SelfLink { node } => Some(node),
             Fault::InputBoundTwice { node, .. } => Some(node),
-            Fault::MissingAttribute { node, .. } => Some(node),
             // On the payload and not on the source: the source is right about
             // where it sends, and the payload is where a trigger would go.
             Fault::UntriggeredInput { node, .. } => Some(node),
             Fault::NoSuchGroup { node, .. } => Some(node),
             Fault::EmptyGroup { .. } => None,
+            Fault::BadNode { node, .. } => Some(node),
             // Not about a node: the section is about the configuration as a
-            // whole, so there is nothing on the canvas to draw it on.
-            Fault::NoTcspecial | Fault::MissingTcspecial { .. } => None,
+            // whole, so there is nothing on the canvas to draw it on. The
+            // parameters window shows it.
+            Fault::BadTcspecial { .. } => None,
         }
     }
 }
@@ -305,6 +350,19 @@ impl Document {
     /// The nodes that live in `home`.
     pub fn nodes_in(&self, home: &Home) -> Vec<&Node> {
         self.nodes.iter().filter(|n| &n.home == home).collect()
+    }
+
+    /// The parameters of the section that are actually stated.
+    ///
+    /// The document holds every attribute the section may have, so that the
+    /// window has a field for each; what the file holds is the ones somebody
+    /// has answered. Both writers ask this, so neither can come to write a
+    /// section the other would not.
+    fn tcspecial_stated(&self) -> Vec<(&String, &String)> {
+        self.tcspecial
+            .iter()
+            .filter(|(_, value)| !value.trim().is_empty())
+            .collect()
     }
 
     /// Put every node inside the pane its type belongs to.
@@ -580,6 +638,64 @@ impl Document {
                     self.tcspecial.remove(attribute);
                 }
             },
+            Edit::SetSimPayload {
+                payload,
+                setting,
+                now,
+                ..
+            } => {
+                if let Some(simulator) = &mut self.simulator {
+                    let said = simulator.payloads.entry(payload.clone()).or_default();
+                    match now {
+                        Some(value) => {
+                            said.insert(setting.clone(), value.clone());
+                        }
+                        None => {
+                            said.remove(setting);
+                        }
+                    }
+                }
+            }
+            Edit::SetSimGroup {
+                group,
+                setting,
+                now,
+                ..
+            } => {
+                if let Some(simulator) = &mut self.simulator {
+                    // Only a group that is there: a setting on a group
+                    // somebody has since removed is an edit with nothing to
+                    // change, and making the entry here would put the group
+                    // back.
+                    if let Some(said) = simulator.groups.get_mut(group) {
+                        match now {
+                            Some(value) => {
+                                said.insert(setting.clone(), value.clone());
+                            }
+                            None => {
+                                said.remove(setting);
+                            }
+                        }
+                    }
+                }
+            }
+            Edit::AddSimGroup { name } => {
+                if let Some(simulator) = &mut self.simulator {
+                    simulator.groups.entry(name.clone()).or_default();
+                }
+            }
+            Edit::RemoveSimGroup { name, .. } => {
+                if let Some(simulator) = &mut self.simulator {
+                    simulator.groups.remove(name);
+                }
+            }
+            Edit::RestoreSimGroup { name, settings } => {
+                if let Some(simulator) = &mut self.simulator {
+                    simulator
+                        .groups
+                        .insert(name.clone(), settings.iter().cloned().collect());
+                }
+            }
             Edit::AddGroup { name, interval } => {
                 self.groups.insert(name.clone(), interval.clone());
             }
@@ -694,24 +810,36 @@ impl Document {
                     node: node.name.clone(),
                     node_type: node.node_type.clone(),
                 }),
+                // What is entered has to be right; what is not entered is
+                // not wrong yet. The editor is lazy on purpose -- an editor
+                // that would not let you leave a field empty is one that
+                // fights a person working out what they are describing -- and
+                // the rules about what a type must say are applied on the
+                // ground and aboard, where the complaint can name the file and
+                // the line.
+                //
+                // So the type's own rules are run only once everything it must
+                // have is there. Until then there is nothing to say that would
+                // not be "this is unfinished", which the person at the
+                // keyboard already knows.
                 Some(node_type) => {
-                    // What the type says it must have. An attribute present
-                    // and empty counts as missing: a person who cleared a
-                    // field meant to clear it, and a blank bus is no more
-                    // usable than an absent one.
-                    for (attribute, required) in node_type.attributes() {
-                        if !required {
-                            continue;
-                        }
-                        let given = node
-                            .attributes
-                            .get(*attribute)
-                            .map(|v| v.trim())
-                            .unwrap_or("");
-                        if given.is_empty() {
-                            faults.push(Fault::MissingAttribute {
+                    let stated = |attribute: &str| {
+                        node.attributes
+                            .get(attribute)
+                            .map(|value| value.trim())
+                            .filter(|value| !value.is_empty())
+                    };
+                    let filled = node_type
+                        .attributes()
+                        .iter()
+                        .filter(|(_, required)| *required)
+                        .all(|(attribute, _)| stated(attribute).is_some());
+
+                    if filled {
+                        if let Err(why) = reach_of_node(node) {
+                            faults.push(Fault::BadNode {
                                 node: Qualified::of(&node.name, &node.home).absolute(),
-                                attribute: attribute.to_string(),
+                                why,
                             });
                         }
                     }
@@ -749,27 +877,33 @@ impl Document {
             }
         }
 
-        // What tcspecial is configured with, which every configuration must
-        // say. The list of what it may say is tcslibgs's, so that the editor
-        // asks for exactly what the ground check and the flight software
-        // require -- no more and no fewer.
-        if self.tcspecial.is_empty() {
-            faults.push(Fault::NoTcspecial);
-        } else {
-            for (attribute, required) in tcslibgs::graph::parameters::ATTRIBUTES {
-                if !required {
-                    continue;
-                }
-                let given = self
-                    .tcspecial
-                    .get(*attribute)
-                    .map(|value| value.trim())
-                    .unwrap_or("");
-                if given.is_empty() {
-                    faults.push(Fault::MissingTcspecial {
-                        attribute: (*attribute).to_string(),
-                    });
-                }
+        // What tcspecial is configured with, once all of it is there. Lazy
+        // about the unanswered and strict about the answered, as a node is:
+        // the section being required is the ground check's business and is
+        // where it can be said with a file and a line.
+        let answered = |attribute: &str| {
+            self.tcspecial
+                .get(attribute)
+                .map(|value| value.trim())
+                .filter(|value| !value.is_empty())
+        };
+        let filled = tcslibgs::graph::parameters::ATTRIBUTES
+            .iter()
+            .filter(|(_, required)| *required)
+            .all(|(attribute, _)| answered(attribute).is_some());
+        if filled {
+            let said = self
+                .tcspecial
+                .iter()
+                .filter(|(_, value)| !value.trim().is_empty())
+                .map(|(attribute, value)| {
+                    (attribute.clone(), Scalar::of(value.as_str()))
+                })
+                .collect();
+            let outcome = tcslibgs::graph::parameters::ci_config_of(&said)
+                .and_then(|section| section.to_ci_config().map(|_| ()));
+            if let Err(why) = outcome {
+                faults.push(Fault::BadTcspecial { why });
             }
         }
 
@@ -863,6 +997,18 @@ impl Document {
             let home = Some(name.clone());
             written.push((file_for(&name, path), self.text_for(&home, path)?));
         }
+
+        // And the simulator's own file, where the session was given one. Part
+        // of the same set on purpose: the two files are edited together,
+        // checked together and must agree, so one Save writes both and one
+        // Undo takes back whichever of them the last edit touched.
+        if let Some(simulator) = &self.simulator {
+            let text = match format_of(&simulator.path)? {
+                Format::Yaml => crate::sim::to_yaml(simulator),
+                Format::Xml => crate::sim::to_xml(simulator),
+            };
+            written.push((simulator.path.clone(), text));
+        }
         Ok(written)
     }
 
@@ -909,12 +1055,8 @@ impl Document {
 
         // The same section the YAML writes, in the same place and for the
         // same reason.
-        if home.is_none() && !self.tcspecial.is_empty() {
-            let said: Vec<(&String, &String)> = self
-                .tcspecial
-                .iter()
-                .filter(|(_, value)| !value.trim().is_empty())
-                .collect();
+        if home.is_none() {
+            let said = self.tcspecial_stated();
             if !said.is_empty() {
                 out.push_str("    <tcspecial>\n");
                 for (attribute, value) in said {
@@ -1043,17 +1185,20 @@ impl Document {
         // the top file: a configuration has one command interpreter, and an
         // included file that declared one would be a second answer to one
         // question.
-        if home.is_none() && !self.tcspecial.is_empty() {
-            out.push_str("\ntcspecial:\n");
-            for (attribute, value) in &self.tcspecial {
-                // An attribute somebody has cleared is left out rather than
-                // written empty. Absent and empty mean the same thing to the
-                // checking -- see parameters::ci_config_of -- and a file
-                // without the line is the one a person would have written.
-                if value.trim().is_empty() {
-                    continue;
+        // An attribute somebody has cleared is left out rather than written
+        // empty. Absent and empty mean the same thing to the checking -- see
+        // parameters::ci_config_of -- and a file without the line is the one a
+        // person would have written. A section with nothing filled in is
+        // therefore no section at all: a `tcspecial:` with nothing under it
+        // would read back as nothing, which is a file that does not say what
+        // it says.
+        if home.is_none() {
+            let said = self.tcspecial_stated();
+            if !said.is_empty() {
+                out.push_str("\ntcspecial:\n");
+                for (attribute, value) in said {
+                    out.push_str(&format!("  {attribute}: {}\n", quoted(value)));
                 }
-                out.push_str(&format!("  {attribute}: {}\n", quoted(value)));
             }
         }
 
@@ -1526,27 +1671,23 @@ mod tests {
         }
     }
 
-    /// What tcspecial is configured with is written, read back, and asked
-    /// for.
+    /// What tcspecial is configured with is written, read back, and left
+    /// alone while it is unfinished.
     ///
-    /// Every configuration must say it, so the editor has to write it in both
-    /// spellings, read what it wrote, and mark what is missing -- and it has
-    /// to do that while somebody is halfway through filling it in, which is
-    /// the state a file would be unreadable in if the section were read
-    /// strictly.
+    /// The editor is lazy about what has been entered: a section half filled
+    /// in is a person partway through, not a configuration that is wrong, and
+    /// nothing is marked for it. What is checked is what the words say -- and
+    /// only once they are all there, because until then the only thing to say
+    /// is "this is unfinished", which the person at the keyboard knows.
     #[test]
-    fn the_tcspecial_section_is_written_and_what_is_missing_is_marked() {
+    fn the_tcspecial_section_is_written_and_left_alone_until_it_is_finished() {
         let mut document = Document::new();
 
-        // A document with no section at all says so, once.
-        assert_eq!(
-            document.faults(),
-            vec![Fault::NoTcspecial],
-            "{:?}",
-            document.faults()
-        );
+        // Nothing at all, which is where every configuration starts: not a
+        // fault.
+        assert!(document.faults().is_empty(), "{:?}", document.faults());
 
-        // Half of it, which is what a person typing has.
+        // Half of it, which is what a person typing has. Still not a fault.
         for (attribute, value) in [("protocol", "udp"), ("port", "4000")] {
             document.apply(&Edit::SetTcspecial {
                 attribute: attribute.into(),
@@ -1554,42 +1695,18 @@ mod tests {
                 now: Some(value.into()),
             });
         }
-        let faults = document.faults();
-        assert!(
-            !faults.contains(&Fault::NoTcspecial),
-            "a section that says something is a section: {faults:?}"
-        );
-        // And the five that are still missing are named one by one, because
-        // "the section is wrong" sends somebody to read all nine.
-        for attribute in [
-            "address",
-            "payload_port",
-            "beacon_interval_ms",
-            "beacon_address",
-            "beacon_interface",
-        ] {
-            assert!(
-                faults.contains(&Fault::MissingTcspecial {
-                    attribute: attribute.to_string()
-                }),
-                "{attribute} is not stated and nothing says so: {faults:?}"
-            );
-        }
-        // The two that are stated are not, and neither are the optional ones.
-        for attribute in ["port", "protocol", "log_dir", "log_segment_bytes"] {
-            assert!(
-                !faults.contains(&Fault::MissingTcspecial {
-                    attribute: attribute.to_string()
-                }),
-                "{attribute} should not be marked: {faults:?}"
-            );
-        }
+        assert!(document.faults().is_empty(), "{:?}", document.faults());
 
         // Written in both spellings, and in the place the payload sets put it:
         // before anything else, because it is about the configuration as a
         // whole.
         let yaml = document.to_yaml();
         assert!(yaml.contains("tcspecial:\n"), "{yaml}");
+        // Quoted, as everything the graph writer writes is: a graph's values
+        // are read as `Scalar`, which takes a value however the file spelled
+        // it, so quoting them all is what keeps a round trip from changing
+        // what a file means. The simulator's own file is different -- see
+        // sim.rs -- because its reader wants the types.
         assert!(yaml.contains("  port: \"4000\"\n"), "{yaml}");
         assert!(
             yaml.find("tcspecial:") < yaml.find("nodes:"),
@@ -1609,94 +1726,123 @@ mod tests {
             now: None,
         });
         assert!(!document.to_yaml().contains("port"), "{}", document.to_yaml());
-        assert!(
-            document.faults().contains(&Fault::MissingTcspecial {
-                attribute: "port".to_string()
-            })
-        );
+        assert!(document.faults().is_empty(), "clearing one is not a fault");
     }
 
-    /// The editor asks for exactly what the checker requires.
+    /// Once the section is complete, what it says has to hold together.
     ///
-    /// Two statements of one list would drift, and what that would look like
-    /// is a configuration the editor called complete and `tcsverify` refused
-    /// -- or, worse, the other way about. So the editor has no list: it reads
-    /// the one in `tcslibgs`, and this is what says the panel is built from
-    /// it.
+    /// The other half of being lazy: the editor requires nothing to be entered
+    /// and requires everything entered to be valid. A beacon address that is
+    /// not a multicast group is wrong the moment the last field is filled in,
+    /// and the words are the ones the command interpreter itself would refuse
+    /// it with.
     #[test]
-    fn the_editor_asks_for_what_the_checker_requires() {
-        use tcslibgs::graph::parameters::{blank, ci_config_of, ATTRIBUTES};
+    fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
+        let whole = [
+            ("address", "0.0.0.0"),
+            ("port", "4000"),
+            ("payload_port", "4001"),
+            ("protocol", "udp"),
+            ("beacon_interval_ms", "5000"),
+            ("beacon_address", "239.255.0.1:5550"),
+            ("beacon_interface", "127.0.0.1"),
+        ];
 
-        let mut document = Document::new();
-        for (attribute, value) in blank() {
-            let value = value.as_str().trim().to_string();
-            if value.is_empty() {
-                continue;
+        let filled = |wrong: Option<(&str, &str)>| {
+            let mut document = Document::new();
+            for (attribute, value) in whole {
+                let value = match wrong {
+                    Some((name, instead)) if name == attribute => instead,
+                    _ => value,
+                };
+                document.apply(&Edit::SetTcspecial {
+                    attribute: attribute.into(),
+                    was: None,
+                    now: Some(value.into()),
+                });
             }
-            document.apply(&Edit::SetTcspecial {
-                attribute,
-                was: None,
-                now: Some(value),
-            });
-        }
+            document
+        };
 
-        // Everything the editor marks as missing is something the checker
-        // refuses the configuration for, and the other way about.
-        let marked: Vec<String> = document
-            .faults()
-            .into_iter()
-            .filter_map(|fault| match fault {
-                Fault::MissingTcspecial { attribute } => Some(attribute),
-                _ => None,
-            })
-            .collect();
-        assert!(!marked.is_empty(), "a blank section is not complete");
-        for attribute in &marked {
+        // Complete and sound: nothing said.
+        assert!(filled(None).faults().is_empty(), "{:?}", filled(None).faults());
+
+        // Complete and wrong, in the words of the rules that know why.
+        for (attribute, instead, expected) in [
+            ("beacon_address", "10.0.0.1:5550", "multicast"),
+            ("protocol", "sctp", "protocol"),
+            ("port", "4001", "payload_port"),
+            ("payload_port", "nought", "payload_port"),
+        ] {
+            let document = filled(Some((attribute, instead)));
+            let said = document
+                .faults()
+                .into_iter()
+                .find_map(|fault| match fault {
+                    Fault::BadTcspecial { why } => Some(why),
+                    _ => None,
+                })
+                .unwrap_or_else(|| {
+                    panic!("{attribute} = {instead} should be refused")
+                });
             assert!(
-                ATTRIBUTES
-                    .iter()
-                    .any(|(name, required)| name == attribute && *required),
-                "{attribute} is marked and is not required"
+                said.contains(expected),
+                "{attribute} = {instead} was refused as {said:?}"
             );
         }
+    }
 
-        // Fill in what is marked, and the checker takes it.
-        for attribute in marked {
-            let value = match attribute.as_str() {
-                "address" => "0.0.0.0",
-                "port" => "4000",
-                "payload_port" => "4001",
-                "beacon_address" => "239.255.0.1:5550",
-                "beacon_interface" => "127.0.0.1",
-                other => panic!("{other} was marked and this test has no value for it"),
-            };
-            document.apply(&Edit::SetTcspecial {
-                attribute,
-                was: None,
-                now: Some(value.to_string()),
-            });
-        }
-        assert!(
-            !document
-                .faults()
-                .iter()
-                .any(|f| matches!(f, Fault::MissingTcspecial { .. } | Fault::NoTcspecial)),
-            "{:?}",
-            document.faults()
-        );
+    /// A node is left alone while it is unfinished and checked once it is
+    /// not.
+    ///
+    /// The same laziness, for the nodes. An editor that marked every empty
+    /// field in red would be calling a node somebody is partway through a
+    /// broken one -- and the thing that has to be true of a configuration
+    /// before it flies is checked where the complaint can name the file and
+    /// the line.
+    #[test]
+    fn a_node_is_left_alone_until_it_says_enough_to_be_wrong() {
+        let mut document = Document::new();
+        document.apply(&add("temp_fore", "i2c"));
 
-        // And the checker agrees, by its own rules.
+        // Nothing stated: nothing to say.
+        assert!(document.faults().is_empty(), "{:?}", document.faults());
+
+        // A bus and no address: still unfinished, still nothing to say.
+        document.apply(&Edit::SetAttribute {
+            node: "temp_fore".into(),
+            attribute: "path".into(),
+            was: None,
+            now: Some("/dev/i2c-1".into()),
+        });
+        assert!(document.faults().is_empty(), "{:?}", document.faults());
+
+        // And an address that is not one, which is wrong rather than
+        // unfinished.
+        document.apply(&Edit::SetAttribute {
+            node: "temp_fore".into(),
+            attribute: "address".into(),
+            was: None,
+            now: Some("0xZZ".into()),
+        });
         let said = document
-            .tcspecial
-            .iter()
-            .map(|(name, value)| {
-                (name.clone(), tcslibgs::endpoint_config::Scalar::of(value.as_str()))
+            .faults()
+            .into_iter()
+            .find_map(|fault| match fault {
+                Fault::BadNode { node, why } if node == "temp_fore" => Some(why),
+                _ => None,
             })
-            .collect();
-        ci_config_of(&said)
-            .expect("the editor's idea of complete")
-            .to_ci_config()
-            .expect("and the command interpreter's");
+            .expect("an address that is not one should be refused");
+        assert!(said.contains("address"), "{said}");
+
+        // Put right, and the editor goes quiet again.
+        document.apply(&Edit::SetAttribute {
+            node: "temp_fore".into(),
+            attribute: "address".into(),
+            was: Some("0xZZ".into()),
+            now: Some("0x48".into()),
+        });
+        assert!(document.faults().is_empty(), "{:?}", document.faults());
     }
 
     /// Reading a configuration puts every node in the pane it belongs to.
@@ -2159,15 +2305,10 @@ mod tests {
     #[test]
     fn a_document_says_what_is_wrong_with_it() {
         let mut document = Document::new();
-        // One fault, and only one: a configuration must say what tcspecial is
-        // configured with, and a document with nothing in it has not. Nothing
-        // else is wrong with emptiness -- a configuration with no nodes is
-        // where every configuration starts.
-        assert_eq!(
-            document.faults(),
-            vec![Fault::NoTcspecial],
-            "an empty document should be faulty only for the one thing"
-        );
+        // Nothing is wrong with emptiness: a configuration with nothing in it
+        // is where every configuration starts, and what it still has to say
+        // before it flies is checked on the ground.
+        assert!(document.faults().is_empty(), "{:?}", document.faults());
 
         document.apply(&add("a", "i2c"));
         document.apply(&add("a", "spi"));
@@ -2191,9 +2332,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&add("a", "contraption"));
         match document.faults().as_slice() {
-            // The missing section is the other one, and is every document's
-            // until it says what tcspecial is configured with.
-            [Fault::UnknownType { node_type, .. }, Fault::NoTcspecial] => {
+            [Fault::UnknownType { node_type, .. }] => {
                 assert_eq!(node_type, "contraption")
             }
             other => panic!("{other:?}"),
@@ -2241,6 +2380,11 @@ mod tests {
                 Edit::SetLinkComment { .. } => (),
                 Edit::MoveNode { .. } => (),
                 Edit::SetTcspecial { .. } => (),
+                Edit::SetSimPayload { .. } => (),
+                Edit::SetSimGroup { .. } => (),
+                Edit::AddSimGroup { .. } => (),
+                Edit::RemoveSimGroup { .. } => (),
+                Edit::RestoreSimGroup { .. } => (),
                 Edit::AddGroup { .. } => (),
                 Edit::RemoveGroup { .. } => (),
                 Edit::SetGroupInterval { .. } => (),
@@ -2270,6 +2414,26 @@ mod tests {
                 node: "a".into(),
                 was: None,
                 now: Some("the fore sensor".into()),
+            });
+            // A simulator configuration, so that the edits which set one of
+            // its settings have somewhere to put them.
+            document.simulator = Some(crate::sim::Simulator::new(
+                std::path::Path::new("vehiclesim.yaml"),
+            ));
+            document.apply(&Edit::AddSimGroup {
+                name: "steady_1hz".into(),
+            });
+            document.apply(&Edit::SetSimGroup {
+                group: "steady_1hz".into(),
+                setting: "packet_interval_ms".into(),
+                was: None,
+                now: Some("1000".into()),
+            });
+            document.apply(&Edit::SetSimPayload {
+                payload: "a".into(),
+                setting: "drop_percent".into(),
+                was: None,
+                now: Some("10".into()),
             });
             // What tcspecial is configured with, so that the edits which set
             // one of its parameters have something to change.
@@ -2349,6 +2513,29 @@ mod tests {
                 attribute: "port".into(),
                 was: Some("4000".into()),
                 now: Some("4100".into()),
+            },
+            Edit::SetSimPayload {
+                payload: "a".into(),
+                setting: "drop_percent".into(),
+                was: Some("10".into()),
+                now: Some("20".into()),
+            },
+            Edit::SetSimGroup {
+                group: "steady_1hz".into(),
+                setting: "packet_interval_ms".into(),
+                was: Some("1000".into()),
+                now: Some("500".into()),
+            },
+            Edit::AddSimGroup {
+                name: "continuous".into(),
+            },
+            Edit::RemoveSimGroup {
+                name: "steady_1hz".into(),
+                settings: vec![("packet_interval_ms".into(), "1000".into())],
+            },
+            Edit::RestoreSimGroup {
+                name: "bay".into(),
+                settings: vec![("packet_interval_ms".into(), "250".into())],
             },
             // And one that clears a parameter, which takes the line out of
             // the file rather than writing it empty.

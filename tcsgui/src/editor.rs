@@ -139,6 +139,27 @@ impl Editor {
         editor
     }
 
+    /// Also open the simulator's configuration, from a second file.
+    ///
+    /// Part of the same session on purpose: the two files are edited
+    /// together, checked together and must agree, so one Save writes both and
+    /// one Undo takes back whichever of them the last edit touched. A file
+    /// that cannot be read is said so and opened as nothing, as the
+    /// configuration is: an editor that refused to start on a damaged file
+    /// would be an editor that cannot be used to fix one.
+    pub fn open_simulator(&mut self, path: &Path) {
+        match crate::sim::read(path) {
+            Ok(simulator) => self.document.simulator = Some(simulator),
+            Err(why) => {
+                self.trouble = Some(format!("{} cannot be read: {why}", path.display()));
+                // An empty one all the same, so that the windows have
+                // somewhere to put what somebody types rather than being
+                // unreachable for the rest of the session.
+                self.document.simulator = Some(crate::sim::Simulator::new(path));
+            }
+        }
+    }
+
     pub fn document(&self) -> &Document {
         &self.document
     }
@@ -481,6 +502,82 @@ links:
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
         assert!(!editor.unsaved());
         assert!(std::fs::read_to_string(&path).unwrap().contains("temp_fore"));
+    }
+
+    /// The simulator's file is written with the configuration's, and read
+    /// back.
+    ///
+    /// One session, two files, one Save: the two are edited together, checked
+    /// together and must agree, so a write that reached one of them and not
+    /// the other would be the pair disagreeing by the editor's own hand.
+    #[test]
+    fn the_simulator_file_is_written_beside_the_configuration() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let sim = where_.path().join("vehiclesim.yaml");
+
+        let mut editor = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+        editor.open_simulator(&sim);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+
+        editor.edit(add("payload", "network"));
+        editor.edit(Edit::SetSimPayload {
+            payload: "payload".into(),
+            setting: "packet_interval_ms".into(),
+            was: None,
+            now: Some("1000".into()),
+        });
+
+        // Both files, from the one edit.
+        let written = std::fs::read_to_string(&sim).expect("the simulator file");
+        assert!(written.contains("simulated_payloads"), "{written}");
+        assert!(written.contains("payload"), "{written}");
+        assert!(written.contains("1000"), "{written}");
+        assert!(std::fs::read_to_string(&path).unwrap().contains("payload"));
+
+        // And read back: a second session on the same pair finds what the
+        // first left.
+        let mut reopened =
+            Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+        reopened.open_simulator(&sim);
+        assert_eq!(
+            reopened
+                .document()
+                .simulator
+                .as_ref()
+                .expect("the simulator configuration")
+                .payloads["payload"]["packet_interval_ms"],
+            "1000"
+        );
+
+        // The simulator's own reader agrees, which is the point of writing it
+        // at all.
+        tcslibgs::sim_config::SimConfigFile::load(&sim)
+            .expect("the simulator should read what the editor wrote");
+    }
+
+    /// A simulator file that cannot be read leaves the session usable.
+    ///
+    /// Said in red, and opened as nothing rather than refused: an editor that
+    /// would not start on a damaged file is an editor that cannot be used to
+    /// fix one.
+    #[test]
+    fn a_damaged_simulator_file_is_reported_and_opened_as_nothing() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let sim = where_.path().join("vehiclesim.yaml");
+        std::fs::write(&sim, "simulated_payloads: [[[\n").expect("a file");
+
+        let mut editor = Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            crate::pane::divider_for(crate::settings::DEFAULT),
+        );
+        editor.open_simulator(&sim);
+
+        let said = editor.trouble().expect("this should be reported");
+        assert!(said.contains("vehiclesim.yaml"), "{said}");
+        // And there is somewhere to type, so the windows are not unreachable
+        // for the rest of the session.
+        assert!(editor.document().simulator.is_some());
     }
 
     /// A group is written out, and read back.

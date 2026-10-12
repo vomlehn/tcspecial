@@ -166,6 +166,42 @@ pub enum Edit {
         was: Option<String>,
         now: Option<String>,
     },
+    /// A setting of one simulated payload was set. Both values, so the
+    /// inverse is a lookup.
+    ///
+    /// `payload` is the payload of the configuration this one stands in for:
+    /// the two files are joined by name, and the editor never invents a name
+    /// the configuration does not have.
+    SetSimPayload {
+        payload: String,
+        setting: String,
+        was: Option<String>,
+        now: Option<String>,
+    },
+    /// A setting of one simulator group was set.
+    SetSimGroup {
+        group: String,
+        setting: String,
+        was: Option<String>,
+        now: Option<String>,
+    },
+    /// A simulator group was declared, or taken away again.
+    ///
+    /// A group is a set of settings several simulated payloads share, so it
+    /// exists before anything is in it -- which is why making one is an edit
+    /// of its own rather than a consequence of typing.
+    AddSimGroup { name: String },
+    /// A simulator group was removed, with what it held, so that undo puts
+    /// back the group that was there and not an empty one of the same name.
+    RemoveSimGroup {
+        name: String,
+        settings: Vec<(String, String)>,
+    },
+    /// A simulator group put back as it was, with everything it held.
+    RestoreSimGroup {
+        name: String,
+        settings: Vec<(String, String)>,
+    },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
     /// because a person who drags a node expects undo to put it back.
@@ -293,6 +329,45 @@ impl Edit {
                 was: now.clone(),
                 now: was.clone(),
             },
+            Edit::SetSimPayload {
+                payload,
+                setting,
+                was,
+                now,
+            } => Edit::SetSimPayload {
+                payload: payload.clone(),
+                setting: setting.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
+            Edit::SetSimGroup {
+                group,
+                setting,
+                was,
+                now,
+            } => Edit::SetSimGroup {
+                group: group.clone(),
+                setting: setting.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
+            Edit::AddSimGroup { name } => Edit::RemoveSimGroup {
+                name: name.clone(),
+                settings: Vec::new(),
+            },
+            Edit::RemoveSimGroup { name, settings } => {
+                // A group comes back with what it held, which an addition
+                // followed by a dozen settings would not: undoing one removal
+                // must be one redo away.
+                Edit::RestoreSimGroup {
+                    name: name.clone(),
+                    settings: settings.clone(),
+                }
+            }
+            Edit::RestoreSimGroup { name, settings } => Edit::RemoveSimGroup {
+                name: name.clone(),
+                settings: settings.clone(),
+            },
             Edit::AddGroup { name, interval } => Edit::RemoveGroup {
                 name: name.clone(),
                 interval: interval.clone(),
@@ -383,6 +458,21 @@ impl Edit {
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
             Edit::SetTcspecial { attribute, .. } => {
                 format!("set tcspecial {attribute}")
+            }
+            Edit::SetSimPayload {
+                payload, setting, ..
+            } => format!("set {setting} of simulated \"{payload}\""),
+            Edit::SetSimGroup { group, setting, .. } => {
+                format!("set {setting} of simulator group \"{group}\"")
+            }
+            Edit::AddSimGroup { name } => {
+                format!("add simulator group \"{name}\"")
+            }
+            Edit::RemoveSimGroup { name, .. } => {
+                format!("remove simulator group \"{name}\"")
+            }
+            Edit::RestoreSimGroup { name, .. } => {
+                format!("put back simulator group \"{name}\"")
             }
             Edit::AddGroup { name, .. } => format!("add group \"{name}\""),
             Edit::RemoveGroup { name, .. } => format!("remove group \"{name}\""),

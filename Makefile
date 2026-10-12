@@ -335,6 +335,16 @@ verify:
 #   make verify  TCSGUI_FILE=edit/graph.yaml
 TCSGUI_FILE = edit/graph.yaml
 
+# The simulator's own configuration, where there is one to edit.
+#
+# A second argument to tcsgui, and empty by default: a session without one
+# edits the configuration alone, and the menu entries that would edit the
+# simulator's two lists are greyed. Named by its stem like TCSGUI_FILE, so the
+# spelling comes from the target:
+#
+#   make runguiy TCSGUI_FILE=edit/graph TCSGUI_SIM=edit/graphsim
+TCSGUI_SIM =
+
 # Running tcsgui on one spelling of a configuration.
 #
 # $(1) is that spelling -- yaml or xml -- as runmoc_on takes it, and for the
@@ -351,6 +361,7 @@ define rungui_on
 		mkdir -p $(dir $(TCSGUI_FILE)); \
 		echo "Running $(GUI_NAME) on $(basename $(TCSGUI_FILE)).$(1)..."; \
 		cd $(RUST) && cargo run -q --bin tcsgui -- $(basename $(TCSGUI_FILE)).$(1) \
+			$(if $(TCSGUI_SIM),$(basename $(TCSGUI_SIM)).$(1),) \
 	)
 endef
 

@@ -666,10 +666,6 @@ component Surface inherits Rectangle {
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> divider: 0px;
     in property <length> working-width: 0px;
-    // What the groups menu offers: its own heading, every group, and the way
-    // to make one. Built in Rust, so the heading and the last row cannot
-    // drift from what the handler expects of them.
-    in property <[string]> group-menu: [];
 
     // How deep undo currently goes, shown rather than guessed at: a person
     // about to abandon an afternoon's work deserves to know how much of it is
@@ -695,8 +691,6 @@ component Surface inherits Rectangle {
     callback open-subdiagram(string);
     // Write every file of the configuration now.
     callback save-clicked();
-    // Something was chosen from the groups menu.
-    callback group-chosen(string);
     // Drawing a link: pressed on one node, released on another.
     callback link-started(string);
     callback link-finished(string);
@@ -754,19 +748,7 @@ component Surface inherits Rectangle {
                 text: "Save";
                 clicked => { root.save-clicked(); }
             }
-            // The groups, as a menu. The first row is the menu's own name and
-            // does nothing; the last one makes a group.
-            ComboBox {
-                model: root.group-menu;
-                current-index: 0;
-                width: 170px;
-                selected(chosen) => {
-                    // Back to the heading, so the menu reads as a menu rather
-                    // than as a setting that now says "every_second".
-                    self.current-index = 0;
-                    root.group-chosen(chosen);
-                }
-            }
+
             Text {
                 text: undo-depth + " edits can be undone";
                 font-size: Type.body;
@@ -1010,10 +992,6 @@ export component MainWindow inherits Window {
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> divider: 0px;
     in property <length> working-width: 0px;
-    // What the groups menu offers: its own heading, every group, and the way
-    // to make one. Built in Rust, so the heading and the last row cannot
-    // drift from what the handler expects of them.
-    in property <[string]> group-menu: [];
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1029,28 +1007,47 @@ export component MainWindow inherits Window {
     callback divider-moved(length);
     callback open-subdiagram(string);
     callback save-clicked();
-    callback group-chosen(string);
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
-    // And for the simulator's groups of settings.
+    // And for the groups, the simulator's groups of settings, and the way
+    // out.
+    callback edit-groups();
     callback edit-simulator-groups();
+    callback exit-requested();
     // Whether this session was given a simulator configuration at all.
     in property <bool> has-simulator: false;
 
-    // The menu bar. The one thing in it so far is the section that is about
-    // the configuration as a whole: there is nothing on the canvas to press
-    // that would mean "the configuration", so a command is how it is reached.
+    // The menu bar.
+    //
+    // What is in it is what belongs to the configuration as a whole rather
+    // than to anything on the canvas: there is nothing to press on a diagram
+    // that would mean "the configuration", or "the groups", or "the way out",
+    // so a command is how each is reached.
     MenuBar {
         Menu {
-            title: "Edit";
+            title: "File";
+            // Saving needs no command -- every edit is written as it is made
+            // -- and there is one anyway, for the three things the ordinary
+            // case does not cover: retrying a write that failed once whatever
+            // stopped it is put right, rewriting a set of files left half new
+            // by a failure between two of them, and answering somebody who
+            // has been taught by every other program to save their work. Both
+            // files of a session go together, each written atomically.
             MenuItem {
-                title: "Edit tcspecial parameters";
-                activated => { root.edit-parameters(); }
+                title: "Save";
+                activated => { root.save-clicked(); }
             }
             MenuSeparator { }
+            // The groups, which are not on the canvas either: a group is a set
+            // of payloads read together, and which payloads those are is
+            // written on the nodes rather than drawn between them.
+            MenuItem {
+                title: "Edit payload groups";
+                activated => { root.edit-groups(); }
+            }
             // The simulator's groups, where this session was given its file.
             // Disabled rather than hidden when it was not: a menu whose
             // entries come and go is a menu nobody learns, and "this needs a
@@ -1059,13 +1056,25 @@ export component MainWindow inherits Window {
             //
             // There is no entry for the simulated payloads themselves. A
             // payload's settings belong to a payload that is already on the
-            // canvas, so they are shown in its panel, under a rule: a window
-            // of its own would be a second place to look for what one node
+            // canvas, so they are in its own window under a rule: a window of
+            // their own would be a second place to look for what one node
             // says about itself.
             MenuItem {
-                title: "Edit simulator payload groups";
+                title: "Edit simulated payload groups";
                 enabled: root.has-simulator;
                 activated => { root.edit-simulator-groups(); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: "Exit";
+                activated => { root.exit-requested(); }
+            }
+        }
+        Menu {
+            title: "Edit";
+            MenuItem {
+                title: "Edit tcspecial parameters";
+                activated => { root.edit-parameters(); }
             }
         }
     }
@@ -1079,9 +1088,7 @@ export component MainWindow inherits Window {
         payload-palette: root.payload-palette;
         divider: root.divider;
         working-width: root.working-width;
-        group-menu: root.group-menu;
         save-clicked => { root.save-clicked(); }
-        group-chosen(g) => { root.group-chosen(g); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
         undo-label: root.undo-label;
@@ -1131,10 +1138,6 @@ export component SubWindow inherits Window {
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> divider: 0px;
     in property <length> working-width: 0px;
-    // What the groups menu offers: its own heading, every group, and the way
-    // to make one. Built in Rust, so the heading and the last row cannot
-    // drift from what the handler expects of them.
-    in property <[string]> group-menu: [];
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1149,25 +1152,43 @@ export component SubWindow inherits Window {
     // The divider between the two working panes was dragged by this much.
     callback divider-moved(length);
     callback save-clicked();
-    callback group-chosen(string);
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
     callback edit-parameters();
+    callback edit-groups();
     callback edit-simulator-groups();
+    callback exit-requested();
     in property <bool> has-simulator: false;
 
-    // The menu bar. The one thing in it so far is the section that is about
-    // the configuration as a whole: there is nothing on the canvas to press
-    // that would mean "the configuration", so a command is how it is reached.
+    // The menu bar.
+    //
+    // What is in it is what belongs to the configuration as a whole rather
+    // than to anything on the canvas: there is nothing to press on a diagram
+    // that would mean "the configuration", or "the groups", or "the way out",
+    // so a command is how each is reached.
     MenuBar {
         Menu {
-            title: "Edit";
+            title: "File";
+            // Saving needs no command -- every edit is written as it is made
+            // -- and there is one anyway, for the three things the ordinary
+            // case does not cover: retrying a write that failed once whatever
+            // stopped it is put right, rewriting a set of files left half new
+            // by a failure between two of them, and answering somebody who
+            // has been taught by every other program to save their work. Both
+            // files of a session go together, each written atomically.
             MenuItem {
-                title: "Edit tcspecial parameters";
-                activated => { root.edit-parameters(); }
+                title: "Save";
+                activated => { root.save-clicked(); }
             }
             MenuSeparator { }
+            // The groups, which are not on the canvas either: a group is a set
+            // of payloads read together, and which payloads those are is
+            // written on the nodes rather than drawn between them.
+            MenuItem {
+                title: "Edit payload groups";
+                activated => { root.edit-groups(); }
+            }
             // The simulator's groups, where this session was given its file.
             // Disabled rather than hidden when it was not: a menu whose
             // entries come and go is a menu nobody learns, and "this needs a
@@ -1176,13 +1197,25 @@ export component SubWindow inherits Window {
             //
             // There is no entry for the simulated payloads themselves. A
             // payload's settings belong to a payload that is already on the
-            // canvas, so they are shown in its panel, under a rule: a window
-            // of its own would be a second place to look for what one node
+            // canvas, so they are in its own window under a rule: a window of
+            // their own would be a second place to look for what one node
             // says about itself.
             MenuItem {
-                title: "Edit simulator payload groups";
+                title: "Edit simulated payload groups";
                 enabled: root.has-simulator;
                 activated => { root.edit-simulator-groups(); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: "Exit";
+                activated => { root.exit-requested(); }
+            }
+        }
+        Menu {
+            title: "Edit";
+            MenuItem {
+                title: "Edit tcspecial parameters";
+                activated => { root.edit-parameters(); }
             }
         }
     }
@@ -1197,9 +1230,7 @@ export component SubWindow inherits Window {
         payload-palette: root.payload-palette;
         divider: root.divider;
         working-width: root.working-width;
-        group-menu: root.group-menu;
         save-clicked => { root.save-clicked(); }
-        group-chosen(g) => { root.group-chosen(g); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
         undo-label: root.undo-label;
@@ -1241,6 +1272,13 @@ export component GroupWindow inherits Window {
     // Which group this is. The name as it stands; renaming goes through the
     // callback and comes back here.
     in property <string> group: "";
+    // Every group there is, for choosing between them.
+    //
+    // Here rather than in a menu in the bar, which is where it was: a list of
+    // what a configuration happens to contain is data, and a control that
+    // holds data belongs with the form that edits it. The menu now says
+    // "Edit payload groups" and this says which.
+    in property <[string]> choices: [];
     in property <string> interval: "";
     // How many payloads are in it, and what they are called: a group with
     // nothing in it reads nothing on its interval, and a field set on no
@@ -1256,6 +1294,8 @@ export component GroupWindow inherits Window {
     callback interval-set(string);
     // One attribute, for every payload in the group.
     callback attribute-set(string, string);
+    callback choose(string);
+    callback add();
     callback removed();
 
     VerticalLayout {
@@ -1266,6 +1306,20 @@ export component GroupWindow inherits Window {
             text: root.group == "" ? "a group" : root.group;
             font-size: Type.title;
             font-weight: Type.bold;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            ComboBox {
+                model: root.choices;
+                current-value: root.group;
+                horizontal-stretch: 1;
+                selected(value) => { root.choose(value); }
+            }
+            Button {
+                text: "New";
+                clicked => { root.add(); }
+            }
         }
         Text {
             text: root.members.length == 0
@@ -1367,6 +1421,7 @@ export component GroupWindow inherits Window {
             Rectangle { }
             Button {
                 text: "Remove this group";
+                enabled: root.group != "";
                 clicked => { root.removed(); }
             }
         }
@@ -1697,6 +1752,13 @@ export component NodeWindow inherits Window {
                         // wrong.
                         text: f.required ? f.name + " *" : f.name;
                         font-size: Type.small;
+                        // Italic for a setting of the simulator's file. The
+                        // rule above says where one file ends and the other
+                        // begins; this says it again on every row, so a
+                        // reader who has scrolled past the rule still knows
+                        // which file they are typing into. Two channels for
+                        // one distinction, as the node shapes have.
+                        font-italic: f.simulated;
                         color: #6b7280;
                         height: 14px;
                     }
@@ -1748,6 +1810,79 @@ export component NodeWindow inherits Window {
             Button {
                 text: "Close";
                 clicked => { root.closed(); }
+            }
+        }
+    }
+}
+
+// The offer to write what the files do not have, on the way out.
+//
+// Normally never seen: every edit is written as it is made, so there is
+// nothing to offer and Exit simply exits. What this is for is the session
+// where a write failed -- a full device, a directory somebody had made
+// read-only -- because leaving a session's work in a process that is ending is
+// the one way this editor could lose anything.
+//
+// Three answers and not two. "Leave without saving" is there because somebody
+// who has just been told the device is full may want to go and deal with it,
+// and a program that insisted on writing first would be a program they cannot
+// get out of. "Stay" is there because the menu is next to everything else and
+// gets pressed by accident.
+export component LeaveWindow inherits Window {
+    title: "Leave tcsgui";
+    background: #fbfbfa;
+    min-width: 360px;
+    min-height: 160px;
+    preferred-width: 420px;
+
+    // Why the last write failed, which is why there is anything to offer.
+    in property <string> trouble: "";
+
+    callback saved();
+    callback left();
+    callback stayed();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: "There are changes the files do not have.";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        Text {
+            text: "Saving writes the configuration and, where this session "
+                + "was given one, the simulator's file beside it.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Button {
+                text: "Stay";
+                clicked => { root.stayed(); }
+            }
+            Rectangle { }
+            Button {
+                text: "Leave without saving";
+                clicked => { root.left(); }
+            }
+            Button {
+                text: "Save and leave";
+                primary: true;
+                clicked => { root.saved(); }
             }
         }
     }

@@ -107,17 +107,6 @@ fn divider_range(document: &Document, divider: i32) -> (i32, i32) {
     (low, high)
 }
 
-/// The groups menu's own name, which is what it reads as when it is closed.
-///
-/// A row of the menu rather than a label beside it, because a Slint ComboBox
-/// shows whatever is selected: with no such row the menu would read as a
-/// setting that says "every_second", and a person would reasonably think they
-/// had put the diagram into that group.
-const MENU_HEADING: &str = "Payload groups\u{2026}";
-
-/// And the row that makes one.
-const MENU_NEW: &str = "New group\u{2026}";
-
 /// Where the ground station goes in a configuration that is new.
 ///
 /// The upper left of the vehicle working pane, clear of the pane's own label.
@@ -165,6 +154,11 @@ struct Views {
     /// sensors on one bus a matter of pressing, reading, pressing and
     /// remembering. Each stays until it is closed.
     attributes: BTreeMap<String, NodeWindow>,
+    /// The offer to save on the way out, while it is being made.
+    ///
+    /// Held so that pressing Exit twice does not stack two of them, and so
+    /// that answering it can take it away again.
+    leaving: Option<LeaveWindow>,
     /// The simulator's groups window, if it is open, and which group it is
     /// showing.
     ///
@@ -325,6 +319,7 @@ fn main() -> Result<(), slint::PlatformError> {
         group: None,
         parameters: None,
         attributes: BTreeMap::new(),
+        leaving: None,
         sim_groups: None,
         showing_sim_group: Rc::new(RefCell::new(String::new())),
         showing: Rc::new(RefCell::new(String::new())),
@@ -559,38 +554,24 @@ macro_rules! wiring {
                 });
             }
             {
-                // The groups menu. Its first row is its own name and does
-                // nothing; its last makes a group; anything else is a group
-                // to open.
+                // The groups, from the File menu. Which group is chosen is
+                // the window's own business now: a list of what a
+                // configuration happens to contain is data, and a control
+                // holding data belongs with the form that edits it.
                 let editor = editor.clone();
                 let views = views.clone();
-                window.on_group_chosen(move |chosen| {
-                    let chosen = chosen.to_string();
-                    if chosen == MENU_HEADING {
-                        return;
-                    }
-
-                    let group = if chosen == MENU_NEW {
-                        let name = {
-                            let mut editor = editor.borrow_mut();
-                            let name = fresh_group(editor.document());
-                            // With an interval, because a group without one
-                            // is a group that reads nothing: a value to
-                            // change is a better start than a blank to fill
-                            // in.
-                            editor.edit(Edit::AddGroup {
-                                name: name.clone(),
-                                interval: FIRST_INTERVAL.to_string(),
-                            });
-                            name
-                        };
-                        views.borrow().refresh(&editor.borrow());
-                        name
-                    } else {
-                        chosen
-                    };
-
-                    show_group(&editor, &views, &group);
+                window.on_edit_groups(move || {
+                    show_group(&editor, &views);
+                });
+            }
+            {
+                // The way out. Where something has been changed that the
+                // files do not have, the offer to write it comes first: see
+                // leave.
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_exit_requested(move || {
+                    leave(&editor, &views);
                 });
             }
             {
@@ -663,9 +644,11 @@ macro_rules! wiring {
                 });
             }
             {
-                // Choosing a node: the panel follows, and nothing is recorded.
+                // Choosing a node: the outline follows, and nothing is
+                // recorded. What the node says about itself is a window of
+                // its own, opened by a click -- see on_node_moved -- so a
+                // press has only the outline to change.
                 let views = views.clone();
-                let editor = editor.clone();
                 let chosen = chosen.clone();
                 let home = home.clone();
                 window.on_node_selected(move |name| {
@@ -721,7 +704,6 @@ fn put(
 ) {
     ui.set_divider(divider as f32);
     ui.set_has_simulator(editor.document().simulator.is_some());
-    ui.set_group_menu(group_menu(editor.document()));
     let (nodes, links) = views_of(editor, home);
     ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
@@ -743,7 +725,6 @@ fn put_sub(
 ) {
     window.set_divider(divider as f32);
     window.set_has_simulator(editor.document().simulator.is_some());
-    window.set_group_menu(group_menu(editor.document()));
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home);
     window.set_selected(chosen.unwrap_or_default().into());
@@ -929,6 +910,85 @@ fn wire_node(
     }
 }
 
+/// Leave, offering first to write anything the files do not have.
+///
+/// Normally there is nothing to offer: every edit is written as it is made, so
+/// the files are already the configuration in the window, and this quits. What
+/// it catches is the session where a write failed -- a full device, a
+/// directory made read-only -- because leaving a session's work in a process
+/// that is ending is the one way this editor could lose anything.
+///
+/// The offer and not the saving: somebody who has been told the device is full
+/// may want to leave and deal with it, and a program that insisted on writing
+/// first would be a program they cannot get out of.
+fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    if !editor.borrow().unsaved() {
+        slint::quit_event_loop().ok();
+        return;
+    }
+
+    if views.borrow().leaving.is_none() {
+        let window = match LeaveWindow::new() {
+            Ok(window) => window,
+            Err(e) => {
+                // Nothing to ask with. The work is still on the disk as of
+                // the last write that succeeded, and refusing to quit would
+                // trap somebody in an editor they asked to leave.
+                eprintln!("tcsgui: the offer to save cannot be shown: {e}");
+                slint::quit_event_loop().ok();
+                return;
+            }
+        };
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_saved(move || {
+                editor.borrow_mut().save();
+                match editor.borrow().trouble() {
+                    None => {
+                        slint::quit_event_loop().ok();
+                    }
+                    // Still not written. Said again, and the way out left
+                    // open: the one thing not to do is quit quietly.
+                    Some(why) => {
+                        eprintln!("tcsgui: still not saved: {why}");
+                        views.borrow().refresh(&editor.borrow());
+                    }
+                }
+            });
+        }
+        {
+            let views = views.clone();
+            window.on_left(move || {
+                let window = views.borrow_mut().leaving.take();
+                if let Some(window) = window {
+                    let _ = window.hide();
+                }
+                slint::quit_event_loop().ok();
+            });
+        }
+        {
+            let views = views.clone();
+            window.on_stayed(move || {
+                let window = views.borrow_mut().leaving.take();
+                if let Some(window) = window {
+                    let _ = window.hide();
+                }
+            });
+        }
+        views.borrow_mut().leaving = Some(window);
+    }
+
+    let window = views.borrow().leaving.as_ref().map(|window| window.as_weak());
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        window.set_trouble(editor.borrow().trouble().unwrap_or_default().into());
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: the offer to save cannot be shown: {e}");
+            slint::quit_event_loop().ok();
+        }
+    }
+}
+
 /// Put a group's state into its window.
 ///
 /// What a group is: a name, how often it is read, and the payloads that are in
@@ -955,6 +1015,15 @@ fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
         })
         .collect();
 
+    // The choices before the choice: a ComboBox given a value that is not in
+    // its model clears the selection, and says so on the error output.
+    window.set_choices(ModelRc::from(Rc::new(VecModel::from(
+        document
+            .groups
+            .keys()
+            .map(|name| slint::SharedString::from(name.clone()))
+            .collect::<Vec<_>>(),
+    ))));
     window.set_group(group.into());
     window.set_interval(
         document
@@ -1305,19 +1374,6 @@ fn wire_sim_groups(
     }
 }
 
-/// What the groups menu offers.
-///
-/// Its own name first, which does nothing and is what the menu reads as when
-/// it is closed; then every group the configuration declares; then the way to
-/// make one. A menu of nothing at all would be a control with no way in, which
-/// is what a configuration that declares no groups yet would have.
-fn group_menu(document: &Document) -> ModelRc<slint::SharedString> {
-    let mut rows: Vec<slint::SharedString> = vec![MENU_HEADING.into()];
-    rows.extend(document.groups.keys().map(|name| name.clone().into()));
-    rows.push(MENU_NEW.into());
-    ModelRc::from(Rc::new(VecModel::from(rows)))
-}
-
 /// Show `group` in the group window, making the window if there is not one.
 ///
 /// Made once and re-pointed afterwards, so choosing a second group does not
@@ -1325,8 +1381,26 @@ fn group_menu(document: &Document) -> ModelRc<slint::SharedString> {
 /// made and read the group out of `Views::showing` as they run, which is what
 /// lets the same handlers go on working after the window is re-pointed -- or
 /// after the group it is showing is renamed from inside it.
-fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, group: &str) {
-    *views.borrow().showing.borrow_mut() = group.to_string();
+fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    // Whichever group was last looked at, or the first the configuration
+    // declares: a window that opened on an invitation to choose would make
+    // every visit two presses when there is only one group, which is what
+    // most configurations have.
+    {
+        let views = views.borrow();
+        let mut showing = views.showing.borrow_mut();
+        let known = editor.borrow().document().groups.contains_key(&*showing);
+        if !known {
+            *showing = editor
+                .borrow()
+                .document()
+                .groups
+                .keys()
+                .next()
+                .cloned()
+                .unwrap_or_default();
+        }
+    }
 
     if views.borrow().group.is_none() {
         let window = match GroupWindow::new() {
@@ -1345,7 +1419,8 @@ fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, group: &
     // handlers that borrow it.
     let window = views.borrow().group.as_ref().map(|window| window.as_weak());
     if let Some(window) = window.and_then(|window| window.upgrade()) {
-        put_group(&window, &editor.borrow(), group);
+        let group = views.borrow().showing.borrow().clone();
+        put_group(&window, &editor.borrow(), &group);
         if let Err(e) = window.show() {
             eprintln!("tcsgui: a group window cannot be shown: {e}");
         }
@@ -1360,6 +1435,38 @@ fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, group: &
 /// single edit, so that undo takes back the gesture rather than the first of a
 /// dozen consequences.
 fn wire_group(window: &GroupWindow, editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    {
+        // Choosing which group the window is showing. Nothing is recorded:
+        // what somebody is looking at is not something the vehicle flies.
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = views.borrow().showing.clone();
+        window.on_choose(move |chosen| {
+            *showing.borrow_mut() = chosen.to_string();
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // A new group, with an interval, because a group without one is a
+        // group that reads nothing: a value to change is a better start than
+        // a blank to fill in.
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = views.borrow().showing.clone();
+        window.on_add(move || {
+            let name = {
+                let mut editor = editor.borrow_mut();
+                let name = fresh_group(editor.document());
+                editor.edit(Edit::AddGroup {
+                    name: name.clone(),
+                    interval: FIRST_INTERVAL.to_string(),
+                });
+                name
+            };
+            *showing.borrow_mut() = name;
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
     {
         let editor = editor.clone();
         let views = views.clone();
@@ -2900,48 +3007,6 @@ mod tests {
         );
     }
 
-    /// The groups menu names itself, then the groups, then the way to make
-    /// one.
-    ///
-    /// The heading is a row of the menu because a Slint ComboBox shows
-    /// whatever is selected: without it the control would read as a setting
-    /// that says "cabin_temps", and a person would reasonably think they had
-    /// just put something into that group. The last row matters for the
-    /// opposite reason -- a configuration that declares no groups yet would
-    /// otherwise have a menu with no way in.
-    #[test]
-    fn the_groups_menu_names_itself_and_offers_a_way_in() {
-        use slint::Model;
-
-        let mut document = Document::new();
-        let rows = |document: &Document| -> Vec<String> {
-            let menu = group_menu(document);
-            (0..menu.row_count())
-                .map(|i| menu.row_data(i).unwrap().to_string())
-                .collect()
-        };
-
-        // With no groups at all: the heading and the way to make one.
-        assert_eq!(rows(&document), vec![MENU_HEADING, MENU_NEW]);
-
-        for (name, interval) in [("cabin_temps", "3s"), ("bay", "5s")] {
-            document.apply(&Edit::AddGroup {
-                name: name.into(),
-                interval: interval.into(),
-            });
-        }
-        assert_eq!(
-            rows(&document),
-            vec![MENU_HEADING, "bay", "cabin_temps", MENU_NEW],
-            "the groups go between, in their own order"
-        );
-
-        // The heading and the new row are not names a group could have, or
-        // choosing one would be ambiguous.
-        assert!(MENU_HEADING.ends_with('\u{2026}'));
-        assert!(MENU_NEW.ends_with('\u{2026}'));
-    }
-
     /// A group made from the menu gets a name nothing else has.
     #[test]
     fn a_fresh_group_name_is_free() {
@@ -3144,6 +3209,8 @@ mod tests {
 
         dragging_a_node_moves_it();
         a_click_opens_a_window_per_node();
+        the_group_window_offers_every_group();
+        leaving_offers_to_write_what_the_files_do_not_have();
         the_menu_opens_the_tcspecial_parameters();
         a_payloads_panel_carries_its_simulation_settings();
         the_menu_opens_the_simulators_groups();
@@ -3269,6 +3336,7 @@ mod tests {
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
+            leaving: None,
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3395,6 +3463,7 @@ mod tests {
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
+            leaving: None,
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3473,6 +3542,7 @@ mod tests {
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
+            leaving: None,
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3545,6 +3615,171 @@ mod tests {
         assert!(!editor.borrow().document().tcspecial.contains_key("port"));
     }
 
+    /// The group window offers every group there is.
+    ///
+    /// Which group is being edited is the window's own business. It was a
+    /// menu in the bar, with the menu's own name as its first row so the
+    /// control did not read as a setting that said "every_second"; a window
+    /// that holds the form can hold the chooser, and the File menu now says
+    /// only "Edit payload groups".
+    fn the_group_window_offers_every_group() {
+        use slint::Model;
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            DIVIDER,
+        )));
+        for (name, interval) in [("cabin_temps", "3s"), ("bay", "5s")] {
+            editor.borrow_mut().edit(Edit::AddGroup {
+                name: name.into(),
+                interval: interval.into(),
+            });
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+
+        show_group(&editor, &views);
+        let window = views
+            .borrow()
+            .group
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("the menu should have opened the groups")
+            .upgrade()
+            .expect("and left them open");
+
+        let offered: Vec<String> = (0..window.get_choices().row_count())
+            .filter_map(|row| window.get_choices().row_data(row))
+            .map(|name| name.to_string())
+            .collect();
+        assert_eq!(offered, vec!["bay".to_string(), "cabin_temps".to_string()]);
+        // Opened on one of them rather than on an invitation to choose: most
+        // configurations have one group, and two presses to reach it would be
+        // one too many.
+        assert_eq!(window.get_group(), "bay");
+
+        // Choosing another shows that one.
+        window.invoke_choose("cabin_temps".into());
+        assert_eq!(window.get_group(), "cabin_temps");
+        assert_eq!(window.get_interval(), "3s");
+
+        // And a new one is made with an interval, because a group without one
+        // reads nothing.
+        window.invoke_add();
+        assert_eq!(window.get_group(), "group");
+        assert_eq!(window.get_interval(), FIRST_INTERVAL);
+    }
+
+    /// Leaving offers to write what the files do not have, and only then.
+    ///
+    /// Normally there is nothing to offer -- every edit is written as it is
+    /// made -- so Exit exits. What this covers is the session where a write
+    /// failed: leaving a session's work in a process that is ending is the one
+    /// way this editor could lose anything.
+    fn leaving_offers_to_write_what_the_files_do_not_have() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let locked = where_.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        let path = locked.join("vehicle.yaml");
+
+        let editor = Rc::new(RefCell::new(Editor::open(&path, DIVIDER)));
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+
+        // Nothing owed: leaving asks nothing. (The loop is not running in a
+        // test, so quitting it is a no-op and the absence of the window is
+        // what there is to check.)
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "to_kelvin".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        assert!(!editor.borrow().unsaved());
+        leave(&editor, &views);
+        assert!(
+            views.borrow().leaving.is_none(),
+            "a session that owes nothing should not be asked"
+        );
+
+        // A write that failed, so there is something to offer.
+        let shut = |mode: u32| {
+            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            permissions.set_mode(mode);
+            std::fs::set_permissions(&locked, permissions).unwrap();
+        };
+        shut(0o500);
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "mean_temp".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        assert!(editor.borrow().unsaved(), "the write should have failed");
+
+        leave(&editor, &views);
+        let window = views
+            .borrow()
+            .leaving
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("the offer should be made")
+            .upgrade()
+            .expect("and still be there");
+        // It says why, which is the thing a person needs in order to answer.
+        assert!(!window.get_trouble().is_empty());
+
+        // Staying takes the offer away and leaves the work where it is.
+        window.invoke_stayed();
+        assert!(views.borrow().leaving.is_none());
+        assert!(editor.borrow().unsaved());
+        assert_eq!(editor.borrow().document().nodes.len(), 2);
+
+        // Put right, and saving on the way out writes it.
+        shut(0o700);
+        leave(&editor, &views);
+        let window = views
+            .borrow()
+            .leaving
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("asked again")
+            .upgrade()
+            .unwrap();
+        window.invoke_saved();
+        assert!(!editor.borrow().unsaved(), "{:?}", editor.borrow().trouble());
+        let written = std::fs::read_to_string(&path).expect("the file");
+        assert!(written.contains("mean_temp"), "{written}");
+    }
+
     /// A click on a node opens a window for it, and another node opens
     /// another.
     ///
@@ -3594,6 +3829,7 @@ mod tests {
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
+            leaving: None,
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3772,6 +4008,7 @@ mod tests {
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
+            leaving: None,
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3805,10 +4042,9 @@ mod tests {
             .attributes
             .contains_key("drop_percent"));
         assert!(editor.borrow_mut().undo());
-        assert!(editor.borrow().document().simulator.as_ref().unwrap().payloads
+        assert!(!editor.borrow().document().simulator.as_ref().unwrap().payloads
             ["temp_fore"]
-            .get("drop_percent")
-            .is_none());
+            .contains_key("drop_percent"));
     }
 
     /// The menu opens the simulator's groups, and typing in them reaches its
@@ -3835,6 +4071,7 @@ mod tests {
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
+            leaving: None,
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3941,12 +4178,14 @@ mod tests {
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
+            leaving: None,
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
 
-        show_group(&editor, &views, "cabin_temps");
+        // The only group there is, so the window opens on it.
+        show_group(&editor, &views);
 
         // The window shows what the group is: its interval, and the payloads
         // in it.

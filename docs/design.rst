@@ -1001,8 +1001,20 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
-What tcspecial itself is configured with is edited from the menu, under **Edit
-tcspecial parameters**. That is the one part of a configuration which is about
+The menu bar holds what belongs to the configuration as a whole rather than to
+anything on the canvas -- there is nothing to press on a diagram that would mean
+"the configuration", or "the groups", or "the way out". **File** holds Save,
+the two kinds of group, and Exit; **Edit** holds the tcspecial parameters.
+
+Exit offers to write anything the files do not have before it goes, which is
+normally nothing. Three answers rather than two: *Save and leave*, *Leave
+without saving* -- because somebody who has just been told the device is full
+may want to go and deal with it, and a program that insisted on writing first
+would be one they cannot get out of -- and *Stay*, because the menu is next to
+everything else and gets pressed by accident.
+
+What tcspecial itself is configured with is edited from the Edit menu, under
+**Edit tcspecial parameters**. That is the one part of a configuration which is about
 the whole of it rather than about anything in it -- so there is nothing on the
 canvas to press that would mean "the configuration", and a command is how it is
 reached. The window offers every attribute the section may have, the ones that
@@ -1127,15 +1139,21 @@ an edit and leaves nothing in the history.
 
 The window holds the attributes the node's type declares, whatever else the
 node happens to hold, its comment, what is wrong with it if anything, and the
-simulator's settings for it where there are any. Removing the panel also gave
-the canvas the 260 pixels it was using, which the two working panes now have.
+simulator's settings for it where there are any -- those with their labels in
+italic, which says on every row what the rule above them says once: a reader
+who has scrolled past the rule still knows which file they are typing into.
+Removing the panel also gave the canvas the 260 pixels it was using, which the
+two working panes now have.
 
-Groups are edited in a window of their own, reached from a menu in the bar. A
-group is not on the canvas and should not be: it is a set of payloads read
-together, and which payloads those are is written on the nodes rather than
-drawn between them. The window states the group's name, how often it is read,
-and which payloads are in it -- and below those, the attributes that *all* of
-those payloads declare.
+Groups are edited in a window of their own, reached from **File -> Edit payload
+groups**. A group is not on the canvas and should not be: it is a set of
+payloads read together, and which payloads those are is written on the nodes
+rather than drawn between them. The window chooses which group, states its
+name, how often it is read, and which payloads are in it -- and below those,
+the attributes that *all* of those payloads declare. The chooser is in the
+window rather than in the bar, where it was: a list of what a configuration
+happens to contain is data, and a control holding data belongs with the form
+that edits it.
 
 Typing a value into one of those writes it to every payload in the group, as a
 single edit. That is what a group is for beyond the schedule: a dozen sensors

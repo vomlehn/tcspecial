@@ -6,7 +6,8 @@ use crate::endpoint_config::{ByteList, Scalar};
 
 use serde::{Deserialize, Serialize};
 
-use crate::node::serial::{ClockType, Encoding, FrameCheck, Parity, StopBits};
+use crate::node::hdlc::{ClockType, Encoding, FrameCheck};
+use crate::node::serial::{Parity, StopBits};
 use crate::node::spi::{BitOrder, CsActive, SpiMode};
 use crate::verify::Problem;
 use std::collections::{BTreeMap, BTreeSet};
@@ -122,6 +123,11 @@ pub enum DHType {
     ///
     /// Experimental; see [`crate::node::gpio`].
     Gpio,
+    /// A handler whose payload is on a synchronous serial line, which Linux
+    /// drives as a network interface.
+    ///
+    /// Experimental; see [`crate::node::hdlc`].
+    Hdlc,
 }
 
 /// Something one handler takes for itself, and so which no other may take.
@@ -190,6 +196,11 @@ fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
         },
         EndpointConfig::Device(device) => Claim::Path(device.path.clone()),
         EndpointConfig::Serial(serial) => Claim::Path(serial.path.clone()),
+        // The whole interface, not a part of it. A raw HDLC frame carries no
+        // address, so there is nothing to tell two payloads on one line
+        // apart -- which is what makes this a claim on the interface where a
+        // CAN payload's is a claim on an identifier.
+        EndpointConfig::Hdlc(hdlc) => Claim::Path(hdlc.interface.clone()),
         EndpointConfig::Iio(iio) => Claim::Path(iio.path.clone()),
         EndpointConfig::Rpmsg(rpmsg) => Claim::Path(rpmsg.path.clone()),
         EndpointConfig::Spi(spi) => Claim::Path(spi.path.clone()),
@@ -372,6 +383,7 @@ impl DHType {
             DHType::Iio => "iio",
             DHType::Rpmsg => "rpmsg",
             DHType::Gpio => "gpio",
+            DHType::Hdlc => "hdlc",
         }
     }
 
@@ -393,6 +405,7 @@ impl DHType {
             DHType::Iio,
             DHType::Rpmsg,
             DHType::Gpio,
+            DHType::Hdlc,
         ]
         .into_iter()
         .find(|kind| kind.spelling() == text)
@@ -411,7 +424,8 @@ impl DHType {
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device-file, serial, i2c, spi, can, iio, rpmsg, or gpio".to_string()
+        "network, device-file, serial, i2c, spi, can, iio, rpmsg, gpio, or hdlc"
+            .to_string()
     }
 
     /// The name this word used to be, for a file that still writes it.
@@ -713,25 +727,11 @@ pub struct SerialConfig {
     pub path: String,
     /// Line rate in bits per second.
     pub datarate: u32,
-    /// Whether the line is start-stop framed or synchronous.
-    pub asynchronous: bool,
-    /// Stop bits following each byte, for a start-stop line. `None` for a
-    /// synchronous one, which has no use for them: a stop bit is what
-    /// start-stop framing uses in place of a clock.
-    pub stop_bits: Option<StopBits>,
-    /// Parity per character, for a start-stop line, which is what termios
-    /// sets. `None` for a synchronous one.
-    pub parity: Option<Parity>,
-    /// What a synchronous line's clock, coding and frame check are, and
-    /// `None` for a start-stop line. Recorded rather than applied: the kernel
-    /// drives such a line through a network interface of its own rather than
-    /// through the terms of a device file, so a handler reading a path cannot
-    /// set them -- and a link whose configuration says what it expects can be
-    /// checked against the equipment and reported plainly.
-    pub clock_type: Option<ClockType>,
-    pub encoding: Option<Encoding>,
-    pub frame_check: Option<FrameCheck>,
-    pub loopback: Option<bool>,
+    /// Stop bits following each byte, which is what start-stop framing uses
+    /// in place of a clock.
+    pub stop_bits: StopBits,
+    /// Parity per character, which is what termios sets.
+    pub parity: Parity,
     /// Data bits per byte. A count rather than a `ByteLength`, which is the
     /// configuration language's checked form: by the time a handler is
     /// started the count has been checked, and this is the number the line
@@ -853,6 +853,31 @@ pub struct CanConfig {
     pub loopback: bool,
 }
 
+/// Configuration for an endpoint that is a synchronous serial line
+///
+/// An interface rather than a path: the kernel drives such a line as a network
+/// interface, and the terms of the line are set with an ioctl on it rather
+/// than with termios on a file descriptor. Experimental; see
+/// [`crate::node::hdlc`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HdlcConfig {
+    /// The network interface the card presents: `hdlc0`.
+    pub interface: String,
+    /// Which electrical standard the port is wired as.
+    pub standard: crate::node::hdlc::Standard,
+    /// Whose clock the bits are on.
+    pub clock_type: ClockType,
+    /// The clock rate in bits per second where this end generates the clock,
+    /// and `None` where the far end does.
+    pub clock_rate: Option<u32>,
+    /// Whether the port is put in loopback.
+    pub loopback: bool,
+    /// How the bits are carried on the wire.
+    pub encoding: Encoding,
+    /// What checks a frame: the kernel's own `parity` for raw HDLC.
+    pub frame_check: FrameCheck,
+}
+
 /// What a data handler does its payload I/O on, and so what kind it is.
 ///
 /// One variant per kind of endpoint, each carrying what that kind needs to be
@@ -880,6 +905,8 @@ pub enum EndpointConfig {
     Rpmsg(RpmsgConfig),
     /// Experimental; see [`GpioConfig`].
     Gpio(GpioConfig),
+    /// Experimental; see [`HdlcConfig`].
+    Hdlc(HdlcConfig),
 }
 
 impl EndpointConfig {
@@ -900,6 +927,7 @@ impl EndpointConfig {
             EndpointConfig::Iio(_) => DHType::Iio,
             EndpointConfig::Rpmsg(_) => DHType::Rpmsg,
             EndpointConfig::Gpio(_) => DHType::Gpio,
+            EndpointConfig::Hdlc(_) => DHType::Hdlc,
         }
     }
 }
@@ -1040,6 +1068,28 @@ fn link_of(
         );
     }
 
+    // A synchronous line is a network interface and nothing else: a raw HDLC
+    // frame carries no address, so the interface is the whole of where the
+    // payload is.
+    if kind == DHType::Hdlc {
+        let interface = stated
+            .interface
+            .clone()
+            .or_else(|| group.and_then(|g| g.interface.clone()))
+            .ok_or_else(|| {
+                format!(
+                    "payload \"{name}\" is an hdlc payload, so it needs the interface \
+                     its line is: say interface, not path"
+                )
+            })?;
+
+        return crate::endpoint_config::endpoint_of(
+            name,
+            &crate::endpoint_config::EndpointLocation::Interface { interface },
+            &kind_params,
+        );
+    }
+
     // Where it is. A line and a peripheral are a device node; a device on a
     // bus is the bus and the address on it, which is what tells one device on
     // a bus from another.
@@ -1118,6 +1168,7 @@ pub(crate) fn kind_of_terms(
         DHType::Iio => crate::node::iio::group_kind_of(name, wire),
         DHType::Rpmsg => crate::node::rpmsg::group_kind_of(name, wire),
         DHType::Gpio => crate::node::gpio::group_kind_of(name, wire),
+        DHType::Hdlc => crate::node::hdlc::group_kind_of(name, wire),
         other => {
             return Err(format!(
                 "{} is not a kind of link this describes",
@@ -1205,10 +1256,12 @@ fn link_terms_of(
     let wire = crate::endpoint_config::LinkTerms {
         datarate: inherited!(datarate),
         stop_bits: inherited!(stop_bits),
-        asynchronous: inherited!(asynchronous),
         parity: inherited!(parity),
         clock_type: inherited!(clock_type),
         encoding: inherited!(encoding),
+        frame_check: inherited!(frame_check),
+        clock_rate: inherited!(clock_rate),
+        standard: inherited!(standard),
         loopback: inherited!(loopback),
         byte_length: inherited!(byte_length),
         protocol: inherited!(protocol),
@@ -1519,9 +1572,15 @@ pub struct DHGroupJson {
     /// How fast a serial line runs. Serial payloads only.
     #[serde(default)]
     pub datarate: Option<Scalar>,
-    /// Whether a serial line is asynchronous. Serial payloads only.
+    /// Which electrical standard a synchronous line's port is wired as, how
+    /// fast this end clocks it, and what checks a frame. HDLC payloads only,
+    /// and experimental; see [`crate::node::hdlc`].
     #[serde(default)]
-    pub asynchronous: Option<Scalar>,
+    pub standard: Option<Scalar>,
+    #[serde(default)]
+    pub clock_rate: Option<Scalar>,
+    #[serde(default)]
+    pub frame_check: Option<Scalar>,
     /// Stop bits per character, on an asynchronous line.
     #[serde(default)]
     pub stop_bits: Option<Scalar>,
@@ -1707,9 +1766,15 @@ pub struct DHConfigJson {
     /// How fast a serial line runs. Serial payloads only.
     #[serde(default)]
     pub datarate: Option<Scalar>,
-    /// Whether a serial line is asynchronous. Serial payloads only.
+    /// Which electrical standard a synchronous line's port is wired as, how
+    /// fast this end clocks it, and what checks a frame. HDLC payloads only,
+    /// and experimental; see [`crate::node::hdlc`].
     #[serde(default)]
-    pub asynchronous: Option<Scalar>,
+    pub standard: Option<Scalar>,
+    #[serde(default)]
+    pub clock_rate: Option<Scalar>,
+    #[serde(default)]
+    pub frame_check: Option<Scalar>,
     /// Stop bits per character, on an asynchronous line.
     #[serde(default)]
     pub stop_bits: Option<Scalar>,
@@ -2117,7 +2182,8 @@ impl DHConfigJson {
             | DHType::Can
             | DHType::Iio
             | DHType::Rpmsg
-            | DHType::Gpio) => {
+            | DHType::Gpio
+            | DHType::Hdlc) => {
                 link_of(&self.name, kind, self, group)?
             }
         };
@@ -2664,13 +2730,8 @@ mod tests {
         let serial = EndpointConfig::Serial(SerialConfig {
             path: "/dev/ttyS0".to_string(),
             datarate: 9600,
-            asynchronous: true,
-            parity: Some(Parity::None),
-            clock_type: None,
-            encoding: None,
-            frame_check: None,
-            loopback: None,
-            stop_bits: Some(StopBits::One),
+            parity: Parity::None,
+            stop_bits: StopBits::One,
             byte_length: 8,
             rs485: None,
         });
@@ -3056,7 +3117,7 @@ payloads:
     fn a_payload_file_describes_a_serial_payload() {
         let yaml = "version: \"1.0\"\ndescription: a line\n\
                     payloads:\n  - name: line\n    type: serial\n    \
-                    path: /dev/ttyS0\n    datarate: 115200\n    asynchronous: true\n    \
+                    path: /dev/ttyS0\n    datarate: 115200\n    \
                     stop_bits: 1\n    parity: none\n    byte_length: 8\n    \
                     packet_size: 12\n    stream:\n      max_length: 12\n      \
                     timeout: none\n";
@@ -3067,15 +3128,9 @@ payloads:
             crate::EndpointConfig::Serial(line) => {
                 assert_eq!(line.path, "/dev/ttyS0");
                 assert_eq!(line.datarate, 115_200);
-                assert!(line.asynchronous);
                 assert_eq!(line.byte_length, 8);
-                assert!(
-                    line.stop_bits.is_some(),
-                    "an asynchronous line has stop bits"
-                );
-                assert!(line.parity.is_some());
-                // Synchronous terms are not a thing an asynchronous line has.
-                assert!(line.clock_type.is_none());
+                assert_eq!(line.stop_bits, StopBits::One);
+                assert_eq!(line.parity, Parity::None);
             }
             other => panic!("a serial payload resolved to {other:?}"),
         }
@@ -3115,15 +3170,15 @@ payloads:
 
     /// The rules each kind had are the rules it still has.
     ///
-    /// Three of them, one per kind, checked through the payload language: an
-    /// asynchronous line may not state a synchronous line's clock, a SPI
-    /// peripheral must say which clock mode it expects, and an I2C address
-    /// the specification reserves is refused.
+    /// Three of them, one per kind, checked through the payload language: a
+    /// start-stop line may not state a clocked line's clock, a SPI peripheral
+    /// must say which clock mode it expects, and an I2C address the
+    /// specification reserves is refused.
     #[test]
     fn a_links_own_rules_survived_the_move() {
         let serial = "version: \"1.0\"\ndescription: a line\n\
                       payloads:\n  - name: line\n    type: serial\n    \
-                      path: /dev/ttyS0\n    datarate: 9600\n    asynchronous: true\n    \
+                      path: /dev/ttyS0\n    datarate: 9600\n    \
                       stop_bits: 1\n    byte_length: 8\n    clock_type: txint\n    \
                       packet_size: 1\n    stream:\n      max_length: 1\n      \
                       timeout: none\n";
@@ -3131,7 +3186,7 @@ payloads:
             .parse::<PayloadConfig>(serial)
             .expect("it parses")
             .to_dh_configs()
-            .expect_err("an asynchronous line has no clock to state");
+            .expect_err("a start-stop line has no clock to state");
         assert!(said.contains("clock_type"), "{said}");
 
         let spi = "version: \"1.0\"\ndescription: a peripheral\n\
@@ -4020,7 +4075,7 @@ payloads:
     }
 
     /// The terms of a line, which is what the stream rule belongs to.
-    const A_LINE: &str = "    path: /dev/ttyS0\n    asynchronous: true\n    \
+    const A_LINE: &str = "    path: /dev/ttyS0\n    \
                           datarate: 9600\n    stop_bits: 1\n    byte_length: 8\n";
 
     /// An RS-485 bus reaches a handler with its turnaround on it.
@@ -4669,15 +4724,14 @@ payloads:
         assert!(said.contains("not a byte value"), "{said}");
     }
 
-    /// A line says whether it is start-stop, and stop bits belong to only one
-    /// of the two.
+    /// A line says its framing, and the words of a clocked line are not its.
     ///
-    /// The two are read differently all the way down -- a start-stop line
-    /// delimits every byte for itself, a synchronous one carries its bits on
-    /// a clock -- so a line that did not say would be guessed at, and a line
-    /// read as the wrong one of the two is a line read as noise.
+    /// This type is start-stop framing and nothing else now. A line whose bits
+    /// are carried on a clock is an `hdlc` payload -- a network interface, with
+    /// the clock and the coding set on it -- so the words that belong to one
+    /// are refused here, where they used to be accepted and recorded.
     #[test]
-    fn a_line_says_whether_it_is_start_stop() {
+    fn a_line_is_start_stop_and_says_so() {
         let line = |extra: &str| {
             link_terms(
                 "serial",
@@ -4693,85 +4747,42 @@ payloads:
             Err(e) => panic!("{extra}: {e}"),
         };
 
-        // Saying nothing is refused: this is not a thing to default.
-        let said = line("    stop_bits: 1\n").expect_err("which kind of line is it");
-        assert!(said.contains("no asynchronous"), "{said}");
-
-        // A start-stop line has stop bits, and must state them.
-        let start_stop = serial("    asynchronous: true\n    stop_bits: 2\n");
-        assert!(start_stop.asynchronous);
-        assert_eq!(start_stop.stop_bits, Some(crate::StopBits::Two));
-        let said = line("    asynchronous: true\n").expect_err("stop bits are required");
+        // Stop bits are required: they are what start-stop framing uses in
+        // place of a clock, so a line without them is not one of these.
+        let start_stop = serial("    stop_bits: 2\n");
+        assert_eq!(start_stop.stop_bits, crate::StopBits::Two);
+        let said = line("").expect_err("stop bits are required");
         assert!(said.contains("stop_bits"), "{said}");
 
-        // A synchronous line has none, and stating them is refused: a stop
-        // bit is what start-stop framing uses in place of a clock, so a line
-        // whose bits are on a clock has nothing for one to delimit.
-        let synchronous = serial("    asynchronous: false\n    clock_type: external\n");
-        assert!(!synchronous.asynchronous);
-        assert_eq!(synchronous.stop_bits, None);
-
-        let said = line("    asynchronous: false\n    clock_type: external\n    stop_bits: 1\n")
-            .expect_err("a clocked line has no stop bits");
-        assert!(
-            said.contains("stop_bits") && said.contains("in place of a clock"),
-            "{said}"
+        // Parity defaults to none, which is what nearly every device link
+        // uses and what a port was set to before this could be stated.
+        assert_eq!(start_stop.parity, crate::Parity::None);
+        assert_eq!(
+            serial("    stop_bits: 1\n    parity: even\n").parity,
+            crate::Parity::Even
         );
 
-        // And it is true or false, not a word that looks like one.
-        let said = line("    asynchronous: sometimes\n").expect_err("it is one or the other");
-        assert!(said.contains("is not true or false"), "{said}");
-
-        // What each kind may say is the other half of the rule: a start-stop
-        // line shares no clock, so the settings of one are refused for it.
+        // A clocked line's words belong to the hdlc type and are refused
+        // here, each by name.
         for stated in [
             "    clock_type: external\n",
             "    encoding: nrzi\n",
+            "    clock_rate: 64000\n",
+            "    frame_check: crc16_pr1\n",
+            "    standard: v35\n",
             "    loopback: true\n",
         ] {
-            let said = line(&format!(
-                "    asynchronous: true\n    stop_bits: 1\n{stated}"
-            ))
-            .expect_err("a start-stop line shares no clock");
+            let said = line(&format!("    stop_bits: 1\n{stated}"))
+                .expect_err("a clocked line's word on a start-stop line");
             let named = stated.trim().split(':').next().unwrap();
-            assert!(
-                said.contains(named) && said.contains("shares no clock"),
-                "{stated}: {said}"
-            );
+            assert!(said.contains(named), "{stated}: {said}");
         }
 
-        // And a synchronous line takes each of them, with the clock required
-        // and the rest defaulted.
-        let clocked = serial(
-            "    asynchronous: false\n    clock_type: internal\n    encoding: nrzi\n    \
-             parity: crc32_pr1_ccitt\n    loopback: true\n",
-        );
-        assert_eq!(clocked.clock_type, Some(crate::ClockType::Internal));
-        assert!(clocked.clock_type.unwrap().is_ours(), "this end clocks it");
-        assert_eq!(clocked.encoding, Some(crate::Encoding::Nrzi));
-        assert_eq!(clocked.frame_check, Some(crate::FrameCheck::Crc32Pr1Ccitt));
-        assert_eq!(clocked.loopback, Some(true));
-        assert_eq!(
-            clocked.parity, None,
-            "a synchronous line has no per-character parity"
-        );
-
-        // The unstated ones are the driver's own defaults.
-        let defaulted = serial("    asynchronous: false\n    clock_type: external\n");
-        assert_eq!(defaulted.encoding, Some(crate::Encoding::Nrz));
-        assert_eq!(defaulted.frame_check, Some(crate::FrameCheck::None));
-        assert_eq!(defaulted.loopback, Some(false));
-
-        // A value that is not one of a kind's is refused with the ones that
-        // are, and each kind has its own list: a CRC is not a parity a
-        // character can have, and even is not a frame check.
-        let said = line("    asynchronous: true\n    stop_bits: 1\n    parity: crc16_pr1\n")
+        // And a parity that is a frame check is refused with the five a
+        // character can have: a CRC is not one of them.
+        let said = line("    stop_bits: 1\n    parity: crc16_pr1\n")
             .expect_err("a character's parity is not a frame check");
         assert!(said.contains("none, even, odd, mark, or space"), "{said}");
-
-        let said = line("    asynchronous: false\n    clock_type: external\n    parity: even\n")
-            .expect_err("a frame check is not a character's parity");
-        assert!(said.contains("is not a frame check"), "{said}");
     }
 
     #[test]
@@ -4784,7 +4795,7 @@ payloads:
             let terms = link_terms(
                 "serial",
                 &format!(
-                    "    path: /dev/ttyS0\n    asynchronous: true\n    datarate: 9600\n    \
+                    "    path: /dev/ttyS0\n    datarate: 9600\n    \
                      stop_bits: {text}\n    byte_length: 8\n    stream:\n      \
                      max_length: 8\n      timeout: none\n"
                 ),
@@ -4792,7 +4803,7 @@ payloads:
             .unwrap_or_else(|e| panic!("{text}: {e}"));
             match terms {
                 crate::endpoint_config::GroupKind::Serial(serial) => {
-                    assert_eq!(serial.stop_bits, Some(want), "for {text}")
+                    assert_eq!(serial.stop_bits, want, "for {text}")
                 }
                 other => panic!("{other:?}"),
             }
@@ -4803,7 +4814,7 @@ payloads:
     fn a_byte_length_no_uart_offers_is_refused() {
         let said = link_terms(
             "serial",
-            "    path: /dev/ttyS0\n    asynchronous: true\n    datarate: 9600\n    \
+            "    path: /dev/ttyS0\n    datarate: 9600\n    \
              stop_bits: 1\n    byte_length: 9\n    stream:\n      max_length: 8\n      \
              timeout: none\n",
         )
@@ -5108,7 +5119,7 @@ payloads:
             ),
             (
                 "serial",
-                "    path: /dev/ttyS0\n    asynchronous: true\n    datarate: 9600\n    \
+                "    path: /dev/ttyS0\n    datarate: 9600\n    \
                  stop_bits: 1\n    byte_length: 8\n    stream:\n      max_length: 8\n      \
                  timeout: none\n",
                 "    cs_active: low\n",

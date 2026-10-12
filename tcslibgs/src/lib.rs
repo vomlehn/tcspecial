@@ -40,9 +40,8 @@ pub use commands::*;
 // by the time a handler holds one it is no longer a matter of configuration
 // files.
 pub use endpoint_config::Scalar;
-pub use node::serial::{
-    ByteLength, ClockType, Encoding, FrameCheck, Parity, StopBits,
-};
+pub use node::serial::{ByteLength, Parity, StopBits};
+pub use node::hdlc::{ClockType, Encoding, FrameCheck, HdlcParams, Standard};
 pub use node::can::CanParams;
 pub use node::gpio::{Bias, Edge as LineEdge, GpioParams};
 pub use node::iio::IioParams;

@@ -43,7 +43,6 @@ payload_groups:
   # exercising even where nothing downstream of it is slower for it.
   - name: payload_line
     type: serial
-    asynchronous: true
     datarate: 115200
     byte_length: 8
     stop_bits: 1

@@ -183,6 +183,16 @@ fn the_shipped_payload_configs_load() {
                 EndpointConfig::I2c(i2c) => {
                     assert!(!i2c.bus.is_empty(), "{file}: {} has no bus", dh.name.0);
                 }
+                // A synchronous line, which is an interface and nothing else;
+                // experimental, and no shipped set has one yet -- there being
+                // no card and nothing to stand in for one.
+                EndpointConfig::Hdlc(hdlc) => {
+                    assert!(
+                        !hdlc.interface.is_empty(),
+                        "{file}: {} has no interface",
+                        dh.name.0
+                    );
+                }
                 // A CAN payload is on an interface with an identifier, not at
                 // a path; experimental, and no shipped set has one yet.
                 EndpointConfig::Can(can) => {

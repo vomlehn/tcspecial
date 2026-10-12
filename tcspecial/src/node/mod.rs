@@ -17,6 +17,7 @@ pub mod i2c;
 pub mod spi;
 pub mod can;
 pub mod gpio;
+pub mod hdlc;
 pub mod iio;
 pub mod rpmsg;
 pub mod serial;

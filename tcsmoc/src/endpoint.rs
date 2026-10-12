@@ -49,6 +49,12 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
             let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
             format!("GPIO {} lines {}", gpio.path, offsets.join(","))
         }
+        // A synchronous line: the interface, and whose clock it is on, which
+        // is the fact an operator compares against the equipment.
+        EndpointConfig::Hdlc(hdlc) => format!(
+            "HDLC {} as {}, clock {}",
+            hdlc.interface, hdlc.standard, hdlc.clock_type
+        ),
     }
 }
 

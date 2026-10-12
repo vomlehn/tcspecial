@@ -135,6 +135,27 @@ pub(crate) fn endpoint_of(
                 kind.type_name()
             )),
         },
+        // A synchronous line, which the kernel drives as a network interface:
+        // the interface is the whole of where it is, there being no address
+        // on it -- a frame carries none, so one line is one payload.
+        EndpointLocation::Interface { interface } => match kind {
+            GroupKind::Hdlc(hdlc) => Ok(EndpointConfig::Hdlc(crate::types::HdlcConfig {
+                interface: interface.clone(),
+                standard: hdlc.standard,
+                clock_type: hdlc.clock_type,
+                clock_rate: hdlc.clock_rate,
+                loopback: hdlc.loopback,
+                encoding: hdlc.encoding,
+                frame_check: hdlc.frame_check,
+            })),
+            // Only an hdlc payload is located by an interface alone, so this
+            // is unreachable through the parser; an error rather than a
+            // panic, for the reason the arms below give.
+            _ => Err(format!(
+                "\"{what}\" is on an interface, which a {} link does not put it on",
+                kind.type_name()
+            )),
+        },
         EndpointLocation::Can { interface, can_id } => match kind {
             GroupKind::Can(can) => Ok(EndpointConfig::Can(CanConfig {
                 interface: interface.clone(),
@@ -160,13 +181,8 @@ pub(crate) fn endpoint_of(
             GroupKind::Serial(serial) => Ok(EndpointConfig::Serial(SerialConfig {
                 path: path.clone(),
                 datarate: serial.datarate,
-                asynchronous: serial.asynchronous,
                 stop_bits: serial.stop_bits,
                 parity: serial.parity,
-                clock_type: serial.clock_type,
-                encoding: serial.encoding,
-                frame_check: serial.frame_check,
-                loopback: serial.loopback,
                 byte_length: serial.byte_length.bits(),
                 rs485: serial.rs485,
             })),
@@ -206,6 +222,12 @@ pub(crate) fn endpoint_of(
                 "\"{what}\" names a device file, but a CAN payload is on an interface \
                  and the identifier its frames carry"
             )),
+            // A synchronous line is a network interface and not a device
+            // file, for the reason a CAN controller is not one.
+            GroupKind::Hdlc(_) => Err(format!(
+                "\"{what}\" names a device file, but a synchronous line is a network \
+                 interface: say interface, not path"
+            )),
         },
     }
 }
@@ -224,6 +246,8 @@ pub enum GroupKind {
     Rpmsg(RpmsgParams),
     /// Experimental; see [`crate::node::gpio`].
     Gpio(GpioParams),
+    /// Experimental; see [`crate::node::hdlc`].
+    Hdlc(crate::node::hdlc::HdlcParams),
 }
 
 impl GroupKind {
@@ -237,6 +261,7 @@ impl GroupKind {
             GroupKind::Iio(_) => "iio",
             GroupKind::Rpmsg(_) => "rpmsg",
             GroupKind::Gpio(_) => "gpio",
+            GroupKind::Hdlc(_) => "hdlc",
         }
     }
 
@@ -253,7 +278,8 @@ impl GroupKind {
             | GroupKind::Can(_)
             | GroupKind::Iio(_)
             | GroupKind::Rpmsg(_)
-            | GroupKind::Gpio(_) => None,
+            | GroupKind::Gpio(_)
+            | GroupKind::Hdlc(_) => None,
         }
     }
 }
@@ -305,6 +331,14 @@ pub enum EndpointLocation {
     /// Both are needed because two endpoints of one I2C group commonly sit
     /// on the same bus and differ only in which device the master addresses.
     I2c { bus: String, address: u16 },
+    /// A network interface, and nothing else.
+    ///
+    /// For a synchronous serial line, which Linux drives as a network
+    /// interface. One interface is one payload: a raw HDLC frame carries no
+    /// address, so there is nothing to tell two payloads on one line apart --
+    /// which is what makes this different from a CAN interface. Experimental;
+    /// see [`crate::node::hdlc`].
+    Interface { interface: String },
     /// A CAN interface and the identifier a payload's frames carry.
     ///
     /// An interface rather than a path: a CAN controller is a network
@@ -343,12 +377,18 @@ pub(crate) struct LinkTerms {
     // A line.
     pub(crate) datarate: Option<Scalar>,
     pub(crate) stop_bits: Option<Scalar>,
-    pub(crate) asynchronous: Option<Scalar>,
     /// A parity per character on an asynchronous line, and the frame check on
     /// a synchronous one: the kernel calls both a line's parity.
     pub(crate) parity: Option<Scalar>,
+    /// Whose clock a synchronous line's bits are on, how they are carried,
+    /// what checks a frame, how fast this end clocks them, and which
+    /// electrical standard the port is wired as: an hdlc node's, every one.
+    /// See [`crate::node::hdlc`].
     pub(crate) clock_type: Option<Scalar>,
     pub(crate) encoding: Option<Scalar>,
+    pub(crate) frame_check: Option<Scalar>,
+    pub(crate) clock_rate: Option<Scalar>,
+    pub(crate) standard: Option<Scalar>,
     pub(crate) loopback: Option<Scalar>,
     pub(crate) byte_length: Option<Scalar>,
     /// Which protocol a network payload speaks, which no link has: here so
@@ -703,10 +743,16 @@ fn reject_unused(
 ///
 /// Listed in one place so that adding an attribute to one type cannot quietly
 /// make it accepted by the others.
-fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 30] {
+fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 32] {
     [
         // Serial.
         ("datarate", g.datarate.is_some()),
+        // HDLC: a synchronous line.
+        ("standard", g.standard.is_some()),
+        ("clock_type", g.clock_type.is_some()),
+        ("clock_rate", g.clock_rate.is_some()),
+        ("encoding", g.encoding.is_some()),
+        ("frame_check", g.frame_check.is_some()),
         ("rs485", g.rs485.is_some()),
         ("rs485_rts_on_send", g.rs485_rts_on_send.is_some()),
         (
@@ -718,11 +764,7 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 30] {
             g.rs485_delay_after_send_ms.is_some(),
         ),
         ("stop_bits", g.stop_bits.is_some()),
-        ("asynchronous", g.asynchronous.is_some()),
         ("parity", g.parity.is_some()),
-        ("clock_type", g.clock_type.is_some()),
-        ("encoding", g.encoding.is_some()),
-        ("loopback", g.loopback.is_some()),
         ("byte_length", g.byte_length.is_some()),
         // Network.
         ("protocol", g.protocol.is_some()),
@@ -731,8 +773,9 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 30] {
         ("pec", g.pec.is_some()),
         ("retries", g.retries.is_some()),
         ("timeout", g.timeout.is_some()),
-        // CAN.
+        // CAN, and the loopback a synchronous line shares the word with.
         ("can_fd", g.can_fd.is_some()),
+        ("loopback", g.loopback.is_some()),
         // rpmsg.
         ("service", g.service.is_some()),
         ("max_message_bytes", g.max_message_bytes.is_some()),

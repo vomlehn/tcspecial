@@ -108,53 +108,8 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             let _ = writeln!(out, "  path             {}", serial.path);
             let _ = writeln!(out, "  datarate         {} bit/s", serial.datarate);
             let _ = writeln!(out, "  byte_length      {} data bits", serial.byte_length);
-            // Which kind of line, and the stop bits only where there are any
-            // to have: a synchronous line carries its bits on a clock, so a
-            // line about stop bits would be a line about nothing.
-            let _ = writeln!(
-                out,
-                "  asynchronous     {}",
-                if serial.asynchronous {
-                    "yes, so each byte is start-stop framed"
-                } else {
-                    "no, so the bits are carried on a clock"
-                }
-            );
-            if let Some(stop_bits) = serial.stop_bits {
-                let _ = writeln!(out, "  stop_bits        {stop_bits}");
-            }
-            if let Some(parity) = serial.parity {
-                let _ = writeln!(out, "  parity           {parity}");
-            }
-
-            // What a synchronous line says instead, each of which the kernel's
-            // generic HDLC can be told and none of which a handler reading a
-            // device file sets: recorded so the link a file describes can be
-            // checked against the equipment.
-            if let Some(clock_type) = serial.clock_type {
-                let _ = writeln!(
-                    out,
-                    "  clock_type       {clock_type}, so the data rate above is {}",
-                    if clock_type.is_ours() {
-                        "the rate this end generates"
-                    } else {
-                        "the rate the far end is expected to clock"
-                    }
-                );
-            }
-            if let Some(encoding) = serial.encoding {
-                let _ = writeln!(out, "  encoding         {encoding}");
-            }
-            if let Some(frame_check) = serial.frame_check {
-                let _ = writeln!(out, "  parity           {frame_check}, the frame check");
-            }
-            if let Some(loopback) = serial.loopback {
-                let _ = writeln!(
-                    out,
-                    "  loopback         {}",
-                    if loopback { "yes" } else { "no" }
-                );
-            }
+            let _ = writeln!(out, "  stop_bits        {}", serial.stop_bits);
+            let _ = writeln!(out, "  parity           {}", serial.parity);
 
             // The electrical layer under a start-stop line. Shown only where
             // the line is a two-wire bus: a panel is read for what a payload
@@ -223,6 +178,50 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
         // sensor up, so a payload says neither.
         EndpointConfig::Iio(iio) => {
             let _ = writeln!(out, "  path             {}", iio.path);
+        }
+        // A synchronous line, whose terms are the two halves the kernel takes:
+        // the port's wiring and clock, and the framing on the wire.
+        EndpointConfig::Hdlc(hdlc) => {
+            let _ = writeln!(out, "  interface        {}", hdlc.interface);
+            let _ = writeln!(out, "  standard         {}", hdlc.standard);
+            let _ = writeln!(
+                out,
+                "  clock_type       {}, so the clock is {}",
+                hdlc.clock_type,
+                if hdlc.clock_type.is_ours() {
+                    "this end's"
+                } else {
+                    "the far end's"
+                }
+            );
+            match hdlc.clock_rate {
+                Some(rate) => {
+                    let _ = writeln!(out, "  clock_rate       {rate} bit/s, generated here");
+                }
+                None => {
+                    let _ = writeln!(
+                        out,
+                        "  clock_rate       none, the far end's clock being whatever \
+                         the far end makes it"
+                    );
+                }
+            }
+            let _ = writeln!(out, "  encoding         {}", hdlc.encoding);
+            let _ = writeln!(
+                out,
+                "  frame_check      {}{}",
+                hdlc.frame_check,
+                if hdlc.frame_check == crate::FrameCheck::None {
+                    ", so a frame carries no check of its own"
+                } else {
+                    ""
+                }
+            );
+            let _ = writeln!(
+                out,
+                "  loopback         {}",
+                if hdlc.loopback { "yes" } else { "no" }
+            );
         }
         EndpointConfig::Can(can) => {
             let _ = writeln!(out, "  interface        {}", can.interface);

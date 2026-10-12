@@ -241,7 +241,14 @@ Some of what follows is marked **experimental, not yet supported**. Each of
 those is written, parses, reaches a handler and has tests; none has been run
 against the hardware it describes, and none is shipped in a payload set. What
 is marked that way is: RS-485 on a serial line, and the ``can``, ``iio``,
-``rpmsg`` and ``gpio`` types of payload.
+``rpmsg``, ``gpio`` and ``hdlc`` types of payload.
+
+One of those is further out than the others. Every experimental type but
+``hdlc`` has something in the kernel to be run against -- a virtual CAN bus, an
+I\ :superscript:`2`\ C stub, a simulated GPIO chip, a dummy sensor -- so each
+has been exercised against something. A synchronous line has none, and needs a
+card; what is written for it is held to the kernel's structures by tests and to
+nothing else.
 
 Read them as a statement of what the configuration will be rather than as a
 feature to rely on. They may change in ways the five supported types --
@@ -551,6 +558,65 @@ simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its lines the other way every
 packet interval.
 
+An HDLC Payload
+---------------
+Keyword ``type: hdlc``. **Experimental, not yet supported.** A synchronous
+serial line -- bits carried on a clock, framed as HDLC -- which Linux drives as
+a network interface rather than as a device file.
+
+.. code-block:: text
+
+   interface      the interface the card presents: hdlc0
+   standard       v35 | v24 | x21 | x21d -- how the port is wired. Required
+   clock_type     external | internal | tx_internal | tx_from_rx -- whose
+                  clock the bits are on. Required
+   clock_rate     bits per second. Required where this end generates the
+                  clock, and refused where the far end does
+   encoding       nrz | nrzi | fm_mark | fm_space | manchester, default nrz
+   frame_check    none | crc16_pr0 | crc16_pr1 | crc16_pr0_ccitt |
+                  crc16_pr1_ccitt | crc32_pr0_ccitt | crc32_pr1_ccitt,
+                  default none
+   loopback       true | false, default false -- for proving a card with no
+                  line attached
+
+An ``interface`` and not a ``path``, which is the first thing to know about
+this type. Linux calls the mechanism **generic HDLC**: a card presents a
+network interface, the terms of the line are set with one ioctl on it, and the
+data is frames on that interface. The attributes above are the kernel's own
+two structures, from ``linux/hdlc/ioctl.h``: ``standard``, ``clock_type``,
+``clock_rate`` and ``loopback`` are the port's wiring, and ``encoding`` and
+``frame_check`` are what the bits mean once the port is clocked. The kernel
+calls that last one a line's ``parity``; it is a frame check, and this calls
+it one.
+
+The rate belongs to whoever generates the clock. With ``internal`` or
+``tx_internal`` this end drives it, so ``clock_rate`` is required; with
+``external`` or ``tx_from_rx`` the far end drives it, and stating a rate is
+refused -- a number this end cannot set is a number it has no business saying.
+
+Both halves are read back after they are set, and a line that reports
+something else is refused. A card may take the call and keep less than it was
+given, and a line whose frame check is not the one the configuration asked for
+is a line checking nothing while the file says it checks every frame.
+
+A frame is its own length, so there is no stream section: a read hands over one
+frame's payload and a write puts one payload into one frame, as on a CAN bus.
+An HDLC payload may be triggered, both ends being peers on the line.
+
+One interface is one payload. A raw HDLC frame carries no address, so there is
+nothing to tell two payloads on one line apart -- which is what makes this
+different from a CAN interface, where the identifier does exactly that.
+
+Bringing the interface up is the platform's business, as it is for a CAN
+controller: ``ip link set dev hdlc0 up``, from whatever starts the vehicle.
+
+**There is no stand-in.** Every other experimental type has something in the
+kernel to be run against -- ``vcan`` for a CAN bus, ``i2c-stub`` for a bus
+device, ``gpio-sim`` for discrete lines, ``iio_dummy`` for a sensor -- and
+generic HDLC has none. This type needs a card: a ``wanxl``, a ``pci200syn``, a
+``pc300too`` or a FarSync. tcssim says so rather than pretending, and refuses
+a set with one of these in it.
+
 An rpmsg Payload
 ----------------
 Keyword ``type: rpmsg``. **Experimental, not yet supported.** Software on
@@ -633,34 +699,22 @@ payload states them beside everything else it states, or takes them from its
 .. code-block:: text
 
    path           the serial port
-
-   asynchronous   true | false -- true for a start-stop line, false for a
-                  synchronous one, whose bits are carried on a clock
    datarate       bits per second
    byte_length    5 | 6 | 7 | 8
+   stop_bits      1 | 1.5 | 2
+   parity         none | even | odd | mark | space, default none
    stream         where a read ends; see below
 
-   stop_bits      1 | 1.5 | 2 -- asynchronous lines only, and required for
-                  them; a synchronous line has no stop bits to state, a stop
-                  bit being what start-stop framing uses in place of a clock
-   parity         asynchronous: none | even | odd | mark | space, default
-                  none. synchronous: the frame check -- none | crc16_pr0 |
-                  crc16_pr1 | crc16_pr0_ccitt | crc16_pr1_ccitt |
-                  crc32_pr0_ccitt | crc32_pr1_ccitt, default none
-   clock_type     external | internal | tx_internal | tx_from_rx --
-                  synchronous lines only, and required for them
-   encoding       nrz | nrzi | fm_mark | fm_space | manchester, default nrz --
-                  synchronous lines only
-   loopback       true | false, default false -- synchronous lines only
+Start-stop framing, each byte delimited by its own start and stop bits, which
+is what ``termios`` drives and what every one of these terms is. A line whose
+bits are carried on a clock is not one of these: Linux drives such a line as a
+network interface rather than as a device file, and it is an `An HDLC
+Payload`_ here.
 
-What each type of line may say is what the Linux driver for such a line can be
-told, and nothing else: termios sets a parity per character on a start-stop
-line, and the kernel's generic HDLC takes a clock, a coding, a frame check and
-a loopback for a synchronous one. A payload stating the other type's
-attributes is refused.
-
-Both types write the frame check as ``parity``, which is what Linux calls both
-of them; the values say which is meant.
+What a line may say is what the Linux driver for one can be told, and nothing
+else. ``stop_bits`` is required -- a stop bit is what start-stop framing uses
+in place of a clock, so a line without one is not this type -- and a clocked
+line's words are refused on it by name.
 
 Two things are worth knowing before setting a parity. A line is read back
 after it is set, and a parity the port did not take is an error rather than a
@@ -668,12 +722,6 @@ handler quietly checking nothing. And a simulated line is a pseudo-terminal,
 which will not take a parity at all -- it rejects ``even`` outright and drops
 the others silently -- so a payload meant to be run against tcssim states
 ``parity: none``, which is what a payload link commonly runs anyway.
-
-A synchronous line's attributes are recorded rather than applied: the kernel
-drives such a line through a network interface of its own rather than through
-the terms of a device file, so a handler that opens a path cannot set them.
-They are kept so that the link a file describes can be checked against the
-equipment, as an I\ :superscript:`2`\ C payload's bus speed is.
 
 **RS-485: a two-wire bus** -- experimental, not yet supported
 

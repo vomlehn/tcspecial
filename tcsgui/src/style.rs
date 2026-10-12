@@ -134,6 +134,8 @@ pub enum NodeType {
     I2c,
     Spi,
     Serial,
+    /// A synchronous serial line, which Linux drives as a network interface.
+    Hdlc,
     Can,
     Iio,
     Rpmsg,
@@ -149,10 +151,11 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 13] = [
+    pub const ALL: [NodeType; 14] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
+        NodeType::Hdlc,
         NodeType::Can,
         NodeType::Iio,
         NodeType::Rpmsg,
@@ -173,6 +176,7 @@ impl NodeType {
             NodeType::I2c => "i2c",
             NodeType::Spi => "spi",
             NodeType::Serial => "serial",
+            NodeType::Hdlc => "hdlc",
             NodeType::Can => "can",
             NodeType::Iio => "iio",
             NodeType::Rpmsg => "rpmsg",
@@ -226,10 +230,25 @@ impl NodeType {
             ],
             NodeType::Serial => &[
                 ("path", true),
-                ("datarate", false),
-                ("byte_length", false),
-                ("stop_bits", false),
+                ("datarate", true),
+                ("byte_length", true),
+                ("stop_bits", true),
                 ("parity", false),
+                ("group", false),
+            ],
+            // An interface, not a path: see tcslibgs::node::hdlc. The
+            // standard and the clock are required because a line carries no
+            // negotiation; the rate is required only where this end
+            // generates the clock, which the palette cannot say, so it is
+            // shown as optional and the checking has the rule.
+            NodeType::Hdlc => &[
+                ("interface", true),
+                ("standard", true),
+                ("clock_type", true),
+                ("clock_rate", false),
+                ("encoding", false),
+                ("frame_check", false),
+                ("loopback", false),
                 ("group", false),
             ],
             NodeType::Can => &[
@@ -285,6 +304,7 @@ impl NodeType {
             NodeType::I2c
             | NodeType::Spi
             | NodeType::Serial
+            | NodeType::Hdlc
             | NodeType::Can
             | NodeType::Iio
             | NodeType::Rpmsg
@@ -341,6 +361,20 @@ impl NodeType {
                 weight: Narrow,
                 size: (132, 48),
                 tint: Tint::Amber,
+            },
+            // Wide, double-outlined and in the sand tint, with a plain face
+            // at the largest label size: a square outline because it is
+            // hardware, and nothing else here is sand and double at once.
+            NodeType::Hdlc => Appearance {
+                face: Face::Plain,
+                label_size: 14,
+                label_weight: 700,
+                label_italic: false,
+                outline: Square,
+                shading: Double,
+                weight: Wide,
+                size: (152, 56),
+                tint: Tint::Sand,
             },
             NodeType::Can => Appearance {
                 face: Face::Mono,

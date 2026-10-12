@@ -78,9 +78,8 @@ endpoint
 endpoint type
     What an endpoint is made of, and so what locates it and what else must be
     said about it. Five are supported -- ``network``, ``device-file``,
-    ``serial``,
-    ``i2c`` and ``spi`` -- and four more are experimental: ``can``, ``iio``,
-    ``rpmsg`` and ``gpio``. A type is not a protocol -- a network endpoint
+    ``serial``, ``i2c`` and ``spi`` -- and five more are experimental:
+    ``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``. A type is not a protocol -- a network endpoint
     carries the protocol it runs over, and no other type is addressed that
     way.
 
@@ -176,8 +175,9 @@ node
     configuration, a type, and the attributes its type requires. Three families
     of type:
 
-    *devices* -- ``i2c``, ``spi``, ``serial``, ``can``, ``gpio``, ``iio``,
-    ``rpmsg``, ``network``, ``device-file`` -- which are the interfaces real
+    *devices* -- ``i2c``, ``spi``, ``serial``, ``hdlc``, ``can``, ``gpio``,
+    ``iio``, ``rpmsg``, ``network``, ``device-file`` -- which are the interfaces
+    real
     hardware arrives on. Each is what used to be called a payload endpoint, and
     the attributes are unchanged: a bus and an address, a chip and a set of
     lines, a path.
@@ -1703,10 +1703,9 @@ check is made before the handler's state is looked at, so a mis-named START_DH
 is refused whether or not the handler happens to be running.
 
 Requirement
-    An endpoint is of one type: ``network``, ``device-file``, ``serial``, ``i2c``
-    or
-    ``spi``, or one of the experimental ``can``, ``iio``, ``rpmsg`` and
-    ``gpio``. The type decides what locates the endpoint and what terms it is
+    An endpoint is of one type: ``network``, ``device-file``, ``serial``,
+    ``i2c`` or ``spi``, or one of the experimental ``can``, ``iio``,
+    ``rpmsg``, ``gpio`` and ``hdlc``. The type decides what locates the endpoint and what terms it is
     opened on, and a handler carries both: a serial line's framing, the address
     of a device on a bus, and a SPI peripheral's clock are as much a part of
     where the payload is as the name of the file.
@@ -2865,10 +2864,12 @@ Requirement
 What Is Experimental
 ^^^^^^^^^^^^^^^^^^^^
 Some of what follows is **experimental and not yet supported**: RS-485 on a
-serial line, and the ``can``, ``iio``, ``rpmsg`` and ``gpio`` types of
-payload. Each is written, parses, reaches a handler and has tests of its
+serial line, and the ``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc`` types
+of payload. Each is written, parses, reaches a handler and has tests of its
 rules; none has been run against the hardware it describes, and no shipped
-payload set uses one.
+payload set uses one. ``hdlc`` is the furthest out of them: every other has
+something in the kernel to be exercised against, and a synchronous line has
+nothing but a card.
 
 The requirements for them are written the way every other requirement here is,
 because that is what they are for: a statement of what the configuration will
@@ -3181,42 +3182,34 @@ Requirement
 
 Serial Payloads: a Line
 ^^^^^^^^^^^^^^^^^^^^^^^
-A serial payload states which type of line it describes, and what else it may
-say follows from that.
+A start-stop line: each byte delimited by its own start and stop bits, which is
+what ``termios`` drives. A line whose bits are carried on a clock is not one of
+these -- Linux drives such a line as a network interface rather than as a
+device file -- and is an `HDLC Payloads: a Synchronous Line`_ instead.
 
 Requirement
-    A serial payload states ``asynchronous``. The two types of line are read
-    differently all the way down -- a start-stop line delimits every byte for
-    itself, a synchronous one carries its bits on a clock -- so a group that
-    did not say would be guessed at, and a line read as the wrong one of the
-    two is a line read as noise.
+    This type is start-stop framing and nothing else. It used to be both,
+    reached by saying ``asynchronous: true`` or ``false``, and almost nothing
+    about the two is the same: one is located by a path and the other by an
+    interface, one is a stream and the other frames, one is set with termios on
+    a file descriptor and the other with an ioctl on a socket. Two types with
+    one word between them was the arrangement that let a file state a clock
+    nothing applied.
 
 Requirement
-    Stop bits belong to a start-stop line and to no other. An asynchronous
-    group states them, and a synchronous one stating them is refused: a stop
-    bit is what start-stop framing uses in place of a clock, so a line whose
-    bits are on a clock has nothing for one to delimit.
+    ``stop_bits`` is required. A stop bit is what start-stop framing uses in
+    place of a clock, so a line that states none is not a line of this type.
 
 Requirement
-    What each type of line may say beyond that is what the Linux driver for
-    such a line can be told, and nothing else. Termios sets a parity per
-    character on a start-stop line; the kernel's generic HDLC takes a clock, a
-    coding, a frame check and a loopback for a synchronous one, from
-    ``sync_serial_settings`` and ``raw_hdlc_proto`` in
-    ``linux/hdlc/ioctl.h``. A payload stating the other type's is refused.
+    A clocked line's terms are refused by name on one of these: ``standard``,
+    ``clock_type``, ``clock_rate``, ``encoding``, ``frame_check`` and
+    ``loopback`` belong to the ``hdlc`` type, and a start-stop line shares no
+    clock.
 
 Requirement
-    A synchronous payload states ``clock_type``. The two ends must agree about
-    whose clock the bits are on, and there is no default to fall back on:
-    guessing which end drives it would be guessing at the cable. It also
-    decides what the data rate means -- the rate this end generates, or the
-    rate the far end is expected to clock.
-
-Requirement
-    Both types write the frame check as ``parity``, which is the name the
-    Linux driver uses for both: per character on a start-stop line, and a CRC
-    over a frame on a synchronous one. The values say which is meant, and the
-    error that refuses a value lists the ones that type offers.
+    ``parity`` is what termios sets per character -- ``none``, ``even``,
+    ``odd``, ``mark`` or ``space`` -- and a frame check is not one of them. A
+    file writing a CRC here is refused with the five a character can have.
 
 Requirement
     A line is read back after it is set, and a parity the port did not take is
@@ -3226,13 +3219,6 @@ Requirement
     checking every character. The message names the parity and says the port
     is what will not have it.
 
-Requirement
-    A synchronous line's attributes are recorded and not applied. The kernel
-    drives such a line through a network interface of its own rather than
-    through the terms of a device file, so a handler that opens a path cannot
-    set them; keeping them lets the link a file describes be checked against
-    the equipment and reported plainly, as an I\ :superscript:`2`\ C group's
-    bus speed is.
 
 RS-485: a Two-Wire Bus
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -3275,18 +3261,17 @@ Requirement
     written.
 
 Requirement
-    None of it applies to a synchronous line. The kernel's RS-485 support is
-    part of its start-stop drivers, where a synchronous line is driven through
-    generic HDLC and a network interface instead.
+    None of it applies to an ``hdlc`` payload, and there is no word for it
+    there. The kernel's RS-485 support is part of its start-stop drivers,
+    where a synchronous line is driven through generic HDLC and a network
+    interface instead.
 
 Requirement
     The mode is applied and read back, and a line that did not take it is
     refused rather than started. A driver that does not support the mode may
     take the call and clear the flag, and a line left in point-to-point mode
     on a two-wire bus transmits into every other transmitter on it --
-    including the payload this handler is trying to read. Which is also why
-    this is refused where a synchronous line's terms are merely recorded: the
-    kernel takes it through an ioctl on the file the handler already has open.
+    including the payload this handler is trying to read.
 
 Requirement
     A simulated line cannot be an RS-485 bus and says so. A pseudo-terminal
@@ -3299,29 +3284,13 @@ Requirement
 +---------------+----------+--------------------------------------------------+
 | Name          | Required | Description                                      |
 +===============+==========+==================================================+
-| asynchronous  | Yes      | ``true`` for a start-stop line, ``false`` for a  |
-|               |          | synchronous one, whose bits are on a clock       |
-+---------------+----------+--------------------------------------------------+
 | datarate      | Yes      | Line rate in bits per second                     |
 +---------------+----------+--------------------------------------------------+
-| stop_bits     | If       | Stop bits after each byte: ``1``, ``1.5``,       |
-|               | async    | ``2``. Asynchronous lines only                   |
+| stop_bits     | Yes      | Stop bits after each byte: ``1``, ``1.5``,       |
+|               |          | ``2``                                            |
 +---------------+----------+--------------------------------------------------+
-| parity        | No       | Asynchronous: ``none``, ``even``, ``odd``,       |
-|               |          | ``mark``, ``space``, defaulting to ``none``.     |
-|               |          | Synchronous: the frame check, ``none`` or one of |
-|               |          | the CRCs below, also defaulting to ``none``      |
-+---------------+----------+--------------------------------------------------+
-| clock_type    | If sync  | Whose clock the bits are on: ``external``,       |
-|               |          | ``internal``, ``tx_internal``, ``tx_from_rx``.   |
-|               |          | Synchronous lines only                           |
-+---------------+----------+--------------------------------------------------+
-| encoding      | No       | How the bits are carried: ``nrz`` (the default), |
-|               |          | ``nrzi``, ``fm_mark``, ``fm_space``,             |
-|               |          | ``manchester``. Synchronous lines only           |
-+---------------+----------+--------------------------------------------------+
-| loopback      | No       | ``true`` to put the line in loopback. Default    |
-|               |          | ``false``. Synchronous lines only                |
+| parity        | No       | ``none``, ``even``, ``odd``, ``mark`` or         |
+|               |          | ``space``, defaulting to ``none``                |
 +---------------+----------+--------------------------------------------------+
 | byte_length   | Yes      | Data bits in each byte, from 5 to 8              |
 +---------------+----------+--------------------------------------------------+
@@ -3334,6 +3303,132 @@ Requirement
 Requirement
     A serial payload has a stream section, because a serial port is a stream and
     so there is always a rule deciding where one read ends.
+
+HDLC Payloads: a Synchronous Line
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Experimental, not yet supported, and the one type with nothing to be run
+against.**
+
+A synchronous serial line: bits carried on a clock, framed as HDLC. Linux calls
+the mechanism **generic HDLC**, and what it presents is a network interface --
+``hdlc0`` -- not a device file. The terms of the line are set with one ioctl on
+it, ``SIOCWANDEV``, which carries whichever of the structures in
+``linux/hdlc/ioctl.h`` its ``type`` field names; the data is frames on that
+interface. The rules are in ``tcslibgs::node::hdlc``, the endpoint in
+``tcspecial::node::hdlc``, and there is no stand-in at all.
+
+Requirement
+    An hdlc payload is located by an ``interface`` and nothing else. The kernel
+    drives such a line as a network interface, so there is no file to open; a
+    payload stating a ``path`` is refused and told which word to use.
+
+Requirement
+    One interface is one payload. A raw HDLC frame carries no address, so there
+    is nothing to tell two payloads on one line apart -- which is what makes
+    this a claim on the whole interface, where a CAN payload's claim is on an
+    identifier and the bus is shared by design.
+
+Requirement
+    The terms are the kernel's own two structures, and nothing beyond them.
+    ``standard``, ``clock_type``, ``clock_rate`` and ``loopback`` are
+    ``sync_serial_settings`` -- the port's wiring -- and ``encoding`` and
+    ``frame_check`` are ``raw_hdlc_proto``, which is what the bits mean once
+    the port is clocked. The values are the kernel's, word for word.
+
+Requirement
+    ``standard`` and ``clock_type`` are required. A line carries no
+    negotiation, so both ends must be told the same thing, and a line read with
+    the wrong one of either delivers noise rather than nothing. The encoding
+    and the frame check default to the kernel's own plain values -- ``nrz`` and
+    ``none`` -- a short cable commonly wanting neither clock recovery nor a
+    CRC.
+
+Requirement
+    ``t1`` and ``e1`` are not standards this takes. They are telco framings
+    rather than a port's wiring, and the kernel takes a different structure for
+    them -- ``te1_settings``, with a map of which timeslots the link owns --
+    which nothing here states. A file asking for one is told that rather than
+    being given a port set up as something else.
+
+Requirement
+    ``clock_rate`` belongs to whoever generates the clock: required with
+    ``internal`` or ``tx_internal``, where this end drives it, and refused with
+    ``external`` or ``tx_from_rx``, where the far end does. A rate this end
+    cannot set is a number it has no business stating, which is the rule the
+    whole type was rewritten under.
+
+Requirement
+    The frame check is called ``frame_check`` and not ``parity``. The kernel's
+    field is named ``parity`` for both types of line, and on a synchronous one
+    it is a CRC over a frame rather than a bit per character: one word for the
+    two was what made a start-stop line's parity and a frame check look like
+    one term.
+
+Requirement
+    Both halves are read back after they are set, and a line that reports
+    something else is refused. ``IF_GET_IFACE`` and ``IF_GET_PROTO`` exist for
+    exactly this: a card may take the call and keep less than it was given, and
+    a line whose frame check is not the one the configuration asked for is a
+    line checking nothing while the file says it checks every frame. It is the
+    rule a start-stop line already follows with its parity.
+
+Requirement
+    The port's wiring is set before the framing. The framing is attached to a
+    port that is already clocked, which is the order ``sethdlc`` uses and the
+    order the drivers expect.
+
+Requirement
+    The frames move over an ``AF_PACKET`` socket of type ``SOCK_DGRAM`` bound
+    to the interface. ``SOCK_DGRAM`` rather than ``SOCK_RAW`` because a raw
+    HDLC frame has no link header worth seeing: a read hands over one frame's
+    payload and a write puts one payload into one frame, as on a CAN bus.
+
+Requirement
+    An hdlc payload has no stream section. A frame is its own length, so there
+    is nothing for a rule about where a read ends to say.
+
+Requirement
+    An hdlc payload may be triggered. Both ends are peers on the line, so a
+    far end really does hear the handler ask -- as on a CAN bus, and unlike on
+    an I\ :superscript:`2`\ C bus where the request is the master's own read.
+
+Requirement
+    Bringing the interface up is not this software's business, as it is not for
+    a CAN controller: ``ip link set dev hdlc0 up``, from whatever starts the
+    vehicle. What this does is set the line's terms and move its frames.
+
+**A line's terms**
+
++---------------+----------+--------------------------------------------------+
+| Name          | Required | Description                                      |
++===============+==========+==================================================+
+| interface     | Yes      | The interface the card presents: ``hdlc0``       |
++---------------+----------+--------------------------------------------------+
+| standard      | Yes      | How the port is wired: ``v35``, ``v24``,         |
+|               |          | ``x21`` or ``x21d``                              |
++---------------+----------+--------------------------------------------------+
+| clock_type    | Yes      | Whose clock the bits are on: ``external``,       |
+|               |          | ``internal``, ``tx_internal``, ``tx_from_rx``    |
++---------------+----------+--------------------------------------------------+
+| clock_rate    | If ours  | Bits per second, where this end generates the    |
+|               |          | clock. Refused where the far end does            |
++---------------+----------+--------------------------------------------------+
+| encoding      | No       | How the bits are carried: ``nrz`` (the default), |
+|               |          | ``nrzi``, ``fm_mark``, ``fm_space``,             |
+|               |          | ``manchester``                                   |
++---------------+----------+--------------------------------------------------+
+| frame_check   | No       | ``none`` (the default), ``crc16_pr0``,           |
+|               |          | ``crc16_pr1``, ``crc16_pr0_ccitt``,              |
+|               |          | ``crc16_pr1_ccitt``, ``crc32_pr0_ccitt`` or      |
+|               |          | ``crc32_pr1_ccitt``                              |
++---------------+----------+--------------------------------------------------+
+| loopback      | No       | ``true`` to put the port in loopback, for        |
+|               |          | proving a card with no line attached. Default    |
+|               |          | ``false``                                        |
++---------------+----------+--------------------------------------------------+
+| packet_size   | No       | Bytes in one packet. Shared by every type of     |
+|               |          | payload, and listed with the rest above          |
++---------------+----------+--------------------------------------------------+
 
 I2C Payloads: a Bus
 ^^^^^^^^^^^^^^^^^^^
@@ -4015,6 +4110,16 @@ A simulated payload has to be whatever is at the far end of its handler's
 payload endpoint, and the types of endpoint are not equally easy to be. The
 experimental types are covered where each of them is: a CAN bus of peers, a
 sensor's buffer, a channel to another core and a set of discrete lines.
+
+Requirement
+    A synchronous line is the one type nothing stands in for, and the
+    simulator says so. Every other type has something in the kernel to be --
+    ``vcan``, ``i2c-stub``, ``gpio-sim``, ``iio_dummy``, or a pseudo-terminal
+    -- and generic HDLC has nothing: there is no virtual HDLC interface, so
+    such a payload needs a card. A set with one in it is refused where the
+    simulator is asked to stand in for it, naming the interface and what a
+    card would be, rather than becoming a payload that looks simulated and is
+    not.
 
 Requirement
     A simulated payload of a network endpoint is a socket of the configured
@@ -5216,9 +5321,9 @@ of them does instead is described in ``design.rst``.
 Where a note calls something **experimental**, it means what ``design.rst``
 and ``manual.rst`` mean by it: written, parsing, reaching a handler and tested,
 but never run against the hardware it describes and in no shipped payload set.
-Five things are in that state, all of them types of payload interface:
-RS-485 on a serial line, and the ``can``, ``iio``, ``rpmsg`` and ``gpio``
-types.
+Six things are in that state, all of them types of payload interface:
+RS-485 on a serial line, and the ``can``, ``iio``, ``rpmsg``, ``gpio`` and
+``hdlc`` types.
 
 The name of the project is TCSpecial
 ------------------------------------

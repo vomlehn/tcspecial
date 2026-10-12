@@ -789,16 +789,40 @@ mod tests {
                 ("path", "/dev/i2c-1"),
                 ("address", "0x48"),
                 ("read_size", "2"),
-                ("trigger", "0x00"),
+                ("trigger", "00"),
             ],
         ))
         .expect("a sensor that is asked");
         assert_eq!(reach.trigger, Some(vec![0x00]));
 
+        // A command and a register, which is what an interface document
+        // commonly asks for: two values, the second of them two bytes.
+        let reach = reach_of(&node(
+            "temp_fore",
+            "i2c",
+            &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("trigger", "03 0400"),
+            ],
+        ))
+        .expect("a sensor that is asked");
+        assert_eq!(reach.trigger, Some(vec![0x03, 0x04, 0x00]));
+
+        // And a trigger that is text, which is a C string: the quotes are
+        // part of the value.
+        let reach = reach_of(&node(
+            "console",
+            "device_file",
+            &[("path", "/dev/ttyS0"), ("trigger", "\"READ\\r\"")],
+        ))
+        .expect("a console that is asked");
+        assert_eq!(reach.trigger, Some(b"READ\r".to_vec()));
+
         let said = reach_of(&node(
             "temp_fore",
             "i2c",
-            &[("path", "/dev/i2c-1"), ("address", "0x48"), ("trigger", "0xzz")],
+            &[("path", "/dev/i2c-1"), ("address", "0x48"), ("trigger", "zz")],
         ))
         .expect_err("a trigger that is not bytes");
         assert!(said.contains("trigger"), "{said}");

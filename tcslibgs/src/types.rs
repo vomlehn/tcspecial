@@ -2451,9 +2451,11 @@ mod tests {
             oc_address: None,
             oc_port: None,
             mode: Some("triggered".to_string()),
-            // As a file writes it: double quotes, where the escape is the
-            // carriage return the payload's interface asks for.
-            trigger: Some("READ\r".to_string()),
+            // As a file writes it: a C string, quotes and all, where the
+            // escape is the carriage return the payload's interface asks
+            // for. The quotes are the mark that says this is text rather
+            // than a list of byte values, so they are part of the value.
+            trigger: Some("\"READ\r\"".to_string()),
             trigger_interval_ms: None,
             packet_interval_ms: Some(500),
             ..Default::default()
@@ -2510,7 +2512,7 @@ mod tests {
             .to_dh_config()
             .unwrap_err();
         assert!(e.contains("states the trigger"), "{e}");
-        let e = bare(Some("triggered"), Some("READ"), None)
+        let e = bare(Some("triggered"), Some("52 45 41 44"), None)
             .to_dh_config()
             .unwrap_err();
         assert!(e.contains("how often"), "{e}");
@@ -2542,7 +2544,7 @@ mod tests {
                 oc_address: None,
                 oc_port: None,
                 mode: Some("triggered".to_string()),
-                trigger: Some("READ".to_string()),
+                trigger: Some("52 45 41 44".to_string()),
                 trigger_interval_ms: None,
                 packet_interval_ms: Some(500),
                 ..Default::default()
@@ -3686,7 +3688,7 @@ payload:
     /// and all, which is what makes the quote-free spelling safe to
     /// recommend.
     #[test]
-    fn a_trigger_of_bytes_needs_no_quotes() {
+    fn a_trigger_is_a_list_of_values_or_a_quoted_string() {
         let with = |trigger: &str| {
             payload(&format!(
                 "
@@ -3711,26 +3713,33 @@ payloads:
             })
         };
 
-        // Unquoted, which is how a series of bytes is written.
-        assert_eq!(with("0x55AA").unwrap(), vec![0x55, 0xAA]);
+        // A list of byte values, which is what a series of bytes is.
+        assert_eq!(with("55 AA").unwrap(), vec![0x55, 0xAA]);
+        assert_eq!(with("55AA").unwrap(), vec![0x55, 0xAA]);
         assert_eq!(
-            with("0x0D0A").unwrap(),
+            with("0D 0A").unwrap(),
             vec![0x0D, 0x0A],
-            "a leading zero survives, which is why the unquoted form is safe"
+            "a leading zero is a zero and not a notation"
         );
-        assert_eq!(with("0x55 AA 0F").unwrap(), vec![0x55, 0xAA, 0x0F]);
+        assert_eq!(with("55 AA 0F").unwrap(), vec![0x55, 0xAA, 0x0F]);
 
-        // Quoted, which the parser cannot tell from the above: the quotes
-        // belong to the format and are gone before this sees the value.
-        assert_eq!(with("\"0x55AA\"").unwrap(), with("0x55AA").unwrap());
+        // The format's own quotes make no difference to a list of values:
+        // they are gone before this sees it, which is why the mark for a C
+        // string has to be a quote inside the value.
+        assert_eq!(with("\"55 AA\"").unwrap(), with("55 AA").unwrap());
 
-        // And a trigger of text, written with quotes because its escapes are
-        // what the quotes are for.
-        assert_eq!(with("\"READ\\r\"").unwrap(), b"READ\r".to_vec());
+        // And a trigger of text, which is a C string: the quotes are part of
+        // the value, so a YAML file writes them inside its own.
+        assert_eq!(with("'\"READ\\r\"'").unwrap(), b"READ\r".to_vec());
         assert_eq!(
-            with("0x52 45 41 44 0D").unwrap(),
-            with("\"READ\\r\"").unwrap()
+            with("52 45 41 44 0D").unwrap(),
+            with("'\"READ\\r\"'").unwrap()
         );
+
+        // The spelling this replaced, caught by name rather than puzzled
+        // over: a file written for the older rule says 0x.
+        let said = with("0x55AA").expect_err("the older spelling");
+        assert!(said.contains("no longer"), "{said}");
     }
 
     /// Which file an interval belongs in follows from the kind of payload.
@@ -3777,7 +3786,7 @@ payloads:
 
         // Triggered: the interval is this file's, and required.
         let handlers = payload(&payload_file(
-            "    mode: triggered\n    trigger: \"READ\\r\"\n    packet_interval_ms: 500",
+            "    mode: triggered\n    trigger: '\"READ\\r\"'\n    packet_interval_ms: 500",
         ))
         .to_dh_configs()
         .expect("a triggered payload states its trigger's rate here");
@@ -3790,7 +3799,7 @@ payloads:
         );
 
         let said = payload(&payload_file(
-            "    mode: triggered\n    trigger: \"READ\\r\"",
+            "    mode: triggered\n    trigger: \'\"READ\\r\"\'",
         ))
         .to_dh_configs()
         .expect_err("a triggered payload with no rate for its trigger");
@@ -3798,7 +3807,7 @@ payloads:
 
         // And the name that rate used to have is told the name it has now.
         let said = payload(&payload_file(
-            "    mode: triggered\n    trigger: \"READ\\r\"\n    trigger_interval_ms: 500",
+            "    mode: triggered\n    trigger: \'\"READ\\r\"\'\n    trigger_interval_ms: 500",
         ))
         .to_dh_configs()
         .expect_err("trigger_interval_ms is not a word this file knows");
@@ -3817,7 +3826,7 @@ payload_groups:
     protocol: tcp
     address: localhost
     mode: triggered
-    trigger: \"READ\\r\"
+    trigger: \'\"READ\\r\"\'
     packet_interval_ms: 500
 payloads:
   - name: DH0
@@ -4162,7 +4171,7 @@ payloads:
         let said = link(
             "gpio",
             "    path: /dev/gpiochip0\n    lines: 0\n    packet_size: 16\n    \
-             mode: triggered\n    trigger: \"READ\"\n    packet_interval_ms: 100\n",
+             mode: triggered\n    trigger: 52 45 41 44\n    packet_interval_ms: 100\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -4239,7 +4248,7 @@ payloads:
         let asked = link(
             "rpmsg",
             "    path: /dev/rpmsg0\n    service: payload\n    packet_size: 8\n    \
-             mode: triggered\n    trigger: \"READ\"\n    packet_interval_ms: 100\n",
+             mode: triggered\n    trigger: 52 45 41 44\n    packet_interval_ms: 100\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -4297,7 +4306,7 @@ payloads:
         let said = link(
             "iio",
             "    path: /dev/iio:device0\n    packet_size: 4\n    mode: triggered\n    \
-             trigger: \"READ\"\n    packet_interval_ms: 100\n",
+             trigger: 52 45 41 44\n    packet_interval_ms: 100\n",
         )
         .expect("it parses")
         .to_dh_configs()

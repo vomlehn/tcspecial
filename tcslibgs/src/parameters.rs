@@ -553,7 +553,7 @@ mod tests {
         // trigger whose carriage return was shown as a line break would read
         // as two triggers.
         assert!(
-            shown.contains("trigger          0x52 45 41 44 0D"),
+            shown.contains("trigger          52 45 41 44 0D"),
             "{shown}"
         );
         // The rate its trigger goes out at, which is this file's to state.

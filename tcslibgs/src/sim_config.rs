@@ -682,6 +682,33 @@ pub struct SimSettings {
     pub ignore_trigger_percent: Option<u32>,
 }
 
+/// Every setting a group or a simulated payload may state, by the name a file
+/// writes.
+///
+/// The one list of them. The simulator reads a file into [`SimSettings`] and
+/// the editor builds a window from this, so a setting added to the struct and
+/// not to this list is one nobody can type -- which the test below is what
+/// stops.
+///
+/// In the order the manual introduces them: what the payload is, where it
+/// answers from, how fast it sends, and then what it does wrong.
+pub const SETTINGS: &[&str] = &[
+    "type",
+    "protocol",
+    "payload_address",
+    "payload_port",
+    "packet_interval_ms",
+    "segment_interval_ms",
+    "segment_size",
+    "drop_percent",
+    "corrupt_percent",
+    "truncate_percent",
+    "jitter_ms",
+    "silent_after",
+    "close_after",
+    "ignore_trigger_percent",
+];
+
 impl SimSettings {
     /// This settings' values, falling back to `base` for whatever it does not
     /// state. Used to lay a simulated payload over the group it names.
@@ -1088,6 +1115,54 @@ mod tests {
     /// the same deserialization a real file goes through.
     fn parse(text: &str) -> SimConfigFile {
         crate::ConfigFormat::Yaml.parse(text).expect("parses")
+    }
+
+    /// Every setting the list names is a setting the file reader knows.
+    ///
+    /// Two statements of what a simulated payload may say -- the struct the
+    /// simulator reads and the list the editor builds a window from -- and two
+    /// statements of one fact drift. What that would look like is a field
+    /// somebody fills in that the simulator reports as a name belonging to
+    /// nothing, or a setting nobody can type because the window has no field
+    /// for it.
+    #[test]
+    fn every_setting_in_the_list_is_one_the_reader_knows() {
+        // One of each, written as a file writes them, with values of the
+        // right shape for the kinds that have one.
+        let said: Vec<String> = SETTINGS
+            .iter()
+            .map(|name| {
+                let value = match *name {
+                    "type" => "network",
+                    "protocol" => "udp",
+                    "payload_address" => "127.0.0.1",
+                    _ => "1",
+                };
+                format!("    {name}: {value}")
+            })
+            .collect();
+        let text = format!(
+            "simulated_payloads:\n  - name: DH0\n{}\n",
+            said.join("\n")
+        );
+
+        let file = parse(&text);
+        let payload = &file.simulated_payloads[0];
+        assert!(
+            payload.unknown.is_empty(),
+            "the reader does not know: {:?}",
+            payload.unknown.keys().collect::<Vec<_>>()
+        );
+
+        // And the other way about: the settings the struct has are the
+        // settings the list names. Checked through serde rather than by
+        // counting fields, because serde is what decides which names a file
+        // may use.
+        let text = format!(
+            "simulated_payload_groups:\n  - name: g\n{}\n",
+            said.join("\n")
+        );
+        assert!(parse(&text).simulated_payload_groups[0].unknown.is_empty());
     }
 
     #[test]

@@ -701,12 +701,15 @@ mod tests {
              protocol: udp\n  beacon_interval_ms: 5000\n  \
              beacon_address: \"239.255.0.1:5550\"\n  beacon_interface: \"127.0.0.1\"\n\
              nodes:\n  \
-             - { name: moc, type: moc }\nlinks:\n  - { from: cabin_sensor, to: moc }\n",
+             - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }\n\
+             links:\n  - { from: cabin_sensor, to: moc }\n",
         )
         .unwrap();
         std::fs::write(
             where_.path().join("cabin.yaml"),
-            "version: \"2.0\"\nnodes:\n  - { name: cabin_sensor, type: i2c }\n",
+            "version: \"2.0\"\nnodes:\n  \
+             - { name: cabin_sensor, type: i2c, path: \"/dev/i2c-1\", \
+             address: \"0x48\" }\n",
         )
         .unwrap();
 

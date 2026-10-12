@@ -20,6 +20,16 @@
 //!   anything the files do not have.
 //! * **Undo goes back to the start of the session**, and past a crash, because
 //!   the history is written down beside the document; see `journal.rs`.
+//! * **It is lazy.** Every value entered has to be valid and none of them has
+//!   to be entered: an editor that insisted on a complete node before it would
+//!   let you move on is one that fights a person working out what they are
+//!   describing. Requiring that it all be entered belongs to `tcsverify` and
+//!   the flight software, where the complaint can name the file and the line.
+//!   See `document.rs`.
+//!
+//! A session may be given a second file, the simulator's own configuration.
+//! Nothing of it is on the canvas -- it introduces no nodes and no connections
+//! -- so it is edited from the menu; see `sim.rs`.
 
 mod document;
 mod editor;
@@ -29,6 +39,7 @@ mod pane;
 mod route;
 mod save;
 mod settings;
+mod sim;
 /// What the colours look like to a reader who cannot see all of them. Used by
 /// the palette's tests and by nothing at run time.
 #[cfg(test)]
@@ -147,6 +158,17 @@ struct Views {
     /// the same form. Choosing another group re-points this one, which is also
     /// what makes the menu behave like a menu.
     group: Option<GroupWindow>,
+    /// The two simulator windows, if they are open, and which entry each is
+    /// showing.
+    ///
+    /// Two windows and not one, because they are two lists: the payloads of
+    /// the configuration, and the groups of settings they share. One apiece
+    /// rather than one per payload, for the reason the group window is one --
+    /// a form about a thing is not a page of it.
+    simulated: Option<SimWindow>,
+    showing_payload: Rc<RefCell<String>>,
+    sim_groups: Option<SimWindow>,
+    showing_sim_group: Rc<RefCell<String>>,
     /// The tcspecial parameters window, if one is open.
     ///
     /// One, like the group window and for the same reason: it is a form about
@@ -212,6 +234,12 @@ impl Views {
         if let Some(window) = &self.parameters {
             put_parameters(window, editor);
         }
+        if let Some(window) = &self.simulated {
+            put_simulated(window, editor, &self.showing_payload.borrow());
+        }
+        if let Some(window) = &self.sim_groups {
+            put_sim_groups(window, editor, &self.showing_sim_group.borrow());
+        }
         if let Some(top) = self.top.upgrade() {
             put(&top, editor, &None, chosen.get("").map(|s| s.as_str()), divider);
         }
@@ -244,13 +272,22 @@ macro_rules! furnish {
 
 fn main() -> Result<(), slint::PlatformError> {
     let path = std::env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("tcsgui: usage: tcsgui <configuration file>");
+        eprintln!("tcsgui: usage: tcsgui <configuration file> [<simulator file>]");
         eprintln!(
             "tcsgui: the file need not exist yet; it is written as edits are made, \
              and its history is kept beside it"
         );
+        eprintln!(
+            "tcsgui: a second file is the simulator's own configuration -- how fast \
+             a simulated payload sends and what it does wrong -- and is edited from \
+             the menu"
+        );
         std::process::exit(2);
     });
+    // The simulator's configuration, where one was named. A second argument
+    // and not a name derived from the first: the shipped sets call it after
+    // the configuration with `sim` on the end, and nothing requires that.
+    let simulator = std::env::args().nth(2);
 
     // How the canvas was divided when the editor was last used, which is a
     // preference and not part of the configuration: see settings.rs. Reading
@@ -269,6 +306,11 @@ fn main() -> Result<(), slint::PlatformError> {
         std::path::Path::new(&path),
         divider.get(),
     )));
+    if let Some(simulator) = &simulator {
+        editor
+            .borrow_mut()
+            .open_simulator(std::path::Path::new(simulator));
+    }
     seed(&mut editor.borrow_mut());
 
     let ui = MainWindow::new()?;
@@ -281,6 +323,10 @@ fn main() -> Result<(), slint::PlatformError> {
         divider: divider.clone(),
         group: None,
         parameters: None,
+        simulated: None,
+        showing_payload: Rc::new(RefCell::new(String::new())),
+        sim_groups: None,
+        showing_sim_group: Rc::new(RefCell::new(String::new())),
         showing: Rc::new(RefCell::new(String::new())),
     }));
     // Which node the panel is showing, per window.
@@ -487,6 +533,21 @@ macro_rules! wiring {
                 let views = views.clone();
                 window.on_edit_parameters(move || {
                     show_parameters(&editor, &views);
+                });
+            }
+            {
+                // And the simulator's own two lists.
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_edit_simulated_payloads(move || {
+                    show_sim(&editor, &views, true);
+                });
+            }
+            {
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_edit_simulator_groups(move || {
+                    show_sim(&editor, &views, false);
                 });
             }
             {
@@ -708,6 +769,7 @@ fn put(
     divider: i32,
 ) {
     ui.set_divider(divider as f32);
+    ui.set_has_simulator(editor.document().simulator.is_some());
     ui.set_group_menu(group_menu(editor.document()));
     let (nodes, links) = views_of(editor, home);
     let panel = panel_of(editor, home, chosen);
@@ -733,6 +795,7 @@ fn put_sub(
     divider: i32,
 ) {
     window.set_divider(divider as f32);
+    window.set_has_simulator(editor.document().simulator.is_some());
     window.set_group_menu(group_menu(editor.document()));
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home);
@@ -811,13 +874,127 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
                 name: (*attribute).into(),
                 value: value.clone().into(),
                 required: *required,
-                missing: *required && value.trim().is_empty(),
             }
         })
         .collect();
 
     window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+    // What is wrong with what has been entered, which belongs to no node and
+    // so has nowhere else to be shown.
+    window.set_complaint(
+        editor
+            .faults()
+            .iter()
+            .find_map(|fault| match fault {
+                document::Fault::BadTcspecial { why } => Some(why.clone()),
+                _ => None,
+            })
+            .unwrap_or_default()
+            .into(),
+    );
+}
+
+/// Put one simulated payload's settings into the simulated-payloads window.
+///
+/// The choices are the payloads of the configuration and not the names the
+/// simulator file happens to hold: the two files are joined by name, every
+/// payload needs settings here, and a name here that no payload has is an
+/// error rather than a line with no effect. So the editor offers one entry per
+/// payload node and never invents a name -- which also means a file whose
+/// payloads were renamed shows the new names with nothing in them, which is
+/// the truth about it.
+fn put_simulated(window: &SimWindow, editor: &Editor, payload: &str) {
+    let document = editor.document();
+    let choices: Vec<slint::SharedString> = document
+        .nodes
+        .iter()
+        .filter(|node| is_payload(&node.node_type))
+        .map(|node| Qualified::of(&node.name, &node.home).absolute().into())
+        .collect();
+
+    let empty = BTreeMap::new();
+    let said = document
+        .simulator
+        .as_ref()
+        .and_then(|simulator| simulator.payloads.get(payload))
+        .unwrap_or(&empty);
+
+    window.set_editing("Simulated payloads".into());
+    window.set_about(
+        "How fast this payload sends when it is simulated, how a packet is          divided into segments, and what it does wrong. None of it is a          property of the payload itself, which is why it is in the simulator's          own file. Everything here is optional: what a payload does not state          it takes from the group it names."
+            .into(),
+    );
+    window.set_can_add(false);
+    window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
+    window.set_chosen(payload.into());
+    window.set_fields(settings_shown(&crate::sim::Simulator::fields(true), said));
+    window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// The same, for one of the simulator's groups of settings.
+fn put_sim_groups(window: &SimWindow, editor: &Editor, group: &str) {
+    let document = editor.document();
+    let choices: Vec<slint::SharedString> = document
+        .simulator
+        .as_ref()
+        .map(|simulator| simulator.groups.keys().map(|name| name.clone().into()).collect())
+        .unwrap_or_default();
+
+    let empty = BTreeMap::new();
+    let said = document
+        .simulator
+        .as_ref()
+        .and_then(|simulator| simulator.groups.get(group))
+        .unwrap_or(&empty);
+
+    window.set_editing("Simulator payload groups".into());
+    window.set_about(
+        "Settings several simulated payloads share. A payload names a group          and overrides whatever it wants for itself, so what is here is what          they have in common -- a rate, a segmentation, a fault to inject."
+            .into(),
+    );
+    window.set_can_add(true);
+    window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
+    window.set_chosen(group.into());
+    window.set_fields(settings_shown(&crate::sim::Simulator::fields(false), said));
+    window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// The fields a simulator window shows: every setting there is, filled in or
+/// not.
+///
+/// Built from the list of settings rather than from what the file happens to
+/// hold, so that an entry nobody has touched shows what it could be asked
+/// rather than nothing at all. Nothing is marked: every one of these is
+/// optional -- a payload that says nothing takes everything from its group --
+/// so an empty field is a question not yet answered and not a fault.
+fn settings_shown(
+    fields: &[&'static str],
+    said: &BTreeMap<String, String>,
+) -> ModelRc<FieldView> {
+    let mut shown: Vec<FieldView> = fields
+        .iter()
+        .map(|setting| FieldView {
+            name: (*setting).into(),
+            value: said.get(*setting).cloned().unwrap_or_default().into(),
+            required: false,
+        })
+        .collect();
+
+    // And anything the file holds that this build does not know about, after
+    // them: a setting nobody can see is one that gets written back out
+    // without anybody knowing it is there.
+    for (setting, value) in said {
+        if fields.contains(&setting.as_str()) {
+            continue;
+        }
+        shown.push(FieldView {
+            name: setting.clone().into(),
+            value: value.clone().into(),
+            required: false,
+        });
+    }
+    ModelRc::from(Rc::new(VecModel::from(shown)))
 }
 
 /// Show the tcspecial parameters, making the window if there is not one.
@@ -869,6 +1046,230 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         if let Err(e) = window.show() {
             eprintln!("tcsgui: the tcspecial parameters cannot be shown: {e}");
         }
+    }
+}
+
+/// Show one of the two simulator windows, making it if there is not one.
+///
+/// One function for both, because they are the same window with a different
+/// list in the chooser: `payloads` says which. What the handlers do differs in
+/// one place only -- which edit they record -- and that is where it says so.
+fn show_sim(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, payloads: bool) {
+    let already = if payloads {
+        views.borrow().simulated.is_some()
+    } else {
+        views.borrow().sim_groups.is_some()
+    };
+
+    if !already {
+        let window = match SimWindow::new() {
+            Ok(window) => window,
+            Err(e) => {
+                eprintln!("tcsgui: a simulator window cannot be opened: {e}");
+                return;
+            }
+        };
+        wire_sim(&window, editor, views, payloads);
+        if payloads {
+            views.borrow_mut().simulated = Some(window);
+        } else {
+            views.borrow_mut().sim_groups = Some(window);
+        }
+
+        // Something chosen to begin with, so the window opens on a form
+        // rather than on an invitation to choose: the first payload of the
+        // configuration, or the first group the simulator file declares.
+        let first = {
+            let editor = editor.borrow();
+            let document = editor.document();
+            if payloads {
+                document
+                    .nodes
+                    .iter()
+                    .find(|node| is_payload(&node.node_type))
+                    .map(|node| Qualified::of(&node.name, &node.home).absolute())
+            } else {
+                document
+                    .simulator
+                    .as_ref()
+                    .and_then(|simulator| simulator.groups.keys().next().cloned())
+            }
+        };
+        if let Some(first) = first {
+            let views = views.borrow();
+            let showing = if payloads {
+                &views.showing_payload
+            } else {
+                &views.showing_sim_group
+            };
+            *showing.borrow_mut() = first;
+        }
+    }
+
+    // Through a weak handle, so nothing of `views` is borrowed while the
+    // window is shown.
+    let window = {
+        let views = views.borrow();
+        let window = if payloads { &views.simulated } else { &views.sim_groups };
+        window.as_ref().map(|window| window.as_weak())
+    };
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        {
+            let editor = editor.borrow();
+            let views = views.borrow();
+            if payloads {
+                put_simulated(&window, &editor, &views.showing_payload.borrow());
+            } else {
+                put_sim_groups(&window, &editor, &views.showing_sim_group.borrow());
+            }
+        }
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: a simulator window cannot be shown: {e}");
+        }
+    }
+}
+
+/// Wire one simulator window's four callbacks to the one editor.
+fn wire_sim(
+    window: &SimWindow,
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    payloads: bool,
+) {
+    let showing = {
+        let views = views.borrow();
+        if payloads {
+            views.showing_payload.clone()
+        } else {
+            views.showing_sim_group.clone()
+        }
+    };
+
+    {
+        // Choosing which payload or which group the window is showing.
+        // Nothing is recorded: what somebody is looking at is not something
+        // the vehicle flies.
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = showing.clone();
+        window.on_choose(move |chosen| {
+            *showing.borrow_mut() = chosen.to_string();
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // A new group. Only the groups window offers it: a simulated payload
+        // stands in for a payload of the configuration, so its name is the
+        // configuration's and not this file's to invent.
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = showing.clone();
+        window.on_add(move || {
+            if payloads {
+                return;
+            }
+            let name = {
+                let mut editor = editor.borrow_mut();
+                let taken = |name: &str| {
+                    editor
+                        .document()
+                        .simulator
+                        .as_ref()
+                        .is_some_and(|simulator| simulator.groups.contains_key(name))
+                };
+                let name = if !taken("group") {
+                    "group".to_string()
+                } else {
+                    (2..)
+                        .map(|n| format!("group-{n}"))
+                        .find(|name| !taken(name))
+                        .expect("a free name exists")
+                };
+                editor.edit(Edit::AddSimGroup { name: name.clone() });
+                name
+            };
+            *showing.borrow_mut() = name;
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = showing.clone();
+        window.on_remove(move || {
+            if payloads {
+                return;
+            }
+            let name = showing.borrow().clone();
+            {
+                let mut editor = editor.borrow_mut();
+                let settings: Vec<(String, String)> = match editor
+                    .document()
+                    .simulator
+                    .as_ref()
+                    .and_then(|simulator| simulator.groups.get(&name))
+                {
+                    // Carried whole, so that undoing the removal puts back
+                    // the group that was there and not an empty one of the
+                    // same name.
+                    Some(said) => said.iter().map(|(a, b)| (a.clone(), b.clone())).collect(),
+                    None => return,
+                };
+                editor.edit(Edit::RemoveSimGroup { name, settings });
+            }
+            // Nothing chosen, rather than a group that is gone.
+            showing.borrow_mut().clear();
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_setting_set(move |setting, value| {
+            let name = showing.borrow().clone();
+            if name.is_empty() {
+                return;
+            }
+            {
+                let mut editor = editor.borrow_mut();
+                let setting = setting.to_string();
+                let was = editor
+                    .document()
+                    .simulator
+                    .as_ref()
+                    .and_then(|simulator| {
+                        let said = if payloads {
+                            simulator.payloads.get(&name)
+                        } else {
+                            simulator.groups.get(&name)
+                        };
+                        said.and_then(|said| said.get(&setting).cloned())
+                    });
+                // An empty field clears the setting rather than setting it to
+                // nothing: absent is what the simulator's own reader means by
+                // "not stated".
+                let now = (!value.trim().is_empty()).then(|| value.to_string());
+                if was == now {
+                    return;
+                }
+                editor.edit(if payloads {
+                    Edit::SetSimPayload {
+                        payload: name,
+                        setting,
+                        was,
+                        now,
+                    }
+                } else {
+                    Edit::SetSimGroup {
+                        group: name,
+                        setting,
+                        was,
+                        now,
+                    }
+                });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
     }
 }
 
@@ -1092,7 +1493,6 @@ fn panel_of(
                 name: (*name).into(),
                 value: value.clone().into(),
                 required: *required,
-                missing: *required && value.trim().is_empty(),
             }
         })
         .collect();
@@ -1109,7 +1509,6 @@ fn panel_of(
             name: name.clone().into(),
             value: value.clone().into(),
             required: false,
-            missing: false,
         });
     }
 
@@ -1303,17 +1702,19 @@ fn seed(editor: &mut Editor) {
     }
 
     // What tcspecial is configured with, which every configuration must say.
-    // The mechanical values are filled in and the mission's own are left
-    // empty, which the panel marks: see tcslibgs::graph::parameters::blank.
-    for (attribute, value) in tcslibgs::graph::parameters::blank() {
-        let value = value.as_str().trim().to_string();
-        if value.is_empty() {
-            continue;
-        }
+    //
+    // The attributes and no values: a new configuration is given the questions
+    // and answers none of them. It was given three -- a protocol, a beacon
+    // interval, a segment size -- on the grounds that they are the same on
+    // every vehicle until somebody has a reason, and that is the argument the
+    // schema itself refuses: a configuration that was silently given an answer
+    // looks as answered as one somebody thought about. So the fields are there
+    // to be filled, empty, and marked until they are.
+    for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
         editor.edit(Edit::SetTcspecial {
-            attribute,
+            attribute: (*attribute).to_string(),
             was: None,
-            now: Some(value),
+            now: Some(String::new()),
         });
     }
 
@@ -1814,21 +2215,26 @@ mod tests {
         assert!(shown.contains(&"path".to_string()), "{shown:?}");
         assert!(shown.contains(&"address".to_string()), "{shown:?}");
 
-        // The two it must have are marked, and marked missing while empty.
+        // The two it must have say so, and say it whether or not they are
+        // filled in: the mark is what the configuration will need, not a
+        // complaint about an empty field. The editor is lazy -- see
+        // Document::faults -- so an empty one is a question not yet answered.
         for wanted in ["path", "address"] {
             let field = fields.iter().find(|f| f.name == wanted).unwrap();
-            assert!(field.required, "{wanted} should be required");
-            assert!(field.missing, "{wanted} is empty and should say so");
+            assert!(field.required, "{wanted} should be marked");
         }
-        // And the optional ones are not marked missing merely for being
-        // empty: red marks what is wrong, not what is absent.
         let optional = fields.iter().find(|f| f.name == "pec").unwrap();
-        assert!(!optional.required && !optional.missing);
+        assert!(!optional.required);
+
+        // And nothing is wrong with the node, which has nothing in it: the
+        // one place that insists is the ground check, where the complaint can
+        // name the file and the line.
+        assert!(editor.faults().is_empty(), "{:?}", editor.faults());
     }
 
-    /// Filling a required field clears its fault.
+    /// A filled field shows what it was filled with.
     #[test]
-    fn a_filled_field_stops_being_missing() {
+    fn a_filled_field_shows_its_value() {
         let where_ = tempfile::tempdir().expect("a directory");
         let mut editor = Editor::new(&where_.path().join("v.yaml"));
         editor.edit(Edit::AddNode {
@@ -1846,19 +2252,11 @@ mod tests {
         let (_, _, _, fields) = panel_of(&editor, &None, Some("temp_fore"));
         let path = fields.iter().find(|f| f.name == "path").unwrap();
         assert_eq!(path.value, "/dev/i2c-1");
-        assert!(!path.missing, "a filled field should not be marked missing");
+        assert!(path.required, "the bus is one the configuration must state");
 
-        // And the document agrees: the fault that was there is gone, and the
-        // one for the address it still lacks remains.
-        let faults = editor.faults();
-        assert!(!faults.iter().any(|f| matches!(
-            f,
-            document::Fault::MissingAttribute { attribute, .. } if attribute == "path"
-        )));
-        assert!(faults.iter().any(|f| matches!(
-            f,
-            document::Fault::MissingAttribute { attribute, .. } if attribute == "address"
-        )));
+        // Half filled in is still not a fault, and the address it has not been
+        // given yet is the ground check's to insist on.
+        assert!(editor.faults().is_empty(), "{:?}", editor.faults());
     }
 
     /// An attribute the build does not know about is shown, not dropped.
@@ -2509,24 +2907,30 @@ mod tests {
         let mut editor = Editor::open(&path, DIVIDER);
         seed(&mut editor);
 
-        // And what tcspecial is configured with, which every configuration
-        // must say. The mechanical values are filled in; the mission's own
-        // are left for somebody to answer, and marked until they do.
+        // And what tcspecial is configured with: every attribute of it, and
+        // not one answer. A new configuration is given the questions -- so
+        // the window has a field apiece and the required ones are marked --
+        // and answers none of them, because a value nobody chose looks as
+        // chosen as one somebody did.
         let said = &editor.document().tcspecial;
-        assert_eq!(said.get("protocol").map(String::as_str), Some("udp"));
-        assert_eq!(said.get("beacon_interval_ms").map(String::as_str), Some("5000"));
-        for unanswered in ["address", "port", "payload_port", "beacon_address"] {
-            assert!(
-                !said.contains_key(unanswered),
-                "{unanswered} was guessed at rather than asked for"
-            );
-            assert!(
-                editor.faults().contains(&document::Fault::MissingTcspecial {
-                    attribute: unanswered.to_string()
-                }),
-                "{unanswered} is unanswered and nothing says so"
+        for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
+            assert_eq!(
+                said.get(*attribute).map(String::as_str),
+                Some(""),
+                "{attribute} should be offered and empty"
             );
         }
+        // And none of it is a fault: the editor is lazy, and a configuration
+        // nobody has filled in yet is one nobody has filled in yet. What it
+        // must say before it flies is the ground check's to insist on, with a
+        // file and a line.
+        assert!(editor.faults().is_empty(), "{:?}", editor.faults());
+
+        // And nothing of it reaches the file, because nothing of it is
+        // stated: a section with nothing under it would read back as no
+        // section at all.
+        let written = std::fs::read_to_string(&path).expect("the file");
+        assert!(!written.contains("tcspecial"), "{written}");
 
         let moc = editor.document().node("moc").expect("a ground station");
         assert_eq!(moc.node_type, "moc");
@@ -2670,6 +3074,7 @@ mod tests {
 
         dragging_a_node_moves_it();
         the_menu_opens_the_tcspecial_parameters();
+        the_menu_opens_the_simulators_two_lists();
         a_group_window_sets_every_payload_in_its_group();
         a_payload_stays_in_the_payload_working_pane();
         the_divider_can_be_dragged();
@@ -2791,6 +3196,10 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
+            simulated: None,
+            showing_payload: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -2914,6 +3323,10 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
+            simulated: None,
+            showing_payload: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -2989,6 +3402,10 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
+            simulated: None,
+            showing_payload: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -3021,15 +3438,17 @@ mod tests {
             .map(|(name, _)| (*name).to_string())
             .collect();
         assert_eq!(offered, expected, "the fields are not the attributes");
-        for field in &fields {
-            if field.required {
-                assert!(
-                    field.missing,
-                    "{} is empty and should be marked",
-                    field.name
-                );
-            }
-        }
+        // The seven that must be stated say so. Said and not insisted on:
+        // an empty one is a question not yet answered, which is why none of
+        // this is a fault.
+        assert_eq!(
+            fields.iter().filter(|f| f.required).count(),
+            tcslibgs::graph::parameters::ATTRIBUTES
+                .iter()
+                .filter(|(_, required)| *required)
+                .count()
+        );
+        assert_eq!(window.get_complaint(), "", "nothing is wrong yet");
 
         // Typing in one records an edit, and one Undo takes it back.
         let depth = editor.borrow().undo_depth();
@@ -3052,10 +3471,176 @@ mod tests {
             .find(|f| f.name == "port")
             .expect("the port field");
         assert_eq!(port.value, "4000");
-        assert!(!port.missing);
 
         assert!(editor.borrow_mut().undo());
         assert!(!editor.borrow().document().tcspecial.contains_key("port"));
+    }
+
+    /// The menu opens the simulator's two lists, and typing in them reaches
+    /// its file.
+    ///
+    /// Both windows, because they are one component with a different list in
+    /// the chooser and the difference is where it goes wrong: the payloads
+    /// window offers the payloads of the *configuration* and cannot make one,
+    /// and the groups window offers what the simulator file declares and can.
+    fn the_menu_opens_the_simulators_two_lists() {
+        use slint::Model;
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            DIVIDER,
+        )));
+        editor
+            .borrow_mut()
+            .open_simulator(&where_.path().join("vehiclesim.yaml"));
+        {
+            let mut editor = editor.borrow_mut();
+            // Two payloads and a computation, so that the chooser can be
+            // checked for offering the payloads and nothing else.
+            for (name, node_type) in
+                [("temp_fore", "i2c"), ("payload", "network"), ("k", "compute")]
+            {
+                editor.edit(Edit::AddNode {
+                    name: name.to_string(),
+                    node_type: node_type.to_string(),
+                    home: None,
+                });
+            }
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            parameters: None,
+            simulated: None,
+            showing_payload: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+
+        // The entries are live, this session having been given a simulator
+        // file.
+        assert!(ui.get_has_simulator());
+
+        // ---- the payloads ------------------------------------------------
+        ui.invoke_edit_simulated_payloads();
+        let window = views
+            .borrow()
+            .simulated
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("the menu should have opened the payloads")
+            .upgrade()
+            .expect("and left them open");
+
+        let choices: Vec<String> = (0..window.get_choices().row_count())
+            .filter_map(|row| window.get_choices().row_data(row))
+            .map(|name| name.to_string())
+            .collect();
+        assert_eq!(
+            choices,
+            vec!["temp_fore".to_string(), "payload".to_string()],
+            "the chooser should offer the payloads of the configuration"
+        );
+        // Opened on one of them, rather than on an invitation to choose.
+        assert_eq!(window.get_chosen(), "temp_fore");
+        assert!(!window.get_can_add(), "a payload's name is not this file's");
+
+        // Every setting there is, filled in or not, and none of them marked:
+        // a payload that says nothing takes everything from its group.
+        let fields: Vec<FieldView> = (0..window.get_fields().row_count())
+            .filter_map(|row| window.get_fields().row_data(row))
+            .collect();
+        let offered: Vec<String> = fields.iter().map(|f| f.name.to_string()).collect();
+        assert_eq!(offered, crate::sim::Simulator::fields(true));
+        // None of them marked: every simulator setting is optional, since a
+        // payload that says nothing takes everything from its group.
+        assert!(fields.iter().all(|f| !f.required));
+
+        window.invoke_setting_set("packet_interval_ms".into(), "1000".into());
+        let said = |editor: &Editor, payload: &str, setting: &str| {
+            editor
+                .document()
+                .simulator
+                .as_ref()
+                .and_then(|simulator| simulator.payloads.get(payload))
+                .and_then(|said| said.get(setting))
+                .cloned()
+        };
+        assert_eq!(
+            said(&editor.borrow(), "temp_fore", "packet_interval_ms").as_deref(),
+            Some("1000")
+        );
+
+        // The other payload, chosen in the window, keeps its own settings.
+        window.invoke_choose("payload".into());
+        assert_eq!(window.get_chosen(), "payload");
+        window.invoke_setting_set("drop_percent".into(), "10".into());
+        assert_eq!(
+            said(&editor.borrow(), "temp_fore", "drop_percent"),
+            None,
+            "one payload's setting went to another"
+        );
+
+        // ---- the groups --------------------------------------------------
+        ui.invoke_edit_simulator_groups();
+        let groups = views
+            .borrow()
+            .sim_groups
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("the menu should have opened the groups")
+            .upgrade()
+            .expect("and left them open");
+        assert!(groups.get_can_add(), "a group is this file's to make");
+        assert_eq!(groups.get_choices().row_count(), 0, "none yet");
+
+        groups.invoke_add();
+        assert_eq!(groups.get_chosen(), "group");
+        assert_eq!(groups.get_choices().row_count(), 1);
+        groups.invoke_setting_set("packet_interval_ms".into(), "500".into());
+        assert_eq!(
+            editor.borrow().document().simulator.as_ref().unwrap().groups["group"]
+                ["packet_interval_ms"],
+            "500"
+        );
+        // And it has no field for a group of its own, a group having none.
+        let offered: Vec<String> = (0..groups.get_fields().row_count())
+            .filter_map(|row| groups.get_fields().row_data(row))
+            .map(|f| f.name.to_string())
+            .collect();
+        assert!(!offered.contains(&"group".to_string()), "{offered:?}");
+
+        // Removing one takes what it held with it, so that undo puts back the
+        // group that was there.
+        groups.invoke_remove();
+        assert!(editor
+            .borrow()
+            .document()
+            .simulator
+            .as_ref()
+            .unwrap()
+            .groups
+            .is_empty());
+        assert!(editor.borrow_mut().undo());
+        assert_eq!(
+            editor.borrow().document().simulator.as_ref().unwrap().groups["group"]
+                ["packet_interval_ms"],
+            "500",
+            "the group came back empty"
+        );
     }
 
     /// Typing in a group's window reaches every payload in the group.
@@ -3102,6 +3687,10 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
+            simulated: None,
+            showing_payload: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
         }));
 

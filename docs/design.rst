@@ -1006,9 +1006,9 @@ tcspecial parameters**. That is the one part of a configuration which is about
 the whole of it rather than about anything in it -- so there is nothing on the
 canvas to press that would mean "the configuration", and a command is how it is
 reached. The window offers every attribute the section may have, the ones that
-must be stated first and marked in red while they are empty, and the list it is
-built from is the checker's own: two lists would drift, and what that would look
-like is a configuration the editor called complete and ``tcsverify`` refused.
+must be stated first and marked as such, and the list it is built from is the
+checker's own: two lists would drift, and what that would look like is a
+configuration the editor called complete and ``tcsverify`` refused.
 
 The section is read as the words a file holds rather than as the struct the
 command interpreter wants, and the strictness applied afterwards. That is what
@@ -1019,11 +1019,74 @@ all -- and a file the editor cannot read back is a file it has destroyed. A
 parameter somebody clears is written out of the file rather than written empty,
 absent and empty meaning the same thing to the checking.
 
-A configuration that does not exist yet is given the section with its
-mechanical values filled in -- a protocol, a beacon interval, a segment size
-are the same on every vehicle until somebody has a reason -- and the
-mission's own left empty and marked. An editor that guessed an address and two
-ports would be answering a question nobody had asked.
+A configuration that does not exist yet is given the section's attributes and
+none of its values. The window then has a field apiece and the configuration
+answers nothing, which is the honest state of it: an editor that filled in a
+protocol and a beacon interval on the grounds that they are the same on every
+vehicle until somebody has a reason would be making a configuration that looks
+as answered as one somebody thought about. Nothing of an unanswered section
+reaches the file -- a ``tcspecial:`` with nothing under it would read back as no
+section at all.
+
+The editor is lazy
+------------------
+
+It requires every value to be **valid** and requires none of them to be
+**entered**.
+
+An editor that insisted on a complete node before it would let you move on is
+an editor that fights a person working out what they are describing: a diagram
+is drawn by placing things and filling them in afterwards, in whatever order
+the thinking goes. So an empty field is a question not yet answered, not a
+fault, and nothing in the window is red for being blank. A field the
+configuration will need says so with a mark beside its name, which is
+information rather than a complaint.
+
+What *is* entered is held to the rules that have been tested against real
+buses. A bus address of ``0xZZ`` is wrong the moment it is typed, an attribute
+belonging to another type is wrong on this one, and a beacon address that is
+not a multicast group is wrong as soon as the section is complete -- each in
+the words the flight software would refuse it with, because the editor reaches
+those rules rather than restating them. A node is put to them once everything
+its type must have is there: until then the only thing to say is "this is
+unfinished", which the person at the keyboard already knows.
+
+Requiring that it all be entered is ``tcsverify``'s and the flight software's,
+where the complaint can name the file, the line and the attribute::
+
+   vehicle.yaml:11: "temp_fore" is an i2c node, so it needs the device it is
+   reached through: say path
+   vehicle.yaml:13: "moc" is a network node, so it needs the host it is at:
+   say address
+
+That check is new, and the editor's laziness rests on it: before it, a node
+that said nothing at all passed every ground check and was found when the
+vehicle tried to open it.
+
+The simulator's own configuration is edited from the menu too, where the
+editor was given one: tcsgui takes a second file name, and **Edit simulated
+payloads** and **Edit simulator payload groups** open it. The entries are
+greyed when there is no second file rather than hidden -- a menu whose entries
+come and go is a menu nobody learns.
+
+Nothing of it is on the canvas, and that is not a shortcut. The simulator file
+adds settings to payloads that are already drawn and declares groups of
+settings for them to share; it introduces no nodes and no connections, so a
+drawing of it would be the same drawing with numbers on it. What it is, is two
+lists of settings, and that is what the two windows are.
+
+The payloads window offers the payloads of the *configuration* and never
+invents a name: the two files are joined by name, every payload needs settings
+here, and a name here that no payload has is an error rather than a line with
+no effect. So a file whose payloads were renamed shows the new names with
+nothing in them, which is the truth about it. The groups window offers what the
+simulator file declares and can make and remove one, a group being that file's
+own.
+
+Both files are one session. They are edited together, checked together and must
+agree, so one Save writes both and one Undo takes back whichever of them the
+last edit touched. Every setting is optional -- what a payload does not state
+it takes from the group it names -- so nothing in either window is marked.
 
 Groups are edited in a window of their own, reached from a menu in the bar. A
 group is not on the canvas and should not be: it is a set of payloads read
@@ -1090,6 +1153,14 @@ These are the checks:
 * no cycle, unless a node on it declares itself a loop and states what breaks
   the cycle -- a control loop is a cycle on purpose, and an accidental one is a
   configuration that would run forever on its own output.
+* every node that is opened says what opening it takes, and says nothing its
+  type does not know. A device on a bus needs the bus and the address, a
+  network link the protocol and the address and the port, a set of discrete
+  lines the chip and the lines. The rules are the ones that have been tested
+  against real buses, reached rather than restated, so a node is refused here
+  for exactly what the flight software would refuse it for -- and refused on a
+  desk rather than when the vehicle tries to open it. This is also what lets
+  the editor be lazy about what has been filled in.
 * the configuration says what tcspecial itself is configured with. The
   ``tcspecial`` section -- where commands are taken, where beacons go, where
   the telemetry log is written -- is required of every configuration, and

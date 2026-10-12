@@ -69,6 +69,21 @@ pub enum Problem {
         wanted: u32,
         produces: Option<u32>,
     },
+    /// A node that does not say what its type needs, or says something its
+    /// type does not know.
+    ///
+    /// `why` is the reason in the words of the rules that have been tested
+    /// against real buses -- see [`crate::graph::reach::reach_of`] -- so that
+    /// the ground check refuses a node for exactly what the flight software
+    /// would refuse it for, and says so with the file and the line.
+    ///
+    /// This check is why the editor can be lazy. An editor that required every
+    /// field before it would let you leave the keyboard is an editor that
+    /// fights a person working out what they are describing; what it owes
+    /// instead is that whatever *is* entered is valid. Requiring that it all be
+    /// entered belongs here, where the complaint can name the file, the line
+    /// and the attribute.
+    BadNode { node: String, why: String },
     /// A configuration with no `tcspecial` section.
     ///
     /// Required, and required rather than defaulted for the reason the beacon
@@ -136,6 +151,7 @@ impl Problem {
             Problem::NoTcspecial | Problem::BadTcspecial { .. } => {
                 About::Section("tcspecial")
             }
+            Problem::BadNode { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
             Problem::MeanInputs { node, .. } => About::Node(node.clone()),
@@ -190,6 +206,9 @@ impl Problem {
                 "\"{node}\" has no link to or from it, so nothing reaches it and \
                  nothing reads it"
             ),
+            // The reason already names the node: see reach_of, whose
+            // complaints are written to be read on their own.
+            Problem::BadNode { why, .. } => why.clone(),
             Problem::NoTcspecial => "this configuration has no tcspecial \
                  section, so nothing says where commands are taken, where \
                  beacons go or where the telemetry log is written"
@@ -524,6 +543,32 @@ impl Graph {
             }
         }
 
+        // Every node that is opened says what opening it takes.
+        //
+        // The rules are the ones that have been tested against real buses,
+        // reached rather than restated: a bus and an address for a device on
+        // one, a protocol and an address and a port for a network link, a
+        // path and a set of lines for discrete lines. What this moves is a
+        // whole class of error from flight time to desk time -- a sensor with
+        // no address used to be found when the vehicle tried to open it.
+        //
+        // Only the nodes that are opened. A computation and a log have their
+        // own rules below, and a node whose type nothing recognises is
+        // refused by name already -- a second complaint about its attributes
+        // would bury the one that says what is actually wrong.
+        for node in self
+            .nodes
+            .iter()
+            .filter(|node| node.is_payload() || node.node_type == "moc")
+        {
+            if let Err(why) = crate::graph::reach::reach_of(node) {
+                problems.push(Problem::BadNode {
+                    node: node.name.clone(),
+                    why,
+                });
+            }
+        }
+
         // What may be written to a payload.
         //
         // A payload that is read is asked for its readings, and the bytes
@@ -655,23 +700,49 @@ mod tests {
 
     /// A node of this type, with whatever its type cannot do without.
     ///
-    /// A compute node is given a conversion, because a computation is now
-    /// checked here and a node that says none is refused -- and these tests
-    /// are about the shape of a graph rather than about anybody's arithmetic.
-    /// A conversion and not a mean: a mean's inputs are checked against the
-    /// links, which is the one computation whose attributes depend on the
-    /// shape around it.
+    /// Every type is given the minimum it is opened with, because a node that
+    /// says less than that is refused here now -- and these tests are about
+    /// the shape of a graph rather than about which bus anything is on. A
+    /// compute node gets a conversion for the same reason, and a conversion
+    /// rather than a mean: a mean's inputs are checked against the links,
+    /// which is the one computation whose attributes depend on the shape
+    /// around it.
     fn node(name: &str, node_type: &str) -> Node {
         let mut attributes = BTreeMap::new();
-        if node_type == "compute" {
-            for (attribute, value) in [
+        let minimum: &[(&str, &str)] = match node_type {
+            "i2c" => &[("path", "/dev/i2c-1"), ("address", "0x48")],
+            "spi" => &[
+                ("path", "/dev/spidev0.0"),
+                ("max_speed", "1000000"),
+                ("spi_mode", "0"),
+            ],
+            "serial" => &[
+                ("path", "/dev/ttyS0"),
+                ("datarate", "9600"),
+                ("byte_length", "8"),
+                ("stop_bits", "1"),
+            ],
+            "can" => &[("interface", "can0"), ("can_id", "0x100")],
+            "iio" => &[("path", "/dev/iio:device0")],
+            "rpmsg" => &[("path", "/dev/rpmsg0"), ("service", "telemetry")],
+            "gpio" => &[("path", "/dev/gpiochip0"), ("lines", "3,4,5")],
+            "device-file" => &[("path", "/dev/urandom")],
+            "network" => &[
+                ("protocol", "udp"),
+                ("address", "127.0.0.1"),
+                ("port", "5100"),
+            ],
+            "moc" => &[("address", "10.0.0.1"), ("port", "5000")],
+            "compute" => &[
                 ("function", "to_kelvin"),
                 ("format", "i16_be"),
                 ("scale", "1.0"),
                 ("offset", "0.0"),
-            ] {
-                attributes.insert(attribute.to_string(), Scalar::of(value));
-            }
+            ],
+            _ => &[],
+        };
+        for (attribute, value) in minimum {
+            attributes.insert(attribute.to_string(), Scalar::of(*value));
         }
 
         Node {
@@ -699,6 +770,91 @@ mod tests {
             vec![link("a", &["b"]), link("b", &["c"])],
         );
         assert_eq!(g.check(), Vec::new());
+    }
+
+    /// Every node that is opened says what opening it takes.
+    ///
+    /// The check the editor's laziness rests on. tcsgui requires nothing to be
+    /// entered -- an editor that did would fight a person working out what
+    /// they are describing -- so this is where a configuration is held to
+    /// saying it all, and it says which node and what to add. A sensor with no
+    /// address used to be found when the vehicle tried to open it.
+    #[test]
+    fn every_node_that_is_opened_says_what_that_takes() {
+        // A graph of nodes that say nothing.
+        let bare = |name: &str, node_type: &str| Node {
+            name: name.to_string(),
+            node_type: node_type.to_string(),
+            group: None,
+            attributes: BTreeMap::new(),
+            editor: None,
+        };
+
+        let g = graph(
+            vec![bare("sensor", "i2c"), bare("ground", "moc")],
+            vec![link("sensor", &["ground"])],
+        );
+        let problems = g.check();
+
+        for (node, expected) in [("sensor", "path"), ("ground", "address")] {
+            let said = problems
+                .iter()
+                .find_map(|p| match p {
+                    Problem::BadNode { node: named, why } if named == node => {
+                        Some(why.clone())
+                    }
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{node}: {problems:?}"));
+            // The complaint names the node and the attribute to add, so that
+            // tcsverify can put a line number on it and a reader knows what to
+            // type.
+            assert!(said.contains(node), "{said}");
+            assert!(said.contains(expected), "{said}");
+        }
+
+        // Reported on the node, which is the line a reader will look for.
+        let said = problems
+            .iter()
+            .find(|p| matches!(p, Problem::BadNode { .. }))
+            .unwrap();
+        assert!(matches!(said.about(), About::Node(_)));
+
+        // A computation and a log are not opened and are not asked: they have
+        // rules of their own, and this one would tell them they are not
+        // interfaces.
+        let g = graph(
+            vec![node("k", "compute"), node("c", "moc")],
+            vec![link("k", &["c"])],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::BadNode { .. })),
+            "{:?}",
+            g.check()
+        );
+
+        // And what a node says has to be a thing its type knows. A misspelled
+        // attribute is otherwise a value silently ignored -- a peripheral left
+        // clocked at whatever the last program set.
+        let mut said_wrong = node("sensor", "i2c");
+        said_wrong
+            .attributes
+            .insert("max_speeed".to_string(), Scalar::of("1000000"));
+        let g = graph(
+            vec![said_wrong, node("c", "moc")],
+            vec![link("sensor", &["c"])],
+        );
+        let complaint = g
+            .check()
+            .into_iter()
+            .find_map(|p| match p {
+                Problem::BadNode { why, .. } => Some(why),
+                _ => None,
+            })
+            .expect("a misspelled attribute should be refused");
+        assert!(complaint.contains("max_speeed"), "{complaint}");
     }
 
     /// A configuration must say what tcspecial itself is configured with.

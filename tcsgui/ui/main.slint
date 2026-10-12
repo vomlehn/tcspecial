@@ -93,10 +93,15 @@ export struct PaletteEntry {
 export struct FieldView {
     name: string,
     value: string,
-    // Stated or not. A required attribute left empty is a fault, and the
-    // panel is where it is easiest to put right.
+    // Whether the configuration must state this one, which the panel says
+    // with a mark beside the name.
+    //
+    // Said and not insisted on. The editor is lazy: a field left empty is a
+    // question not yet answered, and an editor that marked it in red would be
+    // calling an unfinished node a broken one. What must be answered before a
+    // configuration flies is checked on the ground and aboard, where the
+    // complaint can name the file and the line.
     required: bool,
-    missing: bool,
 }
 
 // One attribute a group sets on every payload in it.
@@ -1008,13 +1013,12 @@ component Surface inherits Rectangle {
                         for f in fields: VerticalLayout {
                             spacing: 1px;
                             Text {
-                                // A required field says so, and says it in
-                                // red only when it is empty: red marks what
-                                // is wrong, not what matters.
+                                // A field the configuration must state says
+                                // so, and says it quietly: an empty one is
+                                // unanswered and not wrong.
                                 text: f.required ? f.name + " *" : f.name;
                                 font-size: Type.small;
-                                color: f.missing ? #c0392b : #6b7280;
-                                font-weight: f.missing ? Type.bold : Type.regular;
+                                color: #6b7280;
                                 height: 14px;
                             }
                             LineEdit {
@@ -1104,6 +1108,11 @@ export component MainWindow inherits Window {
     callback comment-set(string, string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
+    // And for the simulator's own two lists.
+    callback edit-simulated-payloads();
+    callback edit-simulator-groups();
+    // Whether this session was given a simulator configuration at all.
+    in property <bool> has-simulator: false;
 
     // The menu bar. The one thing in it so far is the section that is about
     // the configuration as a whole: there is nothing on the canvas to press
@@ -1114,6 +1123,22 @@ export component MainWindow inherits Window {
             MenuItem {
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
+            }
+            MenuSeparator { }
+            // The simulator's own file, where this session was given one.
+            // Disabled rather than hidden when it was not: a menu whose
+            // entries come and go is a menu nobody learns, and "this needs a
+            // second argument" is better said by a greyed entry than by its
+            // absence.
+            MenuItem {
+                title: "Edit simulated payloads";
+                enabled: root.has-simulator;
+                activated => { root.edit-simulated-payloads(); }
+            }
+            MenuItem {
+                title: "Edit simulator payload groups";
+                enabled: root.has-simulator;
+                activated => { root.edit-simulator-groups(); }
             }
         }
     }
@@ -1212,6 +1237,9 @@ export component SubWindow inherits Window {
     callback attribute-set(string, string, string);
     callback comment-set(string, string);
     callback edit-parameters();
+    callback edit-simulated-payloads();
+    callback edit-simulator-groups();
+    in property <bool> has-simulator: false;
 
     // The menu bar. The one thing in it so far is the section that is about
     // the configuration as a whole: there is nothing on the canvas to press
@@ -1222,6 +1250,22 @@ export component SubWindow inherits Window {
             MenuItem {
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
+            }
+            MenuSeparator { }
+            // The simulator's own file, where this session was given one.
+            // Disabled rather than hidden when it was not: a menu whose
+            // entries come and go is a menu nobody learns, and "this needs a
+            // second argument" is better said by a greyed entry than by its
+            // absence.
+            MenuItem {
+                title: "Edit simulated payloads";
+                enabled: root.has-simulator;
+                activated => { root.edit-simulated-payloads(); }
+            }
+            MenuItem {
+                title: "Edit simulator payload groups";
+                enabled: root.has-simulator;
+                activated => { root.edit-simulator-groups(); }
             }
         }
     }
@@ -1449,6 +1493,13 @@ export component ParametersWindow inherits Window {
     // in the main window, so that somebody typing in this one is not left to
     // find out elsewhere that nothing is reaching the disk.
     in property <string> trouble: "";
+    // What is wrong with what has been entered, if anything.
+    //
+    // Here because it belongs to no node: the section is about the
+    // configuration as a whole, so there is nothing on the canvas to draw it
+    // on. Empty while anything is still unanswered -- the editor says what is
+    // wrong and not what is unfinished.
+    in property <string> complaint: "";
 
     callback parameter-set(string, string);
 
@@ -1470,6 +1521,13 @@ export component ParametersWindow inherits Window {
             color: #6b7280;
             wrap: word-wrap;
         }
+        if root.complaint != "": Text {
+            text: root.complaint;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
         Text {
             text: "Two ports, because there are two command links: a command "
                 + "about the spacecraft -- ping it, arm it, restart it -- is "
@@ -1489,18 +1547,131 @@ export component ParametersWindow inherits Window {
                 for f in root.fields: VerticalLayout {
                     spacing: 1px;
                     Text {
-                        // A field that must be stated says so, and says it in
-                        // red only when it is empty: red marks what is wrong,
-                        // not what matters.
                         text: f.required ? f.name + " *" : f.name;
                         font-size: Type.small;
-                        color: f.missing ? #c0392b : #6b7280;
-                        font-weight: f.missing ? Type.bold : Type.regular;
+                        color: #6b7280;
                     }
                     LineEdit {
                         text: f.value;
                         font-size: Type.body;
                         edited => { root.parameter-set(f.name, self.text); }
+                    }
+                }
+                Rectangle { }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// The simulator's settings for one simulated payload, or for one of its
+// groups.
+//
+// One window shape for both, because they are the same list of settings: a
+// group carries what several simulated payloads share and a payload overrides
+// any of it for itself. What differs is what the chooser at the top holds --
+// the payloads of the configuration, or the groups the simulator file declares
+// -- and whether there is a way to make a new one.
+//
+// Nothing here is drawn on the canvas, and that is not a shortcut: the
+// simulator file introduces no nodes and no connections, so a drawing of it
+// would be the same drawing with numbers on it. See sim.rs.
+export component SimWindow inherits Window {
+    title: root.editing;
+    background: #fbfbfa;
+    min-width: 380px;
+    min-height: 360px;
+    preferred-width: 440px;
+    preferred-height: 600px;
+
+    // "Simulated payloads" or "Simulator payload groups", which is also the
+    // window's title.
+    in property <string> editing: "";
+    // A line saying what these settings are and are not.
+    in property <string> about: "";
+    // What there is to choose from, and which one is chosen.
+    in property <[string]> choices: [];
+    in property <string> chosen: "";
+    // The settings of whatever is chosen.
+    in property <[FieldView]> fields: [];
+    // Whether this window can make a new one, which the groups can and the
+    // payloads cannot: a simulated payload stands in for a payload of the
+    // configuration, so its name is the configuration's and not this file's.
+    in property <bool> can-add: false;
+    in property <string> trouble: "";
+
+    callback choose(string);
+    callback add();
+    callback remove();
+    callback setting-set(string, string);
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: root.editing;
+            font-size: Type.title;
+            font-weight: Type.bold;
+        }
+        Text {
+            text: root.about;
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            ComboBox {
+                model: root.choices;
+                current-value: root.chosen;
+                horizontal-stretch: 1;
+                selected(value) => { root.choose(value); }
+            }
+            if root.can-add: Button {
+                text: "New";
+                clicked => { root.add(); }
+            }
+            if root.can-add: Button {
+                text: "Remove";
+                enabled: root.chosen != "";
+                clicked => { root.remove(); }
+            }
+        }
+
+        if root.chosen == "": Text {
+            text: root.choices.length == 0
+                ? "There is nothing here yet."
+                : "Choose one above.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            vertical-stretch: 1;
+        }
+
+        if root.chosen != "": ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for f in root.fields: VerticalLayout {
+                    spacing: 1px;
+                    Text {
+                        text: f.name;
+                        font-size: Type.small;
+                        color: #6b7280;
+                    }
+                    LineEdit {
+                        text: f.value;
+                        font-size: Type.body;
+                        edited => { root.setting-set(f.name, self.text); }
                     }
                 }
                 Rectangle { }

@@ -16,11 +16,9 @@
 //! heaters actually switched. So the state it keeps is the last decision, and
 //! silence means nothing has changed.
 
-use std::collections::BTreeMap;
+use tcslibgs::node::compute::HysteresisParams;
 
-use tcslibgs::Scalar;
-
-use super::{from_value, number, Function};
+use super::{from_value, Function};
 
 /// What the heaters should be doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,25 +58,19 @@ pub struct Hysteresis {
 }
 
 impl Hysteresis {
-    pub fn of(attributes: &BTreeMap<String, Scalar>) -> Result<Hysteresis, String> {
-        let above = number(attributes, "above")?;
-        let below = number(attributes, "below")?;
-
-        if above <= 0.0 || below <= 0.0 {
-            return Err(
-                "above and below are how far from the setpoint the decision \
-                 changes, and must be more than nought: a band of nothing is a \
-                 bare comparison, which cycles a relay on a wobble"
-                    .to_string(),
-            );
-        }
-
-        Ok(Hysteresis {
-            setpoint: number(attributes, "setpoint")?,
-            above,
-            below,
+    /// The thermostat these settled parameters describe.
+    ///
+    /// Nothing to refuse: that a band must be more than nought is
+    /// `tcslibgs::node::compute`'s rule, where the ground tool applies it.
+    /// What is refused here is a *command* that would break it -- see
+    /// [`Hysteresis::set`] -- because a command arrives after the checking.
+    pub fn of(params: HysteresisParams) -> Hysteresis {
+        Hysteresis {
+            setpoint: params.setpoint,
+            above: params.above,
+            below: params.below,
             last: None,
-        })
+        }
     }
 
     /// Set the setpoint, which is what a command from the ground does.
@@ -173,17 +165,11 @@ mod tests {
     use super::*;
 
     fn thermostat() -> Hysteresis {
-        Hysteresis::of(
-            &[
-                ("setpoint", "293.15"),
-                ("above", "2.0"),
-                ("below", "2.0"),
-            ]
-            .iter()
-            .map(|(k, v)| (k.to_string(), Scalar::of(*v)))
-            .collect(),
-        )
-        .expect("a thermostat")
+        Hysteresis::of(HysteresisParams {
+            setpoint: 293.15,
+            above: 2.0,
+            below: 2.0,
+        })
     }
 
     /// Cold turns the heaters on; hot turns them off.
@@ -284,15 +270,28 @@ mod tests {
         assert_eq!(h.setpoint(), 250.0);
     }
 
-    /// A band of nothing is refused at the start.
+    /// A band of nothing is refused where a file is read, not here.
+    ///
+    /// `tcslibgs::node::compute` applies that rule, so the ground tool
+    /// refuses such a node. What this refuses is a *command* that would make
+    /// one, which arrives long after the checking: see the setting test
+    /// below.
     #[test]
-    fn a_band_of_nothing_is_refused() {
+    fn a_band_of_nothing_is_refused_before_it_is_built() {
+        use tcslibgs::node::compute::params_of;
+
         for (above, below) in [("0", "2"), ("2", "0"), ("-1", "2")] {
-            let said = Hysteresis::of(
-                &[("setpoint", "293"), ("above", above), ("below", below)]
-                    .iter()
-                    .map(|(k, v)| (k.to_string(), Scalar::of(*v)))
-                    .collect(),
+            let said = params_of(
+                "thermostat",
+                &[
+                    ("function", "hysteresis"),
+                    ("setpoint", "293"),
+                    ("above", above),
+                    ("below", below),
+                ]
+                .iter()
+                .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(*v)))
+                .collect(),
             )
             .expect_err("a band of nothing");
             assert!(said.contains("more than nought"), "{said}");

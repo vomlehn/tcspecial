@@ -17,6 +17,9 @@
 //! `network` holds the three transports it covers, and `serial` holds the
 //! two-wire variant that is one of its own terms.
 
+// Computation aboard: what a compute node may say, the arithmetic being
+// tcspecial's.
+pub mod compute;
 pub mod i2c;
 pub mod log;
 pub mod spi;

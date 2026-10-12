@@ -592,6 +592,16 @@ Requirement
     it there for a caller with room.
 
 Requirement
+    What a compute node may say is checked by the same code in both places,
+    and it lives in the shared library rather than in the flight software.
+    ``tcsverify`` reads a configuration on a desk and cannot check what it
+    cannot see: these rules used to sit beside the arithmetic, inside
+    tcspecial, so a thermostat with no band or a program with no deadline
+    passed the ground check in silence and was refused when the vehicle
+    started. That is the wrong end of the trip. The arithmetic stays where it
+    was; what moved is the reading of attributes.
+
+Requirement
     A command from the ground has to get past two gates, in this order. The
     configuration must have a binding saying that this attribute of this node
     may be set -- an attribute no binding mentions cannot be set, which is what
@@ -814,7 +824,17 @@ These are the checks:
   states an interval of its own.
 * every command binding names an attribute its node will accept, and a
   attribute no binding mentions cannot be set from the ground.
-* every external process can be executed, and every one of them has a timeout.
+* every compute node names a computation that exists and says what that
+  computation cannot run without -- a conversion's format, scale and offset, a
+  thermostat's setpoint and band, a program's deadline -- and nothing else. An
+  attribute belonging to another computation, or to none, is refused by name.
+* every mean is over the inputs the links bind, and says which they are. A
+  mean over three sensors whose third link was deleted has two inputs, each
+  bound exactly once, and the declaration is what makes that a fault instead
+  of a mean over two.
+* every external process has a timeout. Whether it can be *executed* is the
+  vehicle's answer and not this tool's -- the program is on the vehicle -- so
+  that one is found when the configuration is loaded aboard.
 * every source of a log produces records the log's format can hold, which for
   ``fixed: <n>`` means a stated ``read_size`` of exactly ``n`` from every one
   of them. A source whose record length the configuration does not state --

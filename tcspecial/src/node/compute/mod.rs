@@ -43,9 +43,8 @@ pub mod mean;
 pub mod process;
 pub mod to_kelvin;
 
-use std::collections::BTreeMap;
-
 use tcslibgs::graph::Node;
+use tcslibgs::node::compute::{self, Computation};
 
 /// Something a compute node runs.
 ///
@@ -91,66 +90,47 @@ pub trait Function {
 /// over several of them needs: a mean cannot know it is waiting for three
 /// until something tells it how many links arrive.
 pub fn make(node: &Node, inputs: &[&str]) -> Result<Box<dyn Function>, String> {
-    let attributes = &node.attributes;
-    let function = attributes
-        .get("function")
-        .map(|s| s.as_str().to_string())
-        .ok_or_else(|| {
-            format!(
-                "\"{}\" is a compute node and says no function: one of \
-                 to_kelvin, mean, hysteresis, or process",
-                node.name
-            )
-        })?;
+    // What the node says, by the rules the ground tool checks it against: see
+    // tcslibgs::node::compute. Every complaint from there already names the
+    // node and the computation.
+    let what = compute::params_of(&node.name, &node.attributes)?;
 
-    // Every complaint names the node and the computation it was building.
-    // A configuration has forty of these in it, and "above is not set" says
-    // which attribute and not which node -- so the one fact a reader needs in
-    // order to go and look is the one that was missing.
-    let named = |why: String| format!("\"{}\" ({function}): {why}", node.name);
+    match what {
+        Computation::ToKelvin(params) => Ok(Box::new(to_kelvin::ToKelvin::of(params))),
+        Computation::Mean(params) => {
+            // The declared inputs and the bound ones are checked against each
+            // other by `Graph::check`, so a mean that reaches here is one
+            // whose links are the inputs it says. Checked again all the same,
+            // because what this builds is the thing that waits for them: a
+            // mean waiting for an input nothing delivers would never emit,
+            // and nothing in the telemetry would say why.
+            let mut bound: Vec<&str> = inputs.to_vec();
+            let mut declared: Vec<&str> =
+                params.inputs.iter().map(String::as_str).collect();
+            bound.sort();
+            declared.sort();
+            if bound != declared {
+                return Err(format!(
+                    "\"{}\" (mean) is over {declared:?} and the links bind \
+                     {bound:?}",
+                    node.name
+                ));
+            }
 
-    match function.as_str() {
-        "to_kelvin" => Ok(Box::new(
-            to_kelvin::ToKelvin::of(attributes).map_err(named)?,
-        )),
-        "mean" => Ok(Box::new(mean::Mean::of(inputs).map_err(named)?)),
-        "hysteresis" => Ok(Box::new(
-            hysteresis::Hysteresis::of(attributes).map_err(named)?,
-        )),
+            Ok(Box::new(mean::Mean::of(params)))
+        }
+        Computation::Hysteresis(params) => Ok(Box::new(hysteresis::Hysteresis::of(params))),
         // Started here, as the configuration is loaded: a program that
         // cannot be executed is a fault found on the ground rather than three
         // days into a mission. See node::compute::process.
-        "process" => {
-            let mut program = process::Process::of(attributes).map_err(named)?;
-            program.start().map_err(named)?;
+        Computation::Process(params) => {
+            let mut program = process::Process::of(params);
+            program
+                .start()
+                .map_err(|why| format!("\"{}\" (process): {why}", node.name))?;
             Ok(Box::new(program))
         }
-        other => Err(format!(
-            "\"{}\": there is no computation called \"{other}\". The built-in \
-             ones are to_kelvin, mean and hysteresis; \"process\" runs a \
-             program of your own",
-            node.name
-        )),
     }
-}
-
-/// A number an attribute says, or what is wrong with it.
-///
-/// Required, because every parameter these functions take is one a
-/// computation cannot be done without. A scale of nought or an absent
-/// setpoint is not a default worth inventing -- it is a configuration that
-/// has not said what it wants, and saying so is better than averaging against
-/// zero.
-pub(crate) fn number(
-    attributes: &BTreeMap<String, tcslibgs::Scalar>,
-    name: &str,
-) -> Result<f64, String> {
-    let text = attributes
-        .get(name)
-        .ok_or_else(|| format!("{name} is not set, and there is no sensible default for it"))?;
-    text.as_str()
-        .parse()
-        .map_err(|_| format!("{name}: \"{}\" is not a number", text.as_str()))
 }
 
 /// A value as it travels: decimal text.
@@ -178,6 +158,7 @@ pub(crate) fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     /// A value survives the trip there and back.
     #[test]
@@ -225,30 +206,31 @@ mod tests {
     /// them would pass that one's own tests and fail here.
     #[test]
     fn the_thermostat_runs_from_counts_to_a_decision() {
-        let sensor = |scale: &str, offset: &str| {
-            let mut attributes = BTreeMap::new();
-            attributes.insert("format".to_string(), tcslibgs::Scalar::of("i16_be"));
-            attributes.insert("scale".to_string(), tcslibgs::Scalar::of(scale));
-            attributes.insert("offset".to_string(), tcslibgs::Scalar::of(offset));
-            to_kelvin::ToKelvin::of(&attributes).expect("a conversion")
+        let sensor = |scale: f64, offset: f64| {
+            to_kelvin::ToKelvin::of(tcslibgs::node::compute::ToKelvinParams {
+                format: tcslibgs::node::compute::Format::I16Be,
+                scale,
+                offset,
+            })
         };
 
         // Three sensors of one make, for simplicity: a sixteenth of a degree
         // a count, above freezing.
         let mut converters = [
-            sensor("0.0625", "273.15"),
-            sensor("0.0625", "273.15"),
-            sensor("0.0625", "273.15"),
+            sensor(0.0625, 273.15),
+            sensor(0.0625, 273.15),
+            sensor(0.0625, 273.15),
         ];
-        let mut mean = mean::Mean::of(&["in0", "in1", "in2"]).expect("a mean");
+        let mut mean = mean::Mean::of(tcslibgs::node::compute::MeanParams {
+            inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+        });
 
-        let mut thermostat = {
-            let mut attributes = BTreeMap::new();
-            attributes.insert("setpoint".to_string(), tcslibgs::Scalar::of("293.15"));
-            attributes.insert("above".to_string(), tcslibgs::Scalar::of("2.0"));
-            attributes.insert("below".to_string(), tcslibgs::Scalar::of("2.0"));
-            hysteresis::Hysteresis::of(&attributes).expect("a thermostat")
-        };
+        let mut thermostat =
+            hysteresis::Hysteresis::of(tcslibgs::node::compute::HysteresisParams {
+                setpoint: 293.15,
+                above: 2.0,
+                below: 2.0,
+            });
 
         /// One pass: three readings in, a decision out if there is one.
         fn pass(
@@ -306,25 +288,23 @@ mod tests {
     /// another, each with its own conversion, averaged into one number.
     #[test]
     fn three_unlike_sensors_average_to_one_temperature() {
-        let i2c = |_| {
-            let mut a = BTreeMap::new();
-            a.insert("format".to_string(), tcslibgs::Scalar::of("i16_be"));
-            a.insert("scale".to_string(), tcslibgs::Scalar::of("0.0625"));
-            a.insert("offset".to_string(), tcslibgs::Scalar::of("273.15"));
-            to_kelvin::ToKelvin::of(&a).unwrap()
-        };
-        let mut fore = i2c(());
-        let mut aft = i2c(());
-        // A different part: three bytes, a different scale and offset.
-        let mut bay = {
-            let mut a = BTreeMap::new();
-            a.insert("format".to_string(), tcslibgs::Scalar::of("u24_be"));
-            a.insert("scale".to_string(), tcslibgs::Scalar::of("0.001"));
-            a.insert("offset".to_string(), tcslibgs::Scalar::of("273.15"));
-            to_kelvin::ToKelvin::of(&a).unwrap()
-        };
+        use tcslibgs::node::compute::{Format, MeanParams, ToKelvinParams};
 
-        let mut mean = mean::Mean::of(&["in0", "in1", "in2"]).unwrap();
+        let part = |format: Format, scale: f64| {
+            to_kelvin::ToKelvin::of(ToKelvinParams {
+                format,
+                scale,
+                offset: 273.15,
+            })
+        };
+        let mut fore = part(Format::I16Be, 0.0625);
+        let mut aft = part(Format::I16Be, 0.0625);
+        // A different part: three bytes, and a different scale.
+        let mut bay = part(Format::U24Be, 0.001);
+
+        let mut mean = mean::Mean::of(MeanParams {
+            inputs: vec!["in0".to_string(), "in1".to_string(), "in2".to_string()],
+        });
 
         // All three sitting at 20 above freezing, in their own units.
         let a = fore.give(None, &320i16.to_be_bytes()).unwrap().unwrap();
@@ -380,16 +360,30 @@ mod tests {
         assert!(said.contains("built-in"), "{said}");
     }
 
-    /// A missing parameter is refused rather than defaulted.
+    /// A node whose computation is wrong is refused by the one set of rules.
+    ///
+    /// Which is in `tcslibgs::node::compute` now, so the ground tool applies
+    /// it too: what this holds is that `make` goes through those rules rather
+    /// than having a second set of its own.
     #[test]
     fn a_parameter_with_no_sensible_default_is_required() {
-        let attributes = BTreeMap::new();
-        let said = number(&attributes, "scale").expect_err("a scale is required");
-        assert!(said.contains("no sensible default"), "{said}");
-
         let mut attributes = BTreeMap::new();
-        attributes.insert("scale".to_string(), tcslibgs::Scalar::of("quite a lot"));
-        let said = number(&attributes, "scale").expect_err("not a number");
-        assert!(said.contains("quite a lot"), "{said}");
+        attributes.insert("function".to_string(), tcslibgs::Scalar::of("to_kelvin"));
+        attributes.insert("format".to_string(), tcslibgs::Scalar::of("i16_be"));
+        attributes.insert("offset".to_string(), tcslibgs::Scalar::of("273.15"));
+        let node = Node {
+            name: "k_fore".to_string(),
+            node_type: "compute".to_string(),
+            group: None,
+            attributes,
+            editor: None,
+        };
+
+        let said = match make(&node, &[]) {
+            Err(said) => said,
+            Ok(f) => panic!("a conversion with no scale became {}", f.name()),
+        };
+        assert!(said.contains("k_fore") && said.contains("scale"), "{said}");
     }
+
 }

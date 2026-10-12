@@ -47,6 +47,17 @@ pub enum Problem {
     NotAMocLink { from: String },
     /// A log node whose attributes are not a log's.
     BadLog { node: String, why: String },
+    /// A compute node whose attributes are not its computation's.
+    BadCompute { node: String, why: String },
+    /// A mean whose declared inputs are not the ones the links bind.
+    ///
+    /// `declared` is what the node says it is over and `bound` what arrives:
+    /// the two are listed so that a reader can see which is missing.
+    MeanInputs {
+        node: String,
+        declared: Vec<String>,
+        bound: Vec<String>,
+    },
     /// A source whose records a fixed-length log cannot hold.
     ///
     /// `produces` is what the source's records are, where the configuration
@@ -94,6 +105,8 @@ impl Problem {
             Problem::NotAMocLink { from } => About::Node(from.clone()),
             Problem::Unconnected { node } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
+            Problem::BadCompute { node, .. } => About::Node(node.clone()),
+            Problem::MeanInputs { node, .. } => About::Node(node.clone()),
             // Reported on the source and not on the log: the log is right
             // about what it wants, and the source is the thing a reader will
             // have to change or unlink.
@@ -146,6 +159,20 @@ impl Problem {
                  nothing reads it"
             ),
             Problem::BadLog { node, why } => format!("log \"{node}\": {why}"),
+            // The reason already names the node and the computation: see
+            // crate::node::compute::params_of.
+            Problem::BadCompute { why, .. } => why.clone(),
+            Problem::MeanInputs {
+                node,
+                declared,
+                bound,
+            } => format!(
+                "\"{node}\" is a mean over {} and the links bind {}: a mean whose \
+                 inputs are not the ones that arrive is a mean over the wrong \
+                 readings",
+                said(declared),
+                said(bound)
+            ),
             Problem::LogSourceMismatch {
                 log,
                 source,
@@ -167,6 +194,28 @@ impl Problem {
                  only sources whose length the configuration states, which a \
                  computation's does not"
             ),
+        }
+    }
+}
+
+/// A list of names, as a complaint says one.
+///
+/// "in0, in1 and in2", and "nothing" for an empty list: a sentence that said
+/// "the links bind " and stopped would read as a sentence that had lost a
+/// word.
+fn said(names: &[String]) -> String {
+    match names.len() {
+        0 => "nothing".to_string(),
+        1 => format!("\"{}\"", names[0]),
+        _ => {
+            let (last, rest) = names.split_last().expect("more than one");
+            format!(
+                "{} and \"{last}\"",
+                rest.iter()
+                    .map(|name| format!("\"{name}\""))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            )
         }
     }
 }
@@ -328,6 +377,43 @@ impl Graph {
             }
         }
 
+        // The computations: what each says it computes, and what that
+        // computation must be told. Checked here so that a thermostat with no
+        // band or a program with no deadline is a fault found on a desk --
+        // these rules used to live in the flight software, where this tool
+        // could not reach them.
+        for node in self.nodes.iter().filter(|n| n.node_type == "compute") {
+            let what = match crate::node::compute::params_of(&node.name, &node.attributes) {
+                Ok(what) => what,
+                Err(why) => {
+                    problems.push(Problem::BadCompute {
+                        node: node.name.clone(),
+                        why,
+                    });
+                    continue;
+                }
+            };
+
+            // A mean says which inputs it is over, and the links say which
+            // arrive. Both are checked, and against each other: a mean over
+            // three sensors whose third link was deleted has two inputs, each
+            // bound exactly once, and would otherwise quietly become a mean
+            // over two.
+            if let crate::node::compute::Computation::Mean(mean) = &what {
+                let mut bound = self.inputs_bound_at(&node.name);
+                let mut declared = mean.inputs.clone();
+                bound.sort();
+                declared.sort();
+                if bound != declared {
+                    problems.push(Problem::MeanInputs {
+                        node: node.name.clone(),
+                        declared,
+                        bound,
+                    });
+                }
+            }
+        }
+
         // The logs, and whether what links into each of them fits the shape it
         // writes. Settled here and not when a record is written: a log that
         // would have to refuse a record in flight loses telemetry at the
@@ -369,6 +455,22 @@ impl Graph {
         }
 
         problems
+    }
+
+    /// Every named input of this node that a link binds.
+    fn inputs_bound_at(&self, node: &str) -> Vec<String> {
+        let mut inputs = Vec::new();
+        for link in &self.links {
+            for destination in link.to.each() {
+                let Destination { node: to, input } = Destination::parse(destination);
+                if to == node {
+                    if let Some(input) = input {
+                        inputs.push(input);
+                    }
+                }
+            }
+        }
+        inputs
     }
 
     /// Every node whose output arrives at this one.
@@ -426,12 +528,32 @@ mod tests {
         }
     }
 
+    /// A node of this type, with whatever its type cannot do without.
+    ///
+    /// A compute node is given a conversion, because a computation is now
+    /// checked here and a node that says none is refused -- and these tests
+    /// are about the shape of a graph rather than about anybody's arithmetic.
+    /// A conversion and not a mean: a mean's inputs are checked against the
+    /// links, which is the one computation whose attributes depend on the
+    /// shape around it.
     fn node(name: &str, node_type: &str) -> Node {
+        let mut attributes = BTreeMap::new();
+        if node_type == "compute" {
+            for (attribute, value) in [
+                ("function", "to_kelvin"),
+                ("format", "i16_be"),
+                ("scale", "1.0"),
+                ("offset", "0.0"),
+            ] {
+                attributes.insert(attribute.to_string(), Scalar::of(value));
+            }
+        }
+
         Node {
             name: name.to_string(),
             node_type: node_type.to_string(),
             group: None,
-            attributes: BTreeMap::new(),
+            attributes,
             editor: None,
         }
     }
@@ -664,6 +786,126 @@ mod tests {
             .any(|p| matches!(p, Problem::NotAMocLink { .. })));
     }
 
+    /// A computation is checked here, where the ground tool can see it.
+    #[test]
+    fn a_computation_that_cannot_run_is_refused_on_the_ground() {
+        let computation = |pairs: &[(&str, &str)]| {
+            let mut thermostat = node("thermostat", "compute");
+            thermostat.attributes.clear();
+            for (attribute, value) in pairs {
+                thermostat
+                    .attributes
+                    .insert(attribute.to_string(), Scalar::of(*value));
+            }
+            let g = graph(
+                vec![node("sensor", "i2c"), thermostat],
+                vec![link("sensor", &["thermostat"])],
+            );
+            g.check()
+        };
+
+        // A thermostat with no band, which used to pass here and be refused
+        // when the vehicle started.
+        let problems = computation(&[
+            ("function", "hysteresis"),
+            ("setpoint", "293.15"),
+            ("above", "2.0"),
+        ]);
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadCompute { node, why } if node == "thermostat" && why.contains("below")
+            )),
+            "{problems:?}"
+        );
+
+        // A program with no deadline.
+        let problems = computation(&[("function", "process"), ("program", "/bin/cat")]);
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadCompute { why, .. } if why.contains("timeout")
+            )),
+            "{problems:?}"
+        );
+
+        // And one that is right, which says nothing.
+        let problems = computation(&[
+            ("function", "hysteresis"),
+            ("setpoint", "293.15"),
+            ("above", "2.0"),
+            ("below", "2.0"),
+        ]);
+        assert!(
+            !problems
+                .iter()
+                .any(|p| matches!(p, Problem::BadCompute { .. })),
+            "{problems:?}"
+        );
+    }
+
+    /// A mean is over the inputs the links bind, and says which they are.
+    ///
+    /// The fault this catches has no other symptom: a mean over three sensors
+    /// whose third link was deleted has two inputs, each bound exactly once,
+    /// and would otherwise quietly become a mean over two.
+    #[test]
+    fn a_mean_is_over_the_inputs_that_arrive() {
+        let mean = |declared: &str, links: Vec<Link>| {
+            let mut average = node("average", "compute");
+            average.attributes.clear();
+            average
+                .attributes
+                .insert("function".to_string(), Scalar::of("mean"));
+            average
+                .attributes
+                .insert("inputs".to_string(), Scalar::of(declared));
+            let g = graph(
+                vec![node("a", "i2c"), node("b", "i2c"), average],
+                links,
+            );
+            g.check()
+        };
+
+        let both = || {
+            vec![
+                link("a", &["average.in0"]),
+                link("b", &["average.in1"]),
+            ]
+        };
+
+        // Three declared, two bound.
+        let problems = mean("in0,in1,in2", both());
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::MeanInputs { node, declared, bound }
+                    if node == "average" && declared.len() == 3 && bound.len() == 2
+            )),
+            "{problems:?}"
+        );
+
+        // Two declared and two bound, under other names: the names have to be
+        // the same ones, not merely the same number -- a mean told in1 and in2
+        // and linked in0 and in1 is waiting for a reading nothing delivers.
+        let problems = mean("in1,in2", both());
+        assert!(
+            problems
+                .iter()
+                .any(|p| matches!(p, Problem::MeanInputs { .. })),
+            "{problems:?}"
+        );
+
+        // And the two agreeing, which says nothing.
+        let problems = mean("in0,in1", both());
+        assert!(
+            !problems
+                .iter()
+                .any(|p| matches!(p, Problem::MeanInputs { .. })),
+            "{problems:?}"
+        );
+    }
+
     /// A log says what a log says, and is refused for the rest.
     #[test]
     fn a_log_whose_attributes_are_not_a_logs_is_refused() {
@@ -846,6 +1088,20 @@ mod tests {
             Problem::NoAttributeNamed { sets: "x".into() },
             Problem::NotAMocLink { from: "a".into() },
             Problem::Unconnected { node: "a".into() },
+            Problem::BadCompute {
+                node: "c".into(),
+                why: "\"c\" (mean): inputs is not set".into(),
+            },
+            Problem::MeanInputs {
+                node: "c".into(),
+                declared: vec!["in0".into(), "in1".into(), "in2".into()],
+                bound: vec!["in0".into()],
+            },
+            Problem::MeanInputs {
+                node: "c".into(),
+                declared: vec!["in0".into()],
+                bound: vec![],
+            },
             Problem::BadLog {
                 node: "l".into(),
                 why: "format: \"compressed\" is not a format a log knows".into(),

@@ -45,25 +45,15 @@
 //! Standard error is left alone, so whatever the program complains about
 //! arrives wherever tcspecial's own complaints do.
 
-use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use nix::poll::{poll, PollFd, PollFlags};
-use tcslibgs::Scalar;
+use tcslibgs::node::compute::{ProcessParams, Restart};
 
 use super::Function;
-
-/// What to do when the program stops.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Restart {
-    /// Leave it stopped and refuse the link. The default.
-    Never,
-    /// Start it again, up to this many times.
-    UpTo(u32),
-}
 
 /// The program, running.
 ///
@@ -98,53 +88,21 @@ pub struct Process {
 }
 
 impl Process {
-    pub fn of(attributes: &BTreeMap<String, Scalar>) -> Result<Process, String> {
-        let program = attributes
-            .get("program")
-            .map(|p| p.as_str().to_string())
-            .ok_or_else(|| {
-                "program is not set: a compute node whose function is \"process\" \
-                 is the program it names"
-                    .to_string()
-            })?;
-
-        // Required, with no default. How long a computation may take is a
-        // property of the computation, and a default would be this software
-        // guessing at somebody else's arithmetic -- then treating a slow
-        // answer as a failure on the strength of the guess.
-        let timeout = attributes
-            .get("timeout")
-            .ok_or_else(|| {
-                "timeout is not set, and there is no default for it: how long a \
-                 computation may take is a property of the computation"
-                    .to_string()
-            })
-            .and_then(|t| {
-                tcslibgs::graph::parse_interval(t.as_str())
-                    .map_err(|why| format!("timeout: {why}"))
-            })?;
-
-        let restart = match attributes.get("restart").map(Scalar::as_str) {
-            None | Some("never") => Restart::Never,
-            Some(other) => other
-                .parse::<u32>()
-                .map(Restart::UpTo)
-                .map_err(|_| {
-                    format!(
-                        "restart: \"{other}\" is neither \"never\" nor a number \
-                         of times"
-                    )
-                })?,
-        };
-
-        Ok(Process {
-            program,
-            timeout,
-            restart,
+    /// The program these settled parameters name, not yet started.
+    ///
+    /// Nothing to refuse: what a file may say -- the program, the deadline it
+    /// cannot do without, and whether it may be restarted -- is
+    /// `tcslibgs::node::compute`'s, where the ground tool checks it. What is
+    /// found here is the machine's answer: see [`Process::start`].
+    pub fn of(params: ProcessParams) -> Process {
+        Process {
+            program: params.program,
+            timeout: params.timeout,
+            restart: params.restart,
             running: None,
             restarts: 0,
             stopped: None,
-        })
+        }
     }
 
     /// Start the program.
@@ -301,21 +259,21 @@ impl Process {
     }
 }
 
-/// What the child does not inherit.
-///
-/// Everything this process opens, it opens close-on-exec: the standard
-/// library does that for files, sockets and pipes, and the endpoints that
-/// open their own descriptors ask for it. So a computation starts with its
-/// two pipes and the standard error it shares, and not with the command
-/// socket, the chip another node holds or the log's segment file -- none of
-/// which it has any business with, and one of which, a chip's line request,
-/// is given to a single owner at a time.
-///
-/// Closing them in the child by hand was tried and taken out again. The
-/// descriptor the standard library reports a failed exec on is one of the
-/// ones a sweep like that closes, and with it closed a program that cannot be
-/// run looks like a program that started -- which is the one failure this
-/// node exists to make visible.
+// What the child does not inherit.
+//
+// Everything this process opens, it opens close-on-exec: the standard
+// library does that for files, sockets and pipes, and the endpoints that
+// open their own descriptors ask for it. So a computation starts with its
+// two pipes and the standard error it shares, and not with the command
+// socket, the chip another node holds or the log's segment file -- none of
+// which it has any business with, and one of which, a chip's line request,
+// is given to a single owner at a time.
+//
+// Closing them in the child by hand was tried and taken out again. The
+// descriptor the standard library reports a failed exec on is one of the
+// ones a sweep like that closes, and with it closed a program that cannot be
+// run looks like a program that started -- which is the one failure this
+// node exists to make visible.
 
 /// One whole line out of what has arrived, if there is one.
 ///
@@ -443,60 +401,28 @@ impl Drop for Process {
 mod tests {
     use super::*;
 
-    fn attributes(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), Scalar::of(*v)))
-            .collect()
+    /// A program of these parameters, not started.
+    ///
+    /// What a file may say about one -- that the program and the deadline are
+    /// required, that a restart allowance is a number or "never" -- is
+    /// `tcslibgs::node::compute`'s rule, where the ground tool applies it.
+    /// These tests are about what the supervision does.
+    fn process(program: &str, timeout: Duration, restart: Restart) -> Process {
+        Process::of(ProcessParams {
+            program: program.to_string(),
+            timeout,
+            restart,
+        })
     }
 
-    /// A program and a deadline are both required.
+    /// A restart allowance of never allows none.
     #[test]
-    fn a_program_and_a_deadline_are_both_required() {
-        let said = Process::of(&attributes(&[("timeout", "500ms")]))
-            .expect_err("no program");
-        assert!(said.contains("program is not set"), "{said}");
-
-        let said = Process::of(&attributes(&[("program", "/usr/bin/mean")]))
-            .expect_err("no timeout");
-        assert!(
-            said.contains("no default for it"),
-            "a default deadline would be this software guessing: {said}"
-        );
-
-        let said = Process::of(&attributes(&[
-            ("program", "/usr/bin/mean"),
-            ("timeout", "soon"),
-        ]))
-        .expect_err("an unreadable timeout");
-        assert!(said.contains("timeout:"), "{said}");
-    }
-
-    /// Restarting is never, unless a number says otherwise.
-    #[test]
-    fn restarting_is_never_by_default() {
-        let p = Process::of(&attributes(&[
-            ("program", "/usr/bin/mean"),
-            ("timeout", "500ms"),
-        ]))
-        .unwrap();
+    fn restarting_is_never_unless_a_number_says_otherwise() {
+        let p = process("/usr/bin/mean", Duration::from_millis(500), Restart::Never);
         assert_eq!(p.restart(), Restart::Never);
         assert!(!p.may_restart());
 
-        let p = Process::of(&attributes(&[
-            ("program", "/usr/bin/mean"),
-            ("timeout", "500ms"),
-            ("restart", "never"),
-        ]))
-        .unwrap();
-        assert_eq!(p.restart(), Restart::Never);
-
-        let p = Process::of(&attributes(&[
-            ("program", "/usr/bin/mean"),
-            ("timeout", "500ms"),
-            ("restart", "3"),
-        ]))
-        .unwrap();
+        let p = process("/usr/bin/mean", Duration::from_millis(500), Restart::UpTo(3));
         assert_eq!(p.restart(), Restart::UpTo(3));
         assert!(p.may_restart());
     }
@@ -504,12 +430,7 @@ mod tests {
     /// A restart allowance is spent, and then it is gone.
     #[test]
     fn restarts_are_bounded() {
-        let mut p = Process::of(&attributes(&[
-            ("program", "/usr/bin/mean"),
-            ("timeout", "500ms"),
-            ("restart", "2"),
-        ]))
-        .unwrap();
+        let mut p = process("/usr/bin/mean", Duration::from_millis(500), Restart::UpTo(2));
 
         assert!(p.stopped("it exited"), "the first restart is allowed");
         assert!(p.stopped("it exited"), "and the second");
@@ -524,27 +445,11 @@ mod tests {
     /// A program that will not restart holds why, so every refusal says it.
     #[test]
     fn a_stopped_program_keeps_its_reason() {
-        let mut p = Process::of(&attributes(&[
-            ("program", "/usr/bin/mean"),
-            ("timeout", "500ms"),
-        ]))
-        .unwrap();
+        let mut p = process("/usr/bin/mean", Duration::from_millis(500), Restart::Never);
 
         assert_eq!(p.why_stopped(), None, "it has not stopped yet");
         assert!(!p.stopped("it could not be executed"));
         assert_eq!(p.why_stopped(), Some("it could not be executed"));
-    }
-
-    /// A restart allowance that is not a number is refused.
-    #[test]
-    fn an_unreadable_restart_allowance_is_refused() {
-        let said = Process::of(&attributes(&[
-            ("program", "/usr/bin/mean"),
-            ("timeout", "500ms"),
-            ("restart", "sometimes"),
-        ]))
-        .expect_err("not a number");
-        assert!(said.contains("sometimes"), "{said}");
     }
 
     /// A program written for this test, in whatever shell there is.
@@ -569,10 +474,9 @@ mod tests {
         (where_, name)
     }
 
-    fn running(script: &str, timeout: &str) -> (tempfile::TempDir, Process) {
+    fn running(script: &str, timeout: Duration) -> (tempfile::TempDir, Process) {
         let (where_, name) = program(script);
-        let mut p = Process::of(&attributes(&[("program", &name), ("timeout", timeout)]))
-            .expect("the attributes");
+        let mut p = process(&name, timeout, Restart::Never);
         start_despite_the_race(&mut p);
         assert!(p.is_running());
         (where_, p)
@@ -606,7 +510,7 @@ mod tests {
         // answer from an echo.
         let (_where, mut p) = running(
             "while read line; do echo $(( $line * 2 )); done\n",
-            "2s",
+            Duration::from_secs(2),
         );
 
         assert_eq!(p.give(None, b"21").expect("an answer"), Some(b"42".to_vec()));
@@ -616,7 +520,7 @@ mod tests {
     /// A named input reaches the program as its name and its value.
     #[test]
     fn a_named_input_arrives_named() {
-        let (_where, mut p) = running("while read line; do echo \"$line\"; done\n", "2s");
+        let (_where, mut p) = running("while read line; do echo \"$line\"; done\n", Duration::from_secs(2));
 
         assert_eq!(
             p.give(Some("in1"), b"293.15").expect("an answer"),
@@ -635,7 +539,7 @@ mod tests {
         let (_where, mut p) = running(
             "n=0\nwhile read line; do n=$(( $n + 1 )); \
              if [ $n -eq 3 ]; then echo ready; else echo; fi; done\n",
-            "2s",
+            Duration::from_secs(2),
         );
 
         assert_eq!(p.give(None, b"1").expect("a pass"), None);
@@ -652,7 +556,7 @@ mod tests {
     fn an_answer_split_across_writes_is_one_answer() {
         let (_where, mut p) = running(
             "while read line; do printf '29'; sleep 0.2; printf '1.5\\n'; done\n",
-            "3s",
+            Duration::from_secs(3),
         );
 
         assert_eq!(
@@ -664,7 +568,10 @@ mod tests {
     /// A program that does not answer in time is treated as having failed.
     #[test]
     fn a_program_that_misses_its_deadline_has_failed() {
-        let (_where, mut p) = running("while read line; do sleep 5; echo late; done\n", "200ms");
+        let (_where, mut p) = running(
+            "while read line; do sleep 5; echo late; done\n",
+            Duration::from_millis(200),
+        );
 
         let said = p.give(None, b"1").expect_err("a program that took too long");
         assert!(
@@ -683,7 +590,7 @@ mod tests {
     /// A program that exits is reported with what it exited with.
     #[test]
     fn a_program_that_exits_is_reported() {
-        let (_where, mut p) = running("read line\nexit 3\n", "2s");
+        let (_where, mut p) = running("read line\nexit 3\n", Duration::from_secs(2));
 
         let said = p.give(None, b"1").expect_err("a program that exited");
         assert!(said.contains("exited with status 3"), "{said}");
@@ -694,11 +601,11 @@ mod tests {
     /// fault.
     #[test]
     fn a_program_that_cannot_be_run_is_refused_at_the_start() {
-        let mut p = Process::of(&attributes(&[
-            ("program", "/nonesuch/computation"),
-            ("timeout", "500ms"),
-        ]))
-        .expect("the attributes read");
+        let mut p = process(
+            "/nonesuch/computation",
+            Duration::from_millis(500),
+            Restart::Never,
+        );
 
         let said = p.start().expect_err("a program that is not there");
         assert!(
@@ -713,12 +620,7 @@ mod tests {
     #[test]
     fn a_restart_is_taken_and_the_datum_is_still_lost() {
         let (_where, name) = program("read line\nexit 1\n");
-        let mut p = Process::of(&attributes(&[
-            ("program", &name),
-            ("timeout", "2s"),
-            ("restart", "1"),
-        ]))
-        .expect("the attributes");
+        let mut p = process(&name, Duration::from_secs(2), Restart::UpTo(1));
         start_despite_the_race(&mut p);
 
         // The first datum kills it, and the allowance starts it again. The

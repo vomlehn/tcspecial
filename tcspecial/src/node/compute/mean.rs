@@ -14,6 +14,8 @@
 
 use std::collections::BTreeMap;
 
+use tcslibgs::node::compute::MeanParams;
+
 use super::{as_value, from_value, Function};
 
 /// The mean over a fixed set of named inputs.
@@ -27,22 +29,19 @@ pub struct Mean {
 }
 
 impl Mean {
-    /// A mean over these inputs.
+    /// A mean over the inputs the node declares.
     ///
-    /// The names come from the routing rather than from the configuration's
-    /// own `inputs` attribute, because what matters is what is actually linked
-    /// here: a node that says three and has two bound is a configuration the
-    /// checking refuses, and one that says nothing and has three bound is a
-    /// mean over three.
-    pub fn of(inputs: &[&str]) -> Result<Mean, String> {
-        if inputs.is_empty() {
-            return Err("a mean needs inputs, and nothing is linked to this one"
-                .to_string());
-        }
-        Ok(Mean {
+    /// The declared names, which `Graph::check` has compared with the links
+    /// that arrive: a mean over three sensors whose third link was deleted has
+    /// two inputs, each bound exactly once, and the declaration is what makes
+    /// that a configuration fault rather than a mean over two. Nothing to
+    /// refuse here -- that a mean is over at least two inputs, each named
+    /// once, is `tcslibgs::node::compute`'s rule.
+    pub fn of(params: MeanParams) -> Mean {
+        Mean {
             arrived: BTreeMap::new(),
-            expected: inputs.iter().map(|i| i.to_string()).collect(),
-        })
+            expected: params.inputs,
+        }
     }
 
     /// How many are still to come this pass.
@@ -104,6 +103,13 @@ impl Function for Mean {
 mod tests {
     use super::*;
 
+    /// A mean over these inputs, as a node would declare them.
+    fn mean(inputs: &[&str]) -> Mean {
+        Mean::of(MeanParams {
+            inputs: inputs.iter().map(|name| name.to_string()).collect(),
+        })
+    }
+
     /// Nothing comes out until every input has arrived.
     ///
     /// The test this module exists for. A mean that emitted early would
@@ -111,7 +117,7 @@ mod tests {
     /// number nobody would question.
     #[test]
     fn nothing_is_emitted_until_the_set_is_complete() {
-        let mut mean = Mean::of(&["in0", "in1", "in2"]).unwrap();
+        let mut mean = mean(&["in0", "in1", "in2"]);
 
         assert_eq!(mean.give(Some("in0"), b"290").unwrap(), None);
         assert_eq!(mean.waiting_for(), 2);
@@ -129,7 +135,7 @@ mod tests {
     /// Each pass is made of its own readings.
     #[test]
     fn a_pass_is_not_averaged_against_the_one_before() {
-        let mut mean = Mean::of(&["in0", "in1"]).unwrap();
+        let mut mean = mean(&["in0", "in1"]);
 
         mean.give(Some("in0"), b"100").unwrap();
         let first = mean.give(Some("in1"), b"200").unwrap().unwrap();
@@ -151,12 +157,12 @@ mod tests {
     /// Which order they come in is the devices' business, not the mean's.
     #[test]
     fn the_order_of_arrival_does_not_matter() {
-        let mut forwards = Mean::of(&["in0", "in1", "in2"]).unwrap();
+        let mut forwards = mean(&["in0", "in1", "in2"]);
         forwards.give(Some("in0"), b"1").unwrap();
         forwards.give(Some("in1"), b"2").unwrap();
         let one = forwards.give(Some("in2"), b"3").unwrap().unwrap();
 
-        let mut backwards = Mean::of(&["in0", "in1", "in2"]).unwrap();
+        let mut backwards = mean(&["in0", "in1", "in2"]);
         backwards.give(Some("in2"), b"3").unwrap();
         backwards.give(Some("in1"), b"2").unwrap();
         let other = backwards.give(Some("in0"), b"1").unwrap().unwrap();
@@ -171,7 +177,7 @@ mod tests {
     /// from another, which is a wrong answer that looks like a right one.
     #[test]
     fn a_repeated_input_abandons_the_pass_rather_than_guessing() {
-        let mut mean = Mean::of(&["in0", "in1", "in2"]).unwrap();
+        let mut mean = mean(&["in0", "in1", "in2"]);
         mean.give(Some("in0"), b"100").unwrap();
         mean.give(Some("in1"), b"200").unwrap();
 
@@ -191,7 +197,7 @@ mod tests {
     /// An arrival with no input name is refused, and says how to write one.
     #[test]
     fn an_unnamed_arrival_is_refused() {
-        let mut mean = Mean::of(&["in0"]).unwrap();
+        let mut mean = mean(&["in0"]);
         let said = mean.give(None, b"1").expect_err("no input name");
         assert!(said.contains("to.in0"), "it should say how: {said}");
     }
@@ -199,7 +205,7 @@ mod tests {
     /// An input nobody declared is refused by name.
     #[test]
     fn an_unexpected_input_is_refused() {
-        let mut mean = Mean::of(&["in0", "in1"]).unwrap();
+        let mut mean = mean(&["in0", "in1"]);
         let said = mean.give(Some("in7"), b"1").expect_err("not an input");
         assert!(said.contains("in7"), "{said}");
         assert!(said.contains("in0, in1"), "it should say what there is: {said}");
@@ -208,7 +214,7 @@ mod tests {
     /// A reading that is not a number is refused and does not count.
     #[test]
     fn a_reading_that_is_not_a_number_does_not_fill_an_input() {
-        let mut mean = Mean::of(&["in0", "in1"]).unwrap();
+        let mut mean = mean(&["in0", "in1"]);
         assert!(mean.give(Some("in0"), b"warm").is_err());
         assert_eq!(
             mean.waiting_for(),
@@ -217,10 +223,26 @@ mod tests {
         );
     }
 
-    /// A mean with nothing linked to it is refused at the start.
+    /// A mean over nothing is refused where a file is read, not here.
+    ///
+    /// That a mean is over at least two inputs, each named once, is
+    /// `tcslibgs::node::compute`'s rule -- so the ground tool refuses such a
+    /// node, and what reaches this is a mean whose inputs the links bind.
+    /// What this holds is the other half of it: a mean built over no inputs
+    /// would emit on nothing, so a set that is complete the moment it starts
+    /// is the one shape this cannot be asked for.
     #[test]
-    fn a_mean_over_nothing_is_refused() {
-        let said = Mean::of(&[]).expect_err("no inputs");
-        assert!(said.contains("needs inputs"), "{said}");
+    fn a_mean_over_nothing_is_refused_before_it_is_built() {
+        use tcslibgs::node::compute::params_of;
+
+        let said = params_of(
+            "mean_temp",
+            &[("function", "mean"), ("inputs", "")]
+                .iter()
+                .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(*v)))
+                .collect(),
+        )
+        .expect_err("a mean over nothing");
+        assert!(said.contains("at least two"), "{said}");
     }
 }

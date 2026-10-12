@@ -1044,8 +1044,14 @@ mod tests {
     #[test]
     fn a_computation_has_a_result_when_it_has_enough() {
         use crate::node::compute::mean::Mean;
+        use tcslibgs::node::compute::MeanParams;
 
-        let mut port = ComputePort::of("mean_temp", Box::new(Mean::of(&["in0", "in1"]).unwrap()));
+        let mut port = ComputePort::of(
+            "mean_temp",
+            Box::new(Mean::of(MeanParams {
+                inputs: vec!["in0".to_string(), "in1".to_string()],
+            })),
+        );
         assert_eq!(port.function(), "mean");
 
         // The first arrival is not a result: a mean of one of two sensors
@@ -1071,8 +1077,14 @@ mod tests {
     #[test]
     fn a_datum_a_computation_cannot_use_is_refused() {
         use crate::node::compute::mean::Mean;
+        use tcslibgs::node::compute::MeanParams;
 
-        let mut port = ComputePort::of("mean_temp", Box::new(Mean::of(&["in0"]).unwrap()));
+        let mut port = ComputePort::of(
+            "mean_temp",
+            Box::new(Mean::of(MeanParams {
+                inputs: vec!["in0".to_string(), "in1".to_string()],
+            })),
+        );
 
         let said = port
             .give(Some("in0"), b"29x.15")
@@ -1087,10 +1099,17 @@ mod tests {
     #[test]
     fn a_result_too_large_for_the_buffer_is_kept() {
         use crate::node::compute::mean::Mean;
+        use tcslibgs::node::compute::MeanParams;
 
-        let mut port = ComputePort::of("mean_temp", Box::new(Mean::of(&["in0"]).unwrap()));
+        let mut port = ComputePort::of(
+            "mean_temp",
+            Box::new(Mean::of(MeanParams {
+                inputs: vec!["in0".to_string(), "in1".to_string()],
+            })),
+        );
         port.give(Some("in0"), b"293.15").expect("a reading");
-        assert!(port.ready());
+        port.give(Some("in1"), b"293.15").expect("the other reading");
+        assert!(port.ready(), "the set is complete");
 
         let said = port.take(&mut [0u8; 2]).expect_err("a buffer too small");
         assert!(

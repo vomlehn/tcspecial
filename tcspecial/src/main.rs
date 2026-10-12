@@ -12,6 +12,7 @@ use tcslibgs::config::{
 };
 use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path};
+use tcspecial::runtime;
 use tcspecial::CommandInterpreter;
 
 fn main() {
@@ -52,6 +53,24 @@ fn main() {
         }
     };
     info!("Loading payload configuration from: {}", payload_path);
+
+    // Which of the two things this file is decides which of the two runs.
+    //
+    // No flag and no second program name: a version 2 configuration describes
+    // nodes joined by links and a version 1 one describes payloads paired with
+    // ground endpoints, and the file says which it is -- as it does for
+    // tcsverify, which runs one set of checks or the other on the same
+    // evidence. A flag beside the file would be a second statement of it, and
+    // the two could disagree.
+    //
+    // The version 2 path takes nothing from the sections below it. A graph
+    // carries no command interpreter section, no beacon address and no payload
+    // set, so reading them for it would be reading a version 1 file that is
+    // not there.
+    if runtime::start::is_a_graph(&payload_path) {
+        info!("{}: a version 2 configuration", payload_path);
+        process::exit(runtime::start::run_or_report(&payload_path));
+    }
 
     // Where beacons go belongs to the payload set: it is the set's ground
     // station that listens for them, so the set's own file is where it is

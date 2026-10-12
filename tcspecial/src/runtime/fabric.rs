@@ -69,6 +69,17 @@ pub trait Port {
         ))
     }
 
+    /// Push whatever this node has buffered to where it belongs.
+    ///
+    /// For a log, which does not write a record to its file as it takes it: a
+    /// log flushed per arrival is a write system call per reading. Nothing for
+    /// every other kind of node, which is why the default does nothing -- a
+    /// socket and a bus have handed their bytes over by the time a write
+    /// returns.
+    fn flush(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+
     /// Whether this node has a result waiting as a consequence of what it was
     /// just given.
     ///
@@ -113,7 +124,12 @@ impl Moved {
         self.refused.is_empty()
     }
 
-    fn add(&mut self, other: Moved) {
+    /// Take in what another pass moved.
+    ///
+    /// Public because a pass is made of several: a group, then another, then
+    /// the polled nodes, then the logs -- and what the caller wants at the end
+    /// is one account of all of it, failures included.
+    pub fn add(&mut self, other: Moved) {
         self.delivered += other.delivered;
         self.bytes += other.bytes;
         self.refused.extend(other.refused);
@@ -144,6 +160,28 @@ impl Fabric {
 
     pub fn holds(&self, name: &str) -> bool {
         self.nodes.contains_key(name)
+    }
+
+    /// How many nodes are held.
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    /// Whether any node is held, which a checked configuration always has.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    /// Flush one node, saying what went wrong if anything did.
+    ///
+    /// `None` is "nothing to report", which is what every node but a log
+    /// answers. A name that is not held is reported, as a delivery to one is:
+    /// a log that is not there is a log nothing is being written to.
+    pub fn flush(&mut self, name: &str) -> Option<String> {
+        match self.nodes.get_mut(name) {
+            Some(node) => node.flush().err(),
+            None => Some("there is no such node in this fabric".to_string()),
+        }
     }
 
     /// Hand `data` to every place `from`'s output goes, and pass on whatever

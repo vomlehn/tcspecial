@@ -494,18 +494,19 @@ impl LogPort {
         Ok(LogPort(LogNode::of(node)?))
     }
 
+}
+
+impl Port for LogPort {
     /// Push what has been written to the file.
     ///
     /// For the end of a pass, and for anything about to happen that the log
     /// should be on the far side of. Not done per record: a log flushed per
     /// arrival is a write system call per reading, and the records are in the
     /// kernel's hands either way.
-    pub fn flush(&mut self) -> Result<(), String> {
+    fn flush(&mut self) -> Result<(), String> {
         self.0.flush()
     }
-}
 
-impl Port for LogPort {
     fn take(&mut self, _buffer: &mut [u8]) -> Result<usize, String> {
         Err(format!(
             "{}: nothing is read from a log -- it is where data stops, and a link \

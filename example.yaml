@@ -12,13 +12,21 @@ description: One payload on a UDP link, its telemetry going to the ground
 # ping it, arm it, restart it -- is taken on the command interface, and one
 # about a payload on payload_port at the same address.
 #
-# The address and the port are one attribute, as the beacon address is: two
+# Each is an address and a port in one attribute, as the beacon address is: two
 # things only ever used together are one fact, and writing them apart invites a
-# file that states one and not the other. The protocol is not stated and
-# cannot be -- the link between tcspecial and the ground is UDP.
+# file that states one and not the other. The protocol is not stated and cannot
+# be -- every link here is UDP.
+#
+# The two bases are where the payloads' own data links are counted from: a
+# payload's port is the base plus its own id, which is the position it has in
+# this file. One base and an arithmetic rule rather than an address and a port
+# written on every payload.
 tcspecial:
-  command_interface: 0.0.0.0:4000
+  tcspecial_command: 0.0.0.0:4000
+  moc_command: 127.0.0.1:4100
   payload_port: 4001
+  tcspecial_tc_base: 0.0.0.0:6000
+  moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
   beacon_address: "239.255.0.1:5550"
   beacon_interface: "127.0.0.1"

@@ -3591,13 +3591,13 @@ mod tests {
 
         // Typing in one records an edit, and one Undo takes it back.
         let depth = editor.borrow().undo_depth();
-        window.invoke_parameter_set("command_interface".into(), "0.0.0.0:4000".into());
+        window.invoke_parameter_set("tcspecial_command".into(), "0.0.0.0:4000".into());
         assert_eq!(
             editor
                 .borrow()
                 .document()
                 .tcspecial
-                .get("command_interface")
+                .get("tcspecial_command")
                 .map(String::as_str),
             Some("0.0.0.0:4000")
         );
@@ -3607,7 +3607,7 @@ mod tests {
         // filled and no longer marked.
         let interface = (0..window.get_fields().row_count())
             .filter_map(|row| window.get_fields().row_data(row))
-            .find(|f| f.name == "command_interface")
+            .find(|f| f.name == "tcspecial_command")
             .expect("the command interface field");
         assert_eq!(interface.value, "0.0.0.0:4000");
 
@@ -3616,7 +3616,7 @@ mod tests {
             .borrow()
             .document()
             .tcspecial
-            .contains_key("command_interface"));
+            .contains_key("tcspecial_command"));
     }
 
     /// The group window offers every group there is.

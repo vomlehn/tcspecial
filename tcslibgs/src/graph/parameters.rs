@@ -40,8 +40,11 @@ use crate::types::{default_log_segment_bytes, CIConfigJson};
 /// Required ones first, so a panel built from this asks for what it must have
 /// before what it may.
 pub const ATTRIBUTES: &[(&str, bool)] = &[
-    ("command_interface", true),
+    ("tcspecial_command", true),
+    ("moc_command", true),
     ("payload_port", true),
+    ("tcspecial_tc_base", true),
+    ("moc_tc_base", true),
     ("beacon_interval_ms", true),
     ("beacon_address", true),
     ("beacon_interface", true),
@@ -97,8 +100,11 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
     };
 
     Ok(CIConfigJson {
-        command_interface: text("command_interface")?,
+        tcspecial_command: text("tcspecial_command")?,
+        moc_command: text("moc_command")?,
         payload_port: port("payload_port")?,
+        tcspecial_tc_base: text("tcspecial_tc_base")?,
+        moc_tc_base: text("moc_tc_base")?,
         beacon_interval_ms: number("beacon_interval_ms")?,
         beacon_address: text("beacon_address")?,
         beacon_interface: text("beacon_interface")?,
@@ -143,8 +149,11 @@ mod tests {
 
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("command_interface", "0.0.0.0:4000"),
+            ("tcspecial_command", "0.0.0.0:4000"),
+            ("moc_command", "127.0.0.1:4100"),
             ("payload_port", "4001"),
+            ("tcspecial_tc_base", "0.0.0.0:6000"),
+            ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
             ("beacon_address", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),
@@ -158,7 +167,8 @@ mod tests {
     #[test]
     fn a_whole_section_is_what_the_command_interpreter_takes() {
         let config = ci_config_of(&said(&whole())).expect("this one is complete");
-        assert_eq!(config.command_interface, "0.0.0.0:4000");
+        assert_eq!(config.tcspecial_command, "0.0.0.0:4000");
+        assert_eq!(config.moc_command, "127.0.0.1:4100");
         assert_eq!(config.payload_port, 4001);
         assert_eq!(config.beacon_interval_ms, 5000);
         assert_eq!(config.beacon_address, "239.255.0.1:5550");
@@ -171,6 +181,10 @@ mod tests {
         let settled = config.to_ci_config().expect("and sound");
         assert_eq!(settled.address, "0.0.0.0");
         assert_eq!(settled.port, 4000);
+        assert_eq!(settled.moc_command.to_string(), "127.0.0.1:4100");
+        // And the bases, which are counted on by a payload's own id.
+        assert_eq!(settled.tcspecial_tc_base.at(0).unwrap().port, 6000);
+        assert_eq!(settled.moc_tc_base.at(3).unwrap().port, 6103);
     }
 
     /// Every attribute that must be stated is complained about by name.
@@ -202,11 +216,11 @@ mod tests {
     #[test]
     fn an_empty_attribute_is_a_missing_one() {
         let mut cleared = whole();
-        cleared.retain(|(name, _)| *name != "command_interface");
-        cleared.push(("command_interface", "   "));
+        cleared.retain(|(name, _)| *name != "tcspecial_command");
+        cleared.push(("tcspecial_command", "   "));
         let why = ci_config_of(&said(&cleared))
             .expect_err("an empty command interface is none");
-        assert!(why.contains("command_interface"), "{why}");
+        assert!(why.contains("tcspecial_command"), "{why}");
     }
 
     /// A command interface is an address and a port, and says so when it is
@@ -217,19 +231,28 @@ mod tests {
     /// rather than only that the value is bad.
     #[test]
     fn a_command_interface_is_an_address_and_a_port() {
-        use crate::types::command_interface_of;
+        use crate::types::host_port_of;
 
-        assert_eq!(
-            command_interface_of("0.0.0.0:4000").expect("a plain one"),
-            ("0.0.0.0".to_string(), 4000)
-        );
+        let said = |text: &str| host_port_of("tcspecial_command", text);
+
+        let one = said("0.0.0.0:4000").expect("a plain one");
+        assert_eq!((one.address.as_str(), one.port), ("0.0.0.0", 4000));
         // Whatever the host is called, the port is after the last colon.
-        assert_eq!(
-            command_interface_of(" vehicle.local:4000 ").expect("a named host"),
-            ("vehicle.local".to_string(), 4000)
-        );
+        let named = said(" vehicle.local:4000 ").expect("a named host");
+        assert_eq!((named.address.as_str(), named.port), ("vehicle.local", 4000));
 
-        for (said, expected) in [
+        // A base counted on by an id, which is the one arithmetic in the
+        // section: a payload's own port is the base plus its position.
+        assert_eq!(one.at(0).unwrap().port, 4000);
+        assert_eq!(one.at(7).unwrap().port, 4007);
+        assert_eq!(one.at(7).unwrap().address, "0.0.0.0");
+        // And a sum no port can be is refused while somebody is reading the
+        // file rather than when the socket is made.
+        let high = said("0.0.0.0:65535").unwrap();
+        assert!(high.at(0).is_ok());
+        assert!(high.at(1).is_err());
+
+        for (said_, expected) in [
             // No port at all, which is the half-stated case.
             ("0.0.0.0", "address:port"),
             (":4000", "states no address"),
@@ -239,9 +262,11 @@ mod tests {
             // And a port of nought, which asks for whatever is free.
             ("0.0.0.0:0", "port 0"),
         ] {
-            let why = command_interface_of(said)
-                .expect_err(&format!("{said} should be refused"));
-            assert!(why.contains(expected), "{said} was refused as {why:?}");
+            let why = said(said_).expect_err(&format!("{said_} should be refused"));
+            assert!(why.contains(expected), "{said_} was refused as {why:?}");
+            // Every complaint names the attribute, there being four of these
+            // in one section.
+            assert!(why.contains("tcspecial_command"), "{why}");
         }
     }
 

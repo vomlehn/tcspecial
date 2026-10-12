@@ -412,6 +412,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -533,6 +534,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 50,
@@ -675,6 +677,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 20,
@@ -756,6 +759,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -856,6 +860,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
             mode: Default::default(),
         };
 
@@ -936,6 +941,7 @@ mod tests {
             }),
             packet_size: 64,
             oc: None,
+            ground: None,
                     mode: Default::default(),
         };
 

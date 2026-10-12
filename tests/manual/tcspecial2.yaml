@@ -30,8 +30,11 @@ description: TCSpecial payload set 2
 # The protocol is not stated and cannot be: the link between tcspecial and the
 # ground is UDP.
 tcspecial:
-  command_interface: 0.0.0.0:4000
+  tcspecial_command: 0.0.0.0:4000
+  moc_command: 127.0.0.1:4100
   payload_port: 4001
+  tcspecial_tc_base: 0.0.0.0:6000
+  moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
   beacon_address: "239.255.0.1:5550"
   beacon_interface: "127.0.0.1"
@@ -42,8 +45,6 @@ payloads:
   # Sends of its own accord: nothing here about timing, since how fast a
   # simulated payload sends is a property of the simulation.
   - name: auto-send
-    oc_address: 127.0.0.1
-    oc_port: 6000
     type: network
     protocol: udp
     address: localhost
@@ -58,8 +59,6 @@ payloads:
   # from the payload's first packet, so it has nowhere to send a trigger until
   # the payload has spoken, which a triggered payload does not do.
   - name: triggered-send
-    oc_address: 127.0.0.1
-    oc_port: 6003
     type: network
     protocol: tcp
     address: localhost

@@ -397,6 +397,7 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 6002,
             }),
+            ground: None,
             mode: DHMode::Periodic,
         }
     }

@@ -1003,6 +1003,17 @@ pub struct DHConfig {
     /// started without one -- it would have nowhere to send what it reads --
     /// but a file describing payloads is complete without it.
     pub oc: Option<NetworkConfig>,
+    /// The *ground's* end of this payload's data link.
+    ///
+    /// The MOC binds this and says hello to [`DHConfig::oc`]; tcspecial binds
+    /// that and answers where the hello came from. Two ends, two bases, one
+    /// arithmetic rule -- `moc_tc_base` counted on by the payload's own id --
+    /// so both ends compute the same pair of ports from the same file and
+    /// neither has to be told the other's.
+    ///
+    /// `None` for a set with no `tcspecial` section, as `oc` is: there is
+    /// nothing for either end to bind.
+    pub ground: Option<NetworkConfig>,
     /// How this payload is made to send; see [`DHMode`].
     ///
     /// Defaulted rather than required, so that a tcspecial configuration
@@ -1456,7 +1467,44 @@ impl PayloadConfig {
             };
 
             match dh.to_dh_config_in(group) {
-                Ok(config) => configs.push(config),
+                Ok(mut config) => {
+                    // Where this payload exchanges data with the ground:
+                    // tcspecial's own base counted on by the payload's id,
+                    // which is the position it has in this file. tcspecial's
+                    // and not the MOC's, because this is the socket tcspecial
+                    // *binds* -- the payload is the end that speaks first over
+                    // UDP, so it is the end that has to be findable, and the
+                    // MOC says hello to it. The MOC's own side is counted the
+                    // same way from `moc_tc_base`.
+                    //
+                    // One base and an arithmetic rule rather than an address
+                    // and a port on every payload -- forty payloads were forty
+                    // chances to repeat a port, and a repeated port is two
+                    // payloads whose data arrives interleaved.
+                    //
+                    // A set with no tcspecial section has nowhere to send,
+                    // which is what `oc: None` has always meant: a file
+                    // describing payloads is complete without it, and a
+                    // handler cannot be started without one.
+                    if let Some(Ok(ci)) =
+                        self.tcspecial.as_ref().map(CIConfigJson::to_ci_config)
+                    {
+                        match (
+                            ci.tcspecial_tc_base.at(dh.sequence),
+                            ci.moc_tc_base.at(dh.sequence),
+                        ) {
+                            (Ok(oc), Ok(ground)) => {
+                                config.oc = Some(oc);
+                                config.ground = Some(ground);
+                            }
+                            (Err(why), _) | (_, Err(why)) => {
+                                problems.push(Problem::payload(&dh.name, why));
+                                continue;
+                            }
+                        }
+                    }
+                    configs.push(config);
+                }
                 Err(message) => problems.push(Problem::payload(&dh.name, message)),
             }
         }
@@ -1545,10 +1593,6 @@ pub struct DHGroupJson {
     pub path: Option<String>,
     #[serde(default)]
     pub packet_size: Option<usize>,
-    #[serde(default)]
-    pub oc_address: Option<String>,
-    #[serde(default)]
-    pub oc_port: Option<u16>,
     /// ``periodic`` or ``triggered``; see [`DHMode`]. Absent is periodic.
     #[serde(default)]
     pub mode: Option<String>,
@@ -1742,15 +1786,6 @@ pub struct DHConfigJson {
     pub path: Option<String>,
     #[serde(default)]
     pub packet_size: Option<usize>,
-    /// Address this handler exchanges payload data with the OC on.
-    ///
-    /// Commonly shared by every handler of a group, which is why a group may
-    /// carry it; the port is what tells one handler of a group from another,
-    /// like a network endpoint's port.
-    #[serde(default)]
-    pub oc_address: Option<String>,
-    #[serde(default)]
-    pub oc_port: Option<u16>,
     /// ``periodic`` or ``triggered``; see [`DHMode`]. Absent is periodic.
     #[serde(default)]
     pub mode: Option<String>,
@@ -1974,11 +2009,6 @@ impl DHConfigJson {
                 self.name
             ));
         }
-        let oc_address = self
-            .oc_address
-            .as_deref()
-            .or_else(|| group.and_then(|g| g.oc_address.as_deref()));
-        let oc_port = self.oc_port.or_else(|| group.and_then(|g| g.oc_port));
         let mode = self
             .mode
             .as_deref()
@@ -2239,19 +2269,13 @@ impl DHConfigJson {
             }
         }
 
-        // Half an OC address is a mistake rather than a configuration: a
-        // handler given a port and no address, or the reverse, cannot be
-        // reached and nothing about the file says which was meant.
-        let oc = match (oc_address, oc_port) {
-            (Some(address), Some(port)) => Some(NetworkConfig {
-                protocol: NetworkProtocol::Udp,
-                address: address.to_string(),
-                port,
-            }),
-            (None, None) => None,
-            (Some(_), None) => return Err("oc_address without oc_port".to_string()),
-            (None, Some(_)) => return Err("oc_port without oc_address".to_string()),
-        };
+        // Where this payload exchanges data with the ground is not stated on
+        // the payload at all: it is the `moc_tc_base` of the tcspecial section
+        // counted on by the payload's own id, which only the file as a whole
+        // knows. `PayloadConfig::check` fills it in; this path is for a payload
+        // converted on its own, which has no section to ask.
+        let oc = None;
+        let ground = None;
 
         // What the trigger's rate used to be called. Named so that a file
         // using it is told the name it has now rather than told the word is
@@ -2360,6 +2384,7 @@ impl DHConfigJson {
         };
 
         Ok(DHConfig {
+            ground,
             name: DHName::new(&self.name),
             endpoint,
             packet_size: packet_size.ok_or("Missing packet_size")?,
@@ -2405,49 +2430,105 @@ pub fn beacon_address_of(stated: &str) -> Result<SocketAddr, String> {
     Ok(address)
 }
 
-/// Where the command interpreter takes commands, as `address:port`.
+/// A host and a port, as one attribute writes them.
 ///
-/// One attribute rather than two, as a beacon address is: an address and a
-/// port that are only ever used together are one fact about a configuration,
-/// and writing them apart invites a file that states one and not the other.
+/// Four of the tcspecial section's attributes are one of these: where tcspecial
+/// takes commands, where the MOC takes them, and the two bases the per-payload
+/// data links are counted from. One attribute apiece rather than two, as a
+/// beacon address is: an address and a port only ever used together are one
+/// fact about a configuration, and writing them apart invites a file that
+/// states one and not the other.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostPort {
+    /// The host, as the file spelled it.
+    ///
+    /// Kept as text and not resolved when the file is read: what a name
+    /// resolves to is the business of the moment the socket is made. It may be
+    /// `0.0.0.0`, which is every interface, or one interface's own address, or
+    /// a name.
+    pub address: String,
+    pub port: u16,
+}
+
+impl HostPort {
+    /// This base, counted on by a payload's own id.
+    ///
+    /// The one place the sum is taken, so that both ends of a link compute the
+    /// same port from the same file: a payload's data link is the base port
+    /// plus the payload's id, and the id is the position the payload has in the
+    /// configuration -- see [`DHConfigJson::sequence`].
+    ///
+    /// Refused rather than wrapped where the sum leaves the range a port has:
+    /// a configuration of three hundred payloads based at 65400 describes
+    /// something no socket can be, and the useful moment to say so is while
+    /// somebody is reading the file.
+    pub fn at(&self, id: usize) -> Result<NetworkConfig, String> {
+        let port = (self.port as usize).checked_add(id).ok_or_else(|| {
+            format!("{}:{} plus {id} is not a port", self.address, self.port)
+        })?;
+        if port > u16::MAX as usize {
+            return Err(format!(
+                "{}:{} plus {id} is port {port}, and a port is at most 65535: \
+                 a base this high leaves no room for the payloads counted from \
+                 it",
+                self.address, self.port
+            ));
+        }
+        Ok(NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: self.address.clone(),
+            port: port as u16,
+        })
+    }
+}
+
+impl std::fmt::Display for HostPort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.address, self.port)
+    }
+}
+
+/// A host and a port, as `address:port`, or what is wrong with how it was
+/// written.
 ///
-/// The address is kept as text and not resolved here. It is a local address to
-/// bind -- `0.0.0.0` for every interface, or one interface's own -- and what a
-/// name resolves to is the business of the moment the socket is made, not of
-/// the moment the file is read.
+/// `attribute` is the name the complaint uses, because a configuration with
+/// four of these is read by somebody who needs to know which one is wrong.
 ///
 /// Split at the last colon, so that whatever a host is called the port is the
 /// part after it.
-pub fn command_interface_of(stated: &str) -> Result<(String, u16), String> {
+pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
     let said = stated.trim();
     let (address, port) = said.rsplit_once(':').ok_or_else(|| {
         format!(
-            "command_interface \"{said}\" is not an address and a port: it is \
-             written as address:port, as 0.0.0.0:4000"
+            "{attribute} \"{said}\" is not an address and a port: it is written \
+             as address:port, as 0.0.0.0:4000"
         )
     })?;
 
     if address.trim().is_empty() {
         return Err(format!(
-            "command_interface \"{said}\" states no address. Every interface is \
+            "{attribute} \"{said}\" states no address. Every interface is \
              0.0.0.0, which is what a vehicle usually wants"
         ));
     }
     let port: u16 = port.trim().parse().map_err(|_| {
         format!(
-            "command_interface \"{said}\" ends in \"{port}\", which is not a port: \
-             a port is a whole number between 1 and 65535"
+            "{attribute} \"{said}\" ends in \"{port}\", which is not a port: a \
+             port is a whole number between 1 and 65535"
         )
     })?;
     if port == 0 {
         return Err(format!(
-            "command_interface \"{said}\" asks for port 0, which is a request for \
-             whatever port is free -- and a command link nobody can predict the \
-             port of is one the ground cannot reach"
+            "{attribute} \"{said}\" asks for port 0, which is a request for \
+             whatever port is free -- and a link nobody can predict the port of \
+             is one the other end cannot reach"
         ));
     }
 
-    Ok((address.trim().to_string(), port))
+    Ok(HostPort {
+        address: address.trim().to_string(),
+        port,
+    })
 }
 
 /// The local interface beacons are sent on and listened for on.
@@ -2467,17 +2548,37 @@ pub fn beacon_interface_of(stated: &str) -> Result<Ipv4Addr, String> {
 /// The file-level form of the command interpreter's configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
-    /// Where commands about the spacecraft are taken, as `address:port`.
+    /// Where tcspecial takes commands about the spacecraft, as `address:port`.
     ///
     /// One attribute and not two, as the beacon address beside it is: an
     /// address and a port only ever used together are one fact, and two
-    /// attributes are two chances to state half of it. See
-    /// [`command_interface_of`].
+    /// attributes are two chances to state half of it. See [`host_port_of`].
     ///
-    /// The protocol is not stated and cannot be: the link between tcspecial
-    /// and the ground is UDP. A configuration that could say otherwise would
-    /// be a configuration that could say something untrue.
-    pub command_interface: String,
+    /// The protocol is not stated and cannot be: every link in this section is
+    /// UDP. A configuration that could say otherwise would be a configuration
+    /// that could say something untrue.
+    pub tcspecial_command: String,
+    /// And where the MOC takes them, which is the other end of the same
+    /// conversation.
+    ///
+    /// Both ends in one file, because both ends read this file: a configuration
+    /// that stated only its own end would leave the other to be told
+    /// separately, and two places to say one thing is one place for them to
+    /// disagree.
+    pub moc_command: String,
+    /// The base the per-payload data links are counted from on tcspecial's
+    /// side, as `address:port`.
+    ///
+    /// Each payload has a UDP interface of its own for exchanging data with
+    /// the ground, and its port is this base plus the payload's own id -- the
+    /// position it has in the configuration. One base and an arithmetic rule
+    /// rather than an address and a port written on every payload: forty
+    /// payloads were forty chances to repeat a port, and a repeated port is
+    /// two payloads whose data arrives interleaved.
+    pub tcspecial_tc_base: String,
+    /// And the base for the MOC's side of those links, counted the same way by
+    /// the device's id.
+    pub moc_tc_base: String,
     /// The port payload commands are taken on, which is not the port above.
     ///
     /// A command about a payload -- start it, stop it, ask it for its
@@ -2498,7 +2599,7 @@ pub struct CIConfigJson {
     /// a file was silently given.
     ///
     /// A port and not an `address:port`: it is taken on the same address as
-    /// `command_interface`, there being one command interpreter at one place,
+    /// `tcspecial_command`, there being one command interpreter at one place,
     /// and a second address would be a second answer to where that is.
     pub payload_port: u16,
     pub beacon_interval_ms: u32,
@@ -2531,10 +2632,16 @@ pub struct CIConfigJson {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CIConfig {
     /// The address the command links are taken on, from
-    /// [`CIConfigJson::command_interface`].
+    /// [`CIConfigJson::tcspecial_command`].
     pub address: String,
     /// And the port of it, for commands about the spacecraft.
     pub port: u16,
+    /// Where the MOC takes commands, from [`CIConfigJson::moc_command`].
+    pub moc_command: HostPort,
+    /// The bases the per-payload data links are counted from: tcspecial's own
+    /// side, and the MOC's. See [`HostPort::at`].
+    pub tcspecial_tc_base: HostPort,
+    pub moc_tc_base: HostPort,
     /// The port payload commands are taken on; see
     /// [`CIConfigJson::payload_port`].
     pub payload_port: u16,
@@ -2557,7 +2664,12 @@ pub struct CIConfig {
 
 impl CIConfigJson {
     pub fn to_ci_config(&self) -> Result<CIConfig, String> {
-        let (address, port) = command_interface_of(&self.command_interface)?;
+        let command = host_port_of("tcspecial_command", &self.tcspecial_command)?;
+        let (address, port) = (command.address, command.port);
+        let moc_command = host_port_of("moc_command", &self.moc_command)?;
+        let tcspecial_tc_base =
+            host_port_of("tcspecial_tc_base", &self.tcspecial_tc_base)?;
+        let moc_tc_base = host_port_of("moc_tc_base", &self.moc_tc_base)?;
 
         let beacon_address = beacon_address_of(&self.beacon_address)?;
         let beacon_interface = beacon_interface_of(&self.beacon_interface)?;
@@ -2567,10 +2679,9 @@ impl CIConfigJson {
         // bound second would fail at startup with the other half's address.
         if self.payload_port == port {
             return Err(format!(
-                "command_interface and payload_port are both port {port}, and \
+                "tcspecial_command and payload_port are both port {port}, and \
                  the two links cannot be one socket: spacecraft commands are \
-                 taken on the command interface and payload commands on \
-                 payload_port"
+                 taken on the one and payload commands on the other"
             ));
         }
 
@@ -2578,6 +2689,9 @@ impl CIConfigJson {
             address,
             port,
             payload_port: self.payload_port,
+            moc_command,
+            tcspecial_tc_base,
+            moc_tc_base,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
             beacon_address,
             beacon_interface,
@@ -2628,8 +2742,6 @@ mod tests {
             port: None,
             path: Some("/dev/urandom".to_string()),
             packet_size: Some(4),
-            oc_address: None,
-            oc_port: None,
             mode: None,
             trigger: None,
             trigger_interval_ms: None,
@@ -2655,8 +2767,6 @@ mod tests {
             port: Some(5000),
             path: None,
             packet_size: Some(8),
-            oc_address: None,
-            oc_port: None,
             mode: Some("triggered".to_string()),
             // As a file writes it: a C string, quotes and all, where the
             // escape is the carriage return the payload's interface asks
@@ -2695,8 +2805,6 @@ mod tests {
                 port: Some(5000),
                 path: None,
                 packet_size: Some(8),
-                oc_address: None,
-                oc_port: None,
                 mode: mode.map(str::to_string),
                 trigger: trigger.map(str::to_string),
                 trigger_interval_ms: None,
@@ -2748,8 +2856,6 @@ mod tests {
                 port: Some(5000),
                 path: None,
                 packet_size: Some(8),
-                oc_address: None,
-                oc_port: None,
                 mode: Some("triggered".to_string()),
                 trigger: Some("52 45 41 44".to_string()),
                 trigger_interval_ms: None,
@@ -3082,47 +3188,66 @@ payloads:
         );
     }
 
+    /// Where a payload exchanges data with the ground is counted from the
+    /// section's base by the payload's own id.
+    ///
+    /// Not written on the payload, which is what it used to be: `oc_address`
+    /// and `oc_port` on every entry were as many chances to repeat a port as
+    /// there were payloads, and a repeated port is two payloads whose data
+    /// arrives interleaved. One base and one arithmetic rule cannot be
+    /// written inconsistently.
     #[test]
-    fn an_oc_address_comes_from_the_handler_or_its_group() {
+    fn a_payloads_ground_link_is_counted_from_the_base() {
         let config = payload(
             "
 version: \"1.0\"
-description: an OC address shared, a port each
-payload_groups:
-  - name: udp_localhost
-    type: network
-    protocol: udp
-    address: localhost
-    oc_address: 127.0.0.1
+description: three payloads counted from one base
+tcspecial:
+  tcspecial_command: 0.0.0.0:4000
+  moc_command: 127.0.0.1:4100
+  payload_port: 4001
+  tcspecial_tc_base: 0.0.0.0:6000
+  moc_tc_base: 127.0.0.1:6100
+  beacon_interval_ms: 5000
+  beacon_address: 239.255.0.1:5550
+  beacon_interface: 127.0.0.1
 payloads:
+  - name: DH0
+    type: device-file
+    path: /dev/zero
+    packet_size: 1
   - name: DH1
-    group: udp_localhost
-    oc_port: 6001
-    port: 5001
-    packet_size: 11
+    type: device-file
+    path: /dev/urandom
+    packet_size: 1
+  - name: DH2
+    type: device-file
+    path: /dev/null
+    packet_size: 1
 ",
         );
 
-        let handlers = config.to_dh_configs().unwrap();
-        assert_eq!(
-            handlers[0].oc,
-            Some(NetworkConfig {
-                // The OC link is UDP whatever the payload side is.
-                protocol: NetworkProtocol::Udp,
-                address: "127.0.0.1".to_string(),
-                port: 6001,
-            })
-        );
+        let handlers = config.to_dh_configs().expect("a sound set");
+        for (id, handler) in handlers.iter().enumerate() {
+            let oc = handler.oc.as_ref().expect("a ground link");
+            assert_eq!(oc.protocol, NetworkProtocol::Udp);
+            // tcspecial's own base: this is the socket tcspecial binds, and
+            // the one the MOC says hello to.
+            assert_eq!(oc.address, "0.0.0.0", "{}", handler.name.0);
+            assert_eq!(oc.port, 6000 + id as u16, "{}", handler.name.0);
+        }
     }
 
+    /// A set with no tcspecial section has no ground link for its payloads.
+    ///
+    /// Which is what `oc: None` has always meant: a file describing payloads
+    /// is complete without one, and only starting a handler needs it.
     #[test]
-    fn a_handler_needs_no_oc_address() {
-        // A file describing payloads is complete without one; only starting a
-        // handler needs it.
+    fn a_set_with_no_section_has_no_ground_link() {
         let config = payload(
             "
 version: \"1.0\"
-description: no OC side at all
+description: no section at all
 payloads:
   - name: DH2
     type: device-file
@@ -3134,45 +3259,44 @@ payloads:
         assert_eq!(config.to_dh_configs().unwrap()[0].oc, None);
     }
 
+    /// A base too high for the payloads counted from it is refused.
+    ///
+    /// By name, and while somebody is reading the file: a sum past 65535 is a
+    /// configuration describing something no socket can be, and the useful
+    /// moment to say so is not when the socket is made.
     #[test]
-    fn half_an_oc_address_is_an_error() {
-        // A port with no address, or an address with no port, reaches nothing
-        // and says nothing about which was meant.
-        for (what, line) in [
-            ("port", "oc_address: 127.0.0.1"),
-            ("address", "oc_port: 6000"),
-        ] {
-            let config = payload(&format!(
-                "
+    fn a_base_that_leaves_no_room_is_refused() {
+        let config = payload(
+            "
 version: \"1.0\"
-description: half an OC address
+description: a base at the top of the range
+tcspecial:
+  tcspecial_command: 0.0.0.0:4000
+  moc_command: 127.0.0.1:4100
+  payload_port: 4001
+  tcspecial_tc_base: 0.0.0.0:65535
+  moc_tc_base: 127.0.0.1:6100
+  beacon_interval_ms: 5000
+  beacon_address: 239.255.0.1:5550
+  beacon_interface: 127.0.0.1
 payloads:
   - name: DH0
-    {line}
+    type: device-file
+    path: /dev/zero
+    packet_size: 1
+  - name: DH1
     type: device-file
     path: /dev/urandom
     packet_size: 1
-"
-            ));
+",
+        );
 
-            let message = config
-                .to_dh_configs()
-                .expect_err(&format!("an OC address with no {what} must be rejected"));
-            assert!(
-                message.contains("oc_"),
-                "the error should name the attributes, but said: {message}"
-            );
-        }
+        let message = config
+            .to_dh_configs()
+            .expect_err("the second payload has no port to be at");
+        assert!(message.contains("65535") || message.contains("65536"), "{message}");
     }
 
-    /// A tcspecial configuration describes a serial payload, with every term a
-    /// line has.
-    ///
-    /// The language could describe a network or a device payload and nothing
-    /// else: a line, a bus and a peripheral carry attributes it had no words
-    /// for, so a set like those had to be written in a second configuration
-    /// language. The words are here now, and the rules behind them are the
-    /// ones that language used -- see `link_of`.
     #[test]
     fn a_payload_file_describes_a_serial_payload() {
         let yaml = "version: \"1.0\"\ndescription: a line\n\
@@ -3322,12 +3446,14 @@ payloads:
             )
         };
 
-        payload(&with("  command_interface: 0.0.0.0:4000\n  payload_port: 4001\n"))
+        payload(&with("  tcspecial_command: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  \
+                 payload_port: 4001\n  tcspecial_tc_base: 0.0.0.0:6000\n  \
+                 moc_tc_base: 127.0.0.1:6100\n"))
             .to_dh_configs()
             .expect("two ports are two links");
 
         let said = payload(&with(
-            "  command_interface: 0.0.0.0:4000\n  payload_port: 4000\n",
+            "  tcspecial_command: 0.0.0.0:4000\n  payload_port: 4000\n  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n",
         ))
         .to_dh_configs()
         .expect_err("one socket cannot be two links");
@@ -3341,7 +3467,9 @@ payloads:
         // beacon.
         assert!(
             ConfigFormat::Yaml
-                .parse::<PayloadConfig>(&with("  command_interface: 0.0.0.0:4000\n"))
+                .parse::<PayloadConfig>(&with(
+                    "  tcspecial_command: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n"
+                ))
                 .is_err(),
             "a section with no payload_port was accepted"
         );
@@ -3357,7 +3485,9 @@ payloads:
         let with = |address: &str, port: u16| {
             format!(
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
-                 command_interface: {address}:4000\n  payload_port: 4001\n  \
+                 tcspecial_command: {address}:4000\n  payload_port: 4001\n  \
+                 moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  \
+                 moc_tc_base: 127.0.0.1:6100\n  \
                  beacon_interval_ms: 5000\n  \
                  beacon_address: 239.255.0.1:5550\n  \
                  beacon_interface: 127.0.0.1\npayloads:\n  - \
@@ -3601,24 +3731,33 @@ payloads:
             .expect_err("two payloads on one device file");
         assert!(said.contains("/dev/ttyS0"), "{said}");
 
-        // A handler's OC address is as exclusive as its payload address, and
+        // A payload's ground link is as exclusive as its payload address, and
         // is compared against it: this one would have to bind the port twice.
+        // The ground link is counted from the section's base now, so the
+        // collision is written there rather than on the payload.
         let clash = format!(
             "
 version: \"1.0\"
-description: an OC address on the payload's own port
+description: a ground link on the payload's own port
+tcspecial:
+  tcspecial_command: 0.0.0.0:4000
+  moc_command: 127.0.0.1:4100
+  payload_port: 4001
+  tcspecial_tc_base: localhost:5000
+  moc_tc_base: 127.0.0.1:6100
+  beacon_interval_ms: 5000
+  beacon_address: 239.255.0.1:5550
+  beacon_interface: 127.0.0.1
 payloads:
   - name: DH0
     packet_size: 12
-    oc_address: 127.0.0.1
-    oc_port: 5000
 {}
 ",
             udp(5000)
         );
         let said = payload(&clash)
             .to_dh_configs()
-            .expect_err("one port for the payload and the OC");
+            .expect_err("one port for the payload and the ground link");
         assert!(
             said.contains("payload") && said.contains("OC"),
             "the error should say which of the two is which: {said}"
@@ -3649,6 +3788,7 @@ payloads:
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
             mode: DHMode::Periodic,
         };
 
@@ -3680,6 +3820,7 @@ payloads:
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
             mode: DHMode::Periodic,
         };
 

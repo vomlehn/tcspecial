@@ -9,9 +9,12 @@
 # A data handler takes its attributes from the group it names, and may then
 # override any of them for itself.
 #
-# oc_address and oc_port are the UDP address the handler exchanges payload data
-# with the OC on, which is a different thing from the address it reaches its
-# payload at. Every handler here shares the address and has a port of its own.
+# Where a payload exchanges data with the ground is not written on the payload.
+# Each one has a UDP interface of its own, and its port is a base plus the
+# payload's own id -- the position it has in this file -- so the two bases in
+# the tcspecial section below say where all of them are. Four payloads were
+# four chances to repeat a port, and a repeated port is two payloads whose
+# data arrives interleaved.
 version: "1.0"
 description: TCSpecial payload set 1
 
@@ -32,8 +35,11 @@ description: TCSpecial payload set 1
 # The protocol is not stated and cannot be: the link between tcspecial and the
 # ground is UDP.
 tcspecial:
-  command_interface: 0.0.0.0:4000
+  tcspecial_command: 0.0.0.0:4000
+  moc_command: 127.0.0.1:4100
   payload_port: 4001
+  tcspecial_tc_base: 0.0.0.0:6000
+  moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
   beacon_address: "239.255.0.1:5550"
   beacon_interface: "127.0.0.1"
@@ -51,8 +57,6 @@ payload_groups:
 
 payloads:
   - name: tcp-stream
-    oc_address: 127.0.0.1
-    oc_port: 6000
     type: network
     protocol: tcp
     address: localhost
@@ -60,22 +64,16 @@ payloads:
     packet_size: 12
 
   - name: udp-steady
-    oc_address: 127.0.0.1
-    oc_port: 6001
     group: udp_localhost
     port: 5001
     packet_size: 11
 
   - name: random-device
-    oc_address: 127.0.0.1
-    oc_port: 6002
     type: device-file
     path: /dev/urandom
     packet_size: 1
 
   - name: udp-fast
-    oc_address: 127.0.0.1
-    oc_port: 6003
     group: udp_localhost
     port: 5003
     packet_size: 15

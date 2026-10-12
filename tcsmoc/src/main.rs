@@ -1897,6 +1897,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+            ground: None,
             mode: Default::default(),
         }
     }
@@ -2888,6 +2889,7 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 6003,
             }),
+            ground: None,
             mode: tcslibgs::DHMode::Triggered {
                 trigger: b"go".to_vec(),
                 interval_ms: 1000,
@@ -3011,6 +3013,7 @@ mod tests {
             }),
             packet_size: 12,
             oc: None,
+            ground: None,
             mode: tcslibgs::DHMode::Periodic,
         };
 
@@ -3372,6 +3375,7 @@ mod tests {
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
             mode: Default::default(),
         };
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
@@ -3419,6 +3423,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -3471,6 +3476,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+            ground: None,
             mode: Default::default(),
         };
 
@@ -3642,6 +3648,7 @@ mod tests {
                 }),
                 packet_size: 4,
                 oc: None,
+                ground: None,
                             mode: Default::default(),
             },
             DHConfig {
@@ -3653,6 +3660,7 @@ mod tests {
                 }),
                 packet_size: 8,
                 oc: None,
+                ground: None,
                             mode: Default::default(),
             },
         ];

@@ -1166,6 +1166,7 @@ mod tests {
             }),
             packet_size: 12,
             oc: None,
+            ground: None,
             mode: Default::default(),
         }
     }
@@ -1551,6 +1552,7 @@ mod tests {
             }),
             packet_size: 15,
      oc: None,
+     ground: None,
       mode: Default::default(),
  };
 

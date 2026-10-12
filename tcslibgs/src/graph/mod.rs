@@ -697,8 +697,10 @@ mod tests {
         std::fs::write(
             &top,
             "version: \"2.0\"\ninclude:\n  - cabin\n\
-             tcspecial:\n  command_interface: 0.0.0.0:4000\n  \
-             payload_port: 4001\n  beacon_interval_ms: 5000\n  \
+             tcspecial:\n  tcspecial_command: 0.0.0.0:4000\n  \
+             moc_command: 127.0.0.1:4100\n  payload_port: 4001\n  \
+             tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n  \
+             beacon_interval_ms: 5000\n  \
              beacon_address: \"239.255.0.1:5550\"\n  beacon_interface: \"127.0.0.1\"\n\
              nodes:\n  \
              - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }\n\

@@ -105,11 +105,19 @@ impl Editor {
     /// A file that cannot be read is said so and opened as nothing: an editor
     /// that refused to start on a damaged file would be an editor that cannot
     /// be used to fix one.
-    pub fn open(path: &Path) -> Self {
+    ///
+    /// `divider` is where the two working panes meet, and it is here because
+    /// what is read has to obey the rule the editor enforces: a payload the
+    /// file draws in the vehicle working pane is brought into its own. See
+    /// [`Document::settle`], which says what that is and is not.
+    pub fn open(path: &Path, divider: i32) -> Self {
         let mut editor = Editor::new(path);
 
         match crate::read::read(path) {
-            Ok(document) => editor.document = document,
+            Ok(mut document) => {
+                document.settle(divider);
+                editor.document = document;
+            }
             Err(why) => {
                 editor.trouble =
                     Some(format!("{} cannot be read: {why}", path.display()));
@@ -117,7 +125,7 @@ impl Editor {
                 // describes, and the document is not the one that was meant.
                 return editor;
             }
-        }
+        };
 
         // A journal that cannot be read costs the undo and not the work, so it
         // is passed over in silence rather than reported: there is nothing the
@@ -328,6 +336,87 @@ mod tests {
         assert!(after_two.contains("temp_aft"), "{after_two}");
     }
 
+    /// Opening a configuration settles its nodes and writes nothing.
+    ///
+    /// Both halves matter. A payload the file draws in the vehicle working
+    /// pane comes up in its own pane, because that is the rule the editor
+    /// enforces everywhere else. And the file is byte for byte what it was:
+    /// opening a configuration to look at it is not editing it, and an editor
+    /// that rewrote a file under version control by being pointed at it would
+    /// be an editor nobody could point at anything. The corrected positions
+    /// reach the disk with the first real edit, which rewrites the file
+    /// anyway.
+    #[test]
+    fn opening_settles_the_panes_without_writing_the_file() {
+        let divider = crate::pane::divider_for(crate::settings::DEFAULT);
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+
+        // Written by hand, with the payload where a file from before the
+        // canvas was divided would have put it.
+        let by_hand = "\
+version: \"2.0\"
+
+nodes:
+  - name: temp_fore
+    type: i2c
+    path: \"/dev/i2c-1\"
+    address: \"0x48\"
+    trigger: \"01\"
+    editor: { x: 40, y: 120 }
+  - name: moc
+    type: moc
+    address: \"10.0.0.1\"
+    port: \"5000\"
+    editor: { x: 240, y: 40 }
+
+links:
+  - { from: temp_fore, to: moc }
+  - { from: moc, to: temp_fore }
+";
+        std::fs::write(&path, by_hand).expect("a file");
+
+        let mut editor = Editor::open(&path, divider);
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+
+        // The payload is in the payload working pane.
+        let sensor = editor.document().node("temp_fore").expect("the sensor");
+        assert!(
+            sensor.at.0 >= divider,
+            "the payload opened at {:?}, outside its pane",
+            sensor.at
+        );
+        // At the same height it was drawn at: the smallest move that obeys
+        // the rule, so a diagram is not rearranged by being opened.
+        assert_eq!(sensor.at.1, 120);
+        // And the ground link, which was already where it belongs, has not
+        // moved at all.
+        assert_eq!(editor.document().node("moc").unwrap().at, (240, 40));
+
+        // The file is untouched.
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            by_hand,
+            "opening the configuration wrote to it"
+        );
+        // Nothing to undo, either: this is not an edit, and undoing it would
+        // put a node back where the editor refuses to put one.
+        assert_eq!(editor.undo_depth(), 0);
+
+        // The first real edit writes it, as every edit does.
+        editor.edit(Edit::SetNodeComment {
+            node: "temp_fore".into(),
+            was: None,
+            now: Some("the fore sensor".into()),
+        });
+        let written = std::fs::read_to_string(&path).unwrap();
+        assert_ne!(written, by_hand);
+        assert!(
+            written.contains(&format!("x: {divider}")),
+            "the settled position was not written: {written}"
+        );
+    }
+
     /// Saving when there is nothing to save writes the files anyway.
     ///
     /// Which is the point of the button: it is what retries a write that
@@ -424,7 +513,7 @@ mod tests {
         assert!(written.contains("cabin_temps"), "{written}");
         assert!(written.contains("3s"), "{written}");
 
-        let reopened = Editor::open(&path);
+        let reopened = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
         assert_eq!(
             reopened.document().groups.get("cabin_temps").map(String::as_str),
             Some("3s"),
@@ -452,7 +541,7 @@ mod tests {
             // And the process dies here, with no chance to tidy up.
         }
 
-        let mut recovered = Editor::open(&path);
+        let mut recovered = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
         assert_eq!(
             recovered.document().nodes.len(),
             3,
@@ -577,7 +666,7 @@ mod tests {
         // What a recovery would find: one node and one edit of history, which
         // agree with each other. The second edit is lost, which is what a
         // device that could not be written to costs.
-        let recovered = Editor::open(&path);
+        let recovered = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
         assert_eq!(recovered.document().nodes.len(), 1);
         assert_eq!(recovered.undo_depth(), 1);
     }
@@ -678,7 +767,7 @@ mod tests {
         // And the history is beside it as it is for YAML, so undo reaches past
         // a crash whichever format the configuration is written in.
         editor.edit(add("temp_aft", "i2c"));
-        let recovered = Editor::open(&path);
+        let recovered = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
         assert_eq!(recovered.undo_depth(), 2);
         assert_eq!(recovered.document().nodes.len(), 2);
     }

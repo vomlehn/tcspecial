@@ -22,6 +22,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::journal::{Edit, Link};
+use crate::pane::{confine, is_payload, size_of};
 use crate::style::NodeType;
 use crate::subdiagram::{file_for, Home, Qualified};
 
@@ -123,17 +124,6 @@ pub struct GroupField {
 /// Whether a node names this group.
 fn in_group(node: &Node, group: &str) -> bool {
     node.attributes.get("group").map(|g| g.trim()) == Some(group)
-}
-
-/// Whether a type is a payload, by the editor's table.
-///
-/// A type this build does not know is not a payload, which is the same answer
-/// `tcslibgs` gives: it is refused by name already.
-fn is_payload(node_type: &str) -> bool {
-    NodeType::ALL
-        .iter()
-        .find(|t| t.spelling() == node_type)
-        .is_some_and(|t| t.is_payload())
 }
 
 /// Something wrong with the document, and what it is attached to.
@@ -283,6 +273,69 @@ impl Document {
     /// The nodes that live in `home`.
     pub fn nodes_in(&self, home: &Home) -> Vec<&Node> {
         self.nodes.iter().filter(|n| &n.home == home).collect()
+    }
+
+    /// Put every node inside the pane its type belongs to.
+    ///
+    /// Called when a configuration is read and not at any other time. What it
+    /// is for is the file somebody wrote before the canvas was divided, or
+    /// wrote by hand, or wrote with the divider somewhere else: a payload
+    /// drawn in the vehicle working pane is a drawing that contradicts the
+    /// rule the editor otherwise enforces, and a reader has to be told which
+    /// of the two to believe.
+    ///
+    /// This is a change to the document, so the honest thing is to say what it
+    /// is not. It is not an edit: nothing goes in the history, because undoing
+    /// it would put a node back somewhere the editor refuses to put one. And
+    /// it writes nothing by itself -- the file is untouched until something is
+    /// actually edited, at which point these positions are written with
+    /// everything else, because every edit rewrites the whole file.
+    ///
+    /// A node that has to move keeps its height and takes the near edge of its
+    /// own pane, which is the smallest move that obeys the rule. Where that
+    /// lands it on top of another node it steps down the grid until it is
+    /// clear: a payload column read out of a file where the payloads were in a
+    /// row would otherwise become one node with eleven behind it.
+    ///
+    /// Returns how many were moved, which is what a caller would log.
+    pub fn settle(&mut self, divider: i32) -> usize {
+        let mut moved = 0;
+
+        for at in 0..self.nodes.len() {
+            let node = &self.nodes[at];
+            let want = confine(&node.node_type, divider, node.at);
+            if want == node.at {
+                continue;
+            }
+
+            // Clear of the nodes that are already settled, and of the ones
+            // that were in the right place to begin with. Checked against the
+            // whole document rather than against the pane, because a node of
+            // the other pane overlapping this one is just as unreadable.
+            let (width, height) = size_of(&self.nodes[at].node_type);
+            let mut want = want;
+            for _ in 0..200 {
+                let clashes = self.nodes.iter().enumerate().any(|(other, node)| {
+                    if other == at {
+                        return false;
+                    }
+                    let (theirs, tall) = size_of(&node.node_type);
+                    want.0 < node.at.0 + theirs as i32
+                        && node.at.0 < want.0 + width as i32
+                        && want.1 < node.at.1 + tall as i32
+                        && node.at.1 < want.1 + height as i32
+                });
+                if !clashes {
+                    break;
+                }
+                want.1 += crate::pane::GRID * 4;
+            }
+
+            self.nodes[at].at = want;
+            moved += 1;
+        }
+
+        moved
     }
 
     /// The payloads that are in `group`.
@@ -1340,6 +1393,96 @@ mod tests {
                 "{} is a payload to one of them and not the other",
                 t.spelling()
             );
+        }
+    }
+
+    /// Reading a configuration puts every node in the pane it belongs to.
+    ///
+    /// A payload the file draws in the vehicle working pane is a drawing that
+    /// contradicts the rule the editor enforces everywhere else, and a reader
+    /// has to be told which of the two to believe. The commonest source is a
+    /// file written before the canvas was divided at all.
+    #[test]
+    fn reading_a_configuration_settles_its_nodes_into_their_panes() {
+        let divider = crate::pane::divider_for(crate::settings::DEFAULT);
+        let mut document = Document::new();
+
+        // A payload on the wrong side, a vehicle node on the wrong side, and
+        // one of each where it belongs.
+        for (name, node_type, at) in [
+            ("stray_sensor", "i2c", (40, 120)),
+            ("stray_compute", "compute", (divider + 40, 200)),
+            ("good_sensor", "i2c", (divider + 16, 320)),
+            ("good_compute", "compute", (240, 40)),
+        ] {
+            document.apply(&add(name, node_type));
+            document.apply(&Edit::MoveNode {
+                node: name.into(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+
+        let moved = document.settle(divider);
+        assert_eq!(moved, 2, "only the two out of place should have moved");
+
+        let at = |name: &str| document.node(name).unwrap().at;
+        let width = crate::style::WIDTH as i32;
+
+        // The payload is in its own pane now, at the near edge of it: the
+        // smallest move that obeys the rule.
+        assert_eq!(at("stray_sensor"), (divider, 120));
+        // And the computation is out of it, by its own width.
+        assert_eq!(at("stray_compute"), (divider - width, 200));
+        // The two that were already right are untouched, which matters: a
+        // reader who arranged a diagram should find it as they left it.
+        assert_eq!(at("good_sensor"), (divider + 16, 320));
+        assert_eq!(at("good_compute"), (240, 40));
+
+        // Settling twice changes nothing, which is what makes it safe to do
+        // on every open.
+        assert_eq!(document.settle(divider), 0);
+    }
+
+    /// Nodes settled into one pane do not land on top of each other.
+    ///
+    /// A file with its payloads in a row across the canvas would otherwise
+    /// become one node with the rest behind it -- every one of them clamped to
+    /// the same edge, at whatever height it already had.
+    #[test]
+    fn settling_does_not_stack_nodes_on_one_another() {
+        let divider = crate::pane::divider_for(crate::settings::DEFAULT);
+        let mut document = Document::new();
+
+        // Four sensors in a row at one height, all of them in the wrong pane.
+        for (n, name) in ["one", "two", "three", "four"].iter().enumerate() {
+            document.apply(&add(name, "i2c"));
+            document.apply(&Edit::MoveNode {
+                node: (*name).into(),
+                was: (0, 0),
+                now: (40 + n as i32 * 160, 80),
+            });
+        }
+
+        assert_eq!(document.settle(divider), 4);
+
+        // Every one in its pane, and no two overlapping.
+        let boxes: Vec<((i32, i32), (u32, u32))> = document
+            .nodes
+            .iter()
+            .map(|node| (node.at, crate::pane::size_of(&node.node_type)))
+            .collect();
+        for (at, _) in &boxes {
+            assert!(at.0 >= divider, "{at:?} is not in the payload pane");
+        }
+        for (i, (one, one_size)) in boxes.iter().enumerate() {
+            for (two, two_size) in &boxes[i + 1..] {
+                let apart = one.0 + one_size.0 as i32 <= two.0
+                    || two.0 + two_size.0 as i32 <= one.0
+                    || one.1 + one_size.1 as i32 <= two.1
+                    || two.1 + two_size.1 as i32 <= one.1;
+                assert!(apart, "{one:?} and {two:?} overlap");
+            }
         }
     }
 

@@ -249,6 +249,9 @@ fn locators(kind: DHType) -> &'static [&'static str] {
         // An interface and the identifier the frames carry: a CAN controller
         // is a network interface and not a device file.
         DHType::Can => &["interface", "can_id"],
+        // An interface and nothing else: a raw HDLC frame carries no address,
+        // so one line is one node.
+        DHType::Hdlc => &["interface"],
         // Everything else is a device node.
         _ => &["path"],
     }
@@ -271,6 +274,7 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         "iio" => Ok(DHType::Iio),
         "rpmsg" => Ok(DHType::Rpmsg),
         "gpio" => Ok(DHType::Gpio),
+        "hdlc" => Ok(DHType::Hdlc),
         "device-file" => Ok(DHType::Device),
         "network" | "moc" => Ok(DHType::Network),
         "compute" => Err(format!(
@@ -285,7 +289,8 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         )),
         other => Err(format!(
             "\"{}\": there is no node type called \"{other}\". The interfaces are \
-             i2c, spi, serial, can, iio, rpmsg, gpio, device-file and network; a \
+             i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file and \
+             network; a \
              ground link is moc; and compute and log are the rest",
             node.name
         )),
@@ -322,6 +327,20 @@ fn location_of(
         return Ok(EndpointLocation::Can {
             interface: interface.as_str().to_string(),
             can_id,
+        });
+    }
+
+    // A synchronous line is a network interface and nothing else.
+    if kind == DHType::Hdlc {
+        let interface = required(
+            what,
+            node,
+            "interface",
+            "an hdlc node",
+            "the interface its line is",
+        )?;
+        return Ok(EndpointLocation::Interface {
+            interface: interface.as_str().to_string(),
         });
     }
 
@@ -411,7 +430,10 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
         // A line.
         "datarate" => terms.datarate = value,
         "stop_bits" => terms.stop_bits = value,
-        "asynchronous" => terms.asynchronous = value,
+        // A synchronous line.
+        "standard" => terms.standard = value,
+        "clock_rate" => terms.clock_rate = value,
+        "frame_check" => terms.frame_check = value,
         "parity" => terms.parity = value,
         "clock_type" => terms.clock_type = value,
         "encoding" => terms.encoding = value,
@@ -633,6 +655,59 @@ mod tests {
         assert!(said.contains("path does not locate it"), "{said}");
     }
 
+    /// A synchronous line is located by an interface and nothing else.
+    #[test]
+    fn a_synchronous_line_is_an_interface() {
+        let reach = reach_of(&node(
+            "link",
+            "hdlc",
+            &[
+                ("interface", "hdlc0"),
+                ("standard", "v35"),
+                ("clock_type", "internal"),
+                ("clock_rate", "2048000"),
+                ("frame_check", "crc16_pr1_ccitt"),
+            ],
+        ))
+        .expect("a line");
+
+        match reach.endpoint {
+            EndpointConfig::Hdlc(hdlc) => {
+                assert_eq!(hdlc.interface, "hdlc0");
+                assert_eq!(hdlc.clock_rate, Some(2_048_000));
+            }
+            other => panic!("expected a synchronous line: {other:?}"),
+        }
+
+        // A path does not locate one: the kernel drives such a line as a
+        // network interface, so there is no file to open.
+        let said = reach_of(&node(
+            "link",
+            "hdlc",
+            &[
+                ("path", "/dev/ttyS1"),
+                ("standard", "v35"),
+                ("clock_type", "external"),
+            ],
+        ))
+        .expect_err("a path on a synchronous line");
+        assert!(said.contains("path does not locate it"), "{said}");
+
+        // And a start-stop line's words are not its.
+        let said = reach_of(&node(
+            "link",
+            "hdlc",
+            &[
+                ("interface", "hdlc0"),
+                ("standard", "v35"),
+                ("clock_type", "external"),
+                ("stop_bits", "1"),
+            ],
+        ))
+        .expect_err("stop bits on a clocked line");
+        assert!(said.contains("stop_bits"), "{said}");
+    }
+
     /// A node that does not say where it is cannot be opened.
     #[test]
     fn a_node_that_says_nowhere_is_refused() {
@@ -727,7 +802,6 @@ mod tests {
             &[
                 ("path", "/dev/ttyS0"),
                 ("datarate", "9600"),
-                ("asynchronous", "true"),
                 ("stop_bits", "1"),
                 ("parity", "none"),
                 ("byte_length", "8"),
@@ -752,7 +826,6 @@ mod tests {
             &[
                 ("path", "/dev/ttyS0"),
                 ("datarate", "9600"),
-                ("asynchronous", "true"),
                 ("stop_bits", "1"),
                 ("parity", "none"),
                 ("byte_length", "8"),

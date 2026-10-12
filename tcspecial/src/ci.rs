@@ -484,14 +484,23 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
         }
         EndpointConfig::Device(dev) => format!("device {}", dev.path),
         EndpointConfig::Serial(serial) => format!(
-            "serial {} at {} baud, {} data bits, {}",
-            serial.path,
-            serial.datarate,
-            serial.byte_length,
-            match serial.stop_bits {
-                Some(stop_bits) => format!("{stop_bits} stop"),
-                None => "synchronous".to_string(),
-            }
+            "serial {} at {} baud, {} data bits, {} stop",
+            serial.path, serial.datarate, serial.byte_length, serial.stop_bits
+        ),
+        // A synchronous line, which is an interface and not a path: the
+        // standard and the clock are what a reader compares against the
+        // equipment, the rest being what the framing is.
+        EndpointConfig::Hdlc(hdlc) => format!(
+            "hdlc {} as {}, clock {}{}, {} framing with {}",
+            hdlc.interface,
+            hdlc.standard,
+            hdlc.clock_type,
+            match hdlc.clock_rate {
+                Some(rate) => format!(" at {rate} bit/s"),
+                None => String::new(),
+            },
+            hdlc.encoding,
+            hdlc.frame_check
         ),
         EndpointConfig::Gpio(gpio) => {
             let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();

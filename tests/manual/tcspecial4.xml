@@ -28,7 +28,6 @@
     <payload_groups>
         <name>payload_line</name>
         <type>serial</type>
-        <asynchronous>true</asynchronous>
         <datarate>115200</datarate>
         <byte_length>8</byte_length>
         <stop_bits>1</stop_bits>

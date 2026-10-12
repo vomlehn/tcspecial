@@ -26,6 +26,7 @@ use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
 use crate::node::can::CanEndpoint;
 use crate::node::device_file::DeviceEndpoint;
 use crate::node::gpio::GpioEndpoint;
+use crate::node::hdlc::HdlcEndpoint;
 use crate::node::i2c::I2cEndpoint;
 use crate::node::iio::IioEndpoint;
 use crate::node::rpmsg::RpmsgEndpoint;
@@ -206,6 +207,14 @@ pub fn bind_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        // A synchronous line, which the kernel drives as a network interface:
+        // the line is set up once and the pair shares the socket its frames
+        // come and go on. See node/hdlc.
+        EndpointConfig::Hdlc(hdlc_config) => {
+            let reader = HdlcEndpoint::new(what, hdlc_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
     }
 }
 
@@ -315,6 +324,14 @@ pub fn connect_endpoint_pair(
         // See node/gpio.
         EndpointConfig::Gpio(gpio_config) => {
             let reader = GpioEndpoint::new(what, gpio_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        // A synchronous line, which the kernel drives as a network interface:
+        // the line is set up once and the pair shares the socket its frames
+        // come and go on. See node/hdlc.
+        EndpointConfig::Hdlc(hdlc_config) => {
+            let reader = HdlcEndpoint::new(what, hdlc_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }

@@ -68,6 +68,21 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // and the other. Found rather than made, as the I2C stub is; see
         // payload_gpio.
         EndpointConfig::Gpio(gpio) => (PayloadProtocol::Gpio, gpio.path.clone(), 0, 0),
+        // The one type nothing here can stand in for. Every other has
+        // something in the kernel to be: vcan for a CAN bus, i2c-stub for a
+        // bus device, gpio-sim for discrete lines, a pty for a line or a
+        // buffer. A synchronous line has none -- there is no virtual HDLC
+        // interface -- so what is said is that, rather than a payload that
+        // looks simulated and is not.
+        EndpointConfig::Hdlc(hdlc) => {
+            return Err(format!(
+                "simulated payload \"{}\" is on a synchronous line ({}), and there \
+                 is nothing in the kernel that stands in for one: a card is needed \
+                 -- a wanxl, a pci200syn, a pc300too or a FarSync -- and tcspecial \
+                 reads it directly. Unlike a CAN bus there is no virtual one",
+                dh.name.0, hdlc.interface
+            ))
+        }
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
@@ -198,6 +213,12 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
             let offsets: Vec<String> = gpio.lines.iter().map(|n| n.to_string()).collect();
             format!("GPIO {} lines {}", gpio.path, offsets.join(","))
         }
+        // A synchronous line: the interface, and whose clock it is on, which
+        // is the fact an operator compares against the equipment.
+        EndpointConfig::Hdlc(hdlc) => format!(
+            "HDLC {} as {}, clock {}",
+            hdlc.interface, hdlc.standard, hdlc.clock_type
+        ),
     }
 }
 
@@ -371,13 +392,8 @@ mod tests {
             endpoint: EndpointConfig::Serial(SerialConfig {
                 path: "/tmp/ttyS0".to_string(),
                 datarate: 9600,
-                asynchronous: true,
-                parity: Some(tcslibgs::Parity::None),
-                clock_type: None,
-                encoding: None,
-                frame_check: None,
-                loopback: None,
-                stop_bits: Some(StopBits::One),
+                parity: tcslibgs::Parity::None,
+                stop_bits: StopBits::One,
                 byte_length: 8,
                 rs485: None,
             }),

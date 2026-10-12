@@ -135,23 +135,17 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
 
     terms.c_cflag &= !(libc::CSIZE | libc::CSTOPB | libc::PARENB | libc::PARODD | libc::CMSPAR);
     terms.c_cflag |= byte_length_of(config.byte_length)?;
-    // Stop bits, where the line has any: a synchronous line carries its bits
-    // on a clock and has none, so there is nothing to set. Nothing else here
-    // changes with it -- termios has no synchronous framing to ask for, and a
-    // line that needs one is driven by a driver of its own rather than by
-    // these terms.
     match config.stop_bits {
-        None => {}
-        Some(StopBits::One) => {}
-        Some(StopBits::Two) => terms.c_cflag |= libc::CSTOPB,
-        Some(StopBits::OnePointFive) => return Err(stop_bits_unsupported(what, &config.path)),
+        StopBits::One => {}
+        StopBits::Two => terms.c_cflag |= libc::CSTOPB,
+        StopBits::OnePointFive => return Err(stop_bits_unsupported(what, &config.path)),
     }
 
     // And the parity, which termios computes per character. Mark and space
     // are the two that need CMSPAR: they send a constant bit rather than one
     // computed from the data, which is a protocol marking a frame rather than
     // checking one, and the flag that asks for it is Linux's own.
-    terms.c_cflag |= parity_flags(config.parity.unwrap_or(Parity::None));
+    terms.c_cflag |= parity_flags(config.parity);
     // Read and write both: a device link is two-way, and a port that is not
     // CLOCAL waits on carrier a device link does not have.
     terms.c_cflag |= libc::CREAD | libc::CLOCAL;
@@ -176,18 +170,9 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
             what,
             &config.path,
             &format!(
-                "cannot be set to those terms: {} bits per second, {} data bits, {}, \
-                 {} parity",
-                config.datarate,
-                config.byte_length,
-                match config.stop_bits {
-                    Some(stop_bits) => format!("{stop_bits} stop bits"),
-                    None => "synchronous".to_string(),
-                },
-                match config.parity {
-                    Some(parity) => parity.to_string(),
-                    None => "no".to_string(),
-                }
+                "cannot be set to those terms: {} bits per second, {} data bits, \
+                 {} stop bits, {} parity",
+                config.datarate, config.byte_length, config.stop_bits, config.parity
             ),
         ));
     }
@@ -202,7 +187,7 @@ fn apply_line_terms(what: &str, file: &File, config: &SerialConfig) -> TcsResult
     // a rate or a byte length the port would not take shows up as data that
     // makes no sense, where a missing parity bit shows up as nothing at all
     // until a corrupted byte is believed.
-    let wanted = config.parity.unwrap_or(Parity::None);
+    let wanted = config.parity;
     let mut got: libc::termios = unsafe { std::mem::zeroed() };
     if unsafe { libc::tcgetattr(fd, &mut got) } != 0 {
         return Err(not_a_line(
@@ -403,13 +388,8 @@ mod tests {
         let line = |parity: Parity| SerialConfig {
             path: slave.clone(),
             datarate: 9600,
-            asynchronous: true,
-            parity: Some(parity),
-            clock_type: None,
-            encoding: None,
-            frame_check: None,
-            loopback: None,
-            stop_bits: Some(StopBits::One),
+            parity,
+            stop_bits: StopBits::One,
             byte_length: 8,
             // Not an RS-485 bus: a pty takes no turnaround, as it takes no
             // parity.
@@ -507,13 +487,8 @@ mod tests {
         let config = SerialConfig {
             path: slave.clone(),
             datarate: 9600,
-            asynchronous: true,
-            parity: Some(Parity::None),
-            clock_type: None,
-            encoding: None,
-            frame_check: None,
-            loopback: None,
-            stop_bits: Some(StopBits::One),
+            parity: Parity::None,
+            stop_bits: StopBits::One,
             byte_length: 8,
             // Not an RS-485 bus: a pty takes no turnaround, as it takes no
             // parity.
@@ -554,13 +529,8 @@ mod tests {
         let config = SerialConfig {
             path: file.path().display().to_string(),
             datarate: 9600,
-            asynchronous: true,
-            parity: Some(Parity::None),
-            clock_type: None,
-            encoding: None,
-            frame_check: None,
-            loopback: None,
-            stop_bits: Some(StopBits::One),
+            parity: Parity::None,
+            stop_bits: StopBits::One,
             byte_length: 8,
             // Not an RS-485 bus: a pty takes no turnaround, as it takes no
             // parity.

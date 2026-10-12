@@ -232,7 +232,17 @@ mod tests {
 
         let mut buffer = [0u8; 65535];
         for expected in 1..=3u32 {
-            let (size, _) = ground.recv_from(&mut buffer).expect("a beacon");
+            // Waited on again where a signal interrupted it: another test in
+            // this binary starts child processes, and a child exiting is
+            // enough to interrupt a blocking receive. The link's own loops do
+            // the same, for the same reason.
+            let (size, _) = loop {
+                match ground.recv_from(&mut buffer) {
+                    Ok(got) => break got,
+                    Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(e) => panic!("a beacon: {e}"),
+                }
+            };
             match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
                 Telemetry::Beacon(beacon) => assert_eq!(
                     beacon.header.sequence, expected,

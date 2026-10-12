@@ -431,6 +431,83 @@ so the arrangement is deliberately strict:
   computation can be proved as a program and later moved into the catalogue
   without the configuration changing shape.
 
+A node that runs a program names it, says how long it may take, and says
+whether it may be restarted:
+
+.. code-block:: yaml
+
+   - { name: attitude, type: compute, function: process,
+       program: /opt/flight/attitude, timeout: 500ms, restart: never }
+
+What the program sees is a line per arrival on its standard input and a line
+per answer on its standard output:
+
+.. code-block:: text
+
+   in:  293.15          an arrival on a link that names no input
+   in:  in1=293.15      an arrival on a link that names one
+   out: 291.0           a result, which is passed on
+   out:                 an empty line: nothing to send yet
+
+Requirement
+    The program is handed lines and answers in lines. A value on a link is
+    decimal text, and a line is what every language reads without a library --
+    which is the point of this type of node existing at all.
+
+Requirement
+    An empty line is the program saying "nothing to send yet", and is the same
+    answer a built-in gives by handing back nothing. A computation over several
+    inputs has to be able to say it: an external mean over three sensors
+    answers on the third arrival and not before, and a program that answered
+    something on every line would have to invent a value twice per pass.
+
+Requirement
+    A program that misses its deadline is put down, not left running. It still
+    holds the datum it was given, so a second datum handed to it would be
+    answered with the first one's result -- a control loop reading last pass's
+    number as this pass's.
+
+Requirement
+    A datum that went into a program which then failed is refused, including
+    when a restart allowance paid for the program to be started again. It went
+    into a computation that died without answering, and saying otherwise would
+    be inventing a result.
+
+Requirement
+    A restart is taken at once, in the pass that spent it, rather than at the
+    next datum. A vehicle is better off learning that the program will not
+    start again while something is still watching the pass that killed it.
+
+Requirement
+    A program is killed and waited for when its node goes. A child that is
+    killed and not waited for is a zombie, and a vehicle that restarted a
+    computation a few times would collect one per restart; a vehicle that
+    stopped and left one running would leave the next start to find a program
+    already holding whatever the last one held.
+
+Requirement
+    Standard error is left alone. Whatever the program complains about arrives
+    wherever tcspecial's own complaints do, which is where somebody reading a
+    vehicle's log is already looking.
+
+Requirement
+    A child inherits nothing but its two pipes and the standard error it
+    shares. Everything this software opens, it opens close-on-exec, so a
+    computation starts without the command socket, without the chip another
+    node holds, and without the log's segment file -- none of which it has
+    any business with, and one of which, a chip's line request, is given to a
+    single owner at a time. Sweeping the descriptors closed in the child by
+    hand was tried and taken out again: the descriptor the standard library
+    reports a failed exec on is one such a sweep closes, and with it closed a
+    program that cannot be run looks like a program that started.
+
+Requirement
+    A blocking receive that a signal interrupts is waited on again, not
+    treated as a failure. This matters because of the node above: a computation
+    exiting is enough to interrupt a receive elsewhere in the process, and the
+    two command loops used to return on it -- which would have stopped the link
+    a spacecraft is commanded over because a program on it had finished.
+
 Running a graph
 ---------------
 
@@ -547,6 +624,15 @@ Requirement
     reading is delivered as it is taken -- so a converted reading reaches the
     ground, the mean and the log before the next sensor is read, and the
     decision reaches the heaters inside the pass that read the sensors.
+
+Requirement
+    A pass asks a descriptor whether there is anything before reading it, with
+    no waiting at all, and a node with nothing to say is a read of no bytes.
+    Some endpoints are opened blocking -- a device file is opened as a file --
+    so a read of one with nothing in it does not return, and a pass that
+    blocked there would never end: the group that was due unfinished, every
+    other group starved, and a stop unnoticed, a stop being noticed between
+    passes.
 
 Requirement
     A node is polled only if it is in no group, its output goes somewhere, and

@@ -299,6 +299,12 @@ impl PayloadCommands {
                 Err(ref e)
                     if e.kind() == std::io::ErrorKind::WouldBlock
                         || e.kind() == std::io::ErrorKind::TimedOut => {}
+                // A signal arrived while this was waiting, which is not a
+                // failure of the link: a compute node's program exiting is
+                // enough to do it. Waited on again rather than returned,
+                // because returning here stops the link a payload is
+                // commanded over.
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
                 Err(e) => return Err(TcsError::Io(e)),
             }
         }
@@ -745,6 +751,10 @@ impl CommandInterpreter {
                     // Timeout - continue loop
                     continue;
                 }
+                // A signal arrived while this was waiting. Not a failure of
+                // the link, and not a reason to stop the one the spacecraft
+                // is commanded over: see the payload link's own loop.
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
                 Err(e) => {
                     return Err(TcsError::Io(e));
                 }

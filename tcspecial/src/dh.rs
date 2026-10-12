@@ -330,6 +330,42 @@ mod tests {
     use super::*;
     use tcslibgs::{DeviceConfig, EndpointConfig, DHName};
 
+    /// Bind the OC side, past a race these tests have and a vehicle does not.
+    ///
+    /// Another test in this binary starts a child process -- see
+    /// `node::compute::process` -- and between the fork and the exec that
+    /// follows it the child holds a copy of every descriptor this process has
+    /// open. A socket one of these tests has just closed can therefore still
+    /// look to be in use, and a bind of it fails with `AddrInUse`.
+    ///
+    /// A vehicle has one of these addresses and binds it once, where a test
+    /// binary runs dozens of tests at once; so a bind that loses that race is
+    /// tried again here rather than failing a test about a handler's
+    /// lifecycle. The last error is handed back, so a bind that is really
+    /// held by something else still says so.
+    fn bind_endpoint_pair(
+        what: &str,
+        config: &EndpointConfig,
+    ) -> TcsResult<(
+        Box<dyn crate::endpoint::EndpointReadable + Send>,
+        Box<dyn crate::endpoint::EndpointWritable + Send>,
+    )> {
+        let mut last = crate::endpoint::bind_endpoint_pair(what, config);
+        for _ in 0..50 {
+            match last {
+                Ok(pair) => return Ok(pair),
+                Err(e) => {
+                    if !format!("{e}").contains("address already in use") {
+                        return Err(e);
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                    last = crate::endpoint::bind_endpoint_pair(what, config);
+                }
+            }
+        }
+        last
+    }
+
     /// A UDP payload that speaks first, and a handler waiting where it
     /// speaks to, both come up and data moves both ways.
     ///
@@ -380,7 +416,7 @@ mod tests {
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
-        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+        let (oc_reader, oc_writer) = bind_endpoint_pair(
             &config.name.0,
             &EndpointConfig::Network(config.oc.clone().unwrap()),
         )
@@ -504,7 +540,7 @@ mod tests {
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
-        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+        let (oc_reader, oc_writer) = bind_endpoint_pair(
             &config.name.0,
             &EndpointConfig::Network(config.oc.clone().unwrap()),
         )
@@ -646,7 +682,7 @@ mod tests {
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
-        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+        let (oc_reader, oc_writer) = bind_endpoint_pair(
             &config.name.0,
             &EndpointConfig::Network(config.oc.clone().unwrap()),
         )
@@ -725,7 +761,7 @@ mod tests {
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
         let (oc_reader, oc_writer) =
-            crate::endpoint::bind_endpoint_pair(
+            bind_endpoint_pair(
                 &config.name.0,
                 &EndpointConfig::Network(config.oc.clone().unwrap()),
             )
@@ -829,7 +865,7 @@ mod tests {
         // Three runs, because the second is what was broken and the third
         // says it was the lifecycle rather than one spare set of pipes.
         for run in 1..=3 {
-            let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+            let (oc_reader, oc_writer) = bind_endpoint_pair(
                 &config.name.0,
                 &EndpointConfig::Network(config.oc.clone().unwrap()),
             )
@@ -864,14 +900,14 @@ mod tests {
         // And a running handler still refuses to be started twice, which is
         // the one state that cannot: the command interpreter answers that as
         // success without reaching here, so this is the backstop.
-        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+        let (oc_reader, oc_writer) = bind_endpoint_pair(
             &config.name.0,
             &EndpointConfig::Network(config.oc.clone().unwrap()),
         )
         .unwrap();
         dh.start(oc_reader, oc_writer).expect("a fourth run");
 
-        let (oc_reader, oc_writer) = crate::endpoint::bind_endpoint_pair(
+        let (oc_reader, oc_writer) = bind_endpoint_pair(
             &config.name.0,
             &EndpointConfig::Network(NetworkConfig {
                 protocol: NetworkProtocol::Udp,

@@ -1,4 +1,4 @@
-import { Button, LineEdit, ScrollView } from "std-widgets.slint";
+import { Button, ComboBox, LineEdit, ScrollView } from "std-widgets.slint";
 
 // The two scales, stated once.
 //
@@ -97,6 +97,18 @@ export struct FieldView {
     // panel is where it is easiest to put right.
     required: bool,
     missing: bool,
+}
+
+// One attribute a group sets on every payload in it.
+//
+// Apart from FieldView because the question is different. A node's field is
+// filled in or not; a group's field is filled in, not filled in, or filled in
+// differently on different payloads -- and the third is worth saying, because
+// typing into the field will overwrite all of them.
+export struct GroupFieldView {
+    name: string,
+    value: string,
+    differs: bool,
 }
 
 export struct LinkView {
@@ -636,6 +648,10 @@ component Surface inherits Rectangle {
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> divider: 0px;
     in property <length> working-width: 0px;
+    // What the groups menu offers: its own heading, every group, and the way
+    // to make one. Built in Rust, so the heading and the last row cannot
+    // drift from what the handler expects of them.
+    in property <[string]> group-menu: [];
 
     // How deep undo currently goes, shown rather than guessed at: a person
     // about to abandon an afternoon's work deserves to know how much of it is
@@ -659,6 +675,10 @@ component Surface inherits Rectangle {
     // The divider between the two working panes was dragged by this much.
     callback divider-moved(length);
     callback open-subdiagram(string);
+    // Write every file of the configuration now.
+    callback save-clicked();
+    // Something was chosen from the groups menu.
+    callback group-chosen(string);
     // Drawing a link: pressed on one node, released on another.
     callback link-started(string);
     callback link-finished(string);
@@ -689,15 +709,49 @@ component Surface inherits Rectangle {
                 font-weight: Type.bold;
                 vertical-alignment: center;
             }
+            // The arrow says what the button does and the words say what it
+            // will do it to, which is the half worth keeping: "Undo" on a
+            // button is a label anybody could have guessed, and `move
+            // "payload"` is a thing only this session knows. Colourised, so
+            // the icons follow the platform's foreground and go grey with the
+            // button when there is nothing to take back.
             Button {
-                text: undo-label == "" ? "Undo" : "Undo " + undo-label;
+                icon: @image-url("undo.svg");
+                colorize-icon: true;
+                text: undo-label;
                 enabled: undo-depth > 0;
                 clicked => { undo-clicked(); }
             }
             Button {
-                text: redo-label == "" ? "Redo" : "Redo " + redo-label;
+                icon: @image-url("redo.svg");
+                colorize-icon: true;
+                text: redo-label;
                 enabled: redo-depth > 0;
                 clicked => { redo-clicked(); }
+            }
+            // Saving needs no button -- every edit is written as it is made --
+            // and there is one anyway. It writes every file of the
+            // configuration now, which is what retries a write that failed
+            // and what puts right a set of files left half new by a power
+            // failure between two of them. It is also an answer to somebody
+            // who has been taught by every other program to save their work:
+            // "it is already saved" is true and unconvincing.
+            Button {
+                text: "Save";
+                clicked => { root.save-clicked(); }
+            }
+            // The groups, as a menu. The first row is the menu's own name and
+            // does nothing; the last one makes a group.
+            ComboBox {
+                model: root.group-menu;
+                current-index: 0;
+                width: 170px;
+                selected(chosen) => {
+                    // Back to the heading, so the menu reads as a menu rather
+                    // than as a setting that now says "every_second".
+                    self.current-index = 0;
+                    root.group-chosen(chosen);
+                }
             }
             Text {
                 text: undo-depth + " edits can be undone";
@@ -1020,6 +1074,10 @@ export component MainWindow inherits Window {
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> divider: 0px;
     in property <length> working-width: 0px;
+    // What the groups menu offers: its own heading, every group, and the way
+    // to make one. Built in Rust, so the heading and the last row cannot
+    // drift from what the handler expects of them.
+    in property <[string]> group-menu: [];
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1037,6 +1095,8 @@ export component MainWindow inherits Window {
     // The divider between the two working panes was dragged by this much.
     callback divider-moved(length);
     callback open-subdiagram(string);
+    callback save-clicked();
+    callback group-chosen(string);
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
@@ -1052,6 +1112,9 @@ export component MainWindow inherits Window {
         payload-palette: root.payload-palette;
         divider: root.divider;
         working-width: root.working-width;
+        group-menu: root.group-menu;
+        save-clicked => { root.save-clicked(); }
+        group-chosen(g) => { root.group-chosen(g); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
         undo-label: root.undo-label;
@@ -1106,6 +1169,10 @@ export component SubWindow inherits Window {
     in property <[PaletteEntry]> payload-palette: [];
     in property <length> divider: 0px;
     in property <length> working-width: 0px;
+    // What the groups menu offers: its own heading, every group, and the way
+    // to make one. Built in Rust, so the heading and the last row cannot
+    // drift from what the handler expects of them.
+    in property <[string]> group-menu: [];
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1122,6 +1189,8 @@ export component SubWindow inherits Window {
     callback node-moved(string, length, length);
     // The divider between the two working panes was dragged by this much.
     callback divider-moved(length);
+    callback save-clicked();
+    callback group-chosen(string);
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
@@ -1138,6 +1207,9 @@ export component SubWindow inherits Window {
         payload-palette: root.payload-palette;
         divider: root.divider;
         working-width: root.working-width;
+        group-menu: root.group-menu;
+        save-clicked => { root.save-clicked(); }
+        group-chosen(g) => { root.group-chosen(g); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
         undo-label: root.undo-label;
@@ -1158,4 +1230,165 @@ export component SubWindow inherits Window {
         attribute-set(n, a, v) => { root.attribute-set(n, a, v); }
         comment-set(n, t) => { root.comment-set(n, t); }
     }
+}
+
+// One group's own window.
+//
+// A window and not a panel on the canvas, because a group is not on the
+// canvas: it is a set of payloads read together, and which payloads those are
+// is written on the nodes rather than drawn between them. Its own window is
+// also what lets it be left open while the diagram is worked on, which is how
+// a bus address gets typed once and watched arrive on six sensors.
+//
+// Everything here is an edit like any other -- journalled, written as it is
+// made, and taken back by Undo in the main window. The one that is not like
+// any other is the list at the bottom: setting one of those writes the value
+// to every payload in the group, as one edit, so that undo takes back the
+// gesture and not the first of twelve consequences.
+export component GroupWindow inherits Window {
+    title: "Group -- " + root.group;
+    background: #fbfbfa;
+    min-width: 360px;
+    min-height: 320px;
+    preferred-width: 420px;
+    preferred-height: 480px;
+
+    // Which group this is. The name as it stands; renaming goes through the
+    // callback and comes back here.
+    in property <string> group: "";
+    in property <string> interval: "";
+    // How many payloads are in it, and what they are called: a group with
+    // nothing in it reads nothing on its interval, and a field set on no
+    // payloads at all is a field worth saying nothing happened to.
+    in property <[string]> members: [];
+    in property <[GroupFieldView]> fields: [];
+    // What went wrong with the last write, shown here as well as in the main
+    // window: somebody typing into this one should not have to look at the
+    // other to find out that nothing is reaching the disk.
+    in property <string> trouble: "";
+
+    callback renamed(string);
+    callback interval-set(string);
+    // One attribute, for every payload in the group.
+    callback attribute-set(string, string);
+    callback removed();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: root.group == "" ? "a group" : root.group;
+            font-size: Type.title;
+            font-weight: Type.bold;
+        }
+        Text {
+            text: root.members.length == 0
+                ? "no payloads are in this group, so it reads nothing"
+                : root.members.length + " payload" + (root.members.length == 1 ? "" : "s")
+                    + ": " + root.members-text;
+            font-size: Type.small;
+            color: root.members.length == 0 ? #c0392b : #6b7280;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: "name";
+            font-size: Type.small;
+            color: #6b7280;
+        }
+        LineEdit {
+            text: root.group;
+            font-size: Type.body;
+            // On accept and not on every keystroke: a group's name is what
+            // its payloads refer to, so each letter typed would be a rename
+            // of the group and of every member -- a dozen edits to undo, and
+            // a document briefly naming a group that nothing is in.
+            accepted => { root.renamed(self.text); }
+        }
+
+        Text {
+            text: "interval";
+            font-size: Type.small;
+            color: #6b7280;
+        }
+        LineEdit {
+            text: root.interval;
+            placeholder-text: "500ms, 3s";
+            font-size: Type.body;
+            edited => { root.interval-set(self.text); }
+        }
+        Text {
+            text: "How often the payloads of this group are read. It belongs "
+                + "to the group and not to its members: a payload stating one "
+                + "of its own is refused.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            wrap: word-wrap;
+        }
+
+        if root.fields.length > 0: Text {
+            text: "every payload in this group";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+        }
+        if root.fields.length > 0: Text {
+            text: "Typing here writes the value to all " + root.members.length
+                + " of them, as one edit. Only the attributes they all have "
+                + "are offered.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for f in root.fields: VerticalLayout {
+                    spacing: 1px;
+                    Text {
+                        // A field whose payloads disagree says so: typing in
+                        // it will overwrite six different values with one,
+                        // and that is worth knowing before it happens.
+                        text: f.differs ? f.name + " (they differ)" : f.name;
+                        font-size: Type.small;
+                        color: #6b7280;
+                        font-italic: f.differs;
+                    }
+                    LineEdit {
+                        text: f.value;
+                        placeholder-text: f.differs ? "different on each" : "";
+                        font-size: Type.body;
+                        edited => { root.attribute-set(f.name, self.text); }
+                    }
+                }
+                Rectangle { }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Rectangle { }
+            Button {
+                text: "Remove this group";
+                clicked => { root.removed(); }
+            }
+        }
+    }
+
+    // The members, as one line. Slint has no join, and a `for` inside a
+    // sentence would lay the names out as separate elements that wrap
+    // independently of the words around them.
+    in property <string> members-text: "";
 }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Undo: an arrow curving back on itself to the left.
+
+     Drawn here rather than taken from an icon set, because there is no icon
+     set: Slint ships none, and a font of them is a thing that can fail to
+     load. Two shapes and no gradients, so that the button can colourise it to
+     whatever the platform's foreground is. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path d="M8.5 7 H14 a5 5 0 0 1 0 10 H9.5"
+        fill="none" stroke="#1f2937" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M11.5 2.8 L7 7 L11.5 11.2 Z" fill="#1f2937"/>
+</svg>

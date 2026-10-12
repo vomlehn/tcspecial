@@ -107,6 +107,55 @@ pub enum Edit {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         home: Home,
     },
+    /// A group was declared, with the interval it reads on.
+    ///
+    /// A group is one of the four things a configuration is made of, and the
+    /// one the editor could not make: a node could say `group: cabin_temps`
+    /// and nothing declared what that was.
+    AddGroup { name: String, interval: String },
+    /// A group was taken away, with the interval it had.
+    ///
+    /// The members are left saying they are in it, which is a fault the editor
+    /// marks: the alternative is to take the group off every node that named
+    /// it, which is a removal that quietly edits a dozen other things.
+    RemoveGroup { name: String, interval: String },
+    /// How often a group is read was changed. Both values, so the inverse is
+    /// a lookup.
+    SetGroupInterval {
+        group: String,
+        was: String,
+        now: String,
+    },
+    /// A group was renamed, and every node in it with it.
+    ///
+    /// Nodes name their group, so this is a change to them as well -- and one
+    /// edit rather than a dozen, because a rename is one thing a person did
+    /// and one thing they will expect undo to take back.
+    RenameGroup { was: String, now: String },
+    /// An attribute was set on every payload of a group at once.
+    ///
+    /// What a group is for, beyond the schedule: a dozen sensors on one bus
+    /// are told the bus once. `was` carries what each node had, so undo puts
+    /// back exactly what was there -- including the nodes that had nothing,
+    /// which get the attribute removed again rather than emptied.
+    SetGroupAttribute {
+        group: String,
+        attribute: String,
+        was: Vec<(String, Option<String>)>,
+        now: Option<String>,
+    },
+    /// Every payload of a group given back the value it had.
+    ///
+    /// The inverse of [`Edit::SetGroupAttribute`], and a variant of its own
+    /// for the same reason [`Edit::RestoreNode`] is: undoing one gesture must
+    /// be one redo away, and a dozen separate edits in the history would be a
+    /// dozen presses.
+    RestoreGroupAttribute {
+        group: String,
+        attribute: String,
+        was: Option<String>,
+        now: Vec<(String, Option<String>)>,
+    },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
     /// because a person who drags a node expects undo to put it back.
@@ -225,6 +274,50 @@ impl Edit {
                 was: now.clone(),
                 now: was.clone(),
             },
+            Edit::AddGroup { name, interval } => Edit::RemoveGroup {
+                name: name.clone(),
+                interval: interval.clone(),
+            },
+            Edit::RemoveGroup { name, interval } => Edit::AddGroup {
+                name: name.clone(),
+                interval: interval.clone(),
+            },
+            Edit::SetGroupInterval { group, was, now } => Edit::SetGroupInterval {
+                group: group.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
+            Edit::RenameGroup { was, now } => Edit::RenameGroup {
+                was: now.clone(),
+                now: was.clone(),
+            },
+            // The inverse of one value for everybody is each node's own value
+            // back again, which is why the edit carries them. `now` is not a
+            // single value here and there is nothing to put in it: see
+            // Document::apply, which uses `was` when `now` is absent and the
+            // list is there.
+            Edit::SetGroupAttribute {
+                group,
+                attribute,
+                was,
+                now,
+            } => Edit::RestoreGroupAttribute {
+                group: group.clone(),
+                attribute: attribute.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
+            Edit::RestoreGroupAttribute {
+                group,
+                attribute,
+                was,
+                now,
+            } => Edit::SetGroupAttribute {
+                group: group.clone(),
+                attribute: attribute.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
             Edit::SetLinkComment { link, was, now } => Edit::SetLinkComment {
                 link: link.clone(),
                 was: now.clone(),
@@ -269,6 +362,20 @@ impl Edit {
                 format!("unlink \"{}\" from \"{}\"", link.from, link.to)
             }
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
+            Edit::AddGroup { name, .. } => format!("add group \"{name}\""),
+            Edit::RemoveGroup { name, .. } => format!("remove group \"{name}\""),
+            Edit::SetGroupInterval { group, .. } => {
+                format!("set how often \"{group}\" is read")
+            }
+            Edit::RenameGroup { was, now } => {
+                format!("rename group \"{was}\" to \"{now}\"")
+            }
+            Edit::SetGroupAttribute {
+                group, attribute, ..
+            } => format!("set {attribute} of every payload in \"{group}\""),
+            Edit::RestoreGroupAttribute {
+                group, attribute, ..
+            } => format!("put back {attribute} on every payload in \"{group}\""),
             Edit::SetNodeComment { node, now, .. } => match now {
                 Some(_) => format!("comment on \"{node}\""),
                 None => format!("remove the comment on \"{node}\""),
@@ -354,12 +461,6 @@ impl Journal {
         self.done.len() - self.cursor
     }
 
-    /// Every edit the document reflects, oldest first.
-    ///
-    /// What a fresh document is rebuilt from after a crash.
-    pub fn applied(&self) -> &[Edit] {
-        &self.done[..self.cursor]
-    }
 }
 
 #[cfg(test)]

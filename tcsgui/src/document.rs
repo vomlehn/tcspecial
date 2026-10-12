@@ -106,6 +106,36 @@ pub struct Document {
     pub commands: Vec<Command>,
 }
 
+/// One attribute a group may set on all of its payloads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupField {
+    pub attribute: String,
+    /// What every payload of the group says, where they all say the same.
+    ///
+    /// `None` is "none of them states one" where `differs` is false, and
+    /// "they do not agree" where it is true. The two are different things to
+    /// show and the same thing to set: typing a value here gives it to all of
+    /// them.
+    pub value: Option<String>,
+    pub differs: bool,
+}
+
+/// Whether a node names this group.
+fn in_group(node: &Node, group: &str) -> bool {
+    node.attributes.get("group").map(|g| g.trim()) == Some(group)
+}
+
+/// Whether a type is a payload, by the editor's table.
+///
+/// A type this build does not know is not a payload, which is the same answer
+/// `tcslibgs` gives: it is refused by name already.
+fn is_payload(node_type: &str) -> bool {
+    NodeType::ALL
+        .iter()
+        .find(|t| t.spelling() == node_type)
+        .is_some_and(|t| t.is_payload())
+}
+
 /// Something wrong with the document, and what it is attached to.
 ///
 /// The editor's errors, which are the only things drawn in red. Each names one
@@ -255,6 +285,85 @@ impl Document {
         self.nodes.iter().filter(|n| &n.home == home).collect()
     }
 
+    /// The payloads that are in `group`.
+    ///
+    /// Payloads and not every node: a group is the schedule a set of payloads
+    /// is read on, and it is what the vehicle carries that gets read. A
+    /// computation or a log naming a group is an oddity the configuration
+    /// checker has words for; it is not something to set a bus address on.
+    pub fn payloads_of(&self, group: &str) -> Vec<&Node> {
+        self.nodes
+            .iter()
+            .filter(|node| in_group(node, group) && is_payload(&node.node_type))
+            .collect()
+    }
+
+    /// The same, to be changed.
+    fn payloads_of_mut<'a>(
+        &'a mut self,
+        group: &'a str,
+    ) -> impl Iterator<Item = &'a mut Node> {
+        self.nodes
+            .iter_mut()
+            .filter(move |node| in_group(node, group) && is_payload(&node.node_type))
+    }
+
+    /// What a group may set on its payloads, and what they say now.
+    ///
+    /// Every attribute that *all* of the group's payloads declare, which is
+    /// what makes setting one from the group meaningful: an attribute only
+    /// half of them have is a value that would mean nothing on the rest. For a
+    /// group of one kind that is most of its type's attributes; for a mixed
+    /// group it is the few they share -- the path, the read size, the trigger.
+    ///
+    /// Two attributes are left out whatever the types say. `group` is the
+    /// group itself, and a field that renamed every member's group one node at
+    /// a time is a different thing from renaming the group. `interval` belongs
+    /// to the group and not to its members -- a member stating one is a fault
+    /// the flight reader refuses -- so it is offered as the group's own value
+    /// and never propagated.
+    pub fn group_fields(&self, group: &str) -> Vec<GroupField> {
+        let payloads = self.payloads_of(group);
+        if payloads.is_empty() {
+            return Vec::new();
+        }
+
+        // The attributes the first payload's type declares, in its own order,
+        // kept only while every other payload's type declares them too.
+        let declared = |node: &Node| -> Vec<&'static str> {
+            NodeType::ALL
+                .iter()
+                .find(|t| t.spelling() == node.node_type)
+                .map(|t| t.attributes().iter().map(|(name, _)| *name).collect())
+                .unwrap_or_default()
+        };
+
+        let mut shared: Vec<&'static str> = declared(payloads[0])
+            .into_iter()
+            .filter(|name| !matches!(*name, "group" | "interval"))
+            .collect();
+        for node in &payloads[1..] {
+            let theirs = declared(node);
+            shared.retain(|name| theirs.contains(name));
+        }
+
+        shared
+            .into_iter()
+            .map(|attribute| {
+                let mut values = payloads
+                    .iter()
+                    .map(|node| node.attributes.get(attribute).map(|v| v.trim().to_string()));
+                let first = values.next().flatten();
+                let agreed = values.all(|value| value == first);
+                GroupField {
+                    attribute: attribute.to_string(),
+                    value: if agreed { first.clone() } else { None },
+                    differs: !agreed,
+                }
+            })
+            .collect()
+    }
+
     /// How many links cross into or out of `subdiagram`.
     ///
     /// What a closed box shows instead of its contents: the count of nodes
@@ -371,6 +480,73 @@ impl Document {
             Edit::MoveNode { node, now, .. } => {
                 if let Some(node) = self.node_mut(node) {
                     node.at = *now;
+                }
+            }
+            Edit::AddGroup { name, interval } => {
+                self.groups.insert(name.clone(), interval.clone());
+            }
+            Edit::RemoveGroup { name, .. } => {
+                self.groups.remove(name);
+            }
+            Edit::SetGroupInterval { group, now, .. } => {
+                // Only a group that is there: an interval set on a group
+                // somebody has since removed is an edit with nothing to
+                // change, and inserting one here would put the group back.
+                if let Some(interval) = self.groups.get_mut(group) {
+                    *interval = now.clone();
+                }
+            }
+            Edit::RenameGroup { was, now } => {
+                if let Some(interval) = self.groups.remove(was) {
+                    self.groups.insert(now.clone(), interval);
+                }
+                // And every node that named it. A node's group is how it gets
+                // its interval, so a rename that left them behind would be a
+                // rename that silently unscheduled a dozen sensors.
+                for node in &mut self.nodes {
+                    if node.attributes.get("group").map(|g| g.trim()) == Some(was.as_str()) {
+                        node.attributes
+                            .insert("group".to_string(), now.clone());
+                    }
+                }
+            }
+            Edit::SetGroupAttribute {
+                group,
+                attribute,
+                now,
+                ..
+            } => {
+                for node in self.payloads_of_mut(group) {
+                    match now {
+                        Some(value) => {
+                            node.attributes.insert(attribute.clone(), value.clone());
+                        }
+                        // An empty field clears the attribute rather than
+                        // setting it to nothing: absent and empty are
+                        // different things to a configuration.
+                        None => {
+                            node.attributes.remove(attribute);
+                        }
+                    }
+                }
+            }
+            Edit::RestoreGroupAttribute {
+                attribute, now, ..
+            } => {
+                // Each node's own value, by name: the group may have changed
+                // since, and what is being put back is what these nodes had.
+                for (name, value) in now {
+                    let Some(node) = self.node_mut(name) else {
+                        continue;
+                    };
+                    match value {
+                        Some(value) => {
+                            node.attributes.insert(attribute.clone(), value.clone());
+                        }
+                        None => {
+                            node.attributes.remove(attribute);
+                        }
+                    }
                 }
             }
             Edit::SetNodeComment { node, now, .. } => {
@@ -1167,6 +1343,210 @@ mod tests {
         }
     }
 
+    /// A value set on a group reaches every payload in it.
+    ///
+    /// What a group is for beyond the schedule: a dozen sensors on one bus are
+    /// told the bus once. One edit, so that undo takes back the gesture rather
+    /// than the first of a dozen consequences -- which the round-trip test
+    /// above proves for this variant along with the others.
+    #[test]
+    fn a_value_set_on_a_group_reaches_every_payload_in_it() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddGroup {
+            name: "cabin_temps".into(),
+            interval: "3s".into(),
+        });
+        for (name, node_type, group) in [
+            ("temp_fore", "i2c", Some("cabin_temps")),
+            ("temp_aft", "i2c", Some("cabin_temps")),
+            // In another group, so it is not touched.
+            ("temp_bay", "i2c", Some("bay")),
+            // Not in a group at all.
+            ("loose", "i2c", None),
+            // In the group and not a payload, which is an oddity the checker
+            // has words for and not something to set a bus address on.
+            ("k", "compute", Some("cabin_temps")),
+        ] {
+            document.apply(&add(name, node_type));
+            if let Some(group) = group {
+                document.apply(&Edit::SetAttribute {
+                    node: name.into(),
+                    attribute: "group".into(),
+                    was: None,
+                    now: Some(group.into()),
+                });
+            }
+        }
+
+        let was: Vec<(String, Option<String>)> = document
+            .payloads_of("cabin_temps")
+            .iter()
+            .map(|n| (n.name.clone(), n.attributes.get("path").cloned()))
+            .collect();
+        assert_eq!(was.len(), 2, "the group's payloads: {was:?}");
+
+        document.apply(&Edit::SetGroupAttribute {
+            group: "cabin_temps".into(),
+            attribute: "path".into(),
+            was,
+            now: Some("/dev/i2c-1".into()),
+        });
+
+        let path = |name: &str| {
+            document
+                .node(name)
+                .unwrap()
+                .attributes
+                .get("path")
+                .cloned()
+        };
+        assert_eq!(path("temp_fore").as_deref(), Some("/dev/i2c-1"));
+        assert_eq!(path("temp_aft").as_deref(), Some("/dev/i2c-1"));
+        assert_eq!(path("temp_bay"), None, "another group was written to");
+        assert_eq!(path("loose"), None, "a node in no group was written to");
+        assert_eq!(path("k"), None, "a computation was given a bus path");
+    }
+
+    /// Renaming a group renames it on every node that is in it.
+    ///
+    /// A node's group is how it gets its interval, so a rename that left the
+    /// members behind would be a rename that silently unscheduled them -- and
+    /// it would do it quietly, because the nodes would still say they were in
+    /// a group and the group would still exist under its new name.
+    #[test]
+    fn renaming_a_group_renames_it_on_its_members() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddGroup {
+            name: "cabin_temps".into(),
+            interval: "3s".into(),
+        });
+        document.apply(&add("temp_fore", "i2c"));
+        document.apply(&Edit::SetAttribute {
+            node: "temp_fore".into(),
+            attribute: "group".into(),
+            was: None,
+            now: Some("cabin_temps".into()),
+        });
+
+        document.apply(&Edit::RenameGroup {
+            was: "cabin_temps".into(),
+            now: "cabin".into(),
+        });
+
+        assert_eq!(document.groups.get("cabin").map(String::as_str), Some("3s"));
+        assert!(!document.groups.contains_key("cabin_temps"));
+        assert_eq!(
+            document
+                .node("temp_fore")
+                .unwrap()
+                .attributes
+                .get("group")
+                .map(String::as_str),
+            Some("cabin")
+        );
+        // And the group is not left looking empty, which is a fault.
+        assert!(
+            !document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::EmptyGroup { .. } | Fault::NoSuchGroup { .. })),
+            "{:?}",
+            document.faults()
+        );
+    }
+
+    /// A group offers the attributes its payloads all have, and nothing else.
+    ///
+    /// An attribute only half of them declare is a value that would mean
+    /// nothing on the rest. `group` is left out because it *is* the group, and
+    /// `interval` because it belongs to the group and a member stating one is
+    /// a fault the flight reader refuses.
+    #[test]
+    fn a_group_offers_what_its_payloads_have_in_common() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddGroup {
+            name: "cabin_temps".into(),
+            interval: "3s".into(),
+        });
+        for (name, node_type) in [("temp_fore", "i2c"), ("temp_bay", "spi")] {
+            document.apply(&add(name, node_type));
+            document.apply(&Edit::SetAttribute {
+                node: name.into(),
+                attribute: "group".into(),
+                was: None,
+                now: Some("cabin_temps".into()),
+            });
+        }
+
+        let offered: Vec<String> = document
+            .group_fields("cabin_temps")
+            .into_iter()
+            .map(|f| f.attribute)
+            .collect();
+
+        // What an I2C node and a SPI node both have.
+        for shared in ["path", "read_size", "trigger"] {
+            assert!(offered.contains(&shared.to_string()), "{offered:?}");
+        }
+        // And what only one of them has.
+        for theirs in ["address", "pec", "max_speed", "spi_mode"] {
+            assert!(!offered.contains(&theirs.to_string()), "{offered:?}");
+        }
+        // Never these two.
+        for never in ["group", "interval"] {
+            assert!(!offered.contains(&never.to_string()), "{offered:?}");
+        }
+
+        // A group with nothing in it offers nothing: there is no payload for a
+        // value to mean anything on.
+        assert!(document.group_fields("bay").is_empty());
+    }
+
+    /// A field whose payloads disagree says so.
+    ///
+    /// Different from nobody having one, and worth saying: typing into the
+    /// field will overwrite several different values with one, and that is
+    /// worth knowing before it happens rather than after.
+    #[test]
+    fn a_group_field_says_when_its_payloads_disagree() {
+        let mut document = Document::new();
+        document.apply(&Edit::AddGroup {
+            name: "cabin_temps".into(),
+            interval: "3s".into(),
+        });
+        for (name, address) in [("temp_fore", "0x48"), ("temp_aft", "0x49")] {
+            document.apply(&add(name, "i2c"));
+            for (attribute, value) in
+                [("group", "cabin_temps"), ("address", address), ("path", "/dev/i2c-1")]
+            {
+                document.apply(&Edit::SetAttribute {
+                    node: name.into(),
+                    attribute: attribute.into(),
+                    was: None,
+                    now: Some(value.into()),
+                });
+            }
+        }
+
+        let fields = document.group_fields("cabin_temps");
+        let field = |name: &str| {
+            fields
+                .iter()
+                .find(|f| f.attribute == name)
+                .unwrap_or_else(|| panic!("{name} should be offered"))
+        };
+
+        // They agree about the bus.
+        assert_eq!(field("path").value.as_deref(), Some("/dev/i2c-1"));
+        assert!(!field("path").differs);
+        // And not about the address, which is what makes them two sensors.
+        assert!(field("address").differs);
+        assert_eq!(field("address").value, None);
+        // Nobody has a trigger, which is not the same as disagreeing.
+        assert!(!field("trigger").differs);
+        assert_eq!(field("trigger").value, None);
+    }
+
     /// A document rebuilt from its history is the document that was there.
     ///
     /// The claim crash recovery rests on. Checked by building one document by
@@ -1402,6 +1782,12 @@ mod tests {
                 Edit::SetNodeComment { .. } => (),
                 Edit::SetLinkComment { .. } => (),
                 Edit::MoveNode { .. } => (),
+                Edit::AddGroup { .. } => (),
+                Edit::RemoveGroup { .. } => (),
+                Edit::SetGroupInterval { .. } => (),
+                Edit::RenameGroup { .. } => (),
+                Edit::SetGroupAttribute { .. } => (),
+                Edit::RestoreGroupAttribute { .. } => (),
             }
         }
 
@@ -1425,6 +1811,19 @@ mod tests {
                 node: "a".into(),
                 was: None,
                 now: Some("the fore sensor".into()),
+            });
+            // A group with a payload in it, so that the edits that act on a
+            // group have something to act on: a group edit applied to no
+            // members trivially round-trips and proves nothing.
+            document.apply(&Edit::AddGroup {
+                name: "cabin_temps".into(),
+                interval: "3s".into(),
+            });
+            document.apply(&Edit::SetAttribute {
+                node: "a".into(),
+                attribute: "group".into(),
+                was: None,
+                now: Some("cabin_temps".into()),
             });
             document
         };
@@ -1475,6 +1874,38 @@ mod tests {
                 node: "a".into(),
                 was: (0, 0),
                 now: (120, 80),
+            },
+            Edit::AddGroup {
+                name: "bay".into(),
+                interval: "5s".into(),
+            },
+            Edit::RemoveGroup {
+                name: "cabin_temps".into(),
+                interval: "3s".into(),
+            },
+            Edit::SetGroupInterval {
+                group: "cabin_temps".into(),
+                was: "3s".into(),
+                now: "1s".into(),
+            },
+            Edit::RenameGroup {
+                was: "cabin_temps".into(),
+                now: "cabin".into(),
+            },
+            // One value for every payload of the group, carrying what each of
+            // them had: `a` had no path, so undoing this takes the attribute
+            // off again rather than leaving it empty.
+            Edit::SetGroupAttribute {
+                group: "cabin_temps".into(),
+                attribute: "path".into(),
+                was: vec![("a".into(), None)],
+                now: Some("/dev/i2c-1".into()),
+            },
+            Edit::RestoreGroupAttribute {
+                group: "cabin_temps".into(),
+                attribute: "path".into(),
+                was: None,
+                now: vec![("a".into(), Some("/dev/i2c-1".into()))],
             },
         ];
 

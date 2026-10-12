@@ -12,9 +12,12 @@
 //!   see `style.rs`, where a test fails if that stops being true. Red is
 //!   reserved for things that are wrong, and is the only colour with a meaning
 //!   of its own.
-//! * **There is no Save command.** Every edit is written as it is made, which
-//!   is `editor.rs`, and written in a way that cannot damage the file that was
-//!   there, which is `save.rs`.
+//! * **Every edit is written as it is made**, which is `editor.rs`, and
+//!   written in a way that cannot damage the file that was there, which is
+//!   `save.rs`. Saving is therefore never something a person has to remember.
+//!   There is a Save button all the same -- it writes every file now, which is
+//!   what retries a write that failed -- and the way out of the program writes
+//!   anything the files do not have.
 //! * **Undo goes back to the start of the session**, and past a crash, because
 //!   the history is written down beside the document; see `journal.rs`.
 
@@ -134,6 +137,17 @@ fn divider_range(document: &Document, divider: i32) -> (i32, i32) {
     (low, high)
 }
 
+/// The groups menu's own name, which is what it reads as when it is closed.
+///
+/// A row of the menu rather than a label beside it, because a Slint ComboBox
+/// shows whatever is selected: with no such row the menu would read as a
+/// setting that says "every_second", and a person would reasonably think they
+/// had put the diagram into that group.
+const MENU_HEADING: &str = "Payload groups\u{2026}";
+
+/// And the row that makes one.
+const MENU_NEW: &str = "New group\u{2026}";
+
 /// Where the ground station goes in a configuration that is new.
 ///
 /// The upper left of the vehicle working pane, clear of the pane's own label.
@@ -166,6 +180,20 @@ struct Views {
     /// at two different nodes and a single selection would make one of them
     /// follow the other.
     chosen: Rc<RefCell<BTreeMap<String, String>>>,
+    /// The group window, if one is open.
+    ///
+    /// One window and not one per group, as subdiagrams have. A subdiagram is
+    /// a page, and two of them are two drawings worth seeing at once; a group
+    /// is a set of attributes, and a second window would be a second copy of
+    /// the same form. Choosing another group re-points this one, which is also
+    /// what makes the menu behave like a menu.
+    group: Option<GroupWindow>,
+    /// Which group that window is showing.
+    ///
+    /// Shared with the window's own handlers, because a group can be renamed
+    /// from inside it: a handler that had captured the name the window was
+    /// made with would go on editing a group that no longer exists.
+    showing: Rc<RefCell<String>>,
 }
 
 impl Views {
@@ -213,6 +241,9 @@ impl Views {
     fn refresh(&self, editor: &Editor) {
         let chosen = self.chosen.borrow();
         let divider = self.divider.get();
+        if let Some(window) = &self.group {
+            put_group(window, editor, &self.showing.borrow());
+        }
         if let Some(top) = self.top.upgrade() {
             put(&top, editor, &None, chosen.get("").map(|s| s.as_str()), divider);
         }
@@ -273,6 +304,8 @@ fn main() -> Result<(), slint::PlatformError> {
         open: BTreeMap::new(),
         chosen: Rc::new(RefCell::new(BTreeMap::new())),
         divider: divider.clone(),
+        group: None,
+        showing: Rc::new(RefCell::new(String::new())),
     }));
     // Which node the panel is showing, per window.
     //
@@ -330,7 +363,30 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     }
 
-    ui.run()
+    let outcome = ui.run();
+
+    // On the way out, anything the files do not have.
+    //
+    // Normally there is nothing: every edit is written as it is made, so the
+    // configuration on disk is already the configuration in the window. What
+    // this catches is the session where a write failed -- a full device, a
+    // directory made read-only -- and was then put right without another edit
+    // being made. Leaving a session's work in a process that is ending is the
+    // one way this editor could lose anything, so it is worth one more try
+    // and one plain sentence either way.
+    if editor.borrow().unsaved() {
+        editor.borrow_mut().save();
+        match editor.borrow().trouble() {
+            None => eprintln!("tcsgui: saved {path} on the way out"),
+            Some(why) => eprintln!(
+                "tcsgui: {path} could not be saved: {why}\n\
+                 tcsgui: the work of this session is in {}",
+                editor.borrow().journal_path().display()
+            ),
+        }
+    }
+
+    outcome
 }
 
 /// Wire a window's callbacks to the one editor.
@@ -435,6 +491,53 @@ macro_rules! wiring {
                         });
                     }
                     views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                // Writing every file of the configuration now. Nothing to do
+                // in the ordinary case -- every edit is written as it is made
+                // -- and the way to retry a write that failed. See
+                // Editor::save.
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_save_clicked(move || {
+                    editor.borrow_mut().save();
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                // The groups menu. Its first row is its own name and does
+                // nothing; its last makes a group; anything else is a group
+                // to open.
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_group_chosen(move |chosen| {
+                    let chosen = chosen.to_string();
+                    if chosen == MENU_HEADING {
+                        return;
+                    }
+
+                    let group = if chosen == MENU_NEW {
+                        let name = {
+                            let mut editor = editor.borrow_mut();
+                            let name = fresh_group(editor.document());
+                            // With an interval, because a group without one
+                            // is a group that reads nothing: a value to
+                            // change is a better start than a blank to fill
+                            // in.
+                            editor.edit(Edit::AddGroup {
+                                name: name.clone(),
+                                interval: FIRST_INTERVAL.to_string(),
+                            });
+                            name
+                        };
+                        views.borrow().refresh(&editor.borrow());
+                        name
+                    } else {
+                        chosen
+                    };
+
+                    show_group(&editor, &views, &group);
                 });
             }
             {
@@ -621,6 +724,7 @@ fn put(
     divider: i32,
 ) {
     ui.set_divider(divider as f32);
+    ui.set_group_menu(group_menu(editor.document()));
     let (nodes, links) = views_of(editor, home);
     let panel = panel_of(editor, home, chosen);
     ui.set_selected(panel.0.clone().into());
@@ -645,6 +749,7 @@ fn put_sub(
     divider: i32,
 ) {
     window.set_divider(divider as f32);
+    window.set_group_menu(group_menu(editor.document()));
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home);
     let panel = panel_of(editor, &home, chosen);
@@ -659,6 +764,231 @@ fn put_sub(
     window.set_undo_label(label(editor.journal().next_undo()));
     window.set_redo_label(label(editor.journal().next_redo()));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// Put a group's state into its window.
+///
+/// What a group is: a name, how often it is read, and the payloads that are in
+/// it. The fields below those are the attributes every one of those payloads
+/// declares -- see [`Document::group_fields`] -- which are the ones a value
+/// set here can mean anything on.
+fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
+    let document = editor.document();
+
+    let members: Vec<slint::SharedString> = document
+        .payloads_of(group)
+        .iter()
+        .map(|node| Qualified::of(&node.name, &node.home).absolute().into())
+        .collect();
+    let said: Vec<String> = members.iter().map(|m| m.to_string()).collect();
+
+    let fields: Vec<GroupFieldView> = document
+        .group_fields(group)
+        .into_iter()
+        .map(|field| GroupFieldView {
+            name: field.attribute.into(),
+            value: field.value.unwrap_or_default().into(),
+            differs: field.differs,
+        })
+        .collect();
+
+    window.set_group(group.into());
+    window.set_interval(
+        document
+            .groups
+            .get(group)
+            .cloned()
+            .unwrap_or_default()
+            .into(),
+    );
+    window.set_members_text(said.join(", ").into());
+    window.set_members(ModelRc::from(Rc::new(VecModel::from(members))));
+    window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    // The same red the main window shows, because somebody typing in here
+    // should not have to look at the other one to find out that nothing is
+    // reaching the disk.
+    window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// What the groups menu offers.
+///
+/// Its own name first, which does nothing and is what the menu reads as when
+/// it is closed; then every group the configuration declares; then the way to
+/// make one. A menu of nothing at all would be a control with no way in, which
+/// is what a configuration that declares no groups yet would have.
+fn group_menu(document: &Document) -> ModelRc<slint::SharedString> {
+    let mut rows: Vec<slint::SharedString> = vec![MENU_HEADING.into()];
+    rows.extend(document.groups.keys().map(|name| name.clone().into()));
+    rows.push(MENU_NEW.into());
+    ModelRc::from(Rc::new(VecModel::from(rows)))
+}
+
+/// Show `group` in the group window, making the window if there is not one.
+///
+/// Made once and re-pointed afterwards, so choosing a second group does not
+/// leave a window per group behind. The handlers are wired when the window is
+/// made and read the group out of `Views::showing` as they run, which is what
+/// lets the same handlers go on working after the window is re-pointed -- or
+/// after the group it is showing is renamed from inside it.
+fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, group: &str) {
+    *views.borrow().showing.borrow_mut() = group.to_string();
+
+    if views.borrow().group.is_none() {
+        let window = match GroupWindow::new() {
+            Ok(window) => window,
+            Err(e) => {
+                eprintln!("tcsgui: a group window cannot be opened: {e}");
+                return;
+            }
+        };
+        wire_group(&window, editor, views);
+        views.borrow_mut().group = Some(window);
+    }
+
+    // Through a weak handle, so nothing of `views` is borrowed while the
+    // window is shown: showing one runs the toolkit, and the toolkit runs
+    // handlers that borrow it.
+    let window = views.borrow().group.as_ref().map(|window| window.as_weak());
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        put_group(&window, &editor.borrow(), group);
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: a group window cannot be shown: {e}");
+        }
+    }
+}
+
+/// Wire the group window's four callbacks to the one editor.
+///
+/// Every one of them is an ordinary edit: recorded in the history, written as
+/// it is made, and taken back by Undo in the main window. The last is the one
+/// worth reading twice -- it sets one value on every payload of the group as a
+/// single edit, so that undo takes back the gesture rather than the first of a
+/// dozen consequences.
+fn wire_group(window: &GroupWindow, editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = views.borrow().showing.clone();
+        window.on_renamed(move |now| {
+            let was = showing.borrow().clone();
+            let now = now.trim().to_string();
+
+            // A group with no name is a group nothing can be in, and a name
+            // another group already has would make membership ambiguous.
+            // Refused quietly rather than reported: the refresh below puts
+            // the field back to the name the group has, which is an answer a
+            // person can see without reading anything.
+            let allowed = {
+                let editor = editor.borrow();
+                let groups = &editor.document().groups;
+                !now.is_empty()
+                    && now != was
+                    && groups.contains_key(&was)
+                    && !groups.contains_key(&now)
+            };
+            if allowed {
+                editor.borrow_mut().edit(Edit::RenameGroup {
+                    was,
+                    now: now.clone(),
+                });
+                *showing.borrow_mut() = now;
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = views.borrow().showing.clone();
+        window.on_interval_set(move |value| {
+            let group = showing.borrow().clone();
+            {
+                let mut editor = editor.borrow_mut();
+                let was = match editor.document().groups.get(&group) {
+                    Some(was) => was.clone(),
+                    None => return,
+                };
+                let now = value.trim().to_string();
+                if now == was {
+                    return;
+                }
+                editor.edit(Edit::SetGroupInterval {
+                    group,
+                    was,
+                    now,
+                });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = views.borrow().showing.clone();
+        window.on_attribute_set(move |attribute, value| {
+            let group = showing.borrow().clone();
+            {
+                let mut editor = editor.borrow_mut();
+                let attribute = attribute.to_string();
+                // What each payload has now, by name, so that undo puts back
+                // exactly what was there -- including the ones that had
+                // nothing, which get the attribute taken off again rather
+                // than emptied.
+                let was: Vec<(String, Option<String>)> = editor
+                    .document()
+                    .payloads_of(&group)
+                    .iter()
+                    .map(|node| {
+                        (
+                            Qualified::of(&node.name, &node.home).absolute(),
+                            node.attributes.get(&attribute).cloned(),
+                        )
+                    })
+                    .collect();
+                if was.is_empty() {
+                    return;
+                }
+                let now = (!value.trim().is_empty()).then(|| value.to_string());
+                // Nothing to do where they all have it already.
+                if was.iter().all(|(_, had)| *had == now) {
+                    return;
+                }
+                editor.edit(Edit::SetGroupAttribute {
+                    group,
+                    attribute,
+                    was,
+                    now,
+                });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = views.borrow().showing.clone();
+        window.on_removed(move || {
+            let group = showing.borrow().clone();
+            {
+                let mut editor = editor.borrow_mut();
+                let Some(interval) = editor.document().groups.get(&group).cloned() else {
+                    return;
+                };
+                editor.edit(Edit::RemoveGroup {
+                    name: group,
+                    interval,
+                });
+            }
+            // The window goes with it. The payloads that named it are left
+            // saying so, which the canvas marks: taking the group off a dozen
+            // nodes is a different edit from removing the group, and not one
+            // somebody asked for.
+            if let Some(window) = &views.borrow().group {
+                let _ = window.hide();
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
 }
 
 /// What the panel shows: the chosen node, its type, its comment, its fields.
@@ -987,6 +1317,27 @@ fn confine(node_type: &str, divider: i32, (x, y): (i32, i32)) -> (i32, i32) {
     // has a right bound to the left of its left one, and a node in it sits at
     // its left edge and overhangs.
     (x.clamp(left, right.max(left)), y.max(0))
+}
+
+/// How often a group reads until somebody says otherwise.
+///
+/// A second: slow enough for anything, fast enough to be obviously a value
+/// somebody should look at rather than a default that happens to work.
+const FIRST_INTERVAL: &str = "1s";
+
+/// A name no group in the document has yet.
+///
+/// The word itself, numbered if that is taken, as a node's fresh name is: a
+/// person who makes two groups gets `group` and `group-2` and renames them,
+/// rather than being made to name one before it can exist.
+fn fresh_group(document: &Document) -> String {
+    if !document.groups.contains_key("group") {
+        return "group".to_string();
+    }
+    (2..)
+        .map(|n| format!("group-{n}"))
+        .find(|name| !document.groups.contains_key(name))
+        .expect("a free name exists")
 }
 
 /// Where the next node placed should go.
@@ -2058,6 +2409,71 @@ mod tests {
         );
     }
 
+    /// The groups menu names itself, then the groups, then the way to make
+    /// one.
+    ///
+    /// The heading is a row of the menu because a Slint ComboBox shows
+    /// whatever is selected: without it the control would read as a setting
+    /// that says "cabin_temps", and a person would reasonably think they had
+    /// just put something into that group. The last row matters for the
+    /// opposite reason -- a configuration that declares no groups yet would
+    /// otherwise have a menu with no way in.
+    #[test]
+    fn the_groups_menu_names_itself_and_offers_a_way_in() {
+        use slint::Model;
+
+        let mut document = Document::new();
+        let rows = |document: &Document| -> Vec<String> {
+            let menu = group_menu(document);
+            (0..menu.row_count())
+                .map(|i| menu.row_data(i).unwrap().to_string())
+                .collect()
+        };
+
+        // With no groups at all: the heading and the way to make one.
+        assert_eq!(rows(&document), vec![MENU_HEADING, MENU_NEW]);
+
+        for (name, interval) in [("cabin_temps", "3s"), ("bay", "5s")] {
+            document.apply(&Edit::AddGroup {
+                name: name.into(),
+                interval: interval.into(),
+            });
+        }
+        assert_eq!(
+            rows(&document),
+            vec![MENU_HEADING, "bay", "cabin_temps", MENU_NEW],
+            "the groups go between, in their own order"
+        );
+
+        // The heading and the new row are not names a group could have, or
+        // choosing one would be ambiguous.
+        assert!(MENU_HEADING.ends_with('\u{2026}'));
+        assert!(MENU_NEW.ends_with('\u{2026}'));
+    }
+
+    /// A group made from the menu gets a name nothing else has.
+    #[test]
+    fn a_fresh_group_name_is_free() {
+        let mut document = Document::new();
+        assert_eq!(fresh_group(&document), "group");
+
+        document.apply(&Edit::AddGroup {
+            name: "group".into(),
+            interval: FIRST_INTERVAL.into(),
+        });
+        assert_eq!(fresh_group(&document), "group-2");
+
+        document.apply(&Edit::AddGroup {
+            name: "group-2".into(),
+            interval: FIRST_INTERVAL.into(),
+        });
+        assert_eq!(fresh_group(&document), "group-3");
+
+        // And it comes with an interval, because a group without one reads
+        // nothing.
+        assert!(!FIRST_INTERVAL.is_empty());
+    }
+
     /// A new configuration opens with the ground station in it.
     ///
     /// Every graph has one, so the editor places it rather than waiting to be
@@ -2211,6 +2627,7 @@ mod tests {
         i_slint_backend_testing::init_integration_test_with_system_time();
 
         dragging_a_node_moves_it();
+        a_group_window_sets_every_payload_in_its_group();
         a_payload_stays_in_the_payload_working_pane();
         the_divider_can_be_dragged();
         a_node_follows_the_pointer_and_reports_where_it_went();
@@ -2328,6 +2745,8 @@ mod tests {
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -2447,6 +2866,8 @@ mod tests {
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -2492,6 +2913,125 @@ mod tests {
             now,
             (DIVIDER, was.1 + by.1 as i32),
             "a payload dragged {by:?} from {was:?} left its pane and is at {now:?}"
+        );
+    }
+
+    /// Typing in a group's window reaches every payload in the group.
+    ///
+    /// Through the window's own callbacks and the handlers wired to them,
+    /// which is the whole path bar the pointer: what a person types in the
+    /// field arrives as one edit, every payload of the group has the value,
+    /// and one Undo takes the lot back. The last part is what was asked for
+    /// and is the part a dozen separate edits would quietly fail.
+    fn a_group_window_sets_every_payload_in_its_group() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+        )));
+        {
+            let mut editor = editor.borrow_mut();
+            editor.edit(Edit::AddGroup {
+                name: "cabin_temps".to_string(),
+                interval: "3s".to_string(),
+            });
+            for name in ["temp_fore", "temp_aft"] {
+                editor.edit(Edit::AddNode {
+                    name: name.to_string(),
+                    node_type: "i2c".to_string(),
+                    home: None,
+                });
+                editor.edit(Edit::SetAttribute {
+                    node: name.to_string(),
+                    attribute: "group".to_string(),
+                    was: None,
+                    now: Some("cabin_temps".to_string()),
+                });
+            }
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+
+        show_group(&editor, &views, "cabin_temps");
+
+        // The window shows what the group is: its interval, and the payloads
+        // in it.
+        let window = views
+            .borrow()
+            .group
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("a group window should have been made")
+            .upgrade()
+            .expect("and still be there");
+        assert_eq!(window.get_group(), "cabin_temps");
+        assert_eq!(window.get_interval(), "3s");
+        assert_eq!(window.get_members_text(), "temp_fore, temp_aft");
+
+        // One of the fields they both have, set once.
+        let depth = editor.borrow().undo_depth();
+        window.invoke_attribute_set("path".into(), "/dev/i2c-1".into());
+
+        for name in ["temp_fore", "temp_aft"] {
+            assert_eq!(
+                editor
+                    .borrow()
+                    .document()
+                    .node(name)
+                    .unwrap()
+                    .attributes
+                    .get("path")
+                    .map(String::as_str),
+                Some("/dev/i2c-1"),
+                "{name} did not get the group's value"
+            );
+        }
+
+        // One edit for one gesture, and one Undo takes it back.
+        assert_eq!(
+            editor.borrow().undo_depth(),
+            depth + 1,
+            "setting one value on a group should be one edit"
+        );
+        assert!(editor.borrow_mut().undo());
+        for name in ["temp_fore", "temp_aft"] {
+            assert_eq!(
+                editor.borrow().document().node(name).unwrap().attributes.get("path"),
+                None,
+                "{name} kept the value after one undo"
+            );
+        }
+
+        // Renaming the group from its own window renames it on its members,
+        // and the window goes on working afterwards -- its handlers read the
+        // group as they run rather than remembering the name they were made
+        // with.
+        window.invoke_renamed("cabin".into());
+        assert_eq!(window.get_group(), "cabin");
+        assert_eq!(
+            editor
+                .borrow()
+                .document()
+                .node("temp_fore")
+                .unwrap()
+                .attributes
+                .get("group")
+                .map(String::as_str),
+            Some("cabin")
+        );
+        window.invoke_interval_set("500ms".into());
+        assert_eq!(
+            editor.borrow().document().groups.get("cabin").map(String::as_str),
+            Some("500ms")
         );
     }
 

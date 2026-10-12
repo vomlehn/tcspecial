@@ -1102,6 +1102,21 @@ export component MainWindow inherits Window {
     callback node-selected(string);
     callback attribute-set(string, string, string);
     callback comment-set(string, string);
+    // The menu asked for what tcspecial is configured with.
+    callback edit-parameters();
+
+    // The menu bar. The one thing in it so far is the section that is about
+    // the configuration as a whole: there is nothing on the canvas to press
+    // that would mean "the configuration", so a command is how it is reached.
+    MenuBar {
+        Menu {
+            title: "Edit";
+            MenuItem {
+                title: "Edit tcspecial parameters";
+                activated => { root.edit-parameters(); }
+            }
+        }
+    }
 
     Surface {
         width: 100%;
@@ -1196,6 +1211,20 @@ export component SubWindow inherits Window {
     callback node-selected(string);
     callback attribute-set(string, string, string);
     callback comment-set(string, string);
+    callback edit-parameters();
+
+    // The menu bar. The one thing in it so far is the section that is about
+    // the configuration as a whole: there is nothing on the canvas to press
+    // that would mean "the configuration", so a command is how it is reached.
+    MenuBar {
+        Menu {
+            title: "Edit";
+            MenuItem {
+                title: "Edit tcspecial parameters";
+                activated => { root.edit-parameters(); }
+            }
+        }
+    }
 
     Surface {
         width: 100%;
@@ -1391,4 +1420,99 @@ export component GroupWindow inherits Window {
     // sentence would lay the names out as separate elements that wrap
     // independently of the words around them.
     in property <string> members-text: "";
+}
+
+// What tcspecial itself is configured with.
+//
+// A window and not part of the canvas, because this is the one part of a
+// configuration that is about the whole of it rather than about anything in
+// it: where commands are taken, where beacons go, where the telemetry log is
+// written. There is nothing to press on the diagram that would mean "the
+// configuration", so it is reached from the menu instead.
+//
+// Required, which is why the fields that must be stated are marked and marked
+// in red when they are empty. A graph describes what the vehicle carries and
+// what is done with it, and none of that reaches the ground until these are
+// answered -- so an unanswered one is a fault and not a blank.
+export component ParametersWindow inherits Window {
+    title: "tcspecial parameters";
+    background: #fbfbfa;
+    min-width: 380px;
+    min-height: 360px;
+    preferred-width: 440px;
+    preferred-height: 560px;
+
+    // One per attribute of the section, in the order tcslibgs lists them:
+    // what must be stated first, and the rest after.
+    in property <[FieldView]> fields: [];
+    // What went wrong with the last write, if anything. Shown here as well as
+    // in the main window, so that somebody typing in this one is not left to
+    // find out elsewhere that nothing is reaching the disk.
+    in property <string> trouble: "";
+
+    callback parameter-set(string, string);
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: "tcspecial parameters";
+            font-size: Type.title;
+            font-weight: Type.bold;
+        }
+        Text {
+            text: "Where commands are taken, where beacons go, and where the "
+                + "telemetry log is written. Every configuration must say "
+                + "these: a graph says nothing about how any of it reaches "
+                + "the ground until it does.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+        Text {
+            text: "Two ports, because there are two command links: a command "
+                + "about the spacecraft -- ping it, arm it, restart it -- is "
+                + "taken on port, and one about a payload on payload_port, so "
+                + "what the ground needs in a hurry is never queued behind "
+                + "what it asked for at leisure.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for f in root.fields: VerticalLayout {
+                    spacing: 1px;
+                    Text {
+                        // A field that must be stated says so, and says it in
+                        // red only when it is empty: red marks what is wrong,
+                        // not what matters.
+                        text: f.required ? f.name + " *" : f.name;
+                        font-size: Type.small;
+                        color: f.missing ? #c0392b : #6b7280;
+                        font-weight: f.missing ? Type.bold : Type.regular;
+                    }
+                    LineEdit {
+                        text: f.value;
+                        font-size: Type.body;
+                        edited => { root.parameter-set(f.name, self.text); }
+                    }
+                }
+                Rectangle { }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+    }
 }

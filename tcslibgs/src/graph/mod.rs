@@ -23,6 +23,7 @@
 //! the same code that runs again aboard.
 
 pub mod check;
+pub mod parameters;
 pub mod reach;
 
 use std::collections::BTreeMap;
@@ -56,6 +57,26 @@ pub struct GraphFile {
     /// something nobody meant and everybody would have to remember.
     #[serde(default)]
     pub include: Vec<String>,
+    /// What tcspecial itself is configured with: where commands are taken,
+    /// where beacons go, where the telemetry log is written.
+    ///
+    /// The same section a payload set's file holds, read by the same struct --
+    /// see [`CIConfigJson`]. One statement of what the command interpreter
+    /// needs, so that a graph and a payload set cannot come to describe it
+    /// differently.
+    ///
+    /// Optional here and required by [`Graph::check`], which is the difference
+    /// between a file that cannot be read and a configuration that is
+    /// incomplete: the second is worth a complaint naming the file and saying
+    /// what to add, and the first is a serde error nobody can act on.
+    ///
+    /// Held as the words the file holds, and turned into the struct by
+    /// [`parameters::ci_config_of`]. The editor has to be able to write a
+    /// section somebody is halfway through filling in, and a file it cannot
+    /// read back is a file it has destroyed -- see `parameters.rs`, which has
+    /// the argument.
+    #[serde(default)]
+    pub tcspecial: Option<BTreeMap<String, Scalar>>,
     #[serde(default)]
     pub groups: Vec<Group>,
     #[serde(default)]
@@ -302,6 +323,15 @@ impl CommandBinding {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Graph {
     pub description: Option<String>,
+    /// What tcspecial itself is configured with, from the top file.
+    ///
+    /// The top file's and no other's: a configuration has one command
+    /// interpreter, so one of its files says what that is. An included file
+    /// that declares a section of its own is refused when the configuration is
+    /// read rather than quietly ignored -- two sections would be two answers
+    /// to one question, and whichever won would be an accident of the order
+    /// the files happened to be read in.
+    pub tcspecial: Option<BTreeMap<String, Scalar>>,
     pub groups: Vec<Group>,
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
@@ -326,6 +356,7 @@ impl Graph {
         let path = path.as_ref();
         let mut graph = Graph {
             description: None,
+            tcspecial: None,
             groups: Vec::new(),
             nodes: Vec::new(),
             links: Vec::new(),
@@ -336,6 +367,7 @@ impl Graph {
 
         let top: GraphFile = read_one(path)?;
         graph.description = top.description.clone();
+        graph.tcspecial = top.tcspecial.clone();
         graph.absorb(path, &top);
         graph.files.push(path.to_path_buf());
 
@@ -349,6 +381,14 @@ impl Graph {
                 )));
             }
             let file: GraphFile = read_one(&included)?;
+            if file.tcspecial.is_some() {
+                return Err(TcsError::Config(format!(
+                    "{}: an included file may not have a tcspecial section -- a \
+                     configuration has one command interpreter, and the file \
+                     that was asked for says what it is",
+                    included.display()
+                )));
+            }
             if !file.include.is_empty() {
                 // One level, and the refusal says why rather than silently
                 // ignoring it: a subdiagram that included another would be a
@@ -652,9 +692,15 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.yaml");
 
+        // With a tcspecial section, which every configuration must have and
+        // only the top file may: see Graph::tcspecial.
         std::fs::write(
             &top,
-            "version: \"2.0\"\ninclude:\n  - cabin\nnodes:\n  \
+            "version: \"2.0\"\ninclude:\n  - cabin\n\
+             tcspecial:\n  address: 0.0.0.0\n  port: 4000\n  payload_port: 4001\n  \
+             protocol: udp\n  beacon_interval_ms: 5000\n  \
+             beacon_address: \"239.255.0.1:5550\"\n  beacon_interface: \"127.0.0.1\"\n\
+             nodes:\n  \
              - { name: moc, type: moc }\nlinks:\n  - { from: cabin_sensor, to: moc }\n",
         )
         .unwrap();

@@ -220,6 +220,53 @@ command binding
     what the ground is able to change in flight is written down and checkable,
     rather than being whatever the compute element happens to accept.
 
+What tcspecial itself is configured with
+----------------------------------------
+
+Four concepts describe what a vehicle carries and what is done with it. None of
+them says where any of it goes, and one section does: ``tcspecial``, the same
+section a payload set's file holds, which is required of every configuration.
+
+.. code-block:: yaml
+
+   tcspecial:
+     address: 0.0.0.0
+     port: 4000
+     payload_port: 4001
+     protocol: udp
+     beacon_interval_ms: 5000
+     beacon_address: "239.255.0.1:5550"
+     beacon_interface: "127.0.0.1"
+     log_dir: /var/log/tcspecial
+     log_segment_bytes: 65536
+
+Seven of the nine must be stated, and are required rather than defaulted for
+one reason: a configuration that has not been asked the question has not
+answered it. Where commands are taken and where beacons go are mission facts,
+and a file that was silently given an answer to either is a vehicle nobody can
+reach whose configuration looks complete. ``log_dir`` absent means the
+telemetry log is not kept, which is a configuration somebody may mean -- a
+vehicle with no writable storage -- and ``log_segment_bytes`` is a tuning
+choice with a defensible answer, so it has one.
+
+Two ports because there are two command links: a command about the spacecraft
+-- ping it, arm it, restart it -- is taken on ``port``, and one about a payload
+on ``payload_port``, so what the ground needs in a hurry is never queued behind
+what it asked for at leisure. On a space link the two become two virtual
+channels, which is where the priority between them is really decided; here they
+are two ports, which is what an IP network has to divide traffic with.
+
+It is read by the same struct a payload set's section is read by. A second
+statement of what the command interpreter needs would be two statements
+drifting apart a flight at a time, and the first symptom would be a
+configuration that verifies on the ground and starts something else aboard.
+
+Only the top file of a configuration may state it. A configuration has one
+command interpreter, so one of its files says what that is; an included file
+that declared a section of its own is refused as the configuration is read,
+rather than quietly ignored, because two sections would be two answers with the
+winner decided by the order the files happened to be read in.
+
 What a device node says
 -----------------------
 
@@ -938,6 +985,30 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
+What tcspecial itself is configured with is edited from the menu, under **Edit
+tcspecial parameters**. That is the one part of a configuration which is about
+the whole of it rather than about anything in it -- so there is nothing on the
+canvas to press that would mean "the configuration", and a command is how it is
+reached. The window offers every attribute the section may have, the ones that
+must be stated first and marked in red while they are empty, and the list it is
+built from is the checker's own: two lists would drift, and what that would look
+like is a configuration the editor called complete and ``tcsverify`` refused.
+
+The section is read as the words a file holds rather than as the struct the
+command interpreter wants, and the strictness applied afterwards. That is what
+lets the editor write a section somebody is halfway through filling in: a port
+cleared on the way to typing another leaves a file that still opens, says what
+is missing, and can be put right, where a file read strictly would not open at
+all -- and a file the editor cannot read back is a file it has destroyed. A
+parameter somebody clears is written out of the file rather than written empty,
+absent and empty meaning the same thing to the checking.
+
+A configuration that does not exist yet is given the section with its
+mechanical values filled in -- a protocol, a beacon interval, a segment size
+are the same on every vehicle until somebody has a reason -- and the
+mission's own left empty and marked. An editor that guessed an address and two
+ports would be answering a question nobody had asked.
+
 Groups are edited in a window of their own, reached from a menu in the bar. A
 group is not on the canvas and should not be: it is a set of payloads read
 together, and which payloads those are is written on the nodes rather than
@@ -1003,6 +1074,16 @@ These are the checks:
 * no cycle, unless a node on it declares itself a loop and states what breaks
   the cycle -- a control loop is a cycle on purpose, and an accidental one is a
   configuration that would run forever on its own output.
+* the configuration says what tcspecial itself is configured with. The
+  ``tcspecial`` section -- where commands are taken, where beacons go, where
+  the telemetry log is written -- is required of every configuration, and
+  required rather than defaulted for the reason the attributes inside it are:
+  a configuration that has not been asked the question has not answered it. It
+  is the same section a payload set's file holds and is read by the same
+  struct, so one mistake is one complaint wherever it is written. Only the top
+  file of a configuration may state one: a configuration has one command
+  interpreter, and a second section would be two answers to one question with
+  the winner decided by the order the files happened to be read in.
 * a payload that is read is written to only if it says what asks it. What is
   written to a payload that is read is the question it answers, and the
   ``trigger`` is the bytes of that question -- so a payload stating none is one

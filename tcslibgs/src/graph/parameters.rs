@@ -1,0 +1,282 @@
+//! What tcspecial itself is configured with, as a graph states it.
+//!
+//! The `tcspecial` section: where commands are taken, where beacons go, where
+//! the telemetry log is written. A graph describes what the vehicle carries and
+//! what is done with it, and none of that reaches the ground until these are
+//! answered -- so the section is required, and [`crate::graph::Graph::check`]
+//! says so about a configuration that has none.
+//!
+//! The same section a payload set's file holds, and the same struct reads it:
+//! [`CIConfigJson`] is the one statement of what the command interpreter needs,
+//! and a second one for the version 2 schema would be two statements drifting
+//! apart a flight at a time.
+//!
+//! # Why it is read as text first
+//!
+//! The section arrives here as the words a file holds, and is turned into
+//! [`CIConfigJson`] by [`ci_config_of`] rather than by the deserialiser. That
+//! is not ceremony. The editor has to be able to write a configuration that is
+//! half filled in -- a port somebody has cleared on the way to typing another
+//! -- and a file it cannot read back is a file it has destroyed. Read as text,
+//! such a file opens, says what is missing, and can be put right; read
+//! strictly, it would not open at all.
+//!
+//! So the strictness is here, where it can name the attribute and say what is
+//! wrong with it, and `Scalar` is what holds a value as the file spelled it --
+//! the same arrangement a node's attributes have, and for the same reason.
+
+use std::collections::BTreeMap;
+
+use crate::endpoint_config::Scalar;
+use crate::types::{default_log_segment_bytes, CIConfigJson};
+
+/// Every attribute of the section, and whether it must be stated.
+///
+/// The one list of them. The ground check reads it to refuse a name that
+/// belongs to nothing, and the editor reads it to know which fields to offer
+/// and which to mark when they are empty -- so a tenth attribute is added here
+/// and appears in both.
+///
+/// Required ones first, so a panel built from this asks for what it must have
+/// before what it may.
+pub const ATTRIBUTES: &[(&str, bool)] = &[
+    ("address", true),
+    ("port", true),
+    ("payload_port", true),
+    ("protocol", true),
+    ("beacon_interval_ms", true),
+    ("beacon_address", true),
+    ("beacon_interface", true),
+    ("log_dir", false),
+    ("log_segment_bytes", false),
+];
+
+/// The section as the command interpreter wants it, or what is wrong with it.
+///
+/// Every complaint names the attribute, because a configuration is read by
+/// somebody who needs to know which of nine words to change.
+pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, String> {
+    // A name belonging to nothing, first. A misspelled attribute is otherwise
+    // a value silently ignored -- `beacon_adress` would leave beacons going
+    // wherever the rest of the file happened to say -- and nothing in the
+    // telemetry would ever mention it.
+    for name in said.keys() {
+        if !ATTRIBUTES.iter().any(|(known, _)| known == name) {
+            return Err(format!(
+                "there is no tcspecial attribute called \"{name}\". They are {}",
+                ATTRIBUTES
+                    .iter()
+                    .map(|(name, _)| *name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+    }
+
+    let text = |name: &str| -> Result<String, String> {
+        match said.get(name).map(|value| value.as_str().trim().to_string()) {
+            Some(value) if !value.is_empty() => Ok(value),
+            _ => Err(format!(
+                "{name} is not stated, and it has no default: where commands \
+                 are taken and where beacons go are not questions to be \
+                 answered by whatever a file was silently given"
+            )),
+        }
+    };
+    let number = |name: &str| -> Result<u32, String> {
+        let said = text(name)?;
+        said.parse::<u32>()
+            .map_err(|_| format!("{name} is \"{said}\", which is not a whole number"))
+    };
+    let port = |name: &str| -> Result<u16, String> {
+        let value = number(name)?;
+        if value == 0 || value > u16::MAX as u32 {
+            return Err(format!(
+                "{name} is {value}, and a port is between 1 and 65535"
+            ));
+        }
+        Ok(value as u16)
+    };
+
+    Ok(CIConfigJson {
+        address: text("address")?,
+        port: port("port")?,
+        payload_port: port("payload_port")?,
+        protocol: text("protocol")?,
+        beacon_interval_ms: number("beacon_interval_ms")?,
+        beacon_address: text("beacon_address")?,
+        beacon_interface: text("beacon_interface")?,
+        // Absent is "run without a telemetry log", which is a configuration
+        // somebody may mean: a vehicle with no writable storage.
+        log_dir: said
+            .get("log_dir")
+            .map(|value| value.as_str().trim().to_string())
+            .filter(|value| !value.is_empty()),
+        log_segment_bytes: match said.get("log_segment_bytes") {
+            Some(value) if !value.as_str().trim().is_empty() => number("log_segment_bytes")?,
+            _ => default_log_segment_bytes(),
+        },
+    })
+}
+
+/// The section as a graph would write it, for a configuration being started.
+///
+/// The three that are mechanical are filled in: a protocol, a beacon interval
+/// and a segment size are the same on every vehicle until somebody has a
+/// reason, and a value to change is a better start than a blank to fill in.
+/// The five that are site-specific are left empty on purpose -- an address and
+/// two ports and where the beacons go are the configuration's own, and an
+/// editor that guessed them would be answering a question nobody had asked.
+pub fn blank() -> BTreeMap<String, Scalar> {
+    let mut said = BTreeMap::new();
+    for (name, value) in [
+        ("address", ""),
+        ("port", ""),
+        ("payload_port", ""),
+        ("protocol", "udp"),
+        ("beacon_interval_ms", "5000"),
+        ("beacon_address", ""),
+        ("beacon_interface", ""),
+        ("log_dir", ""),
+        ("log_segment_bytes", "65536"),
+    ] {
+        said.insert(name.to_string(), Scalar::of(value));
+    }
+    said
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn said(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
+        pairs
+            .iter()
+            .map(|(name, value)| (name.to_string(), Scalar::of(*value)))
+            .collect()
+    }
+
+    fn whole() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("address", "0.0.0.0"),
+            ("port", "4000"),
+            ("payload_port", "4001"),
+            ("protocol", "udp"),
+            ("beacon_interval_ms", "5000"),
+            ("beacon_address", "239.255.0.1:5550"),
+            ("beacon_interface", "127.0.0.1"),
+            ("log_dir", "/var/log/tcspecial"),
+            ("log_segment_bytes", "65536"),
+        ]
+    }
+
+    /// A section with everything in it reads as what the command interpreter
+    /// wants.
+    #[test]
+    fn a_whole_section_is_what_the_command_interpreter_takes() {
+        let config = ci_config_of(&said(&whole())).expect("this one is complete");
+        assert_eq!(config.address, "0.0.0.0");
+        assert_eq!(config.port, 4000);
+        assert_eq!(config.payload_port, 4001);
+        assert_eq!(config.protocol, "udp");
+        assert_eq!(config.beacon_interval_ms, 5000);
+        assert_eq!(config.beacon_address, "239.255.0.1:5550");
+        assert_eq!(config.log_dir.as_deref(), Some("/var/log/tcspecial"));
+        assert_eq!(config.log_segment_bytes, 65536);
+
+        // And it holds together by the rules of the one piece of code that
+        // knows them.
+        config.to_ci_config().expect("and sound");
+    }
+
+    /// Every attribute that must be stated is complained about by name.
+    ///
+    /// Nine attributes and one complaint apiece: "the tcspecial section is
+    /// wrong" is a sentence that sends somebody to read all nine.
+    #[test]
+    fn a_missing_attribute_is_named() {
+        for (name, required) in ATTRIBUTES {
+            let left_out: Vec<(&str, &str)> = whole()
+                .into_iter()
+                .filter(|(had, _)| had != name)
+                .collect();
+            let outcome = ci_config_of(&said(&left_out));
+            if *required {
+                let why = outcome.expect_err(&format!("{name} is required"));
+                assert!(why.contains(name), "{why}");
+            } else {
+                outcome.unwrap_or_else(|why| panic!("{name} is optional: {why}"));
+            }
+        }
+    }
+
+    /// An attribute left empty is the same as one left out.
+    ///
+    /// Which is what the editor writes when somebody clears a field, and the
+    /// reason the section is read as text at all: the file still opens, and
+    /// says what is missing.
+    #[test]
+    fn an_empty_attribute_is_a_missing_one() {
+        let mut cleared = whole();
+        cleared.retain(|(name, _)| *name != "port");
+        cleared.push(("port", "   "));
+        let why = ci_config_of(&said(&cleared)).expect_err("an empty port is no port");
+        assert!(why.contains("port"), "{why}");
+    }
+
+    /// A value that is not a number is refused, saying what it was.
+    #[test]
+    fn a_port_that_is_not_a_port_is_refused() {
+        for (name, value) in [
+            ("port", "four thousand"),
+            ("port", "0"),
+            ("port", "70000"),
+            ("payload_port", "-1"),
+            ("beacon_interval_ms", "often"),
+        ] {
+            let mut wrong = whole();
+            wrong.retain(|(had, _)| *had != name);
+            wrong.push((name, value));
+            let why = ci_config_of(&said(&wrong))
+                .expect_err(&format!("{name} = {value} should be refused"));
+            assert!(why.contains(name), "{why}");
+        }
+    }
+
+    /// A name belonging to nothing is refused rather than ignored.
+    ///
+    /// `beacon_adress` silently ignored is a vehicle whose beacons go
+    /// somewhere nobody is listening, and nothing in the telemetry would ever
+    /// say so.
+    #[test]
+    fn a_misspelled_attribute_is_refused_by_name() {
+        let mut wrong = whole();
+        wrong.push(("beacon_adress", "239.255.0.1:5550"));
+        let why = ci_config_of(&said(&wrong)).expect_err("a typo should be refused");
+        assert!(why.contains("beacon_adress"), "{why}");
+        // And the complaint lists what there is, so the typo can be fixed
+        // without opening the manual.
+        assert!(why.contains("beacon_address"), "{why}");
+    }
+
+    /// What a configuration being started is given, and what it is not.
+    #[test]
+    fn a_blank_section_asks_for_what_only_the_mission_knows() {
+        let blank = blank();
+        // Every attribute is there, so the window has a field for each.
+        for (name, _) in ATTRIBUTES {
+            assert!(blank.contains_key(*name), "{name} is not offered");
+        }
+        // The mechanical ones are filled in.
+        assert_eq!(blank["protocol"].as_str(), "udp");
+        assert_eq!(blank["beacon_interval_ms"].as_str(), "5000");
+        // And the site-specific ones are not, so a configuration that has not
+        // been asked is not pretending to have answered.
+        for name in ["address", "port", "payload_port", "beacon_address"] {
+            assert!(blank[name].as_str().is_empty(), "{name} was guessed at");
+        }
+        // Which means a blank one is refused, naming the first thing to fill
+        // in.
+        assert!(ci_config_of(&blank).is_err());
+    }
+}

@@ -243,6 +243,11 @@ mod tests {
     fn no_groups_means_nothing_to_wake_for() {
         let graph = Graph {
             description: None,
+            // What tcspecial is configured with is nothing to do with the
+            // routing, the ports or the schedule: these tests build a graph
+            // by hand and the checking that requires a section is not on
+            // their path.
+            tcspecial: None,
             groups: Vec::new(),
             nodes: Vec::new(),
             links: Vec::new(),

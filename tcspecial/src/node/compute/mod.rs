@@ -103,16 +103,26 @@ pub fn make(node: &Node, inputs: &[&str]) -> Result<Box<dyn Function>, String> {
             )
         })?;
 
+    // Every complaint names the node and the computation it was building.
+    // A configuration has forty of these in it, and "above is not set" says
+    // which attribute and not which node -- so the one fact a reader needs in
+    // order to go and look is the one that was missing.
+    let named = |why: String| format!("\"{}\" ({function}): {why}", node.name);
+
     match function.as_str() {
-        "to_kelvin" => Ok(Box::new(to_kelvin::ToKelvin::of(attributes)?)),
-        "mean" => Ok(Box::new(mean::Mean::of(inputs)?)),
-        "hysteresis" => Ok(Box::new(hysteresis::Hysteresis::of(attributes)?)),
+        "to_kelvin" => Ok(Box::new(
+            to_kelvin::ToKelvin::of(attributes).map_err(named)?,
+        )),
+        "mean" => Ok(Box::new(mean::Mean::of(inputs).map_err(named)?)),
+        "hysteresis" => Ok(Box::new(
+            hysteresis::Hysteresis::of(attributes).map_err(named)?,
+        )),
         // Started here, as the configuration is loaded: a program that
         // cannot be executed is a fault found on the ground rather than three
         // days into a mission. See node::compute::process.
         "process" => {
-            let mut program = process::Process::of(attributes)?;
-            program.start()?;
+            let mut program = process::Process::of(attributes).map_err(named)?;
+            program.start().map_err(named)?;
             Ok(Box::new(program))
         }
         other => Err(format!(

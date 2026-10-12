@@ -22,8 +22,11 @@ version: "1.0"
 description: TCSpecial payload set 4
 
 tcspecial:
-  command_interface: 0.0.0.0:4000
+  tcspecial_command: 0.0.0.0:4000
+  moc_command: 127.0.0.1:4100
   payload_port: 4001
+  tcspecial_tc_base: 0.0.0.0:6000
+  moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
   beacon_address: "239.255.0.1:5550"
   beacon_interface: "127.0.0.1"
@@ -62,8 +65,6 @@ payloads:
   - name: serial-line
     group: payload_line
     path: /tmp/tcspecial4-line
-    oc_address: 127.0.0.1
-    oc_port: 6400
 
   # A datagram, which is what the other sets are mostly made of. No group,
   # because there is one of it: a group earns its place where two payloads
@@ -75,8 +76,6 @@ payloads:
     address: localhost
     port: 5400
     packet_size: 12
-    oc_address: 127.0.0.1
-    oc_port: 6401
 
   # A device file, read as it comes. /dev/urandom rather than a path under
   # /tmp because this is the one kind needing no stand-in: the file is already
@@ -86,8 +85,6 @@ payloads:
     type: device-file
     path: /dev/urandom
     packet_size: 8
-    oc_address: 127.0.0.1
-    oc_port: 6402
 
   # A device on a bus, at the address bin/mki2c loads the kernel's stub with
   # -- so this payload reaches the stand-in that script makes without being
@@ -102,8 +99,6 @@ payloads:
     path: /tmp/tcspecial4-bus
     address: 0x48
     packet_size: 12
-    oc_address: 127.0.0.1
-    oc_port: 6403
 
   # A peripheral on a clocked link. The rate and the mode are the two terms a
   # SPI payload must state: no controller default is right for every
@@ -115,5 +110,3 @@ payloads:
     max_speed: 1000000
     spi_mode: 0
     packet_size: 12
-    oc_address: 127.0.0.1
-    oc_port: 6404

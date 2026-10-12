@@ -669,7 +669,10 @@ mod tests {
     /// the shipped examples'.
     fn tcspecial() -> BTreeMap<String, Scalar> {
         [
-            ("command_interface", "0.0.0.0:4000"),
+            ("tcspecial_command", "0.0.0.0:4000"),
+            ("moc_command", "127.0.0.1:4100"),
+            ("tcspecial_tc_base", "0.0.0.0:6000"),
+            ("moc_tc_base", "127.0.0.1:6100"),
             ("payload_port", "4001"),
             ("beacon_interval_ms", "5000"),
             ("beacon_address", "239.255.0.1:5550"),
@@ -899,7 +902,7 @@ mod tests {
             ("beacon_adress", "239.255.0.1:5550", "beacon_adress"),
             // A command interface that is only half stated, which is the way
             // one attribute carrying two things goes wrong.
-            ("command_interface", "0.0.0.0", "address:port"),
+            ("tcspecial_command", "0.0.0.0", "address:port"),
             // A port that is not one.
             ("payload_port", "nought", "payload_port"),
             // And a beacon address that is not a multicast group, which is

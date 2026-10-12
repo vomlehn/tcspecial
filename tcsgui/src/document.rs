@@ -1410,8 +1410,11 @@ pub fn thermostat_example() -> Document {
     // must say: where commands are taken, where beacons go, where the
     // telemetry log is written.
     for (attribute, value) in [
-        ("command_interface", "0.0.0.0:4000"),
+        ("tcspecial_command", "0.0.0.0:4000"),
+        ("moc_command", "127.0.0.1:4100"),
         ("payload_port", "4001"),
+        ("tcspecial_tc_base", "0.0.0.0:6000"),
+        ("moc_tc_base", "127.0.0.1:6100"),
         ("beacon_interval_ms", "5000"),
         ("beacon_address", "239.255.0.1:5550"),
         ("beacon_interface", "127.0.0.1"),
@@ -1737,8 +1740,11 @@ mod tests {
     #[test]
     fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
         let whole = [
-            ("command_interface", "0.0.0.0:4000"),
+            ("tcspecial_command", "0.0.0.0:4000"),
+            ("moc_command", "127.0.0.1:4100"),
             ("payload_port", "4001"),
+            ("tcspecial_tc_base", "0.0.0.0:6000"),
+            ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
             ("beacon_address", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),
@@ -1768,8 +1774,8 @@ mod tests {
             ("beacon_address", "10.0.0.1:5550", "multicast"),
             // Half a command interface, which is the one way an attribute
             // carrying two things goes wrong.
-            ("command_interface", "0.0.0.0", "address:port"),
-            ("command_interface", "0.0.0.0:4001", "payload_port"),
+            ("tcspecial_command", "0.0.0.0", "address:port"),
+            ("tcspecial_command", "0.0.0.0:4001", "payload_port"),
             ("payload_port", "nought", "payload_port"),
         ] {
             let document = filled(Some((attribute, instead)));

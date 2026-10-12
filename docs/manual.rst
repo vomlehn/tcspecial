@@ -264,9 +264,6 @@ Attributes Every Payload Has
    type           network | device | serial | i2c | spi, or one of the
                   experimental can | iio | rpmsg | gpio
    packet_size    bytes in one packet
-   oc_address     the host this handler exchanges payload data with the
-                  OC on, which is always UDP
-   oc_port        the port it does so on
    mode           periodic | triggered; absent is periodic
    trigger        what to send to make the payload answer:    triggered only
                   bytes, as unquoted hexadecimal after 0x,
@@ -362,8 +359,6 @@ YAML one states with the format's own escapes.
    payloads:
      # Sends on its own: nothing here about timing.
      - name: auto-send
-       oc_address: 127.0.0.1
-       oc_port: 6000
        type: network
        protocol: tcp
        address: localhost
@@ -373,8 +368,6 @@ YAML one states with the format's own escapes.
      # Answers a request: both halves of the request are here, and the rate
      # is the rate the trigger goes out at.
      - name: triggered-send
-       oc_address: 127.0.0.1
-       oc_port: 6001
        type: network
        protocol: tcp
        address: localhost
@@ -898,7 +891,7 @@ otherwise produces a payload that looks configured and is not:
   written on one of them used to be taken in and dropped, which is a payload
   that looks configured and is not. A network payload's ``protocol`` is its
   own type's and is not a term of somebody else's link.
-* A **word that is not an attribute**. A misspelled ``oc_address`` is a
+* A **word that is not an attribute**. A misspelled ``packet_size`` is a
   payload with nowhere to send its data, and ignoring the word says nothing
   about it.
 * A **misspelled section**, for the same reason: ``payload`` is not
@@ -915,7 +908,9 @@ otherwise produces a payload that looks configured and is not:
 * **Two payloads wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
-  whole. A payload's own address and its ``oc_address`` are compared together,
+  whole. A payload's own address and its end of the data link -- the section's
+  ``tcspecial_tc_base`` counted on by the payload's id -- are compared
+  together,
   since a port is a port whatever claims it, and ``localhost``, ``127.0.0.1``
   and ``::1`` count as one host. A Unix socket collides by its path, its port
   meaning nothing, and so does a device file opened twice. The exception is a
@@ -946,8 +941,6 @@ in the MOC shows.
 
    payloads:
      - name: tcp-stream
-       oc_address: 127.0.0.1
-       oc_port: 6000
        type: network
        protocol: tcp
        address: localhost
@@ -955,22 +948,16 @@ in the MOC shows.
        packet_size: 12
 
      - name: udp-steady
-       oc_address: 127.0.0.1
-       oc_port: 6001
        group: udp_localhost
        port: 5001
        packet_size: 11
 
      - name: random-device
-       oc_address: 127.0.0.1
-       oc_port: 6002
        type: device-file
        path: /dev/urandom
        packet_size: 1
 
      - name: udp-fast
-       oc_address: 127.0.0.1
-       oc_port: 6003
        group: udp_localhost
        port: 5003
        packet_size: 15
@@ -994,8 +981,6 @@ repeated siblings, an absent optional field simply left out:
        </payload_groups>
        <payloads>
            <name>tcp-stream</name>
-           <oc_address>127.0.0.1</oc_address>
-           <oc_port>6000</oc_port>
            <type>network</type>
            <protocol>tcp</protocol>
            <address>localhost</address>
@@ -1004,24 +989,18 @@ repeated siblings, an absent optional field simply left out:
        </payloads>
        <payloads>
            <name>udp-steady</name>
-           <oc_address>127.0.0.1</oc_address>
-           <oc_port>6001</oc_port>
            <group>udp_localhost</group>
            <port>5001</port>
            <packet_size>11</packet_size>
        </payloads>
        <payloads>
            <name>random-device</name>
-           <oc_address>127.0.0.1</oc_address>
-           <oc_port>6002</oc_port>
            <type>device-file</type>
            <path>/dev/urandom</path>
            <packet_size>1</packet_size>
        </payloads>
        <payloads>
            <name>udp-fast</name>
-           <oc_address>127.0.0.1</oc_address>
-           <oc_port>6003</oc_port>
            <group>udp_localhost</group>
            <port>5003</port>
            <packet_size>15</packet_size>
@@ -1570,6 +1549,60 @@ file:
      beacon_interval_ms: 5000
      beacon_address: "239.255.0.1:5550"
      beacon_interface: "127.0.0.1"
+
+Where the links are
+-------------------
+
+Four of the section's attributes are a host and a port written together, as
+``address:port``:
+
+.. code-block:: yaml
+
+   tcspecial:
+     tcspecial_command: 0.0.0.0:4000
+     moc_command: 127.0.0.1:4100
+     payload_port: 4001
+     tcspecial_tc_base: 0.0.0.0:6000
+     moc_tc_base: 127.0.0.1:6100
+
+``tcspecial_command`` is where tcspecial takes commands about the spacecraft
+and ``moc_command`` is where the MOC takes them -- both ends in one file,
+because both ends read this file, and two places to say one thing is one place
+for them to disagree. ``payload_port`` is a bare port: commands about a payload
+are taken at the command interface's address, there being one command
+interpreter at one place, so a second address would be a second answer to where
+that is.
+
+The two ``_tc_base`` attributes are where each payload's own data link is, and
+there are two because the link has two ends. Every payload has a UDP interface
+for exchanging data with the ground; tcspecial binds its end at
+``tcspecial_tc_base`` plus **the payload's own id** -- the position the payload
+has in the configuration, counting from nought -- and the MOC binds its end at
+``moc_tc_base`` plus the same id. So a set of four payloads based at 6000 and
+6100 has tcspecial at 6000 to 6003 and the ground at 6100 to 6103.
+
+Both ends come out of the one file both ends read, so neither has to be told
+the other's. The MOC says hello to tcspecial's end, which is why that is the
+end that has to be findable: over UDP the payload is the end that speaks
+first. The ground's end used to be whatever port the system chose, which
+worked and left the ground's own ports written down nowhere -- so nothing
+between the two ends could be checked, or firewalled by a rule anybody could
+state.
+
+That is why a payload entry states no address for its ground link. It used to
+state ``oc_address`` and ``oc_port``, which for forty payloads was forty
+chances to repeat a port -- and a repeated port is two payloads whose data
+arrives interleaved, each reporting part of the other's stream as though it
+were the whole. One base and one arithmetic rule cannot be written
+inconsistently. A base so high that the payloads counted from it would pass
+65535 is refused by name while somebody is reading the file.
+
+An address and a port are one attribute apiece for the same sort of reason:
+two things only ever used together are one fact about a configuration, and
+writing them apart invites a file that states one and not the other. Each is
+split at its last colon, so whatever a host is called the port is the part
+after it. None of them states a protocol and none can: every link here is UDP,
+and an attribute for it would be one that could say something untrue.
 
 All three are required of every command interpreter configuration, with no
 defaults: beacons are how the ground knows the spacecraft is alive, and a

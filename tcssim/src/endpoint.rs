@@ -253,6 +253,7 @@ mod tests {
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -283,6 +284,7 @@ mod tests {
             endpoint,
             packet_size: 4,
             oc: None,
+            ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ".to_vec(),
                 interval_ms: 500,
@@ -334,6 +336,7 @@ mod tests {
             }),
             packet_size: 8,
             oc: None,
+            ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 500,
@@ -370,6 +373,7 @@ mod tests {
                 }),
                 packet_size: 4,
                 oc: None,
+                ground: None,
                             mode: Default::default(),
             };
 
@@ -399,6 +403,7 @@ mod tests {
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -432,6 +437,7 @@ mod tests {
             }),
             packet_size: 8,
             oc: None,
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -464,6 +470,7 @@ mod tests {
             }),
             packet_size: 8,
             oc: None,
+            ground: None,
             mode: Default::default(),
         };
 

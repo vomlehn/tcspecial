@@ -12,9 +12,12 @@
 # configuration: the formats are two spellings of one set of values.
 #
 # The two command links. A command about the spacecraft -- ping it, arm it,
-# restart it -- is taken on the command interface; a command about a payload --
+# restart it -- is taken on tcspecial_command; a command about a payload --
 # start it, stop it, ask it for its statistics -- on payload_port at the same
-# address. One table says which is which, read by both ends, so neither can
+# address. moc_command is the other end of the same conversation, which is in
+# this file because both ends read this file: a configuration that stated only
+# its own end would leave the other to be told separately, and two places to
+# say one thing is one place for them to disagree. One table says which is which, read by both ends, so neither can
 # send a command to the link the other does not expect it on.
 #
 # Two links rather than one because what the ground needs in a hurry must
@@ -33,8 +36,19 @@
 #
 # Note the quotes: unquoted, 0.0.0.0:4000 is a string in YAML only because it
 # happens not to be a number, which is a thin reason to rely on.
-command_interface: "0.0.0.0:4000"
+tcspecial_command: "0.0.0.0:4000"
+moc_command: "127.0.0.1:4100"
 payload_port: 4001
+
+# Where each payload's own data link is, on each side. A payload's port is the
+# base plus the payload's own id -- the position it has in the payload
+# configuration -- so these two lines say where all of them are, on tcspecial's
+# side and on the MOC's. One base and an arithmetic rule rather than an address
+# and a port written on every payload: forty payloads were forty chances to
+# repeat a port, and a repeated port is two payloads whose data arrives
+# interleaved.
+tcspecial_tc_base: "0.0.0.0:6000"
+moc_tc_base: "127.0.0.1:6100"
 
 # How often beacons go out and where they go. Both are required of every
 # command interpreter configuration, here and in the tcspecial section of a

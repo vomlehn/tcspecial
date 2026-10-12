@@ -132,13 +132,19 @@ mod tests {
         load_tcspecial_config(file.path())
     }
 
-    const YAML: &str = "command_interface: 0.0.0.0:4000\npayload_port: 4001\n\
+    const YAML: &str = "tcspecial_command: 0.0.0.0:4000\n\
+                        moc_command: 127.0.0.1:4100\npayload_port: 4001\n\
+                        tcspecial_tc_base: 0.0.0.0:6000\n\
+                        moc_tc_base: 127.0.0.1:6100\n\
                         beacon_interval_ms: 5000\nbeacon_address: 239.255.0.1:5550\n\
                         beacon_interface: 127.0.0.1\n";
 
     const XML: &str = "<tcspecial>\
-        <command_interface>0.0.0.0:4000</command_interface>\
+        <tcspecial_command>0.0.0.0:4000</tcspecial_command>\
+        <moc_command>127.0.0.1:4100</moc_command>\
         <payload_port>4001</payload_port>\
+        <tcspecial_tc_base>0.0.0.0:6000</tcspecial_tc_base>\
+        <moc_tc_base>127.0.0.1:6100</moc_tc_base>\
         <beacon_interval_ms>5000</beacon_interval_ms>\
         <beacon_address>239.255.0.1:5550</beacon_address>\
         <beacon_interface>127.0.0.1</beacon_interface>\
@@ -207,8 +213,11 @@ mod tests {
         assert_eq!(from_the_file.beacon_address.to_string(), "239.255.0.9:5550");
 
         let section = |beacon: &str| CIConfigJson {
-            command_interface: "0.0.0.0:4000".to_string(),
+            tcspecial_command: "0.0.0.0:4000".to_string(),
+            moc_command: "127.0.0.1:4100".to_string(),
             payload_port: 4001,
+            tcspecial_tc_base: "0.0.0.0:6000".to_string(),
+            moc_tc_base: "127.0.0.1:6100".to_string(),
             beacon_interval_ms: 5000,
             beacon_address: beacon.to_string(),
             beacon_interface: "127.0.0.1".to_string(),
@@ -297,11 +306,11 @@ mod tests {
         // command interface took its place as the value that can be written
         // wrongly: half of it, or a port that is not one.
         for instead in [
-            "command_interface: 0.0.0.0",
-            "command_interface: 0.0.0.0:nought",
-            "command_interface: :4000",
+            "tcspecial_command: 0.0.0.0",
+            "tcspecial_command: 0.0.0.0:nought",
+            "tcspecial_command: :4000",
         ] {
-            let bad = YAML.replace("command_interface: 0.0.0.0:4000", instead);
+            let bad = YAML.replace("tcspecial_command: 0.0.0.0:4000", instead);
             assert_ne!(bad, YAML, "the test changed nothing");
             assert!(
                 load_from(".yaml", &bad).is_err(),

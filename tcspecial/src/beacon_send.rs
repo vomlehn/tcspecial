@@ -209,6 +209,18 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 0,
             payload_port: 0,
+            moc_command: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 4100,
+            },
+            tcspecial_tc_base: tcslibgs::HostPort {
+                address: "0.0.0.0".to_string(),
+                port: 6000,
+            },
+            moc_tc_base: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 6100,
+            },
             beacon_interval: BeaconTime(50),
             beacon_address: at,
             beacon_interface: std::net::Ipv4Addr::LOCALHOST,

@@ -230,15 +230,18 @@ section a payload set's file holds, which is required of every configuration.
 .. code-block:: yaml
 
    tcspecial:
-     command_interface: 0.0.0.0:4000
+     tcspecial_command: 0.0.0.0:4000
+     moc_command: 127.0.0.1:4100
      payload_port: 4001
+     tcspecial_tc_base: 0.0.0.0:6000
+     moc_tc_base: 127.0.0.1:6100
      beacon_interval_ms: 5000
      beacon_address: "239.255.0.1:5550"
      beacon_interface: "127.0.0.1"
      log_dir: /var/log/tcspecial
      log_segment_bytes: 65536
 
-Five of the seven must be stated, and are required rather than defaulted for
+Eight of the ten must be stated, and are required rather than defaulted for
 one reason: a configuration that has not been asked the question has not
 answered it. Where commands are taken and where beacons go are mission facts,
 and a file that was silently given an answer to either is a vehicle nobody can
@@ -247,12 +250,18 @@ telemetry log is not kept, which is a configuration somebody may mean -- a
 vehicle with no writable storage -- and ``log_segment_bytes`` is a tuning
 choice with a defensible answer, so it has one.
 
-``command_interface`` is an address and a port together, as ``beacon_address``
-is: two things only ever used together are one fact about a configuration, and
-writing them apart invites a file that states one and not the other. Split at
-the last colon, so whatever a host is called the port is the part after it. The
-address is kept as text and not resolved when the file is read -- what a name
+Four of them are a host and a port written together, as ``address:port``, as
+``beacon_address`` is: two things only ever used together are one fact about a
+configuration, and writing them apart invites a file that states one and not
+the other. Each is split at its last colon, so whatever a host is called the
+port is the part after it, and the address is kept as text -- what a name
 resolves to is the business of the moment the socket is made.
+
+``tcspecial_command`` is where tcspecial takes commands about the spacecraft
+and ``moc_command`` is where the MOC takes them. Both ends in one file because
+both ends read this file: a configuration stating only its own end would leave
+the other to be told separately, and two places to say one thing is one place
+for them to disagree.
 
 Two command links because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure: a command about the spacecraft -- ping it,
@@ -260,13 +269,34 @@ arm it, restart it -- is taken on the command interface, and one about a payload
 on ``payload_port`` at the same address. On a space link the two become two
 virtual channels, which is where the priority between them is really decided;
 here they are two ports, which is what an IP network has to divide traffic
-with. ``payload_port`` is a port and not an address and a port, there being one
-command interpreter at one place: a second address would be a second answer to
-where that is.
+with. ``payload_port`` is a bare port, there being one command interpreter at
+one place: a second address would be a second answer to where that is.
 
-The protocol is not stated and cannot be. The link between tcspecial and the
-ground is UDP, so an attribute for it would be an attribute that could say
-something untrue -- and a configuration able to describe a link the software
+The two ``_tc_base`` attributes are where each payload's own data link is, and
+there are two of them because the link has two ends. tcspecial binds its end at
+``tcspecial_tc_base`` plus the payload's own id -- the position the payload has
+in the configuration -- and the MOC binds its end at ``moc_tc_base`` plus the
+same id. Four payloads based at 6000 and 6100 are at 6000 to 6003 on the
+vehicle and 6100 to 6103 on the ground.
+
+Both ends come out of the one file both ends read, so neither has to be told
+the other's. The MOC says hello to tcspecial's end and tcspecial answers where
+the hello came from, which is why that is the end that has to be findable: over
+UDP the payload is the end that speaks first. The ground's end was whatever
+port the system chose, which worked and left the ground's own ports written
+down nowhere -- so nothing between the two ends could be checked, or firewalled
+by a rule anybody could state.
+
+That is why a payload states no address for its ground link. It used to state
+``oc_address`` and ``oc_port``, which for forty payloads was forty chances to
+repeat a port -- and a repeated port is two payloads whose data arrives
+interleaved, each reporting part of the other's stream as though it were the
+whole. One base and one arithmetic rule cannot be written inconsistently, and a
+base so high that the payloads counted from it would pass 65535 is refused by
+name while the file is being read rather than when the socket is made.
+
+The protocol is not stated and cannot be. Every link in this section is UDP,
+so an attribute for it would be an attribute that could say something untrue -- and a configuration able to describe a link the software
 cannot make is worse than one that cannot describe it at all.
 
 It is read by the same struct a payload set's section is read by. A second

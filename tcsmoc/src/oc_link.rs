@@ -70,8 +70,13 @@ pub type Arrivals = Arc<Mutex<Vec<Option<Arrival>>>>;
 ///
 /// One socket and one thread per handler, because one handler's data has
 /// nothing to do with another's and a datagram is answered where it arrived.
-/// A handler with no OC address gets neither: it cannot be started, so there
-/// is nothing to listen for.
+/// A handler with no data link gets neither: it cannot be started, so there is
+/// nothing to listen for.
+///
+/// Each socket is bound where the configuration says the ground's end of that
+/// payload's link is -- `moc_tc_base` counted on by the payload's id -- and
+/// says hello to where tcspecial's end is. Both ends come out of the one file
+/// both ends read, so neither has to be told the other's.
 ///
 /// Nothing is reported from here. A payload data socket that cannot be opened
 /// is not a reason to refuse to command payloads, which is what the MOC is
@@ -86,7 +91,18 @@ pub fn listen(dh_configs: &[DHConfig]) -> Arrivals {
             continue;
         };
 
-        let socket = match UdpSocket::bind("0.0.0.0:0") {
+        // The ground's own end of this payload's data link, where the
+        // configuration says it is: `moc_tc_base` counted on by the payload's
+        // id. It was whatever port the system chose, which worked because the
+        // hello told tcspecial where to answer -- and left the ground's own
+        // ports unwritten anywhere, so nothing between the two ends could be
+        // checked or firewalled by a rule anybody could state.
+        //
+        // A set with no section has no end to bind, as it has none to send
+        // to.
+        let Some(ground) = &dh.ground else { continue };
+        let socket = match UdpSocket::bind(format!("{}:{}", ground.address, ground.port))
+        {
             Ok(socket) => socket,
             Err(_) => continue,
         };
@@ -162,8 +178,12 @@ mod tests {
     use super::*;
     use tcslibgs::{DHMode, DHName, EndpointConfig, NetworkProtocol};
 
-    /// A handler as the tcspecial configuration describes one, with an OC
-    /// address of its own.
+    /// A handler as a payload set describes one: both ends of its data link,
+    /// which the two bases of the tcspecial section give it.
+    ///
+    /// The ground's end is bound by the listener, so it is a port the system
+    /// chooses here: a test that named one would fail whenever something else
+    /// on the machine happened to hold it.
     fn handler(oc: Option<SocketAddr>) -> DHConfig {
         DHConfig {
             name: DHName::new("auto-send"),
@@ -177,6 +197,11 @@ mod tests {
                 protocol: NetworkProtocol::Udp,
                 address: addr.ip().to_string(),
                 port: addr.port(),
+            }),
+            ground: oc.map(|_| NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "127.0.0.1".to_string(),
+                port: 0,
             }),
             mode: DHMode::Periodic,
         }

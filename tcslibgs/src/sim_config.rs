@@ -1107,6 +1107,7 @@ mod tests {
             }),
             packet_size,
             oc: None,
+            ground: None,
             mode: Default::default(),
         }
     }
@@ -1767,6 +1768,7 @@ simulated_payloads:
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
             mode: DHMode::Periodic,
         };
 
@@ -1820,6 +1822,7 @@ simulated_payloads:
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 500,
@@ -1888,6 +1891,7 @@ simulated_payloads:
             }),
             packet_size: 4,
             oc: None,
+            ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ".to_vec(),
                 interval_ms: 500,

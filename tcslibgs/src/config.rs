@@ -251,8 +251,6 @@ version: \"1.0\"
 description: a tcspecial configuration
 payloads:
   - name: DH0
-    oc_address: 127.0.0.1
-    oc_port: 6000
     type: network
     protocol: udp
     address: localhost
@@ -359,7 +357,10 @@ payloads:
     #[test]
     fn a_payload_sets_tcspecial_section_is_read() {
         let stated = "version: \"1.0\"\ndescription: a set\n\
-                      tcspecial:\n  command_interface: 0.0.0.0:4000\n  payload_port: 4001\n  \
+                      tcspecial:\n  tcspecial_command: 0.0.0.0:4000\n  \
+                     moc_command: 127.0.0.1:4100\n  payload_port: 4001\n  \
+                     tcspecial_tc_base: 0.0.0.0:6000\n  \
+                     moc_tc_base: 127.0.0.1:6100\n  \
                       beacon_interval_ms: 5000\n  beacon_address: 239.255.0.7:7550\n  beacon_interface: 127.0.0.1\n\
                       payloads:\n  - name: DH0\n    type: device\n    \
                       path: /dev/null\n    packet_size: 1\n";
@@ -390,7 +391,10 @@ payloads:
     #[test]
     fn a_tcspecial_section_states_both_beacon_attributes() {
         let whole = "version: \"1.0\"\ndescription: a set\n\
-                     tcspecial:\n  command_interface: 0.0.0.0:4000\n  payload_port: 4001\n  \
+                     tcspecial:\n  tcspecial_command: 0.0.0.0:4000\n  \
+                     moc_command: 127.0.0.1:4100\n  payload_port: 4001\n  \
+                     tcspecial_tc_base: 0.0.0.0:6000\n  \
+                     moc_tc_base: 127.0.0.1:6100\n  \
                      beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
                      beacon_interface: 127.0.0.1\n\
                      payloads:\n  - name: DH0\n    type: device\n    \

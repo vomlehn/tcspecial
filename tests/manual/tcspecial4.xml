@@ -15,8 +15,11 @@
     <version>1.0</version>
     <description>TCSpecial payload set 4</description>
     <tcspecial>
-        <command_interface>0.0.0.0:4000</command_interface>
+        <tcspecial_command>0.0.0.0:4000</tcspecial_command>
+        <moc_command>127.0.0.1:4100</moc_command>
         <payload_port>4001</payload_port>
+        <tcspecial_tc_base>0.0.0.0:6000</tcspecial_tc_base>
+        <moc_tc_base>127.0.0.1:6100</moc_tc_base>
         <beacon_interval_ms>5000</beacon_interval_ms>
         <beacon_address>239.255.0.1:5550</beacon_address>
         <beacon_interface>127.0.0.1</beacon_interface>
@@ -40,8 +43,6 @@
         <name>serial-line</name>
         <group>payload_line</group>
         <path>/tmp/tcspecial4-line</path>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6400</oc_port>
     </payloads>
     <payloads>
         <name>udp-steady</name>
@@ -50,16 +51,12 @@
         <address>localhost</address>
         <port>5400</port>
         <packet_size>12</packet_size>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6401</oc_port>
     </payloads>
     <payloads>
         <name>random-device</name>
         <type>device-file</type>
         <path>/dev/urandom</path>
         <packet_size>8</packet_size>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6402</oc_port>
     </payloads>
     <payloads>
         <name>bus-device</name>
@@ -67,8 +64,6 @@
         <path>/tmp/tcspecial4-bus</path>
         <address>0x48</address>
         <packet_size>12</packet_size>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6403</oc_port>
     </payloads>
     <payloads>
         <name>clocked-peripheral</name>
@@ -77,7 +72,5 @@
         <max_speed>1000000</max_speed>
         <spi_mode>0</spi_mode>
         <packet_size>12</packet_size>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6404</oc_port>
     </payloads>
 </payload>

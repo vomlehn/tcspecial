@@ -14,8 +14,11 @@
     <version>1.0</version>
     <description>TCSpecial payload set 1</description>
     <tcspecial>
-        <command_interface>0.0.0.0:4000</command_interface>
+        <tcspecial_command>0.0.0.0:4000</tcspecial_command>
+        <moc_command>127.0.0.1:4100</moc_command>
         <payload_port>4001</payload_port>
+        <tcspecial_tc_base>0.0.0.0:6000</tcspecial_tc_base>
+        <moc_tc_base>127.0.0.1:6100</moc_tc_base>
         <beacon_interval_ms>5000</beacon_interval_ms>
         <beacon_address>239.255.0.1:5550</beacon_address>
         <beacon_interface>127.0.0.1</beacon_interface>
@@ -30,8 +33,6 @@
     </payload_groups>
     <payloads>
         <name>tcp-stream</name>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6000</oc_port>
         <type>network</type>
         <protocol>tcp</protocol>
         <address>localhost</address>
@@ -40,24 +41,18 @@
     </payloads>
     <payloads>
         <name>udp-steady</name>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6001</oc_port>
         <group>udp_localhost</group>
         <port>5001</port>
         <packet_size>11</packet_size>
     </payloads>
     <payloads>
         <name>random-device</name>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6002</oc_port>
         <type>device-file</type>
         <path>/dev/urandom</path>
         <packet_size>1</packet_size>
     </payloads>
     <payloads>
         <name>udp-fast</name>
-        <oc_address>127.0.0.1</oc_address>
-        <oc_port>6003</oc_port>
         <group>udp_localhost</group>
         <port>5003</port>
         <packet_size>15</packet_size>

@@ -449,7 +449,9 @@ fn no_such_handler(name: &DHName, configs: &[DHConfig]) -> String {
 fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
     let oc = config.oc.clone().ok_or_else(|| {
         TcsError::Config(format!(
-            "data handler \"{}\" has no OC address: give it oc_address and oc_port",
+            "data handler \"{}\" has nowhere to send what it reads: the payload \
+             set states no tcspecial section, and a payload's ground link is \
+             the section's moc_tc_base counted on by the payload's own id",
             config.name.0
         ))
     })?;
@@ -833,6 +835,20 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 0, // Let OS assign port
             payload_port: 0, // and one for payload commands
+            // The far ends and the bases, which nothing in the
+            // commanding reads: see tcslibgs::CIConfig.
+            moc_command: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 4100,
+            },
+            tcspecial_tc_base: tcslibgs::HostPort {
+                address: "0.0.0.0".to_string(),
+                port: 6000,
+            },
+            moc_tc_base: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 6100,
+            },
             beacon_interval: BeaconTime(5000),
             beacon_address: a_beacon_address(),
             beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -860,6 +876,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -914,6 +944,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+            ground: None,
             mode: Default::default(),
         };
 
@@ -922,6 +953,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1006,6 +1051,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
             mode: DHMode::Triggered {
                 trigger: b"go".to_vec(),
                 interval_ms: 50,
@@ -1017,6 +1063,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1116,6 +1176,7 @@ mod tests {
             // No OC address: a handler that were started would fail for want
             // of one, and nothing here should get that far.
             oc: None,
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -1124,6 +1185,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1194,6 +1269,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -1202,6 +1278,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1319,6 +1409,7 @@ mod tests {
             }),
             packet_size: 1,
             oc: None,
+            ground: None,
             mode: Default::default(),
         };
 
@@ -1327,6 +1418,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0,
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1380,6 +1485,7 @@ mod tests {
                 address: oc_addr.ip().to_string(),
                 port: oc_addr.port(),
             }),
+            ground: None,
                     mode: Default::default(),
         };
 
@@ -1388,6 +1494,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1449,6 +1569,18 @@ mod tests {
             // The port under test is the one already held; the other is the
             // OS's to choose, so what fails is the one this is about.
             payload_port: 0,
+            moc_command: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 4100,
+            },
+            tcspecial_tc_base: tcslibgs::HostPort {
+                address: "0.0.0.0".to_string(),
+                port: 6000,
+            },
+            moc_tc_base: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 6100,
+            },
             beacon_interval: BeaconTime(5000),
             beacon_address: a_beacon_address(),
             beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1482,6 +1614,20 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
+                // The far ends and the bases, which nothing in the
+                // commanding reads: see tcslibgs::CIConfig.
+                moc_command: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 4100,
+                },
+                tcspecial_tc_base: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 6000,
+                },
+                moc_tc_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 6100,
+                },
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,

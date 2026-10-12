@@ -45,6 +45,19 @@ pub enum Problem {
     NoAttributeNamed { sets: String },
     /// A command binding arriving on something that is not a MOC link.
     NotAMocLink { from: String },
+    /// A log node whose attributes are not a log's.
+    BadLog { node: String, why: String },
+    /// A source whose records a fixed-length log cannot hold.
+    ///
+    /// `produces` is what the source's records are, where the configuration
+    /// says: `None` is a source whose record length nothing states, which a
+    /// fixed-length log cannot take either.
+    LogSourceMismatch {
+        log: String,
+        source: String,
+        wanted: u32,
+        produces: Option<u32>,
+    },
     /// A node nothing reads and nothing writes.
     ///
     /// More likely a mistake than an intention: a node with no link at all
@@ -80,6 +93,11 @@ impl Problem {
             }
             Problem::NotAMocLink { from } => About::Node(from.clone()),
             Problem::Unconnected { node } => About::Node(node.clone()),
+            Problem::BadLog { node, .. } => About::Node(node.clone()),
+            // Reported on the source and not on the log: the log is right
+            // about what it wants, and the source is the thing a reader will
+            // have to change or unlink.
+            Problem::LogSourceMismatch { source, .. } => About::Node(source.clone()),
         }
     }
 
@@ -126,6 +144,28 @@ impl Problem {
             Problem::Unconnected { node } => format!(
                 "\"{node}\" has no link to or from it, so nothing reaches it and \
                  nothing reads it"
+            ),
+            Problem::BadLog { node, why } => format!("log \"{node}\": {why}"),
+            Problem::LogSourceMismatch {
+                log,
+                source,
+                wanted,
+                produces: Some(produces),
+            } => format!(
+                "\"{source}\" produces records of {produces} bytes and log \"{log}\" \
+                 holds records of exactly {wanted}: a fixed-length log cannot hold \
+                 both"
+            ),
+            Problem::LogSourceMismatch {
+                log,
+                source,
+                wanted,
+                produces: None,
+            } => format!(
+                "log \"{log}\" holds records of exactly {wanted} bytes, and nothing \
+                 says how long \"{source}\"'s records are: a fixed-length log takes \
+                 only sources whose length the configuration states, which a \
+                 computation's does not"
             ),
         }
     }
@@ -288,7 +328,81 @@ impl Graph {
             }
         }
 
+        // The logs, and whether what links into each of them fits the shape it
+        // writes. Settled here and not when a record is written: a log that
+        // would have to refuse a record in flight loses telemetry at the
+        // moment telemetry is worth most.
+        for node in self.nodes.iter().filter(|n| n.node_type == "log") {
+            let params = match crate::node::log::params_of(&node.name, &node.attributes) {
+                Ok(params) => params,
+                Err(why) => {
+                    problems.push(Problem::BadLog {
+                        node: node.name.clone(),
+                        // The name is in the problem already; the reason need
+                        // not carry it twice.
+                        why: why
+                            .strip_prefix(&format!("\"{}\": ", node.name))
+                            .unwrap_or(&why)
+                            .to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            // Only a fixed-length log is particular: the two variable formats
+            // take a record of any length, so any source suits them.
+            let Some(wanted) = params.format.exactly() else {
+                continue;
+            };
+
+            for source in self.sources_of(&node.name) {
+                let produces = self.record_bytes_of(source);
+                if produces != Some(wanted) {
+                    problems.push(Problem::LogSourceMismatch {
+                        log: node.name.clone(),
+                        source: source.to_string(),
+                        wanted,
+                        produces,
+                    });
+                }
+            }
+        }
+
         problems
+    }
+
+    /// Every node whose output arrives at this one.
+    ///
+    /// Each once: a node delivering to two inputs of one destination is one
+    /// source of it, and naming it twice would read as two.
+    fn sources_of(&self, node: &str) -> Vec<&str> {
+        let mut sources: Vec<&str> = Vec::new();
+        for link in &self.links {
+            let arrives = link.to.each().iter().any(|destination| {
+                destination.split('.').next().unwrap_or(destination) == node
+            });
+            if arrives && !sources.contains(&link.from.as_str()) {
+                sources.push(link.from.as_str());
+            }
+        }
+        sources
+    }
+
+    /// How long this node's records are, where the configuration says.
+    ///
+    /// `read_size` and nothing else. A device read in fixed-size packets says
+    /// so and is the case a fixed-length log exists for; a computation's
+    /// result is a number written out as text, whose width depends on the
+    /// number, and nothing in the file could say otherwise. `None` is "not
+    /// knowable from this configuration", which is different from a length
+    /// that disagrees and is reported differently.
+    fn record_bytes_of(&self, node: &str) -> Option<u32> {
+        let node = self.node(node)?;
+        if node.node_type == "compute" || node.node_type == "log" {
+            return None;
+        }
+        let stated = node.attributes.get("read_size")?;
+        stated.as_str().parse().ok()
     }
 }
 
@@ -296,6 +410,7 @@ impl Graph {
 mod tests {
     use super::*;
     use crate::graph::{CommandBinding, Destinations, Group, Link, Node};
+    use crate::Scalar;
     use std::collections::BTreeMap;
 
     /// A graph built here rather than read, so a test can make one wrong.
@@ -549,6 +664,156 @@ mod tests {
             .any(|p| matches!(p, Problem::NotAMocLink { .. })));
     }
 
+    /// A log says what a log says, and is refused for the rest.
+    #[test]
+    fn a_log_whose_attributes_are_not_a_logs_is_refused() {
+        let mut log = node("housekeeping", "log");
+        log.attributes
+            .insert("format".to_string(), Scalar::of("compressed"));
+        log.attributes
+            .insert("directory".to_string(), Scalar::of("/var/log/tcspecial"));
+
+        let g = graph(
+            vec![node("sensor", "i2c"), log],
+            vec![link("sensor", &["housekeeping"])],
+        );
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadLog { node, why } if node == "housekeeping" && why.contains("compressed")
+            )),
+            "{problems:?}"
+        );
+    }
+
+    /// A fixed-length log takes only sources of exactly that length.
+    ///
+    /// Settled on the ground, which is the point: a log that would have to
+    /// refuse a record in flight loses telemetry at the moment telemetry is
+    /// worth most.
+    #[test]
+    fn a_fixed_length_log_takes_only_what_fits() {
+        let fixed_log = |format: &str| {
+            let mut log = node("housekeeping", "log");
+            log.attributes
+                .insert("format".to_string(), Scalar::of(format));
+            log.attributes
+                .insert("directory".to_string(), Scalar::of("/var/log/tcspecial"));
+            log
+        };
+        let sensor = |name: &str, read_size: Option<&str>| {
+            let mut sensor = node(name, "i2c");
+            if let Some(size) = read_size {
+                sensor
+                    .attributes
+                    .insert("read_size".to_string(), Scalar::of(size));
+            }
+            sensor
+        };
+
+        // Two sensors read in two-byte packets, into a two-byte log: nothing
+        // to say.
+        let g = graph(
+            vec![
+                sensor("temp_fore", Some("2")),
+                sensor("temp_aft", Some("2")),
+                fixed_log("fixed:2"),
+            ],
+            vec![
+                link("temp_fore", &["housekeeping"]),
+                link("temp_aft", &["housekeeping"]),
+            ],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::LogSourceMismatch { .. })),
+            "{:?}",
+            g.check()
+        );
+
+        // One of them read in three, which the log cannot hold: reported on
+        // the source, naming both lengths.
+        let g = graph(
+            vec![
+                sensor("temp_fore", Some("2")),
+                sensor("temp_bay", Some("3")),
+                fixed_log("fixed:2"),
+            ],
+            vec![
+                link("temp_fore", &["housekeeping"]),
+                link("temp_bay", &["housekeeping"]),
+            ],
+        );
+        let problems = g.check();
+        let mismatches: Vec<&Problem> = problems
+            .iter()
+            .filter(|p| matches!(p, Problem::LogSourceMismatch { .. }))
+            .collect();
+        assert_eq!(mismatches.len(), 1, "{problems:?}");
+        assert!(matches!(
+            mismatches[0],
+            Problem::LogSourceMismatch { source, wanted: 2, produces: Some(3), .. }
+                if source == "temp_bay"
+        ));
+        assert!(
+            mismatches[0].describe().contains("3 bytes")
+                && mismatches[0].describe().contains("exactly 2"),
+            "{}",
+            mismatches[0].describe()
+        );
+
+        // A source whose length nothing states, which is every computation:
+        // refused too, and told why rather than being told a number.
+        let g = graph(
+            vec![
+                node("thermostat", "compute"),
+                sensor("temp_fore", None),
+                fixed_log("fixed:2"),
+            ],
+            vec![
+                link("thermostat", &["housekeeping"]),
+                link("temp_fore", &["housekeeping"]),
+            ],
+        );
+        let problems = g.check();
+        assert_eq!(
+            problems
+                .iter()
+                .filter(|p| matches!(
+                    p,
+                    Problem::LogSourceMismatch { produces: None, .. }
+                ))
+                .count(),
+            2,
+            "{problems:?}"
+        );
+
+        // And the two variable formats take all of them: a record of any
+        // length fits a log that writes its length beside it.
+        for format in ["variable_simple", "variable_ts_rc"] {
+            let g = graph(
+                vec![
+                    node("thermostat", "compute"),
+                    sensor("temp_bay", Some("3")),
+                    fixed_log(format),
+                ],
+                vec![
+                    link("thermostat", &["housekeeping"]),
+                    link("temp_bay", &["housekeeping"]),
+                ],
+            );
+            assert!(
+                !g.check()
+                    .iter()
+                    .any(|p| matches!(p, Problem::LogSourceMismatch { .. })),
+                "{format}: {:?}",
+                g.check()
+            );
+        }
+    }
+
     /// Every problem can be shown to a person.
     #[test]
     fn every_problem_describes_itself() {
@@ -581,6 +846,22 @@ mod tests {
             Problem::NoAttributeNamed { sets: "x".into() },
             Problem::NotAMocLink { from: "a".into() },
             Problem::Unconnected { node: "a".into() },
+            Problem::BadLog {
+                node: "l".into(),
+                why: "format: \"compressed\" is not a format a log knows".into(),
+            },
+            Problem::LogSourceMismatch {
+                log: "l".into(),
+                source: "s".into(),
+                wanted: 2,
+                produces: Some(3),
+            },
+            Problem::LogSourceMismatch {
+                log: "l".into(),
+                source: "s".into(),
+                wanted: 2,
+                produces: None,
+            },
         ];
         for problem in problems {
             assert!(!problem.describe().is_empty(), "{problem:?} says nothing");

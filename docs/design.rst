@@ -316,6 +316,50 @@ A log with no source links into it records nothing, and is named at load for the
 same reason a node with no outbound link is -- a configuration that cannot do
 anything is more likely a mistake than an intention.
 
+Requirement
+    A fixed-length log takes only sources whose record length the
+    configuration states, which means a device with a ``read_size``. A
+    computation's result is a number written out as text and its width depends
+    on the number, so nothing in the file could say otherwise -- and a source
+    whose length is not knowable is refused with that reason rather than with a
+    number it does not have. The two variable formats take any source.
+
+Requirement
+    A log is never read, and no link may leave one. It is where data stops; a
+    link out of a log would be a log read back into the vehicle that wrote it.
+
+Requirement
+    Segment files are named for the node: ``log-<node>-`` and the sequence
+    ``tcslog`` gives them. Two logs may write into one directory -- a
+    housekeeping log and a log of one noisy instrument, say -- and a reader of
+    that directory has to be able to tell which files are which.
+
+Requirement
+    A log node may say ``segment_bytes`` and need not. The default is the
+    telemetry log's, because a log node whose segment size differed from it for
+    no stated reason would be two answers to one question; a segment smaller
+    than one record is refused, being a log that would fill a file per record
+    and then fail on the one that would not fit.
+
+Requirement
+    The directory must already exist. A log node is not the thing to be
+    creating directories on a vehicle: a mistyped path created would become a
+    log nobody is looking in, where a mistyped path refused is a configuration
+    somebody fixes.
+
+Requirement
+    A record is not flushed as it is written. A log flushed per arrival is a
+    write system call per reading, and the records are in the kernel's hands
+    either way; what is flushed is a pass, and anything the log should be on
+    the far side of.
+
+Requirement
+    A write that fails is reported and counted, not swallowed. The fabric
+    attempts each destination of a link independently, so a log that cannot be
+    written does not stop the ground getting its telemetry -- which is exactly
+    why the failure must be visible: a silent one would be a log that stopped
+    recording with everything else still working.
+
 .. code-block:: yaml
 
    nodes:
@@ -612,7 +656,9 @@ These are the checks:
   attribute no binding mentions cannot be set from the ground.
 * every external process can be executed, and every one of them has a timeout.
 * every source of a log produces records the log's format can hold, which for
-  ``fixed: <n>`` means records of exactly ``n`` bytes from every one of them.
+  ``fixed: <n>`` means a stated ``read_size`` of exactly ``n`` from every one
+  of them. A source whose record length the configuration does not state --
+  every computation -- can feed a variable-length log and not a fixed one.
 
 Example: a cabin thermostat
 ---------------------------

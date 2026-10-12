@@ -18,6 +18,7 @@
 //! two-wire variant that is one of its own terms.
 
 pub mod i2c;
+pub mod log;
 pub mod spi;
 pub mod can;
 pub mod gpio;

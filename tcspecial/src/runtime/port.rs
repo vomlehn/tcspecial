@@ -14,9 +14,10 @@
 //! type would be nine copies of the same delegation with nine places for them
 //! to drift apart.
 //!
-//! [`ComputePort`] is the other adapter, and it is here rather than beside the
-//! computations for the same reason: it answers the same questions as
-//! [`EndpointPort`] -- what a refusal says, what a partial datum means -- and
+//! [`ComputePort`] and [`LogPort`] are the other two adapters, and they are
+//! here rather than beside the computations and the log for the same reason:
+//! they answer the same questions as [`EndpointPort`] -- what a refusal says,
+//! what a partial datum means, which direction a node may be used in -- and
 //! answers kept together are answers that stay the same.
 //!
 //! # What this decides
@@ -47,6 +48,7 @@ use tcslibgs::graph::Node;
 use tcslibgs::{EndpointConfig, TcsResult};
 
 use crate::node::compute::{self, Function};
+use crate::node::log::LogNode;
 
 use crate::endpoint::{
     bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
@@ -468,6 +470,56 @@ impl Port for ComputePort {
 
     fn ready(&self) -> bool {
         !self.ready.is_empty()
+    }
+}
+
+/// A log, as a node of the graph.
+///
+/// The thinnest of the three adapters, because a log is the simplest kind of
+/// node: what arrives is written, nothing is read, and there is no result to
+/// pass on. The input name is ignored on purpose -- a log is the one node type
+/// with no fixed number of inputs, so an arrival cannot be ambiguous to it,
+/// and every source writing into one log in the order things happened is the
+/// whole point of having it.
+pub struct LogPort(LogNode);
+
+impl LogPort {
+    /// Hold a log that is already open.
+    pub fn of(log: LogNode) -> LogPort {
+        LogPort(log)
+    }
+
+    /// Open the log this node describes.
+    pub fn open(node: &Node) -> Result<LogPort, String> {
+        Ok(LogPort(LogNode::of(node)?))
+    }
+
+    /// Push what has been written to the file.
+    ///
+    /// For the end of a pass, and for anything about to happen that the log
+    /// should be on the far side of. Not done per record: a log flushed per
+    /// arrival is a write system call per reading, and the records are in the
+    /// kernel's hands either way.
+    pub fn flush(&mut self) -> Result<(), String> {
+        self.0.flush()
+    }
+}
+
+impl Port for LogPort {
+    fn take(&mut self, _buffer: &mut [u8]) -> Result<usize, String> {
+        Err(format!(
+            "{}: nothing is read from a log -- it is where data stops, and a link \
+             out of one would be a log read back into the vehicle that wrote it",
+            self.0.name()
+        ))
+    }
+
+    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<(), String> {
+        self.0.record(data)
+    }
+
+    fn produces(&self) -> bool {
+        false
     }
 }
 
@@ -956,6 +1008,76 @@ mod tests {
         let mut buffer = [0u8; 64];
         let got = port.take(&mut buffer).expect("the result");
         assert_eq!(&buffer[..got], b"293.15");
+    }
+
+    /// Every source of a log writes into the one log, in order.
+    #[test]
+    fn a_log_takes_what_several_nodes_produced() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut port = LogPort::open(&Node {
+            name: "housekeeping".to_string(),
+            node_type: "log".to_string(),
+            group: None,
+            attributes: [
+                (
+                    "directory".to_string(),
+                    tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
+                ),
+                ("format".to_string(), tcslibgs::Scalar::of("variable_ts_rc")),
+            ]
+            .into_iter()
+            .collect(),
+            editor: None,
+        })
+        .expect("a log");
+
+        // Three readings and a decision, arriving as the fabric delivers
+        // them: unnamed, because a log has no named inputs.
+        for record in [&b"289.15"[..], b"289.15", b"287.3188", b"1"] {
+            assert_eq!(port.give(None, record), Ok(()));
+        }
+        // And one that arrives with a name anyway, which a log takes: an
+        // arrival cannot be ambiguous to a node that writes everything down.
+        assert_eq!(port.give(Some("in0"), b"291.0"), Ok(()));
+        port.flush().expect("the log is flushed");
+
+        assert!(!port.produces(), "a log is where data stops");
+        assert!(port.accepts());
+        let said = port
+            .take(&mut [0u8; 64])
+            .expect_err("a log read back into the vehicle");
+        assert!(
+            said.contains("housekeeping") && said.contains("where data stops"),
+            "{said}"
+        );
+    }
+
+    /// A record the log's format cannot hold is refused, and named.
+    #[test]
+    fn a_log_refuses_what_its_format_cannot_hold() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut port = LogPort::open(&Node {
+            name: "fixed_log".to_string(),
+            node_type: "log".to_string(),
+            group: None,
+            attributes: [
+                (
+                    "directory".to_string(),
+                    tcslibgs::Scalar::of(where_.path().to_str().expect("a path")),
+                ),
+                ("format".to_string(), tcslibgs::Scalar::of("fixed:4")),
+            ]
+            .into_iter()
+            .collect(),
+            editor: None,
+        })
+        .expect("a log");
+
+        assert_eq!(port.give(None, b"abcd"), Ok(()));
+        let said = port
+            .give(None, b"289.15")
+            .expect_err("six bytes in a four-byte log");
+        assert!(said.contains("fixed_log"), "{said}");
     }
 
     /// A device does not produce because something was delivered to it.

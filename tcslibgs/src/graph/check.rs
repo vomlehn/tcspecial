@@ -69,6 +69,20 @@ pub enum Problem {
         wanted: u32,
         produces: Option<u32>,
     },
+    /// A configuration with no `tcspecial` section.
+    ///
+    /// Required, and required rather than defaulted for the reason the beacon
+    /// attributes inside it are: where commands are taken and where beacons go
+    /// are not questions to be answered by whatever a file was silently given.
+    /// A configuration that has not been asked them has not answered them.
+    NoTcspecial,
+    /// A `tcspecial` section that is there and does not hold together.
+    ///
+    /// `why` is the reason in the words of the one piece of code that knows
+    /// them -- see [`crate::types::CIConfigJson::to_ci_config`] -- so that the
+    /// ground check, the editor and the flight software all refuse the same
+    /// file for the same stated reason.
+    BadTcspecial { why: String },
     /// A payload that is read and also written to, and says nothing about
     /// what the writing is for.
     ///
@@ -116,6 +130,12 @@ impl Problem {
             // about where it sends, and the payload is where the trigger
             // would have to be written.
             Problem::UntriggeredInput { node, .. } => About::Node(node.clone()),
+            // The section, where there is one to point at. A missing section
+            // has no line of its own and is reported on the file, which is
+            // where it would have to be written.
+            Problem::NoTcspecial | Problem::BadTcspecial { .. } => {
+                About::Section("tcspecial")
+            }
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
             Problem::MeanInputs { node, .. } => About::Node(node.clone()),
@@ -170,6 +190,11 @@ impl Problem {
                 "\"{node}\" has no link to or from it, so nothing reaches it and \
                  nothing reads it"
             ),
+            Problem::NoTcspecial => "this configuration has no tcspecial \
+                 section, so nothing says where commands are taken, where \
+                 beacons go or where the telemetry log is written"
+                .to_string(),
+            Problem::BadTcspecial { why } => format!("tcspecial: {why}"),
             Problem::UntriggeredInput { node, from } => format!(
                 "\"{from}\" is delivered to \"{node}\", which states no trigger: \
                  what is written to a payload that is read is what asks it for \
@@ -472,6 +497,33 @@ impl Graph {
             }
         }
 
+        // What tcspecial itself is configured with.
+        //
+        // Required: a graph describes what the vehicle carries and what is
+        // done with it, and none of that reaches the ground unless something
+        // says where commands are taken and where beacons go. Checked with
+        // the same code the payload sets are checked with, so that one
+        // mistake is one complaint wherever the section is written.
+        match &self.tcspecial {
+            None => problems.push(Problem::NoTcspecial),
+            Some(said) => {
+                // Two rounds of rules, and both of them somebody else's. What
+                // the section may say and whether it says it is in
+                // parameters.rs; what the values have to be -- a multicast
+                // beacon address, a protocol that exists, two ports that are
+                // not one socket -- is in the struct the command interpreter
+                // itself reads.
+                match crate::graph::parameters::ci_config_of(said) {
+                    Err(why) => problems.push(Problem::BadTcspecial { why }),
+                    Ok(section) => {
+                        if let Err(why) = section.to_ci_config() {
+                            problems.push(Problem::BadTcspecial { why });
+                        }
+                    }
+                }
+            }
+        }
+
         // What may be written to a payload.
         //
         // A payload that is read is asked for its readings, and the bytes
@@ -563,10 +615,35 @@ mod tests {
     use crate::Scalar;
     use std::collections::BTreeMap;
 
+    /// What tcspecial is configured with, for a graph that is otherwise
+    /// sound.
+    ///
+    /// Required of every configuration, so every test that is about something
+    /// else has to have one: a graph without it is refused, and a test that
+    /// read `check() == []` would be reading the wrong refusal. The values are
+    /// the shipped examples'.
+    fn tcspecial() -> BTreeMap<String, Scalar> {
+        [
+            ("address", "0.0.0.0"),
+            ("port", "4000"),
+            ("payload_port", "4001"),
+            ("protocol", "udp"),
+            ("beacon_interval_ms", "5000"),
+            ("beacon_address", "239.255.0.1:5550"),
+            ("beacon_interface", "127.0.0.1"),
+            ("log_dir", "/var/log/tcspecial"),
+            ("log_segment_bytes", "65536"),
+        ]
+        .into_iter()
+        .map(|(name, value)| (name.to_string(), Scalar::of(value)))
+        .collect()
+    }
+
     /// A graph built here rather than read, so a test can make one wrong.
     fn graph(nodes: Vec<Node>, links: Vec<Link>) -> Graph {
         Graph {
             description: None,
+            tcspecial: Some(tcspecial()),
             groups: Vec::new(),
             nodes,
             links,
@@ -622,6 +699,79 @@ mod tests {
             vec![link("a", &["b"]), link("b", &["c"])],
         );
         assert_eq!(g.check(), Vec::new());
+    }
+
+    /// A configuration must say what tcspecial itself is configured with.
+    ///
+    /// A graph describes what the vehicle carries and what is done with it,
+    /// and none of that reaches the ground until something says where commands
+    /// are taken and where beacons go. Required rather than defaulted for the
+    /// reason the attributes inside it are: a configuration that has not been
+    /// asked the question has not answered it.
+    #[test]
+    fn a_configuration_says_what_tcspecial_is_configured_with() {
+        let mut g = graph(vec![node("a", "i2c"), node("c", "moc")], vec![link("a", &["c"])]);
+        assert_eq!(g.check(), Vec::new(), "this one is sound");
+
+        g.tcspecial = None;
+        let problems = g.check();
+        assert!(
+            problems.contains(&Problem::NoTcspecial),
+            "{problems:?}"
+        );
+        let said = problems
+            .iter()
+            .find(|p| **p == Problem::NoTcspecial)
+            .unwrap();
+        // Reported on the section, which is where it would have to be
+        // written, and the complaint says what the section is for.
+        assert_eq!(said.about(), About::Section("tcspecial"));
+        for word in ["tcspecial", "commands", "beacons"] {
+            assert!(said.describe().contains(word), "{}", said.describe());
+        }
+    }
+
+    /// A section that is there and does not hold together is refused by its
+    /// own words.
+    ///
+    /// Two sets of rules behind this, and neither of them written twice: what
+    /// the section may say is `graph::parameters`, and what the values have to
+    /// be is the struct the command interpreter itself reads. A mistake is one
+    /// complaint wherever the section is written.
+    #[test]
+    fn a_tcspecial_section_that_does_not_hold_together_is_refused() {
+        let wrong = [
+            // A name belonging to nothing.
+            ("beacon_adress", "239.255.0.1:5550", "beacon_adress"),
+            // A port that is not one.
+            ("port", "nought", "port"),
+            // A beacon address that is not a multicast group, which is the
+            // rule the command interpreter's own struct knows.
+            ("beacon_address", "10.0.0.1:5550", "multicast"),
+            // And a protocol that does not exist.
+            ("protocol", "sctp", "protocol"),
+        ];
+
+        for (attribute, value, expected) in wrong {
+            let mut g = graph(vec![node("a", "i2c"), node("c", "moc")], vec![link("a", &["c"])]);
+            g.tcspecial
+                .as_mut()
+                .unwrap()
+                .insert(attribute.to_string(), Scalar::of(value));
+
+            let problems = g.check();
+            let said = problems
+                .iter()
+                .find_map(|p| match p {
+                    Problem::BadTcspecial { why } => Some(why.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{attribute} = {value}: {problems:?}"));
+            assert!(
+                said.contains(expected),
+                "{attribute} = {value} was refused as {said:?}"
+            );
+        }
     }
 
     /// A payload that is read takes nothing unless it says what asks it.

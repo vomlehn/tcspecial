@@ -48,6 +48,17 @@ pub fn read(path: &Path) -> Result<Document, String> {
         ..Document::default()
     };
 
+    // What tcspecial is configured with, as the words the file holds. The
+    // reader is deliberately not strict about it -- see
+    // tcslibgs::graph::parameters -- so a section somebody left halfway
+    // through opens, says what is missing, and can be put right.
+    if let Some(said) = &graph.tcspecial {
+        document.tcspecial = said
+            .iter()
+            .map(|(attribute, value)| (attribute.clone(), value.as_str().to_string()))
+            .collect();
+    }
+
     for group in &graph.groups {
         document
             .groups

@@ -1,6 +1,27 @@
 version: "2.0"
 description: One payload on a UDP link, its telemetry going to the ground
 
+# What tcspecial itself is configured with: where commands are taken, where
+# beacons go, and where the telemetry log is written. The same section a
+# payload set's file holds, and required of every configuration -- a graph
+# that describes what the vehicle carries says nothing about how any of it
+# reaches the ground until this is answered.
+#
+# Two ports, because there are two command links: a command about the
+# spacecraft -- ping it, arm it, restart it -- is taken on port, and one about
+# a payload on payload_port, so what the ground needs in a hurry is never
+# queued behind what it asked for at leisure.
+tcspecial:
+  address: 0.0.0.0
+  port: 4000
+  payload_port: 4001
+  protocol: udp
+  beacon_interval_ms: 5000
+  beacon_address: "239.255.0.1:5550"
+  beacon_interface: "127.0.0.1"
+  log_dir: /var/log/tcspecial
+  log_segment_bytes: 65536
+
 # How often the payload is read.
 #
 # The interval belongs to a group and not to a node: a node that stated one of

@@ -88,6 +88,19 @@ pub struct Document {
     /// file back without it would be deleting something somebody wrote.
     #[serde(default)]
     pub description: Option<String>,
+    /// What tcspecial itself is configured with: where commands are taken,
+    /// where beacons go, where the telemetry log is written.
+    ///
+    /// Required of every configuration, and the one part of a configuration
+    /// that is not on the canvas: it is about the whole of it rather than
+    /// about any node in it, so it is edited in a window of its own and not by
+    /// pressing something. See `tcslibgs::graph::parameters`, which holds the
+    /// list of what it may say and the rules about it.
+    ///
+    /// Text, as a node's attributes are, because the editor has to be able to
+    /// hold a port somebody is halfway through typing.
+    #[serde(default)]
+    pub tcspecial: BTreeMap<String, String>,
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
     /// The groups, by name, each with the interval it reads on.
@@ -153,6 +166,14 @@ pub enum Fault {
     NoSuchGroup { node: String, group: String },
     /// A group nothing is in, which reads nothing on its interval.
     EmptyGroup { group: String },
+    /// A configuration with no tcspecial section at all.
+    ///
+    /// Required: nothing in a graph says where commands are taken or where
+    /// beacons go until this does. The editor can hold a configuration
+    /// without one -- it has to be able to hold anything -- and says so.
+    NoTcspecial,
+    /// One of tcspecial's own parameters, required and not stated.
+    MissingTcspecial { attribute: String },
     /// A link delivering into a payload that is read and states no trigger.
     ///
     /// The same rule `tcsverify` applies on the ground and tcspecial applies
@@ -190,6 +211,14 @@ impl Fault {
             Fault::MissingAttribute { attribute, .. } => {
                 format!("{attribute} is not set")
             }
+            Fault::NoTcspecial => {
+                "this configuration does not say what tcspecial is configured \
+                 with: see Edit tcspecial parameters"
+                    .to_string()
+            }
+            Fault::MissingTcspecial { attribute } => {
+                format!("tcspecial {attribute} is not set")
+            }
             Fault::UntriggeredInput { from, .. } => {
                 format!("nothing is written to this: \"{from}\" has nowhere to go")
             }
@@ -217,6 +246,9 @@ impl Fault {
             Fault::UntriggeredInput { node, .. } => Some(node),
             Fault::NoSuchGroup { node, .. } => Some(node),
             Fault::EmptyGroup { .. } => None,
+            // Not about a node: the section is about the configuration as a
+            // whole, so there is nothing on the canvas to draw it on.
+            Fault::NoTcspecial | Fault::MissingTcspecial { .. } => None,
         }
     }
 }
@@ -535,6 +567,19 @@ impl Document {
                     node.at = *now;
                 }
             }
+            Edit::SetTcspecial {
+                attribute, now, ..
+            } => match now {
+                Some(value) => {
+                    self.tcspecial.insert(attribute.clone(), value.clone());
+                }
+                // Cleared rather than emptied: absent and empty are the same
+                // thing to the checking, and a cleared field should leave the
+                // file as somebody would have written it.
+                None => {
+                    self.tcspecial.remove(attribute);
+                }
+            },
             Edit::AddGroup { name, interval } => {
                 self.groups.insert(name.clone(), interval.clone());
             }
@@ -704,6 +749,30 @@ impl Document {
             }
         }
 
+        // What tcspecial is configured with, which every configuration must
+        // say. The list of what it may say is tcslibgs's, so that the editor
+        // asks for exactly what the ground check and the flight software
+        // require -- no more and no fewer.
+        if self.tcspecial.is_empty() {
+            faults.push(Fault::NoTcspecial);
+        } else {
+            for (attribute, required) in tcslibgs::graph::parameters::ATTRIBUTES {
+                if !required {
+                    continue;
+                }
+                let given = self
+                    .tcspecial
+                    .get(*attribute)
+                    .map(|value| value.trim())
+                    .unwrap_or("");
+                if given.is_empty() {
+                    faults.push(Fault::MissingTcspecial {
+                        attribute: (*attribute).to_string(),
+                    });
+                }
+            }
+        }
+
         // What may be written to a payload.
         //
         // A payload that is read is asked for its readings, and the bytes that
@@ -838,6 +907,26 @@ impl Document {
             ));
         }
 
+        // The same section the YAML writes, in the same place and for the
+        // same reason.
+        if home.is_none() && !self.tcspecial.is_empty() {
+            let said: Vec<(&String, &String)> = self
+                .tcspecial
+                .iter()
+                .filter(|(_, value)| !value.trim().is_empty())
+                .collect();
+            if !said.is_empty() {
+                out.push_str("    <tcspecial>\n");
+                for (attribute, value) in said {
+                    out.push_str(&format!(
+                        "        <{attribute}>{}</{attribute}>\n",
+                        escape(value)
+                    ));
+                }
+                out.push_str("    </tcspecial>\n");
+            }
+        }
+
         if home.is_none() {
             for name in self.subdiagrams() {
                 out.push_str(&format!("    <include>{}</include>\n", escape(&name)));
@@ -946,6 +1035,26 @@ impl Document {
         out.push_str("version: \"2.0\"\n");
         if let Some(description) = &self.description {
             out.push_str(&format!("description: {}\n", quoted(description)));
+        }
+
+        // What tcspecial is configured with, first, because it is about the
+        // configuration as a whole rather than about anything in it -- which
+        // is where the payload sets put their own copy of this section. Only
+        // the top file: a configuration has one command interpreter, and an
+        // included file that declared one would be a second answer to one
+        // question.
+        if home.is_none() && !self.tcspecial.is_empty() {
+            out.push_str("\ntcspecial:\n");
+            for (attribute, value) in &self.tcspecial {
+                // An attribute somebody has cleared is left out rather than
+                // written empty. Absent and empty mean the same thing to the
+                // checking -- see parameters::ci_config_of -- and a file
+                // without the line is the one a person would have written.
+                if value.trim().is_empty() {
+                    continue;
+                }
+                out.push_str(&format!("  {attribute}: {}\n", quoted(value)));
+            }
         }
 
         // The subdiagrams this file pulls in, named rather than discovered.
@@ -1151,6 +1260,27 @@ pub fn thermostat_example() -> Document {
             now: Some(comment.to_string()),
         });
     };
+
+    // What tcspecial itself is configured with, which every configuration
+    // must say: where commands are taken, where beacons go, where the
+    // telemetry log is written.
+    for (attribute, value) in [
+        ("address", "0.0.0.0"),
+        ("port", "4000"),
+        ("payload_port", "4001"),
+        ("protocol", "udp"),
+        ("beacon_interval_ms", "5000"),
+        ("beacon_address", "239.255.0.1:5550"),
+        ("beacon_interface", "127.0.0.1"),
+        ("log_dir", "/var/log/tcspecial"),
+        ("log_segment_bytes", "65536"),
+    ] {
+        document.apply(&Edit::SetTcspecial {
+            attribute: attribute.to_string(),
+            was: None,
+            now: Some(value.to_string()),
+        });
+    }
 
     // The group the three sensors share, which is the point of the example:
     // readings that will be averaged are taken as close to together as the
@@ -1394,6 +1524,179 @@ mod tests {
                 t.spelling()
             );
         }
+    }
+
+    /// What tcspecial is configured with is written, read back, and asked
+    /// for.
+    ///
+    /// Every configuration must say it, so the editor has to write it in both
+    /// spellings, read what it wrote, and mark what is missing -- and it has
+    /// to do that while somebody is halfway through filling it in, which is
+    /// the state a file would be unreadable in if the section were read
+    /// strictly.
+    #[test]
+    fn the_tcspecial_section_is_written_and_what_is_missing_is_marked() {
+        let mut document = Document::new();
+
+        // A document with no section at all says so, once.
+        assert_eq!(
+            document.faults(),
+            vec![Fault::NoTcspecial],
+            "{:?}",
+            document.faults()
+        );
+
+        // Half of it, which is what a person typing has.
+        for (attribute, value) in [("protocol", "udp"), ("port", "4000")] {
+            document.apply(&Edit::SetTcspecial {
+                attribute: attribute.into(),
+                was: None,
+                now: Some(value.into()),
+            });
+        }
+        let faults = document.faults();
+        assert!(
+            !faults.contains(&Fault::NoTcspecial),
+            "a section that says something is a section: {faults:?}"
+        );
+        // And the five that are still missing are named one by one, because
+        // "the section is wrong" sends somebody to read all nine.
+        for attribute in [
+            "address",
+            "payload_port",
+            "beacon_interval_ms",
+            "beacon_address",
+            "beacon_interface",
+        ] {
+            assert!(
+                faults.contains(&Fault::MissingTcspecial {
+                    attribute: attribute.to_string()
+                }),
+                "{attribute} is not stated and nothing says so: {faults:?}"
+            );
+        }
+        // The two that are stated are not, and neither are the optional ones.
+        for attribute in ["port", "protocol", "log_dir", "log_segment_bytes"] {
+            assert!(
+                !faults.contains(&Fault::MissingTcspecial {
+                    attribute: attribute.to_string()
+                }),
+                "{attribute} should not be marked: {faults:?}"
+            );
+        }
+
+        // Written in both spellings, and in the place the payload sets put it:
+        // before anything else, because it is about the configuration as a
+        // whole.
+        let yaml = document.to_yaml();
+        assert!(yaml.contains("tcspecial:\n"), "{yaml}");
+        assert!(yaml.contains("  port: \"4000\"\n"), "{yaml}");
+        assert!(
+            yaml.find("tcspecial:") < yaml.find("nodes:"),
+            "the section should come first: {yaml}"
+        );
+        let xml = document.to_xml();
+        assert!(xml.contains("<tcspecial>"), "{xml}");
+        assert!(xml.contains("<port>4000</port>"), "{xml}");
+
+        // A parameter somebody clears leaves the file without the line rather
+        // than with an empty one: absent and empty mean the same thing to the
+        // checking, and a file with an empty value is one nobody would have
+        // written.
+        document.apply(&Edit::SetTcspecial {
+            attribute: "port".into(),
+            was: Some("4000".into()),
+            now: None,
+        });
+        assert!(!document.to_yaml().contains("port"), "{}", document.to_yaml());
+        assert!(
+            document.faults().contains(&Fault::MissingTcspecial {
+                attribute: "port".to_string()
+            })
+        );
+    }
+
+    /// The editor asks for exactly what the checker requires.
+    ///
+    /// Two statements of one list would drift, and what that would look like
+    /// is a configuration the editor called complete and `tcsverify` refused
+    /// -- or, worse, the other way about. So the editor has no list: it reads
+    /// the one in `tcslibgs`, and this is what says the panel is built from
+    /// it.
+    #[test]
+    fn the_editor_asks_for_what_the_checker_requires() {
+        use tcslibgs::graph::parameters::{blank, ci_config_of, ATTRIBUTES};
+
+        let mut document = Document::new();
+        for (attribute, value) in blank() {
+            let value = value.as_str().trim().to_string();
+            if value.is_empty() {
+                continue;
+            }
+            document.apply(&Edit::SetTcspecial {
+                attribute,
+                was: None,
+                now: Some(value),
+            });
+        }
+
+        // Everything the editor marks as missing is something the checker
+        // refuses the configuration for, and the other way about.
+        let marked: Vec<String> = document
+            .faults()
+            .into_iter()
+            .filter_map(|fault| match fault {
+                Fault::MissingTcspecial { attribute } => Some(attribute),
+                _ => None,
+            })
+            .collect();
+        assert!(!marked.is_empty(), "a blank section is not complete");
+        for attribute in &marked {
+            assert!(
+                ATTRIBUTES
+                    .iter()
+                    .any(|(name, required)| name == attribute && *required),
+                "{attribute} is marked and is not required"
+            );
+        }
+
+        // Fill in what is marked, and the checker takes it.
+        for attribute in marked {
+            let value = match attribute.as_str() {
+                "address" => "0.0.0.0",
+                "port" => "4000",
+                "payload_port" => "4001",
+                "beacon_address" => "239.255.0.1:5550",
+                "beacon_interface" => "127.0.0.1",
+                other => panic!("{other} was marked and this test has no value for it"),
+            };
+            document.apply(&Edit::SetTcspecial {
+                attribute,
+                was: None,
+                now: Some(value.to_string()),
+            });
+        }
+        assert!(
+            !document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::MissingTcspecial { .. } | Fault::NoTcspecial)),
+            "{:?}",
+            document.faults()
+        );
+
+        // And the checker agrees, by its own rules.
+        let said = document
+            .tcspecial
+            .iter()
+            .map(|(name, value)| {
+                (name.clone(), tcslibgs::endpoint_config::Scalar::of(value.as_str()))
+            })
+            .collect();
+        ci_config_of(&said)
+            .expect("the editor's idea of complete")
+            .to_ci_config()
+            .expect("and the command interpreter's");
     }
 
     /// Reading a configuration puts every node in the pane it belongs to.
@@ -1856,7 +2159,15 @@ mod tests {
     #[test]
     fn a_document_says_what_is_wrong_with_it() {
         let mut document = Document::new();
-        assert!(document.faults().is_empty(), "an empty document is not faulty");
+        // One fault, and only one: a configuration must say what tcspecial is
+        // configured with, and a document with nothing in it has not. Nothing
+        // else is wrong with emptiness -- a configuration with no nodes is
+        // where every configuration starts.
+        assert_eq!(
+            document.faults(),
+            vec![Fault::NoTcspecial],
+            "an empty document should be faulty only for the one thing"
+        );
 
         document.apply(&add("a", "i2c"));
         document.apply(&add("a", "spi"));
@@ -1880,7 +2191,11 @@ mod tests {
         let mut document = Document::new();
         document.apply(&add("a", "contraption"));
         match document.faults().as_slice() {
-            [Fault::UnknownType { node_type, .. }] => assert_eq!(node_type, "contraption"),
+            // The missing section is the other one, and is every document's
+            // until it says what tcspecial is configured with.
+            [Fault::UnknownType { node_type, .. }, Fault::NoTcspecial] => {
+                assert_eq!(node_type, "contraption")
+            }
             other => panic!("{other:?}"),
         }
 
@@ -1925,6 +2240,7 @@ mod tests {
                 Edit::SetNodeComment { .. } => (),
                 Edit::SetLinkComment { .. } => (),
                 Edit::MoveNode { .. } => (),
+                Edit::SetTcspecial { .. } => (),
                 Edit::AddGroup { .. } => (),
                 Edit::RemoveGroup { .. } => (),
                 Edit::SetGroupInterval { .. } => (),
@@ -1955,6 +2271,17 @@ mod tests {
                 was: None,
                 now: Some("the fore sensor".into()),
             });
+            // What tcspecial is configured with, so that the edits which set
+            // one of its parameters have something to change.
+            for (attribute, value) in
+                [("port", "4000"), ("log_dir", "/var/log/tcspecial")]
+            {
+                document.apply(&Edit::SetTcspecial {
+                    attribute: attribute.into(),
+                    was: None,
+                    now: Some(value.into()),
+                });
+            }
             // A group with a payload in it, so that the edits that act on a
             // group have something to act on: a group edit applied to no
             // members trivially round-trips and proves nothing.
@@ -2017,6 +2344,18 @@ mod tests {
                 node: "a".into(),
                 was: (0, 0),
                 now: (120, 80),
+            },
+            Edit::SetTcspecial {
+                attribute: "port".into(),
+                was: Some("4000".into()),
+                now: Some("4100".into()),
+            },
+            // And one that clears a parameter, which takes the line out of
+            // the file rather than writing it empty.
+            Edit::SetTcspecial {
+                attribute: "log_dir".into(),
+                was: Some("/var/log/tcspecial".into()),
+                now: None,
             },
             Edit::AddGroup {
                 name: "bay".into(),

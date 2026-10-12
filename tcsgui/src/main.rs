@@ -147,6 +147,12 @@ struct Views {
     /// the same form. Choosing another group re-points this one, which is also
     /// what makes the menu behave like a menu.
     group: Option<GroupWindow>,
+    /// The tcspecial parameters window, if one is open.
+    ///
+    /// One, like the group window and for the same reason: it is a form about
+    /// the configuration rather than a page of it, and a second copy would be
+    /// two sets of fields writing to one set of values.
+    parameters: Option<ParametersWindow>,
     /// Which group that window is showing.
     ///
     /// Shared with the window's own handlers, because a group can be renamed
@@ -202,6 +208,9 @@ impl Views {
         let divider = self.divider.get();
         if let Some(window) = &self.group {
             put_group(window, editor, &self.showing.borrow());
+        }
+        if let Some(window) = &self.parameters {
+            put_parameters(window, editor);
         }
         if let Some(top) = self.top.upgrade() {
             put(&top, editor, &None, chosen.get("").map(|s| s.as_str()), divider);
@@ -271,6 +280,7 @@ fn main() -> Result<(), slint::PlatformError> {
         chosen: Rc::new(RefCell::new(BTreeMap::new())),
         divider: divider.clone(),
         group: None,
+        parameters: None,
         showing: Rc::new(RefCell::new(String::new())),
     }));
     // Which node the panel is showing, per window.
@@ -469,6 +479,14 @@ macro_rules! wiring {
                 window.on_save_clicked(move || {
                     editor.borrow_mut().save();
                     views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
+                // The menu item that opens what tcspecial is configured with.
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_edit_parameters(move || {
+                    show_parameters(&editor, &views);
                 });
             }
             {
@@ -774,6 +792,84 @@ fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
     // should not have to look at the other one to find out that nothing is
     // reaching the disk.
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// Put the tcspecial parameters into their window.
+///
+/// Every attribute the section may have, in the order `tcslibgs` lists them --
+/// the ones that must be stated first -- with the empty required ones marked.
+/// Built from that list rather than from what the document happens to hold, so
+/// that a section somebody has never filled in shows nine fields to fill
+/// rather than nothing at all.
+fn put_parameters(window: &ParametersWindow, editor: &Editor) {
+    let said = &editor.document().tcspecial;
+    let fields: Vec<FieldView> = tcslibgs::graph::parameters::ATTRIBUTES
+        .iter()
+        .map(|(attribute, required)| {
+            let value = said.get(*attribute).cloned().unwrap_or_default();
+            FieldView {
+                name: (*attribute).into(),
+                value: value.clone().into(),
+                required: *required,
+                missing: *required && value.trim().is_empty(),
+            }
+        })
+        .collect();
+
+    window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// Show the tcspecial parameters, making the window if there is not one.
+fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    if views.borrow().parameters.is_none() {
+        let window = match ParametersWindow::new() {
+            Ok(window) => window,
+            Err(e) => {
+                eprintln!("tcsgui: the tcspecial parameters cannot be opened: {e}");
+                return;
+            }
+        };
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_parameter_set(move |attribute, value| {
+                {
+                    let mut editor = editor.borrow_mut();
+                    let attribute = attribute.to_string();
+                    let was = editor.document().tcspecial.get(&attribute).cloned();
+                    // An empty field clears the parameter rather than setting
+                    // it to nothing: the line comes out of the file, which is
+                    // what somebody would have written.
+                    let now = (!value.trim().is_empty()).then(|| value.to_string());
+                    if was == now {
+                        return;
+                    }
+                    editor.edit(Edit::SetTcspecial {
+                        attribute,
+                        was,
+                        now,
+                    });
+                }
+                views.borrow().refresh(&editor.borrow());
+            });
+        }
+        views.borrow_mut().parameters = Some(window);
+    }
+
+    // Through a weak handle, so nothing of `views` is borrowed while the
+    // window is shown.
+    let window = views
+        .borrow()
+        .parameters
+        .as_ref()
+        .map(|window| window.as_weak());
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        put_parameters(&window, &editor.borrow());
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: the tcspecial parameters cannot be shown: {e}");
+        }
+    }
 }
 
 /// What the groups menu offers.
@@ -1204,6 +1300,21 @@ fn seed(editor: &mut Editor) {
         && editor.trouble().is_none();
     if !fresh {
         return;
+    }
+
+    // What tcspecial is configured with, which every configuration must say.
+    // The mechanical values are filled in and the mission's own are left
+    // empty, which the panel marks: see tcslibgs::graph::parameters::blank.
+    for (attribute, value) in tcslibgs::graph::parameters::blank() {
+        let value = value.as_str().trim().to_string();
+        if value.is_empty() {
+            continue;
+        }
+        editor.edit(Edit::SetTcspecial {
+            attribute,
+            was: None,
+            now: Some(value),
+        });
     }
 
     // Two edits, as placing one by hand is: a node exists, and then it is
@@ -2398,6 +2509,25 @@ mod tests {
         let mut editor = Editor::open(&path, DIVIDER);
         seed(&mut editor);
 
+        // And what tcspecial is configured with, which every configuration
+        // must say. The mechanical values are filled in; the mission's own
+        // are left for somebody to answer, and marked until they do.
+        let said = &editor.document().tcspecial;
+        assert_eq!(said.get("protocol").map(String::as_str), Some("udp"));
+        assert_eq!(said.get("beacon_interval_ms").map(String::as_str), Some("5000"));
+        for unanswered in ["address", "port", "payload_port", "beacon_address"] {
+            assert!(
+                !said.contains_key(unanswered),
+                "{unanswered} was guessed at rather than asked for"
+            );
+            assert!(
+                editor.faults().contains(&document::Fault::MissingTcspecial {
+                    attribute: unanswered.to_string()
+                }),
+                "{unanswered} is unanswered and nothing says so"
+            );
+        }
+
         let moc = editor.document().node("moc").expect("a ground station");
         assert_eq!(moc.node_type, "moc");
         assert_eq!(moc.at, MOC_PLACE);
@@ -2539,6 +2669,7 @@ mod tests {
         i_slint_backend_testing::init_integration_test_with_system_time();
 
         dragging_a_node_moves_it();
+        the_menu_opens_the_tcspecial_parameters();
         a_group_window_sets_every_payload_in_its_group();
         a_payload_stays_in_the_payload_working_pane();
         the_divider_can_be_dragged();
@@ -2659,6 +2790,7 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
+            parameters: None,
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -2781,6 +2913,7 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
+            parameters: None,
             showing: Rc::new(RefCell::new(String::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
@@ -2830,6 +2963,101 @@ mod tests {
         );
     }
 
+    /// The menu item opens the parameters, and typing in them reaches the
+    /// configuration.
+    ///
+    /// The whole path bar the pointer: the menu item's callback, the window it
+    /// makes, the fields it shows, and the edit one of them records. What it
+    /// would catch is the window being built from what the document happens to
+    /// hold rather than from the list of what a section may say -- which would
+    /// show nothing at all for a configuration that has never had one, and
+    /// leave no way to give it one.
+    fn the_menu_opens_the_tcspecial_parameters() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            DIVIDER,
+        )));
+
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            parameters: None,
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+
+        // Nothing is open until the menu item is chosen.
+        assert!(views.borrow().parameters.is_none());
+        ui.invoke_edit_parameters();
+
+        let window = views
+            .borrow()
+            .parameters
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("the menu should have opened the parameters")
+            .upgrade()
+            .expect("and left them open");
+
+        // A field for every attribute the section may have, the required ones
+        // first and marked, and this configuration has none of them.
+        use slint::Model;
+        let fields: Vec<FieldView> = (0..window.get_fields().row_count())
+            .filter_map(|row| window.get_fields().row_data(row))
+            .collect();
+        let offered: Vec<String> = fields.iter().map(|f| f.name.to_string()).collect();
+        let expected: Vec<String> = tcslibgs::graph::parameters::ATTRIBUTES
+            .iter()
+            .map(|(name, _)| (*name).to_string())
+            .collect();
+        assert_eq!(offered, expected, "the fields are not the attributes");
+        for field in &fields {
+            if field.required {
+                assert!(
+                    field.missing,
+                    "{} is empty and should be marked",
+                    field.name
+                );
+            }
+        }
+
+        // Typing in one records an edit, and one Undo takes it back.
+        let depth = editor.borrow().undo_depth();
+        window.invoke_parameter_set("port".into(), "4000".into());
+        assert_eq!(
+            editor
+                .borrow()
+                .document()
+                .tcspecial
+                .get("port")
+                .map(String::as_str),
+            Some("4000")
+        );
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+
+        // And the window says so the next time it is drawn: the field is
+        // filled and no longer marked.
+        let port = (0..window.get_fields().row_count())
+            .filter_map(|row| window.get_fields().row_data(row))
+            .find(|f| f.name == "port")
+            .expect("the port field");
+        assert_eq!(port.value, "4000");
+        assert!(!port.missing);
+
+        assert!(editor.borrow_mut().undo());
+        assert!(!editor.borrow().document().tcspecial.contains_key("port"));
+    }
+
     /// Typing in a group's window reaches every payload in the group.
     ///
     /// Through the window's own callbacks and the handlers wired to them,
@@ -2873,6 +3101,7 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
+            parameters: None,
             showing: Rc::new(RefCell::new(String::new())),
         }));
 

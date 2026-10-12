@@ -403,6 +403,14 @@ mod tests {
 
     const SOUND_GRAPH: &str = "\
 version: \"2.0\"
+tcspecial:
+  address: 0.0.0.0
+  port: 4000
+  payload_port: 4001
+  protocol: udp
+  beacon_interval_ms: 5000
+  beacon_address: \"239.255.0.1:5550\"
+  beacon_interface: \"127.0.0.1\"
 groups:
   - name: temps
     interval: \"3s\"

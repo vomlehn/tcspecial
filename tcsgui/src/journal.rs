@@ -156,6 +156,16 @@ pub enum Edit {
         was: Option<String>,
         now: Vec<(String, Option<String>)>,
     },
+    /// One of tcspecial's own parameters was set. Both values, so the
+    /// inverse is a lookup.
+    ///
+    /// `was: None` means the attribute was not stated before, and undoing
+    /// takes the line out again rather than writing it empty.
+    SetTcspecial {
+        attribute: String,
+        was: Option<String>,
+        now: Option<String>,
+    },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
     /// because a person who drags a node expects undo to put it back.
@@ -274,6 +284,15 @@ impl Edit {
                 was: now.clone(),
                 now: was.clone(),
             },
+            Edit::SetTcspecial {
+                attribute,
+                was,
+                now,
+            } => Edit::SetTcspecial {
+                attribute: attribute.clone(),
+                was: now.clone(),
+                now: was.clone(),
+            },
             Edit::AddGroup { name, interval } => Edit::RemoveGroup {
                 name: name.clone(),
                 interval: interval.clone(),
@@ -362,6 +381,9 @@ impl Edit {
                 format!("unlink \"{}\" from \"{}\"", link.from, link.to)
             }
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
+            Edit::SetTcspecial { attribute, .. } => {
+                format!("set tcspecial {attribute}")
+            }
             Edit::AddGroup { name, .. } => format!("add group \"{name}\""),
             Edit::RemoveGroup { name, .. } => format!("remove group \"{name}\""),
             Edit::SetGroupInterval { group, .. } => {

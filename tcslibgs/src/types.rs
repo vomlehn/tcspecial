@@ -2371,7 +2371,13 @@ impl DHConfigJson {
 
 /// Payload bytes per telemetry log segment file, when the configuration
 /// does not say. The segment file header is added on top of this.
-fn default_log_segment_bytes() -> u32 {
+/// Payload bytes per segment file, for a configuration that does not say.
+///
+/// A size rather than a required value because it is a tuning choice with a
+/// defensible answer, where the beacon attributes beside it are mission facts
+/// with none: 64KiB is small enough that a lost segment loses little and large
+/// enough that the per-file overhead is nothing.
+pub fn default_log_segment_bytes() -> u32 {
     65_536
 }
 

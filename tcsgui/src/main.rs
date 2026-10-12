@@ -625,6 +625,7 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
                 // tested: see route.rs.
                 route: route::route(x1, y1, x2, y2).into(),
                 head: route::arrow(x2, y2).into(),
+                marker: route::marker(x1, y1, x2, y2).into(),
                 // The label goes at the middle of the run, which for an
                 // orthogonal route is the middle of its vertical segment.
                 label_x: (x1 + x2) / 2.0,
@@ -1431,6 +1432,23 @@ mod tests {
                 2,
                 "example.{extension} should draw both links"
             );
+
+            // Each with a head and a marker: the two links of this example
+            // run between the same pair of nodes, one each way, so the
+            // direction is the only thing that tells them apart.
+            for row in 0..ui.get_links().row_count() {
+                let link = ui.get_links().row_data(row).expect("a link");
+                assert!(
+                    link.head.ends_with('Z'),
+                    "example.{extension}: link {row} has no arrowhead: {:?}",
+                    link.head
+                );
+                assert!(
+                    link.marker.ends_with('Z'),
+                    "example.{extension}: link {row} has no flow marker: {:?}",
+                    link.marker
+                );
+            }
         }
     }
 

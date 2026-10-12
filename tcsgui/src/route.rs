@@ -33,7 +33,25 @@ const RADIUS: f32 = 8.0;
 const STUB: f32 = 16.0;
 
 /// The arrowhead's length along the line, and its half-width across it.
-const HEAD: (f32, f32) = (9.0, 5.0);
+///
+/// Large enough to be seen without looking for it. It was nine by five, which
+/// is the size an arrowhead is in a drawing you are already reading closely --
+/// butted against a node's edge, in the line's own grey, it was easy to miss
+/// entirely and the direction of a link with it.
+const HEAD: (f32, f32) = (14.0, 6.0);
+
+/// The flow marker's length along the line, and its half-width across it.
+///
+/// Smaller than the head: it says the same thing in the middle of the run,
+/// where there is nothing else to confuse it with, and a second arrow as big
+/// as the first would read as a second link.
+const MARKER: (f32, f32) = (11.0, 5.0);
+
+/// How long a run has to be before a marker is put in the middle of it.
+///
+/// A marker on a run barely longer than itself is a shape with no room to
+/// point: it would touch both corners and read as a thickening of the line.
+const ROOM: f32 = 28.0;
 
 /// The path of a link from `(x1, y1)` to `(x2, y2)`.
 ///
@@ -94,13 +112,99 @@ pub fn route(x1: f32, y1: f32, x2: f32, y2: f32) -> String {
 /// not have to be rotated.
 pub fn arrow(x2: f32, y2: f32) -> String {
     let (length, half) = HEAD;
+    // The tip at the node's edge, where the line ends, so the arrow touches
+    // what it points at: a head set back from the edge leaves a stub of line
+    // sticking out of its point.
+    triangle(x2 - length / 2.0, y2, Way::Right, (length, half))
+}
+
+/// Which way along a run the data goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Way {
+    Right,
+    Left,
+    Down,
+    Up,
+}
+
+/// A filled triangle at `(cx, cy)`, pointing this way.
+fn triangle(cx: f32, cy: f32, way: Way, size: (f32, f32)) -> String {
+    let (length, half) = size;
+    let (tip, back) = (length / 2.0, length / 2.0);
+    let (apex, left, right) = match way {
+        Way::Right => (
+            (cx + tip, cy),
+            (cx - back, cy - half),
+            (cx - back, cy + half),
+        ),
+        Way::Left => (
+            (cx - tip, cy),
+            (cx + back, cy - half),
+            (cx + back, cy + half),
+        ),
+        Way::Down => (
+            (cx, cy + tip),
+            (cx - half, cy - back),
+            (cx + half, cy - back),
+        ),
+        Way::Up => (
+            (cx, cy - tip),
+            (cx - half, cy + back),
+            (cx + half, cy + back),
+        ),
+    };
+
     format!(
-        "M {x2:.1} {y2:.1} L {:.1} {:.1} L {:.1} {:.1} Z",
-        x2 - length,
-        y2 - half,
-        x2 - length,
-        y2 + half
+        "M {:.1} {:.1} L {:.1} {:.1} L {:.1} {:.1} Z",
+        apex.0, apex.1, left.0, left.1, right.0, right.1
     )
+}
+
+/// A second arrow, in the middle of the route's longest run.
+///
+/// The head at the end says which way the data goes, and says it where the
+/// line meets a node -- which is the one place a diagram is already crowded,
+/// and the one place two links between the same pair of nodes look alike. A
+/// marker out in the middle of the run says it where there is room to see it,
+/// so a pair of links between one pair of nodes can be told apart at a glance
+/// instead of by following each to its end.
+///
+/// On the vertical run where the link changes height, since that run belongs
+/// to this link alone; on the long return run where the link goes backwards;
+/// and in the middle of the line where it is level. A run with no room for one
+/// gets none -- see [`ROOM`] -- which is a short link, where the head at the
+/// end is already next to everything else about it.
+pub fn marker(x1: f32, y1: f32, x2: f32, y2: f32) -> String {
+    let out = x1 + STUB;
+    let in_ = x2 - STUB;
+    let across = (out + in_) / 2.0;
+
+    // Level: the line is one horizontal run, and its middle is the middle of
+    // the link.
+    if (y2 - y1).abs() < 1.0 {
+        if (x2 - x1).abs() < ROOM {
+            return String::new();
+        }
+        let way = if x2 > x1 { Way::Right } else { Way::Left };
+        return triangle((x1 + x2) / 2.0, y1, way, MARKER);
+    }
+
+    // Backwards: the long run is the one that carries it back past the
+    // source, at the height between the two.
+    if in_ <= out {
+        let around = y1 + (y2 - y1) / 2.0;
+        if (out - in_).abs() < ROOM {
+            return String::new();
+        }
+        return triangle((out + in_) / 2.0, around, Way::Left, MARKER);
+    }
+
+    // Otherwise the vertical run, which is this link's own.
+    if (y2 - y1).abs() < ROOM {
+        return String::new();
+    }
+    let way = if y2 > y1 { Way::Down } else { Way::Up };
+    triangle(across, (y1 + y2) / 2.0, way, MARKER)
 }
 
 /// Which way the route turns: down the canvas is positive.
@@ -276,5 +380,83 @@ mod tests {
         // And the two other corners are behind the tip, one either side.
         assert!(visited[1].0 < 240.0 && visited[2].0 < 240.0, "{head}");
         assert!(visited[1].1 < 64.0 && visited[2].1 > 64.0, "{head}");
+
+        // Big enough to be seen without looking for it. The size is the
+        // reason this was asked for twice: the direction was drawn all along,
+        // in nine pixels of the line's own grey, against a node's edge.
+        let (length, half) = HEAD;
+        assert!(length >= 12.0 && half >= 5.0, "{HEAD:?} is a small arrow");
+        assert_eq!(240.0 - visited[1].0, length, "the head is as long as it says");
+        assert_eq!(visited[2].1 - visited[1].1, half * 2.0, "and as wide");
+    }
+
+    /// A second arrow out in the middle of the run, pointing the way the data
+    /// goes.
+    ///
+    /// Three routes, three directions: a level link points along itself, a
+    /// link that changes height points down or up its own vertical run, and
+    /// one that goes backwards points back the way it goes. Without this the
+    /// direction was only legible where the line met a node -- which is where
+    /// two links between one pair of nodes look most alike.
+    #[test]
+    fn the_marker_points_the_way_the_data_goes() {
+        // Level: the middle of the line, pointing along it.
+        let said = marker(40.0, 100.0, 240.0, 100.0);
+        let visited = points(&said);
+        assert!(said.ends_with('Z'), "{said}");
+        assert!(
+            visited[0].0 > visited[1].0 && visited[0].0 > visited[2].0,
+            "a level link's marker points right: {said}"
+        );
+        assert!(
+            (visited[0].0 - 140.0).abs() < MARKER.0,
+            "and sits in the middle of the line: {said}"
+        );
+
+        // Down the canvas: on the vertical run, pointing down.
+        let said = marker(40.0, 40.0, 240.0, 200.0);
+        let visited = points(&said);
+        assert!(
+            visited[0].1 > visited[1].1 && visited[0].1 > visited[2].1,
+            "a link that descends points down: {said}"
+        );
+        assert!(
+            (visited[0].0 - 140.0).abs() < MARKER.0,
+            "on the vertical run, which is halfway across: {said}"
+        );
+
+        // And up it.
+        let said = marker(40.0, 200.0, 240.0, 40.0);
+        let visited = points(&said);
+        assert!(
+            visited[0].1 < visited[1].1 && visited[0].1 < visited[2].1,
+            "a link that climbs points up: {said}"
+        );
+
+        // Backwards: the target is to the left of the source, so the long run
+        // carries the data back the way it came.
+        let said = marker(400.0, 40.0, 40.0, 200.0);
+        let visited = points(&said);
+        assert!(
+            visited[0].0 < visited[1].0 && visited[0].0 < visited[2].0,
+            "a link that goes backwards points left: {said}"
+        );
+        assert!(
+            (visited[0].1 - 120.0).abs() < MARKER.0,
+            "at the height between the two: {said}"
+        );
+    }
+
+    /// A run with no room for a marker gets none.
+    ///
+    /// A triangle on a run barely longer than itself touches both corners and
+    /// reads as a thickening of the line, which says nothing about direction
+    /// and makes the line look like something else.
+    #[test]
+    fn a_short_run_has_no_marker() {
+        // Two nodes almost touching, level.
+        assert_eq!(marker(40.0, 100.0, 60.0, 100.0), "");
+        // And two at nearly one height, where the vertical run is a step.
+        assert_eq!(marker(40.0, 100.0, 240.0, 110.0), "");
     }
 }

@@ -520,6 +520,59 @@ Requirement
     than of a temperature.
 
 Requirement
+    One pass is: every group that is due, read in full and in order; then the
+    nodes in no group, polled; then the logs flushed. A group is read in full
+    before anything else happens because that is what a group is for, and each
+    reading is delivered as it is taken -- so a converted reading reaches the
+    ground, the mean and the log before the next sensor is read, and the
+    decision reaches the heaters inside the pass that read the sensors.
+
+Requirement
+    A node is polled only if it is in no group, its output goes somewhere, and
+    it produces by the clock rather than by arrival. Each of those rules out a
+    read whose result would be discarded. The one that matters is a MOC link:
+    what arrives on one is a command, which sets an attribute rather than
+    travelling a link, so polling it would be taking commands off the socket
+    and throwing them away. A ground link that does feed the graph says so with
+    a link out of it, and is polled like anything else.
+
+Requirement
+    A vehicle starts only if every node opens, and the complaint lists every
+    reason rather than the first. The configuration was checked on the ground,
+    so a failure here is the hardware. Carrying on without one node sounds
+    kinder and is not: a thermostat whose third sensor did not open would hold
+    its last decision for ever, because a mean over three inputs waits for
+    three, and nothing in the telemetry would say that is why. An operator who
+    wants to fly without a sensor changes the configuration, which is
+    checkable, visible in the diagram and recorded in the beacon's digest.
+
+Requirement
+    The checks are run again before anything is opened, by the same code the
+    ground tool runs. A configuration that reached a vehicle unchecked is the
+    one case the ground tool cannot help with, and a bus opened on the strength
+    of a file nobody checked is worse than a vehicle that will not start.
+
+Requirement
+    A stop takes effect between passes. A signal sets a flag and returns; the
+    loop notices within one pause, finishes the pass it is making and flushes
+    its logs. Stopping inside a pass would leave a log part way through a
+    record and a heater in a state nothing decided. Both an interrupt and a
+    termination are answered, those being the two ways a vehicle is stopped: a
+    person at a console and a service manager.
+
+Requirement
+    A pass that delivered everything reports nothing. A vehicle reading three
+    sensors every three seconds would otherwise fill its log with the news that
+    it is working, and the refusals -- which are what somebody is looking for
+    -- would be the hardest lines to find in it.
+
+Requirement
+    Which version a configuration is decides which of the two programs runs,
+    and the file says which. No flag beside it: a flag would be a second
+    statement of the same fact, and the two could disagree. ``tcsverify``
+    already decides the same way on the same evidence.
+
+Requirement
     A command binding counts as a connection at both of its ends. A MOC link
     exists to carry commands as much as telemetry, and a computation whose
     setpoint is the only thing the ground sets is reached by its binding and by

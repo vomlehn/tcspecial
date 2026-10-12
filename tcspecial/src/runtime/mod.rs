@@ -12,6 +12,8 @@
 //! * [`fabric`] holds the nodes and moves the bytes, using the other two.
 //! * [`port`] is the one piece that does open something: it presents an
 //!   opened endpoint as a node the fabric can move bytes to and from.
+//! * [`system`] is the assembly and the loop: a port per node, held in a
+//!   fabric, with the schedule deciding when each group is read.
 //!
 //! The first two open nothing. They are the arithmetic of the graph, and they
 //! are separate from the moving of bytes on purpose: both can be tested
@@ -22,3 +24,5 @@ pub mod fabric;
 pub mod port;
 pub mod route;
 pub mod schedule;
+pub mod start;
+pub mod system;

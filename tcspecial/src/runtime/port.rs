@@ -42,6 +42,7 @@
 use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
 
+use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::Node;
 use tcslibgs::{EndpointConfig, TcsResult};
 
@@ -139,6 +140,10 @@ pub struct EndpointPort {
     ///
     /// See [`EndpointPort::triggered_by`].
     trigger: Option<Vec<u8>>,
+    /// How many bytes one read asks for, where the node says.
+    ///
+    /// See [`EndpointPort::reading`].
+    read_size: Option<usize>,
 }
 
 impl EndpointPort {
@@ -182,7 +187,53 @@ impl EndpointPort {
             writer,
             uses,
             trigger: None,
+            read_size: None,
         }
+    }
+
+    /// Open the node a version 2 configuration describes.
+    ///
+    /// Everything the node says about reaching it comes from
+    /// [`tcslibgs::graph::reach`], and which way it is used from the links --
+    /// so this is the whole of what turns a configured graph into something
+    /// that moves bytes.
+    ///
+    /// A MOC link is bound and everything else is reached out to. That
+    /// follows from which end exists first: the ground sends to an address it
+    /// was told, so the vehicle waits at it, where a device is something the
+    /// vehicle opens.
+    pub fn open(node: &Node, routes: &Routes) -> Result<EndpointPort, String> {
+        let uses = Use::of(routes, &node.name)?;
+        let reach = reach_of(node)?;
+
+        let opened = if node.node_type == "moc" {
+            EndpointPort::bind(&node.name, &reach.endpoint, uses)
+        } else {
+            EndpointPort::connect(&node.name, &reach.endpoint, uses)
+        };
+        let mut port = opened.map_err(|e| format!("{e}"))?;
+
+        if let Some(size) = reach.read_size {
+            port = port.reading(size as usize);
+        }
+        if let Some(trigger) = reach.trigger {
+            port = port.triggered_by(trigger);
+        }
+
+        Ok(port)
+    }
+
+    /// Ask for no more than this many bytes at a time.
+    ///
+    /// What a read asks for is a property of the part on the other end: a bus
+    /// master clocks exactly as many bytes as it asks for, so a sensor that
+    /// answers in two bytes read sixty-four bytes at a time is a sensor
+    /// clocked sixty-two bytes past the end of what it has to say. The
+    /// buffer a caller offers is the other bound, and the smaller of the two
+    /// wins.
+    pub fn reading(mut self, bytes: usize) -> EndpointPort {
+        self.read_size = Some(bytes);
+        self
     }
 
     /// Ask this device before reading it.
@@ -253,9 +304,15 @@ impl Port for EndpointPort {
             ));
         }
 
+        // No more than the part has to say, and no more than there is room
+        // for: see EndpointPort::reading.
+        let want = self
+            .read_size
+            .map_or(buffer.len(), |size| size.min(buffer.len()));
+
         let got = self
             .reader
-            .read(buffer)
+            .read(&mut buffer[..want])
             .map_err(|e| format!("{}: the read failed: {e}", self.what));
 
         // Asked after being read, and asked whether or not the read found
@@ -466,8 +523,11 @@ mod tests {
             }
             match script.to_read.remove(0) {
                 Ok(datum) => {
-                    buffer[..datum.len()].copy_from_slice(&datum);
-                    Ok(datum.len())
+                    // No more than the slice holds, as a device read into a
+                    // short buffer answers what fits.
+                    let got = datum.len().min(buffer.len());
+                    buffer[..got].copy_from_slice(&datum[..got]);
+                    Ok(got)
                 }
                 Err(e) => Err(e),
             }
@@ -494,6 +554,17 @@ mod tests {
             Box::new(Half(Arc::clone(&script))),
             uses,
         );
+        (script, port)
+    }
+
+    /// A port whose stand-in is already scripted.
+    fn port_of_script(
+        what: &str,
+        uses: Use,
+        to_read: Vec<TcsResult<Vec<u8>>>,
+    ) -> (Arc<Mutex<Script>>, EndpointPort) {
+        let (script, port) = port(what, uses);
+        script.lock().expect("the script").to_read = to_read;
         (script, port)
     }
 
@@ -717,6 +788,66 @@ mod tests {
             script.lock().expect("the script").written.is_empty(),
             "nothing should have been written"
         );
+    }
+
+    /// A read asks for what the part answers in, not what the buffer holds.
+    #[test]
+    fn a_read_asks_for_what_the_node_says() {
+        let (script, port) = port("temp_fore", Use::Read);
+        let mut port = port.reading(2);
+        script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
+
+        // A sensor that answers in two bytes, read into a buffer with room
+        // for sixty-four: two is what is asked for.
+        let mut buffer = [0u8; 64];
+        let got = port.take(&mut buffer).expect("a reading");
+        assert_eq!(got, 2, "a bus master clocks what it asks for and no more");
+
+        // And the buffer is the other bound: a caller with room for one byte
+        // gets one, whatever the node says.
+        let (script, port) = port_of_script("temp_fore", Use::Read, vec![Ok(b"293.15".to_vec())]);
+        let mut port = port.reading(2);
+        let got = port.take(&mut [0u8; 1]).expect("a reading");
+        assert_eq!(got, 1);
+        assert!(script.lock().expect("the script").to_read.is_empty());
+    }
+
+    /// A node of the shipped example is opened from its configuration.
+    ///
+    /// As far as a test without hardware can go: the example's sensors are on
+    /// an I2C bus and a SPI bus that are not on this machine, so what is
+    /// checked is that the attempt is the right one -- the complaint names the
+    /// device the file named -- and that a node the file describes wrongly
+    /// never gets as far as opening anything.
+    #[test]
+    fn a_node_is_opened_from_its_configuration() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let routes = Routes::of(&graph);
+
+        let said = match EndpointPort::open(graph.node("temp_fore").expect("a sensor"), &routes) {
+            Err(why) => why,
+            Ok(_) => {
+                // A machine with an I2C bus 1 and something at 0x48 on it.
+                // Nothing to complain about, and nothing more to test here.
+                return;
+            }
+        };
+        assert!(
+            said.contains("/dev/i2c-1"),
+            "the complaint should name the bus the file named: {said}"
+        );
+
+        // A computation is not opened at all, and says so before anything is
+        // reached for.
+        let said = match EndpointPort::open(
+            graph.node("thermostat").expect("the thermostat"),
+            &routes,
+        ) {
+            Err(why) => why,
+            Ok(_) => panic!("a computation was opened as a device"),
+        };
+        assert!(said.contains("not something that is opened"), "{said}");
     }
 
     /// A real endpoint, opened by the factory, moves bytes both ways.

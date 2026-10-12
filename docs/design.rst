@@ -199,6 +199,71 @@ command binding
     what the ground is able to change in flight is written down and checkable,
     rather than being whatever the compute element happens to accept.
 
+What a device node says
+-----------------------
+
+A node of an interface type says where it is, what the link is set up as, and
+how it is read. The second of those is unchanged from version 1 -- a data rate,
+a bus address, a clock mode, a set of line numbers -- and is deliberately so:
+those rules are the ones that have been tested against real buses, and a second
+set of them for a second schema would be two statements of every rule drifting
+apart one flight at a time. A version 2 node's attributes are handed to the
+same per-type rules, which refuse in the same words.
+
+What locates a node depends on its type:
+
+.. code-block:: text
+
+   network, moc    address, port, and for network the protocol
+   i2c             path (the bus) and address (the device on it)
+   can             interface and can_id
+   everything else path
+
+And every interface type may say, beyond the terms of its own link:
+
+.. code-block:: text
+
+   group           which group reads it, which the schedule reads
+   read_size       how many bytes one read asks for
+   trigger         what to write to make it answer
+   max_length      where one read of a line ends: the three attributes a
+   read_timeout    version 1 file nests under "stream". A node's attributes
+   terminators     are flat, so they are written beside the line's terms
+
+Requirement
+    An attribute nothing reads is refused, by name, for the type it is written
+    on. A term belonging to another type is refused by that type's own rules;
+    a term belonging to no type at all would otherwise vanish, and
+    ``max_speeed`` ignored is a peripheral clocked at whatever the last
+    program left the bus at, which looks exactly like a configured one.
+
+Requirement
+    An attribute that locates another type is refused. A port on a node
+    reached through a device file is a file that looks configured and is not.
+
+Requirement
+    ``read_size`` bounds a read, and the buffer offered bounds it too: the
+    smaller wins. A bus master clocks exactly as many bytes as it asks for, so
+    a sensor that answers in two bytes read sixty-four at a time is a sensor
+    clocked sixty-two bytes past the end of what it has to say.
+
+Requirement
+    A node with a ``trigger`` is a node that is asked, and there is no
+    separate word for the mode. A trigger and nothing else is what made a
+    version 1 payload triggered, so a second word could only disagree with it.
+
+Requirement
+    A port of ``0`` is refused. It is the one number a socket would accept and
+    a configuration cannot mean -- it asks the kernel for whichever port is
+    free, so a configuration stating it describes a link nothing could be told
+    where to find.
+
+Requirement
+    A ``moc`` node needs no protocol and a ``network`` node does. A ground link
+    is a datagram link, as the one tcspecial has always had is; a device
+    reached over a socket could be any of the four, and guessing which is how a
+    stream payload comes to be addressed as datagrams.
+
 The logging node
 ----------------
 

@@ -23,6 +23,7 @@
 //! the same code that runs again aboard.
 
 pub mod check;
+pub mod reach;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

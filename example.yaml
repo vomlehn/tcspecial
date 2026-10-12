@@ -29,7 +29,10 @@ nodes:
     address: "127.0.0.1"
     port: "5100"
     group: "every_second"
-    editor: { x: 40, y: 120 }
+    # In the payload working pane, which is the right-hand quarter of the
+    # editor's canvas: everything the vehicle carries is drawn on that side,
+    # and the rest of the graph on the other.
+    editor: { x: 744, y: 160 }
 
   # The ground. tcspecial waits at this address for a ground station to speak
   # to it, and sends telemetry back where the datagrams came from.
@@ -37,7 +40,7 @@ nodes:
     type: moc
     address: "127.0.0.1"
     port: "5000"
-    editor: { x: 360, y: 40 }
+    editor: { x: 24, y: 40 }
 
 links:
   # Up: every datagram the payload sends goes to the ground as it arrives.

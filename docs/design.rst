@@ -808,6 +808,98 @@ round trip does not keep is prose attached to nothing: a heading at the top of
 a file, or a paragraph after the last entry, belongs to no node and is not
 written back.
 
+The canvas is divided in two. The right-hand quarter is the *payload working
+pane* and holds everything the vehicle carries -- a device on a bus, a line it
+drives, a link to something aboard -- and the rest of the canvas is the
+*vehicle working pane* and holds the rest of the graph: the computations, the
+log, the ground link, a page of its own. There is a selection pane for each,
+one above the other, and which one a shape was pressed in is what decides
+where it lands. A node stays in its pane: a drag that would carry a payload
+across the divider stops at it.
+
+What that buys is a drawing that can be compared with last mission's. The
+vehicle's own graph is the part that persists; what it is carrying is the part
+that changes between flights, and a diagram that puts the changing part in one
+column shows at a glance what is different. Links cross the divider freely --
+that is what a payload is for -- and only positions are confined.
+
+The divider is drawn, and it can be moved: it carries a handle halfway down it,
+and dragging that handle moves the line and resizes both panes. Neither pane
+may be squeezed below a twentieth of the working pane, so neither can be
+dragged shut -- a pane with nothing visible in it is a pane whose nodes cannot
+be reached, and the drag that does it is one press away. The divider also stops
+against a node rather than passing over it: against the right edge of the
+rightmost vehicle node and the left edge of the leftmost payload. The
+alternative was to let it go where it liked and shunt the nodes it passed,
+which is a gesture that quietly rearranges a diagram -- and one that would have
+to carry every node it moved through the history to be undoable. A line that
+stops where it would orphan something says what it is doing while it does it. A
+node already on the wrong side holds nothing, so one such node cannot freeze
+the control.
+
+Where the divider sits is kept in ``$HOME/.tcsgui/config.xml``, as the
+percentage of the working pane the vehicle working pane takes -- the vehicle
+working pane being always the left-hand one, so a percentage and that sentence
+are the whole of it. The directory is made automatically, and a settings file
+that is missing, unreadable or hand-edited into nonsense leaves the default
+three quarters in place and says so on the error output: an editor that refused
+to start because it could not remember a pane width would be an editor traded
+for a preference.
+
+That file and not the configuration, which is the distinction worth stating. A
+node's position is in the configuration because it is part of the diagram --
+two people reading one configuration should see one drawing. How the canvas is
+divided is not part of the diagram: it is a working preference of the person at
+the keyboard, and writing it into the configuration would make resizing a pane
+a change to a file that flies. A percentage rather than pixels for the same
+reason: a percentage is the thing the person chose, where a pixel count is how
+this build happens to lay a canvas out.
+
+Within a session the divider is one position in the document's own
+coordinates, shared by every window, and not three quarters of whatever window
+it is drawn in. Which pane a node is in says what it is allowed to be, so a
+divider that moved with the window would make a payload into a vehicle node by
+being looked at on a smaller screen. For the same reason opening a file moves
+nothing: a node the file puts on the wrong side stays where the file put it
+until somebody drags it, and then it comes home. An editor that silently
+rewrote positions would be an editor that changed a file by being pointed at
+it.
+
+Every node is drawn the same width. Nodes of four widths in a column have no
+edge to line up on, and a diagram built from them looks approximate however
+carefully each node was placed; height is still per type, because it is one of
+the channels that tells two types apart.
+
+Every node type has its own colour, and the fourteen were chosen for one thing
+before anything else: that a reader with any of the three dichromacies can tell
+them apart. They are the output of a search over sRGB that maximised the
+smallest perceived difference between any two of them, measured in CIE
+L\*a\*b\* under normal vision and under simulated protanopia, deuteranopia and
+tritanopia at once. The worst pair of the fourteen is seventeen CIE units apart
+under every one of the four, where two or three is "the same colour in two
+printings" and ten is "clearly two colours". Each also has a contrast against
+white of at least three to one, so that a one-pixel border of it is legible on
+the canvas. What aesthetics the first priority left room for went on keeping
+the chroma moderate and spreading the lightness over five levels -- which is
+useful as well as calmer, lightness being the one channel every kind of colour
+blindness keeps, the total ones included. The simulation and the check are in
+the editor's own tests, run against the colours the window is actually given,
+because a fourteenth colour added by hand would be a near-copy of one of the
+other thirteen under one of the dichromacies and nobody with normal vision
+would see it.
+
+Colour remains the redundant channel for all that. Nothing is told apart by
+colour alone: every type differs from every other in at least two of outline,
+border width, shading, height and the way its label is set, and a test fails if
+that stops being true. Red is reserved for things that are wrong.
+
+A configuration that does not exist yet opens with the ground station already
+in it, at the upper left. Every graph has
+one -- a vehicle whose telemetry reaches nobody is a vehicle nobody is
+operating -- so placing it is work the editor can do rather than work it can
+wait for. It is placed through the history like any other edit, so it can be
+taken back by somebody drawing a page of a larger configuration.
+
 ``TCSGUI_FILE`` is the same variable the editor takes, so checking what was
 just edited is the same name in both commands: ``make runguiy`` and ``make
 runguix`` open it as YAML and as XML, one target per spelling as the

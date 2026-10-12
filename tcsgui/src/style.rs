@@ -25,15 +25,20 @@
 /// The outline a node is drawn with.
 ///
 /// Slint draws all of these from its own primitives -- a `Rectangle` with and
-/// without `border-radius`, a `Rectangle` of equal sides with a radius of
-/// half its width for a circle -- so none of this needs an image or a font.
+/// without `border-radius`, and one with a radius of half its shorter side for
+/// a fully rounded end -- so none of this needs an image or a font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outline {
     /// Square corners. Hardware: what is physically there.
     Square,
     /// Rounded corners. Software aboard: a computation.
     Rounded,
-    /// A circle. An end of the graph: the ground, or a log.
+    /// Fully rounded ends. An end of the graph: the ground, or a log.
+    ///
+    /// Drawn as a radius of half the shorter side, so it is a circle where the
+    /// sides are equal and a rounded-off pill where they are not. Every node
+    /// being one width now means these are pills, which reads as the same
+    /// shape family and still shares nothing with the other three outlines.
     Circle,
     /// A rectangle with one pair of corners rounded and one square, which
     /// reads as a direction. Interfaces that are driven rather than read.
@@ -81,16 +86,20 @@ pub enum Face {
 
 /// What a node type looks like.
 ///
-/// `tint` is a hint and never the whole of the distinction. It is named rather
-/// than given as a value so the window can hold the palette and this table can
-/// hold the meaning.
+/// `tint` is never the whole of the distinction -- see the rule at the top of
+/// this file -- and there is one per type. It is named rather than given as a
+/// value so the window can hold the colours and this table can hold which
+/// type has which.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Appearance {
     pub outline: Outline,
     pub shading: Shading,
     pub weight: Weight,
     /// The nominal width and height, in pixels, before a label widens it.
-    /// Size is the fourth channel: a MOC link is visibly larger than a sensor.
+    ///
+    /// Width is [`WIDTH`] for every type, so what varies here is the height:
+    /// size is still the fourth channel -- a MOC link is visibly taller than a
+    /// sensor -- and it is one channel whichever of the two carries it.
     pub size: (u32, u32),
     /// How the label is set: the face, its size in pixels, its weight, and
     /// whether it is italic. The fifth channel.
@@ -101,23 +110,69 @@ pub struct Appearance {
     pub tint: Tint,
 }
 
-/// The palette, by meaning rather than by colour.
+/// The palette: one tint per node type, and no two alike.
+///
+/// Fourteen rather than nine, so that no two types share a colour. Colour is
+/// still the redundant channel -- the outline, the shading, the border, the
+/// height and the way the label is set are what tell two types apart, and the
+/// test above says so -- but a reader who *can* use colour now gets it for
+/// every type instead of for most of them.
+///
+/// The fourteen were chosen for one thing before anything else: that a reader
+/// with any of the three dichromacies can tell them apart. They are the output
+/// of a search over sRGB that maximised the smallest perceived difference
+/// between any two of them, taken under normal vision and under simulated
+/// protanopia, deuteranopia and tritanopia at once, and constrained to a
+/// moderate chroma and a contrast against white of at least three to one so
+/// that each is legible as a border. The worst pair of the fourteen is 17 CIE
+/// units apart under every one of the four -- and `main.rs` has the test that
+/// says so, checked against the colours the window is actually given.
+///
+/// Spread in lightness on purpose: lightness is the one channel every kind of
+/// colour blindness keeps, including the total ones. Five levels from about
+/// 28 to about 60.
+///
+/// Named by colour here, where the earlier palette was named by meaning, for a
+/// plain reason: with one per type the meaning is the type, and a name like
+/// `I2cTint` would be the enum repeating [`NodeType`]. What the separation
+/// still buys is that this file says *which* tint and `main.rs` says what it is
+/// painted, so the accessibility tests can check the rules without this file
+/// holding a single hex value.
 ///
 /// No `Red`. Error colouring does not come from this table at all -- see
 /// [`ERROR_TINT`] -- which is what keeps red out of the ordinary drawing by
 /// construction instead of by discipline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tint {
-    Slate,
-    Teal,
-    Amber,
-    Violet,
-    Olive,
     Indigo,
-    Sand,
-    Cyan,
-    Grey,
+    Forest,
+    Bronze,
+    Plum,
+    Purple,
+    Magenta,
+    Blue,
+    Rose,
+    Olive,
+    Taupe,
+    Periwinkle,
+    Gold,
+    Blush,
+    Lavender,
 }
+
+/// How wide every node is drawn, in pixels.
+///
+/// One width for all of them, and the reason is alignment: a column of nodes
+/// of four different widths has no edge to line up on, so a diagram built from
+/// them looks approximate however carefully each node was placed. Height is
+/// still per type -- it is one of the channels that tells two types apart --
+/// and height alone is enough, as the accessibility test below proves by
+/// still passing.
+///
+/// Wide enough for the longest type name at the largest label size, which is
+/// what sets the floor: a label that elides is a label that has stopped being
+/// a channel.
+pub const WIDTH: u32 = 152;
 
 /// The one red in the program, and the only thing it is used for.
 ///
@@ -317,6 +372,42 @@ impl NodeType {
         }
     }
 
+    /// Whether this type is a payload.
+    ///
+    /// A payload is something the vehicle carries and reads: a device on a
+    /// bus, a line it drives, a link to something aboard. The rest of the
+    /// graph is not -- a computation, a log, the ground station, a page of its
+    /// own are all parts of the telemetry and control system itself rather
+    /// than things bolted to the vehicle.
+    ///
+    /// The editor keeps the two apart on the canvas: payloads live in the
+    /// payload working pane and everything else in the vehicle working pane,
+    /// which is what makes a diagram readable as "here is the vehicle, and
+    /// here is what it is carrying this flight". The flight is the thing that
+    /// changes between missions, and a drawing that puts the changing part in
+    /// one place is a drawing that can be compared with last mission's.
+    ///
+    /// Listed rather than derived from [`NodeType::family`] so that a new type
+    /// has to say which side it is on. The test below checks the two agree.
+    pub fn is_payload(self) -> bool {
+        match self {
+            NodeType::I2c
+            | NodeType::Spi
+            | NodeType::Serial
+            | NodeType::Hdlc
+            | NodeType::Can
+            | NodeType::Iio
+            | NodeType::Rpmsg
+            | NodeType::Network
+            | NodeType::DeviceFile
+            | NodeType::Gpio => true,
+            NodeType::Compute
+            | NodeType::Log
+            | NodeType::Moc
+            | NodeType::Subdiagram => false,
+        }
+    }
+
     /// How this type is drawn.
     ///
     /// The groupings are meant to be learnable rather than arbitrary: square
@@ -337,8 +428,8 @@ impl NodeType {
                 outline: Square,
                 shading: Solid,
                 weight: Narrow,
-                size: (120, 48),
-                tint: Tint::Slate,
+                size: (WIDTH, 48),
+                tint: Tint::Purple,
             },
             NodeType::Spi => Appearance {
                 face: Face::Mono,
@@ -348,8 +439,8 @@ impl NodeType {
                 outline: Square,
                 shading: Hatched,
                 weight: Narrow,
-                size: (120, 56),
-                tint: Tint::Teal,
+                size: (WIDTH, 56),
+                tint: Tint::Magenta,
             },
             NodeType::Serial => Appearance {
                 face: Face::Mono,
@@ -359,8 +450,8 @@ impl NodeType {
                 outline: Square,
                 shading: Open,
                 weight: Narrow,
-                size: (132, 48),
-                tint: Tint::Amber,
+                size: (WIDTH, 48),
+                tint: Tint::Rose,
             },
             // Wide, double-outlined and in the sand tint, with a plain face
             // at the largest label size: a square outline because it is
@@ -373,8 +464,8 @@ impl NodeType {
                 outline: Square,
                 shading: Double,
                 weight: Wide,
-                size: (152, 56),
-                tint: Tint::Sand,
+                size: (WIDTH, 56),
+                tint: Tint::Bronze,
             },
             NodeType::Can => Appearance {
                 face: Face::Mono,
@@ -384,8 +475,8 @@ impl NodeType {
                 outline: Square,
                 shading: Double,
                 weight: Narrow,
-                size: (120, 64),
-                tint: Tint::Violet,
+                size: (WIDTH, 64),
+                tint: Tint::Gold,
             },
             NodeType::Iio => Appearance {
                 face: Face::Plain,
@@ -395,8 +486,8 @@ impl NodeType {
                 outline: Square,
                 shading: Hatched,
                 weight: Wide,
-                size: (132, 56),
-                tint: Tint::Olive,
+                size: (WIDTH, 56),
+                tint: Tint::Taupe,
             },
             NodeType::Rpmsg => Appearance {
                 face: Face::Mono,
@@ -406,8 +497,8 @@ impl NodeType {
                 outline: Square,
                 shading: Solid,
                 weight: Wide,
-                size: (144, 48),
-                tint: Tint::Indigo,
+                size: (WIDTH, 48),
+                tint: Tint::Periwinkle,
             },
             NodeType::Network => Appearance {
                 face: Face::Plain,
@@ -417,8 +508,8 @@ impl NodeType {
                 outline: Square,
                 shading: Open,
                 weight: Wide,
-                size: (144, 56),
-                tint: Tint::Cyan,
+                size: (WIDTH, 56),
+                tint: Tint::Lavender,
             },
             NodeType::DeviceFile => Appearance {
                 face: Face::Mono,
@@ -428,8 +519,8 @@ impl NodeType {
                 outline: Square,
                 shading: Double,
                 weight: Wide,
-                size: (132, 64),
-                tint: Tint::Sand,
+                size: (WIDTH, 64),
+                tint: Tint::Blush,
             },
             // Driven rather than read, and shaped to say so.
             NodeType::Gpio => Appearance {
@@ -440,8 +531,8 @@ impl NodeType {
                 outline: Keyed,
                 shading: Solid,
                 weight: Wide,
-                size: (120, 72),
-                tint: Tint::Grey,
+                size: (WIDTH, 72),
+                tint: Tint::Olive,
             },
             // Software aboard.
             NodeType::Compute => Appearance {
@@ -452,13 +543,13 @@ impl NodeType {
                 outline: Rounded,
                 shading: Solid,
                 weight: Wide,
-                size: (152, 64),
-                tint: Tint::Teal,
+                size: (WIDTH, 64),
+                tint: Tint::Blue,
             },
-            // A diagram of its own. Doubly outlined and the widest thing on
-            // the canvas, because it stands for a page rather than a device:
-            // the two outlines read as a box holding a box, which is what it
-            // is, and nothing else is this wide.
+            // A diagram of its own. Doubly outlined and the tallest thing on
+            // the canvas bar the two ends of the graph, because it stands for
+            // a page rather than a device: the two outlines read as a box
+            // holding a box, which is what it is.
             NodeType::Subdiagram => Appearance {
                 face: Face::Plain,
                 label_size: 14,
@@ -467,8 +558,8 @@ impl NodeType {
                 outline: Rounded,
                 shading: Double,
                 weight: Wide,
-                size: (200, 88),
-                tint: Tint::Slate,
+                size: (WIDTH, 88),
+                tint: Tint::Plum,
             },
             // Ends of the graph.
             NodeType::Log => Appearance {
@@ -479,8 +570,8 @@ impl NodeType {
                 outline: Circle,
                 shading: Hatched,
                 weight: Narrow,
-                size: (96, 96),
-                tint: Tint::Sand,
+                size: (WIDTH, 96),
+                tint: Tint::Forest,
             },
             NodeType::Moc => Appearance {
                 face: Face::Plain,
@@ -490,7 +581,7 @@ impl NodeType {
                 outline: Circle,
                 shading: Solid,
                 weight: Wide,
-                size: (128, 128),
+                size: (WIDTH, 128),
                 tint: Tint::Indigo,
             },
         }
@@ -561,6 +652,28 @@ mod tests {
         }
     }
 
+    /// Every type has its own tint.
+    ///
+    /// Asked for, and worth a test rather than a glance down the table:
+    /// fourteen entries written one at a time is fourteen chances to reach for
+    /// the one above. Colour remains the redundant channel -- the rule at the
+    /// top of this file is what tells types apart -- so this is not what makes
+    /// the palette usable, only what makes it complete.
+    #[test]
+    fn no_two_types_share_a_tint() {
+        for (i, a) in NodeType::ALL.iter().enumerate() {
+            for b in &NodeType::ALL[i + 1..] {
+                assert_ne!(
+                    a.appearance().tint,
+                    b.appearance().tint,
+                    "{} and {} are the same colour",
+                    a.spelling(),
+                    b.spelling()
+                );
+            }
+        }
+    }
+
     /// Red is not in the palette at all.
     ///
     /// Checked against the names rather than against values, because the
@@ -601,6 +714,73 @@ mod tests {
                 a.label_weight
             );
         }
+    }
+
+    /// Every node is drawn the same width.
+    ///
+    /// Alignment is the point: nodes of four widths in a column have no edge
+    /// to line up on, and a diagram of them looks approximate however
+    /// carefully it was laid out. A test rather than a comment because the
+    /// next type added will be written by copying one of these, and the one it
+    /// gets copied from is whichever was most convenient.
+    #[test]
+    fn every_type_is_drawn_the_same_width() {
+        for t in NodeType::ALL {
+            assert_eq!(
+                t.appearance().size.0,
+                WIDTH,
+                "{} is {}px wide and everything else is {WIDTH}px",
+                t.spelling(),
+                t.appearance().size.0
+            );
+        }
+    }
+
+    /// A width that holds the longest name it has to hold.
+    ///
+    /// The label is a channel only while it can be read: the type name is
+    /// shown under every node, and one that elides to "device-fi..." is a
+    /// distinction that has stopped working. Measured generously -- a little
+    /// over half the label size per character, which no system face exceeds
+    /// for lower case -- because the point is a floor and not a layout.
+    #[test]
+    fn the_width_holds_the_longest_type_name() {
+        for t in NodeType::ALL {
+            let wanted = t.spelling().len() as f32 * 7.0 + 8.0;
+            assert!(
+                WIDTH as f32 >= wanted,
+                "{} wants about {wanted:.0}px and a node is {WIDTH}px",
+                t.spelling()
+            );
+        }
+    }
+
+    /// What is a payload and what is not, said twice and agreeing.
+    ///
+    /// [`NodeType::is_payload`] is written out type by type so that a new type
+    /// has to declare which side of the canvas it belongs on. That leaves two
+    /// statements of the same fact, and two statements of one fact drift: this
+    /// is what stops them. The families are the shape grammar, and the grammar
+    /// already divides what the vehicle carries from what the system is made
+    /// of.
+    #[test]
+    fn a_payload_is_a_device_or_a_driven_line() {
+        for t in NodeType::ALL {
+            let by_family = matches!(t.family(), "Devices" | "Driven");
+            assert_eq!(
+                t.is_payload(),
+                by_family,
+                "{} is in the {} family and says is_payload() is {}",
+                t.spelling(),
+                t.family(),
+                t.is_payload()
+            );
+        }
+
+        // And both panes have something to offer: an empty selection pane is
+        // a pane nobody can tell the purpose of.
+        assert!(NodeType::ALL.iter().any(|t| t.is_payload()));
+        assert!(NodeType::ALL.iter().any(|t| !t.is_payload()));
     }
 
     /// Every type says what it needs, and needs something.

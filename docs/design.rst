@@ -799,6 +799,12 @@ performs them again aboard. One command, on one file:
    $ tcsverify tests/manual/thermostat.yaml
    $ make verify TCSGUI_FILE=tests/manual/thermostat.yaml
 
+``TCSGUI_FILE`` is the same variable the editor takes, so checking what was
+just edited is the same name in both commands: ``make runguiy`` and ``make
+runguix`` open it as YAML and as XML, one target per spelling as the
+``runmocy`` and ``runmocx`` pair is, and ``make verify`` checks the file the
+variable names.
+
 It prints one line per problem -- the file, the line to look at, and what is
 wrong -- and says nothing at all about a configuration it accepts. Which
 version a file is decides which checks are run: the two describe different

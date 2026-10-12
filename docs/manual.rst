@@ -245,7 +245,7 @@ is marked that way is: RS-485 on a serial line, and the ``can``, ``iio``,
 
 Read them as a statement of what the configuration will be rather than as a
 feature to rely on. They may change in ways the five supported types --
-``network``, ``device``, ``serial``, ``i2c`` and ``spi`` -- will not.
+``network``, ``device-file``, ``serial``, ``i2c`` and ``spi`` -- will not.
 
 Attributes Every Payload Has
 ----------------------------

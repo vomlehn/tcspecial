@@ -781,6 +781,24 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
         })
         .collect();
 
+    // What a line may not run through: every node on this page, where it is
+    // and how big it is. Worked out once for the page rather than once per
+    // link, and handed to the router, which knows about geometry and nothing
+    // about documents.
+    let obstacles: Vec<route::Obstacle> = document
+        .nodes_in(home)
+        .iter()
+        .map(|node| {
+            let (width, height) = size_of(&node.node_type);
+            route::Obstacle::new(
+                node.at.0 as f32,
+                node.at.1 as f32,
+                width as f32,
+                height as f32,
+            )
+        })
+        .collect();
+
     let here = |name: &str| &Qualified::parse(name).in_ == home;
     let links: Vec<LinkView> = document
         .links
@@ -816,16 +834,18 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
                 (None, false) => String::new(),
             };
 
+            // The label goes at the middle of the route's longest run, which
+            // is on the line wherever the line had to go.
+            let (label_x, label_y) = route::label_at(x1, y1, x2, y2, &obstacles);
+
             LinkView {
                 // The route and the arrow, worked out where they can be
                 // tested: see route.rs.
-                route: route::route(x1, y1, x2, y2).into(),
+                route: route::route(x1, y1, x2, y2, &obstacles).into(),
                 head: route::arrow(x2, y2).into(),
-                marker: route::marker(x1, y1, x2, y2).into(),
-                // The label goes at the middle of the run, which for an
-                // orthogonal route is the middle of its vertical segment.
-                label_x: (x1 + x2) / 2.0,
-                label_y: (y1 + y2) / 2.0,
+                marker: route::marker(x1, y1, x2, y2, &obstacles).into(),
+                label_x,
+                label_y,
                 wide: link.input.is_some(),
                 label: label.into(),
                 comment: link.comment.clone().unwrap_or_default().into(),
@@ -2116,6 +2136,61 @@ mod tests {
     #[test]
     fn a_new_node_is_placed_where_it_can_be_seen() {
         assert!(FIRST_PLACE.0 > 0 && FIRST_PLACE.1 > 0);
+    }
+
+    /// No line in the shipped example is drawn through a node.
+    ///
+    /// The rules are checked in `route.rs` against boxes and numbers; this
+    /// asks the same question of a real configuration, which is where a
+    /// routing fault was actually found. The return link of this example used
+    /// to run its long leg straight through the box of the node it was
+    /// arriving at.
+    #[test]
+    fn the_shipped_example_draws_no_line_through_a_node() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+
+        for extension in ["yaml", "xml"] {
+            let editor = Editor::open(&root.join(format!("example.{extension}")));
+            let document = editor.document();
+
+            // The same boxes and the same ends views_of works out, because
+            // what is being checked is what gets drawn.
+            let obstacles: Vec<route::Obstacle> = document
+                .nodes_in(&None)
+                .iter()
+                .map(|node| {
+                    let (width, height) = size_of(&node.node_type);
+                    route::Obstacle::new(
+                        node.at.0 as f32,
+                        node.at.1 as f32,
+                        width as f32,
+                        height as f32,
+                    )
+                })
+                .collect();
+            assert!(!obstacles.is_empty(), "example.{extension} has no nodes");
+            assert!(!document.links.is_empty(), "and no links");
+
+            for link in &document.links {
+                let from = document.node(&link.from).expect("the source");
+                let to = document.node(&link.to).expect("the target");
+                let (width, height) = size_of(&from.node_type);
+                let (_, arrives) = size_of(&to.node_type);
+                let through = route::runs_through(
+                    (from.at.0 + width as i32) as f32,
+                    (from.at.1 + height as i32 / 2) as f32,
+                    to.at.0 as f32,
+                    (to.at.1 + arrives as i32 / 2) as f32,
+                    &obstacles,
+                );
+                assert_eq!(
+                    through, 0,
+                    "example.{extension}: the line from {} to {} runs through \
+                     {through} node(s)",
+                    link.from, link.to
+                );
+            }
+        }
     }
 
     /// What needs a window, which is one test because only one may have one.

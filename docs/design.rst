@@ -888,6 +888,25 @@ because a fourteenth colour added by hand would be a near-copy of one of the
 other thirteen under one of the dichromacies and nobody with normal vision
 would see it.
 
+A link is drawn as an orthogonal route rather than a straight line -- out of
+the source, across, into the target, corners rounded -- and it goes around
+whatever is in the way. A line that runs through a node says there is a
+connection where there is none, which is worse than a line that is hard to
+follow: a reader tracing it arrives at the wrong node and has no way of
+knowing. So a route is chosen rather than computed. A handful of shapes are
+laid out -- straight through, a vertical run down the middle or beside each
+node in the way, and a run along a clear row above or below everything -- each
+is checked against every node on the page, and the one that crosses fewest,
+turns least and runs shortest is drawn, in that order of priority. Crossings
+first because a line through a node is a lie about the graph; turns before
+length because two orthogonal routes between one pair of points are usually
+the same length, and of two equal routes the one with fewer corners is the one
+that can be followed. A line keeps six pixels off any node it only passes,
+because a line along a node's edge reads as a line that touches it. Where
+nothing misses everything -- a target walled in on every side -- the best
+available is drawn anyway: a link with no line is a connection that does not
+appear in the drawing at all.
+
 Colour remains the redundant channel for all that. Nothing is told apart by
 colour alone: every type differs from every other in at least two of outline,
 border width, shading, height and the way its label is set, and a test fails if

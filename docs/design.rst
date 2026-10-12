@@ -923,6 +923,47 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
+Groups are edited in a window of their own, reached from a menu in the bar. A
+group is not on the canvas and should not be: it is a set of payloads read
+together, and which payloads those are is written on the nodes rather than
+drawn between them. The window states the group's name, how often it is read,
+and which payloads are in it -- and below those, the attributes that *all* of
+those payloads declare.
+
+Typing a value into one of those writes it to every payload in the group, as a
+single edit. That is what a group is for beyond the schedule: a dozen sensors
+on one bus are told the bus once. One edit and not a dozen, because undo has to
+take back the gesture rather than the first of its consequences, and the edit
+carries what each payload had so that undoing it puts back exactly what was
+there -- including the payloads that had nothing, which have the attribute
+taken off again rather than emptied. A field whose payloads disagree says so,
+because typing into it will overwrite several different values with one.
+
+Two attributes are never propagated. ``group`` is the group itself, and
+``interval`` belongs to the group rather than to its members -- a member
+stating one is a fault the flight reader refuses -- so it is the group's own
+field and goes nowhere else. Renaming a group renames it on every node in it,
+as one edit, for the same reason: a rename that left the members behind would
+silently unschedule them.
+
+Every edit is written as it is made, so saving is not something to remember.
+There is a Save button all the same. It writes every file of the configuration
+now, which covers the three things the ordinary case does not: retrying a write
+that failed once whatever stopped it has been put right, rewriting a set of
+files left half new by a failure between two of them, and answering somebody
+who has been taught by every other program to save their work. The way out of
+the program does the same for anything the files do not have, and says on the
+error output whether it got there -- leaving a session's work in a process that
+is ending is the one way this editor could lose anything.
+
+Undo and redo are a drawn arrow apiece beside the name of the edit they would
+take back or put again. The arrow is what the button does and the name is what
+it will do it to, which is the half worth keeping: "Undo" on a button is a word
+anybody could have guessed, where ``move "payload"`` is something only this
+session knows. The icons are drawn here as SVG rather than taken from an icon
+set, for the reason every other mark in the window is drawn from primitives:
+there is nothing to fail to load.
+
 ``TCSGUI_FILE`` is the same variable the editor takes, so checking what was
 just edited is the same name in both commands: ``make runguiy`` and ``make
 runguix`` open it as YAML and as XML, one target per spelling as the

@@ -1,10 +1,17 @@
 //! A session: the document, its history, and keeping both on disk.
 //!
-//! There is no Save command. Every edit is written as it is made, which is
-//! what was asked for and is also the only arrangement that does not have to
-//! ask a person whether they want to lose their work when something goes
-//! wrong. What that costs is a write per edit, which for a configuration file
-//! is nothing.
+//! Every edit is written as it is made, which is what was asked for and is
+//! also the only arrangement that does not have to ask a person whether they
+//! want to lose their work when something goes wrong. What that costs is a
+//! write per edit, which for a configuration file is nothing.
+//!
+//! So saving is never something to remember, and [`Editor::save`] exists
+//! anyway. It writes every file of the configuration now, which is the three
+//! things the ordinary case does not cover: retrying a write that failed,
+//! putting right a set of files left half new by a failure between two of
+//! them, and answering somebody who has been taught by every other program to
+//! save their work. The way out of the program does the same for anything the
+//! files do not have -- see [`Editor::unsaved`].
 //!
 //! Two files are written, and both matter:
 //!
@@ -33,6 +40,16 @@ pub struct Editor {
     document: Document,
     journal: Journal,
     path: PathBuf,
+    /// Whether the document has changes the files do not have.
+    ///
+    /// Normally false, and that is the point: every edit is written as it is
+    /// made, so the files are current. It goes true when a write fails -- a
+    /// full device, a directory gone read-only, a name whose extension says
+    /// nothing -- and stays true until one succeeds. What it is for is the
+    /// Save button and the write on the way out, which are both "try that
+    /// again now": the first when somebody has fixed whatever was wrong, the
+    /// second so that a session is not left with work only in memory.
+    unsaved: bool,
     /// Why the last write failed, if it did.
     ///
     /// Held rather than returned and forgotten, because the window shows it --
@@ -50,6 +67,7 @@ impl Editor {
             document: Document::new(),
             journal: Journal::new(),
             path: path.to_path_buf(),
+            unsaved: false,
             trouble: None,
         }
     }
@@ -130,6 +148,40 @@ impl Editor {
         self.trouble.as_deref()
     }
 
+    /// Whether anything has been changed that the files do not have.
+    pub fn unsaved(&self) -> bool {
+        self.unsaved
+    }
+
+    /// Where the history is kept, for saying so when the configuration itself
+    /// cannot be written.
+    pub fn journal_path(&self) -> PathBuf {
+        journal_beside(&self.path)
+    }
+
+    /// Write every file of the configuration now.
+    ///
+    /// There is nothing to do here in the ordinary case -- every edit is
+    /// written as it is made -- and it is worth having all the same, for three
+    /// things that the ordinary case does not cover.
+    ///
+    /// A write that failed can be retried. A full device or a directory
+    /// somebody had made read-only leaves the document in memory and the
+    /// reason in red; once that is put right, this is how the work reaches the
+    /// disk without having to make another edit.
+    ///
+    /// A configuration written as several files can be left half new by a
+    /// power failure between two of them. Nothing can undo that afterwards, so
+    /// what puts it right is writing them all again.
+    ///
+    /// And a person who has been taught by every other program to save their
+    /// work can save it, and be told plainly that it is saved. "There is no
+    /// Save command" is a true description of what the editor does and a poor
+    /// answer to somebody who wants to be sure.
+    pub fn save(&mut self) {
+        self.persist();
+    }
+
     /// Apply an edit, record it, and write both files.
     ///
     /// The document is changed whether or not the write succeeds: refusing the
@@ -175,6 +227,10 @@ impl Editor {
     /// why that order.
     fn persist(&mut self) {
         self.trouble = None;
+        // Until a write succeeds, there is something in the document that no
+        // file has. Set before the writing rather than after a failure, so
+        // that a path which returns early still leaves it true.
+        self.unsaved = true;
 
         // Every file the document is written as: the top diagram and one per
         // subdiagram, each in whichever format its name asks for.
@@ -200,6 +256,9 @@ impl Editor {
                 return;
             }
         }
+        // The configuration is on the disk. Whatever happens to the history
+        // below, there is nothing left in the document that no file has.
+        self.unsaved = false;
 
         match serde_yaml::to_string(&self.journal) {
             Ok(text) => {
@@ -267,6 +326,111 @@ mod tests {
         editor.edit(add("temp_aft", "i2c"));
         let after_two = std::fs::read_to_string(&path).unwrap();
         assert!(after_two.contains("temp_aft"), "{after_two}");
+    }
+
+    /// Saving when there is nothing to save writes the files anyway.
+    ///
+    /// Which is the point of the button: it is what retries a write that
+    /// failed, and what puts right a set of files left half new by a failure
+    /// between two of them. Nothing to save is the ordinary case, because
+    /// every edit is written as it is made.
+    #[test]
+    fn saving_writes_every_file_whether_or_not_anything_is_owed() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let mut editor = Editor::new(&path);
+
+        editor.edit(add("temp_fore", "i2c"));
+        assert!(!editor.unsaved(), "an edit that was written owes nothing");
+
+        // Taken away behind the editor's back, as a half-written set of files
+        // would be.
+        std::fs::remove_file(&path).expect("the file goes");
+        editor.save();
+        assert!(path.exists(), "Save did not write the file");
+        assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
+        assert!(std::fs::read_to_string(&path).unwrap().contains("temp_fore"));
+    }
+
+    /// A write that failed is owed, and a later save settles it.
+    ///
+    /// The one way this editor could lose a session's work: a device that
+    /// could not be written to, and nobody told. What it does instead is hold
+    /// the work, say so in red, and leave a way to write it -- the button, or
+    /// the way out of the program.
+    #[test]
+    fn work_the_files_do_not_have_is_owed_until_it_is_written() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let locked = where_.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        let path = locked.join("vehicle.yaml");
+        let mut editor = Editor::new(&path);
+
+        let shut = |mode: u32| {
+            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            permissions.set_mode(mode);
+            std::fs::set_permissions(&locked, permissions).unwrap();
+        };
+
+        shut(0o500);
+        editor.edit(add("temp_fore", "i2c"));
+        assert!(editor.trouble().is_some(), "a failed write should be said");
+        assert!(
+            editor.unsaved(),
+            "work the files do not have should be owed"
+        );
+        // And the work is still there: the person at the keyboard has lost
+        // nothing but the saving.
+        assert_eq!(editor.document().nodes.len(), 1);
+
+        // Put right, and saved without another edit being made -- which is
+        // what the button is for, and what the way out of the program does.
+        shut(0o700);
+        editor.save();
+        assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
+        assert!(!editor.unsaved());
+        assert!(std::fs::read_to_string(&path).unwrap().contains("temp_fore"));
+    }
+
+    /// A group is written out, and read back.
+    ///
+    /// A group is one of the four things a configuration is made of, and the
+    /// one the editor could only read: a group made in the window had to reach
+    /// the file or the nodes in it would name something nothing declared.
+    #[test]
+    fn a_group_made_in_the_editor_is_written_and_read_back() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let mut editor = Editor::new(&path);
+
+        editor.edit(Edit::AddGroup {
+            name: "cabin_temps".into(),
+            interval: "3s".into(),
+        });
+        editor.edit(add("temp_fore", "i2c"));
+        for (attribute, value) in [("group", "cabin_temps"), ("path", "/dev/i2c-1"), ("address", "0x48")] {
+            editor.edit(Edit::SetAttribute {
+                node: "temp_fore".into(),
+                attribute: attribute.into(),
+                was: None,
+                now: Some(value.into()),
+            });
+        }
+        assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
+
+        let written = std::fs::read_to_string(&path).expect("the file");
+        assert!(written.contains("cabin_temps"), "{written}");
+        assert!(written.contains("3s"), "{written}");
+
+        let reopened = Editor::open(&path);
+        assert_eq!(
+            reopened.document().groups.get("cabin_temps").map(String::as_str),
+            Some("3s"),
+            "the group did not survive a round trip"
+        );
+        assert_eq!(reopened.document().payloads_of("cabin_temps").len(), 1);
     }
 
     /// A session recovered after a crash has the work *and* the undo.

@@ -306,6 +306,16 @@ one name, in the place the payload's type puts it. It was
 ``trigger_interval_ms`` here; a file still using that name is told the name it
 has now.
 
+In a graph, a ``trigger`` is also what allows anything to be sent to a payload
+at all. What is written to a payload that is read is the question it answers,
+and the trigger is the bytes of that question -- so a payload that states none
+is one the configuration describes as only read, and a link delivering into it
+is refused, naming both ends. The usual cause is a link drawn to the wrong
+node, which nothing else in a configuration would reveal. A payload that is
+written and never read is a different thing and takes no trigger: a heater, a
+valve or a latch is driven rather than asked, and a trigger on one would be
+bytes written before a read that never happens.
+
 **The trigger itself** is bytes, not text, since an interface document asks
 for what it asks for. A series of bytes is written as a list of values
 separated by spaces, in hexadecimal, in either case. One or two digits is one

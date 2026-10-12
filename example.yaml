@@ -20,15 +20,22 @@ nodes:
   # nowhere to send it. The payload speaks first, and tcspecial learns where
   # it is from the datagram that arrives.
   #
-  # The second is the payload's own: nothing here makes it send. What this
-  # file says is that the link is read once a second, which is what it is
-  # worth reading if that is how often it has something new to say.
+  # The second is the group's: the link is read once a second, and once a
+  # second the trigger below is sent to ask for the next reading.
+  #
+  # The trigger is also what allows the downward link at all. A payload that
+  # is read is asked for its readings, and the bytes that ask are its
+  # trigger -- so a payload that states none is one the configuration
+  # describes as only read, and `tcsverify` refuses a link delivering into
+  # it. One byte here; a real payload's would be whatever its own protocol
+  # asks with.
   - name: payload
     type: network
     protocol: "udp"
     address: "127.0.0.1"
     port: "5100"
     group: "every_second"
+    trigger: "01"
     # In the payload working pane, which is the right-hand quarter of the
     # editor's canvas: everything the vehicle carries is drawn on that side,
     # and the rest of the graph on the other.

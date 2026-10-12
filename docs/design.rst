@@ -947,6 +947,15 @@ These are the checks:
 * no cycle, unless a node on it declares itself a loop and states what breaks
   the cycle -- a control loop is a cycle on purpose, and an accidental one is a
   configuration that would run forever on its own output.
+* a payload that is read is written to only if it says what asks it. What is
+  written to a payload that is read is the question it answers, and the
+  ``trigger`` is the bytes of that question -- so a payload stating none is one
+  the configuration describes as only read, and a link delivering into it has
+  nowhere to go. The usual cause is a link drawn to the wrong node, which
+  nothing else in a configuration would reveal. A payload that is written and
+  never read is exempt: a heater, a valve or a latch is driven rather than
+  asked, and a trigger on one would be bytes written before a read that never
+  happens.
 * direction agrees with the type. A set of discrete lines driven as outputs is
   not also read; a sensor buffer is not written; a node with no outbound link
   produces data nobody reads and is named as such.

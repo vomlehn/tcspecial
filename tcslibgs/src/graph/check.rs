@@ -69,6 +69,14 @@ pub enum Problem {
         wanted: u32,
         produces: Option<u32>,
     },
+    /// A payload that is read and also written to, and says nothing about
+    /// what the writing is for.
+    ///
+    /// `from` is the node whose data arrives. A payload that is read is
+    /// written to in order to ask it for a reading, and the bytes that ask are
+    /// the `trigger`: a payload with none is one the configuration describes
+    /// as only read, so a link delivering into it has nowhere to go.
+    UntriggeredInput { node: String, from: String },
     /// A node nothing reads and nothing writes.
     ///
     /// More likely a mistake than an intention: a node with no link at all
@@ -104,6 +112,10 @@ impl Problem {
             }
             Problem::NotAMocLink { from } => About::Node(from.clone()),
             Problem::Unconnected { node } => About::Node(node.clone()),
+            // On the payload and not on the source: the source is right
+            // about where it sends, and the payload is where the trigger
+            // would have to be written.
+            Problem::UntriggeredInput { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
             Problem::MeanInputs { node, .. } => About::Node(node.clone()),
@@ -157,6 +169,12 @@ impl Problem {
             Problem::Unconnected { node } => format!(
                 "\"{node}\" has no link to or from it, so nothing reaches it and \
                  nothing reads it"
+            ),
+            Problem::UntriggeredInput { node, from } => format!(
+                "\"{from}\" is delivered to \"{node}\", which states no trigger: \
+                 what is written to a payload that is read is what asks it for \
+                 a reading, so a payload with no trigger is one nothing may be \
+                 delivered to"
             ),
             Problem::BadLog { node, why } => format!("log \"{node}\": {why}"),
             // The reason already names the node and the computation: see
@@ -454,6 +472,36 @@ impl Graph {
             }
         }
 
+        // What may be written to a payload.
+        //
+        // A payload that is read is asked for its readings, and the bytes
+        // that ask are its trigger -- so a payload that is read, is written
+        // to, and states no trigger is a configuration delivering data to
+        // something it also describes as answering nothing. The usual cause
+        // is a link drawn to the wrong node.
+        //
+        // Only a payload that is read. A payload that is written and never
+        // read -- a heater, a valve, a latch -- is driven rather than asked,
+        // and there is nothing for a trigger to do on one: the bytes would be
+        // written before a read that never happens. Requiring one there would
+        // be requiring an attribute that means nothing, which is how a rule
+        // gets worked around rather than obeyed.
+        for node in self.nodes.iter().filter(|n| n.is_payload()) {
+            if node.attributes.contains_key("trigger") {
+                continue;
+            }
+            let read = self.links.iter().any(|link| link.from == node.name);
+            if !read {
+                continue;
+            }
+            for from in self.sources_of(&node.name) {
+                problems.push(Problem::UntriggeredInput {
+                    node: node.name.clone(),
+                    from: from.to_string(),
+                });
+            }
+        }
+
         problems
     }
 
@@ -574,6 +622,132 @@ mod tests {
             vec![link("a", &["b"]), link("b", &["c"])],
         );
         assert_eq!(g.check(), Vec::new());
+    }
+
+    /// A payload that is read takes nothing unless it says what asks it.
+    ///
+    /// The rule: what is written to a payload that is read is what asks it for
+    /// a reading, and the trigger is the asking. A link delivering into a
+    /// payload with no trigger has nowhere to go, and the usual cause is a
+    /// link drawn to the wrong node -- which is a mistake nothing else in the
+    /// configuration would reveal.
+    #[test]
+    fn a_payload_that_is_read_takes_nothing_without_a_trigger() {
+        // A sensor read into a computation, with something delivered back
+        // into it.
+        let g = graph(
+            vec![
+                node("sensor", "i2c"),
+                node("k", "compute"),
+                node("moc", "moc"),
+            ],
+            vec![
+                link("sensor", &["k"]),
+                link("k", &["moc"]),
+                link("moc", &["sensor"]),
+            ],
+        );
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::UntriggeredInput { node, from } if node == "sensor" && from == "moc"
+            )),
+            "{problems:?}"
+        );
+        // Reported on the payload, which is where a trigger would be written.
+        let said = problems
+            .iter()
+            .find(|p| matches!(p, Problem::UntriggeredInput { .. }))
+            .unwrap();
+        assert_eq!(said.about(), About::Node("sensor".to_string()));
+        assert!(said.describe().contains("trigger"), "{}", said.describe());
+
+        // And with a trigger it is allowed: the payload answers what it is
+        // asked, which is what a trigger says.
+        let mut nodes = vec![
+            node("sensor", "i2c"),
+            node("k", "compute"),
+            node("moc", "moc"),
+        ];
+        nodes[0]
+            .attributes
+            .insert("trigger".to_string(), Scalar::of("01"));
+        let g = graph(
+            nodes,
+            vec![
+                link("sensor", &["k"]),
+                link("k", &["moc"]),
+                link("moc", &["sensor"]),
+            ],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::UntriggeredInput { .. })),
+            "{:?}",
+            g.check()
+        );
+    }
+
+    /// A payload that is only driven needs no trigger.
+    ///
+    /// A heater, a valve, a latch: nothing is read from it, so there is
+    /// nothing to ask it for, and a trigger on one would be bytes written
+    /// before a read that never happens. Requiring one would be requiring an
+    /// attribute that means nothing -- which is how a rule gets worked around
+    /// instead of obeyed, and the shipped thermostat is exactly this shape.
+    #[test]
+    fn a_payload_that_is_only_driven_needs_no_trigger() {
+        let g = graph(
+            vec![
+                node("sensor", "i2c"),
+                node("thermostat", "compute"),
+                node("heaters", "gpio"),
+            ],
+            vec![
+                link("sensor", &["thermostat"]),
+                link("thermostat", &["heaters"]),
+            ],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::UntriggeredInput { .. })),
+            "{:?}",
+            g.check()
+        );
+    }
+
+    /// The rule is about payloads and nothing else.
+    ///
+    /// A computation, a log and the ground link all take inputs and none of
+    /// them is a thing the vehicle carries: a trigger would mean nothing on
+    /// any of them, and asking for one would make every configuration
+    /// unwritable.
+    #[test]
+    fn only_a_payload_is_asked_for_a_trigger() {
+        for node_type in ["compute", "log", "moc"] {
+            assert!(!node("x", node_type).is_payload(), "{node_type}");
+        }
+        for node_type in [
+            "i2c",
+            "spi",
+            "serial",
+            "hdlc",
+            "can",
+            "iio",
+            "rpmsg",
+            "network",
+            "device-file",
+            "gpio",
+        ] {
+            assert!(node("x", node_type).is_payload(), "{node_type}");
+        }
+        // And a type nothing recognises is not a payload: it is refused by
+        // name already, and a second complaint about a trigger would bury the
+        // one that says what is actually wrong.
+        assert!(!node("x", "contraption").is_payload());
     }
 
     /// A link naming a node that is not there is refused, saying which.

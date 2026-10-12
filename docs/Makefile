@@ -1,6 +1,6 @@
 O = ../OUT
 
-all:	design.html manual.html requirements.html
+all:	design.html manual.html
 
 design.html: design.rst
 	rst2html design.rst design.html
@@ -8,9 +8,6 @@ design.html: design.rst
 manual.html: manual.rst
 	rst2html manual.rst manual.html
 
-requirements.html: requirements.rst
-	rst2html requirements.rst requirements.html
-
 .PHONY: clean
 clean:
-	rm -f design.html manual.html requirements.html
+	rm -f design.html manual.html

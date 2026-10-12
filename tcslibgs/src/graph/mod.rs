@@ -127,6 +127,35 @@ pub struct Node {
     pub editor: Option<Editor>,
 }
 
+impl Node {
+    /// Whether this node is a payload: something the vehicle carries.
+    ///
+    /// A device on a bus, a line it drives, a link to something aboard. The
+    /// rest of a graph is not -- a computation, a log and the ground link are
+    /// parts of the telemetry and control system itself rather than things
+    /// bolted to the vehicle for a flight.
+    ///
+    /// Listed rather than taken as "everything else", so that a type nothing
+    /// recognises is not a payload: a misspelled type is already refused by
+    /// name, and counting it as a payload would pile a second complaint on
+    /// top of the one that says what is actually wrong.
+    pub fn is_payload(&self) -> bool {
+        matches!(
+            self.node_type.as_str(),
+            "i2c"
+                | "spi"
+                | "serial"
+                | "hdlc"
+                | "can"
+                | "iio"
+                | "rpmsg"
+                | "network"
+                | "device-file"
+                | "gpio"
+        )
+    }
+}
+
 /// What an editor keeps about a node that a vehicle does not need.
 ///
 /// Only a position so far. It is in the configuration rather than in a file

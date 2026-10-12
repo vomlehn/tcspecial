@@ -24,6 +24,9 @@
         <address>127.0.0.1</address>
         <port>5100</port>
         <group>every_second</group>
+        <!-- What is written to ask for the next reading, and what allows the
+             link down to this payload at all: see example.yaml -->
+        <trigger>01</trigger>
         <!-- In the payload working pane, the right-hand quarter of the
              editor's canvas -->
         <editor><x>744</x><y>160</y></editor>

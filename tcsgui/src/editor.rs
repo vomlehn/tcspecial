@@ -54,40 +54,60 @@ impl Editor {
         }
     }
 
-    /// Open a configuration: the file, or the session that was editing it.
+    /// Open a configuration: the document from the file, the history from
+    /// beside it.
     ///
-    /// Two ways in, and which one is taken follows from what is beside the
-    /// file. A journal there is a session that did not finish -- the editor
-    /// was killed, or the machine was -- and replaying it brings the work back
-    /// with its undo intact, which is the whole reason the journal exists. No
-    /// journal, and the file itself is read: a configuration somebody wrote by
-    /// hand, or one a finished session left.
+    /// Two files and two different questions. *What is the configuration* is
+    /// answered by the file, always, because the file is current: every edit is
+    /// written as it is made, so the file already holds the result of every
+    /// edit the journal describes. *What can be taken back* is answered by the
+    /// journal, which is how undo reaches past the end of the last session and
+    /// past a crash.
     ///
-    /// The journal wins where both are there, because it is the later of the
-    /// two by construction: it is written after every edit, and the file is
-    /// written from the document it describes.
+    /// It used to replay the journal instead, onto an empty document, and
+    /// return that -- which was right while the editor could not read a file at
+    /// all, because then the journal was the only record of anything. It became
+    /// wrong the moment the editor could open a configuration somebody else had
+    /// written: a session that moved one node of a twelve-node graph left a
+    /// journal holding one edit, and reopening the file rebuilt the document
+    /// from that one edit. Eleven nodes and every link went missing, and the
+    /// next edit wrote the loss to disk.
+    ///
+    /// Replaying the journal *on top of* the file would be wrong in the other
+    /// direction: the file is written after every edit, so each edit would be
+    /// applied a second time and a session that added a node would reopen with
+    /// two of it.
+    ///
+    /// What the split costs is the one case where the two disagree: a process
+    /// that died between writing the document and writing the journal leaves
+    /// the journal one edit short, so that edit is in the configuration and
+    /// cannot be undone. That is the trade the write order was chosen for --
+    /// see the top of this file -- and losing one undo is the better failure.
     ///
     /// A file that cannot be read is said so and opened as nothing: an editor
     /// that refused to start on a damaged file would be an editor that cannot
     /// be used to fix one.
     pub fn open(path: &Path) -> Self {
         let mut editor = Editor::new(path);
-        let journal_path = journal_beside(path);
-
-        if let Ok(text) = std::fs::read_to_string(&journal_path) {
-            if let Ok(journal) = serde_yaml::from_str::<Journal>(&text) {
-                for edit in journal.applied() {
-                    editor.document.apply(edit);
-                }
-                editor.journal = journal;
-                return editor;
-            }
-        }
 
         match crate::read::read(path) {
             Ok(document) => editor.document = document,
             Err(why) => {
-                editor.trouble = Some(format!("{} cannot be read: {why}", path.display()))
+                editor.trouble =
+                    Some(format!("{} cannot be read: {why}", path.display()));
+                // No history either: a journal belongs to the document it
+                // describes, and the document is not the one that was meant.
+                return editor;
+            }
+        }
+
+        // A journal that cannot be read costs the undo and not the work, so it
+        // is passed over in silence rather than reported: there is nothing the
+        // person at the keyboard can do about it, and the thing they came to
+        // edit is open and correct.
+        if let Ok(text) = std::fs::read_to_string(journal_beside(path)) {
+            if let Ok(journal) = serde_yaml::from_str::<Journal>(&text) {
+                editor.journal = journal;
             }
         }
         editor
@@ -169,9 +189,11 @@ impl Editor {
         // Each is written atomically, so none can be left half-written. What
         // cannot be promised across several files is that they all change
         // together: a power failure between two of them leaves one new and one
-        // old. The journal is what recovers from that -- it is written last
-        // and holds the whole history, so replaying it rebuilds every file --
-        // which is why a failure here stops before the journal is touched.
+        // old. Nothing can undo that afterwards -- the journal is history and
+        // not a copy of the document -- so what puts it right is writing them
+        // all again, which the next edit does and the Save button does on
+        // demand. A failure here stops before the journal is touched, so the
+        // history never gets ahead of the configuration.
         for (path, text) in &files {
             if let Err(why) = write_atomically(path, text.as_bytes()) {
                 self.trouble = Some(describe(&why));

@@ -133,6 +133,14 @@ pub enum Fault {
     NoSuchGroup { node: String, group: String },
     /// A group nothing is in, which reads nothing on its interval.
     EmptyGroup { group: String },
+    /// A link delivering into a payload that is read and states no trigger.
+    ///
+    /// The same rule `tcsverify` applies on the ground and tcspecial applies
+    /// again aboard: what is written to a payload that is read is what asks
+    /// it for a reading, and the trigger is what is written. Marked here as
+    /// the link is drawn, which is the moment at which saying so costs
+    /// nobody anything.
+    UntriggeredInput { node: String, from: String },
     /// A required attribute with nothing in it.
     ///
     /// The same check `tcsverify` makes on the ground and tcspecial makes
@@ -162,6 +170,9 @@ impl Fault {
             Fault::MissingAttribute { attribute, .. } => {
                 format!("{attribute} is not set")
             }
+            Fault::UntriggeredInput { from, .. } => {
+                format!("nothing is written to this: \"{from}\" has nowhere to go")
+            }
             Fault::NoSuchGroup { group, .. } => {
                 format!("there is no group \"{group}\"")
             }
@@ -181,6 +192,9 @@ impl Fault {
             Fault::SelfLink { node } => Some(node),
             Fault::InputBoundTwice { node, .. } => Some(node),
             Fault::MissingAttribute { node, .. } => Some(node),
+            // On the payload and not on the source: the source is right about
+            // where it sends, and the payload is where a trigger would go.
+            Fault::UntriggeredInput { node, .. } => Some(node),
             Fault::NoSuchGroup { node, .. } => Some(node),
             Fault::EmptyGroup { .. } => None,
         }
@@ -457,6 +471,38 @@ impl Document {
             if !used {
                 faults.push(Fault::EmptyGroup {
                     group: group.clone(),
+                });
+            }
+        }
+
+        // What may be written to a payload.
+        //
+        // A payload that is read is asked for its readings, and the bytes that
+        // ask are its trigger -- so a link delivering into a payload that is
+        // read and states no trigger has nowhere to go. The same rule
+        // tcsverify applies on the ground and tcspecial applies again aboard;
+        // see tcslibgs::graph::check, which is where the reasoning is.
+        //
+        // Only a payload that is read. One that is written and never read -- a
+        // heater, a valve, a latch -- is driven rather than asked, and a
+        // trigger on one would be bytes written before a read that never
+        // happens.
+        for node in &self.nodes {
+            let payload = NodeType::ALL
+                .iter()
+                .find(|t| t.spelling() == node.node_type)
+                .is_some_and(|t| t.is_payload());
+            if !payload || node.attributes.contains_key("trigger") {
+                continue;
+            }
+            let name = Qualified::of(&node.name, &node.home).absolute();
+            if !self.links.iter().any(|link| link.from == name) {
+                continue;
+            }
+            for link in self.links.iter().filter(|link| link.to == name) {
+                faults.push(Fault::UntriggeredInput {
+                    node: name.clone(),
+                    from: link.from.clone(),
                 });
             }
         }
@@ -1004,6 +1050,120 @@ mod tests {
             name: name.to_string(),
             node_type: node_type.to_string(),
             home: None,
+        }
+    }
+
+    /// The editor marks a link into a payload that states no trigger.
+    ///
+    /// The same rule the ground check and the flight software apply, applied
+    /// here as the link is drawn: the moment at which saying so costs nobody
+    /// anything. A fault and not a refusal -- the editor has to be able to
+    /// hold a configuration that is wrong, because that is what the middle of
+    /// an edit looks like.
+    #[test]
+    fn a_link_into_an_untriggered_payload_is_marked() {
+        let mut document = Document::new();
+        for edit in [
+            add("sensor", "i2c"),
+            add("k", "compute"),
+            Edit::AddLink {
+                link: Link::new("sensor", "k", None),
+            },
+            Edit::AddLink {
+                link: Link::new("k", "sensor", None),
+            },
+        ] {
+            document.apply(&edit);
+        }
+
+        let faults = document.faults();
+        assert!(
+            faults.iter().any(|f| matches!(
+                f,
+                Fault::UntriggeredInput { node, from } if node == "sensor" && from == "k"
+            )),
+            "{faults:?}"
+        );
+        // Drawn on the payload, which is where a trigger would be typed.
+        let said = faults
+            .iter()
+            .find(|f| matches!(f, Fault::UntriggeredInput { .. }))
+            .unwrap();
+        assert_eq!(said.node(), Some("sensor"));
+
+        // A trigger clears it.
+        document.apply(&Edit::SetAttribute {
+            node: "sensor".into(),
+            attribute: "trigger".into(),
+            was: None,
+            now: Some("01".into()),
+        });
+        assert!(
+            !document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::UntriggeredInput { .. })),
+            "{:?}",
+            document.faults()
+        );
+    }
+
+    /// A payload that is only driven is not asked for a trigger.
+    ///
+    /// The heaters of the shipped thermostat: written and never read, so there
+    /// is nothing to ask them for.
+    #[test]
+    fn a_driven_payload_is_not_asked_for_a_trigger() {
+        let mut document = Document::new();
+        for edit in [
+            add("thermostat", "compute"),
+            add("heaters", "gpio"),
+            Edit::AddLink {
+                link: Link::new("thermostat", "heaters", None),
+            },
+        ] {
+            document.apply(&edit);
+        }
+        assert!(
+            !document
+                .faults()
+                .iter()
+                .any(|f| matches!(f, Fault::UntriggeredInput { .. })),
+            "{:?}",
+            document.faults()
+        );
+    }
+
+    /// The editor and the checker mean the same thing by "payload".
+    ///
+    /// Two statements of one fact -- `style.rs` has the editor's, so that a
+    /// type can be put in the right selection pane, and `tcslibgs` has the
+    /// one the ground check and the flight software use -- and two statements
+    /// of one fact drift. What that would look like is a node the editor
+    /// drew in the payload pane and the checker did not hold to a payload's
+    /// rules, or the other way about.
+    #[test]
+    fn the_editor_and_the_checker_agree_on_what_a_payload_is() {
+        for t in NodeType::ALL {
+            // The subdiagram is the editor's own: a page of a configuration
+            // is an `include` to everything else, and no node at all.
+            if t == NodeType::Subdiagram {
+                assert!(!t.is_payload());
+                continue;
+            }
+            let theirs = tcslibgs::graph::Node {
+                name: "x".to_string(),
+                node_type: t.spelling().to_string(),
+                group: None,
+                attributes: Default::default(),
+                editor: None,
+            };
+            assert_eq!(
+                t.is_payload(),
+                theirs.is_payload(),
+                "{} is a payload to one of them and not the other",
+                t.spelling()
+            );
         }
     }
 

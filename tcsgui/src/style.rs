@@ -267,6 +267,7 @@ impl NodeType {
                 ("path", true),
                 ("address", true),
                 ("group", false),
+                ("trigger", false),
                 ("read_size", false),
                 ("ten_bit", false),
                 ("pec", false),
@@ -278,6 +279,7 @@ impl NodeType {
                 ("max_speed", true),
                 ("spi_mode", true),
                 ("group", false),
+                ("trigger", false),
                 ("read_size", false),
                 ("bits_per_word", false),
                 ("bit_order", false),
@@ -290,6 +292,7 @@ impl NodeType {
                 ("stop_bits", true),
                 ("parity", false),
                 ("group", false),
+                ("trigger", false),
             ],
             // An interface, not a path: see tcslibgs::node::hdlc. The
             // standard and the clock are required because a line carries no
@@ -305,6 +308,7 @@ impl NodeType {
                 ("frame_check", false),
                 ("loopback", false),
                 ("group", false),
+                ("trigger", false),
             ],
             NodeType::Can => &[
                 ("interface", true),
@@ -312,18 +316,31 @@ impl NodeType {
                 ("can_fd", false),
                 ("loopback", false),
                 ("group", false),
+                ("trigger", false),
             ],
             NodeType::Iio => &[
                 ("path", true),
                 ("group", false),
+                ("trigger", false),
             ],
-            NodeType::Rpmsg => &[("path", true), ("service", true), ("group", false)],
+            NodeType::Rpmsg => &[
+                ("path", true),
+                ("service", true),
+                ("group", false),
+                ("trigger", false),
+            ],
             NodeType::Network => &[
                 ("protocol", true),
                 ("address", true),
                 ("port", true),
+                ("group", false),
+                ("trigger", false),
             ],
-            NodeType::DeviceFile => &[("path", true), ("group", false)],
+            NodeType::DeviceFile => &[
+                ("path", true),
+                ("group", false),
+                ("trigger", false),
+            ],
             NodeType::Gpio => &[
                 ("path", true),
                 ("lines", true),
@@ -332,6 +349,7 @@ impl NodeType {
                 ("bias", false),
                 ("debounce_us", false),
                 ("group", false),
+                ("trigger", false),
             ],
             NodeType::Compute => &[
                 ("function", true),

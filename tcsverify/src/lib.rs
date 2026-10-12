@@ -906,4 +906,26 @@ simulated_payloads:
             }
         }
     }
+
+    /// Every shipped version 2 configuration verifies, in both formats.
+    ///
+    /// The examples somebody is handed first. A graph has no simulator file
+    /// beside it, so each is checked on its own -- and both spellings of each
+    /// are checked, because a configuration may be written in either and the
+    /// two are transcribed by hand.
+    #[test]
+    fn every_shipped_graph_verifies() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        for name in ["example", "tests/manual/thermostat"] {
+            for extension in ["yaml", "xml"] {
+                let graph = root.join(format!("{name}.{extension}"));
+                let report = verify(&graph, None);
+                assert!(
+                    !report.found_errors(),
+                    "{name}.{extension} was faulted: {:?}",
+                    report.findings
+                );
+            }
+        }
+    }
 }

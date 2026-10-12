@@ -489,6 +489,32 @@ mod tests {
     use super::*;
     use std::path::Path;
 
+    /// The two spellings of a shipped example say the same thing.
+    ///
+    /// Not a comparison of the text, which differs, but of what each
+    /// describes: the same groups, the same nodes with the same attributes,
+    /// and the same links. Every example in this repository is kept in both
+    /// formats, and the two drifting apart is what this catches -- the
+    /// thermostat's pair is written by the editor and compared there, where
+    /// these are written by hand and have nothing else to hold them together.
+    #[test]
+    fn the_two_spellings_of_an_example_agree() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+
+        for name in ["example", "tests/manual/thermostat"] {
+            let yaml = Graph::load(root.join(format!("{name}.yaml")))
+                .unwrap_or_else(|e| panic!("{name}.yaml: {e}"));
+            let xml = Graph::load(root.join(format!("{name}.xml")))
+                .unwrap_or_else(|e| panic!("{name}.xml: {e}"));
+
+            assert_eq!(yaml.description, xml.description, "{name}: description");
+            assert_eq!(yaml.groups, xml.groups, "{name}: groups");
+            assert_eq!(yaml.nodes, xml.nodes, "{name}: nodes");
+            assert_eq!(yaml.links, xml.links, "{name}: links");
+            assert_eq!(yaml.commands, xml.commands, "{name}: commands");
+        }
+    }
+
     /// An interval is a number and a unit, and nought is not one.
     #[test]
     fn an_interval_is_a_number_and_a_unit() {

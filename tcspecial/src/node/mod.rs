@@ -10,6 +10,9 @@
 // Computation aboard, which is a node type like any other: it is named in
 // the configuration, it takes what arrives and it hands something on.
 pub mod compute;
+// Somewhere data stops, which is a node type like any other for the same
+// reasons: see node/log.
+pub mod log;
 pub mod i2c;
 pub mod spi;
 pub mod can;

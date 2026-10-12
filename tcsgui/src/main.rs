@@ -158,15 +158,20 @@ struct Views {
     /// the same form. Choosing another group re-points this one, which is also
     /// what makes the menu behave like a menu.
     group: Option<GroupWindow>,
-    /// The two simulator windows, if they are open, and which entry each is
+    /// The nodes whose attributes are open, by the name a link would use.
+    ///
+    /// One window per node and several at once, which is what they are for: a
+    /// panel showing whichever node was last pressed made comparing two
+    /// sensors on one bus a matter of pressing, reading, pressing and
+    /// remembering. Each stays until it is closed.
+    attributes: BTreeMap<String, NodeWindow>,
+    /// The simulator's groups window, if it is open, and which group it is
     /// showing.
     ///
-    /// Two windows and not one, because they are two lists: the payloads of
-    /// the configuration, and the groups of settings they share. One apiece
-    /// rather than one per payload, for the reason the group window is one --
-    /// a form about a thing is not a page of it.
-    simulated: Option<SimWindow>,
-    showing_payload: Rc<RefCell<String>>,
+    /// The groups and not the simulated payloads: a payload's settings belong
+    /// to a payload that is already on the canvas, so they are shown in its
+    /// panel under a rule. A window of its own would be a second place to look
+    /// for what one node says about itself.
     sim_groups: Option<SimWindow>,
     showing_sim_group: Rc<RefCell<String>>,
     /// The tcspecial parameters window, if one is open.
@@ -184,7 +189,7 @@ struct Views {
 }
 
 impl Views {
-    /// Say which node a window's panel is showing, and nothing else.
+    /// Say which node is drawn as chosen, and nothing else.
     ///
     /// Apart from [`Views::refresh`] because choosing a node must not rebuild
     /// the canvas. Rebuilding it replaces every element on it, including the
@@ -195,30 +200,23 @@ impl Views {
     ///
     /// Nothing on the canvas needs rebuilding for a selection anyway: a node
     /// is drawn as chosen by comparing its name with the window's `selected`,
-    /// so setting that one property is the whole of it.
-    fn chose(&self, editor: &Editor, home: &Home) {
+    /// so setting that one property is the whole of it. What a node says about
+    /// itself is in a window of its own -- see [`show_node`] -- which is not
+    /// touched by a press.
+    fn chose(&self, home: &Home) {
         let chosen = self.chosen.borrow();
+        let said = |home: &str| {
+            chosen.get(home).cloned().unwrap_or_default()
+        };
         match home {
             None => {
                 if let Some(top) = self.top.upgrade() {
-                    let panel = panel_of(editor, &None, chosen.get("").map(|s| s.as_str()));
-                    top.set_selected(panel.0.clone().into());
-                    top.set_selected_type(panel.1.clone().into());
-                    top.set_selected_comment(panel.2.clone().into());
-                    top.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
+                    top.set_selected(said("").into());
                 }
             }
             Some(home) => {
                 if let Some(window) = self.open.get(home) {
-                    let panel = panel_of(
-                        editor,
-                        &Some(home.clone()),
-                        chosen.get(home).map(|s| s.as_str()),
-                    );
-                    window.set_selected(panel.0.clone().into());
-                    window.set_selected_type(panel.1.clone().into());
-                    window.set_selected_comment(panel.2.clone().into());
-                    window.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
+                    window.set_selected(said(home).into());
                 }
             }
         }
@@ -234,11 +232,14 @@ impl Views {
         if let Some(window) = &self.parameters {
             put_parameters(window, editor);
         }
-        if let Some(window) = &self.simulated {
-            put_simulated(window, editor, &self.showing_payload.borrow());
-        }
         if let Some(window) = &self.sim_groups {
             put_sim_groups(window, editor, &self.showing_sim_group.borrow());
+        }
+        // Every node whose attributes are open. A node that has since been
+        // removed shows itself as empty rather than vanishing: a window that
+        // disappeared would leave somebody wondering what they had pressed.
+        for (node, window) in &self.attributes {
+            put_node(window, editor, node);
         }
         if let Some(top) = self.top.upgrade() {
             put(&top, editor, &None, chosen.get("").map(|s| s.as_str()), divider);
@@ -323,8 +324,7 @@ fn main() -> Result<(), slint::PlatformError> {
         divider: divider.clone(),
         group: None,
         parameters: None,
-        simulated: None,
-        showing_payload: Rc::new(RefCell::new(String::new())),
+        attributes: BTreeMap::new(),
         sim_groups: None,
         showing_sim_group: Rc::new(RefCell::new(String::new())),
         showing: Rc::new(RefCell::new(String::new())),
@@ -476,6 +476,10 @@ macro_rules! wiring {
             }
             {
                 let editor = editor.clone();
+                // A second handle, for the click that opens a window: the
+                // borrow taken to read the document has to be dropped before
+                // the window's own handlers can run.
+                let editor_for_click = editor.clone();
                 let views = views.clone();
                 let home = home.clone();
                 window.on_node_moved(move |name, dx, dy| {
@@ -500,10 +504,19 @@ macro_rules! wiring {
                             views.borrow().divider.get(),
                             snap((was.0 + dx.round() as i32, was.1 + dy.round() as i32)),
                         );
-                        // A drag that went nowhere is not an edit. Without
-                        // this, every press on a node would put an entry in
-                        // the history.
+                        // A press that moved nothing is a click, and a click
+                        // on a node is a request to see what it says. Told
+                        // apart by the distance and not by the time: a gesture
+                        // that means one thing or another depending on how
+                        // long it took is a gesture that does the wrong one
+                        // under pressure.
+                        //
+                        // It is also what keeps a drag out of the history:
+                        // without this, every press on a node would put an
+                        // entry in it.
                         if now == was {
+                            drop(editor);
+                            show_node(&editor_for_click, &views, &absolute);
                             return;
                         }
                         editor.edit(Edit::MoveNode {
@@ -536,18 +549,13 @@ macro_rules! wiring {
                 });
             }
             {
-                // And the simulator's own two lists.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_edit_simulated_payloads(move || {
-                    show_sim(&editor, &views, true);
-                });
-            }
-            {
+                // And the simulator's groups of settings. A simulated
+                // payload's own settings are in its node's panel, under a
+                // rule: see panel_of.
                 let editor = editor.clone();
                 let views = views.clone();
                 window.on_edit_simulator_groups(move || {
-                    show_sim(&editor, &views, false);
+                    show_sim_groups(&editor, &views);
                 });
             }
             {
@@ -665,68 +673,11 @@ macro_rules! wiring {
                         home.clone().unwrap_or_default(),
                         name.to_string(),
                     );
-                    // The panel only: choosing a node is the same press that
-                    // starts dragging it, and rebuilding the canvas here
+                    // The outline only: choosing a node is the same press
+                    // that starts dragging it, and rebuilding the canvas here
                     // would replace the element the pointer is holding. See
                     // Views::chose.
-                    views.borrow().chose(&editor.borrow(), &home);
-                });
-            }
-            {
-                // Typing into a field. The old value comes from the document,
-                // so the edit carries what it replaced and undo is a lookup.
-                let editor = editor.clone();
-                let views = views.clone();
-                let home = home.clone();
-                window.on_attribute_set(move |node, attribute, value| {
-                    {
-                        let mut editor = editor.borrow_mut();
-                        let absolute = Qualified::of(&node, &home).absolute();
-                        let was = editor
-                            .document()
-                            .node(&absolute)
-                            .and_then(|n| n.attributes.get(attribute.as_str()))
-                            .cloned();
-                        // An empty field clears the attribute rather than
-                        // setting it to nothing: absent and empty are
-                        // different things to a configuration.
-                        let now = (!value.trim().is_empty()).then(|| value.to_string());
-                        if was == now {
-                            return;
-                        }
-                        editor.edit(Edit::SetAttribute {
-                            node: absolute,
-                            attribute: attribute.to_string(),
-                            was,
-                            now,
-                        });
-                    }
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                let editor = editor.clone();
-                let views = views.clone();
-                let home = home.clone();
-                window.on_comment_set(move |node, text| {
-                    {
-                        let mut editor = editor.borrow_mut();
-                        let absolute = Qualified::of(&node, &home).absolute();
-                        let was = editor
-                            .document()
-                            .node(&absolute)
-                            .and_then(|n| n.comment.clone());
-                        let now = (!text.trim().is_empty()).then(|| text.to_string());
-                        if was == now {
-                            return;
-                        }
-                        editor.edit(Edit::SetNodeComment {
-                            node: absolute,
-                            was,
-                            now,
-                        });
-                    }
-                    views.borrow().refresh(&editor.borrow());
+                    views.borrow().chose(&home);
                 });
             }
             let _ = window;
@@ -772,11 +723,7 @@ fn put(
     ui.set_has_simulator(editor.document().simulator.is_some());
     ui.set_group_menu(group_menu(editor.document()));
     let (nodes, links) = views_of(editor, home);
-    let panel = panel_of(editor, home, chosen);
-    ui.set_selected(panel.0.clone().into());
-    ui.set_selected_type(panel.1.clone().into());
-    ui.set_selected_comment(panel.2.clone().into());
-    ui.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
+    ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     ui.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
     ui.set_undo_depth(editor.undo_depth() as i32);
@@ -799,11 +746,7 @@ fn put_sub(
     window.set_group_menu(group_menu(editor.document()));
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home);
-    let panel = panel_of(editor, &home, chosen);
-    window.set_selected(panel.0.clone().into());
-    window.set_selected_type(panel.1.clone().into());
-    window.set_selected_comment(panel.2.clone().into());
-    window.set_fields(ModelRc::from(Rc::new(VecModel::from(panel.3))));
+    window.set_selected(chosen.unwrap_or_default().into());
     window.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
     window.set_undo_depth(editor.undo_depth() as i32);
@@ -811,6 +754,179 @@ fn put_sub(
     window.set_undo_label(label(editor.journal().next_undo()));
     window.set_redo_label(label(editor.journal().next_redo()));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// Put what a node says about itself into its own window.
+///
+/// Everything its type declares, whatever else it holds, and -- below a rule
+/// -- the settings the simulator file gives it. See [`panel_of`], which builds
+/// the rows; this is what hands them to a window.
+fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
+    let (name, node_type, comment, fields) =
+        panel_of(editor, &Qualified::parse(node).in_, Some(&Qualified::parse(node).node));
+
+    // What is wrong with what it says, if anything: the same red the canvas
+    // draws, where somebody typing is looking.
+    let fault = editor
+        .faults()
+        .iter()
+        .find(|fault| fault.node() == Some(node))
+        .map(|fault| fault.describe())
+        .unwrap_or_default();
+
+    window.set_node(name.into());
+    window.set_node_type(node_type.into());
+    window.set_comment(comment.into());
+    window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    window.set_fault(fault.into());
+    window.set_trouble(editor.trouble().unwrap_or_default().into());
+}
+
+/// Show what a node says about itself, making the window if there is not one.
+///
+/// Made once per node and raised afterwards: pressing a node twice should
+/// bring its window forward, not make a second one saying the same thing.
+fn show_node(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node: &str) {
+    if !views.borrow().attributes.contains_key(node) {
+        let window = match NodeWindow::new() {
+            Ok(window) => window,
+            Err(e) => {
+                eprintln!("tcsgui: {node} cannot be opened: {e}");
+                return;
+            }
+        };
+        wire_node(&window, editor, views, node);
+        views
+            .borrow_mut()
+            .attributes
+            .insert(node.to_string(), window);
+    }
+
+    // Through a weak handle, so nothing of `views` is borrowed while the
+    // window is shown: showing one runs the toolkit, and the toolkit runs
+    // handlers that borrow it.
+    let window = views
+        .borrow()
+        .attributes
+        .get(node)
+        .map(|window| window.as_weak());
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        put_node(&window, &editor.borrow(), node);
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: {node} cannot be shown: {e}");
+        }
+    }
+}
+
+/// Wire one node's window to the one editor.
+///
+/// `node` is the name a link would use, captured once: a window belongs to the
+/// node it was opened for, and goes on belonging to it however many others are
+/// opened afterwards.
+fn wire_node(
+    window: &NodeWindow,
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    node: &str,
+) {
+    {
+        // Typing into a field. The old value comes from the document, so the
+        // edit carries what it replaced and undo is a lookup.
+        let editor = editor.clone();
+        let views = views.clone();
+        let node = node.to_string();
+        window.on_attribute_set(move |attribute, value| {
+            {
+                let mut editor = editor.borrow_mut();
+                let was = editor
+                    .document()
+                    .node(&node)
+                    .and_then(|n| n.attributes.get(attribute.as_str()))
+                    .cloned();
+                // An empty field clears the attribute rather than setting it
+                // to nothing: absent and empty are different things to a
+                // configuration.
+                let now = (!value.trim().is_empty()).then(|| value.to_string());
+                if was == now {
+                    return;
+                }
+                editor.edit(Edit::SetAttribute {
+                    node: node.clone(),
+                    attribute: attribute.to_string(),
+                    was,
+                    now,
+                });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // And into one of the simulator's settings for it, which is a
+        // different file and so a different edit.
+        let editor = editor.clone();
+        let views = views.clone();
+        let node = node.to_string();
+        window.on_sim_attribute_set(move |setting, value| {
+            {
+                let mut editor = editor.borrow_mut();
+                let setting = setting.to_string();
+                let was = editor
+                    .document()
+                    .simulator
+                    .as_ref()
+                    .and_then(|simulator| simulator.payloads.get(&node))
+                    .and_then(|said| said.get(&setting).cloned());
+                let now = (!value.trim().is_empty()).then(|| value.to_string());
+                if was == now {
+                    return;
+                }
+                editor.edit(Edit::SetSimPayload {
+                    payload: node.clone(),
+                    setting,
+                    was,
+                    now,
+                });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let node = node.to_string();
+        window.on_comment_set(move |text| {
+            {
+                let mut editor = editor.borrow_mut();
+                let was = editor
+                    .document()
+                    .node(&node)
+                    .and_then(|n| n.comment.clone());
+                let now = (!text.trim().is_empty()).then(|| text.to_string());
+                if was == now {
+                    return;
+                }
+                editor.edit(Edit::SetNodeComment {
+                    node: node.clone(),
+                    was,
+                    now,
+                });
+            }
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // Closing takes a press of its own, which is the point of a window
+        // per node: one that closed itself when another node was pressed
+        // would be the panel this replaced.
+        let views = views.clone();
+        let node = node.to_string();
+        window.on_closed(move || {
+            let window = views.borrow_mut().attributes.remove(&node);
+            if let Some(window) = window {
+                let _ = window.hide();
+            }
+        });
+    }
 }
 
 /// Put a group's state into its window.
@@ -874,6 +990,8 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
                 name: (*attribute).into(),
                 value: value.clone().into(),
                 required: *required,
+                is_heading: false,
+                simulated: false,
             }
         })
         .collect();
@@ -895,44 +1013,7 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
     );
 }
 
-/// Put one simulated payload's settings into the simulated-payloads window.
-///
-/// The choices are the payloads of the configuration and not the names the
-/// simulator file happens to hold: the two files are joined by name, every
-/// payload needs settings here, and a name here that no payload has is an
-/// error rather than a line with no effect. So the editor offers one entry per
-/// payload node and never invents a name -- which also means a file whose
-/// payloads were renamed shows the new names with nothing in them, which is
-/// the truth about it.
-fn put_simulated(window: &SimWindow, editor: &Editor, payload: &str) {
-    let document = editor.document();
-    let choices: Vec<slint::SharedString> = document
-        .nodes
-        .iter()
-        .filter(|node| is_payload(&node.node_type))
-        .map(|node| Qualified::of(&node.name, &node.home).absolute().into())
-        .collect();
-
-    let empty = BTreeMap::new();
-    let said = document
-        .simulator
-        .as_ref()
-        .and_then(|simulator| simulator.payloads.get(payload))
-        .unwrap_or(&empty);
-
-    window.set_editing("Simulated payloads".into());
-    window.set_about(
-        "How fast this payload sends when it is simulated, how a packet is          divided into segments, and what it does wrong. None of it is a          property of the payload itself, which is why it is in the simulator's          own file. Everything here is optional: what a payload does not state          it takes from the group it names."
-            .into(),
-    );
-    window.set_can_add(false);
-    window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
-    window.set_chosen(payload.into());
-    window.set_fields(settings_shown(&crate::sim::Simulator::fields(true), said));
-    window.set_trouble(editor.trouble().unwrap_or_default().into());
-}
-
-/// The same, for one of the simulator's groups of settings.
+/// Put one of the simulator's groups of settings into its window.
 fn put_sim_groups(window: &SimWindow, editor: &Editor, group: &str) {
     let document = editor.document();
     let choices: Vec<slint::SharedString> = document
@@ -950,7 +1031,10 @@ fn put_sim_groups(window: &SimWindow, editor: &Editor, group: &str) {
 
     window.set_editing("Simulator payload groups".into());
     window.set_about(
-        "Settings several simulated payloads share. A payload names a group          and overrides whatever it wants for itself, so what is here is what          they have in common -- a rate, a segmentation, a fault to inject."
+        "Settings several simulated payloads share. A payload names a group \
+         and overrides whatever it wants for itself, so what is here is what \
+         they have in common -- a rate, a segmentation, a fault to inject. A \
+         payload's own settings are in its panel on the canvas."
             .into(),
     );
     window.set_can_add(true);
@@ -972,12 +1056,23 @@ fn settings_shown(
     fields: &[&'static str],
     said: &BTreeMap<String, String>,
 ) -> ModelRc<FieldView> {
+    ModelRc::from(Rc::new(VecModel::from(settings_of(fields, said))))
+}
+
+/// The same, as rows rather than as a model, for the panel to append to a
+/// node's own.
+fn settings_of(
+    fields: &[&'static str],
+    said: &BTreeMap<String, String>,
+) -> Vec<FieldView> {
     let mut shown: Vec<FieldView> = fields
         .iter()
         .map(|setting| FieldView {
             name: (*setting).into(),
             value: said.get(*setting).cloned().unwrap_or_default().into(),
             required: false,
+            is_heading: false,
+            simulated: true,
         })
         .collect();
 
@@ -992,9 +1087,11 @@ fn settings_shown(
             name: setting.clone().into(),
             value: value.clone().into(),
             required: false,
+            is_heading: false,
+            simulated: true,
         });
     }
-    ModelRc::from(Rc::new(VecModel::from(shown)))
+    shown
 }
 
 /// Show the tcspecial parameters, making the window if there is not one.
@@ -1049,19 +1146,10 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// Show one of the two simulator windows, making it if there is not one.
-///
-/// One function for both, because they are the same window with a different
-/// list in the chooser: `payloads` says which. What the handlers do differs in
-/// one place only -- which edit they record -- and that is where it says so.
-fn show_sim(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, payloads: bool) {
-    let already = if payloads {
-        views.borrow().simulated.is_some()
-    } else {
-        views.borrow().sim_groups.is_some()
-    };
-
-    if !already {
+/// Show the simulator's groups of settings, making the window if there is not
+/// one.
+fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    if views.borrow().sim_groups.is_none() {
         let window = match SimWindow::new() {
             Ok(window) => window,
             Err(e) => {
@@ -1069,59 +1157,34 @@ fn show_sim(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, payloads: 
                 return;
             }
         };
-        wire_sim(&window, editor, views, payloads);
-        if payloads {
-            views.borrow_mut().simulated = Some(window);
-        } else {
-            views.borrow_mut().sim_groups = Some(window);
-        }
+        wire_sim_groups(&window, editor, views);
+        views.borrow_mut().sim_groups = Some(window);
 
         // Something chosen to begin with, so the window opens on a form
-        // rather than on an invitation to choose: the first payload of the
-        // configuration, or the first group the simulator file declares.
-        let first = {
-            let editor = editor.borrow();
-            let document = editor.document();
-            if payloads {
-                document
-                    .nodes
-                    .iter()
-                    .find(|node| is_payload(&node.node_type))
-                    .map(|node| Qualified::of(&node.name, &node.home).absolute())
-            } else {
-                document
-                    .simulator
-                    .as_ref()
-                    .and_then(|simulator| simulator.groups.keys().next().cloned())
-            }
-        };
+        // rather than on an invitation to choose.
+        let first = editor
+            .borrow()
+            .document()
+            .simulator
+            .as_ref()
+            .and_then(|simulator| simulator.groups.keys().next().cloned());
         if let Some(first) = first {
-            let views = views.borrow();
-            let showing = if payloads {
-                &views.showing_payload
-            } else {
-                &views.showing_sim_group
-            };
-            *showing.borrow_mut() = first;
+            *views.borrow().showing_sim_group.borrow_mut() = first;
         }
     }
 
     // Through a weak handle, so nothing of `views` is borrowed while the
     // window is shown.
-    let window = {
-        let views = views.borrow();
-        let window = if payloads { &views.simulated } else { &views.sim_groups };
-        window.as_ref().map(|window| window.as_weak())
-    };
+    let window = views
+        .borrow()
+        .sim_groups
+        .as_ref()
+        .map(|window| window.as_weak());
     if let Some(window) = window.and_then(|window| window.upgrade()) {
         {
             let editor = editor.borrow();
             let views = views.borrow();
-            if payloads {
-                put_simulated(&window, &editor, &views.showing_payload.borrow());
-            } else {
-                put_sim_groups(&window, &editor, &views.showing_sim_group.borrow());
-            }
+            put_sim_groups(&window, &editor, &views.showing_sim_group.borrow());
         }
         if let Err(e) = window.show() {
             eprintln!("tcsgui: a simulator window cannot be shown: {e}");
@@ -1129,26 +1192,17 @@ fn show_sim(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, payloads: 
     }
 }
 
-/// Wire one simulator window's four callbacks to the one editor.
-fn wire_sim(
+/// Wire the groups window's four callbacks to the one editor.
+fn wire_sim_groups(
     window: &SimWindow,
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
-    payloads: bool,
 ) {
-    let showing = {
-        let views = views.borrow();
-        if payloads {
-            views.showing_payload.clone()
-        } else {
-            views.showing_sim_group.clone()
-        }
-    };
+    let showing = views.borrow().showing_sim_group.clone();
 
     {
-        // Choosing which payload or which group the window is showing.
-        // Nothing is recorded: what somebody is looking at is not something
-        // the vehicle flies.
+        // Choosing which group the window is showing. Nothing is recorded:
+        // what somebody is looking at is not something the vehicle flies.
         let editor = editor.clone();
         let views = views.clone();
         let showing = showing.clone();
@@ -1158,16 +1212,12 @@ fn wire_sim(
         });
     }
     {
-        // A new group. Only the groups window offers it: a simulated payload
-        // stands in for a payload of the configuration, so its name is the
-        // configuration's and not this file's to invent.
+        // A new group, which is this file's to make -- unlike a simulated
+        // payload, whose name is the configuration's.
         let editor = editor.clone();
         let views = views.clone();
         let showing = showing.clone();
         window.on_add(move || {
-            if payloads {
-                return;
-            }
             let name = {
                 let mut editor = editor.borrow_mut();
                 let taken = |name: &str| {
@@ -1197,9 +1247,6 @@ fn wire_sim(
         let views = views.clone();
         let showing = showing.clone();
         window.on_remove(move || {
-            if payloads {
-                return;
-            }
             let name = showing.borrow().clone();
             {
                 let mut editor = editor.borrow_mut();
@@ -1226,8 +1273,8 @@ fn wire_sim(
         let editor = editor.clone();
         let views = views.clone();
         window.on_setting_set(move |setting, value| {
-            let name = showing.borrow().clone();
-            if name.is_empty() {
+            let group = showing.borrow().clone();
+            if group.is_empty() {
                 return;
             }
             {
@@ -1237,14 +1284,8 @@ fn wire_sim(
                     .document()
                     .simulator
                     .as_ref()
-                    .and_then(|simulator| {
-                        let said = if payloads {
-                            simulator.payloads.get(&name)
-                        } else {
-                            simulator.groups.get(&name)
-                        };
-                        said.and_then(|said| said.get(&setting).cloned())
-                    });
+                    .and_then(|simulator| simulator.groups.get(&group))
+                    .and_then(|said| said.get(&setting).cloned());
                 // An empty field clears the setting rather than setting it to
                 // nothing: absent is what the simulator's own reader means by
                 // "not stated".
@@ -1252,20 +1293,11 @@ fn wire_sim(
                 if was == now {
                     return;
                 }
-                editor.edit(if payloads {
-                    Edit::SetSimPayload {
-                        payload: name,
-                        setting,
-                        was,
-                        now,
-                    }
-                } else {
-                    Edit::SetSimGroup {
-                        group: name,
-                        setting,
-                        was,
-                        now,
-                    }
+                editor.edit(Edit::SetSimGroup {
+                    group,
+                    setting,
+                    was,
+                    now,
                 });
             }
             views.borrow().refresh(&editor.borrow());
@@ -1493,6 +1525,8 @@ fn panel_of(
                 name: (*name).into(),
                 value: value.clone().into(),
                 required: *required,
+                is_heading: false,
+                simulated: false,
             }
         })
         .collect();
@@ -1509,7 +1543,43 @@ fn panel_of(
             name: name.clone().into(),
             value: value.clone().into(),
             required: false,
+            is_heading: false,
+            simulated: false,
         });
+    }
+
+    // And, below a rule, what the simulator's file says about this payload.
+    //
+    // Here rather than in a window of its own, which is what it had: a
+    // payload's simulation settings are about a payload that is already on the
+    // canvas, and a second window would be a second place to look for what one
+    // node says about itself. Two files, one panel, and a line to say where
+    // one ends and the other begins.
+    //
+    // Only for a payload, and only where this session was given the
+    // simulator's file. A computation, a log and the ground link are not
+    // simulated -- there is nothing standing in for them -- so there is
+    // nothing to show.
+    if let Some(simulator) = &editor.document().simulator {
+        if is_payload(&node.node_type) {
+            let empty = BTreeMap::new();
+            let said = simulator.payloads.get(&absolute).unwrap_or(&empty);
+            fields.push(FieldView {
+                name: "simulated payload".into(),
+                value: String::new().into(),
+                required: false,
+                is_heading: true,
+                simulated: true,
+            });
+            fields.extend(
+                settings_of(&crate::sim::Simulator::fields(true), said)
+                    .into_iter()
+                    .map(|mut field| {
+                        field.simulated = true;
+                        field
+                    }),
+            );
+        }
     }
 
     (
@@ -3073,8 +3143,10 @@ mod tests {
         i_slint_backend_testing::init_integration_test_with_system_time();
 
         dragging_a_node_moves_it();
+        a_click_opens_a_window_per_node();
         the_menu_opens_the_tcspecial_parameters();
-        the_menu_opens_the_simulators_two_lists();
+        a_payloads_panel_carries_its_simulation_settings();
+        the_menu_opens_the_simulators_groups();
         a_group_window_sets_every_payload_in_its_group();
         a_payload_stays_in_the_payload_working_pane();
         the_divider_can_be_dragged();
@@ -3196,8 +3268,7 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
-            simulated: None,
-            showing_payload: Rc::new(RefCell::new(String::new())),
+            attributes: BTreeMap::new(),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3323,8 +3394,7 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
-            simulated: None,
-            showing_payload: Rc::new(RefCell::new(String::new())),
+            attributes: BTreeMap::new(),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3402,8 +3472,7 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
-            simulated: None,
-            showing_payload: Rc::new(RefCell::new(String::new())),
+            attributes: BTreeMap::new(),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3476,14 +3545,275 @@ mod tests {
         assert!(!editor.borrow().document().tcspecial.contains_key("port"));
     }
 
-    /// The menu opens the simulator's two lists, and typing in them reaches
-    /// its file.
+    /// A click on a node opens a window for it, and another node opens
+    /// another.
     ///
-    /// Both windows, because they are one component with a different list in
-    /// the chooser and the difference is where it goes wrong: the payloads
-    /// window offers the payloads of the *configuration* and cannot make one,
-    /// and the groups window offers what the simulator file declares and can.
-    fn the_menu_opens_the_simulators_two_lists() {
+    /// What replaced the panel down the right-hand side. The panel showed
+    /// whichever node was pressed last, so comparing two sensors on one bus
+    /// was press, read, press, remember; now each node's attributes are a
+    /// window and they stay until they are closed. Closing takes a press of
+    /// its own, or the windows would be the panel again.
+    ///
+    /// Opened by a click and not by a press, because a press is how a drag
+    /// starts: a gesture that moved the node is a move, and one that moved
+    /// nothing is a request to see what the node says. Told apart by the
+    /// distance, not by the time.
+    fn a_click_opens_a_window_per_node() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            DIVIDER,
+        )));
+        {
+            let mut editor = editor.borrow_mut();
+            for (name, at) in [("to_kelvin", (120, 88)), ("mean_temp", (120, 240))] {
+                editor.edit(Edit::AddNode {
+                    name: name.to_string(),
+                    node_type: "compute".to_string(),
+                    home: None,
+                });
+                editor.edit(Edit::MoveNode {
+                    node: name.to_string(),
+                    was: (0, 0),
+                    now: at,
+                });
+            }
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui);
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        views.borrow_mut().chosen = chosen.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+        ui.show().expect("the window shows");
+
+        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+            .next()
+            .expect("the window has a canvas");
+        let at = canvas.absolute_position();
+        let (width, height) = size_of("compute");
+
+        // Pressed and released at one place, which is a click.
+        let click = |node: (i32, i32)| {
+            let on = slint::LogicalPosition::new(
+                at.x + node.0 as f32 + width as f32 / 2.0,
+                at.y + node.1 as f32 + height as f32 / 2.0,
+            );
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: on });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position: on,
+                button: PointerEventButton::Left,
+            });
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position: on,
+                button: PointerEventButton::Left,
+            });
+        };
+
+        assert!(views.borrow().attributes.is_empty(), "nothing open yet");
+
+        click((120, 88));
+        assert!(
+            views.borrow().attributes.contains_key("to_kelvin"),
+            "a click should open what the node says: {:?}",
+            views.borrow().attributes.keys().collect::<Vec<_>>()
+        );
+        // And it moved nothing, so nothing is in the history.
+        assert_eq!(editor.borrow().undo_depth(), 4, "a click is not an edit");
+
+        // The window shows that node and no other, and offers what the type
+        // declares.
+        let window = views
+            .borrow()
+            .attributes
+            .get("to_kelvin")
+            .map(|window| window.as_weak())
+            .unwrap()
+            .upgrade()
+            .expect("still open");
+        assert_eq!(window.get_node(), "to_kelvin");
+        assert_eq!(window.get_node_type(), "compute");
+
+        // A second node opens a second window, and the first stays: which is
+        // the whole point of this not being a panel.
+        click((120, 240));
+        assert_eq!(
+            views.borrow().attributes.len(),
+            2,
+            "a second node should open a second window: {:?}",
+            views.borrow().attributes.keys().collect::<Vec<_>>()
+        );
+        assert!(views.borrow().attributes.contains_key("to_kelvin"));
+
+        // Clicking the same node again raises its window rather than making a
+        // second one saying the same thing.
+        click((120, 88));
+        assert_eq!(views.borrow().attributes.len(), 2);
+
+        // Typing in it reaches the document, and the other window is
+        // untouched.
+        window.invoke_attribute_set("function".into(), "to_kelvin".into());
+        assert_eq!(
+            editor
+                .borrow()
+                .document()
+                .node("to_kelvin")
+                .unwrap()
+                .attributes
+                .get("function")
+                .map(String::as_str),
+            Some("to_kelvin")
+        );
+
+        // And closing takes a press of its own, and takes only that one.
+        window.invoke_closed();
+        assert_eq!(
+            views.borrow().attributes.keys().collect::<Vec<_>>(),
+            vec!["mean_temp"],
+            "Close should shut one window and leave the other"
+        );
+    }
+
+    /// A payload's panel carries the simulator's settings for it, and typing
+    /// in them reaches the simulator's file.
+    ///
+    /// The settings were in a window of their own and are in the panel now: a
+    /// payload's simulation settings are about a payload that is already on
+    /// the canvas, and a second window was a second place to look for what one
+    /// node says about itself. Two files, one panel, and a rule between them.
+    fn a_payloads_panel_carries_its_simulation_settings() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            DIVIDER,
+        )));
+        {
+            let mut editor = editor.borrow_mut();
+            for (name, node_type) in [("temp_fore", "i2c"), ("k", "compute")] {
+                editor.edit(Edit::AddNode {
+                    name: name.to_string(),
+                    node_type: node_type.to_string(),
+                    home: None,
+                });
+            }
+        }
+
+        // With no simulator file, a payload's panel is its own attributes and
+        // nothing else: there is no second file for anything to go in.
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_fore"));
+        assert!(
+            fields.iter().all(|f| !f.is_heading && !f.simulated),
+            "the panel should carry nothing of a file that was not given"
+        );
+
+        editor
+            .borrow_mut()
+            .open_simulator(&where_.path().join("vehiclesim.yaml"));
+
+        // Now the payload's panel is its attributes, a rule, and the
+        // simulator's settings for it.
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("temp_fore"));
+        let rule = fields
+            .iter()
+            .position(|f| f.is_heading)
+            .expect("a rule between the two files");
+        assert!(
+            fields[..rule].iter().all(|f| !f.simulated),
+            "the node's own attributes come first"
+        );
+        assert!(
+            fields[rule + 1..].iter().all(|f| f.simulated),
+            "and the simulator's settings after"
+        );
+        let after: Vec<String> = fields[rule + 1..]
+            .iter()
+            .map(|f| f.name.to_string())
+            .collect();
+        assert_eq!(after, crate::sim::Simulator::fields(true));
+
+        // A computation is not simulated -- nothing stands in for it -- so
+        // its panel carries none of this.
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("k"));
+        assert!(
+            fields.iter().all(|f| !f.is_heading && !f.simulated),
+            "a computation has no simulated payload"
+        );
+
+        // And typing in one reaches the simulator's file, as its own edit --
+        // through the node's own window, which is where the fields are.
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+
+        show_node(&editor, &views, "temp_fore");
+        let window = views
+            .borrow()
+            .attributes
+            .get("temp_fore")
+            .map(|window| window.as_weak())
+            .expect("the node's window")
+            .upgrade()
+            .expect("still open");
+
+        let depth = editor.borrow().undo_depth();
+        window.invoke_sim_attribute_set("drop_percent".into(), "10".into());
+        assert_eq!(
+            editor.borrow().document().simulator.as_ref().unwrap().payloads
+                ["temp_fore"]["drop_percent"],
+            "10"
+        );
+        // One edit, and the node's own attributes are untouched: two files,
+        // and the panel knows which row goes where.
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+        assert!(!editor
+            .borrow()
+            .document()
+            .node("temp_fore")
+            .unwrap()
+            .attributes
+            .contains_key("drop_percent"));
+        assert!(editor.borrow_mut().undo());
+        assert!(editor.borrow().document().simulator.as_ref().unwrap().payloads
+            ["temp_fore"]
+            .get("drop_percent")
+            .is_none());
+    }
+
+    /// The menu opens the simulator's groups, and typing in them reaches its
+    /// file.
+    fn the_menu_opens_the_simulators_groups() {
         use slint::Model;
         use std::rc::Rc;
 
@@ -3495,20 +3825,6 @@ mod tests {
         editor
             .borrow_mut()
             .open_simulator(&where_.path().join("vehiclesim.yaml"));
-        {
-            let mut editor = editor.borrow_mut();
-            // Two payloads and a computation, so that the chooser can be
-            // checked for offering the payloads and nothing else.
-            for (name, node_type) in
-                [("temp_fore", "i2c"), ("payload", "network"), ("k", "compute")]
-            {
-                editor.edit(Edit::AddNode {
-                    name: name.to_string(),
-                    node_type: node_type.to_string(),
-                    home: None,
-                });
-            }
-        }
 
         let ui = MainWindow::new().expect("a window");
         let views = Rc::new(RefCell::new(Views {
@@ -3518,8 +3834,7 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
-            simulated: None,
-            showing_payload: Rc::new(RefCell::new(String::new())),
+            attributes: BTreeMap::new(),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -3530,71 +3845,9 @@ mod tests {
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
 
-        // The entries are live, this session having been given a simulator
-        // file.
+        // The entry is live, this session having been given a simulator file.
         assert!(ui.get_has_simulator());
 
-        // ---- the payloads ------------------------------------------------
-        ui.invoke_edit_simulated_payloads();
-        let window = views
-            .borrow()
-            .simulated
-            .as_ref()
-            .map(|window| window.as_weak())
-            .expect("the menu should have opened the payloads")
-            .upgrade()
-            .expect("and left them open");
-
-        let choices: Vec<String> = (0..window.get_choices().row_count())
-            .filter_map(|row| window.get_choices().row_data(row))
-            .map(|name| name.to_string())
-            .collect();
-        assert_eq!(
-            choices,
-            vec!["temp_fore".to_string(), "payload".to_string()],
-            "the chooser should offer the payloads of the configuration"
-        );
-        // Opened on one of them, rather than on an invitation to choose.
-        assert_eq!(window.get_chosen(), "temp_fore");
-        assert!(!window.get_can_add(), "a payload's name is not this file's");
-
-        // Every setting there is, filled in or not, and none of them marked:
-        // a payload that says nothing takes everything from its group.
-        let fields: Vec<FieldView> = (0..window.get_fields().row_count())
-            .filter_map(|row| window.get_fields().row_data(row))
-            .collect();
-        let offered: Vec<String> = fields.iter().map(|f| f.name.to_string()).collect();
-        assert_eq!(offered, crate::sim::Simulator::fields(true));
-        // None of them marked: every simulator setting is optional, since a
-        // payload that says nothing takes everything from its group.
-        assert!(fields.iter().all(|f| !f.required));
-
-        window.invoke_setting_set("packet_interval_ms".into(), "1000".into());
-        let said = |editor: &Editor, payload: &str, setting: &str| {
-            editor
-                .document()
-                .simulator
-                .as_ref()
-                .and_then(|simulator| simulator.payloads.get(payload))
-                .and_then(|said| said.get(setting))
-                .cloned()
-        };
-        assert_eq!(
-            said(&editor.borrow(), "temp_fore", "packet_interval_ms").as_deref(),
-            Some("1000")
-        );
-
-        // The other payload, chosen in the window, keeps its own settings.
-        window.invoke_choose("payload".into());
-        assert_eq!(window.get_chosen(), "payload");
-        window.invoke_setting_set("drop_percent".into(), "10".into());
-        assert_eq!(
-            said(&editor.borrow(), "temp_fore", "drop_percent"),
-            None,
-            "one payload's setting went to another"
-        );
-
-        // ---- the groups --------------------------------------------------
         ui.invoke_edit_simulator_groups();
         let groups = views
             .borrow()
@@ -3687,8 +3940,7 @@ mod tests {
             divider: Rc::new(std::cell::Cell::new(DIVIDER)),
             group: None,
             parameters: None,
-            simulated: None,
-            showing_payload: Rc::new(RefCell::new(String::new())),
+            attributes: BTreeMap::new(),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),

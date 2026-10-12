@@ -58,6 +58,25 @@ pub struct Node {
     pub comment: Option<String>,
 }
 
+/// A statement that the ground may set an attribute of a node.
+///
+/// The fourth thing a configuration is made of, and the one with nothing on
+/// the canvas: a binding is not drawn, because what it describes is a value
+/// arriving rather than data travelling a path. It is held and written all the
+/// same -- a configuration the editor rewrote without it would be a thermostat
+/// whose setpoint had quietly stopped being commandable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Command {
+    /// The MOC node the command arrives on.
+    pub from: String,
+    /// What it sets, as `node.attribute`.
+    pub sets: String,
+    /// What somebody wrote about it, kept as the comments on nodes and links
+    /// are.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+}
+
 /// The whole of what is being edited.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Document {
@@ -72,6 +91,12 @@ pub struct Document {
     /// which is what a checker is for.
     #[serde(default)]
     pub groups: BTreeMap<String, String>,
+    /// What the ground may set in flight.
+    ///
+    /// Not editable on the canvas yet, and written out whatever else happens:
+    /// see [`Command`].
+    #[serde(default)]
+    pub commands: Vec<Command>,
 }
 
 /// Something wrong with the document, and what it is attached to.
@@ -589,6 +614,29 @@ impl Document {
             out.push_str("    </links>\n");
         }
 
+        // The command bindings, which only the top file declares: what the
+        // ground may change is a property of the whole configuration rather
+        // than of one page of it.
+        if home.is_none() {
+            for command in &self.commands {
+                if let Some(comment) = &command.comment {
+                    for line in comment.lines() {
+                        out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+                    }
+                }
+                out.push_str("    <commands>\n");
+                out.push_str(&format!(
+                    "        <from>{}</from>\n",
+                    escape(&command.from)
+                ));
+                out.push_str(&format!(
+                    "        <sets>{}</sets>\n",
+                    escape(&command.sets)
+                ));
+                out.push_str("    </commands>\n");
+            }
+        }
+
         out.push_str("</configuration>\n");
         out
     }
@@ -683,6 +731,23 @@ impl Document {
                 None => out.push_str(&format!("  - {{ from: {from}, to: {to} }}\n")),
             }
         }
+
+        // The command bindings, top file only: see the XML writer.
+        if home.is_none() && !self.commands.is_empty() {
+            out.push_str("\ncommands:\n");
+            for command in &self.commands {
+                if let Some(comment) = &command.comment {
+                    for line in comment.lines() {
+                        out.push_str(&format!("  # {line}\n"));
+                    }
+                }
+                out.push_str(&format!(
+                    "  - {{ from: {}, sets: {} }}\n",
+                    command.from, command.sets
+                ));
+            }
+        }
+
         out
     }
 
@@ -898,6 +963,17 @@ pub fn thermostat_example() -> Document {
         link: Link::new("thermostat", "heaters", None),
         was: None,
         now: Some("asserted below the setpoint, unasserted above it".to_string()),
+    });
+
+    // What the ground may change in flight, which the worked example calls for
+    // and the diagram cannot show: the setpoint is commanded, and the rest of
+    // the thermostat is not.
+    document.commands.push(Command {
+        from: "moc".to_string(),
+        sets: "thermostat.setpoint".to_string(),
+        comment: Some(
+            "the cabin temperature the heaters are held at, in kelvin".to_string(),
+        ),
     });
 
     document

@@ -60,6 +60,27 @@ pub trait Function {
     /// cannot use, and is reported rather than guessed at.
     fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Vec<u8>>, String>;
 
+    /// Set one of this function's parameters, as a command from the ground
+    /// does.
+    ///
+    /// A setpoint arrives this way, and the value is text as everything on a
+    /// link is. Most functions take none: a mean has nothing to set, and a
+    /// conversion's scale is a property of the part rather than something the
+    /// ground changes -- so the default refuses, naming the function, and a
+    /// function that does take settings says which.
+    ///
+    /// What a command may set is in the configuration as a binding, and the
+    /// checking refuses one naming an attribute its node will not accept. This
+    /// is where that promise is kept: an attribute no function accepts is
+    /// refused here however it was reached.
+    fn set(&mut self, attribute: &str, _value: &[u8]) -> Result<(), String> {
+        Err(format!(
+            "{} has nothing called \"{attribute}\" to set, and takes no settings \
+             from the ground at all",
+            self.name()
+        ))
+    }
+
     /// What this function is called, for a complaint to name.
     fn name(&self) -> &'static str;
 }

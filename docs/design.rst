@@ -385,6 +385,39 @@ Requirement
     it there for a caller with room.
 
 Requirement
+    A command from the ground has to get past two gates, in this order. The
+    configuration must have a binding saying that this attribute of this node
+    may be set -- an attribute no binding mentions cannot be set, which is what
+    makes what the ground can change in flight something written down and
+    checkable rather than whatever a computation happens to accept. The node
+    must then accept the value, which is where a setpoint that is not a number,
+    or a band of nought, is refused.
+
+Requirement
+    A device accepts no settings. A bus address or a set of line numbers is
+    what the configuration said, and a vehicle whose hardware could be
+    re-described from the ground in flight would have no checked configuration
+    at all. What the ground changes is a parameter of a computation.
+
+Requirement
+    A refused command changes nothing. The value is read and checked before
+    anything is written, so a thermostat whose new setpoint was rejected goes
+    on running against the one it had rather than against half of a number.
+
+Requirement
+    A command does not act on its own. Setting a setpoint does not recompute
+    the decision; the next reading does, one interval away at most. Acting
+    immediately would switch the heaters on the strength of a number rather
+    than of a temperature.
+
+Requirement
+    A command binding counts as a connection at both of its ends. A MOC link
+    exists to carry commands as much as telemetry, and a computation whose
+    setpoint is the only thing the ground sets is reached by its binding and by
+    nothing else -- so a configuration judged by its links alone would call
+    both of them unconnected and refuse something correct.
+
+Requirement
     A node is opened for the direction the configuration uses it in, and the
     other direction is refused. The links say which: a node whose output goes
     somewhere is read, a node things are delivered to is written, and a node

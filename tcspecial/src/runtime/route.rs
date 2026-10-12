@@ -158,6 +158,17 @@ impl Routes {
         self.commands.get(node).map_or(&[], Vec::as_slice)
     }
 
+    /// Whether the configuration lets the ground set this attribute.
+    ///
+    /// The question a command asks on arrival. An attribute no binding
+    /// mentions cannot be set from the ground: what is changeable in flight is
+    /// written down, which is what makes it checkable before it flies.
+    pub fn is_commanded(&self, node: &str, attribute: &str) -> bool {
+        self.commands.values().flatten().any(|commanded| {
+            commanded.node == node && commanded.attribute == attribute
+        })
+    }
+
     /// Every node whose output arrives here, in order and once each.
     ///
     /// The question a node asks about itself: is anything delivered to me.

@@ -242,6 +242,21 @@ impl Graph {
                 }
             }
         }
+        // A command binding touches both ends of itself. A MOC link exists to
+        // carry commands as much as to carry telemetry, and a thermostat whose
+        // setpoint is the only thing the ground sets is reached by the binding
+        // and by nothing else -- so a configuration judged by its links alone
+        // would call both of them unconnected and refuse something correct.
+        for binding in &self.commands {
+            if let Some(node) = self.node(&binding.from) {
+                touched.insert(node.name.as_str());
+            }
+            let target = binding.target();
+            if let Some(node) = self.node(&target.node) {
+                touched.insert(node.name.as_str());
+            }
+        }
+
         for node in &self.nodes {
             if !node.name.trim().is_empty() && !touched.contains(node.name.as_str()) {
                 problems.push(Problem::Unconnected {
@@ -455,6 +470,32 @@ mod tests {
                 .iter()
                 .any(|p| matches!(p, Problem::Unconnected { node } if node == "lonely")),
             "{problems:?}"
+        );
+    }
+
+    /// A command binding counts as a connection, at both of its ends.
+    ///
+    /// A MOC link exists to carry commands as much as telemetry, and a
+    /// computation whose setpoint is the only thing the ground sets is reached
+    /// by the binding and by nothing else. Judged by links alone both would be
+    /// called unconnected, and a correct configuration refused.
+    #[test]
+    fn a_command_binding_connects_both_of_its_ends() {
+        let mut g = graph(
+            vec![node("moc", "moc"), node("thermostat", "compute")],
+            Vec::new(),
+        );
+        g.commands = vec![CommandBinding {
+            from: "moc".to_string(),
+            sets: "thermostat.setpoint".to_string(),
+        }];
+
+        let problems = g.check();
+        assert!(
+            !problems
+                .iter()
+                .any(|p| matches!(p, Problem::Unconnected { .. })),
+            "neither end of a binding is unconnected: {problems:?}"
         );
     }
 

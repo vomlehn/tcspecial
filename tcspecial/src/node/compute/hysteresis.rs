@@ -125,6 +125,44 @@ impl Function for Hysteresis {
         Ok(Some(wanted.as_value()))
     }
 
+    /// The setpoint and the band, which are what the ground commands.
+    ///
+    /// The same rules as the configuration's: a band of nought or less is
+    /// refused here as it is there, because a bare comparison cycles a relay
+    /// on a wobble whether it was written in a file or sent from the ground.
+    /// Nothing is half applied -- the value is read and checked before
+    /// anything changes -- so a command that is refused leaves a thermostat
+    /// running on what it had.
+    fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
+        let wanted = from_value(value, attribute)?;
+
+        match attribute {
+            "setpoint" => self.set_setpoint(wanted),
+            "above" | "below" => {
+                if wanted <= 0.0 {
+                    return Err(format!(
+                        "{attribute}: {wanted} is not more than nought, and a band \
+                         of nothing is a bare comparison, which cycles a relay on \
+                         a wobble"
+                    ));
+                }
+                if attribute == "above" {
+                    self.above = wanted;
+                } else {
+                    self.below = wanted;
+                }
+            }
+            other => {
+                return Err(format!(
+                    "a hysteresis has nothing called \"{other}\" to set: there are \
+                     setpoint, above and below"
+                ))
+            }
+        }
+
+        Ok(())
+    }
+
     fn name(&self) -> &'static str {
         "hysteresis"
     }

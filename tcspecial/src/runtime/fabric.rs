@@ -54,6 +54,21 @@ pub trait Port {
         true
     }
 
+    /// Set a named attribute of this node, as a command from the ground does.
+    ///
+    /// Refused by default, which is what a device answers: a bus address or a
+    /// set of line numbers is what the configuration said, and a vehicle whose
+    /// hardware could be re-described from the ground in flight would have no
+    /// checked configuration at all. What the ground may change is a parameter
+    /// of a computation -- a setpoint, a band -- and the configuration says
+    /// which, as a command binding.
+    fn set(&mut self, attribute: &str, _value: &[u8]) -> Result<(), String> {
+        Err(format!(
+            "there is nothing called \"{attribute}\" on this node that the ground \
+             may set"
+        ))
+    }
+
     /// Whether this node has a result waiting as a consequence of what it was
     /// just given.
     ///
@@ -235,6 +250,34 @@ impl Fabric {
         }
 
         moved
+    }
+
+    /// Apply a command from the ground.
+    ///
+    /// Two things have to be true, and the order matters. The configuration
+    /// must say the ground may set this attribute of this node -- an
+    /// attribute no binding mentions cannot be set, which is what makes what
+    /// the ground can change in flight something written down and checkable
+    /// rather than whatever a computation happens to accept. And the node must
+    /// then accept the value, which is where a setpoint that is not a number
+    /// or a band of nought is refused.
+    ///
+    /// One answer rather than a [`Moved`]: a command is one thing, and the
+    /// ground is told whether it took effect.
+    pub fn set(&mut self, node: &str, attribute: &str, value: &[u8]) -> Result<(), String> {
+        if !self.routes.is_commanded(node, attribute) {
+            return Err(format!(
+                "no command binding says the ground may set \"{node}.{attribute}\": \
+                 what a command may change is in the configuration, so that it is \
+                 checkable before it flies"
+            ));
+        }
+
+        let Some(port) = self.nodes.get_mut(node) else {
+            return Err(format!("there is no node called \"{node}\" in this fabric"));
+        };
+
+        port.set(attribute, value)
     }
 
     /// Read one node and deliver whatever it had.
@@ -573,6 +616,110 @@ mod tests {
         // Nothing reached the ground along that branch, and nothing was lost
         // quietly: the refusal is in hand.
         assert!(moc.borrow().given.is_empty());
+    }
+
+    /// A command from the ground changes what the thermostat decides.
+    ///
+    /// The last link in the worked example's chain. The example's binding says
+    /// the ground may set `thermostat.setpoint`, and a cabin that was within
+    /// the band becomes a cabin the heaters are wanted in -- without the
+    /// readings changing at all, which is what makes this the command's doing
+    /// and not the sensors'.
+    #[test]
+    fn a_commanded_setpoint_changes_the_decision() {
+        use crate::runtime::port::ComputePort;
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let routes = Routes::of(&graph);
+
+        let mut fabric = Fabric::new(routes.clone(), 64);
+        let thermostat = graph.node("thermostat").expect("the thermostat");
+        fabric.hold(
+            "thermostat",
+            Box::new(ComputePort::make(thermostat, &[]).expect("it builds")),
+        );
+        let (heaters, heater_port) = recorder();
+        let (_, log_port) = recorder();
+        let (_, moc_port) = recorder();
+        fabric.hold("heaters", heater_port);
+        fabric.hold("housekeeping", log_port);
+        fabric.hold("moc", moc_port);
+
+        // 294 kelvin against a setpoint of 293.15 with two degrees either
+        // side: inside the band, so nothing is decided.
+        let moved = fabric.deliver("mean_temp", b"294.0");
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert!(
+            heaters.borrow().given.is_empty(),
+            "a cabin inside the band should not have been acted on"
+        );
+
+        // The ground asks for a warmer cabin. The decision is not taken on
+        // the strength of the number -- the next reading decides -- so the
+        // heaters are still untouched.
+        assert_eq!(fabric.set("thermostat", "setpoint", b"300.0"), Ok(()));
+        assert!(heaters.borrow().given.is_empty());
+
+        // And the same reading now calls for heat.
+        let moved = fabric.deliver("mean_temp", b"294.0");
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert_eq!(
+            heaters.borrow().given,
+            vec![(None, b"1".to_vec())],
+            "294 is more than two degrees below 300"
+        );
+    }
+
+    /// Only what the configuration says may be set can be set.
+    #[test]
+    fn an_attribute_no_binding_names_cannot_be_set() {
+        use crate::runtime::port::ComputePort;
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let routes = Routes::of(&graph);
+
+        let mut fabric = Fabric::new(routes, 64);
+        let thermostat = graph.node("thermostat").expect("the thermostat");
+        fabric.hold(
+            "thermostat",
+            Box::new(ComputePort::make(thermostat, &[]).expect("it builds")),
+        );
+
+        // The band either side of the setpoint is in the file and no binding
+        // names it, so the ground cannot change it however willing the
+        // computation is.
+        let said = fabric
+            .set("thermostat", "above", b"5.0")
+            .expect_err("an attribute no binding names");
+        assert!(
+            said.contains("thermostat.above") && said.contains("checkable"),
+            "the refusal should name what was asked and why not: {said}"
+        );
+
+        // A value that is not a number is refused by the computation, which
+        // is the other half of what a command has to get past.
+        let said = fabric
+            .set("thermostat", "setpoint", b"warm")
+            .expect_err("a setpoint that is not a number");
+        assert!(
+            said.contains("thermostat") && said.contains("warm"),
+            "the refusal should name the node and the value: {said}"
+        );
+    }
+
+    /// A device's configuration is not changed from the ground.
+    #[test]
+    fn a_device_refuses_a_setting() {
+        let (_, mut heaters) = recorder();
+        let said = heaters
+            .set("lines", b"6,7,8")
+            .expect_err("a chip re-described in flight");
+        assert!(
+            said.contains("lines"),
+            "the refusal should name what was asked: {said}"
+        );
     }
 
     /// A cycle in the links is stopped and named, not run.

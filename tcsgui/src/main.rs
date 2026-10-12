@@ -1333,4 +1333,92 @@ mod tests {
     fn a_new_node_is_placed_where_it_can_be_seen() {
         assert!(FIRST_PLACE.0 > 0 && FIRST_PLACE.1 > 0);
     }
+
+    /// A node follows the pointer, and the move it reports is the one made.
+    ///
+    /// Pressed, moved and released through the window, because that is the one
+    /// way to find out: a drag is markup, so the arithmetic that places a node
+    /// while the pointer is down cannot be tested by calling anything. What
+    /// this caught is worth saying -- the offset was measured against the
+    /// node's own `TouchArea`, which moves with the node, so the delta
+    /// cancelled itself and a dragged node went nowhere.
+    #[test]
+    fn a_node_follows_the_pointer_and_reports_where_it_went() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        testing::init_integration_test_with_system_time();
+
+        let window = MainWindow::new().expect("a window");
+        let at = (120, 90);
+        let node = view_of("temp_fore", "i2c", at, None, false, None);
+        let (width, height) = (node.width, node.height);
+        window
+            .set_nodes(ModelRc::from(Rc::new(VecModel::from(vec![node]))));
+
+        // What the window says it moved, which is what the editor would
+        // record.
+        let moved: Rc<Cell<Option<(f32, f32)>>> = Rc::new(Cell::new(None));
+        {
+            let moved = moved.clone();
+            window.on_node_moved(move |_name, dx, dy| moved.set(Some((dx, dy))));
+        }
+
+        // The canvas is laid out before anything can be pressed on it.
+        window.show().expect("the window shows");
+        let canvas = testing::ElementHandle::find_by_element_id(&window, "Surface::canvas")
+            .next();
+        let (origin_x, origin_y) = match canvas {
+            Some(canvas) => {
+                let at = canvas.absolute_position();
+                (at.x, at.y)
+            }
+            // The canvas has no id to find: the node's own position is still
+            // relative to it, so the press would land somewhere else
+            // entirely. Said rather than guessed at.
+            None => panic!("the canvas should be findable by its element id"),
+        };
+
+        // The middle of the node, which is where a person presses.
+        let from = slint::LogicalPosition::new(
+            origin_x + at.0 as f32 + width / 2.0,
+            origin_y + at.1 as f32 + height / 2.0,
+        );
+        let by = (60.0, 40.0);
+        let to = slint::LogicalPosition::new(from.x + by.0, from.y + by.1);
+
+        window.window().dispatch_event(WindowEvent::PointerMoved { position: from });
+        window.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+        window.window().dispatch_event(WindowEvent::PointerMoved { position: to });
+
+        // It follows the pointer while the gesture is running, which is the
+        // half a person sees: a drag that only moved the node on release
+        // would look like a drag that was doing nothing.
+        let drawn = testing::ElementHandle::find_by_element_id(&window, "NodeShape::moving")
+            .next()
+            .expect("a node draws its parts in a container that the drag moves");
+        let followed = drawn.absolute_position();
+        assert!(
+            (followed.x - (origin_x + at.0 as f32 + by.0)).abs() < 1.0
+                && (followed.y - (origin_y + at.1 as f32 + by.1)).abs() < 1.0,
+            "mid-drag the node is drawn at {followed:?}, not {:?}",
+            (origin_x + at.0 as f32 + by.0, origin_y + at.1 as f32 + by.1)
+        );
+
+        window.window().dispatch_event(WindowEvent::PointerReleased {
+            position: to,
+            button: PointerEventButton::Left,
+        });
+
+        let said = moved.get().expect("a drag should report where the node went");
+        assert!(
+            (said.0 - by.0).abs() < 1.0 && (said.1 - by.1).abs() < 1.0,
+            "a node dragged by {by:?} reported {said:?}"
+        );
+    }
 }

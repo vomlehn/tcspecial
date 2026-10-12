@@ -28,3 +28,16 @@ telemetry/
 
 # Resume command written by the SessionEnd hook
 claude-resume
+
+# Where `make runguiy` and `make runguix` edit by default.
+#
+# tcsgui saves every edit as it is made and keeps a history beside the file, so
+# the editor needs somewhere of its own to write: a default pointing at a
+# shipped example would rewrite the example the first time anybody moved a
+# node.
+edit/
+
+# What tcsgui keeps beside a configuration it is editing: the history that
+# makes undo survive a crash. Of a moment rather than of a configuration, so
+# it is not something to commit.
+*.tcsgui-history

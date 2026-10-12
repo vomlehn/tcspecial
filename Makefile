@@ -323,9 +323,17 @@ verify:
 # history beside it, so starting on a name that is not there is how a new
 # configuration is begun.
 #
+# The default is under edit/, which is not in the repository, and deliberately
+# not the shipped example. tcsgui saves every edit as it is made -- that is
+# the point of it -- so an editor opened on tests/manual/thermostat.yaml to
+# see what the thing does rewrites the shipped example, and the first thing
+# anybody does with an editor is move something. The example is still
+# editable, by naming it:
+#
+#   make runguiy
 #   make runguiy TCSGUI_FILE=tests/manual/thermostat
-#   make verify  TCSGUI_FILE=tests/manual/thermostat.yaml
-TCSGUI_FILE = tests/manual/thermostat.yaml
+#   make verify  TCSGUI_FILE=edit/graph.yaml
+TCSGUI_FILE = edit/graph.yaml
 
 # Running tcsgui on one spelling of a configuration.
 #
@@ -340,6 +348,7 @@ TCSGUI_FILE = tests/manual/thermostat.yaml
 define rungui_on
 	( \
 		set -eu; \
+		mkdir -p $(dir $(TCSGUI_FILE)); \
 		echo "Running $(GUI_NAME) on $(basename $(TCSGUI_FILE)).$(1)..."; \
 		cd $(RUST) && cargo run -q --bin tcsgui -- $(basename $(TCSGUI_FILE)).$(1) \
 	)

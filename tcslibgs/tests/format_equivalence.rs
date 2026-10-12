@@ -67,9 +67,7 @@ fn the_actual_file_has_expected_contents() {
         .tcspecial
         .as_ref()
         .expect("the payload actual file carries a tcspecial section");
-    assert_eq!(ci.address, "0.0.0.0");
-    assert_eq!(ci.port, 4000);
-    assert_eq!(ci.protocol, "udp");
+    assert_eq!(ci.command_interface, "0.0.0.0:4000");
     assert_eq!(ci.beacon_interval_ms, 5000);
     assert_eq!(ci.log_dir.as_deref(), Some("/var/log/tcspecial"));
     assert_eq!(ci.log_segment_bytes, 65_536);
@@ -215,9 +213,10 @@ fn the_tcspecial_section_is_a_command_interpreter_configuration() {
 
         // Enough of the result to show the conversion carried the values
         // rather than succeeding on defaults.
+        // The one attribute becomes the address and the port, which is the
+        // conversion's own work and the reason it is worth checking here.
         assert_eq!(ci.address, "0.0.0.0", "tcspecial.{ext}");
         assert_eq!(ci.port, 4000, "tcspecial.{ext}");
-        assert_eq!(ci.protocol, NetworkProtocol::Udp, "tcspecial.{ext}");
     }
 }
 
@@ -237,21 +236,20 @@ payloads:
     path: /dev/null
     packet_size: 1
 tcspecial:
-  address: 0.0.0.0
-  port: 4000
+  command_interface: 0.0.0.0
   payload_port: 4001
-  protocol: carrier-pigeon
   beacon_interval_ms: 5000
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 ",
         )
-        .expect("parses: a protocol that is not one is not a syntax error");
+        .expect("parses: half a command interface is not a syntax error");
 
     let message = config.to_dh_configs().expect_err("must be rejected");
     assert!(
-        message.contains("tcspecial") && message.contains("carrier-pigeon"),
-        "the error should name the section and the value, but said: {message}"
+        message.contains("tcspecial") && message.contains("address:port"),
+        "the error should name the section and say what the shape is, but \
+         said: {message}"
     );
 }
 
@@ -264,9 +262,11 @@ fn malformed_input_is_rejected_in_every_format() {
 
     // A required field is missing in each format, so each must refuse it.
     assert!(ConfigFormat::Yaml
-        .parse::<CIConfigJson>("address: 0.0.0.0\nport: 1\n")
+        .parse::<CIConfigJson>("command_interface: 0.0.0.0:4000\n")
         .is_err());
     assert!(ConfigFormat::Xml
-        .parse::<CIConfigJson>("<ci><address>0.0.0.0</address><port>1</port></ci>")
+        .parse::<CIConfigJson>(
+            "<ci><command_interface>0.0.0.0:4000</command_interface></ci>"
+        )
         .is_err());
 }

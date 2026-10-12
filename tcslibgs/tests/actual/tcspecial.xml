@@ -12,10 +12,8 @@
     <version>1.0</version>
     <description>Two data handlers, one of each endpoint kind</description>
     <tcspecial>
-        <address>0.0.0.0</address>
-        <port>4000</port>
+        <command_interface>0.0.0.0:4000</command_interface>
         <payload_port>4001</payload_port>
-        <protocol>udp</protocol>
         <beacon_interval_ms>5000</beacon_interval_ms>
         <beacon_address>239.255.0.2:6550</beacon_address>
         <beacon_interface>127.0.0.1</beacon_interface>

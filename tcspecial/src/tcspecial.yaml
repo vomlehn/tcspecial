@@ -11,15 +11,11 @@
 # true of this file as of a payload configuration or a simulator
 # configuration: the formats are two spellings of one set of values.
 #
-# Note the quotes on the address: unquoted, 0.0.0.0 is a string in YAML only
-# because it happens not to be a number, which is a thin reason to rely on.
-address: "0.0.0.0"
-
 # The two command links. A command about the spacecraft -- ping it, arm it,
-# restart it -- is taken on port; a command about a payload -- start it, stop
-# it, ask it for its statistics -- on payload_port. One table says which is
-# which, read by both ends, so neither can send a command to the link the
-# other does not expect it on.
+# restart it -- is taken on the command interface; a command about a payload --
+# start it, stop it, ask it for its statistics -- on payload_port at the same
+# address. One table says which is which, read by both ends, so neither can
+# send a command to the link the other does not expect it on.
 #
 # Two links rather than one because what the ground needs in a hurry must
 # never be queued behind what it asked for at leisure: a restart waiting
@@ -27,9 +23,18 @@ address: "0.0.0.0"
 # it is busy. On a space link the two become two virtual channels, which is
 # where the priority between them is really decided; here they are two ports,
 # which is what an IP network has to divide traffic with.
-port: 4000
+#
+# The address and its port are one value, as the beacon address below is: two
+# things only ever used together are one fact about a configuration, and
+# writing them apart invites a file that states one and not the other. The
+# protocol is not stated and cannot be -- the link between tcspecial and the
+# ground is UDP, so a configuration that could say otherwise would be one that
+# could say something untrue.
+#
+# Note the quotes: unquoted, 0.0.0.0:4000 is a string in YAML only because it
+# happens not to be a number, which is a thin reason to rely on.
+command_interface: "0.0.0.0:4000"
 payload_port: 4001
-protocol: udp
 
 # How often beacons go out and where they go. Both are required of every
 # command interpreter configuration, here and in the tcspecial section of a

@@ -2405,6 +2405,51 @@ pub fn beacon_address_of(stated: &str) -> Result<SocketAddr, String> {
     Ok(address)
 }
 
+/// Where the command interpreter takes commands, as `address:port`.
+///
+/// One attribute rather than two, as a beacon address is: an address and a
+/// port that are only ever used together are one fact about a configuration,
+/// and writing them apart invites a file that states one and not the other.
+///
+/// The address is kept as text and not resolved here. It is a local address to
+/// bind -- `0.0.0.0` for every interface, or one interface's own -- and what a
+/// name resolves to is the business of the moment the socket is made, not of
+/// the moment the file is read.
+///
+/// Split at the last colon, so that whatever a host is called the port is the
+/// part after it.
+pub fn command_interface_of(stated: &str) -> Result<(String, u16), String> {
+    let said = stated.trim();
+    let (address, port) = said.rsplit_once(':').ok_or_else(|| {
+        format!(
+            "command_interface \"{said}\" is not an address and a port: it is \
+             written as address:port, as 0.0.0.0:4000"
+        )
+    })?;
+
+    if address.trim().is_empty() {
+        return Err(format!(
+            "command_interface \"{said}\" states no address. Every interface is \
+             0.0.0.0, which is what a vehicle usually wants"
+        ));
+    }
+    let port: u16 = port.trim().parse().map_err(|_| {
+        format!(
+            "command_interface \"{said}\" ends in \"{port}\", which is not a port: \
+             a port is a whole number between 1 and 65535"
+        )
+    })?;
+    if port == 0 {
+        return Err(format!(
+            "command_interface \"{said}\" asks for port 0, which is a request for \
+             whatever port is free -- and a command link nobody can predict the \
+             port of is one the ground cannot reach"
+        ));
+    }
+
+    Ok((address.trim().to_string(), port))
+}
+
 /// The local interface beacons are sent on and listened for on.
 ///
 /// Both ends have to name the same one, and on a host with more than one
@@ -2422,8 +2467,17 @@ pub fn beacon_interface_of(stated: &str) -> Result<Ipv4Addr, String> {
 /// The file-level form of the command interpreter's configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
-    pub address: String,
-    pub port: u16,
+    /// Where commands about the spacecraft are taken, as `address:port`.
+    ///
+    /// One attribute and not two, as the beacon address beside it is: an
+    /// address and a port only ever used together are one fact, and two
+    /// attributes are two chances to state half of it. See
+    /// [`command_interface_of`].
+    ///
+    /// The protocol is not stated and cannot be: the link between tcspecial
+    /// and the ground is UDP. A configuration that could say otherwise would
+    /// be a configuration that could say something untrue.
+    pub command_interface: String,
     /// The port payload commands are taken on, which is not the port above.
     ///
     /// A command about a payload -- start it, stop it, ask it for its
@@ -2442,8 +2496,11 @@ pub struct CIConfigJson {
     /// Required, with no default, for the reason the beacon attributes are:
     /// where commands are taken is not a question to be answered by whatever
     /// a file was silently given.
+    ///
+    /// A port and not an `address:port`: it is taken on the same address as
+    /// `command_interface`, there being one command interpreter at one place,
+    /// and a second address would be a second answer to where that is.
     pub payload_port: u16,
-    pub protocol: String,
     pub beacon_interval_ms: u32,
     /// Directory holding the telemetry log's segment files. The directory
     /// must already exist. Telemetry logging is disabled when this is absent.
@@ -2473,12 +2530,14 @@ pub struct CIConfigJson {
 /// Command interpreter configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CIConfig {
+    /// The address the command links are taken on, from
+    /// [`CIConfigJson::command_interface`].
     pub address: String,
+    /// And the port of it, for commands about the spacecraft.
     pub port: u16,
     /// The port payload commands are taken on; see
     /// [`CIConfigJson::payload_port`].
     pub payload_port: u16,
-    pub protocol: NetworkProtocol,
     pub beacon_interval: BeaconTime,
     /// The multicast group beacons are sent to.
     ///
@@ -2498,11 +2557,7 @@ pub struct CIConfig {
 
 impl CIConfigJson {
     pub fn to_ci_config(&self) -> Result<CIConfig, String> {
-        let protocol = match self.protocol.as_str() {
-            "tcp" => NetworkProtocol::Tcp,
-            "udp" => NetworkProtocol::Udp,
-            _ => return Err(format!("Invalid protocol: {}", self.protocol)),
-        };
+        let (address, port) = command_interface_of(&self.command_interface)?;
 
         let beacon_address = beacon_address_of(&self.beacon_address)?;
         let beacon_interface = beacon_interface_of(&self.beacon_interface)?;
@@ -2510,20 +2565,19 @@ impl CIConfigJson {
         // One socket cannot be two links. A file that gave both the same port
         // would describe a split it has not made, and the half of it that
         // bound second would fail at startup with the other half's address.
-        if self.payload_port == self.port {
+        if self.payload_port == port {
             return Err(format!(
-                "port and payload_port are both {}, and the two links cannot be \
-                 one socket: spacecraft commands are taken on port and payload \
-                 commands on payload_port",
-                self.port
+                "command_interface and payload_port are both port {port}, and \
+                 the two links cannot be one socket: spacecraft commands are \
+                 taken on the command interface and payload commands on \
+                 payload_port"
             ));
         }
 
         Ok(CIConfig {
-            address: self.address.clone(),
-            port: self.port,
+            address,
+            port,
             payload_port: self.payload_port,
-            protocol,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
             beacon_address,
             beacon_interface,
@@ -3260,8 +3314,7 @@ payloads:
     fn a_set_states_two_command_ports() {
         let with = |ports: &str| {
             format!(
-                "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
-                 address: 0.0.0.0\n{ports}  protocol: udp\n  \
+                "version: \"1.0\"\ndescription: a set\ntcspecial:\n{ports}  \
                  beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
                  beacon_interface: 127.0.0.1\npayloads:\n  - \
                  name: p\n    type: device-file\n    path: /dev/null\n    \
@@ -3269,13 +3322,15 @@ payloads:
             )
         };
 
-        payload(&with("  port: 4000\n  payload_port: 4001\n"))
+        payload(&with("  command_interface: 0.0.0.0:4000\n  payload_port: 4001\n"))
             .to_dh_configs()
             .expect("two ports are two links");
 
-        let said = payload(&with("  port: 4000\n  payload_port: 4000\n"))
-            .to_dh_configs()
-            .expect_err("one socket cannot be two links");
+        let said = payload(&with(
+            "  command_interface: 0.0.0.0:4000\n  payload_port: 4000\n",
+        ))
+        .to_dh_configs()
+        .expect_err("one socket cannot be two links");
         assert!(
             said.contains("payload_port") && said.contains("4000"),
             "{said}"
@@ -3286,7 +3341,7 @@ payloads:
         // beacon.
         assert!(
             ConfigFormat::Yaml
-                .parse::<PayloadConfig>(&with("  port: 4000\n"))
+                .parse::<PayloadConfig>(&with("  command_interface: 0.0.0.0:4000\n"))
                 .is_err(),
             "a section with no payload_port was accepted"
         );
@@ -3302,8 +3357,8 @@ payloads:
         let with = |address: &str, port: u16| {
             format!(
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
-                 address: {address}\n  port: 4000\n  payload_port: 4001\n  \
-                 protocol: udp\n  beacon_interval_ms: 5000\n  \
+                 command_interface: {address}:4000\n  payload_port: 4001\n  \
+                 beacon_interval_ms: 5000\n  \
                  beacon_address: 239.255.0.1:5550\n  \
                  beacon_interface: 127.0.0.1\npayloads:\n  - \
                  name: p\n    type: network\n    protocol: udp\n    \

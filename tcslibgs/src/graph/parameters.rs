@@ -40,10 +40,8 @@ use crate::types::{default_log_segment_bytes, CIConfigJson};
 /// Required ones first, so a panel built from this asks for what it must have
 /// before what it may.
 pub const ATTRIBUTES: &[(&str, bool)] = &[
-    ("address", true),
-    ("port", true),
+    ("command_interface", true),
     ("payload_port", true),
-    ("protocol", true),
     ("beacon_interval_ms", true),
     ("beacon_address", true),
     ("beacon_interface", true),
@@ -99,10 +97,8 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
     };
 
     Ok(CIConfigJson {
-        address: text("address")?,
-        port: port("port")?,
+        command_interface: text("command_interface")?,
         payload_port: port("payload_port")?,
-        protocol: text("protocol")?,
         beacon_interval_ms: number("beacon_interval_ms")?,
         beacon_address: text("beacon_address")?,
         beacon_interface: text("beacon_interface")?,
@@ -121,26 +117,15 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
 
 /// The section as a graph would write it, for a configuration being started.
 ///
-/// The three that are mechanical are filled in: a protocol, a beacon interval
-/// and a segment size are the same on every vehicle until somebody has a
-/// reason, and a value to change is a better start than a blank to fill in.
-/// The five that are site-specific are left empty on purpose -- an address and
-/// two ports and where the beacons go are the configuration's own, and an
-/// editor that guessed them would be answering a question nobody had asked.
+/// Every attribute and not one value. An editor that filled in a protocol or a
+/// beacon interval on the grounds that they are the same on every vehicle
+/// until somebody has a reason would be making a configuration that looks as
+/// answered as one somebody thought about -- which is the argument the schema
+/// itself makes for requiring these at all.
 pub fn blank() -> BTreeMap<String, Scalar> {
     let mut said = BTreeMap::new();
-    for (name, value) in [
-        ("address", ""),
-        ("port", ""),
-        ("payload_port", ""),
-        ("protocol", "udp"),
-        ("beacon_interval_ms", "5000"),
-        ("beacon_address", ""),
-        ("beacon_interface", ""),
-        ("log_dir", ""),
-        ("log_segment_bytes", "65536"),
-    ] {
-        said.insert(name.to_string(), Scalar::of(value));
+    for (name, _) in ATTRIBUTES {
+        said.insert((*name).to_string(), Scalar::of(""));
     }
     said
 }
@@ -158,10 +143,8 @@ mod tests {
 
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("address", "0.0.0.0"),
-            ("port", "4000"),
+            ("command_interface", "0.0.0.0:4000"),
             ("payload_port", "4001"),
-            ("protocol", "udp"),
             ("beacon_interval_ms", "5000"),
             ("beacon_address", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),
@@ -175,18 +158,19 @@ mod tests {
     #[test]
     fn a_whole_section_is_what_the_command_interpreter_takes() {
         let config = ci_config_of(&said(&whole())).expect("this one is complete");
-        assert_eq!(config.address, "0.0.0.0");
-        assert_eq!(config.port, 4000);
+        assert_eq!(config.command_interface, "0.0.0.0:4000");
         assert_eq!(config.payload_port, 4001);
-        assert_eq!(config.protocol, "udp");
         assert_eq!(config.beacon_interval_ms, 5000);
         assert_eq!(config.beacon_address, "239.255.0.1:5550");
         assert_eq!(config.log_dir.as_deref(), Some("/var/log/tcspecial"));
         assert_eq!(config.log_segment_bytes, 65536);
 
         // And it holds together by the rules of the one piece of code that
-        // knows them.
-        config.to_ci_config().expect("and sound");
+        // knows them -- which is also where the one address and the one port
+        // come out of the one attribute.
+        let settled = config.to_ci_config().expect("and sound");
+        assert_eq!(settled.address, "0.0.0.0");
+        assert_eq!(settled.port, 4000);
     }
 
     /// Every attribute that must be stated is complained about by name.
@@ -218,19 +202,56 @@ mod tests {
     #[test]
     fn an_empty_attribute_is_a_missing_one() {
         let mut cleared = whole();
-        cleared.retain(|(name, _)| *name != "port");
-        cleared.push(("port", "   "));
-        let why = ci_config_of(&said(&cleared)).expect_err("an empty port is no port");
-        assert!(why.contains("port"), "{why}");
+        cleared.retain(|(name, _)| *name != "command_interface");
+        cleared.push(("command_interface", "   "));
+        let why = ci_config_of(&said(&cleared))
+            .expect_err("an empty command interface is none");
+        assert!(why.contains("command_interface"), "{why}");
+    }
+
+    /// A command interface is an address and a port, and says so when it is
+    /// not.
+    ///
+    /// One attribute carrying two things has one way to go wrong that two
+    /// attributes do not: half of it. So the complaint says what the shape is
+    /// rather than only that the value is bad.
+    #[test]
+    fn a_command_interface_is_an_address_and_a_port() {
+        use crate::types::command_interface_of;
+
+        assert_eq!(
+            command_interface_of("0.0.0.0:4000").expect("a plain one"),
+            ("0.0.0.0".to_string(), 4000)
+        );
+        // Whatever the host is called, the port is after the last colon.
+        assert_eq!(
+            command_interface_of(" vehicle.local:4000 ").expect("a named host"),
+            ("vehicle.local".to_string(), 4000)
+        );
+
+        for (said, expected) in [
+            // No port at all, which is the half-stated case.
+            ("0.0.0.0", "address:port"),
+            (":4000", "states no address"),
+            ("0.0.0.0:", "not a port"),
+            ("0.0.0.0:nought", "not a port"),
+            ("0.0.0.0:70000", "not a port"),
+            // And a port of nought, which asks for whatever is free.
+            ("0.0.0.0:0", "port 0"),
+        ] {
+            let why = command_interface_of(said)
+                .expect_err(&format!("{said} should be refused"));
+            assert!(why.contains(expected), "{said} was refused as {why:?}");
+        }
     }
 
     /// A value that is not a number is refused, saying what it was.
     #[test]
     fn a_port_that_is_not_a_port_is_refused() {
         for (name, value) in [
-            ("port", "four thousand"),
-            ("port", "0"),
-            ("port", "70000"),
+            ("payload_port", "four thousand"),
+            ("payload_port", "0"),
+            ("payload_port", "70000"),
             ("payload_port", "-1"),
             ("beacon_interval_ms", "often"),
         ] {
@@ -263,17 +284,12 @@ mod tests {
     #[test]
     fn a_blank_section_asks_for_what_only_the_mission_knows() {
         let blank = blank();
-        // Every attribute is there, so the window has a field for each.
+        // Every attribute is there, so the window has a field for each, and
+        // not one of them is answered: a value nobody chose looks as chosen as
+        // one somebody did.
         for (name, _) in ATTRIBUTES {
             assert!(blank.contains_key(*name), "{name} is not offered");
-        }
-        // The mechanical ones are filled in.
-        assert_eq!(blank["protocol"].as_str(), "udp");
-        assert_eq!(blank["beacon_interval_ms"].as_str(), "5000");
-        // And the site-specific ones are not, so a configuration that has not
-        // been asked is not pretending to have answered.
-        for name in ["address", "port", "payload_port", "beacon_address"] {
-            assert!(blank[name].as_str().is_empty(), "{name} was guessed at");
+            assert!(blank[*name].as_str().is_empty(), "{name} was guessed at");
         }
         // Which means a blank one is refused, naming the first thing to fill
         // in.

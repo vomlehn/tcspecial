@@ -184,7 +184,7 @@ struct CondPair<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::{BeaconTime, CIConfig, NetworkProtocol};
+    use tcslibgs::{BeaconTime, CIConfig};
 
     /// Every beacon carries the next number, from one.
     ///
@@ -209,7 +209,6 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 0,
             payload_port: 0,
-            protocol: NetworkProtocol::Udp,
             beacon_interval: BeaconTime(50),
             beacon_address: at,
             beacon_interface: std::net::Ipv4Addr::LOCALHOST,

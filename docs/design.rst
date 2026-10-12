@@ -230,17 +230,15 @@ section a payload set's file holds, which is required of every configuration.
 .. code-block:: yaml
 
    tcspecial:
-     address: 0.0.0.0
-     port: 4000
+     command_interface: 0.0.0.0:4000
      payload_port: 4001
-     protocol: udp
      beacon_interval_ms: 5000
      beacon_address: "239.255.0.1:5550"
      beacon_interface: "127.0.0.1"
      log_dir: /var/log/tcspecial
      log_segment_bytes: 65536
 
-Seven of the nine must be stated, and are required rather than defaulted for
+Five of the seven must be stated, and are required rather than defaulted for
 one reason: a configuration that has not been asked the question has not
 answered it. Where commands are taken and where beacons go are mission facts,
 and a file that was silently given an answer to either is a vehicle nobody can
@@ -249,12 +247,27 @@ telemetry log is not kept, which is a configuration somebody may mean -- a
 vehicle with no writable storage -- and ``log_segment_bytes`` is a tuning
 choice with a defensible answer, so it has one.
 
-Two ports because there are two command links: a command about the spacecraft
--- ping it, arm it, restart it -- is taken on ``port``, and one about a payload
-on ``payload_port``, so what the ground needs in a hurry is never queued behind
-what it asked for at leisure. On a space link the two become two virtual
-channels, which is where the priority between them is really decided; here they
-are two ports, which is what an IP network has to divide traffic with.
+``command_interface`` is an address and a port together, as ``beacon_address``
+is: two things only ever used together are one fact about a configuration, and
+writing them apart invites a file that states one and not the other. Split at
+the last colon, so whatever a host is called the port is the part after it. The
+address is kept as text and not resolved when the file is read -- what a name
+resolves to is the business of the moment the socket is made.
+
+Two command links because what the ground needs in a hurry must never be queued
+behind what it asked for at leisure: a command about the spacecraft -- ping it,
+arm it, restart it -- is taken on the command interface, and one about a payload
+on ``payload_port`` at the same address. On a space link the two become two
+virtual channels, which is where the priority between them is really decided;
+here they are two ports, which is what an IP network has to divide traffic
+with. ``payload_port`` is a port and not an address and a port, there being one
+command interpreter at one place: a second address would be a second answer to
+where that is.
+
+The protocol is not stated and cannot be. The link between tcspecial and the
+ground is UDP, so an attribute for it would be an attribute that could say
+something untrue -- and a configuration able to describe a link the software
+cannot make is worse than one that cannot describe it at all.
 
 It is read by the same struct a payload set's section is read by. A second
 statement of what the command interpreter needs would be two statements

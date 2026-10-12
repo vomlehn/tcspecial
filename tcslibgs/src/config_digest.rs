@@ -254,10 +254,8 @@ mod tests {
 version: \"1.0\"
 description: a set
 tcspecial:
-  address: 0.0.0.0
-  port: 4000
+  command_interface: 0.0.0.0:4000
   payload_port: 4001
-  protocol: udp
   beacon_interval_ms: 5000
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
@@ -318,10 +316,8 @@ payloads:
     packet_size: 2
 description: a set
 tcspecial:
-  address: 0.0.0.0
-  port: 4000
+  command_interface: 0.0.0.0:4000
   payload_port: 4001
-  protocol: udp
   beacon_interval_ms: 5000
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
@@ -349,10 +345,8 @@ version: \"1.0\"
 version: \"1.0\"
 description: a set
 tcspecial:
-  address: 0.0.0.0
-  port: 4000
+  command_interface: 0.0.0.0:4000
   payload_port: 4001
-  protocol: udp
   beacon_interval_ms: 5000
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
@@ -402,10 +396,8 @@ payloads:
 version: \"1.0\"
 description: a set
 tcspecial:
-  address: 0.0.0.0
-  port: 4000
+  command_interface: 0.0.0.0:4000
   payload_port: 4001
-  protocol: udp
   beacon_interval_ms: 5000
   beacon_address: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
@@ -428,7 +420,7 @@ payloads:
         for changed in [
             YAML.replace("packet_size: 1", "packet_size: 3"),
             YAML.replace("/dev/null", "/dev/urandom"),
-            YAML.replace("port: 4000", "port: 4001"),
+            YAML.replace("0.0.0.0:4000", "0.0.0.0:4001"),
             YAML.replace("description: a set", "description: another set"),
             YAML.replace("name: DH0", "name: DH9"),
         ] {

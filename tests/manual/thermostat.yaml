@@ -102,3 +102,7 @@ links:
   # asserted below the setpoint, unasserted above it
   - { from: thermostat, to: heaters }
   - { from: thermostat, to: housekeeping }
+
+commands:
+  # the cabin temperature the heaters are held at, in kelvin
+  - { from: moc, sets: thermostat.setpoint }

@@ -403,6 +403,12 @@ impl Port for ComputePort {
         }
     }
 
+    fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
+        self.function
+            .set(attribute, value)
+            .map_err(|why| format!("{}: {why}", self.what))
+    }
+
     fn ready(&self) -> bool {
         !self.ready.is_empty()
     }
@@ -506,10 +512,10 @@ mod tests {
         assert_eq!(Use::of(&routes, "temp_fore"), Ok(Use::Read));
         // The heaters are the other way round.
         assert_eq!(Use::of(&routes, "heaters"), Ok(Use::Driven));
-        // The ground link of the shipped example is written and not read:
-        // telemetry goes to it, and the example declares no command binding
-        // yet -- see the commanded case below for the other half of this.
-        assert_eq!(Use::of(&routes, "moc"), Ok(Use::Driven));
+        // And the ground link is both: telemetry goes to it, and the
+        // setpoint is commanded through it. The second half of that is the
+        // binding and not a link -- see the commanded case below.
+        assert_eq!(Use::of(&routes, "moc"), Ok(Use::Both));
         // A log takes and produces nothing of its own.
         assert_eq!(Use::of(&routes, "housekeeping"), Ok(Use::Driven));
 

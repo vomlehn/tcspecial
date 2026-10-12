@@ -170,4 +170,9 @@
         <from>thermostat</from>
         <to>housekeeping</to>
     </links>
+    <!-- the cabin temperature the heaters are held at, in kelvin -->
+    <commands>
+        <from>moc</from>
+        <sets>thermostat.setpoint</sets>
+    </commands>
 </configuration>

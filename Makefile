@@ -66,7 +66,8 @@ help:
 	@echo "  make runmocy     - Run tcsmoc, which starts tcspecial and tcssim"
 	@echo "  make runmocx     - As runmocy, on the XML configuration"
 	@echo "  make runsim      - Run tcssim alone"
-	@echo "  make rungui      - Run tcsgui on a configuration file"
+	@echo "  make runguiy     - Run tcsgui on the YAML configuration"
+	@echo "  make runguix     - Run tcsgui on the XML configuration"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
 	@echo "  make verify      - Check one version 2 configuration"
@@ -311,29 +312,51 @@ verify:
 		cd $(RUST) && cargo run -q --bin tcsverify -- $(TCSGUI_FILE) \
 	)
 
-# Run the configuration editor.
-#
-# TCSGUI_FILE is the configuration to edit, and it need not exist yet: tcsgui
-# writes it as edits are made and keeps its history beside it, so starting on
-# a name that is not there is how a new configuration is begun.
+# The configuration to edit, and to check.
 #
 # A name of its own rather than TCSPECIAL_CONFIG_FILE, which the run targets
 # use: that variable names a payload *set* -- a stem, with a tcspecial
-# configuration and a simulator file either side of it -- and this is one file
-# with its extension, because the extension is what says whether to write YAML
-# or XML.
+# configuration and a simulator file either side of it -- where this is one
+# configuration, which has no simulator file beside it.
 #
-#   make rungui TCSGUI_FILE=tests/manual/thermostat.yaml
-#   make rungui TCSGUI_FILE=tests/manual/thermostat.xml
+# It need not exist yet: tcsgui writes it as edits are made and keeps its
+# history beside it, so starting on a name that is not there is how a new
+# configuration is begun.
+#
+#   make runguiy TCSGUI_FILE=tests/manual/thermostat
+#   make verify  TCSGUI_FILE=tests/manual/thermostat.yaml
 TCSGUI_FILE = tests/manual/thermostat.yaml
 
-.PHONY: rungui
-rungui:
+# Running tcsgui on one spelling of a configuration.
+#
+# $(1) is that spelling -- yaml or xml -- as runmoc_on takes it, and for the
+# same reason: a configuration may be written in either, the two describe the
+# same graph, and the extension is what says which to write. An editor that
+# only ever opened the YAML would leave the XML to be written by hand.
+#
+# The spelling comes from the target and not from TCSGUI_FILE, so whatever
+# extension that variable carries is replaced -- exactly as runmoc_on replaces
+# the one on a payload set's stem.
+define rungui_on
 	( \
 		set -eu; \
-		echo "Running $(GUI_NAME) on $(TCSGUI_FILE)..."; \
-		cd $(RUST) && cargo run -q --bin tcsgui -- $(TCSGUI_FILE) \
+		echo "Running $(GUI_NAME) on $(basename $(TCSGUI_FILE)).$(1)..."; \
+		cd $(RUST) && cargo run -q --bin tcsgui -- $(basename $(TCSGUI_FILE)).$(1) \
 	)
+endef
+
+# Run the configuration editor, on each spelling.
+#
+# One target per spelling rather than one target and a variable, as with the
+# runmoc and runverify targets: a spelling is asked for by name, with nothing
+# to remember about which variable selects it.
+.PHONY: runguiy
+runguiy:
+	$(call rungui_on,yaml)
+
+.PHONY: runguix
+runguix:
+	$(call rungui_on,xml)
 
 # Clean build artifacts
 .PHONY: clean

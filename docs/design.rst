@@ -850,10 +850,26 @@ The editor reads what it writes. A configuration opened in tcsgui comes up on
 the canvas -- nodes where their ``editor`` positions put them, links between
 them, groups and command bindings held and written back -- and the comments
 come with it: a comment is written as a comment rather than as a field, so the
-editor reads the run of comment lines above an entry as that entry's. What a
-round trip does not keep is prose attached to nothing: a heading at the top of
-a file, or a paragraph after the last entry, belongs to no node and is not
-written back.
+editor reads the run of comment lines above an entry as that entry's.
+
+An *entry* is a node, a link, a group or a command binding, and that is the
+limit of it. Three kinds of comment in a hand-written file are not kept, and
+all three are lost the first time the editor writes the file -- which the Save
+button does on demand, whether or not anything was edited:
+
+* prose attached to nothing: a heading at the top of a file, or a paragraph
+  after the last entry, belongs to no entry.
+* a comment above the ``tcspecial`` section, which is not an entry either.
+* a comment above one *attribute* of an entry rather than above the entry
+  itself -- the line explaining why a sensor is at ``0x49`` is kept, and the
+  same line written directly above the ``address`` attribute is not.
+
+The attribute order is not kept either: the editor writes a node's attributes
+and the section's parameters in the order a dictionary gives them, which is
+alphabetical, where a hand-written file usually groups them by what they mean.
+So a hand-written configuration opened and saved stays correct and stops
+looking hand-written. For the shipped examples that is what ``git diff`` is
+for; for a working configuration it is worth knowing before the first Save.
 
 The canvas is divided in two. The right-hand quarter is the *payload working
 pane* and holds everything the vehicle carries -- a device on a bus, a line it

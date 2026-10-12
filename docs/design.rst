@@ -799,6 +799,15 @@ performs them again aboard. One command, on one file:
    $ tcsverify tests/manual/thermostat.yaml
    $ make verify TCSGUI_FILE=tests/manual/thermostat.yaml
 
+The editor reads what it writes. A configuration opened in tcsgui comes up on
+the canvas -- nodes where their ``editor`` positions put them, links between
+them, groups and command bindings held and written back -- and the comments
+come with it: a comment is written as a comment rather than as a field, so the
+editor reads the run of comment lines above an entry as that entry's. What a
+round trip does not keep is prose attached to nothing: a heading at the top of
+a file, or a paragraph after the last entry, belongs to no node and is not
+written back.
+
 ``TCSGUI_FILE`` is the same variable the editor takes, so checking what was
 just edited is the same name in both commands: ``make runguiy`` and ``make
 runguix`` open it as YAML and as XML, one target per spelling as the

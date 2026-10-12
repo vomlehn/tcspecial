@@ -107,7 +107,14 @@ pub fn make(node: &Node, inputs: &[&str]) -> Result<Box<dyn Function>, String> {
         "to_kelvin" => Ok(Box::new(to_kelvin::ToKelvin::of(attributes)?)),
         "mean" => Ok(Box::new(mean::Mean::of(inputs)?)),
         "hysteresis" => Ok(Box::new(hysteresis::Hysteresis::of(attributes)?)),
-        "process" => Ok(Box::new(process::Process::of(attributes)?)),
+        // Started here, as the configuration is loaded: a program that
+        // cannot be executed is a fault found on the ground rather than three
+        // days into a mission. See node::compute::process.
+        "process" => {
+            let mut program = process::Process::of(attributes)?;
+            program.start()?;
+            Ok(Box::new(program))
+        }
         other => Err(format!(
             "\"{}\": there is no computation called \"{other}\". The built-in \
              ones are to_kelvin, mean and hysteresis; \"process\" runs a \

@@ -41,7 +41,10 @@
 //! reported those would bury the real faults in them.
 
 use std::collections::VecDeque;
+use std::os::fd::BorrowedFd;
 use std::os::unix::io::RawFd;
+
+use nix::poll::{poll, PollFd, PollFlags};
 
 use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::Node;
@@ -273,6 +276,32 @@ impl EndpointPort {
         self.reader.wait_for_event(cmd_fd, timeout_ms)
     }
 
+    /// Whether there is something to read, without waiting to find out.
+    ///
+    /// A poll with no timeout. An error is the poll's own and is reported: a
+    /// descriptor that cannot be asked is a node that cannot be read, and
+    /// quietly reporting no bytes would make a broken endpoint look like an
+    /// idle one.
+    fn ready_to_read(&self) -> Result<bool, String> {
+        // SAFETY: a descriptor the reader owns, borrowed for the call and not
+        // kept.
+        let borrowed = unsafe { BorrowedFd::borrow_raw(self.reader.io_fd()) };
+        let mut fds = [PollFd::new(&borrowed, PollFlags::POLLIN)];
+
+        match poll(&mut fds, 0) {
+            Ok(0) => Ok(false),
+            Ok(_) => Ok(fds[0].revents().is_some_and(|events| {
+                // Readable, and also an end or an error: a descriptor at its
+                // end is read, which is how an end is noticed at all.
+                events.intersects(PollFlags::POLLIN | PollFlags::POLLHUP | PollFlags::POLLERR)
+            })),
+            Err(e) => Err(format!(
+                "{}: cannot ask whether there is anything to read: {e}",
+                self.what
+            )),
+        }
+    }
+
     /// Write the whole of `data`, or say what happened instead.
     fn write_all(&mut self, data: &[u8], doing: &str) -> Result<(), String> {
         match self.writer.write(data) {
@@ -312,10 +341,23 @@ impl Port for EndpointPort {
             .read_size
             .map_or(buffer.len(), |size| size.min(buffer.len()));
 
-        let got = self
-            .reader
-            .read(&mut buffer[..want])
-            .map_err(|e| format!("{}: the read failed: {e}", self.what));
+        // Asked before read, and this is not an optimisation. Some endpoints
+        // are opened blocking -- a device file is opened as a file -- so a
+        // read of one with nothing in it does not return. A pass that blocked
+        // there would be a pass that never ends: the group that was due is
+        // never finished, every other group starves, and a stop is not
+        // noticed because a stop is noticed between passes. So the descriptor
+        // is asked whether there is anything, with no waiting at all, and a
+        // node with nothing to say is a read of no bytes -- which is the
+        // ordinary answer from a device that is not due.
+        let got = match self.ready_to_read() {
+            Ok(true) => self
+                .reader
+                .read(&mut buffer[..want])
+                .map_err(|e| format!("{}: the read failed: {e}", self.what)),
+            Ok(false) => Ok(0),
+            Err(why) => Err(why),
+        };
 
         // Asked after being read, and asked whether or not the read found
         // anything: a device that answered nothing is a device that most
@@ -527,6 +569,7 @@ impl Port for LogPort {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::fd::AsRawFd;
     use std::path::Path;
     use std::sync::{Arc, Mutex};
 
@@ -554,13 +597,26 @@ mod tests {
         write_answers: Vec<TcsResult<usize>>,
     }
 
-    struct Half(Arc<Mutex<Script>>);
+    /// A stand-in endpoint, and a descriptor that is always readable.
+    ///
+    /// `/dev/null` for the descriptor, which `EndpointPort::take` polls
+    /// before reading: the stand-in answers from its script rather than from
+    /// the descriptor, and what the poll has to say is only "there is
+    /// something", which a read of /dev/null always does.
+    struct Half(Arc<Mutex<Script>>, std::fs::File);
+
+    impl Half {
+        fn of(script: &Arc<Mutex<Script>>) -> Half {
+            Half(
+                Arc::clone(script),
+                std::fs::File::open("/dev/null").expect("every machine has one"),
+            )
+        }
+    }
 
     impl EndpointWaitable for Half {
         fn io_fd(&self) -> RawFd {
-            // Not a descriptor anything is waited on here: the stand-in is
-            // read and written directly.
-            -1
+            self.1.as_raw_fd()
         }
 
         fn wait_for_event(&self, _cmd_fd: RawFd, _timeout_ms: i32) -> TcsResult<WaitResult> {
@@ -603,8 +659,8 @@ mod tests {
         let script = Arc::new(Mutex::new(Script::default()));
         let port = EndpointPort::of(
             what,
-            Box::new(Half(Arc::clone(&script))),
-            Box::new(Half(Arc::clone(&script))),
+            Box::new(Half::of(&script)),
+            Box::new(Half::of(&script)),
             uses,
         );
         (script, port)
@@ -901,6 +957,44 @@ mod tests {
             Ok(_) => panic!("a computation was opened as a device"),
         };
         assert!(said.contains("not something that is opened"), "{said}");
+    }
+
+    /// A node with nothing to say does not hold up the pass.
+    ///
+    /// The failure this prevents is total: a device file is opened as a file,
+    /// so a read of one with nothing in it does not return, and a pass that
+    /// blocked there would never end -- the group that was due unfinished,
+    /// every other group starved, and a stop unnoticed because a stop is
+    /// noticed between passes. A named pipe with nothing in it is exactly
+    /// that endpoint.
+    #[test]
+    fn a_quiet_node_does_not_block_the_pass() {
+        use std::ffi::CString;
+        use tcslibgs::DeviceConfig;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("pipe");
+        let name = CString::new(path.to_str().expect("a path")).expect("a name");
+        // SAFETY: a path in a directory this test owns, and a mode.
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0, "a named pipe");
+
+        let config = EndpointConfig::Device(DeviceConfig {
+            path: path.to_string_lossy().to_string(),
+        });
+        let mut port =
+            EndpointPort::connect("sensor", &config, Use::Read).expect("the pipe opens");
+
+        // Nothing has been written, and this returns: without the readiness
+        // question in take, this test would hang rather than fail.
+        let mut buffer = [0u8; 64];
+        assert_eq!(port.take(&mut buffer), Ok(0), "nothing to say is not a wait");
+
+        // And when there is something, it is read.
+        let mut writer = EndpointPort::connect("writer", &config, Use::Both)
+            .expect("the other end");
+        assert_eq!(writer.give(None, b"293.15"), Ok(()));
+        let got = port.take(&mut buffer).expect("the reading");
+        assert_eq!(&buffer[..got], b"293.15");
     }
 
     /// A real endpoint, opened by the factory, moves bytes both ways.

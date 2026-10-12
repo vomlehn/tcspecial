@@ -1954,6 +1954,14 @@ mod tests {
         for percent in settings::LEAST..=settings::MOST {
             let divider = divider_for(percent);
             assert_eq!(divider % GRID, 0, "{percent}% is off the grid");
+            // And a percentage means what it says: that much of the working
+            // pane, to the left-hand pane, within the grid step it is
+            // snapped to.
+            assert!(
+                (divider - WORKING_WIDTH * percent / 100).abs() <= GRID / 2,
+                "a vehicle pane of {percent}% was placed at {divider} of \
+                 {WORKING_WIDTH}"
+            );
             let again = divider_for(percent_for(divider));
             assert_eq!(
                 again, divider,

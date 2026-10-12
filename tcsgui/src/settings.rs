@@ -1,4 +1,5 @@
-//! What tcsgui remembers between sessions, in `$HOME/.tcsgui/config.xml`.
+//! What tcsgui remembers between sessions, in
+//! `$HOME/.tcsgui/preferences.xml`.
 //!
 //! One setting so far: how much of the working pane the vehicle working pane
 //! takes, as a percentage. The vehicle working pane is always the left-hand
@@ -80,6 +81,19 @@ pub fn directory() -> Option<PathBuf> {
 
 /// The settings file itself.
 pub fn path() -> Option<PathBuf> {
+    Some(directory()?.join("preferences.xml"))
+}
+
+/// What the file was called before it was called `preferences.xml`.
+///
+/// Read when the current name is not there, so that the rename does not
+/// silently forget what somebody had already arranged. The value is carried
+/// into the new file and the old one is left alone for its owner to delete:
+/// removing a file somebody might want to look at is not this program's
+/// business, and this program did not ask for the rename.
+///
+/// It can go once no machine has one.
+fn older() -> Option<PathBuf> {
     Some(directory()?.join("config.xml"))
 }
 
@@ -101,9 +115,17 @@ pub fn load() -> Settings {
     };
     let text = match std::fs::read_to_string(&path) {
         Ok(text) => text,
-        // Not there yet is the ordinary case, the first time the editor runs.
+        // Not there yet is the ordinary case, the first time the editor runs
+        // -- or the first run since the file was renamed, which is why the
+        // older name is tried before the defaults are.
         Err(why) if why.kind() == std::io::ErrorKind::NotFound => {
-            let settings = Settings::default();
+            let settings = older()
+                .and_then(|older| std::fs::read_to_string(older).ok())
+                .map(|text| Settings {
+                    vehicle_percent: percent_in(&text, "the file this one \
+                                                        replaced"),
+                })
+                .unwrap_or_default();
             save(settings);
             return settings;
         }
@@ -113,31 +135,36 @@ pub fn load() -> Settings {
         }
     };
 
-    let said = element(&text, "vehicle_pane_percent");
-    let percent = match said.and_then(|said| said.parse::<i32>().ok()) {
+    Settings {
+        vehicle_percent: percent_in(&text, &path.display().to_string()),
+    }
+}
+
+/// The vehicle working pane's share, as this text states it.
+///
+/// `whose` names the file in anything said about it, because a complaint about
+/// a percentage is only useful with the file it came from.
+fn percent_in(text: &str, whose: &str) -> i32 {
+    let said = element(text, "vehicle_pane_percent");
+    match said.and_then(|said| said.parse::<i32>().ok()) {
         Some(percent) if (LEAST..=MOST).contains(&percent) => percent,
         Some(percent) => {
             eprintln!(
-                "tcsgui: {} asks for a vehicle working pane of {percent}%, \
-                 which is outside {LEAST}% to {MOST}%; using {DEFAULT}%",
-                path.display()
+                "tcsgui: {whose} asks for a vehicle working pane of \
+                 {percent}%, which is outside {LEAST}% to {MOST}%; using \
+                 {DEFAULT}%"
             );
             DEFAULT
         }
         None => {
             if said.is_some() {
                 eprintln!(
-                    "tcsgui: {} does not say a number of percent; using \
-                     {DEFAULT}%",
-                    path.display()
+                    "tcsgui: {whose} does not say a number of percent; using \
+                     {DEFAULT}%"
                 );
             }
             DEFAULT
         }
-    };
-
-    Settings {
-        vehicle_percent: percent,
     }
 }
 
@@ -247,27 +274,27 @@ mod tests {
 
     /// A value outside what is allowed is replaced rather than obeyed.
     ///
-    /// Through the same arithmetic `load` uses. A hand-edited 0 would be a
-    /// vehicle working pane with nothing in it, and an editor that did as it
-    /// was told there would open on a canvas nobody could work out.
+    /// A hand-edited 0 would be a vehicle working pane with nothing in it, and
+    /// an editor that did as it was told there would open on a canvas nobody
+    /// could work out. Through the reader itself, so what is checked is what
+    /// the editor would use.
     #[test]
     fn a_percentage_outside_the_rule_is_refused() {
         for (said, expected) in [
             ("75", 75),
-            ("5", 5),
-            ("95", 95),
+            ("5", LEAST),
+            ("95", MOST),
             ("0", DEFAULT),
             ("100", DEFAULT),
             ("-20", DEFAULT),
             ("three quarters", DEFAULT),
             ("", DEFAULT),
         ] {
-            let percent = match said.parse::<i32>() {
-                Ok(percent) if (LEAST..=MOST).contains(&percent) => percent,
-                _ => DEFAULT,
-            };
-            assert_eq!(percent, expected, "{said:?}");
+            let text = format!("<vehicle_pane_percent>{said}</vehicle_pane_percent>");
+            assert_eq!(percent_in(&text, "a test"), expected, "{said:?}");
         }
+        // And a file that says nothing about it at all.
+        assert_eq!(percent_in("<settings></settings>", "a test"), DEFAULT);
     }
 
     /// The settings live under the home directory, in their own place.
@@ -280,7 +307,7 @@ mod tests {
         std::env::set_var("HOME", where_.path());
 
         let path = path().expect("a settings path");
-        assert_eq!(path, where_.path().join(".tcsgui/config.xml"));
+        assert_eq!(path, where_.path().join(".tcsgui/preferences.xml"));
         // Made on the way in, before anything is written.
         assert!(
             where_.path().join(".tcsgui").is_dir(),
@@ -304,6 +331,29 @@ mod tests {
         // A file nobody can make sense of leaves the default standing.
         std::fs::write(&path, "not xml at all").expect("a file");
         assert_eq!(load().vehicle_percent, DEFAULT);
+
+        // The file was called config.xml before it was called
+        // preferences.xml, and the rename does not forget what somebody had
+        // already arranged: with only the old name there, the old name is
+        // read and the new one is written from it.
+        std::fs::remove_file(&path).expect("the file goes");
+        let older = where_.path().join(".tcsgui/config.xml");
+        std::fs::write(
+            &older,
+            "<settings><vehicle_pane_percent>30</vehicle_pane_percent></settings>",
+        )
+        .expect("a file");
+        assert_eq!(load().vehicle_percent, 30);
+        assert!(path.exists(), "the value should be carried into the new name");
+        assert_eq!(load().vehicle_percent, 30, "and read from it afterwards");
+        assert!(older.exists(), "the old file is left for its owner to delete");
+
+        // The current name wins where both are there, it being the one that
+        // is written.
+        save(Settings {
+            vehicle_percent: 60,
+        });
+        assert_eq!(load().vehicle_percent, 60);
 
         match was {
             Some(was) => std::env::set_var("HOME", was),

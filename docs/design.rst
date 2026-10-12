@@ -837,14 +837,18 @@ stops where it would orphan something says what it is doing while it does it. A
 node already on the wrong side holds nothing, so one such node cannot freeze
 the control.
 
-Where the divider sits is kept in ``$HOME/.tcsgui/config.xml``, as the
+Where the divider sits is kept in ``$HOME/.tcsgui/preferences.xml``, as the
 percentage of the working pane the vehicle working pane takes -- the vehicle
 working pane being always the left-hand one, so a percentage and that sentence
-are the whole of it. The directory is made automatically, and a settings file
-that is missing, unreadable or hand-edited into nonsense leaves the default
-three quarters in place and says so on the error output: an editor that refused
-to start because it could not remember a pane width would be an editor traded
-for a preference.
+are the whole of it. The file is read when the editor starts and is what places
+the divider; it is written whenever the line is moved. The directory is made
+automatically, and a preferences file that is missing, unreadable or
+hand-edited into nonsense leaves the default three quarters in place and says
+so on the error output: an editor that refused to start because it could not
+remember a pane width would be an editor traded for a preference. The file was
+called ``config.xml`` in one build and is still read under that name when the
+current one is absent, so the rename forgets nothing; the old file is left for
+its owner to delete.
 
 That file and not the configuration, which is the distinction worth stating. A
 node's position is in the configuration because it is part of the diagram --

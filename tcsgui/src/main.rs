@@ -20,6 +20,7 @@
 
 mod document;
 mod editor;
+mod read;
 mod journal;
 mod route;
 mod save;
@@ -132,9 +133,8 @@ fn main() -> Result<(), slint::PlatformError> {
         std::process::exit(2);
     });
 
-    // Recovered rather than opened: if a previous session died, its history is
-    // beside the file and the work comes back with its undo intact.
-    let editor = Rc::new(RefCell::new(Editor::recover(std::path::Path::new(&path))));
+    // The file, or the session that was editing it: see Editor::open.
+    let editor = Rc::new(RefCell::new(Editor::open(std::path::Path::new(&path))));
 
     let ui = MainWindow::new()?;
     ui.set_palette(palette());
@@ -1389,6 +1389,49 @@ mod tests {
 
         dragging_a_node_moves_it();
         a_node_follows_the_pointer_and_reports_where_it_went();
+        an_existing_configuration_is_on_the_canvas();
+    }
+
+    /// Opening a configuration puts it on the canvas.
+    ///
+    /// Which it did not: tcsgui had no reader, so a file that already existed
+    /// opened as an empty canvas -- and the first edit wrote that emptiness
+    /// over the file. Both spellings of the shipped example, because the
+    /// reader has a path for each.
+    fn an_existing_configuration_is_on_the_canvas() {
+        use slint::Model;
+        use std::rc::Rc;
+
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+
+        for extension in ["yaml", "xml"] {
+            let path = root.join(format!("example.{extension}"));
+            let editor = Rc::new(RefCell::new(Editor::open(&path)));
+            assert_eq!(
+                editor.borrow().trouble(),
+                None,
+                "example.{extension} should open without complaint"
+            );
+
+            let ui = MainWindow::new().expect("a window");
+            ui.set_palette(palette());
+            put(&ui, &editor.borrow(), &None, None);
+
+            let names: Vec<String> = (0..ui.get_nodes().row_count())
+                .filter_map(|row| ui.get_nodes().row_data(row))
+                .map(|node| node.name.to_string())
+                .collect();
+            assert_eq!(
+                names,
+                vec!["payload".to_string(), "moc".to_string()],
+                "example.{extension} should put its nodes on the canvas"
+            );
+            assert_eq!(
+                ui.get_links().row_count(),
+                2,
+                "example.{extension} should draw both links"
+            );
+        }
     }
 
     /// Dragging a node moves it, all the way into the document.
@@ -1409,7 +1452,7 @@ mod tests {
         // and a test that wrote into the repository would be a test that
         // rewrote whatever it was pointed at.
         let where_ = tempfile::tempdir().expect("a directory");
-        let editor = Rc::new(RefCell::new(Editor::recover(
+        let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("graph.yaml"),
         )));
         editor.borrow_mut().edit(Edit::AddNode {

@@ -80,6 +80,13 @@ pub struct Command {
 /// The whole of what is being edited.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Document {
+    /// What the configuration says it is, as the file's `description`.
+    ///
+    /// Held so that saving does not drop it. It is a line of the schema rather
+    /// than a comment, so a reader can see it and an editor that wrote the
+    /// file back without it would be deleting something somebody wrote.
+    #[serde(default)]
+    pub description: Option<String>,
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
     /// The groups, by name, each with the interval it reads on.
@@ -549,6 +556,12 @@ impl Document {
         let mut out = String::new();
         out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         out.push_str("<configuration>\n    <version>2.0</version>\n");
+        if let Some(description) = &self.description {
+            out.push_str(&format!(
+                "    <description>{}</description>\n",
+                escape(description)
+            ));
+        }
 
         if home.is_none() {
             for name in self.subdiagrams() {
@@ -656,6 +669,9 @@ impl Document {
     fn to_yaml_for(&self, home: &Home) -> String {
         let mut out = String::new();
         out.push_str("version: \"2.0\"\n");
+        if let Some(description) = &self.description {
+            out.push_str(&format!("description: {}\n", quoted(description)));
+        }
 
         // The subdiagrams this file pulls in, named rather than discovered.
         // Only the top diagram has them: a subdiagram that included another

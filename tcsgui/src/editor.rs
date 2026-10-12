@@ -54,12 +54,23 @@ impl Editor {
         }
     }
 
-    /// Recover a session: the document rebuilt from the journal beside it.
+    /// Open a configuration: the file, or the session that was editing it.
     ///
-    /// The journal is the authority on history, so the document is rebuilt by
-    /// replaying it rather than read back. That way one implementation of what
-    /// an edit means serves the live session, undo, and this.
-    pub fn recover(path: &Path) -> Self {
+    /// Two ways in, and which one is taken follows from what is beside the
+    /// file. A journal there is a session that did not finish -- the editor
+    /// was killed, or the machine was -- and replaying it brings the work back
+    /// with its undo intact, which is the whole reason the journal exists. No
+    /// journal, and the file itself is read: a configuration somebody wrote by
+    /// hand, or one a finished session left.
+    ///
+    /// The journal wins where both are there, because it is the later of the
+    /// two by construction: it is written after every edit, and the file is
+    /// written from the document it describes.
+    ///
+    /// A file that cannot be read is said so and opened as nothing: an editor
+    /// that refused to start on a damaged file would be an editor that cannot
+    /// be used to fix one.
+    pub fn open(path: &Path) -> Self {
         let mut editor = Editor::new(path);
         let journal_path = journal_beside(path);
 
@@ -69,6 +80,14 @@ impl Editor {
                     editor.document.apply(edit);
                 }
                 editor.journal = journal;
+                return editor;
+            }
+        }
+
+        match crate::read::read(path) {
+            Ok(document) => editor.document = document,
+            Err(why) => {
+                editor.trouble = Some(format!("{} cannot be read: {why}", path.display()))
             }
         }
         editor
@@ -247,7 +266,7 @@ mod tests {
             // And the process dies here, with no chance to tidy up.
         }
 
-        let mut recovered = Editor::recover(&path);
+        let mut recovered = Editor::open(&path);
         assert_eq!(
             recovered.document().nodes.len(),
             3,
@@ -372,7 +391,7 @@ mod tests {
         // What a recovery would find: one node and one edit of history, which
         // agree with each other. The second edit is lost, which is what a
         // device that could not be written to costs.
-        let recovered = Editor::recover(&path);
+        let recovered = Editor::open(&path);
         assert_eq!(recovered.document().nodes.len(), 1);
         assert_eq!(recovered.undo_depth(), 1);
     }
@@ -473,7 +492,7 @@ mod tests {
         // And the history is beside it as it is for YAML, so undo reaches past
         // a crash whichever format the configuration is written in.
         editor.edit(add("temp_aft", "i2c"));
-        let recovered = Editor::recover(&path);
+        let recovered = Editor::open(&path);
         assert_eq!(recovered.undo_depth(), 2);
         assert_eq!(recovered.document().nodes.len(), 2);
     }

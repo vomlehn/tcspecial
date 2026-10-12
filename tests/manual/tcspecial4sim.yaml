@@ -48,7 +48,7 @@ simulated_payloads:
   # As fast as it will go, which for a device file means the handler sets the
   # pace: /dev/urandom is never not ready, so there is nothing to wait for.
   - name: random-device
-    type: device
+    type: device-file
     packet_interval_ms: 0
 
   # Twice a second, whole. A simulated bus is a register rather than a

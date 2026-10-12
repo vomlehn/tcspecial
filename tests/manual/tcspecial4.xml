@@ -58,7 +58,7 @@
     </payloads>
     <payloads>
         <name>random-device</name>
-        <type>device</type>
+        <type>device-file</type>
         <path>/dev/urandom</path>
         <packet_size>8</packet_size>
         <oc_address>127.0.0.1</oc_address>

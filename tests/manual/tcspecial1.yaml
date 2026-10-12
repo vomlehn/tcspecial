@@ -68,7 +68,7 @@ payloads:
   - name: random-device
     oc_address: 127.0.0.1
     oc_port: 6002
-    type: device
+    type: device-file
     path: /dev/urandom
     packet_size: 1
 

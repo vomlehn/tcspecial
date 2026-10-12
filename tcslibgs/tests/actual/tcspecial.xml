@@ -36,7 +36,7 @@
     </payloads>
     <payloads>
         <name>device-alone</name>
-        <type>device</type>
+        <type>device-file</type>
         <path>/dev/ttyS0</path>
         <packet_size>64</packet_size>
     </payloads>

@@ -51,7 +51,7 @@ simulated_payloads:
 
   # A device has no transport: it is opened and read.
   - name: random-device
-    type: device
+    type: device-file
     group: continuous
 
   # Twice a second rather than once, so this one states its own rate instead

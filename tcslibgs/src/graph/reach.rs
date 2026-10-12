@@ -256,7 +256,7 @@ fn locators(kind: DHType) -> &'static [&'static str] {
 
 /// Which of the version 1 types this node's type is.
 ///
-/// The type names differ in two places and both are deliberate. `device_file`
+/// The type names differ in two places and both are deliberate. `device-file`
 /// is what version 2 calls a file opened in the filesystem, the word `device`
 /// having meant that and a piece of hardware on a bus at once. And `moc` is a
 /// network link named for what is at the far end of it rather than for how it
@@ -271,7 +271,7 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         "iio" => Ok(DHType::Iio),
         "rpmsg" => Ok(DHType::Rpmsg),
         "gpio" => Ok(DHType::Gpio),
-        "device_file" => Ok(DHType::Device),
+        "device-file" => Ok(DHType::Device),
         "network" | "moc" => Ok(DHType::Network),
         "compute" => Err(format!(
             "\"{}\" is a compute node: it is a computation and not something \
@@ -285,7 +285,7 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         )),
         other => Err(format!(
             "\"{}\": there is no node type called \"{other}\". The interfaces are \
-             i2c, spi, serial, can, iio, rpmsg, gpio, device_file and network; a \
+             i2c, spi, serial, can, iio, rpmsg, gpio, device-file and network; a \
              ground link is moc; and compute and log are the rest",
             node.name
         )),
@@ -569,7 +569,7 @@ mod tests {
 
         let said = reach_of(&node("mystery", "quantum", &[])).expect_err("a type that is not one");
         assert!(
-            said.contains("quantum") && said.contains("device_file"),
+            said.contains("quantum") && said.contains("device-file"),
             "the complaint should list the types there are: {said}"
         );
     }
@@ -646,7 +646,7 @@ mod tests {
             ("temp_fore", "i2c", vec![("address", "0x48")], "path"),
             ("link", "moc", vec![("port", "5000")], "address"),
             ("link", "moc", vec![("address", "10.0.0.1")], "port"),
-            ("file", "device_file", vec![], "path"),
+            ("file", "device-file", vec![], "path"),
             ("bus", "can", vec![("can_id", "0x201")], "interface"),
             ("bus", "can", vec![("interface", "vcan0")], "can_id"),
         ] {
@@ -769,7 +769,7 @@ mod tests {
         // And those three on something that is not a line.
         let said = reach_of(&node(
             "file",
-            "device_file",
+            "device-file",
             &[("path", "/dev/urandom"), ("max_length", "512")],
         ))
         .expect_err("where a read ends, on a file");
@@ -813,7 +813,7 @@ mod tests {
         // part of the value.
         let reach = reach_of(&node(
             "console",
-            "device_file",
+            "device-file",
             &[("path", "/dev/ttyS0"), ("trigger", "\"READ\\r\"")],
         ))
         .expect("a console that is asked");

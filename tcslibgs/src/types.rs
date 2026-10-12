@@ -364,7 +364,7 @@ impl DHType {
     pub fn spelling(&self) -> &'static str {
         match self {
             DHType::Network => "network",
-            DHType::Device => "device",
+            DHType::Device => "device-file",
             DHType::Serial => "serial",
             DHType::I2c => "i2c",
             DHType::Spi => "spi",
@@ -376,6 +376,12 @@ impl DHType {
     }
 
     /// Which kind a file's word names, if it names one.
+    ///
+    /// `device` was what a file in the filesystem used to be called, and is
+    /// not a kind any more: "device" meant that and a piece of hardware on a
+    /// bus at once, which is the one place the two had to be told apart. It
+    /// is left out here rather than quietly accepted, so that a file still
+    /// using it is told the name it has now -- see [`DHType::renamed`].
     pub fn from_spelling(text: &str) -> Option<DHType> {
         [
             DHType::Network,
@@ -405,7 +411,21 @@ impl DHType {
 
     /// Every kind, as a file would write them, for an error to list.
     pub fn spellings() -> String {
-        "network, device, serial, i2c, spi, can, iio, rpmsg, or gpio".to_string()
+        "network, device-file, serial, i2c, spi, can, iio, rpmsg, or gpio".to_string()
+    }
+
+    /// The name this word used to be, for a file that still writes it.
+    ///
+    /// A file written against the older spelling is told the name the thing
+    /// has now rather than being told its word is not a kind, which is what
+    /// `trigger_interval_ms` is told about `packet_interval_ms`: the author of
+    /// such a file wrote something that was right once, and the useful answer
+    /// is the new word and not a list of nine.
+    pub fn renamed(text: &str) -> Option<&'static str> {
+        match text {
+            "device" => Some("device-file"),
+            _ => None,
+        }
     }
 }
 
@@ -1874,7 +1894,17 @@ impl DHConfigJson {
 
         let kind = match dh_type {
             Some(text) => DHType::from_spelling(text).ok_or_else(|| {
-                format!("{text} is not a kind of payload: expected {}", DHType::spellings())
+                match DHType::renamed(text) {
+                    Some(now) => format!(
+                        "{text} is the name a {now} payload used to have, and {now} is \
+                         the name it has now: \"device\" meant a file in the filesystem \
+                         and a piece of hardware on a bus at once"
+                    ),
+                    None => format!(
+                        "{text} is not a kind of payload: expected {}",
+                        DHType::spellings()
+                    ),
+                }
             })?,
             None => return Err("Missing type".to_string()),
         };
@@ -2415,7 +2445,7 @@ mod tests {
         let dh = DHConfigJson {
             name: "DH0".to_string(),
             group: None,
-            dh_type: Some("device".to_string()),
+            dh_type: Some("device-file".to_string()),
             protocol: None,
             address: None,
             port: None,
@@ -2865,7 +2895,7 @@ version: \"1.0\"
 description: a handler stating everything for itself
 payloads:
   - name: DH2
-    type: device
+    type: device-file
     path: /dev/urandom
     packet_size: 1
 ",
@@ -2923,7 +2953,7 @@ version: \"1.0\"
 description: no OC side at all
 payloads:
   - name: DH2
-    type: device
+    type: device-file
     path: /dev/urandom
     packet_size: 1
 ",
@@ -2947,7 +2977,7 @@ description: half an OC address
 payloads:
   - name: DH0
     {line}
-    type: device
+    type: device-file
     path: /dev/urandom
     packet_size: 1
 "
@@ -3081,18 +3111,18 @@ payloads:
             (
                 ConfigFormat::Yaml,
                 "version: \"1.0\"\ndescription: two\npayloads:\n  \
-                 - name: first\n    type: device\n    path: /dev/null\n    \
+                 - name: first\n    type: device-file\n    path: /dev/null\n    \
                  packet_size: 1\n  \
-                 - name: second\n    type: device\n    path: /dev/zero\n    \
+                 - name: second\n    type: device-file\n    path: /dev/zero\n    \
                  packet_size: 2\n"
                     .to_string(),
             ),
             (
                 ConfigFormat::Xml,
                 "<payload><version>1.0</version><description>two</description>\
-                 <payloads><name>first</name><type>device</type>\
+                 <payloads><name>first</name><type>device-file</type>\
                  <path>/dev/null</path><packet_size>1</packet_size></payloads>\
-                 <payloads><name>second</name><type>device</type>\
+                 <payloads><name>second</name><type>device-file</type>\
                  <path>/dev/zero</path><packet_size>2</packet_size></payloads></payload>"
                     .to_string(),
             ),
@@ -3122,7 +3152,7 @@ payloads:
                  address: 0.0.0.0\n{ports}  protocol: udp\n  \
                  beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
                  beacon_interface: 127.0.0.1\npayloads:\n  - \
-                 name: p\n    type: device\n    path: /dev/null\n    \
+                 name: p\n    type: device-file\n    path: /dev/null\n    \
                  packet_size: 1\n"
             )
         };
@@ -3199,7 +3229,7 @@ payloads:
         let with = |version: &str| {
             format!(
                 "version: \"{version}\"\ndescription: one payload\npayloads:\n  \
-                 - name: p\n    type: device\n    path: /dev/null\n    \
+                 - name: p\n    type: device-file\n    path: /dev/null\n    \
                  packet_size: 1\n"
             )
         };
@@ -3263,7 +3293,7 @@ payloads:
     #[test]
     fn a_file_may_not_state_a_position() {
         let text = "version: \"1.0\"\ndescription: one\npayloads:\n  \
-                    - name: first\n    type: device\n    path: /dev/null\n    \
+                    - name: first\n    type: device-file\n    path: /dev/null\n    \
                     packet_size: 1\n    sequence: 7\n";
 
         let message = ConfigFormat::Yaml
@@ -3382,7 +3412,7 @@ payloads:
                 "    type: network\n    protocol: udp\n    address: localhost\n    port: {port}"
             )
         };
-        let device = |path: &str| format!("    type: device\n    path: {path}");
+        let device = |path: &str| format!("    type: device-file\n    path: {path}");
 
         // The same host and port, written two ways: localhost and 127.0.0.1
         // are one host, so naming it differently does not make it a different
@@ -3558,7 +3588,7 @@ version: \"1.0\"
 description: a device stating network attributes
 payloads:
   - name: DH0
-    type: device
+    type: device-file
     path: /dev/urandom
     protocol: udp
     address: localhost
@@ -3610,7 +3640,7 @@ payload_groups:
 payloads:
   - name: DH0
     group: udp_localhost
-    type: device
+    type: device-file
     path: /dev/urandom
     packet_size: 1
 ",
@@ -4010,7 +4040,7 @@ payloads:
             "rs485: true",
         ] {
             let said = link(
-                "device",
+                "device-file",
                 &format!("    path: /dev/urandom\n    packet_size: 1\n    {term}\n"),
             )
             .expect("it parses")
@@ -4018,7 +4048,7 @@ payloads:
             .expect_err("a device file is not a link");
             let field = term.split(':').next().expect("a term");
             assert!(
-                said.contains(field) && said.contains("device payload"),
+                said.contains(field) && said.contains("device-file payload"),
                 "the error should name the term and the kind: {said}"
             );
 
@@ -4067,7 +4097,7 @@ payloads:
     fn a_link_term_from_a_group_names_the_group() {
         let text = "version: \"1.0\"\ndescription: a device in a serial group\n\
                     payload_groups:\n  - name: lines\n    datarate: 9600\n\
-                    payloads:\n  - name: p\n    type: device\n    group: lines\n    \
+                    payloads:\n  - name: p\n    type: device-file\n    group: lines\n    \
                     path: /dev/urandom\n    packet_size: 1\n";
         let said = ConfigFormat::Yaml
             .parse::<PayloadConfig>(text)
@@ -4450,7 +4480,7 @@ payloads:
     #[test]
     fn an_interface_is_refused_on_a_kind_that_is_not_a_can_bus() {
         let said = link(
-            "device",
+            "device-file",
             "    path: /dev/urandom\n    packet_size: 1\n    interface: vcan0\n",
         )
         .expect("it parses")
@@ -4738,7 +4768,7 @@ payloads:
         // A packet of no bytes is not a packet. Every kind of payload is
         // asked, because the size is one every kind states.
         for (kind, rest) in [
-            ("device", "    path: /dev/null\n"),
+            ("device-file", "    path: /dev/null\n"),
             (
                 "network",
                 "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n",
@@ -4895,7 +4925,7 @@ payloads:
         // that gives them one is told, rather than having the section read
         // and dropped.
         for (kind, rest) in [
-            ("device", "    path: /dev/null\n"),
+            ("device-file", "    path: /dev/null\n"),
             (
                 "network",
                 "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n",

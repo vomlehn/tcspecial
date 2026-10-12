@@ -92,7 +92,7 @@ fn the_actual_file_has_expected_contents() {
     // A handler in no group states everything itself.
     let device = &config.payloads[1];
     assert_eq!(device.group, None);
-    assert_eq!(device.dh_type.as_deref(), Some("device"));
+    assert_eq!(device.dh_type.as_deref(), Some("device-file"));
     assert_eq!(device.path.as_deref(), Some("/dev/ttyS0"));
     assert_eq!(device.port, None);
 }
@@ -160,7 +160,7 @@ payload_groups:
     protocol: udp
     address: localhost
   - name: dup
-    type: device
+    type: device-file
     path: /dev/null
 payloads:
   - name: DH0
@@ -233,7 +233,7 @@ fn a_tcspecial_section_that_could_never_be_used_is_refused() {
 description: a set whose tcspecial section is wrong
 payloads:
   - name: DH0
-    type: device
+    type: device-file
     path: /dev/null
     packet_size: 1
 tcspecial:

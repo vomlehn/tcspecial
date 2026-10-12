@@ -263,11 +263,11 @@ tcspecial:
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH0
-    type: device
+    type: device-file
     path: /dev/null
     packet_size: 1
   - name: DH1
-    type: device
+    type: device-file
     path: /dev/zero
     packet_size: 2
 ";
@@ -309,11 +309,11 @@ payloads:
         let moved = "\
 payloads:
   - name: DH0
-    type: device
+    type: device-file
     path: /dev/null
     packet_size: 1
   - name: DH1
-    type: device
+    type: device-file
     path: /dev/zero
     packet_size: 2
 description: a set
@@ -334,8 +334,8 @@ version: \"1.0\"
     #[test]
     fn the_order_of_attributes_does_not_matter() {
         let shuffled = YAML.replace(
-            "  - name: DH0\n    type: device\n    path: /dev/null\n    packet_size: 1\n",
-            "  - packet_size: 1\n    path: /dev/null\n    type: device\n    name: DH0\n",
+            "  - name: DH0\n    type: device-file\n    path: /dev/null\n    packet_size: 1\n",
+            "  - packet_size: 1\n    path: /dev/null\n    type: device-file\n    name: DH0\n",
         );
         assert_ne!(shuffled, YAML, "the test did not shuffle anything");
         assert_eq!(digest(&shuffled), digest(YAML));
@@ -358,11 +358,11 @@ tcspecial:
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH1
-    type: device
+    type: device-file
     path: /dev/zero
     packet_size: 2
   - name: DH0
-    type: device
+    type: device-file
     path: /dev/null
     packet_size: 1
 ";
@@ -411,11 +411,11 @@ tcspecial:
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH1
-    type: device
+    type: device-file
     path: /dev/zero
     packet_size: 2
   - name: DH0
-    type: device
+    type: device-file
     path: /dev/null
     packet_size: 1
 ";

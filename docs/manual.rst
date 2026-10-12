@@ -385,7 +385,7 @@ asking are different things -- and a handler goes on asking through either.
 
 A Network Payload
 -----------------
-``type: network``. A socket, which the transport decides the shape of.
+Keyword ``type: network``. A socket, which the transport decides the shape of.
 
 .. code-block:: text
 
@@ -401,9 +401,10 @@ the handler reaches out and may ask the payload for data, while a datagram
 handler waits to be spoken to and learns where its payload is from the first
 packet that arrives.
 
-A Device Payload
-----------------
-``type: device``. A file in the filesystem, opened and read as the data comes.
+A Device File Payload
+---------------------
+Keyword ``type: device-file``. A file in the filesystem, opened and read as
+the data comes.
 
 .. code-block:: text
 
@@ -419,9 +420,9 @@ own, which is why each has a type of its own below.
 
 A CAN Payload
 -------------
-``type: can``. **Experimental, not yet supported.** A payload on a CAN bus,
-which is not a device file at all: a CAN controller is a network interface,
-and a payload on it is addressed by the identifier its frames carry.
+Keyword ``type: can``. **Experimental, not yet supported.** A payload on a CAN
+bus, which is not a device file at all: a CAN controller is a network
+interface, and a payload on it is addressed by the identifier its frames carry.
 
 .. code-block:: text
 
@@ -492,9 +493,9 @@ prints in the angle brackets:
 
 A GPIO Payload
 --------------
-``type: gpio``. **Experimental, not yet supported.** A set of discrete lines
--- a deployment switch, an arming line, a payload's own "alive" line -- watched
-for changes, or a set of circuits driven: a heater, a valve, a latch.
+Keyword ``type: gpio``. **Experimental, not yet supported.** A set of discrete
+lines -- a deployment switch, an arming line, a payload's own "alive" line --
+watched for changes, or a set of circuits driven: a heater, a valve, a latch.
 
 .. code-block:: text
 
@@ -554,10 +555,10 @@ packet interval.
 
 An rpmsg Payload
 ----------------
-``type: rpmsg``. **Experimental, not yet supported.** Software on another core
-of the same package -- a real-time core beside the Linux one -- reached over
-an rpmsg channel, which Linux presents as a character device carrying whole
-messages both ways.
+Keyword ``type: rpmsg``. **Experimental, not yet supported.** Software on
+another core of the same package -- a real-time core beside the Linux one --
+reached over an rpmsg channel, which Linux presents as a character device
+carrying whole messages both ways.
 
 .. code-block:: text
 
@@ -588,7 +589,7 @@ payload writes faster than the handler reads.
 
 An IIO Payload
 --------------
-``type: iio``. **Experimental, not yet supported.** A sensor's buffered
+Keyword ``type: iio``. **Experimental, not yet supported.** A sensor's buffered
 samples, read from a character device: what a thermistor, an accelerometer or
 an ADC looks like on Linux.
 
@@ -629,8 +630,8 @@ why the scripts go by name and not by number.
 
 A Serial Payload
 ----------------
-``type: serial``. A line, with terms that say how it is driven. A payload
-states them beside everything else it states, or takes them from its
+Keyword ``type: serial``. A line, with terms that say how it is driven. A
+payload states them beside everything else it states, or takes them from its
 ``payload_groups`` group the way it takes the rest.
 
 .. code-block:: text
@@ -746,9 +747,9 @@ supported types; ``tcspecial4.xml`` is the same set in the other format.
 
 An I\ :superscript:`2`\ C Payload
 ---------------------------------
-``type: i2c``. A device on a bus, which is why it gives two things to be found
-by: the bus and the address on it. Two payloads commonly sit on the same bus
-and differ only in which device the master addresses.
+Keyword ``type: i2c``. A device on a bus, which is why it gives two things to
+be found by: the bus and the address on it. Two payloads commonly sit on the
+same bus and differ only in which device the master addresses.
 
 .. code-block:: text
 
@@ -797,7 +798,7 @@ afterwards: ``./bin/mki2c 0x50`` reloads it with a chip there.
 
 A SPI Payload
 -------------
-``type: spi``. A peripheral on a clocked, full-duplex link.
+Keyword ``type: spi``. A peripheral on a clocked, full-duplex link.
 
 .. code-block:: text
 
@@ -829,15 +830,17 @@ otherwise produces a payload that looks configured and is not:
   two payloads from one entry. The rule reaches no further than the file --
   two sets may name their payloads and their groups alike, and the shipped
   examples do.
-* An **attribute of another type** -- a device payload stating ``protocol``,
-  ``address`` or ``port``, or a network payload stating ``path``. The check is
+* An **attribute of another type** -- a device file payload stating
+  ``protocol``, ``address`` or ``port``, or a network payload stating
+  ``path``. The check is
   made after the group has been laid under the payload, since an attribute
   inherited from a group reaches the payload just as one it states itself
   does: a payload of one type joining a group written for another is what this
   catches, and the error names the group when the group is where the attribute
   came from.
 * A **term of a link on a type that is not on one**: a ``datarate`` or a
-  ``spi_mode`` or a set of ``lines`` on a network or device payload. Each type
+  ``spi_mode`` or a set of ``lines`` on a network or device file payload. Each
+  type
   that *is* on a link refuses what belongs to another type as its own terms are
   read, and those two types have no terms of their own to read -- so a term
   written on one of them used to be taken in and dropped, which is a payload
@@ -909,7 +912,7 @@ in the MOC shows.
      - name: random-device
        oc_address: 127.0.0.1
        oc_port: 6002
-       type: device
+       type: device-file
        path: /dev/urandom
        packet_size: 1
 
@@ -919,6 +922,64 @@ in the MOC shows.
        group: udp_localhost
        port: 5003
        packet_size: 15
+
+The same set in the other format is the shipped ``tcspecial1.xml``. It
+describes the same four payloads and the same group, by the conventions of
+`Configuration File Formats`_ -- every value a child element, a sequence as
+repeated siblings, an absent optional field simply left out:
+
+.. code-block:: xml
+
+   <?xml version="1.0" encoding="UTF-8"?>
+   <payload>
+       <version>1.0</version>
+       <description>TCSpecial payload set 1</description>
+       <payload_groups>
+           <name>udp_localhost</name>
+           <type>network</type>
+           <protocol>udp</protocol>
+           <address>localhost</address>
+       </payload_groups>
+       <payloads>
+           <name>tcp-stream</name>
+           <oc_address>127.0.0.1</oc_address>
+           <oc_port>6000</oc_port>
+           <type>network</type>
+           <protocol>tcp</protocol>
+           <address>localhost</address>
+           <port>5000</port>
+           <packet_size>12</packet_size>
+       </payloads>
+       <payloads>
+           <name>udp-steady</name>
+           <oc_address>127.0.0.1</oc_address>
+           <oc_port>6001</oc_port>
+           <group>udp_localhost</group>
+           <port>5001</port>
+           <packet_size>11</packet_size>
+       </payloads>
+       <payloads>
+           <name>random-device</name>
+           <oc_address>127.0.0.1</oc_address>
+           <oc_port>6002</oc_port>
+           <type>device-file</type>
+           <path>/dev/urandom</path>
+           <packet_size>1</packet_size>
+       </payloads>
+       <payloads>
+           <name>udp-fast</name>
+           <oc_address>127.0.0.1</oc_address>
+           <oc_port>6003</oc_port>
+           <group>udp_localhost</group>
+           <port>5003</port>
+           <packet_size>15</packet_size>
+       </payloads>
+   </payload>
+
+Both files are shipped and either may be run. The YAML is the one to read,
+being the one that carries the comments; what the two have in common is
+checked by a test, so an example that drifted in one format would fail the
+build rather than mislead a reader.
 
 Not Yet Read
 ------------
@@ -1214,7 +1275,7 @@ This is the shipped ``tcspecial1sim.yaml``.
        group: steady_1hz
 
      - name: random-device
-       type: device
+       type: device-file
        group: continuous
 
      - name: udp-fast
@@ -1298,10 +1359,24 @@ disturbing the others, or watched with its own logging.
 ``make run`` passes only the tcspecial configuration: tcspecial does not
 simulate anything. ``make runsim`` passes both, because tcssim run on its own
 needs the payloads as well as the simulator configuration -- and one variable
-names both, so
-they cannot be given for different sets.
-Started in that order, tcsmoc finds the tcspecial already running and attaches
-to it.
+names both, so they cannot be given for different sets. Started in that order,
+tcsmoc finds the tcspecial already running and attaches to it.
+
+``make runmocy`` runs tcsmoc on the YAML spelling of the set and
+``make runmocx`` on the XML:
+
+.. code-block:: console
+
+   $ make runmocx TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1
+
+One target per spelling rather than one target and a variable, so that a
+spelling is asked for the way everything else here is asked for -- by name,
+with nothing to remember about which variable selects it. The two are
+otherwise the same target. A set is transcribed by hand into the other format,
+so running the one you have not run lately is how the transcription gets
+exercised; the simulator configuration is YAML in both cases, there being only
+one of it, and ``make runverifyy`` and ``make runverifyx`` check the two
+spellings the same way.
 
 Checking a set without running it
 ---------------------------------
@@ -1326,7 +1401,7 @@ the file, the line and what is wrong there:
 
    $ cargo run --bin tcsverify -- /tmp/draft.yaml
    /tmp/draft.yaml:61: payload "udp-steady": packet_size must be greater than zero
-   /tmp/draft.yaml:68: payload "random-device" is a device payload, so port does not apply to it
+   /tmp/draft.yaml:68: payload "random-device" is a device-file payload, so port does not apply to it
 
 It exits 0 when nothing is wrong, 1 when something is, and 2 when the command
 line is neither of those two shapes -- which a script can tell apart from a
@@ -1358,6 +1433,25 @@ What the programs take without the Makefile
        cargo run --bin tcssim -- tests/manual/tcspecial1.yaml
    $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
        cargo run --bin tcsmoc -- tests/manual/tcspecial1.yaml
+
+Every tcspecial configuration above may end in ``.xml`` instead, and the same
+commands then run the same set in the other format:
+
+.. code-block:: console
+
+   $ cargo run --bin tcspecial -- tests/manual/tcspecial1.xml
+   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
+       cargo run --bin tcssim -- tests/manual/tcspecial1.xml
+   $ PAYLOAD_SIM_YAML=tests/manual/tcspecial1sim.yaml \
+       cargo run --bin tcsmoc -- tests/manual/tcspecial1.xml
+
+The extension is what says how to read a file -- see `Configuration File
+Formats`_ -- and it is read rather than guessed at, so a name ending in
+neither is refused rather than parsed as whichever the program tried first.
+The simulator configuration is YAML in these examples because
+``PAYLOAD_SIM_YAML`` names a file whose extension says the same thing: a
+simulator configuration may be XML as well, and the variable's name is older
+than that.
 
 An argument naming the configuration file beats any environment variable
 naming one.

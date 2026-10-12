@@ -270,7 +270,7 @@ tcspecial:
 
 payload_groups:
   - name: shared
-    type: device
+    type: device-file
 
 payloads:
   - name: DH0
@@ -278,7 +278,7 @@ payloads:
     packet_size: 1
 
   - name: \"DH1\"
-    type: device
+    type: device-file
     path: /dev/zero
     packet_size: 1
 ";
@@ -334,7 +334,7 @@ simulated_payload_groups:
 
 simulated_payloads:
   - name: DH0
-    type: device
+    type: device-file
     group: steady
 ";
         let found = Where::of(text, ConfigFormat::Yaml);

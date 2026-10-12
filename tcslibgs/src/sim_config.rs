@@ -1407,7 +1407,7 @@ simulated_payloads:
 
         // A device has no address at all.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
              packet_interval_ms: 0\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
@@ -1538,7 +1538,7 @@ simulated_payloads:
     #[test]
     fn the_two_files_cannot_disagree_about_the_kind() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
              packet_interval_ms: 1000\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
@@ -1579,7 +1579,7 @@ simulated_payloads:
     #[test]
     fn only_a_network_payload_has_a_transport() {
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
              protocol: udp\n    packet_interval_ms: 0\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
@@ -1591,7 +1591,7 @@ simulated_payloads:
         // And a device that states none resolves, which is the whole of what
         // a device has to say about how it is reached.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device\n    packet_interval_ms: 0\n",
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval_ms: 0\n",
         );
         file.resolve(&[device("DH0")]).expect("a device needs no transport");
     }
@@ -1821,7 +1821,7 @@ simulated_payloads:
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device\n    packet_interval_ms: 1000\n",
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval_ms: 1000\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
@@ -1834,7 +1834,7 @@ simulated_payloads:
         // the segment settings still apply, since how a payload divides an
         // answer is its own business.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device\n    segment_size: 2\n",
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    segment_size: 2\n",
         );
         let resolved = file
             .resolve(&[triggered("DH0")])
@@ -1970,7 +1970,7 @@ simulated_payloads:
             "
 simulated_payloads:
   - name: DEV
-    type: device
+    type: device-file
     packet_interval_ms: 0
 ",
         );

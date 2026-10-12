@@ -156,7 +156,7 @@ node
     of type:
 
     *devices* -- ``i2c``, ``spi``, ``serial``, ``can``, ``gpio``, ``iio``,
-    ``rpmsg``, ``network``, ``device_file`` -- which are the interfaces real
+    ``rpmsg``, ``network``, ``device-file`` -- which are the interfaces real
     hardware arrives on. Each is what used to be called a payload endpoint, and
     the attributes are unchanged: a bus and an address, a chip and a set of
     lines, a path.
@@ -267,7 +267,7 @@ Requirement
 The logging node
 ----------------
 
-``type: log`` records what reaches it, built on ``tcslog`` -- the same library
+Keyword ``type: log`` records what reaches it, built on ``tcslog`` -- the same library
 the telemetry log already uses, so a log node is a generalisation of something
 the software does rather than a new mechanism to trust. Two attributes:
 
@@ -2629,7 +2629,7 @@ Requirement
     ``auto-send``.
 
 Requirement
-    An attribute of another type of payload is an error. A device payload
+    An attribute of another type of payload is an error. A device file payload
     stating a protocol, an address or a port, or a network payload stating a
     path, has written something nothing will read -- and a payload that looks
     configured and is not is worse than one that is refused. A link's own
@@ -2711,8 +2711,8 @@ Requirement
     network address and a plain device file. Every other type refuses what
     belongs to another type as its own rules are asked, and these two have no
     rules to ask -- so a term written on one of them was read and dropped. A
-    device payload could state a data rate, or a sensor's channels, and be
-    read as a device payload that had said nothing of the sort: a
+    device file payload could state a data rate, or a sensor's channels, and be
+    read as a device file payload that had said nothing of the sort: a
     misspelling that configured nothing and reported nothing. A network
     payload's ``protocol`` is a term of its own type and is allowed.
 
@@ -3457,7 +3457,7 @@ is what a panel in the MOC shows.
      - name: random-device
        oc_address: 127.0.0.1
        oc_port: 6002
-       type: device
+       type: device-file
        path: /dev/urandom
        packet_size: 1
 
@@ -3820,7 +3820,7 @@ states its own rate instead.
        group: steady_1hz
 
      - name: random-device
-       type: device
+       type: device-file
        group: continuous
 
      - name: udp-fast

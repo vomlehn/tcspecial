@@ -43,6 +43,6 @@ payloads:
     port: 5000
   # States every attribute for itself, naming no group.
   - name: device-alone
-    type: device
+    type: device-file
     path: /dev/ttyS0
     packet_size: 64

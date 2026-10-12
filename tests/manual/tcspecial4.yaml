@@ -86,7 +86,7 @@ payloads:
   # a source of bytes, so there is nothing for tcssim to make and nothing for
   # it to link.
   - name: random-device
-    type: device
+    type: device-file
     path: /dev/urandom
     packet_size: 8
     oc_address: 127.0.0.1

@@ -177,7 +177,7 @@ impl NodeType {
             NodeType::Iio => "iio",
             NodeType::Rpmsg => "rpmsg",
             NodeType::Network => "network",
-            NodeType::DeviceFile => "device_file",
+            NodeType::DeviceFile => "device-file",
             NodeType::Gpio => "gpio",
             NodeType::Compute => "compute",
             NodeType::Log => "log",

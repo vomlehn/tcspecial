@@ -570,7 +570,7 @@ version: \"1.0\"
 description: two payloads
 payloads:
   - name: DH0
-    type: device
+    type: device-file
     path: /dev/zero
     packet_size: 4
   - name: DH1
@@ -586,7 +586,7 @@ version: \"1.0\"
 description: settings
 simulated_payloads:
   - name: DH0
-    type: device
+    type: device-file
     packet_interval_ms: 1000
   - name: DH1
     type: network
@@ -622,13 +622,13 @@ version: \"1.0\"
 description: three bad payloads
 payloads:
   - name: no_size
-    type: device
+    type: device-file
     path: /dev/zero
   - name: no_path
-    type: device
+    type: device-file
     packet_size: 4
   - name: bad_kind
-    type: device
+    type: device-file
     path: /dev/null
     port: 5000
     packet_size: 4
@@ -769,10 +769,10 @@ version: \"1.0\"
 description: settings
 simulated_payloads:
   - name: DH0
-    type: device
+    type: device-file
     packet_interval_ms: 1000
   - name: nobody
-    type: device
+    type: device-file
     packet_interval_ms: 1000
 ";
         let set = written(".yaml", GOOD, sim);
@@ -819,7 +819,7 @@ simulated_payloads:
         let set = written(
             ".yaml",
             &text,
-            "simulated_payloads:\n  - name: DH0\n   type: device\n",
+            "simulated_payloads:\n  - name: DH0\n   type: device-file\n",
         );
         let report = verify(&set.payload, Some(&set.sim));
         assert!(
@@ -837,7 +837,7 @@ simulated_payloads:
         let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
         for id in 0..150 {
             text.push_str(&format!(
-                "  - name: DH{id}\n    type: device\n    \
+                "  - name: DH{id}\n    type: device-file\n    \
                  path: /dev/null{id}\n    port: 1\n    packet_size: 4\n"
             ));
         }
@@ -867,7 +867,7 @@ simulated_payloads:
         let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
         for id in 0..ERROR_LIMIT {
             text.push_str(&format!(
-                "  - name: DH{id}\n    type: device\n    \
+                "  - name: DH{id}\n    type: device-file\n    \
                  path: /dev/null{id}\n    port: 1\n    packet_size: 4\n"
             ));
         }

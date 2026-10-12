@@ -52,7 +52,7 @@
         <name>random-device</name>
         <oc_address>127.0.0.1</oc_address>
         <oc_port>6002</oc_port>
-        <type>device</type>
+        <type>device-file</type>
         <path>/dev/urandom</path>
         <packet_size>1</packet_size>
     </payloads>

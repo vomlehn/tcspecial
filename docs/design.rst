@@ -2469,31 +2469,40 @@ Requirement
     file asking for it is refused rather than left to fail as silence.
 
 A trigger is bytes rather than text: a payload's interface document asks for
-what it asks for, and that is as likely to be ``0x55AA`` as ``READ\r``.
+what it asks for, and that is as likely to be ``55 AA`` as ``"READ\r"``.
 
 Requirement
-    A trigger is written in hexadecimal after ``0x``, or as a string in C's
-    notation. Two digits to a byte, in either case of a-f, with spaces or
-    underscores allowed between bytes so that a long trigger can be compared
-    against an interface document without counting digits.
+    A trigger is written as a list of hexadecimal values separated by spaces,
+    or as a string in C's notation. One or two digits is one byte -- ``5`` and
+    ``05`` are the same byte, a datasheet writing either -- and three or four
+    digits is two bytes, most significant first: the order it is written in,
+    and the order every other multi-byte quantity in this project uses. A
+    value of more digits than that is refused, which of its digits pair with
+    which not being something to decide for a file.
 
 Requirement
-    A series of bytes is written without quotes, and a trigger that is text
-    with them: a series of bytes is no more a string than a port number is,
-    and the quotes a C string needs are what its escapes are written inside.
-    This is a convention for writing the file rather than a rule a program
-    enforces -- every format hands the same string over whichever way the
-    value was written, so the quotes are not there to be read. What makes the
-    quote-free spelling safe is that YAML's core schema does not read
-    ``0x55AA`` as a number: the digits arrive as written, leading zeros and
-    all, so ``0x0D0A`` is two bytes rather than a number that has forgotten
-    one of them.
+    There is no ``0x`` on a value. A trigger is a list of byte values and
+    nothing else, so a prefix saying "this is hexadecimal" would be saying it
+    once per value for a notation with no alternative. A file written for the
+    older spelling, which had one, is told so by name rather than being
+    refused for the ``x``: an error about a digit says nothing about what to
+    write instead.
 
 Requirement
-    Which notation a value is in follows from its first two characters and
-    nothing else. ``52 45`` is a plausible pair of bytes and a plausible pair
-    of digits, so a file that meant one and got the other would send something
-    nobody asked for; the ``0x`` says which.
+    Which notation a value is in follows from its first character and nothing
+    else: a quote opens a C string, and anything else is a list of values.
+    ``52 45`` is a plausible pair of bytes and a plausible pair of digits, so
+    something has to say which, and a file that meant one and got the other
+    would send something nobody asked for.
+
+Requirement
+    The quotes of a C string are part of the value rather than part of the way
+    the file is written, since they are the mark that says which notation it
+    is. So a YAML file writes them inside its own -- ``'"READ\r"'`` -- and an
+    XML one as ``<trigger>&quot;READ\r&quot;</trigger>``. A value whose quotes
+    belong only to the format, such as ``"55 AA"``, arrives as ``55 AA`` and
+    is read as the two bytes it is. A string that opens and does not close is
+    refused rather than taken for a list of values.
 
 Requirement
     A C string's escapes are C's own -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``

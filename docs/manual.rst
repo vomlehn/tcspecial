@@ -300,32 +300,45 @@ one name, in the place the payload's type puts it. It was
 has now.
 
 **The trigger itself** is bytes, not text, since an interface document asks
-for what it asks for. A series of bytes is written in hexadecimal after
-``0x``, two digits to a byte, in either case, with spaces or underscores
-allowed between bytes -- and **without quotes**, a series of bytes being no
-more a string than a port number is::
+for what it asks for. A series of bytes is written as a list of values
+separated by spaces, in hexadecimal, in either case. One or two digits is one
+byte -- ``5`` and ``05`` are the same byte -- and three or four digits is two
+bytes, most significant first, which is both the order it is written in and
+the order every other multi-byte quantity in this project uses::
 
-   trigger: 0x55AA
-   trigger: 0x55 AA 0F
-   trigger: 0x0D0A
+   trigger: 55 AA 0F
+   trigger: 0D 0A
+   trigger: 03 0400
 
-A trigger that is text is written as a string in C's notation, in quotes,
-which is what its escapes need -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
+There is no ``0x`` on any of them. A trigger is a list of byte values and
+nothing else, so a prefix saying "this is hexadecimal" would be saying it once
+per value for a notation that has no alternative. A file that writes one is
+told so by name rather than having ``0x55`` read as something.
+
+A trigger that is text is written as a string in C's notation, **quotes and
+all**, which is what its escapes need -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
 ``\t`` ``\0`` ``\a`` ``\b`` ``\f`` ``\v`` and ``\xNN``::
 
-   trigger: "READ\r"
+   trigger: '"READ\r"'
+   trigger: '"\x02ARM\x03"'
 
-Which of the two a value is in follows from its first two characters and
-nothing else: ``52 45`` is a plausible pair of bytes and a plausible pair of
-digits, so the ``0x`` is what says which. The quotes themselves are a
-convention for writing the file and not a rule the programs enforce -- every
-format hands the same string over whichever way it was written, so a quoted
-``"0x55AA"`` is read as the same two bytes.
+Which of the two a value is in follows from its first character and nothing
+else: a quote opens a C string, and anything else is a list of values.
+``52 45`` is a plausible pair of bytes and a plausible pair of digits, so
+something has to say which, and the quote is it.
 
-An escape C does not have is refused rather than passed through, and a trigger
-of no bytes at all is refused: a payload that answers requests has to be asked
-something. Writing the escapes yourself is also how an XML configuration
-states a trigger that a YAML one states with the format's own escapes.
+The quotes are therefore part of the **value** rather than part of the way the
+file is written, which is why a YAML trigger of text is written inside the
+format's own quotes -- ``'"READ\r"'`` -- and an XML one as
+``<trigger>&quot;READ\r&quot;</trigger>``. A value whose quotes belong to the
+format alone, such as ``"55 AA"``, arrives here as ``55 AA`` and is read as
+the two bytes it is.
+
+An escape C does not have is refused rather than passed through, a string that
+opens and does not close is refused, and a trigger of no bytes at all is
+refused: a payload that answers requests has to be asked something. Writing
+the escapes yourself is also how an XML configuration states a trigger that a
+YAML one states with the format's own escapes.
 
 .. code-block:: yaml
 
@@ -351,7 +364,7 @@ states a trigger that a YAML one states with the format's own escapes.
        port: 5001
        packet_size: 12
        mode: triggered
-       trigger: "READ\r"        # or 0x52 45 41 44 0D, the same bytes
+       trigger: '"READ\r"'      # or 52 45 41 44 0D, the same bytes
        packet_interval_ms: 500
 
 A file that mixes the two is refused rather than run, in either direction: a

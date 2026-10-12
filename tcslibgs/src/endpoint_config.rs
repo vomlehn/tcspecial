@@ -529,6 +529,18 @@ impl<'de> Deserialize<'de> for Scalar {
 #[derive(Debug, Clone)]
 pub struct ByteList(Vec<String>);
 
+impl ByteList {
+    /// The bytes this text lists, as a file would have written them: commas
+    /// or spaces between them, decimal or `0x`.
+    ///
+    /// For a caller building a configuration rather than reading one -- a
+    /// version 2 node states its terminators as one attribute, where a
+    /// version 1 file could state them as a list.
+    pub fn of(text: &str) -> ByteList {
+        ByteList(split_list(text))
+    }
+}
+
 /// Compared and written out as the values it holds, for the reason
 /// [`Scalar`] is.
 impl PartialEq for ByteList {

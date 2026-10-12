@@ -1078,8 +1078,21 @@ pub(crate) fn link_params_of(
     stated: &DHConfigJson,
     group: Option<&DHGroupJson>,
 ) -> Result<crate::endpoint_config::GroupKind, String> {
-    let wire = link_terms_of(stated, group);
+    kind_of_terms(name, kind, link_terms_of(stated, group))
+}
 
+/// What the rules for `kind` make of these terms.
+///
+/// Apart from [`link_params_of`] because the terms arrive from two schemas
+/// now: a version 1 payload and the group it names state them between them,
+/// and a version 2 node states them as its attributes -- see
+/// [`crate::graph::reach`]. The rules themselves are asked here, once, so
+/// that the two schemas cannot come to be read differently.
+pub(crate) fn kind_of_terms(
+    name: &str,
+    kind: DHType,
+    wire: crate::endpoint_config::LinkTerms,
+) -> Result<crate::endpoint_config::GroupKind, String> {
     match kind {
         DHType::Serial => crate::node::serial::group_kind_of(name, wire),
         DHType::I2c => crate::node::i2c::group_kind_of(name, wire),

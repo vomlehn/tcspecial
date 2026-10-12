@@ -22,10 +22,8 @@ version: "1.0"
 description: TCSpecial payload set 4
 
 tcspecial:
-  address: 0.0.0.0
-  port: 4000
+  command_interface: 0.0.0.0:4000
   payload_port: 4001
-  protocol: udp
   beacon_interval_ms: 5000
   beacon_address: "239.255.0.1:5550"
   beacon_interface: "127.0.0.1"

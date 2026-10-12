@@ -121,7 +121,6 @@ pub mod constants {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tcslibgs::NetworkProtocol;
     use tempfile::Builder;
 
     /// Write `text` to a temporary file with the given extension, so that
@@ -133,16 +132,13 @@ mod tests {
         load_tcspecial_config(file.path())
     }
 
-    const YAML: &str = "address: 0.0.0.0\nport: 4000\npayload_port: 4001\n\
-                        protocol: udp\n\
+    const YAML: &str = "command_interface: 0.0.0.0:4000\npayload_port: 4001\n\
                         beacon_interval_ms: 5000\nbeacon_address: 239.255.0.1:5550\n\
                         beacon_interface: 127.0.0.1\n";
 
     const XML: &str = "<tcspecial>\
-        <address>0.0.0.0</address>\
-        <port>4000</port>\
+        <command_interface>0.0.0.0:4000</command_interface>\
         <payload_port>4001</payload_port>\
-        <protocol>udp</protocol>\
         <beacon_interval_ms>5000</beacon_interval_ms>\
         <beacon_address>239.255.0.1:5550</beacon_address>\
         <beacon_interface>127.0.0.1</beacon_interface>\
@@ -154,10 +150,10 @@ mod tests {
             let config = load_from(ext, text)
                 .unwrap_or_else(|e| panic!("{ext} failed to load: {e}"));
 
+            // The one attribute becomes an address and a port.
             assert_eq!(config.address, "0.0.0.0", "{ext}");
             assert_eq!(config.port, 4000, "{ext}");
             assert_eq!(config.payload_port, 4001, "{ext}");
-            assert_eq!(config.protocol, NetworkProtocol::Udp, "{ext}");
             assert_eq!(config.beacon_interval.0, 5000, "{ext}");
             // Absent in every actual input, so the serde defaults must apply.
             assert_eq!(config.log_dir, None, "{ext}");
@@ -211,10 +207,8 @@ mod tests {
         assert_eq!(from_the_file.beacon_address.to_string(), "239.255.0.9:5550");
 
         let section = |beacon: &str| CIConfigJson {
-            address: "0.0.0.0".to_string(),
-            port: 4000,
+            command_interface: "0.0.0.0:4000".to_string(),
             payload_port: 4001,
-            protocol: "udp".to_string(),
             beacon_interval_ms: 5000,
             beacon_address: beacon.to_string(),
             beacon_interface: "127.0.0.1".to_string(),
@@ -297,9 +291,23 @@ mod tests {
     }
 
     #[test]
-    fn test_bad_protocol_is_rejected() {
-        let bad = YAML.replace("protocol: udp", "protocol: carrier-pigeon");
-        assert!(load_from(".yaml", &bad).is_err());
+    fn a_command_interface_that_is_not_one_is_rejected() {
+        // There is no protocol to get wrong any more -- the link between
+        // tcspecial and the ground is UDP, so nothing states it -- and the
+        // command interface took its place as the value that can be written
+        // wrongly: half of it, or a port that is not one.
+        for instead in [
+            "command_interface: 0.0.0.0",
+            "command_interface: 0.0.0.0:nought",
+            "command_interface: :4000",
+        ] {
+            let bad = YAML.replace("command_interface: 0.0.0.0:4000", instead);
+            assert_ne!(bad, YAML, "the test changed nothing");
+            assert!(
+                load_from(".yaml", &bad).is_err(),
+                "{instead} was accepted"
+            );
+        }
     }
 
     // -- tcspecial configurations ------------------------------------------------------

@@ -669,10 +669,8 @@ mod tests {
     /// the shipped examples'.
     fn tcspecial() -> BTreeMap<String, Scalar> {
         [
-            ("address", "0.0.0.0"),
-            ("port", "4000"),
+            ("command_interface", "0.0.0.0:4000"),
             ("payload_port", "4001"),
-            ("protocol", "udp"),
             ("beacon_interval_ms", "5000"),
             ("beacon_address", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),
@@ -899,13 +897,14 @@ mod tests {
         let wrong = [
             // A name belonging to nothing.
             ("beacon_adress", "239.255.0.1:5550", "beacon_adress"),
+            // A command interface that is only half stated, which is the way
+            // one attribute carrying two things goes wrong.
+            ("command_interface", "0.0.0.0", "address:port"),
             // A port that is not one.
-            ("port", "nought", "port"),
-            // A beacon address that is not a multicast group, which is the
-            // rule the command interpreter's own struct knows.
+            ("payload_port", "nought", "payload_port"),
+            // And a beacon address that is not a multicast group, which is
+            // the rule the command interpreter's own struct knows.
             ("beacon_address", "10.0.0.1:5550", "multicast"),
-            // And a protocol that does not exist.
-            ("protocol", "sctp", "protocol"),
         ];
 
         for (attribute, value, expected) in wrong {

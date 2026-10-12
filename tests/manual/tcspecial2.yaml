@@ -21,16 +21,17 @@ description: TCSpecial payload set 2
 # business; the rest is carried and checked and not yet read, tcspecial taking
 # it from the file TCSPECIAL_CONFIG_PATH names.
 #
-# Two ports, because there are two command links: a command about the
-# spacecraft -- ping it, arm it, restart it -- is taken on port, and a command
+# Two command links, because what the ground needs in a hurry must never be
+# queued behind what it asked for at leisure: a command about the spacecraft --
+# ping it, arm it, restart it -- is taken on the command interface, and one
 # about a payload -- start it, stop it, ask it for its statistics -- on
-# payload_port. What the ground needs in a hurry is then never queued behind
-# what it asked for at leisure.
+# payload_port at the same address.
+#
+# The protocol is not stated and cannot be: the link between tcspecial and the
+# ground is UDP.
 tcspecial:
-  address: 0.0.0.0
-  port: 4000
+  command_interface: 0.0.0.0:4000
   payload_port: 4001
-  protocol: udp
   beacon_interval_ms: 5000
   beacon_address: "239.255.0.1:5550"
   beacon_interface: "127.0.0.1"

@@ -833,7 +833,6 @@ mod tests {
             address: "127.0.0.1".to_string(),
             port: 0, // Let OS assign port
             payload_port: 0, // and one for payload commands
-            protocol: NetworkProtocol::Udp,
             beacon_interval: BeaconTime(5000),
             beacon_address: a_beacon_address(),
             beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -861,7 +860,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -924,7 +922,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1020,7 +1017,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1128,7 +1124,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1207,7 +1202,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1333,7 +1327,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0,
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1395,7 +1388,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1457,7 +1449,6 @@ mod tests {
             // The port under test is the one already held; the other is the
             // OS's to choose, so what fails is the one this is about.
             payload_port: 0,
-            protocol: NetworkProtocol::Udp,
             beacon_interval: BeaconTime(5000),
             beacon_address: a_beacon_address(),
             beacon_interface: std::net::Ipv4Addr::LOCALHOST,
@@ -1491,7 +1482,6 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 payload_port: 0, // and one for payload commands
-                protocol: NetworkProtocol::Udp,
                 beacon_interval: BeaconTime(5000),
                 beacon_address: a_beacon_address(),
                 beacon_interface: std::net::Ipv4Addr::LOCALHOST,

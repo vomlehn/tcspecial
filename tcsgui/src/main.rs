@@ -3591,28 +3591,32 @@ mod tests {
 
         // Typing in one records an edit, and one Undo takes it back.
         let depth = editor.borrow().undo_depth();
-        window.invoke_parameter_set("port".into(), "4000".into());
+        window.invoke_parameter_set("command_interface".into(), "0.0.0.0:4000".into());
         assert_eq!(
             editor
                 .borrow()
                 .document()
                 .tcspecial
-                .get("port")
+                .get("command_interface")
                 .map(String::as_str),
-            Some("4000")
+            Some("0.0.0.0:4000")
         );
         assert_eq!(editor.borrow().undo_depth(), depth + 1);
 
         // And the window says so the next time it is drawn: the field is
         // filled and no longer marked.
-        let port = (0..window.get_fields().row_count())
+        let interface = (0..window.get_fields().row_count())
             .filter_map(|row| window.get_fields().row_data(row))
-            .find(|f| f.name == "port")
-            .expect("the port field");
-        assert_eq!(port.value, "4000");
+            .find(|f| f.name == "command_interface")
+            .expect("the command interface field");
+        assert_eq!(interface.value, "0.0.0.0:4000");
 
         assert!(editor.borrow_mut().undo());
-        assert!(!editor.borrow().document().tcspecial.contains_key("port"));
+        assert!(!editor
+            .borrow()
+            .document()
+            .tcspecial
+            .contains_key("command_interface"));
     }
 
     /// The group window offers every group there is.

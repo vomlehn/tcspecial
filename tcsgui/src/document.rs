@@ -1410,10 +1410,8 @@ pub fn thermostat_example() -> Document {
     // must say: where commands are taken, where beacons go, where the
     // telemetry log is written.
     for (attribute, value) in [
-        ("address", "0.0.0.0"),
-        ("port", "4000"),
+        ("command_interface", "0.0.0.0:4000"),
         ("payload_port", "4001"),
-        ("protocol", "udp"),
         ("beacon_interval_ms", "5000"),
         ("beacon_address", "239.255.0.1:5550"),
         ("beacon_interface", "127.0.0.1"),
@@ -1739,10 +1737,8 @@ mod tests {
     #[test]
     fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
         let whole = [
-            ("address", "0.0.0.0"),
-            ("port", "4000"),
+            ("command_interface", "0.0.0.0:4000"),
             ("payload_port", "4001"),
-            ("protocol", "udp"),
             ("beacon_interval_ms", "5000"),
             ("beacon_address", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),
@@ -1770,8 +1766,10 @@ mod tests {
         // Complete and wrong, in the words of the rules that know why.
         for (attribute, instead, expected) in [
             ("beacon_address", "10.0.0.1:5550", "multicast"),
-            ("protocol", "sctp", "protocol"),
-            ("port", "4001", "payload_port"),
+            // Half a command interface, which is the one way an attribute
+            // carrying two things goes wrong.
+            ("command_interface", "0.0.0.0", "address:port"),
+            ("command_interface", "0.0.0.0:4001", "payload_port"),
             ("payload_port", "nought", "payload_port"),
         ] {
             let document = filled(Some((attribute, instead)));

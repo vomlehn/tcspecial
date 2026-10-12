@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 use tcslibgs::config::load_dh_configs;
 use tcslibgs::config_digest::digest_of_file;
-use tcslibgs::{EndpointConfig, NetworkProtocol};
+use tcslibgs::EndpointConfig;
 use tcspecial::config::load_tcspecial_config;
 
 /// Where the shipped payload sets live.
@@ -71,16 +71,6 @@ fn the_shipped_tcspecial_config_loads() {
     // produced a configuration the program could not act on.
     assert!(!config.address.is_empty(), "no address");
     assert_ne!(config.port, 0, "no port");
-    assert!(
-        matches!(
-            config.protocol,
-            NetworkProtocol::Tcp
-                | NetworkProtocol::Udp
-                | NetworkProtocol::UnixStream
-                | NetworkProtocol::UnixDgram
-        ),
-        "protocol did not parse into a known transport"
-    );
     assert_ne!(config.beacon_interval.0, 0, "no beacon interval");
     assert_ne!(config.log_segment_bytes, 0, "no log segment size");
 }

@@ -102,6 +102,19 @@ export struct FieldView {
     // configuration flies is checked on the ground and aboard, where the
     // complaint can name the file and the line.
     required: bool,
+    // A rule across the panel with this name on it, rather than a field.
+    //
+    // What divides a node's own attributes from the settings the simulator
+    // file gives it: two files, one panel, and a line to say where one ends
+    // and the other begins.
+    is-heading: bool,
+    // Whether this field belongs to the simulator's file rather than to the
+    // configuration.
+    //
+    // The panel shows both and they are written to different files, so each
+    // row has to say which it is: the two go to different callbacks and are
+    // recorded as different edits.
+    simulated: bool,
 }
 
 // One attribute a group sets on every payload in it.
@@ -688,14 +701,10 @@ component Surface inherits Rectangle {
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
-    callback attribute-set(string, string, string);
-    callback comment-set(string, string);
 
-    // Which node the panel is showing, and what it holds.
+    // Which node is drawn as chosen. What it says about itself is in a window
+    // of its own -- see NodeWindow -- so this is all the canvas needs.
     in property <string> selected: "";
-    in property <string> selected-type: "";
-    in property <string> selected-comment: "";
-    in property <[FieldView]> fields: [];
 
     background: #fbfbfa;
 
@@ -966,86 +975,6 @@ component Surface inherits Rectangle {
                 }
             }
 
-            // What the selected node says about itself.
-            //
-            // Beside the canvas rather than floating over it: a panel that
-            // covers the diagram makes you choose between seeing the node's
-            // settings and seeing where it sits, and both are wanted at once.
-            //
-            // The fields are the ones the type declares, shown whether or not
-            // they are filled in -- so placing an I2C device tells you it
-            // needs a bus and an address, instead of leaving you to know.
-            Rectangle {
-                width: 260px;
-                background: #f2f2f0;
-                border-width: 1px;
-                border-color: #d8d8d4;
-
-                if root.selected == "": Text {
-                    x: Space.step;
-                    y: Space.step;
-                    width: parent.width - Space.wide;
-                    text: "Press a node to see what it says about itself.";
-                    font-size: Type.small;
-                    font-italic: true;
-                    color: #9ca3af;
-                    wrap: word-wrap;
-                }
-
-                if root.selected != "": ScrollView {
-                    VerticalLayout {
-                        padding: Space.step;
-                        spacing: Space.tight;
-
-                        Text {
-                            text: root.selected;
-                            font-size: Type.strong;
-                            font-weight: Type.bold;
-                            height: 20px;
-                        }
-                        Text {
-                            text: root.selected-type;
-                            font-size: Type.small;
-                            color: #6b7280;
-                            height: 14px;
-                        }
-
-                        for f in fields: VerticalLayout {
-                            spacing: 1px;
-                            Text {
-                                // A field the configuration must state says
-                                // so, and says it quietly: an empty one is
-                                // unanswered and not wrong.
-                                text: f.required ? f.name + " *" : f.name;
-                                font-size: Type.small;
-                                color: #6b7280;
-                                height: 14px;
-                            }
-                            LineEdit {
-                                text: f.value;
-                                font-size: Type.body;
-                                edited => {
-                                    attribute-set(root.selected, f.name, self.text);
-                                }
-                            }
-                        }
-
-                        Text {
-                            text: "comment";
-                            font-size: Type.small;
-                            color: #6b7280;
-                            height: 14px;
-                        }
-                        LineEdit {
-                            text: root.selected-comment;
-                            font-size: Type.body;
-                            edited => { comment-set(root.selected, self.text); }
-                        }
-
-                        Rectangle { }
-                    }
-                }
-            }
         }
     }
 }
@@ -1053,16 +982,19 @@ component Surface inherits Rectangle {
 export component MainWindow inherits Window {
     title: "TCSpecial Configuration";
     background: #fbfbfa;
-    // Wide enough for both working panes, both selection panes and the
-    // panel, which is what the preferred width is: 960 of working area, 180
-    // of selection panes, 260 of panel and the gaps between them. The
-    // minimum is smaller because a window that cannot be made to fit a
-    // screen is a window that cannot be used on it -- squeezed, the right of
+    // Wide enough for both working panes and both selection panes, which is
+    // what the preferred width is: 960 of working area, 180 of selection
+    // panes and the gaps between them. There was a 260-pixel panel here as
+    // well, and what a node says about itself is a window of its own now --
+    // so the working panes have those pixels.
+    //
+    // The minimum is smaller because a window that cannot be made to fit a
+    // screen is a window that cannot be used on it: squeezed, the right of
     // the payload working pane goes off the edge, which is a nuisance rather
     // than a failure.
-    min-width: 1000px;
+    min-width: 760px;
     min-height: 600px;
-    preferred-width: 1440px;
+    preferred-width: 1180px;
     preferred-height: 820px;
 
     in property <[NodeView]> nodes: [];
@@ -1088,9 +1020,6 @@ export component MainWindow inherits Window {
     in property <string> redo-label: "";
     in property <string> trouble: "";
     in property <string> selected: "";
-    in property <string> selected-type: "";
-    in property <string> selected-comment: "";
-    in property <[FieldView]> fields: [];
 
     callback undo-clicked();
     callback redo-clicked();
@@ -1104,12 +1033,9 @@ export component MainWindow inherits Window {
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
-    callback attribute-set(string, string, string);
-    callback comment-set(string, string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
-    // And for the simulator's own two lists.
-    callback edit-simulated-payloads();
+    // And for the simulator's groups of settings.
     callback edit-simulator-groups();
     // Whether this session was given a simulator configuration at all.
     in property <bool> has-simulator: false;
@@ -1125,16 +1051,17 @@ export component MainWindow inherits Window {
                 activated => { root.edit-parameters(); }
             }
             MenuSeparator { }
-            // The simulator's own file, where this session was given one.
+            // The simulator's groups, where this session was given its file.
             // Disabled rather than hidden when it was not: a menu whose
             // entries come and go is a menu nobody learns, and "this needs a
             // second argument" is better said by a greyed entry than by its
             // absence.
-            MenuItem {
-                title: "Edit simulated payloads";
-                enabled: root.has-simulator;
-                activated => { root.edit-simulated-payloads(); }
-            }
+            //
+            // There is no entry for the simulated payloads themselves. A
+            // payload's settings belong to a payload that is already on the
+            // canvas, so they are shown in its panel, under a rule: a window
+            // of its own would be a second place to look for what one node
+            // says about itself.
             MenuItem {
                 title: "Edit simulator payload groups";
                 enabled: root.has-simulator;
@@ -1169,12 +1096,7 @@ export component MainWindow inherits Window {
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
         selected: root.selected;
-        selected-type: root.selected-type;
-        selected-comment: root.selected-comment;
-        fields: root.fields;
         node-selected(n) => { root.node-selected(n); }
-        attribute-set(n, a, v) => { root.attribute-set(n, a, v); }
-        comment-set(n, t) => { root.comment-set(n, t); }
     }
 }
 
@@ -1190,9 +1112,9 @@ export component SubWindow inherits Window {
     // The same two working panes as the top diagram, so the same room: a
     // subdiagram is a page of one configuration and its payloads go on the
     // same side of it.
-    min-width: 1000px;
+    min-width: 760px;
     min-height: 520px;
-    preferred-width: 1440px;
+    preferred-width: 1180px;
     preferred-height: 760px;
 
     in property <string> editing: "";
@@ -1219,9 +1141,6 @@ export component SubWindow inherits Window {
     in property <string> redo-label: "";
     in property <string> trouble: "";
     in property <string> selected: "";
-    in property <string> selected-type: "";
-    in property <string> selected-comment: "";
-    in property <[FieldView]> fields: [];
 
     callback undo-clicked();
     callback redo-clicked();
@@ -1234,10 +1153,7 @@ export component SubWindow inherits Window {
     callback link-started(string);
     callback link-finished(string);
     callback node-selected(string);
-    callback attribute-set(string, string, string);
-    callback comment-set(string, string);
     callback edit-parameters();
-    callback edit-simulated-payloads();
     callback edit-simulator-groups();
     in property <bool> has-simulator: false;
 
@@ -1252,16 +1168,17 @@ export component SubWindow inherits Window {
                 activated => { root.edit-parameters(); }
             }
             MenuSeparator { }
-            // The simulator's own file, where this session was given one.
+            // The simulator's groups, where this session was given its file.
             // Disabled rather than hidden when it was not: a menu whose
             // entries come and go is a menu nobody learns, and "this needs a
             // second argument" is better said by a greyed entry than by its
             // absence.
-            MenuItem {
-                title: "Edit simulated payloads";
-                enabled: root.has-simulator;
-                activated => { root.edit-simulated-payloads(); }
-            }
+            //
+            // There is no entry for the simulated payloads themselves. A
+            // payload's settings belong to a payload that is already on the
+            // canvas, so they are shown in its panel, under a rule: a window
+            // of its own would be a second place to look for what one node
+            // says about itself.
             MenuItem {
                 title: "Edit simulator payload groups";
                 enabled: root.has-simulator;
@@ -1296,12 +1213,7 @@ export component SubWindow inherits Window {
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
         selected: root.selected;
-        selected-type: root.selected-type;
-        selected-comment: root.selected-comment;
-        fields: root.fields;
         node-selected(n) => { root.node-selected(n); }
-        attribute-set(n, a, v) => { root.attribute-set(n, a, v); }
-        comment-set(n, t) => { root.comment-set(n, t); }
     }
 }
 
@@ -1684,6 +1596,159 @@ export component SimWindow inherits Window {
             font-size: Type.body;
             font-weight: Type.bold;
             wrap: word-wrap;
+        }
+    }
+}
+
+// What one node says about itself.
+//
+// A window per node, and several open at once. It was a panel down the
+// right-hand side, which showed whichever node was last pressed: that made
+// comparing two nodes a matter of pressing one, reading, pressing the other
+// and remembering -- and the one thing somebody filling in a configuration
+// does constantly is compare two sensors on the same bus.
+//
+// So each node's attributes are a window, and the window stays until it is
+// closed. Pressing another node opens another window rather than replacing
+// this one, which is why closing takes a press of its own: a window that went
+// away when something else was pressed would be the panel again.
+//
+// Two files in one window, where the editor was given the simulator's: the
+// node's own attributes, a rule, and the settings the simulator file gives it.
+// Each row says which file it belongs to, because they are written to
+// different ones.
+export component NodeWindow inherits Window {
+    title: root.node == "" ? "a node" : root.node;
+    background: #f2f2f0;
+    min-width: 300px;
+    min-height: 260px;
+    preferred-width: 340px;
+    preferred-height: 560px;
+
+    in property <string> node: "";
+    in property <string> node-type: "";
+    in property <string> comment: "";
+    in property <[FieldView]> fields: [];
+    // What is wrong with what this node says, if anything. The one red text
+    // here, as on the canvas.
+    in property <string> fault: "";
+    in property <string> trouble: "";
+
+    callback attribute-set(string, string);
+    callback sim-attribute-set(string, string);
+    callback comment-set(string);
+    callback closed();
+
+    VerticalLayout {
+        padding: Space.step;
+        spacing: Space.tight;
+
+        Text {
+            text: root.node;
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            height: 20px;
+        }
+        Text {
+            text: root.node-type;
+            font-size: Type.small;
+            color: #6b7280;
+            height: 14px;
+        }
+        if root.fault != "": Text {
+            text: root.fault;
+            color: #c0392b;
+            font-size: Type.small;
+            font-italic: true;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+
+                for f in root.fields: VerticalLayout {
+                    spacing: 1px;
+
+                    // Where the node's own attributes end and the simulator's
+                    // settings for it begin. A rule and a name, because the
+                    // fields below it are written to a different file and
+                    // nothing else would say so.
+                    if f.is-heading: Rectangle {
+                        height: Space.wide;
+                        Rectangle {
+                            y: parent.height - 1px;
+                            height: 1px;
+                            background: #d8d8d4;
+                        }
+                    }
+                    if f.is-heading: Text {
+                        text: f.name;
+                        font-size: Type.small;
+                        font-weight: Type.bold;
+                        color: #6b7280;
+                        height: 16px;
+                    }
+
+                    if !f.is-heading: Text {
+                        // A field the configuration must state says so, and
+                        // says it quietly: an empty one is unanswered and not
+                        // wrong.
+                        text: f.required ? f.name + " *" : f.name;
+                        font-size: Type.small;
+                        color: #6b7280;
+                        height: 14px;
+                    }
+                    if !f.is-heading: LineEdit {
+                        text: f.value;
+                        font-size: Type.body;
+                        edited => {
+                            // Two files, two edits: a node's attribute goes to
+                            // the configuration and a simulated payload's
+                            // setting to the simulator's own file.
+                            if (f.simulated) {
+                                root.sim-attribute-set(f.name, self.text);
+                            } else {
+                                root.attribute-set(f.name, self.text);
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    text: "comment";
+                    font-size: Type.small;
+                    color: #6b7280;
+                    height: 14px;
+                }
+                LineEdit {
+                    text: root.comment;
+                    font-size: Type.body;
+                    edited => { root.comment-set(self.text); }
+                }
+
+                Rectangle { }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.small;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+
+        // Closing takes a press, which is the whole point of a window per
+        // node: one that closed itself when another node was pressed would be
+        // the panel this replaced.
+        HorizontalLayout {
+            Rectangle { }
+            Button {
+                text: "Close";
+                clicked => { root.closed(); }
+            }
         }
     }
 }

@@ -1065,28 +1065,70 @@ vehicle tried to open it.
 
 The simulator's own configuration is edited from the menu too, where the
 editor was given one: tcsgui takes a second file name, and **Edit simulated
-payloads** and **Edit simulator payload groups** open it. The entries are
-greyed when there is no second file rather than hidden -- a menu whose entries
-come and go is a menu nobody learns.
+groups** opens the groups of settings it declares. The entry is greyed when
+there is no second file rather than hidden -- a menu whose entries come and go
+is a menu nobody learns.
 
 Nothing of it is on the canvas, and that is not a shortcut. The simulator file
 adds settings to payloads that are already drawn and declares groups of
 settings for them to share; it introduces no nodes and no connections, so a
 drawing of it would be the same drawing with numbers on it. What it is, is two
-lists of settings, and that is what the two windows are.
+lists of settings.
 
-The payloads window offers the payloads of the *configuration* and never
-invents a name: the two files are joined by name, every payload needs settings
-here, and a name here that no payload has is an error rather than a line with
-no effect. So a file whose payloads were renamed shows the new names with
-nothing in them, which is the truth about it. The groups window offers what the
-simulator file declares and can make and remove one, a group being that file's
-own.
+One of those lists needs no window of its own. A simulated payload's settings
+are about a payload that is already on the canvas, so they are in that node's
+own window, below a rule: a window of its own would be a second place to look
+for what one node says about itself. The rule is there because the fields above
+it and the fields below go to different files, and nothing else would say so.
+The settings appear only for a payload and only where the session was given the
+simulator's file -- a computation, a log and the ground link have nothing
+standing in for them.
+
+The names are the configuration's and are never invented here: the two files
+are joined by name, every payload needs settings in the simulator's file, and a
+name there that no payload has is an error rather than a line with no effect.
+So a file whose payloads were renamed shows the new names with nothing in them,
+which is the truth about it. The groups window offers what the simulator file
+declares and can make and remove one, a group being that file's own.
 
 Both files are one session. They are edited together, checked together and must
 agree, so one Save writes both and one Undo takes back whichever of them the
 last edit touched. Every setting is optional -- what a payload does not state
-it takes from the group it names -- so nothing in either window is marked.
+it takes from the group it names -- so nothing in either place is marked.
+
+``make runsimguiy`` and ``make runsimguix`` open a configuration and the
+simulator file beside it, in YAML and in XML; ``TCSGUI_SIM`` names the second
+file and defaults to the first's stem with ``sim`` on the end, which is what
+the shipped sets are called. The simulator file is YAML whichever spelling the
+configuration is in: it chooses its parser from its extension like every
+configuration file here, and the shipped ones are YAML because that is what
+carries comments.
+
+What a node says about itself
+-----------------------------
+
+In a window of its own, one per node, opened by clicking the node and closed by
+a press of the Close button.
+
+It was a panel down the right-hand side, which showed whichever node had last
+been pressed. That made the commonest thing somebody filling in a
+configuration does -- comparing two sensors on one bus -- a matter of pressing
+one, reading it, pressing the other and remembering. Several windows can be
+open at once, so the two can be read side by side, and closing takes a press of
+its own: a window that went away when something else was pressed would be the
+panel again.
+
+Opened by a *click* and not by a press, because a press is how a drag starts. A
+gesture that moved the node is a move and one that moved nothing is a request
+to see what the node says -- told apart by the distance and not by the time,
+since a gesture that means one thing or another depending on how long it took
+is a gesture that does the wrong one under pressure. A click is therefore not
+an edit and leaves nothing in the history.
+
+The window holds the attributes the node's type declares, whatever else the
+node happens to hold, its comment, what is wrong with it if anything, and the
+simulator's settings for it where there are any. Removing the panel also gave
+the canvas the 260 pixels it was using, which the two working panes now have.
 
 Groups are edited in a window of their own, reached from a menu in the bar. A
 group is not on the canvas and should not be: it is a set of payloads read
@@ -1112,8 +1154,7 @@ as one edit, for the same reason: a rename that left the members behind would
 silently unschedule them.
 
 Every edit is written as it is made, so saving is not something to remember.
-There is a Save button all the same. It writes every file of the configuration
-now, which covers the three things the ordinary case does not: retrying a write
+There is a Save button all the same. It writes every file of the session now, which covers the three things the ordinary case does not: retrying a write
 that failed once whatever stopped it has been put right, rewriting a set of
 files left half new by a failure between two of them, and answering somebody
 who has been taught by every other program to save their work. The way out of

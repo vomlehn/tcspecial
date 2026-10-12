@@ -68,6 +68,8 @@ help:
 	@echo "  make runsim      - Run tcssim alone"
 	@echo "  make runguiy     - Run tcsgui on the YAML configuration"
 	@echo "  make runguix     - Run tcsgui on the XML configuration"
+	@echo "  make runsimguiy  - Run tcsgui on the YAML configuration and the simulator's"
+	@echo "  make runsimguix  - Run tcsgui on the XML configuration and the simulator's"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
 	@echo "  make verify      - Check one version 2 configuration"
@@ -335,15 +337,17 @@ verify:
 #   make verify  TCSGUI_FILE=edit/graph.yaml
 TCSGUI_FILE = edit/graph.yaml
 
-# The simulator's own configuration, where there is one to edit.
+# The simulator's own configuration, for the runsimgui targets.
 #
-# A second argument to tcsgui, and empty by default: a session without one
-# edits the configuration alone, and the menu entries that would edit the
-# simulator's two lists are greyed. Named by its stem like TCSGUI_FILE, so the
-# spelling comes from the target:
+# Named by its stem, like TCSGUI_FILE, and defaulting to the configuration's
+# stem with `sim` on the end -- which is what the shipped sets are called, and
+# is the one convention there is. The runguiy and runguix targets ignore it: a
+# session given no simulator file edits the configuration alone, and the menu
+# entry that would edit the simulator's groups is greyed.
 #
-#   make runguiy TCSGUI_FILE=edit/graph TCSGUI_SIM=edit/graphsim
-TCSGUI_SIM =
+#   make runsimguiy
+#   make runsimguiy TCSGUI_FILE=edit/graph TCSGUI_SIM=edit/othersim
+TCSGUI_SIM = $(basename $(TCSGUI_FILE))sim
 
 # Running tcsgui on one spelling of a configuration.
 #
@@ -361,7 +365,29 @@ define rungui_on
 		mkdir -p $(dir $(TCSGUI_FILE)); \
 		echo "Running $(GUI_NAME) on $(basename $(TCSGUI_FILE)).$(1)..."; \
 		cd $(RUST) && cargo run -q --bin tcsgui -- $(basename $(TCSGUI_FILE)).$(1) \
-			$(if $(TCSGUI_SIM),$(basename $(TCSGUI_SIM)).$(1),) \
+	)
+endef
+
+# Running tcsgui on one spelling of a configuration and a simulator
+# configuration beside it.
+#
+# $(1) is the configuration's spelling, as rungui_on takes it. $(2) is the
+# simulator configuration, by its stem.
+#
+# The simulator file is YAML whichever spelling the configuration is in, and
+# that is not an oversight: a simulator configuration may be written in either
+# -- it chooses its parser from its extension as every configuration file in
+# this project does -- and the shipped ones are YAML because that is what
+# carries comments. A session editing the XML spelling of a graph is still
+# editing the one simulator file beside it.
+define tcssimgui_on
+	( \
+		set -eu; \
+		mkdir -p $(dir $(TCSGUI_FILE)) $(dir $(2)); \
+		echo "Running $(GUI_NAME) on $(basename $(TCSGUI_FILE)).$(1) and \
+$(basename $(2)).yaml..."; \
+		cd $(RUST) && cargo run -q --bin tcsgui -- \
+			$(basename $(TCSGUI_FILE)).$(1) $(basename $(2)).yaml \
 	)
 endef
 
@@ -377,6 +403,17 @@ runguiy:
 .PHONY: runguix
 runguix:
 	$(call rungui_on,xml)
+
+# And with the simulator's configuration beside it, which is what adds the
+# simulation settings to each payload's window and lights the menu entry for
+# the simulator's groups.
+.PHONY: runsimguiy
+runsimguiy:
+	$(call tcssimgui_on,yaml,$(TCSGUI_SIM))
+
+.PHONY: runsimguix
+runsimguix:
+	$(call tcssimgui_on,xml,$(TCSGUI_SIM))
 
 # Clean build artifacts
 .PHONY: clean

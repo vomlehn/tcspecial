@@ -114,9 +114,17 @@ pub fn read(path: &Path) -> Result<Document, String> {
         // lines on the canvas, and each is drawn and deleted on its own.
         for destination in link.to.each() {
             let Destination { node, input } = Destination::parse(destination);
-            let from = Qualified::parse(&link.from);
+            // The leaving end, split from the terminal it names: everything in
+            // the editor that looks a link's source up looks up a node.
+            let origin = link.origin();
+            let from = Qualified::parse(&origin.node);
             let to = Qualified::parse(&node);
-            let mut line = Link::new(&from.absolute(), &to.absolute(), input.as_deref());
+            let mut line = Link::joining(
+                &from.absolute(),
+                origin.input.as_deref(),
+                &to.absolute(),
+                input.as_deref(),
+            );
             line.comment = link
                 .comment
                 .clone()
@@ -391,6 +399,56 @@ mod tests {
                 assert!(
                     read.links.contains(written),
                     "{name}: {written:?} was not read back"
+                );
+            }
+        }
+    }
+
+    /// A link that names its terminals is written and read back as one.
+    ///
+    /// The `null` node's case, and the reason a terminal is written into a
+    /// file at all: a node with two data sources and two data sinks has to say
+    /// which stream a link carries. Both spellings, because the terminal goes
+    /// into the `from` of the link and each format writes that its own way --
+    /// and a terminal that survived the YAML and not the XML would be a file
+    /// that changed meaning by being saved under another name.
+    #[test]
+    fn a_link_that_names_its_terminals_is_read_back() {
+        use crate::journal::{Edit, Link};
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut document = Document::new();
+        for (name, node_type) in [("sensor", "i2c"), ("through", "null"), ("ground", "moc")] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+        }
+        // Both streams through the null node, each saying which terminal it
+        // leaves by and which it arrives at.
+        for link in [
+            Link::joining("sensor", None, "through", Some("from_payload")),
+            Link::joining("through", Some("to_moc"), "ground", None),
+            Link::joining("ground", None, "through", Some("from_moc")),
+            Link::joining("through", Some("to_payload"), "sensor", None),
+        ] {
+            document.apply(&Edit::AddLink { link });
+        }
+
+        for (name, text) in [
+            ("through.yaml", document.to_yaml()),
+            ("through.xml", document.to_xml()),
+        ] {
+            let path = where_.path().join(name);
+            std::fs::write(&path, &text).expect("the file is written");
+            let read = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
+
+            assert_eq!(read.links.len(), document.links.len(), "{name}");
+            for written in &document.links {
+                assert!(
+                    read.links.contains(written),
+                    "{name}: {written:?} was not read back from\n{text}"
                 );
             }
         }

@@ -366,7 +366,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // Which node a link is being drawn from, while the gesture is running.
     // Nothing is recorded until it finishes on another node, so a drag that
     // ends nowhere leaves no trace.
-    let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+    let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
 
     views.borrow().refresh(&editor.borrow());
 
@@ -450,7 +450,7 @@ macro_rules! wiring {
             window: &$window,
             editor: &Rc<RefCell<Editor>>,
             views: &Rc<RefCell<Views>>,
-            drawing: &Rc<RefCell<Option<String>>>,
+            drawing: &Rc<RefCell<Option<Drawing>>>,
             chosen: &Rc<RefCell<BTreeMap<String, String>>>,
             home: &Home,
         ) {
@@ -630,12 +630,15 @@ macro_rules! wiring {
                 }
             }
             {
-                // Drawing a link: the handle pressed is remembered, and the
-                // handle released over is the other end.
+                // Drawing a link: the terminal pressed is remembered, and the
+                // terminal released over is the other end.
                 let drawing = drawing.clone();
                 let home = home.clone();
-                window.on_link_started(move |name| {
-                    *drawing.borrow_mut() = Some(Qualified::of(&name, &home).absolute());
+                window.on_link_started(move |name, terminal| {
+                    *drawing.borrow_mut() = Some(Drawing {
+                        node: Qualified::of(&name, &home).absolute(),
+                        terminal: terminal.to_string(),
+                    });
                 });
             }
             {
@@ -643,27 +646,27 @@ macro_rules! wiring {
                 let views = views.clone();
                 let drawing = drawing.clone();
                 let home = home.clone();
-                window.on_link_finished(move |name| {
+                window.on_link_finished(move |x, y| {
                     let from = match drawing.borrow_mut().take() {
                         Some(from) => from,
                         None => return,
                     };
-                    let to = Qualified::of(&name, &home).absolute();
-                    // A link from a node to itself is refused here rather
-                    // than drawn and then reported: releasing on the handle
-                    // you pressed is a gesture that was abandoned, not a
-                    // request for a loop.
-                    if from == to {
-                        return;
-                    }
-                    {
+                    let made = {
                         let mut editor = editor.borrow_mut();
-                        let input = free_input(editor.document(), &to);
-                        editor.edit(Edit::AddLink {
-                            link: Link::new(&from, &to, input.as_deref()),
-                        });
+                        match joined(editor.document(), &home, &from, (x, y)) {
+                            Some(link) => {
+                                editor.edit(Edit::AddLink { link });
+                                true
+                            }
+                            None => false,
+                        }
+                    };
+                    // Only when something was made: a gesture let go of over
+                    // nothing has changed nothing, and rebuilding the canvas
+                    // for it would be a flicker that says something happened.
+                    if made {
+                        views.borrow().refresh(&editor.borrow());
                     }
-                    views.borrow().refresh(&editor.borrow());
                 });
             }
             {
@@ -699,7 +702,7 @@ fn wire_sub(
     window: &SubWindow,
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
-    drawing: &Rc<RefCell<Option<String>>>,
+    drawing: &Rc<RefCell<Option<Drawing>>>,
     chosen: &Rc<RefCell<BTreeMap<String, String>>>,
     home: &str,
 ) {
@@ -1839,30 +1842,23 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
         .iter()
         .filter(|link| here(&link.from) || here(&link.to))
         .map(|link| {
-            let from = document.node(&link.from);
-            let to = document.node(&link.to);
-            let (x1, y1) = match from {
-                Some(node) if here(&link.from) => {
-                    let (w, h) = size_of(&node.node_type);
-                    ((node.at.0 + w as i32) as f32, (node.at.1 + h as i32 / 2) as f32)
-                }
-                // Off this page: a stub at the left edge.
-                _ => (0.0, to.map(|n| n.at.1 as f32 + 24.0).unwrap_or(24.0)),
-            };
-            let (x2, y2) = match to {
-                Some(node) if here(&link.to) => {
-                    let (_, h) = size_of(&node.node_type);
-                    (node.at.0 as f32, (node.at.1 + h as i32 / 2) as f32)
-                }
-                // Off this page: a stub to the right of its source.
-                _ => (x1 + 72.0, y1),
-            };
+            let ends = ends_of(document, link, home);
 
             // The label says which input it arrives at, and names the far
             // node where that node is on another page.
             let crossing = !here(&link.from) || !here(&link.to);
-            let label = match (&link.input, crossing) {
-                (Some(input), false) => input.clone(),
+            //
+            // A terminal is not one of those, and is not labelled: it is drawn
+            // as the corner the line is attached to and as the arrow in it,
+            // which says the same thing in the place a reader is already
+            // looking. A label reading "from_payload" beside every line would
+            // be the name of the thing the picture is showing.
+            let named_input = link
+                .input
+                .as_deref()
+                .filter(|input| tcslibgs::graph::terminals::stream_of(input).is_none());
+            let label = match (named_input, crossing) {
+                (Some(input), false) => input.to_string(),
                 (Some(input), true) => format!("{} . {input}", far_end(link, home)),
                 (None, true) => far_end(link, home),
                 (None, false) => String::new(),
@@ -1870,17 +1866,17 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
 
             // The label goes at the middle of the route's longest run, which
             // is on the line wherever the line had to go.
-            let (label_x, label_y) = route::label_at(x1, y1, x2, y2, &obstacles);
+            let (label_x, label_y) = route::label_at(ends, &obstacles);
 
             LinkView {
                 // The route and the arrow, worked out where they can be
                 // tested: see route.rs.
-                route: route::route(x1, y1, x2, y2, &obstacles).into(),
-                head: route::arrow(x2, y2).into(),
-                marker: route::marker(x1, y1, x2, y2, &obstacles).into(),
+                route: route::route(ends, &obstacles).into(),
+                head: route::arrow(ends).into(),
+                marker: route::marker(ends, &obstacles).into(),
                 label_x,
                 label_y,
-                wide: link.input.is_some(),
+                wide: named_input.is_some(),
                 label: label.into(),
                 comment: link.comment.clone().unwrap_or_default().into(),
             }
@@ -1888,6 +1884,67 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
         .collect();
 
     (nodes, links)
+}
+
+/// Where a link's line starts and finishes, and which way it points at each
+/// end.
+///
+/// Each end at the terminal it is attached to, which is where the line has to
+/// start and finish now that a link is drawn from a terminal: a line that left
+/// the middle of a node's right edge while its arrow sat in the lower left
+/// corner would be two statements about one link. See [`style::attachment`].
+///
+/// The direction comes with the point, and that is the other half of it. A
+/// groundward link leaves a node's left side and arrives at the next one's
+/// right side, so "out of the source, across, into the target" is no longer
+/// always left to right -- see [`route::Ends`].
+///
+/// One function because two callers must agree: the canvas draws this, and the
+/// test that no line runs through a node asks about the same geometry. Two
+/// copies of it would be a test of a drawing nobody sees.
+fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
+    let here = |name: &str| &Qualified::parse(name).in_ == home;
+    let from = document.node(&link.from);
+    let to = document.node(&link.to);
+
+    let joined = |node: &document::Node, named: Option<&str>, sink: bool| {
+        let terminal = style::terminal_for(&node.node_type, named, sink)?;
+        style::attachment(&node.node_type, node.at, terminal)
+    };
+
+    let ((x1, y1), leaves_right) = match from {
+        Some(node) if here(&link.from) => joined(node, link.origin.as_deref(), false)
+            .unwrap_or_else(|| {
+                // A type this build does not know, drawn as a node with no
+                // terminals: the middle of its right edge, where every link
+                // used to leave.
+                let (w, h) = size_of(&node.node_type);
+                (
+                    (
+                        (node.at.0 + w as i32) as f32,
+                        (node.at.1 + h as i32 / 2) as f32,
+                    ),
+                    true,
+                )
+            }),
+        // Off this page: a stub at the left edge.
+        _ => (
+            (0.0, to.map(|n| n.at.1 as f32 + 24.0).unwrap_or(24.0)),
+            true,
+        ),
+    };
+    let ((x2, y2), arrives_right) = match to {
+        Some(node) if here(&link.to) => {
+            joined(node, link.input.as_deref(), true).unwrap_or_else(|| {
+                let (_, h) = size_of(&node.node_type);
+                ((node.at.0 as f32, (node.at.1 + h as i32 / 2) as f32), true)
+            })
+        }
+        // Off this page: a stub to the right of its source.
+        _ => ((x1 + 72.0, y1), true),
+    };
+
+    route::Ends::new((x1, y1), (x2, y2), leaves_right, arrives_right)
 }
 
 /// The name of the end of `link` that is not on this page.
@@ -1904,6 +1961,154 @@ fn far_end(link: &Link, home: &Home) -> String {
 /// A node that names its inputs gets the first one nothing is bound to, so
 /// drawing three links into a mean fills in0, in1 and in2 without anybody
 /// typing them. A node that names none takes a link with no input at all.
+/// Half a link gesture: the node a line was dragged from, and the terminal.
+///
+/// The terminal is what the gesture is about. A node has two of them per
+/// stream and the one pressed says which stream the link carries and which way
+/// -- so a gesture that remembered only the node would have thrown away the
+/// thing it was asked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Drawing {
+    node: String,
+    terminal: String,
+}
+
+/// The link a gesture made, where it made one.
+///
+/// `from` is the terminal the line was drawn from and `(x, y)` is where the
+/// pointer was let go of, in the canvas's own coordinates. `None` for every
+/// gesture that is not a link, and there are four of those -- each refused
+/// here, as the gesture, rather than drawn and then reported. An editor that
+/// cannot make a bad link is worth more than one that explains it afterwards:
+///
+/// let go of over nothing, which is how a gesture is abandoned;
+///
+/// let go of over the node it started on, which is a loop and not a link --
+/// and releasing on the terminal you pressed is a gesture that changed its
+/// mind;
+///
+/// let go of over a terminal that does not pair with the one it started at. A
+/// `to_moc` may only be linked to a `from_payload` and a `to_payload` only to
+/// a `from_moc`: that is one stream, named at each of its ends, and anything
+/// else would carry one stream into the other. The rule is
+/// `tcslibgs::graph::terminals::pairs_with`, which is also what the checking
+/// refuses a written-out configuration for;
+///
+/// and a link that is already there, which would otherwise be a second line
+/// on top of the first and two deliveries of every datum.
+fn joined(
+    document: &Document,
+    home: &Home,
+    from: &Drawing,
+    (x, y): (f32, f32),
+) -> Option<Link> {
+    let to = terminal_under(document, home, (x, y), true)?;
+    if to.node == from.node {
+        return None;
+    }
+    if !tcslibgs::graph::terminals::pairs_with(&from.terminal, &to.terminal) {
+        return None;
+    }
+
+    let link = Link::joining(
+        &from.node,
+        leaving_by(document, from).as_deref(),
+        &to.node,
+        arriving_at(document, &to.node, &to.terminal).as_deref(),
+    );
+    if document.links.iter().any(|theirs| theirs.same_connection(&link)) {
+        return None;
+    }
+    Some(link)
+}
+
+/// Which terminal of which node is at this point, where one is.
+///
+/// What the release of a link gesture lands on. `sink` says which kind is
+/// being looked for: a link is let go of over a data sink, a data source being
+/// where it was drawn from.
+///
+/// Only the nodes of this page, because only they are drawn on it: a point on
+/// this canvas is not a point on another one, and a link to a node on another
+/// page is drawn as a stub rather than as a box to aim at.
+fn terminal_under(
+    document: &Document,
+    home: &Home,
+    (x, y): (f32, f32),
+    sink: bool,
+) -> Option<Drawing> {
+    for node in document.nodes_in(home) {
+        let terminals = NodeType::ALL
+            .iter()
+            .find(|t| t.spelling() == node.node_type)?
+            .terminals();
+        let named = if sink {
+            terminals.sinks
+        } else {
+            terminals.sources
+        };
+        for terminal in named {
+            let Some((bx, by, width, height)) =
+                style::terminal_box(&node.node_type, node.at, terminal)
+            else {
+                continue;
+            };
+            if x >= bx && x <= bx + width && y >= by && y <= by + height {
+                return Some(Drawing {
+                    node: node.name.clone(),
+                    terminal: (*terminal).to_string(),
+                });
+            }
+        }
+    }
+    None
+}
+
+/// What to record about the end a line arrives at.
+///
+/// Three answers, and the order is the order of authority:
+///
+/// a computation that declares its inputs gets the next free one. That is
+/// what a mean is: `in0`, `in1`, `in2`, filled as the lines are drawn, and
+/// the terminal the line was dropped on is not what distinguishes them;
+///
+/// a type with more than one data sink gets the terminal, because the file
+/// has to say which -- the `null` node and nothing else today;
+///
+/// and everything else gets nothing, because there is nothing to say: a
+/// payload has one way in, and the schema reads an unnamed end as that one.
+/// Which is also what keeps the editor from writing a terminal into every
+/// link of every file it saves.
+fn arriving_at(document: &Document, node: &str, terminal: &str) -> Option<String> {
+    if let Some(input) = free_input(document, node) {
+        return Some(input);
+    }
+    must_name(document, node, true).then(|| terminal.to_string())
+}
+
+/// And about the end it leaves by, which is the same question without the
+/// named inputs: only a computation has those, and nothing is read out of one
+/// by name.
+fn leaving_by(document: &Document, from: &Drawing) -> Option<String> {
+    must_name(document, &from.node, false).then(|| from.terminal.clone())
+}
+
+/// Whether a link at this end of this node has to name its terminal.
+///
+/// The type's own answer -- see [`NodeType::must_name`] -- and `false` for a
+/// node that is not there or a type this build does not know: a name written
+/// on a type nothing can describe would be a guess recorded in a file.
+fn must_name(document: &Document, node: &str, sink: bool) -> bool {
+    document
+        .node(node)
+        .and_then(|node| {
+            NodeType::ALL
+                .iter()
+                .find(|t| t.spelling() == node.node_type)
+        })
+        .is_some_and(|t| t.must_name(sink))
+}
+
 fn free_input(document: &Document, node: &str) -> Option<String> {
     let inputs = document.node(node)?.attributes.get("inputs")?.clone();
     let taken: Vec<&str> = document
@@ -2448,7 +2653,9 @@ mod tests {
         assert!(moc.from_payload.x > moc.width / 2.0);
         assert!(moc.to_payload.y < moc.from_payload.y);
 
-        // A page claims none: what is inside it is what has terminals.
+        // A page has all four: what is inside it may have any of them, and
+        // nothing out here knows which -- so a line can be drawn to a page
+        // either way on either stream.
         let page = view("subdiagram");
         for terminal in [
             &page.from_moc,
@@ -2456,12 +2663,13 @@ mod tests {
             &page.from_payload,
             &page.to_moc,
         ] {
-            assert!(!terminal.shown);
+            assert!(terminal.shown);
         }
 
-        // Nor does a type this build does not know. The shape already says it
+        // A type this build does not know has none. The shape already says it
         // cannot be placed; four arrows on it would be four claims about a
-        // type nothing here can describe.
+        // type nothing here can describe -- and there is nothing to be gained
+        // by letting a line be drawn to one.
         let unknown = view("contraption");
         assert!(!unknown.from_moc.shown && !unknown.to_moc.shown);
 
@@ -2842,7 +3050,15 @@ mod tests {
         assert_eq!(fresh_name(&document, "i2c", &cabin), "i2c");
     }
 
-    /// A link's ends are placed on the two nodes it joins.
+    /// A link's ends are placed on the terminals it is attached to.
+    ///
+    /// Which is the drawing the canvas is for: the readings leave a payload by
+    /// its `to_moc`, in its lower left corner, and arrive at the computation
+    /// by its `from_payload`, in that node's lower right -- so the line runs
+    /// leftward along the bottom of both, the way the data goes and the way
+    /// the panes are arranged. It used to leave the middle of the source's
+    /// right edge and arrive at the middle of the target's left edge, which
+    /// was the only thing a line could do before terminals.
     #[test]
     fn a_link_is_drawn_between_its_nodes() {
         use journal::{Edit, Link};
@@ -2885,15 +3101,18 @@ mod tests {
                 node_type: "compute".into(),
                 home: None,
             },
+            // The payload to the right of the computation, which is where
+            // the panes put it: payloads are the rightmost working pane and
+            // the vehicle's own graph is the middle one.
             Edit::MoveNode {
                 node: "a".into(),
                 was: (0, 0),
-                now: (8, 24),
+                now: (504, 24),
             },
             Edit::MoveNode {
                 node: "b".into(),
                 was: (0, 0),
-                now: (304, 40),
+                now: (200, 40),
             },
             Edit::AddLink {
                 link: Link::new("a", "b", Some("in0")),
@@ -2906,23 +3125,192 @@ mod tests {
         assert_eq!(links.len(), 1);
         let view = &links[0];
 
-        // It starts at the right edge of the source and ends at the left edge
-        // of the destination, so the line does not cross either shape.
-        let (width, _) = size_of("i2c");
+        // It starts on the payload's own `to_moc` terminal, which is the
+        // left edge of its lower left corner, and finishes on the
+        // computation's `from_payload`, the right edge of its lower right
+        // corner -- so the line touches both boxes it joins and crosses
+        // neither shape.
+        let ((start_x, start_y), leaves_right) =
+            style::attachment("i2c", (504, 24), "to_moc").expect("a payload's source");
+        assert!(!leaves_right, "the readings leave towards the ground");
         assert!(
-            view.route.starts_with(&format!("M {}.0", 8 + width as i32)),
+            view.route
+                .starts_with(&format!("M {start_x:.1} {start_y:.1}")),
             "{}",
             view.route
         );
-        let (_, target_height) = size_of("compute");
-        let arrives = 40 + target_height as i32 / 2;
+
+        let ((end_x, end_y), _) =
+            style::attachment("compute", (200, 40), "from_payload").expect("a sink");
         assert!(
-            view.route.ends_with(&format!("304.0 {arrives}.0")),
+            view.route.ends_with(&format!("{end_x:.1} {end_y:.1}")),
             "{}",
             view.route
         );
         assert!(view.head.ends_with('Z'), "there should be an arrowhead");
         assert!(view.wide, "a link into a named input is drawn wide");
+
+        // And the whole of it is on the canvas. A line that leaves a node by
+        // its left side has its stub to the left of that node, which runs off
+        // the edge if the node is against it -- and a line that disappears
+        // reads as a line that stops. No minus sign anywhere in the path is
+        // the whole of the check, the canvas starting at nought.
+        assert!(
+            !view.route.contains('-'),
+            "part of the route is off the canvas: {}",
+            view.route
+        );
+    }
+
+    /// A link is drawn from one terminal to the one it pairs with, and
+    /// nothing else is drawn at all.
+    ///
+    /// The gesture, without the window: the terminal pressed and the point the
+    /// pointer was let go of are the whole of what it says, and `joined` is
+    /// what turns those into a link or into nothing. Each refusal here is a
+    /// link the editor cannot make -- which is worth more than one it makes
+    /// and then marks red.
+    #[test]
+    fn a_link_is_drawn_between_terminals_that_pair() {
+        use journal::Edit;
+
+        let mut document = Document::new();
+        for (name, node_type, at) in [
+            ("sensor", "i2c", (560, 120)),
+            ("through", "null", (300, 120)),
+            ("ground", "moc", (16, 120)),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+            document.apply(&Edit::MoveNode {
+                node: name.into(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+
+        // The middle of a terminal's box, which is where a person lets go.
+        // Taken from a copy of where the nodes are, so that a link can be
+        // added to the document afterwards without the borrow outliving it.
+        let placed: Vec<(String, String, (i32, i32))> = document
+            .nodes_in(&None)
+            .iter()
+            .map(|node| (node.name.clone(), node.node_type.clone(), node.at))
+            .collect();
+        let over = |node: &str, terminal: &str| {
+            let (_, node_type, at) = placed
+                .iter()
+                .find(|(name, _, _)| name == node)
+                .expect("the node");
+            let (x, y, width, height) =
+                style::terminal_box(node_type, *at, terminal).expect("a terminal");
+            (x + width / 2.0, y + height / 2.0)
+        };
+        let drawn = |node: &str, terminal: &str| Drawing {
+            node: node.to_string(),
+            terminal: terminal.to_string(),
+        };
+
+        // The readings, from the payload to the ground: a to_moc let go of
+        // over a from_payload. Neither end names its terminal, both types
+        // having one of each -- which is what keeps a saved file saying
+        // `{ from: sensor, to: ground }`.
+        let link = joined(
+            &document,
+            &None,
+            &drawn("sensor", "to_moc"),
+            over("ground", "from_payload"),
+        )
+        .expect("a payload's readings reach the ground");
+        assert_eq!(link.from, "sensor");
+        assert_eq!(link.origin, None);
+        assert_eq!(link.to, "ground");
+        assert_eq!(link.input, None);
+
+        // And back the other way, which is the other stream: a to_payload let
+        // go of over a from_moc.
+        let back = joined(
+            &document,
+            &None,
+            &drawn("ground", "to_payload"),
+            over("sensor", "from_moc"),
+        )
+        .expect("what the ground sends reaches the payload");
+        assert_eq!((back.from.as_str(), back.to.as_str()), ("ground", "sensor"));
+
+        // A null node has two of each, so its links say which: that is the
+        // whole reason a terminal is written into a file.
+        let through = joined(
+            &document,
+            &None,
+            &drawn("through", "to_moc"),
+            over("ground", "from_payload"),
+        )
+        .expect("a null node reaches the ground");
+        assert_eq!(through.origin.as_deref(), Some("to_moc"));
+
+        // Now the four gestures that are not links.
+        //
+        // Let go of over a terminal that does not pair: a to_payload carries
+        // what the ground sends, and a from_payload is where readings arrive
+        // -- a line between them would carry one stream into the other.
+        assert_eq!(
+            joined(
+                &document,
+                &None,
+                &drawn("through", "to_payload"),
+                over("ground", "from_payload"),
+            ),
+            None,
+            "a to_payload may only be linked to a from_moc"
+        );
+
+        // Let go of over a data source, which is where a link is drawn from
+        // and not a place to let go of one.
+        assert_eq!(
+            joined(
+                &document,
+                &None,
+                &drawn("sensor", "to_moc"),
+                over("ground", "to_payload"),
+            ),
+            None
+        );
+
+        // Let go of over nothing.
+        assert_eq!(
+            joined(&document, &None, &drawn("sensor", "to_moc"), (900.0, 400.0)),
+            None
+        );
+
+        // Let go of over the node it started on, which is a gesture that
+        // changed its mind rather than a request for a loop.
+        assert_eq!(
+            joined(
+                &document,
+                &None,
+                &drawn("through", "to_moc"),
+                over("through", "from_moc"),
+            ),
+            None
+        );
+
+        // And a link that is already there: a second line on top of the first
+        // would be two deliveries of every datum.
+        document.apply(&Edit::AddLink { link: link.clone() });
+        assert_eq!(
+            joined(
+                &document,
+                &None,
+                &drawn("sensor", "to_moc"),
+                over("ground", "from_payload"),
+            ),
+            None,
+            "the same link twice"
+        );
     }
 
     /// Every working pane has room for a node.
@@ -3384,17 +3772,9 @@ mod tests {
             assert!(!document.links.is_empty(), "and no links");
 
             for link in &document.links {
-                let from = document.node(&link.from).expect("the source");
-                let to = document.node(&link.to).expect("the target");
-                let (width, height) = size_of(&from.node_type);
-                let (_, arrives) = size_of(&to.node_type);
-                let through = route::runs_through(
-                    (from.at.0 + width as i32) as f32,
-                    (from.at.1 + height as i32 / 2) as f32,
-                    to.at.0 as f32,
-                    (to.at.1 + arrives as i32 / 2) as f32,
-                    &obstacles,
-                );
+                // The same ends the canvas draws, which is the point of
+                // asking here: see ends_of.
+                let through = route::runs_through(ends_of(document, link, &None), &obstacles);
                 assert_eq!(
                     through, 0,
                     "example.{extension}: the line from {} to {} runs through \
@@ -3426,6 +3806,149 @@ mod tests {
         the_divider_can_be_dragged();
         a_node_follows_the_pointer_and_reports_where_it_went();
         an_existing_configuration_is_on_the_canvas();
+        a_link_is_drawn_by_dragging_from_a_terminal();
+    }
+
+    /// Dragging from one terminal to another makes the link.
+    ///
+    /// The gesture through the window, which is the only way to find out
+    /// whether the terminals can be reached at all: they are drawn inside the
+    /// node, over the area a drag is taken from, and a press that went to the
+    /// grip instead would move the node and draw nothing. What `joined`
+    /// decides is tested on its own above; this is the wiring around it.
+    fn a_link_is_drawn_by_dragging_from_a_terminal() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("drawn.yaml"),
+            dividers(),
+        )));
+        // A payload in the payload working pane and the ground link in its
+        // own, which is where the two of them belong -- and the arrangement
+        // the terminals are drawn for: the readings leave the payload's lower
+        // left corner and arrive at the ground link's lower right.
+        for (name, node_type, at) in [
+            ("sensor", "i2c", (dividers().vehicle + 24, 120)),
+            ("ground", "moc", (16, 120)),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+            editor.borrow_mut().edit(Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui);
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
+        views.borrow_mut().chosen = chosen.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+        ui.show().expect("the window shows");
+
+        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+            .next()
+            .expect("the window has a canvas");
+        let origin = canvas.absolute_position();
+
+        // The middle of a terminal's box, where the pointer goes.
+        let middle = |node: &str, terminal: &str| {
+            let at = editor.borrow().document().node(node).expect("the node").at;
+            let node_type = editor
+                .borrow()
+                .document()
+                .node(node)
+                .expect("the node")
+                .node_type
+                .clone();
+            let (x, y, width, height) =
+                style::terminal_box(&node_type, at, terminal).expect("a terminal");
+            slint::LogicalPosition::new(
+                origin.x + x + width / 2.0,
+                origin.y + y + height / 2.0,
+            )
+        };
+
+        let from = middle("sensor", "to_moc");
+        let to = middle("ground", "from_payload");
+
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: from });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: to });
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: to,
+            button: PointerEventButton::Left,
+        });
+
+        let links = editor.borrow().document().links.clone();
+        assert_eq!(
+            links.len(),
+            1,
+            "dragging from a terminal to one that pairs with it should make one \
+             link: {links:?}"
+        );
+        assert_eq!((links[0].from.as_str(), links[0].to.as_str()), ("sensor", "ground"));
+        // Neither end names its terminal: both types have one of each, and the
+        // schema reads an unnamed end as that one.
+        assert_eq!((&links[0].origin, &links[0].input), (&None, &None));
+
+        // And the node did not move: a press on a terminal draws a link, and
+        // the drag the same press would otherwise have started is what the
+        // terminals sit on top of.
+        assert_eq!(
+            editor.borrow().document().node("sensor").expect("it").at,
+            (dividers().vehicle + 24, 120)
+        );
+
+        // A pairing that is not allowed makes nothing: a to_moc let go of
+        // over a to_payload, which is a data source and not a place for a
+        // link to arrive.
+        let to = middle("ground", "to_payload");
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: from });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: to });
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: to,
+            button: PointerEventButton::Left,
+        });
+        assert_eq!(
+            editor.borrow().document().links.len(),
+            1,
+            "a gesture between terminals that do not pair should draw nothing"
+        );
     }
 
     /// Opening a configuration puts it on the canvas.
@@ -3551,7 +4074,7 @@ mod tests {
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
-        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
@@ -3678,7 +4201,7 @@ mod tests {
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
-        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
@@ -3757,7 +4280,7 @@ mod tests {
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
-        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
 
         // Nothing is open until the menu item is chosen.
@@ -4054,7 +4577,7 @@ mod tests {
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
-        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
@@ -4296,7 +4819,7 @@ mod tests {
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
-        let drawing: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
 

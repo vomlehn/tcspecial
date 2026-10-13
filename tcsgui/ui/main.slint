@@ -224,13 +224,46 @@ component Terminal inherits Rectangle {
     in property <color> ink;
     // Whether the arrow points right, which is to say towards the payloads.
     in property <bool> rightward;
+    // Whether this is where data arrives. A link is drawn *from* a data
+    // source, so only a source answers a press; a sink is a place to let go
+    // of one, and where it was let go of is worked out from the pointer.
+    in property <bool> sink;
+
+    // A link is being drawn from this terminal, and then let go of -- at this
+    // point, measured from the terminal's own corner.
+    //
+    // The release is reported by the terminal the gesture *started* on, not by
+    // the one it finished over, because that is how a pointer works: a press
+    // grabs it, so every event until the release goes to the thing that was
+    // pressed. What is under the pointer at the end is a question about where
+    // the nodes are, and the answer is worked out in Rust where the geometry
+    // is -- see `terminal_under`.
+    callback grabbed();
+    callback released(length, length);
 
     width: 24px;
     height: 10px;
     border-width: 1px;
     border-color: ink;
     border-radius: 1px;
-    background: ink.with-alpha(0.10);
+    // Filled while the pointer is over it, as the old round handles were: a
+    // target that answers the pointer is a target somebody can see they have
+    // hit before they let go.
+    background: touch.has-hover ? ink.with-alpha(0.45) : ink.with-alpha(0.10);
+
+    touch := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: MouseCursor.crosshair;
+        pointer-event(event) => {
+            if (!sink && event.kind == PointerEventKind.down) {
+                grabbed();
+            }
+            if (!sink && event.kind == PointerEventKind.up) {
+                released(self.mouse-x, self.mouse-y);
+            }
+        }
+    }
 
     Path {
         width: 100%;
@@ -266,8 +299,12 @@ component NodeShape inherits Rectangle {
     callback open-requested();
     // A link is being drawn: pressed on the handle of one node, released over
     // another.
-    callback link-from();
-    callback link-to();
+    // A link is being drawn: the terminal pressed is remembered, and where
+    // the pointer was let go of says what the other end is. The name of the
+    // terminal pressed is the whole of what the first half says; the second
+    // half is a point on the canvas.
+    callback link-from(string);
+    callback link-dropped(length, length);
     // This node was pressed, so it is the one the panel should show.
     callback chosen();
 
@@ -389,35 +426,6 @@ component NodeShape inherits Rectangle {
             background: ink;
         }
 
-        // The terminals: a link may be attached to each, and a type is drawn
-        // with the ones it has and no others. Inside the shape and in its
-        // corners, so that the box a person presses and the box a link
-        // arrives at are the same box.
-        if node.from-moc.shown: Terminal {
-            x: node.from-moc.x;
-            y: node.from-moc.y;
-            rightward: node.from-moc.rightward;
-            ink: ink;
-        }
-        if node.to-payload.shown: Terminal {
-            x: node.to-payload.x;
-            y: node.to-payload.y;
-            rightward: node.to-payload.rightward;
-            ink: ink;
-        }
-        if node.from-payload.shown: Terminal {
-            x: node.from-payload.x;
-            y: node.from-payload.y;
-            rightward: node.from-payload.rightward;
-            ink: ink;
-        }
-        if node.to-moc.shown: Terminal {
-            x: node.to-moc.x;
-            y: node.to-moc.y;
-            rightward: node.to-moc.rightward;
-            ink: ink;
-        }
-
         // The name, and under it the type. The type is shown always and not only
         // on hover: a diagram whose shapes have to be remembered is a diagram that
         // is read wrongly under pressure.
@@ -476,59 +484,6 @@ component NodeShape inherits Rectangle {
             }
         }
 
-        // The handle a link is drawn from: a small circle on the right edge,
-        // where a link leaves.
-        //
-        // A handle rather than a modifier key or a mode: a diagram is edited by
-        // people who use it rarely, and a thing that is visible is a thing that
-        // does not have to be remembered. On the right because a link is drawn
-        // left to right, which is the direction the canvas lays a graph out in.
-        out-handle := Rectangle {
-            x: root.width - 7px;
-            y: root.height / 2 - 7px;
-            width: 14px;
-            height: 14px;
-            border-radius: 7px;
-            border-width: 1px;
-            border-color: ink;
-            background: out-touch.has-hover ? ink : white;
-
-            out-touch := TouchArea {
-                width: 100%;
-                height: 100%;
-                mouse-cursor: MouseCursor.crosshair;
-                pointer-event(event) => {
-                    if (event.kind == PointerEventKind.down) {
-                        link-from();
-                    }
-                }
-            }
-        }
-
-        // And where one arrives: the left edge. A release over this says which
-        // node the link reaches.
-        in-handle := Rectangle {
-            x: -7px;
-            y: root.height / 2 - 7px;
-            width: 14px;
-            height: 14px;
-            border-radius: 7px;
-            border-width: 1px;
-            border-color: ink;
-            background: in-touch.has-hover ? ink : white;
-
-            in-touch := TouchArea {
-                width: 100%;
-                height: 100%;
-                mouse-cursor: MouseCursor.crosshair;
-                pointer-event(event) => {
-                    if (event.kind == PointerEventKind.up) {
-                        link-to();
-                    }
-                }
-            }
-        }
-
         // A subdiagram is opened from a mark in its own corner.
         //
         // Not a double press on the box: a single press already drags it, and a
@@ -536,9 +491,11 @@ component NodeShape inherits Rectangle {
         // gesture that does the wrong one under pressure. A mark that says
         // "there is more in here" is also the only hint a closed box gives that
         // it can be opened at all.
+        // The middle of the top edge, which is the one place on a node that
+        // no terminal is in: the four of them hold the four corners.
         if node.openable: Rectangle {
-            x: root.width - 20px;
-            y: 6px;
+            x: (root.width - 14px) / 2;
+            y: 4px;
             width: 14px;
             height: 14px;
             border-width: 1px;
@@ -603,6 +560,59 @@ component NodeShape inherits Rectangle {
             if (event.kind == PointerEventKind.up) {
                 dragged(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
             }
+        }
+    }
+
+    // The terminals: a link may be attached to each, and a type is drawn with
+    // the ones it has and no others. In its corners, inside the shape, so that
+    // the box a person presses and the box the line arrives at are the same
+    // box.
+    //
+    // After the grip and not inside `moving`, which is a choice about what a
+    // press on a corner means: the grip covers the whole node, so anything
+    // under it is a thing the pointer cannot reach, and a press on a terminal
+    // has to draw a link rather than start a drag. The drag offset is applied
+    // here by hand for the same reason -- these are outside the group that
+    // carries it, and a terminal that stayed put while its node moved would be
+    // a line attached to where the node used to be.
+    if node.from-moc.shown: Terminal {
+        x: node.from-moc.x + drag-x;
+        y: node.from-moc.y + drag-y;
+        rightward: node.from-moc.rightward;
+        sink: true;
+        ink: ink;
+    }
+    if node.to-payload.shown: Terminal {
+        x: node.to-payload.x + drag-x;
+        y: node.to-payload.y + drag-y;
+        rightward: node.to-payload.rightward;
+        sink: false;
+        ink: ink;
+        grabbed => { link-from("to_payload"); }
+        // Where the pointer was let go of, in the canvas's own coordinates:
+        // the node is placed at node.x and the terminal sits at its own offset
+        // inside it, so the two and the pointer's offset from the terminal's
+        // corner are the whole of it.
+        released(x, y) => {
+            link-dropped(node.x + node.to-payload.x + x, node.y + node.to-payload.y + y);
+        }
+    }
+    if node.from-payload.shown: Terminal {
+        x: node.from-payload.x + drag-x;
+        y: node.from-payload.y + drag-y;
+        rightward: node.from-payload.rightward;
+        sink: true;
+        ink: ink;
+    }
+    if node.to-moc.shown: Terminal {
+        x: node.to-moc.x + drag-x;
+        y: node.to-moc.y + drag-y;
+        rightward: node.to-moc.rightward;
+        sink: false;
+        ink: ink;
+        grabbed => { link-from("to_moc"); }
+        released(x, y) => {
+            link-dropped(node.x + node.to-moc.x + x, node.y + node.to-moc.y + y);
         }
     }
 
@@ -874,8 +884,8 @@ component Surface inherits Rectangle {
     // Write every file of the configuration now.
     callback save-clicked();
     // Drawing a link: pressed on one node, released on another.
-    callback link-started(string);
-    callback link-finished(string);
+    callback link-started(string, string);
+    callback link-finished(length, length);
     callback node-selected(string);
 
     // Which node is drawn as chosen. What it says about itself is in a window
@@ -1105,8 +1115,8 @@ component Surface inherits Rectangle {
                     selected: n.name == root.selected;
                     dragged(dx, dy) => { node-moved(n.name, dx, dy); }
                     open-requested => { open-subdiagram(n.name); }
-                    link-from => { link-started(n.name); }
-                    link-to => { link-finished(n.name); }
+                    link-from(terminal) => { link-started(n.name, terminal); }
+                    link-dropped(x, y) => { link-finished(x, y); }
                     chosen => { node-selected(n.name); }
                 }
             }
@@ -1167,8 +1177,8 @@ export component MainWindow inherits Window {
     callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
     callback save-clicked();
-    callback link-started(string);
-    callback link-finished(string);
+    callback link-started(string, string);
+    callback link-finished(length, length);
     callback node-selected(string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
@@ -1263,8 +1273,8 @@ export component MainWindow inherits Window {
         moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         open-subdiagram(n) => { root.open-subdiagram(n); }
-        link-started(n) => { root.link-started(n); }
-        link-finished(n) => { root.link-finished(n); }
+        link-started(n, terminal) => { root.link-started(n, terminal); }
+        link-finished(x, y) => { root.link-finished(x, y); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
     }
@@ -1321,8 +1331,8 @@ export component SubWindow inherits Window {
     callback moc-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback save-clicked();
-    callback link-started(string);
-    callback link-finished(string);
+    callback link-started(string, string);
+    callback link-finished(length, length);
     callback node-selected(string);
     callback edit-parameters();
     callback edit-groups();
@@ -1413,8 +1423,8 @@ export component SubWindow inherits Window {
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
         moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
-        link-started(n) => { root.link-started(n); }
-        link-finished(n) => { root.link-finished(n); }
+        link-started(n, terminal) => { root.link-started(n, terminal); }
+        link-finished(x, y) => { root.link-finished(x, y); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
     }

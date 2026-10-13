@@ -307,6 +307,23 @@ Requirement
     payload the configuration describes and nothing reads or drives.
 
 Requirement
+    Each terminal may be linked to one other terminal, and the pairing is four
+    sentences: a ``to_moc`` only to a ``from_payload``, a ``from_payload`` only
+    to a ``to_moc``, a ``to_payload`` only to a ``from_moc``, a ``from_moc``
+    only to a ``to_payload``. Which is one sentence twice over -- a stream
+    leaves at one terminal and arrives at the other -- so the pairing is
+    derived from the table above rather than written out again.
+
+    The editor is held to it as a *gesture*: a line dragged from a terminal
+    will not join to one that does not pair with it, so a bad link cannot be
+    drawn in the first place. The checking refuses a written-out configuration
+    for the same reason, which is what a file edited by hand is still held to.
+    What that rules out is a link that carries one stream into the other, and
+    with it the circular link a drawing could otherwise be made to say.
+    Loops within the vehicle are still possible -- a vehicle node may feed
+    another and be fed by it -- and this rule is not what would stop one.
+
+Requirement
     A link whose two ends carry opposite streams is refused. One end of it is
     drawn backwards, and nothing else in the configuration would show it: both
     nodes exist, both terminals exist, and in flight it is a payload that
@@ -317,6 +334,15 @@ Requirement
     terminal named at the wrong end of the link is refused as the mistake it is
     rather than as a name nothing knows. The name is right and the end is
     wrong, which is worth saying in those words.
+
+Requirement
+    A terminal is written into a file only where it says which. A node with one
+    data source and one data sink needs neither name -- ``{ from: temp_fore,
+    to: moc }`` is unambiguous, and the schema reads an unnamed end as the only
+    terminal of the kind that end needs -- so the editor writes a terminal for
+    the ``null`` node and for nothing else. A tool that wrote a name into every
+    link of every file it saved would churn every configuration it opened for
+    no gain.
 
 Requirement
     A terminal is not a named input. ``in0`` is which *of several* ways into a
@@ -1176,7 +1202,16 @@ one.
 
 A link is drawn as an orthogonal route rather than a straight line -- out of
 the source, across, into the target, corners rounded -- and it goes around
-whatever is in the way. A line that runs through a node says there is a
+whatever is in the way. Out of the source and into the target, and which way
+each of those is, is what the terminals decide: the groundward stream leaves a
+node's left side and arrives at the next one's right side, and the next one is
+usually drawn further left, the ground being the leftmost working pane. So a
+line's first turn is to the left of a node whose terminal is on its left, and
+the arrowhead at the end points the way the line is actually travelling when it
+arrives. Before there were terminals a link left every node by the middle of
+its right edge and arrived at the middle of the next one's left edge, which
+made a payload reporting to a ground link drawn to its left run out to the
+right and all the way back. A line that runs through a node says there is a
 connection where there is none, which is worse than a line that is hard to
 follow: a reader tracing it arrives at the wrong node and has no way of
 knowing. So a route is chosen rather than computed. A handful of shapes are
@@ -1216,6 +1251,34 @@ The label is padded away from whichever side carries terminals rather than a
 row being reserved at the top and the bottom: the name stays in the middle of
 the node and stops short of the corner boxes, where reserving rows would leave
 sixteen pixels for a name on the shortest node.
+
+A link is drawn by dragging from one terminal to another, and the terminals are
+the only handles there are. There were two round handles on every node -- one
+on each side, meaning "a link leaves here" and "a link arrives here" -- and
+they are gone: a node has two places a link may leave and two it may arrive at,
+and a handle in the middle of an edge could not say which of them was meant. So
+the boxes a reader looks at to see what may be linked to what are the boxes a
+person presses to link them, which is one thing to learn instead of two.
+
+The gesture will not make a link that the configuration check would refuse.
+Letting go over a terminal that does not pair with the one the drag started at
+does nothing at all, and so does letting go over a data source, over the node
+the drag started on, over empty canvas, or over a terminal the same link is
+already drawn to. An editor that cannot make a bad link is worth more than one
+that makes it and marks it red -- and the four refusals are the four ways a
+person's hand slips, not four ways of being wrong about the vehicle.
+
+Which terminal was pressed is the whole of what the first half of the gesture
+says. The second half is a point: a press grabs the pointer, so every event up
+to the release goes to the terminal that was pressed, and what is under the
+pointer at the end is worked out from where the nodes are. That arithmetic is
+in Rust, with the rest of the geometry, where it can be tested without a
+window.
+
+A terminal is drawn inside its node and over the area a drag is taken from, so
+a press on a corner draws a link and a press anywhere else moves the node. That
+is the one thing the arrangement costs: a node can no longer be dragged by its
+corners.
 
 Colour remains the redundant channel for all that. Nothing is told apart by
 colour alone: every type differs from every other in at least two of outline,

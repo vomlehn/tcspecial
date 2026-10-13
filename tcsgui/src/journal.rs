@@ -216,9 +216,25 @@ pub enum Edit {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Link {
     pub from: String,
+    /// Which data source of the origin the line leaves by, where the type has
+    /// more than one. `None` is a node with one, which needs no naming -- see
+    /// `tcslibgs::graph::terminals`.
+    ///
+    /// Written into the file as part of the `from`: `from: through.to_moc`.
+    /// Kept apart from the name here because everything in the editor that
+    /// looks a link's source up looks up a node, and a field that sometimes
+    /// held `node.terminal` would be a name that sometimes is not one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
     pub to: String,
     /// Which input of the destination, where the destination has more than
     /// one. `None` is a destination that takes a single input.
+    ///
+    /// Two things are written here, because the file writes both in the same
+    /// place: a computation's named input -- `in0` -- and a data sink of a
+    /// type that has more than one, which is a terminal. Which it is, is a
+    /// question for the name: `tcslibgs::graph::terminals::stream_of` knows
+    /// the four terminals and nothing else does.
     pub input: Option<String>,
     /// What somebody wrote about this connection.
     ///
@@ -237,18 +253,34 @@ impl Link {
     /// is what the history compares -- an edit that changed a comment and an
     /// edit that did not are different edits.
     pub fn same_connection(&self, other: &Link) -> bool {
-        self.from == other.from && self.to == other.to && self.input == other.input
+        self.from == other.from
+            && self.origin == other.origin
+            && self.to == other.to
+            && self.input == other.input
     }
 
     /// A link joining these, with nothing written about it.
     ///
-    /// Used by the tests today, and by drawing a link on the canvas when that
-    /// lands -- which is why it is here rather than gated to the tests: the
-    /// one caller it is waiting for is the obvious one.
-    #[allow(dead_code)]
+    /// Neither end naming a terminal, which is every link between two nodes
+    /// that have one of each: see [`Link::joining`] for the other case.
     pub fn new(from: &str, to: &str, input: Option<&str>) -> Link {
+        Link::joining(from, None, to, input)
+    }
+
+    /// A link leaving a named data source, with nothing written about it.
+    ///
+    /// What the canvas makes when the line was dragged from the terminal of a
+    /// node that has more than one -- a `null` node, whose links have to say
+    /// which stream they carry.
+    pub fn joining(
+        from: &str,
+        origin: Option<&str>,
+        to: &str,
+        input: Option<&str>,
+    ) -> Link {
         Link {
             from: from.to_string(),
+            origin: origin.map(|t| t.to_string()),
             to: to.to_string(),
             input: input.map(|i| i.to_string()),
             comment: None,

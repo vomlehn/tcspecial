@@ -94,6 +94,83 @@ impl Obstacle {
     }
 }
 
+/// Where a line starts and finishes, and which way it points at each end.
+///
+/// The directions are what terminals made necessary. A link used to leave
+/// every node by the middle of its right edge and arrive at the middle of the
+/// next one's left edge, so "out, across, in" meant one thing and the
+/// arrowhead always pointed right. Now a link leaves the terminal it is
+/// attached to -- and the groundward stream leaves a node's *left* side, on
+/// its way to a ground link drawn further left -- so the way out of the source
+/// and the way into the target are two separate facts, and neither of them is
+/// always right.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Ends {
+    /// Where the line starts: a point on the source's edge.
+    pub from: (f32, f32),
+    /// Where it finishes: a point on the target's edge.
+    pub to: (f32, f32),
+    /// Whether it goes right as it leaves the source.
+    pub leaves_right: bool,
+    /// Whether it is going right as it reaches the target, which is to say it
+    /// arrives at the target's left side. The arrowhead points this way.
+    pub arrives_right: bool,
+}
+
+impl Ends {
+    /// Left to right at both ends, which is how every link was drawn before
+    /// there were terminals.
+    ///
+    /// Still the answer for the nodes whose terminals are their own business
+    /// and for the tests of the shapes themselves, which are about geometry
+    /// and not about which corner a stream leaves by.
+    pub fn forward(x1: f32, y1: f32, x2: f32, y2: f32) -> Ends {
+        Ends {
+            from: (x1, y1),
+            to: (x2, y2),
+            leaves_right: true,
+            arrives_right: true,
+        }
+    }
+
+    /// Both ends as the terminals put them.
+    pub fn new(
+        from: (f32, f32),
+        to: (f32, f32),
+        leaves_right: bool,
+        arrives_right: bool,
+    ) -> Ends {
+        Ends {
+            from,
+            to,
+            leaves_right,
+            arrives_right,
+        }
+    }
+
+    /// Where the line turns after leaving the source.
+    ///
+    /// A stub out along the edge it left, so that two links leaving one node
+    /// do not overlap for their whole first segment -- and out *away* from the
+    /// node, which is the half of it the direction decides: a stub to the
+    /// right of a terminal on the left side would run back through the node it
+    /// just left.
+    fn out(&self) -> f32 {
+        self.from.0 + if self.leaves_right { STUB } else { -STUB }
+    }
+
+    /// And where it makes its last turn before the target.
+    fn in_(&self) -> f32 {
+        self.to.0 + if self.arrives_right { -STUB } else { STUB }
+    }
+
+    /// Whether the two ends point the same way, so that a route can run
+    /// straight from one stub to the other.
+    fn agree(&self) -> bool {
+        self.leaves_right == self.arrives_right
+    }
+}
+
 /// A box a line may not cross, as two corners.
 type Box = (f32, f32, f32, f32);
 
@@ -115,22 +192,28 @@ type Weighed = (Cost, Vec<(f32, f32)>);
 /// as many more turns as it takes to miss what is in the way. Where the two
 /// ends are at the same height and nothing is between them the route is one
 /// straight line, which is the common case and wants no corners at all.
-pub fn route(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> String {
-    drawn(&way(x1, y1, x2, y2, around))
+pub fn route(ends: Ends, around: &[Obstacle]) -> String {
+    drawn(&way(ends, around))
 }
 
 /// The arrowhead at the target end, as a filled triangle.
 ///
 /// A separate path because it is filled and the route is stroked, and Slint
 /// gives one `Path` one of each. Pointing along the last segment, which is
-/// always horizontal and always arrives from the left -- so the triangle does
-/// not have to be rotated.
-pub fn arrow(x2: f32, y2: f32) -> String {
+/// always horizontal -- and which way along it is [`Ends::arrives_right`]: a
+/// groundward link arrives at its target's right side travelling left, and an
+/// arrowhead that pointed right there would point back up its own line.
+pub fn arrow(ends: Ends) -> String {
     let (length, half) = HEAD;
+    let (x2, y2) = ends.to;
     // The tip at the node's edge, where the line ends, so the arrow touches
     // what it points at: a head set back from the edge leaves a stub of line
     // sticking out of its point.
-    triangle(x2 - length / 2.0, y2, Way::Right, (length, half))
+    if ends.arrives_right {
+        triangle(x2 - length / 2.0, y2, Way::Right, (length, half))
+    } else {
+        triangle(x2 + length / 2.0, y2, Way::Left, (length, half))
+    }
 }
 
 /// A second arrow, in the middle of the route's longest run.
@@ -147,8 +230,8 @@ pub fn arrow(x2: f32, y2: f32) -> String {
 /// most room to is the segment with room for this. A route whose longest run
 /// has no room for one gets none -- see [`ROOM`] -- which is a short link,
 /// where the head at the end is already next to everything else about it.
-pub fn marker(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> String {
-    let points = way(x1, y1, x2, y2, around);
+pub fn marker(ends: Ends, around: &[Obstacle]) -> String {
+    let points = way(ends, around);
     let (from, to) = match longest(&points) {
         Some(run) => run,
         None => return String::new(),
@@ -182,11 +265,14 @@ pub fn marker(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> String
 /// used to be. A route that detours around a node has a middle nowhere near
 /// the straight line between its ends, and a label sitting there is a label
 /// beside a different link -- or beside nothing at all.
-pub fn label_at(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> (f32, f32) {
-    let points = way(x1, y1, x2, y2, around);
+pub fn label_at(ends: Ends, around: &[Obstacle]) -> (f32, f32) {
+    let points = way(ends, around);
     match longest(&points) {
         Some((from, to)) => ((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0),
-        None => ((x1 + x2) / 2.0, (y1 + y2) / 2.0),
+        None => (
+            (ends.from.0 + ends.to.0) / 2.0,
+            (ends.from.1 + ends.to.1) / 2.0,
+        ),
     }
 }
 
@@ -198,8 +284,8 @@ pub fn label_at(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> (f32
 /// be checked; this is how a test of a real configuration asks the same
 /// question of every link in it at once.
 #[cfg(test)]
-pub fn runs_through(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> usize {
-    let points = way(x1, y1, x2, y2, around);
+pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
+    let points = way(ends, around);
     around
         .iter()
         .filter(|b| {
@@ -217,11 +303,11 @@ pub fn runs_through(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> 
 /// lie about the graph; bends before length because the lengths of two
 /// orthogonal routes between one pair of points are usually equal, and of two
 /// equal routes the one with fewer turns is the one that can be followed.
-fn way(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> Vec<(f32, f32)> {
-    let boxes = blocking(around, (x1, y1), (x2, y2));
+fn way(ends: Ends, around: &[Obstacle]) -> Vec<(f32, f32)> {
+    let boxes = blocking(around, ends.from, ends.to);
     let mut best: Option<Weighed> = None;
 
-    for points in shapes(x1, y1, x2, y2, around) {
+    for points in shapes(ends, around) {
         let cost: Cost = (
             crossings(&points, &boxes),
             points.len() - 2,
@@ -236,32 +322,39 @@ fn way(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> Vec<(f32, f32
     }
 
     best.map(|(_, points)| points)
-        .unwrap_or_else(|| vec![(x1, y1), (x2, y2)])
+        .unwrap_or_else(|| vec![ends.from, ends.to])
 }
 
 /// Every route worth considering, in the order they are preferred.
-fn shapes(x1: f32, y1: f32, x2: f32, y2: f32, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
-    let out = x1 + STUB;
-    let in_ = x2 - STUB;
+fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
+    let ((x1, y1), (x2, y2)) = (ends.from, ends.to);
+    let (out, in_) = (ends.out(), ends.in_());
+    // Whether the target lies the way the line set off, which is what makes a
+    // straight run or a Z possible at all: a line that left rightward and has
+    // to arrive somewhere on its left has to go around, whichever way it is
+    // pointing when it gets there.
+    let ahead = if ends.leaves_right { in_ > out } else { in_ < out };
     let mut tries: Vec<Vec<(f32, f32)>> = Vec::new();
 
-    // Straight through: the two ends level and the target ahead of the
-    // source. Nothing beats it when it is clear.
-    if (y2 - y1).abs() < 1.0 && x2 > x1 {
+    // Straight through: the two ends level, pointing the same way, and the
+    // target ahead of the source. Nothing beats it when it is clear.
+    if (y2 - y1).abs() < 1.0 && ends.agree() && ahead {
         tries.push(vec![(x1, y1), (x2, y2)]);
     }
 
     // A Z: out, across, in. Down the middle first, then down either side of
-    // anything in the way.
-    if in_ > out {
+    // anything in the way. Only where both ends point the same way -- a Z
+    // between two stubs that point at each other's nodes would double back
+    // through one of them.
+    if ends.agree() && ahead {
         for across in columns(out, in_, around) {
             tries.push(vec![(x1, y1), (across, y1), (across, y2), (x2, y2)]);
         }
     }
 
     // Around: out, along a clear row, and back in. The only shape that
-    // reaches a target to the left of its source, and the one a forward link
-    // falls back to when every column through the middle is blocked.
+    // reaches a target behind its source, and the one a link falls back to
+    // when every column between the two is blocked.
     for band in rows(y1, y2, around) {
         tries.push(vec![
             (x1, y1),
@@ -284,8 +377,10 @@ fn columns(out: f32, in_: f32, around: &[Obstacle]) -> Vec<f32> {
         xs.push(b.x + b.width + CLEAR);
     }
     // Only between the two stubs: a vertical run outside them would double
-    // back through the node it just left.
-    xs.retain(|x| *x >= out - 0.05 && *x <= in_ + 0.05);
+    // back through the node it just left. Either order, because a leftward
+    // link's stubs run the other way about.
+    let (near, far) = (out.min(in_), out.max(in_));
+    xs.retain(|x| *x >= near - 0.05 && *x <= far + 0.05);
     tidy_numbers(xs)
 }
 
@@ -346,8 +441,20 @@ fn tidied(points: &[(f32, f32)]) -> Vec<(f32, f32)> {
     for (i, p) in kept.iter().enumerate() {
         let between = i > 0 && i + 1 < kept.len() && {
             let (before, after) = (kept[i - 1], kept[i + 1]);
-            let flat = (before.1 - p.1).abs() < 0.5 && (after.1 - p.1).abs() < 0.5;
-            let upright = (before.0 - p.0).abs() < 0.5 && (after.0 - p.0).abs() < 0.5;
+            // On the line, and with its neighbours on opposite sides of it.
+            // The second half matters as much as the first: three points in a
+            // row where the outer two are on the *same* side is a line that
+            // runs out and comes back, which is a reversal and not a point to
+            // drop. Dropping one turned a route that approached a target from
+            // the right into one that approached it from the left -- which is
+            // a line arriving at the wrong side of a node, and with terminals
+            // that is a line arriving at the wrong terminal.
+            let flat = (before.1 - p.1).abs() < 0.5
+                && (after.1 - p.1).abs() < 0.5
+                && (before.0 - p.0) * (after.0 - p.0) < 0.0;
+            let upright = (before.0 - p.0).abs() < 0.5
+                && (after.0 - p.0).abs() < 0.5
+                && (before.1 - p.1) * (after.1 - p.1) < 0.0;
             flat || upright
         };
         if !between {
@@ -577,7 +684,7 @@ mod tests {
                 (0.0, 0.0, 0.0, 0.0),
                 (252.0, 88.0, 300.0, 228.0),
             ] {
-                let path = route(x1, y1, x2, y2, around);
+                let path = route(Ends::forward(x1, y1, x2, y2), around);
                 let visited = points(&path);
                 assert!(path.starts_with('M'), "{path}");
                 assert_eq!(visited.first().copied(), Some((x1, y1)), "{path}");
@@ -592,13 +699,13 @@ mod tests {
     /// would be a bend in a line that does not bend.
     #[test]
     fn a_level_route_is_a_single_line() {
-        let path = route(0.0, 64.0, 240.0, 64.0, &[]);
+        let path = route(Ends::forward(0.0, 64.0, 240.0, 64.0), &[]);
         assert_eq!(path, "M 0.0 64.0 L 240.0 64.0");
         assert!(!path.contains('Q'), "a level route was given a corner");
 
         // And within a pixel of level, which is where two nodes of the same
         // height but different sizes land.
-        assert!(!route(0.0, 64.0, 240.0, 64.4, &[]).contains('Q'));
+        assert!(!route(Ends::forward(0.0, 64.0, 240.0, 64.4), &[]).contains('Q'));
     }
 
     /// A route that turns does so at right angles.
@@ -615,7 +722,7 @@ mod tests {
             (0.0, 0.0, 600.0, 120.0, &[node(280.0, 0.0)][..]),
             (600.0, 40.0, 40.0, 240.0, &[node(40.0, 212.0), node(600.0, 12.0)][..]),
         ] {
-            let route_ = way(x1, y1, x2, y2, around);
+            let route_ = way(Ends::forward(x1, y1, x2, y2), around);
             for pair in route_.windows(2) {
                 let (from, to) = (pair[0], pair[1]);
                 assert!(
@@ -643,7 +750,7 @@ mod tests {
         assert_eq!(radius(0.0, 0.0), 0.0);
 
         // And a route between two nodes two pixels apart is still a route.
-        let path = route(0.0, 0.0, 34.0, 4.0, &[]);
+        let path = route(Ends::forward(0.0, 0.0, 34.0, 4.0), &[]);
         assert!(points(&path).first().copied() == Some((0.0, 0.0)), "{path}");
         assert!(points(&path).last().copied() == Some((34.0, 4.0)), "{path}");
     }
@@ -654,7 +761,7 @@ mod tests {
     /// without the line doubling back across both nodes.
     #[test]
     fn a_backwards_route_does_not_double_back_through_its_nodes() {
-        let path = route(300.0, 40.0, 100.0, 200.0, &[]);
+        let path = route(Ends::forward(300.0, 40.0, 100.0, 200.0), &[]);
         let visited = points(&path);
         assert_eq!(visited.first().copied(), Some((300.0, 40.0)));
         assert_eq!(visited.last().copied(), Some((100.0, 200.0)));
@@ -677,7 +784,7 @@ mod tests {
 
         // Two nodes level with each other, with a third exactly between them:
         // the one case a straight line would otherwise be drawn for.
-        let route_ = way(192.0, 68.0, 560.0, 68.0, &around);
+        let route_ = way(Ends::forward(192.0, 68.0, 560.0, 68.0), &around);
         assert!(
             !through(&route_, &between),
             "the line runs through the node between its ends: {route_:?}"
@@ -706,7 +813,7 @@ mod tests {
 
         // From the payload's right edge back round to the ground station's
         // left edge, which is the shape of every telemetry link.
-        let route_ = way(896.0, 188.0, 24.0, 104.0, &around);
+        let route_ = way(Ends::forward(896.0, 188.0, 24.0, 104.0), &around);
         assert!(
             !through(&route_, &payload),
             "the line runs back through its own source: {route_:?}"
@@ -726,7 +833,7 @@ mod tests {
     fn a_line_keeps_off_a_node_it_passes() {
         let passed = node(300.0, 100.0);
         let around = [node(40.0, 40.0), passed, node(600.0, 300.0)];
-        let route_ = way(192.0, 68.0, 600.0, 328.0, &around);
+        let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &around);
 
         let kept = (
             passed.x - CLEAR,
@@ -752,7 +859,7 @@ mod tests {
         let wall: Vec<Obstacle> = (0..6)
             .map(|n| Obstacle::new(240.0, n as f32 * 56.0, 152.0, 56.0))
             .collect();
-        let path = route(192.0, 28.0, 600.0, 300.0, &wall);
+        let path = route(Ends::forward(192.0, 28.0, 600.0, 300.0), &wall);
         let visited = points(&path);
         assert!(!path.is_empty());
         assert_eq!(visited.first().copied(), Some((192.0, 28.0)));
@@ -769,7 +876,7 @@ mod tests {
     fn a_clear_route_turns_as_little_as_it_can() {
         // Nothing in the way: two turns, which is a Z and the fewest a route
         // that changes height can have.
-        let route_ = way(192.0, 68.0, 600.0, 328.0, &[]);
+        let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &[]);
         assert_eq!(route_.len(), 4, "{route_:?}");
         // Down the middle, so that two links between the same pair of columns
         // do not lie on top of each other.
@@ -780,7 +887,7 @@ mod tests {
     /// The arrowhead points along the line and sits at its end.
     #[test]
     fn the_arrowhead_is_at_the_target_and_points_into_it() {
-        let head = arrow(240.0, 64.0);
+        let head = arrow(Ends::forward(0.0, 64.0, 240.0, 64.0));
         let visited = points(&head);
 
         assert_eq!(visited[0], (240.0, 64.0), "the tip is at the target");
@@ -798,6 +905,76 @@ mod tests {
         assert_eq!(visited[2].1 - visited[1].1, half * 2.0, "and as wide");
     }
 
+    /// A link that goes the other way is routed the other way about.
+    ///
+    /// The groundward stream, which is what terminals made necessary: it
+    /// leaves a node's left side and arrives at the next one's right side, and
+    /// the next one is drawn further left -- the ground link being the
+    /// leftmost working pane. Every piece of the route has to turn around for
+    /// it: the stub, the straight run, the arrowhead.
+    #[test]
+    fn a_leftward_link_runs_leftward() {
+        let leftward = |x1: f32, y1: f32, x2: f32, y2: f32| {
+            Ends::new((x1, y1), (x2, y2), false, false)
+        };
+
+        // Level and clear: one straight line, as the forward case is.
+        assert_eq!(
+            route(leftward(400.0, 100.0, 100.0, 100.0), &[]),
+            "M 400.0 100.0 L 100.0 100.0"
+        );
+
+        // A step down, which is a Z the other way about: the first turn is to
+        // the *left* of the source, because a stub to its right would run back
+        // through the node the line just left.
+        let route_ = way(leftward(400.0, 100.0, 100.0, 200.0), &[]);
+        assert_eq!(route_.len(), 4, "{route_:?}");
+        assert!(route_[1].0 < 400.0, "the stub goes left: {route_:?}");
+        assert!(route_[1].0 > 100.0, "and not past the target: {route_:?}");
+        assert_eq!(route_.first().copied(), Some((400.0, 100.0)));
+        assert_eq!(route_.last().copied(), Some((100.0, 200.0)));
+
+        // And the head points left, into the target's right side. An
+        // arrowhead pointing right there would point back up its own line.
+        let head = arrow(leftward(400.0, 100.0, 100.0, 100.0));
+        let visited = points(&head);
+        assert_eq!(visited[0], (100.0, 100.0), "the tip is at the target");
+        assert!(
+            visited[1].0 > 100.0 && visited[2].0 > 100.0,
+            "the head points left: {head}"
+        );
+    }
+
+    /// A route whose ends point at each other goes around.
+    ///
+    /// The mixed case: a line leaving a node's right side that has to arrive
+    /// at a node's right side. There is no Z that does it -- a vertical run
+    /// between the two stubs would double back through one of the nodes -- so
+    /// the shape is out, along a clear row, and back in, and both ends are
+    /// still joined.
+    #[test]
+    fn a_route_between_ends_that_face_each_other_goes_around() {
+        let facing = Ends::new((200.0, 100.0), (500.0, 220.0), true, false);
+        let route_ = way(facing, &[]);
+        assert_eq!(route_.first().copied(), Some((200.0, 100.0)), "{route_:?}");
+        assert_eq!(route_.last().copied(), Some((500.0, 220.0)), "{route_:?}");
+        // Out to the right of the source and in from the right of the target,
+        // which is what the two directions say.
+        assert!(route_[1].0 > 200.0, "{route_:?}");
+        assert!(
+            route_[route_.len() - 2].0 > 500.0,
+            "the last turn is to the right of the target: {route_:?}"
+        );
+        // Orthogonal throughout, like every other route.
+        for pair in route_.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            assert!(
+                (a.0 - b.0).abs() < 0.5 || (a.1 - b.1).abs() < 0.5,
+                "{route_:?} has a diagonal"
+            );
+        }
+    }
+
     /// A second arrow out in the middle of the run, pointing the way the data
     /// goes.
     ///
@@ -809,7 +986,7 @@ mod tests {
     #[test]
     fn the_marker_points_the_way_the_data_goes() {
         // Level: the middle of the line, pointing along it.
-        let said = marker(40.0, 100.0, 240.0, 100.0, &[]);
+        let said = marker(Ends::forward(40.0, 100.0, 240.0, 100.0), &[]);
         let visited = points(&said);
         assert!(said.ends_with('Z'), "{said}");
         assert!(
@@ -823,7 +1000,7 @@ mod tests {
 
         // Down the canvas: the vertical run is the longest, and it points
         // down it.
-        let said = marker(40.0, 40.0, 240.0, 240.0, &[]);
+        let said = marker(Ends::forward(40.0, 40.0, 240.0, 240.0), &[]);
         let visited = points(&said);
         assert!(
             visited[0].1 > visited[1].1 && visited[0].1 > visited[2].1,
@@ -835,7 +1012,7 @@ mod tests {
         );
 
         // And up it.
-        let said = marker(40.0, 240.0, 240.0, 40.0, &[]);
+        let said = marker(Ends::forward(40.0, 240.0, 240.0, 40.0), &[]);
         let visited = points(&said);
         assert!(
             visited[0].1 < visited[1].1 && visited[0].1 < visited[2].1,
@@ -846,7 +1023,7 @@ mod tests {
         // carries the data back the way it came, and the marker points that
         // way. With nothing in the way the long run is the one that arrives
         // at the target, which is the fewest turns the shape can be drawn in.
-        let said = marker(400.0, 40.0, 40.0, 200.0, &[]);
+        let said = marker(Ends::forward(400.0, 40.0, 40.0, 200.0), &[]);
         let visited = points(&said);
         assert!(
             visited[0].0 < visited[1].0 && visited[0].0 > 40.0,
@@ -870,7 +1047,7 @@ mod tests {
         let between = node(280.0, 40.0);
         let around = [node(40.0, 40.0), between, node(560.0, 40.0)];
         let (x1, y1, x2, y2) = (192.0, 68.0, 560.0, 68.0);
-        let route_ = way(x1, y1, x2, y2, &around);
+        let route_ = way(Ends::forward(x1, y1, x2, y2), &around);
 
         let on_the_line = |(x, y): (f32, f32)| {
             route_.windows(2).any(|s| {
@@ -880,7 +1057,7 @@ mod tests {
             })
         };
 
-        let at = label_at(x1, y1, x2, y2, &around);
+        let at = label_at(Ends::forward(x1, y1, x2, y2), &around);
         assert!(on_the_line(at), "the label is at {at:?}, off the line");
         // And not halfway between the two nodes, which is the old answer and
         // is inside the node this route goes around.
@@ -889,7 +1066,7 @@ mod tests {
             "the label is inside the node the line avoids"
         );
 
-        let said = marker(x1, y1, x2, y2, &around);
+        let said = marker(Ends::forward(x1, y1, x2, y2), &around);
         let tip = points(&said)[0];
         assert!(
             on_the_line((
@@ -908,14 +1085,14 @@ mod tests {
     #[test]
     fn a_short_run_has_no_marker() {
         // Two nodes almost touching, level: the whole route is one short run.
-        assert_eq!(marker(40.0, 100.0, 60.0, 100.0, &[]), "");
+        assert_eq!(marker(Ends::forward(40.0, 100.0, 60.0, 100.0), &[]), "");
 
         // Where only some of the runs are short the marker goes on the
         // longest, which is the rule now that the route's shape is chosen
         // rather than known: two nodes nearly level have a vertical run of
         // ten pixels and two horizontal runs of a hundred, and the direction
         // is perfectly legible on one of those.
-        let said = marker(40.0, 100.0, 240.0, 110.0, &[]);
+        let said = marker(Ends::forward(40.0, 100.0, 240.0, 110.0), &[]);
         assert!(!said.is_empty(), "a long run should carry a marker");
         let visited = points(&said);
         assert!(

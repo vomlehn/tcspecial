@@ -1007,6 +1007,11 @@ fn main() {
         }
     };
 
+    // What the operator has asked for, per payload: Disable sets a flag and
+    // Enable clears it, and the asking done when contact is made skips the
+    // payloads it names.
+    let declined: Declined = Arc::new(Mutex::new(vec![false; dh_configs.len()]));
+
     handle_link_button(&ui, ui_weak.clone(), link.clone());
     handle_main_menu(&ui, ui_weak.clone(), link.clone());
     query_dh_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
@@ -1021,8 +1026,16 @@ fn main() {
         dh_model.clone(),
         arrivals,
         contact.clone(),
+        declined.clone(),
     );
-    handle_transfer_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
+    handle_transfer_buttons(
+        &ui,
+        ui_weak.clone(),
+        link.clone(),
+        dh_configs.clone(),
+        dh_model.clone(),
+        declined.clone(),
+    );
 /*
     // Menu action handler
     {
@@ -1352,6 +1365,7 @@ fn refresh_panels(
     dh_model: Rc<VecModel<DHInfo>>,
     arrivals: Arrivals,
     contact: Arc<Mutex<Contact>>,
+    declined: Declined,
 ) {
     // What the pass before this one found, so a pass can tell a change from a
     // state of affairs. Starts lost: a MOC that has heard nothing knows
@@ -1361,6 +1375,8 @@ fn refresh_panels(
     // just enabled has its interval to produce something rather than being
     // late the moment it is switched on.
     let mut enabled_at: Vec<Option<u64>> = vec![None; dh_configs.len()];
+    // What an asking done off the event loop left for the panels.
+    let gathered: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
 
     let timer = slint::Timer::default();
     timer.start(
@@ -1384,7 +1400,31 @@ fn refresh_panels(
                     });
                 }
             }
+            // And the two moments when the spacecraft is asked what its
+            // handlers are doing without anyone pressing anything: the first
+            // beacon, and the end of an outage. Both are a MOC that has just
+            // learnt the spacecraft is there and knows nothing about its
+            // payloads -- it may have been serving them for hours.
+            //
+            // Off the event loop, because each question waits on the
+            // spacecraft: a burst of them on this thread would stop the
+            // window repainting exactly while an operator was looking at it.
+            // What comes back is left for the next pass to paint.
+            if contact_is_made(seen, heard) {
+                ask_what_handlers_are_doing(
+                    link.clone(),
+                    dh_configs.clone(),
+                    declined.clone(),
+                    gathered.clone(),
+                );
+            }
             seen = heard;
+
+            if let Ok(mut updates) = gathered.lock() {
+                for update in std::mem::take(&mut *updates) {
+                    apply_panel_update(&dh_model, &update);
+                }
+            }
 
             show_arrivals(&dh_model, &arrivals);
             show_freshness(
@@ -1412,6 +1452,59 @@ fn refresh_panels(
 
     // The timer stops when it is dropped, and this function is returning.
     std::mem::forget(timer);
+}
+
+/// Whether this pass is the moment contact was made.
+///
+/// The first beacon, and the end of an outage: the pass where the beacon
+/// indicator came into its contact colour. Not every pass of a contact that
+/// is simply holding, which would be a poll.
+fn contact_is_made(was: Contact, now: Contact) -> bool {
+    was == Contact::Lost && now == Contact::Made
+}
+
+/// Ask the spacecraft what each payload is doing, in a thread of its own.
+///
+/// Every payload but the ones the operator has turned off: a payload whose
+/// last press was Disable is a payload somebody stopped, and asking the
+/// spacecraft about it would be spending a command to be told what the
+/// operator already said.
+///
+/// Nothing is asked while the link is down, and nothing waits for it either:
+/// the panels then keep saying unknown until the next time contact is made or
+/// somebody presses Query all. Contact returning while the link is down is
+/// rare -- the beacon and the link come back together -- and a question owed
+/// indefinitely is a question that goes out at a moment nobody chose.
+fn ask_what_handlers_are_doing(
+    link: Arc<Mutex<CiLink>>,
+    dh_configs: Arc<Vec<DHConfig>>,
+    declined: Declined,
+    gathered: Arc<Mutex<Vec<PanelUpdate>>>,
+) {
+    thread::spawn(move || {
+        let asked_to_stop = declined.lock().map(|flags| flags.clone()).unwrap_or_default();
+
+        // The link the buttons hold, for as long as this burst takes. A press
+        // waits on it, which is the cost of there being one sender of payload
+        // commands: the burst happens when contact is made and not again.
+        let Ok(mut guard) = link.lock() else { return };
+        let Some(client) = guard.client() else { return };
+
+        let mut updates = Vec::new();
+        for (row, dh) in dh_configs.iter().enumerate() {
+            if asked_to_stop.get(row).copied().unwrap_or(false) {
+                continue;
+            }
+            if let Some(update) = panel_update_for(client, row, dh, &mut None, true) {
+                updates.push(update);
+            }
+        }
+        drop(guard);
+
+        if let Ok(mut queue) = gathered.lock() {
+            queue.extend(updates);
+        }
+    });
 }
 
 /// Whether this pass should blank every panel's status.
@@ -1635,14 +1728,21 @@ fn handle_transfer_buttons(
     link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
+    declined: Declined,
 ) {
     let enable = {
-        let (ui_weak, link, dh_configs, dh_model) =
-            (ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
+        let (ui_weak, link, dh_configs, dh_model, declined) = (
+            ui_weak.clone(),
+            link.clone(),
+            dh_configs.clone(),
+            dh_model.clone(),
+            declined.clone(),
+        );
         move |row: i32| {
             let ui = ui_weak.unwrap();
             let row = row as usize;
             if let Some(dh) = dh_configs.get(row) {
+                set_declined(&declined, row, false);
                 enable(&ui, &link, dh, &dh_model, row);
             }
         }
@@ -1653,9 +1753,31 @@ fn handle_transfer_buttons(
         let ui = ui_weak.unwrap();
         let row = row as usize;
         if let Some(dh) = dh_configs.get(row) {
+            set_declined(&declined, row, true);
             disable(&ui, &link, dh, &dh_model, row);
         }
     });
+}
+
+/// Which payloads the operator has turned off, one flag per panel.
+///
+/// Set when Disable is pressed and cleared when Enable is, so it says
+/// whether the operator's last word about that payload was to stop it. What
+/// reads it is the asking done when contact returns: a payload somebody
+/// stopped is not a payload to go asking the spacecraft about.
+pub type Declined = Arc<Mutex<Vec<bool>>>;
+
+/// Remember what the operator just pressed about one payload.
+///
+/// A poisoned lock leaves the flags as they were: what it costs is a question
+/// asked about a payload somebody stopped, which is a wasted command and not a
+/// wrong one.
+fn set_declined(declined: &Declined, row: usize, asked_to_stop: bool) {
+    if let Ok(mut flags) = declined.lock() {
+        if let Some(flag) = flags.get_mut(row) {
+            *flag = asked_to_stop;
+        }
+    }
 }
 
 /// Start the handler: what the payload sends begins reaching the MOC.
@@ -1806,7 +1928,6 @@ mod tests {
     use std::ffi::OsStr;
     use std::path::Path;
     use tcslibgs::{EndpointConfig, NetworkProtocol};
-    use std::time::Instant;
     use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
     use tcspecial::config::DEFAULT_TCSPECIAL_CONFIG_PATH;
     use tcslibgs::{DHName, DeviceConfig, NetworkConfig};
@@ -1818,10 +1939,6 @@ mod tests {
         all.extend(rest.iter().map(|s| s.to_string()));
         all.into_iter()
     }
-
-    /// A port nothing in this project uses, so a command sent there is never
-    /// answered and a poll has to wait out its timeout.
-    const UNANSWERED_ADDRESS: &str = "127.0.0.1:65123";
 
     /// One data handler, for the tests that need something to ask about.
     fn a_dh() -> DHConfig {
@@ -2959,6 +3076,128 @@ mod tests {
     /// The count was the spacecraft's instead, and the wrong half of its
     /// statistics -- the bytes its handler had read from the ground, which is
     /// the direction nobody sends in -- so a payload sending steadily was
+    /// The spacecraft is asked what its handlers are doing when contact is
+    /// made, and not about a payload the operator turned off.
+    ///
+    /// Through a stub that answers QUERY_DH, because what is being tested is
+    /// which payloads are asked about: the first beacon and the end of an
+    /// outage are both a MOC that has just learnt the spacecraft is there and
+    /// knows nothing about its payloads.
+    #[test]
+    fn contact_being_made_asks_about_every_payload_the_operator_wants() {
+        use std::net::UdpSocket;
+        use tcslibgs::{Command, QueryDHTelemetry, Statistics, Telemetry};
+
+        // A stub that answers whatever is asked of it, and remembers which
+        // payloads were asked about.
+        let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
+        spacecraft
+            .set_read_timeout(Some(Duration::from_millis(500)))
+            .expect("a timeout");
+        let at = spacecraft.local_addr().expect("where it is").to_string();
+        let asked_about: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let heard = asked_about.clone();
+        let stub = thread::spawn(move || {
+            let mut buffer = vec![0u8; 65535];
+            // Two payloads, each answered twice: the statistics and the
+            // sample. A stub that stopped early would leave the asking
+            // waiting on a timeout and say nothing about which payload it
+            // was.
+            while let Ok((size, from)) = spacecraft.recv_from(&mut buffer) {
+                let command: Command =
+                    serde_json::from_slice(&buffer[..size]).expect("a command");
+                if let Some(name) = command.payload_name() {
+                    heard.lock().unwrap().push(name.0.clone());
+                }
+                let answer = Telemetry::QueryDH(QueryDHTelemetry::new(
+                    command.sequence(),
+                    CommandStatus::Success,
+                    command
+                        .payload_name()
+                        .cloned()
+                        .unwrap_or_else(|| DHName::new("unnamed")),
+                    Some(DHState::Active),
+                    Statistics::new(),
+                ));
+                let _ = spacecraft.send_to(&serde_json::to_vec(&answer).unwrap(), from);
+            }
+        });
+
+        // Two payloads, both commanded through the one stub: what the test is
+        // about is which of them is asked about, not where the sockets are.
+        let mut quiet = a_dh();
+        quiet.name = DHName::new("quiet");
+        let dh_configs = Arc::new(vec![a_dh(), quiet]);
+        let payloads = dh_configs
+            .iter()
+            .map(|dh| PayloadLink {
+                name: dh.name.clone(),
+                from: HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                to: at.parse::<std::net::SocketAddr>().map(|at| HostPort {
+                    address: at.ip().to_string(),
+                    port: at.port(),
+                })
+                .expect("the stub's address"),
+            })
+            .collect();
+        let link = Arc::new(Mutex::new(CiLink::down_from(
+            crate::ci_link::LOCAL_BIND_ANY,
+            payloads,
+        )));
+        link.lock().unwrap().connect(&at).expect("the link comes up");
+
+        // The second payload is one the operator turned off.
+        let declined: Declined = Arc::new(Mutex::new(vec![false, true]));
+        let gathered: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
+
+        ask_what_handlers_are_doing(
+            link.clone(),
+            dh_configs.clone(),
+            declined,
+            gathered.clone(),
+        );
+
+        // The asking is in a thread of its own, so this waits for what it
+        // left rather than assuming it has run.
+        let found = (0..50)
+            .find_map(|_| {
+                thread::sleep(Duration::from_millis(20));
+                let updates = gathered.lock().ok()?;
+                (!updates.is_empty()).then(|| updates.clone())
+            })
+            .expect("the asking left something for the panels");
+
+        assert_eq!(found.len(), 1, "one payload was asked about: {found:?}");
+        assert_eq!(found[0].row, 0);
+        assert_eq!(found[0].status, Some(ACTIVE_STATUS));
+
+        let names = asked_about.lock().unwrap().clone();
+        assert!(
+            names.iter().all(|name| name == "DH1"),
+            "the payload the operator stopped was asked about: {names:?}"
+        );
+
+        drop(link);
+        let _ = stub.join();
+    }
+
+    /// Contact being made is the first beacon and the end of an outage, and
+    /// nothing else.
+    ///
+    /// Not every pass of a contact that is holding, which would be a poll:
+    /// the whole point of asking here is that it happens twice and not once a
+    /// second.
+    #[test]
+    fn only_the_first_beacon_and_the_end_of_an_outage_ask() {
+        assert!(contact_is_made(Contact::Lost, Contact::Made));
+        assert!(!contact_is_made(Contact::Made, Contact::Made));
+        assert!(!contact_is_made(Contact::Made, Contact::Lost));
+        assert!(!contact_is_made(Contact::Lost, Contact::Lost));
+    }
+
     /// A panel's data indicator says what the ground can say about its
     /// payload's data, and nothing more.
     ///

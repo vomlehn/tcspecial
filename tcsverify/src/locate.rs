@@ -50,7 +50,12 @@ impl Where {
     /// which is itself a problem -- is reported from the first of them, that
     /// being the definition the others are duplicates of.
     pub fn line_of(&self, about: &About) -> usize {
-        let (section, name) = match about {
+        // Which sections an entry of this kind may be written in, and the name
+        // to look for. Three for a node of a version 2 configuration: the
+        // sections are the editor's three working panes, and which one a node
+        // is in is decided by its type -- see `tcslibgs::graph::section_of` --
+        // so a complaint about a node has to be looked for in all of them.
+        let (sections, name): (&[&str], &String) = match about {
             About::File => return THE_FILE_ITSELF,
             About::Section(section) => {
                 return self
@@ -59,21 +64,29 @@ impl Where {
                     .copied()
                     .unwrap_or(THE_FILE_ITSELF)
             }
-            About::Payload(name) => ("payloads", name),
-            About::Group(name) => ("payload_groups", name),
-            About::SimPayload(name) => ("simulated_payloads", name),
-            About::SimGroup(name) => ("simulated_payload_groups", name),
-            About::Node(name) => ("nodes", name),
-            About::NodeGroup(name) => ("groups", name),
+            About::Payload(name) => (&["payloads"], name),
+            About::Group(name) => (&["payload_groups"], name),
+            About::SimPayload(name) => (&["simulated_payloads"], name),
+            About::SimGroup(name) => (&["simulated_payload_groups"], name),
+            About::Node(name) => (&["moc", "vehicle", "payloads"], name),
+            About::NodeGroup(name) => (&["payload_groups"], name),
         };
 
-        self.entries
-            .get(&(section.to_string(), name.clone()))
-            .copied()
+        sections
+            .iter()
+            .find_map(|section| {
+                self.entries
+                    .get(&(section.to_string(), name.clone()))
+                    .copied()
+            })
             // The section it belongs to, if the entry itself cannot be found:
             // a problem about a payload a reader cannot be pointed at is
             // still a problem about the payloads.
-            .or_else(|| self.sections.get(section).copied())
+            .or_else(|| {
+                sections
+                    .iter()
+                    .find_map(|section| self.sections.get(*section).copied())
+            })
             .unwrap_or(THE_FILE_ITSELF)
     }
 

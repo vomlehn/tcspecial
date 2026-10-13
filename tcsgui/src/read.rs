@@ -125,10 +125,15 @@ pub fn read(path: &Path) -> Result<Document, String> {
                 &to.absolute(),
                 input.as_deref(),
             );
-            line.comment = link
-                .comment
-                .clone()
-                .or_else(|| said.links.get(&(link.from.clone(), node.clone())).cloned());
+            // What somebody wrote above the attribute this link is written
+            // under, which is a note about the connection: see Said::links.
+            line.comment = link.comment.clone().or_else(|| {
+                origin.input.as_ref().and_then(|terminal| {
+                    said.links
+                        .get(&(origin.node.clone(), terminal.clone()))
+                        .cloned()
+                })
+            });
             document.links.push(line);
         }
     }
@@ -149,7 +154,12 @@ pub fn read(path: &Path) -> Result<Document, String> {
 struct Said {
     /// By node name.
     nodes: BTreeMap<String, String>,
-    /// By the two ends of the link, as the file wrote them.
+    /// By the node a link leaves and the data source it leaves by.
+    ///
+    /// Which is where a link is written now: an attribute of its own node,
+    /// named after the terminal. So a comment above `to_moc:` is about the
+    /// links that attribute makes -- all of them, where it names several
+    /// destinations, because one line carries one comment.
     links: BTreeMap<(String, String), String>,
     /// By what the binding sets.
     commands: BTreeMap<String, String>,
@@ -176,6 +186,8 @@ fn comments_of(path: &Path) -> Said {
         .is_some_and(|e| e.eq_ignore_ascii_case("xml"));
 
     let mut waiting: Vec<String> = Vec::new();
+    // Which node's entry the scan is inside, for the links written on it.
+    let mut inside: Option<String> = None;
     let mut lines = text.lines().peekable();
 
     while let Some(line) = lines.next() {
@@ -192,6 +204,13 @@ fn comments_of(path: &Path) -> Said {
         if trimmed.is_empty() {
             waiting.clear();
             continue;
+        }
+
+        // The node an attribute belongs to, whether or not anything is
+        // waiting: a comment three attributes further down is still about this
+        // node's link.
+        if let Some(name) = node_named(trimmed, xml) {
+            inside = Some(name);
         }
 
         if waiting.is_empty() {
@@ -214,8 +233,11 @@ fn comments_of(path: &Path) -> Said {
         // the one line and in XML are the two lines after it.
         if let Some(name) = node_named(trimmed, xml) {
             said.nodes.insert(name, comment);
-        } else if let Some((from, to)) = link_in(trimmed, xml, &mut lines) {
-            said.links.insert((from, to), comment);
+        } else if let Some(terminal) = source_named(trimmed, xml) {
+            // A link, which is an attribute of the node this entry is about.
+            if let Some(node) = &inside {
+                said.links.insert((node.clone(), terminal), comment);
+            }
         } else if let Some(sets) = command_in(trimmed, xml, &mut lines) {
             said.commands.insert(sets, comment);
         }
@@ -226,12 +248,31 @@ fn comments_of(path: &Path) -> Said {
 
 /// Whether this XML line opens an entry whose name is on the next line.
 ///
-/// `<nodes>` is the one: a node's comment sits above the tag and the name is
-/// inside it. `<links>` and `<commands>` are matched by their opening tags
-/// instead, since what identifies one of those is two of its children rather
-/// than a name of its own.
+/// The three node sections are the ones: a node's comment sits above its
+/// opening tag and the name is inside it. `<commands>` is matched by its
+/// opening tag instead, since what identifies one of those is its children
+/// rather than a name of its own.
 fn line_opens_an_entry(line: &str) -> bool {
-    line == "<nodes>"
+    matches!(line, "<moc>" | "<vehicle>" | "<payloads>")
+}
+
+/// Which data source this line writes, if it writes one.
+///
+/// `to_moc: k_fore` in YAML and `<to_moc>k_fore</to_moc>` in XML -- and the
+/// list form too, a comment above `to_moc: [a, b]` being about both of them.
+/// The two names are the schema's: see `tcslibgs::graph::terminals`.
+fn source_named(line: &str, xml: bool) -> Option<String> {
+    for terminal in ["to_moc", "to_payload"] {
+        let is = if xml {
+            line.starts_with(&format!("<{terminal}>"))
+        } else {
+            line.starts_with(&format!("{terminal}:"))
+        };
+        if is {
+            return Some(terminal.to_string());
+        }
+    }
+    None
 }
 
 /// The text of a comment line, if this line is one.
@@ -258,36 +299,6 @@ fn node_named(line: &str, xml: bool) -> Option<String> {
     } else {
         let name = line.strip_prefix("- name: ")?;
         Some(unquoted(name))
-    }
-}
-
-/// The two ends of the link this line starts, if it starts one.
-fn link_in<'a, I: Iterator<Item = &'a str>>(
-    line: &str,
-    xml: bool,
-    lines: &mut std::iter::Peekable<I>,
-) -> Option<(String, String)> {
-    if xml {
-        if line != "<links>" {
-            return None;
-        }
-        let from = element(lines.next()?, "from")?;
-        let to = element(lines.next()?, "to")?;
-        Some((from, bare(&to)))
-    } else {
-        // `- { from: a, to: b }` or `- { from: a, to: b.in0 }`.
-        let inside = line.strip_prefix("- {")?.strip_suffix('}')?;
-        let mut from = None;
-        let mut to = None;
-        for part in inside.split(',') {
-            let (key, value) = part.split_once(':')?;
-            match key.trim() {
-                "from" => from = Some(unquoted(value.trim())),
-                "to" => to = Some(unquoted(value.trim())),
-                _ => {}
-            }
-        }
-        Some((from?, bare(&to?)))
     }
 }
 
@@ -322,14 +333,6 @@ fn element(line: &str, name: &str) -> Option<String> {
         .strip_prefix(&format!("<{name}>"))?
         .strip_suffix(&format!("</{name}>"))?;
     Some(unescape(body))
-}
-
-/// A destination without the input it names: the node is what a comment is
-/// keyed by, an input being part of the one link.
-fn bare(destination: &str) -> String {
-    destination
-        .split_once('.')
-        .map_or(destination.to_string(), |(node, _)| node.to_string())
 }
 
 /// A value without the quotes a writer puts round it.
@@ -427,10 +430,13 @@ mod tests {
         }
         // Both streams through the null node, each saying which terminal it
         // leaves by and which it arrives at.
+        // Every link names the data source it leaves by, that being the
+        // attribute it is written under -- and the sink it arrives at where
+        // the type has more than one, which is what the null node is for.
         for link in [
-            Link::joining("sensor", None, "through", Some("from_payload")),
+            Link::joining("sensor", Some("to_moc"), "through", Some("from_payload")),
             Link::joining("through", Some("to_moc"), "ground", None),
-            Link::joining("ground", None, "through", Some("from_moc")),
+            Link::joining("ground", Some("to_payload"), "through", Some("from_moc")),
             Link::joining("through", Some("to_payload"), "sensor", None),
         ] {
             document.apply(&Edit::AddLink { link });

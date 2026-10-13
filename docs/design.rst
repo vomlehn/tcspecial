@@ -219,11 +219,70 @@ link
     configuration that leaves one unbound is refused rather than averaging two
     numbers and a zero.
 
+    A link is written as an **attribute of the node it leaves**, named after
+    the data source it leaves by:
+
+    .. code-block:: yaml
+
+       - name: k_fore
+         type: compute
+         function: "to_kelvin"
+         to_moc: [moc, mean_temp.in0, housekeeping]
+
+    So there is no links section. A node and the links out of it are read,
+    written and deleted together, which is where a reader of the file wants
+    them: a list at the bottom has to be read against the nodes to make sense
+    of either. It also settles a question the old shape left open -- which file
+    of a configuration a link belongs in. A link is in the file its source node
+    is in, once, however far it reaches.
+
+    In memory they are still a list, because every rule about a link is about
+    both of its ends and a list is what a rule can be written against.
+
 command binding
     A statement that a named command from the MOC sets a named attribute of a
     node. A setpoint arrives this way. The binding is in the configuration, so
     what the ground is able to change in flight is written down and checkable,
     rather than being whatever the compute element happens to accept.
+
+The three sections
+------------------
+
+A configuration's nodes are written in three sections, and they are the three
+working panes of the editor:
+
+``moc``
+    the ground links: the other end of the link, which is not the vehicle at
+    all.
+
+``vehicle``
+    what the vehicle itself runs -- computations, logs, pass-throughs, pages of
+    their own.
+
+``payloads``
+    what it carries this flight: a device on a bus, a line it drives, a link to
+    something aboard.
+
+Which section a node belongs in is its type's own answer, and there is one
+statement of it: ``tcslibgs::graph::section_of``. The editor's panes read it
+and so does the file reader, so a file and a drawing cannot come to disagree
+about what a node is.
+
+Requirement
+    A node written in the wrong section is refused where the file is read,
+    naming the node, the section it is in and the one it belongs in. A payload
+    written under ``vehicle`` is a file whose own arrangement contradicts the
+    rule the editor enforces everywhere else, and a reader would have to be
+    told which of the two to believe.
+
+Requirement
+    A section with nothing in it is not written. A configuration with no
+    payloads yet is one somebody is partway through, and ``payloads:`` with
+    nothing under it reads back as nothing anyway.
+
+The sets of payloads that share a sampling interval are ``payload_groups``,
+which is what a payload set calls them too: one vocabulary for the two
+languages, so a reader who has learned one has learned the other.
 
 Terminals: where a link is attached
 -----------------------------------
@@ -1079,6 +1138,12 @@ button does on demand, whether or not anything was edited:
   itself -- the line explaining why a sensor is at ``0x49`` is kept, and the
   same line written directly above the ``address`` attribute is not.
 
+A comment above a link is kept, and a link is now an attribute -- so this is
+the one attribute whose comment survives a save: the run of comment lines above
+a ``to_moc:`` or ``to_payload:`` is read as a note about the links that
+attribute makes. Where the attribute names several destinations the note is
+about all of them, one line carrying one comment.
+
 The attribute order is not kept either: the editor writes a node's attributes
 and the section's parameters in the order a dictionary gives them, which is
 alphabetical, where a hand-written file usually groups them by what they mean.
@@ -1260,11 +1325,17 @@ and a handle in the middle of an edge could not say which of them was meant. So
 the boxes a reader looks at to see what may be linked to what are the boxes a
 person presses to link them, which is one thing to learn instead of two.
 
+A link may be drawn either way about: from the data source that feeds it or
+from the data sink that wants feeding. It is the same link, and the file says
+the same thing -- a person drawing a diagram works in whichever direction they
+are reading it, and an editor that insisted on one would be an editor to be
+remembered rather than used.
+
 The gesture will not make a link that the configuration check would refuse.
 Letting go over a terminal that does not pair with the one the drag started at
-does nothing at all, and so does letting go over a data source, over the node
-the drag started on, over empty canvas, or over a terminal the same link is
-already drawn to. An editor that cannot make a bad link is worth more than one
+does nothing at all, and so does letting go over a terminal of the same kind as
+the one the drag started at, over the node the drag started on, over empty
+canvas, or over a terminal the same link is already drawn to. An editor that cannot make a bad link is worth more than one
 that makes it and marks it red -- and the four refusals are the four ways a
 person's hand slips, not four ways of being wrong about the vehicle.
 

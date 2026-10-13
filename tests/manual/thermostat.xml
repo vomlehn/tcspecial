@@ -24,33 +24,108 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <groups>
+    <payload_groups>
         <name>cabin_temps</name>
         <interval>3s</interval>
-    </groups>
+    </payload_groups>
+    <moc>
+        <name>moc</name>
+        <type>moc</type>
+        <address>10.0.0.1</address>
+        <port>5000</port>
+        <editor><x>660</x><y>40</y></editor>
+    </moc>
+    <vehicle>
+        <name>k_fore</name>
+        <type>compute</type>
+        <format>i16_be</format>
+        <function>to_kelvin</function>
+        <offset>273.15</offset>
+        <scale>0.0625</scale>
+        <to_moc>moc</to_moc>
+        <to_moc>mean_temp.in0</to_moc>
+        <to_moc>housekeeping</to_moc>
+        <editor><x>240</x><y>40</y></editor>
+    </vehicle>
+    <vehicle>
+        <name>k_aft</name>
+        <type>compute</type>
+        <format>i16_be</format>
+        <function>to_kelvin</function>
+        <offset>273.15</offset>
+        <scale>0.0625</scale>
+        <to_moc>moc</to_moc>
+        <to_moc>mean_temp.in1</to_moc>
+        <to_moc>housekeeping</to_moc>
+        <editor><x>240</x><y>160</y></editor>
+    </vehicle>
+    <vehicle>
+        <name>k_bay</name>
+        <type>compute</type>
+        <format>u24_be</format>
+        <function>to_kelvin</function>
+        <offset>255.37</offset>
+        <scale>0.0078</scale>
+        <to_moc>moc</to_moc>
+        <to_moc>mean_temp.in2</to_moc>
+        <to_moc>housekeeping</to_moc>
+        <editor><x>240</x><y>280</y></editor>
+    </vehicle>
+    <vehicle>
+        <name>mean_temp</name>
+        <type>compute</type>
+        <function>mean</function>
+        <inputs>in0,in1,in2</inputs>
+        <to_moc>moc</to_moc>
+        <to_moc>thermostat</to_moc>
+        <editor><x>460</x><y>160</y></editor>
+    </vehicle>
+    <!-- setpoint is set from the ground; above and below are the two degrees -->
+    <!-- either side that the heaters are switched at. -->
+    <vehicle>
+        <name>thermostat</name>
+        <type>compute</type>
+        <above>2.0</above>
+        <below>2.0</below>
+        <function>hysteresis</function>
+        <setpoint>293.15</setpoint>
+        <to_moc>housekeeping</to_moc>
+        <!-- asserted below the setpoint, unasserted above it -->
+        <to_payload>heaters</to_payload>
+        <editor><x>660</x><y>240</y></editor>
+    </vehicle>
+    <vehicle>
+        <name>housekeeping</name>
+        <type>log</type>
+        <directory>/var/log/tcspecial</directory>
+        <format>variable_ts_rc</format>
+        <editor><x>460</x><y>380</y></editor>
+    </vehicle>
     <!-- Forward bulkhead. Two bytes, signed, big endian. -->
-    <nodes>
+    <payloads>
         <name>temp_fore</name>
         <type>i2c</type>
         <address>0x48</address>
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
+        <to_moc>k_fore</to_moc>
         <editor><x>40</x><y>40</y></editor>
-    </nodes>
+    </payloads>
     <!-- Aft bulkhead; same part as temp_fore. -->
-    <nodes>
+    <payloads>
         <name>temp_aft</name>
         <type>i2c</type>
         <address>0x49</address>
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
+        <to_moc>k_aft</to_moc>
         <editor><x>40</x><y>160</y></editor>
-    </nodes>
+    </payloads>
     <!-- Equipment bay. Three bytes, unsigned -- a different part, hence its -->
     <!-- own conversion. -->
-    <nodes>
+    <payloads>
         <name>temp_bay</name>
         <type>spi</type>
         <group>cabin_temps</group>
@@ -58,141 +133,18 @@
         <path>/dev/spidev0.0</path>
         <read_size>3</read_size>
         <spi_mode>0</spi_mode>
+        <to_moc>k_bay</to_moc>
         <editor><x>40</x><y>280</y></editor>
-    </nodes>
-    <nodes>
-        <name>k_fore</name>
-        <type>compute</type>
-        <format>i16_be</format>
-        <function>to_kelvin</function>
-        <offset>273.15</offset>
-        <scale>0.0625</scale>
-        <editor><x>240</x><y>40</y></editor>
-    </nodes>
-    <nodes>
-        <name>k_aft</name>
-        <type>compute</type>
-        <format>i16_be</format>
-        <function>to_kelvin</function>
-        <offset>273.15</offset>
-        <scale>0.0625</scale>
-        <editor><x>240</x><y>160</y></editor>
-    </nodes>
-    <nodes>
-        <name>k_bay</name>
-        <type>compute</type>
-        <format>u24_be</format>
-        <function>to_kelvin</function>
-        <offset>255.37</offset>
-        <scale>0.0078</scale>
-        <editor><x>240</x><y>280</y></editor>
-    </nodes>
-    <nodes>
-        <name>mean_temp</name>
-        <type>compute</type>
-        <function>mean</function>
-        <inputs>in0,in1,in2</inputs>
-        <editor><x>460</x><y>160</y></editor>
-    </nodes>
-    <!-- setpoint is set from the ground; above and below are the two degrees -->
-    <!-- either side that the heaters are switched at. -->
-    <nodes>
-        <name>thermostat</name>
-        <type>compute</type>
-        <above>2.0</above>
-        <below>2.0</below>
-        <function>hysteresis</function>
-        <setpoint>293.15</setpoint>
-        <editor><x>660</x><y>240</y></editor>
-    </nodes>
-    <nodes>
-        <name>moc</name>
-        <type>moc</type>
-        <address>10.0.0.1</address>
-        <port>5000</port>
-        <editor><x>660</x><y>40</y></editor>
-    </nodes>
+    </payloads>
     <!-- Three circuits, driven together. -->
-    <nodes>
+    <payloads>
         <name>heaters</name>
         <type>gpio</type>
         <direction>output</direction>
         <lines>3,4,5</lines>
         <path>/dev/gpiochip0</path>
         <editor><x>860</x><y>240</y></editor>
-    </nodes>
-    <nodes>
-        <name>housekeeping</name>
-        <type>log</type>
-        <directory>/var/log/tcspecial</directory>
-        <format>variable_ts_rc</format>
-        <editor><x>460</x><y>380</y></editor>
-    </nodes>
-    <links>
-        <from>temp_fore</from>
-        <to>k_fore</to>
-    </links>
-    <links>
-        <from>temp_aft</from>
-        <to>k_aft</to>
-    </links>
-    <links>
-        <from>temp_bay</from>
-        <to>k_bay</to>
-    </links>
-    <links>
-        <from>k_fore</from>
-        <to>moc</to>
-    </links>
-    <links>
-        <from>k_fore</from>
-        <to>mean_temp.in0</to>
-    </links>
-    <links>
-        <from>k_fore</from>
-        <to>housekeeping</to>
-    </links>
-    <links>
-        <from>k_aft</from>
-        <to>moc</to>
-    </links>
-    <links>
-        <from>k_aft</from>
-        <to>mean_temp.in1</to>
-    </links>
-    <links>
-        <from>k_aft</from>
-        <to>housekeeping</to>
-    </links>
-    <links>
-        <from>k_bay</from>
-        <to>moc</to>
-    </links>
-    <links>
-        <from>k_bay</from>
-        <to>mean_temp.in2</to>
-    </links>
-    <links>
-        <from>k_bay</from>
-        <to>housekeeping</to>
-    </links>
-    <links>
-        <from>mean_temp</from>
-        <to>moc</to>
-    </links>
-    <links>
-        <from>mean_temp</from>
-        <to>thermostat</to>
-    </links>
-    <!-- asserted below the setpoint, unasserted above it -->
-    <links>
-        <from>thermostat</from>
-        <to>heaters</to>
-    </links>
-    <links>
-        <from>thermostat</from>
-        <to>housekeeping</to>
-    </links>
+    </payloads>
     <!-- the cabin temperature the heaters are held at, in kelvin -->
     <commands>
         <from>moc</from>

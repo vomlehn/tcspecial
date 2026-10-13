@@ -5,6 +5,21 @@
 //! and bindings that say which commands from the ground may set which
 //! attribute of which node.
 //!
+//! Three sections of nodes, and they are the three working panes of the
+//! editor: `moc` holds the ground links, `vehicle` holds what the vehicle
+//! itself runs, and `payloads` holds what it carries. A node's type says which
+//! section it belongs in -- see [`Section`] -- and a node written in the wrong
+//! one is refused where the file is read, because a file and a drawing that
+//! disagree about what a node is are two statements of one fact.
+//!
+//! A link is an attribute of the node it leaves, named after the data source
+//! it leaves by: `to_moc: k_fore` is a link from this node's `to_moc` terminal
+//! to `k_fore`, and `to_moc: [moc, mean_temp.in0]` is one to each of two. So
+//! there is no links section, and a node and the links out of it are read,
+//! written and deleted together. In memory they are still a list -- see
+//! [`Link`] -- because every rule about a link is about both of its ends, and
+//! a list of them is what a rule can be written against.
+//!
 //! One logical configuration, which may be written as several files. The top
 //! file may name others in an `include` list and their contents are merged
 //! into it; nothing is discovered by scanning a directory, so the set of files
@@ -78,14 +93,209 @@ pub struct GraphFile {
     /// the argument.
     #[serde(default)]
     pub tcspecial: Option<BTreeMap<String, parameters::Parameter>>,
+    /// Sets of payloads read on one interval.
     #[serde(default)]
-    pub groups: Vec<Group>,
+    pub payload_groups: Vec<Group>,
+    /// The ground links: what the editor's moc working pane holds.
     #[serde(default)]
-    pub nodes: Vec<Node>,
+    pub moc: Vec<NodeFile>,
+    /// What the vehicle itself runs: computations, logs, pass-throughs, pages.
     #[serde(default)]
-    pub links: Vec<Link>,
+    pub vehicle: Vec<NodeFile>,
+    /// What the vehicle carries: a device on a bus, a line it drives, a link
+    /// to something aboard.
+    #[serde(default)]
+    pub payloads: Vec<NodeFile>,
     #[serde(default)]
     pub commands: Vec<CommandBinding>,
+    /// The sections a version 2 file used to have, kept to be refused.
+    ///
+    /// Declared so that a file written against the earlier shape is refused by
+    /// name, saying where its contents have moved. Without them the complaint
+    /// is serde's -- "unknown field `nodes`" -- which says what is wrong and
+    /// not what to do about it, and a reader with a file full of them would
+    /// have to be told three times.
+    #[serde(default)]
+    pub nodes: Option<Vec<NodeFile>>,
+    #[serde(default)]
+    pub links: Option<Vec<Link>>,
+    #[serde(default)]
+    pub groups: Option<Vec<Group>>,
+}
+
+/// Which section of a file a node belongs in.
+///
+/// The three working panes of the editor, and the same three families the
+/// drawing is arranged in: the ground is the other end of the link and not the
+/// vehicle at all, the vehicle's own graph persists between missions, and what
+/// it carries changes every flight. A file whose sections are those three can
+/// be read as "here is the vehicle, and here is what it is carrying".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Section {
+    Moc,
+    Vehicle,
+    Payloads,
+}
+
+impl Section {
+    /// What the section is called in a file.
+    pub fn name(self) -> &'static str {
+        match self {
+            Section::Moc => "moc",
+            Section::Vehicle => "vehicle",
+            Section::Payloads => "payloads",
+        }
+    }
+}
+
+/// Which section a node of this type belongs in.
+///
+/// The one statement of the rule, read by the file reader and by the editor's
+/// panes: a payload is something the vehicle carries, `moc` is the ground link,
+/// and everything else -- a computation, a log, a pass-through, a page of its
+/// own -- is the vehicle's own. A type this build does not know is the
+/// vehicle's: it is refused by name elsewhere, and the vehicle pane is the one
+/// a reader looks at first.
+pub fn section_of(node_type: &str) -> Section {
+    if Node::is_payload_type(node_type) {
+        Section::Payloads
+    } else if node_type == "moc" {
+        Section::Moc
+    } else {
+        Section::Vehicle
+    }
+}
+
+/// One node as a file writes it: the node, and the links that leave it.
+///
+/// Apart from [`Node`] because the two are different things. A node is what the
+/// vehicle opens and what the rules are about; the links out of it are a
+/// property of the graph, written here because this is where a reader of the
+/// file wants them -- beside the node they leave, not in a list at the bottom
+/// that has to be read against the nodes to make sense of either.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NodeFile {
+    pub node: Node,
+    /// Where this node's groundward data goes: the sinks its `to_moc` reaches.
+    pub to_moc: Vec<String>,
+    /// And its vehicleward data: the sinks its `to_payload` reaches.
+    pub to_payload: Vec<String>,
+}
+
+impl NodeFile {
+    /// The links this node's sources make.
+    ///
+    /// One per destination, each `from` naming the node and the data source it
+    /// leaves by -- `k_fore.to_moc` -- which is what every rule about a link
+    /// already reads: see [`Link::origin`].
+    pub fn links(&self) -> Vec<Link> {
+        let mut links = Vec::new();
+        for (terminal, destinations) in
+            [("to_moc", &self.to_moc), ("to_payload", &self.to_payload)]
+        {
+            if destinations.is_empty() {
+                continue;
+            }
+            links.push(Link {
+                from: format!("{}.{terminal}", self.node.name),
+                to: Destinations::of(destinations.clone()),
+                comment: None,
+            });
+        }
+        links
+    }
+}
+
+impl<'de> Deserialize<'de> for NodeFile {
+    /// Read by hand, for the reason [`Destinations`] is.
+    ///
+    /// A node's attributes are whatever its type takes, so they are collected
+    /// rather than declared -- and `serde(flatten)` cannot be used to collect
+    /// them beside a declared `to_moc`, because an XML file writes several
+    /// destinations as several `<to_moc>` elements and a flattened map refuses
+    /// the second as a duplicate key. Read as a map here, the repeats are what
+    /// they look like: more destinations.
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::{self, MapAccess, Visitor};
+        use std::fmt;
+
+        struct V;
+
+        impl<'de> Visitor<'de> for V {
+            type Value = NodeFile;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a node")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<NodeFile, A::Error> {
+                let mut name: Option<String> = None;
+                let mut node_type: Option<String> = None;
+                let mut group: Option<String> = None;
+                let mut editor: Option<Editor> = None;
+                let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
+                let mut to_moc: Vec<String> = Vec::new();
+                let mut to_payload: Vec<String> = Vec::new();
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "name" => name = Some(map.next_value::<Scalar>()?.as_str().to_string()),
+                        "type" => {
+                            node_type = Some(map.next_value::<Scalar>()?.as_str().to_string())
+                        }
+                        "group" => {
+                            group = Some(map.next_value::<Scalar>()?.as_str().to_string())
+                        }
+                        "editor" => editor = Some(map.next_value::<Editor>()?),
+                        // A data source, and the one place a file says what is
+                        // linked to what. Repeats add to it rather than
+                        // replacing it: that is what several XML elements of
+                        // one name mean.
+                        "to_moc" => to_moc.extend(
+                            map.next_value::<Destinations>()?
+                                .each()
+                                .into_iter()
+                                .map(str::to_string),
+                        ),
+                        "to_payload" => to_payload.extend(
+                            map.next_value::<Destinations>()?
+                                .each()
+                                .into_iter()
+                                .map(str::to_string),
+                        ),
+                        // Everything else is an attribute of the node, which
+                        // is where a word nothing reads ends up -- and is
+                        // refused by name against what the type takes. See
+                        // `reach::reach_of`.
+                        _ => {
+                            let value = map.next_value::<Scalar>()?;
+                            if attributes.insert(key.clone(), value).is_some() {
+                                return Err(de::Error::custom(format!(
+                                    "\"{}\" states {key} twice",
+                                    name.as_deref().unwrap_or("a node")
+                                )));
+                            }
+                        }
+                    }
+                }
+
+                Ok(NodeFile {
+                    node: Node {
+                        name: name.ok_or_else(|| de::Error::missing_field("name"))?,
+                        node_type: node_type
+                            .ok_or_else(|| de::Error::missing_field("type"))?,
+                        group,
+                        attributes,
+                        editor,
+                    },
+                    to_moc,
+                    to_payload,
+                })
+            }
+        }
+
+        d.deserialize_map(V)
+    }
 }
 
 /// A set of nodes read on one interval.
@@ -162,8 +372,15 @@ impl Node {
     /// name, and counting it as a payload would pile a second complaint on
     /// top of the one that says what is actually wrong.
     pub fn is_payload(&self) -> bool {
+        Node::is_payload_type(&self.node_type)
+    }
+
+    /// The same question of a type rather than of a node.
+    ///
+    /// For [`section_of`], which is asked before there is a node to ask about.
+    pub fn is_payload_type(node_type: &str) -> bool {
         matches!(
-            self.node_type.as_str(),
+            node_type,
             "i2c"
                 | "spi"
                 | "serial"
@@ -386,7 +603,7 @@ impl Graph {
         let top: GraphFile = read_one(path)?;
         graph.description = top.description.clone();
         graph.tcspecial = top.tcspecial.clone();
-        graph.absorb(path, &top);
+        graph.absorb(path, &top)?;
         graph.files.push(path.to_path_buf());
 
         for name in &top.include {
@@ -416,22 +633,49 @@ impl Graph {
                     included.display()
                 )));
             }
-            graph.absorb(&included, &file);
+            graph.absorb(&included, &file)?;
             graph.files.push(included);
         }
 
         Ok(graph)
     }
 
-    /// Add one file's contents to the whole.
-    fn absorb(&mut self, from: &Path, file: &GraphFile) {
-        for node in &file.nodes {
-            self.homes.insert(node.name.clone(), from.to_path_buf());
+    /// Take in one file: its nodes, the links they carry, and the rest.
+    ///
+    /// The three sections are one list of nodes once they are read, because
+    /// every rule about a node is about nodes and not about sections. What the
+    /// sections are for is that a reader of the file can see at a glance what
+    /// the vehicle carries this flight -- so a node in the wrong one is
+    /// refused here, where the complaint can name the file.
+    fn absorb(&mut self, from: &Path, file: &GraphFile) -> TcsResult<()> {
+        for (section, nodes) in [
+            (Section::Moc, &file.moc),
+            (Section::Vehicle, &file.vehicle),
+            (Section::Payloads, &file.payloads),
+        ] {
+            for said in nodes {
+                let belongs = section_of(&said.node.node_type);
+                if belongs != section {
+                    return Err(TcsError::Config(format!(
+                        "{}: \"{}\" is a {} node and is written under {}: it \
+                         belongs under {}",
+                        from.display(),
+                        said.node.name,
+                        said.node.node_type,
+                        section.name(),
+                        belongs.name()
+                    )));
+                }
+                self.homes
+                    .insert(said.node.name.clone(), from.to_path_buf());
+                self.nodes.push(said.node.clone());
+                self.links.extend(said.links());
+            }
         }
-        self.groups.extend(file.groups.iter().cloned());
-        self.nodes.extend(file.nodes.iter().cloned());
-        self.links.extend(file.links.iter().cloned());
+
+        self.groups.extend(file.payload_groups.iter().cloned());
         self.commands.extend(file.commands.iter().cloned());
+        Ok(())
     }
 
     /// The node of this name, if the configuration has one.
@@ -512,9 +756,39 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
         }
     }
 
-    format
+    let file: GraphFile = format
         .parse(&text)
-        .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))
+        .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
+
+    // The sections a version 2 file used to have, refused by name and told
+    // where their contents have gone. A file full of them would otherwise be
+    // read as far as the first one and complained about in serde's words --
+    // "unknown field `nodes`" -- which says what is wrong and not what to do.
+    let moved: &[(&str, bool, &str)] = &[
+        (
+            "nodes",
+            file.nodes.is_some(),
+            "a node is written under moc, vehicle or payloads, according to what \
+             it is",
+        ),
+        (
+            "links",
+            file.links.is_some(),
+            "a link is an attribute of the node it leaves, named after the data \
+             source it leaves by: `to_moc: k_fore`",
+        ),
+        ("groups", file.groups.is_some(), "groups are now payload_groups"),
+    ];
+    for (section, there, where_) in moved {
+        if *there {
+            return Err(TcsError::Config(format!(
+                "{}: there is no {section} section any more -- {where_}",
+                path.display()
+            )));
+        }
+    }
+
+    Ok(file)
 }
 
 /// Where an included file sits: beside the file that named it, in the same
@@ -731,18 +1005,20 @@ tcspecial:
     interval_ms: 5000
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
-nodes:
+moc:
   - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
-links:
-  - { from: cabin_sensor, to: moc }
 ",
         )
         .unwrap();
+        // And the included file's own payload, with the link that joins the
+        // two: a link is an attribute of the node it leaves, so a link across
+        // the boundary between two files is written in the file the node is
+        // in.
         std::fs::write(
             where_.path().join("cabin.yaml"),
-            "version: \"2.0\"\nnodes:\n  \
+            "version: \"2.0\"\npayloads:\n  \
              - { name: cabin_sensor, type: i2c, path: \"/dev/i2c-1\", \
-             address: \"0x48\" }\n",
+             address: \"0x48\", to_moc: moc }\n",
         )
         .unwrap();
 
@@ -793,7 +1069,7 @@ links:
         .unwrap();
         std::fs::write(
             where_.path().join("cabin.yaml"),
-            "version: \"2.0\"\nnodes: []\n",
+            "version: \"2.0\"\npayloads: []\n",
         )
         .unwrap();
 
@@ -839,3 +1115,4 @@ links:
         assert_eq!(many.to.each(), vec!["b", "c.in0"]);
     }
 }
+

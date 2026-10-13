@@ -18,11 +18,67 @@ tcspecial:
     recv: "0.0.0.0:4000"
     send: "127.0.0.1:4100"
 
-groups:
+payload_groups:
   - name: "cabin_temps"
     interval: "3s"
 
-nodes:
+moc:
+  - name: moc
+    type: moc
+    address: "10.0.0.1"
+    port: "5000"
+    editor: { x: 660, y: 40 }
+
+vehicle:
+  - name: k_fore
+    type: compute
+    format: "i16_be"
+    function: "to_kelvin"
+    offset: "273.15"
+    scale: "0.0625"
+    to_moc: [moc, mean_temp.in0, housekeeping]
+    editor: { x: 240, y: 40 }
+  - name: k_aft
+    type: compute
+    format: "i16_be"
+    function: "to_kelvin"
+    offset: "273.15"
+    scale: "0.0625"
+    to_moc: [moc, mean_temp.in1, housekeeping]
+    editor: { x: 240, y: 160 }
+  - name: k_bay
+    type: compute
+    format: "u24_be"
+    function: "to_kelvin"
+    offset: "255.37"
+    scale: "0.0078"
+    to_moc: [moc, mean_temp.in2, housekeeping]
+    editor: { x: 240, y: 280 }
+  - name: mean_temp
+    type: compute
+    function: "mean"
+    inputs: "in0,in1,in2"
+    to_moc: [moc, thermostat]
+    editor: { x: 460, y: 160 }
+  # setpoint is set from the ground; above and below are the two degrees
+  # either side that the heaters are switched at.
+  - name: thermostat
+    type: compute
+    above: "2.0"
+    below: "2.0"
+    function: "hysteresis"
+    setpoint: "293.15"
+    to_moc: housekeeping
+    # asserted below the setpoint, unasserted above it
+    to_payload: heaters
+    editor: { x: 660, y: 240 }
+  - name: housekeeping
+    type: log
+    directory: "/var/log/tcspecial"
+    format: "variable_ts_rc"
+    editor: { x: 460, y: 380 }
+
+payloads:
   # Forward bulkhead. Two bytes, signed, big endian.
   - name: temp_fore
     type: i2c
@@ -30,6 +86,7 @@ nodes:
     group: "cabin_temps"
     path: "/dev/i2c-1"
     read_size: "2"
+    to_moc: k_fore
     editor: { x: 40, y: 40 }
   # Aft bulkhead; same part as temp_fore.
   - name: temp_aft
@@ -38,6 +95,7 @@ nodes:
     group: "cabin_temps"
     path: "/dev/i2c-1"
     read_size: "2"
+    to_moc: k_aft
     editor: { x: 40, y: 160 }
   # Equipment bay. Three bytes, unsigned -- a different part, hence its
   # own conversion.
@@ -48,47 +106,8 @@ nodes:
     path: "/dev/spidev0.0"
     read_size: "3"
     spi_mode: "0"
+    to_moc: k_bay
     editor: { x: 40, y: 280 }
-  - name: k_fore
-    type: compute
-    format: "i16_be"
-    function: "to_kelvin"
-    offset: "273.15"
-    scale: "0.0625"
-    editor: { x: 240, y: 40 }
-  - name: k_aft
-    type: compute
-    format: "i16_be"
-    function: "to_kelvin"
-    offset: "273.15"
-    scale: "0.0625"
-    editor: { x: 240, y: 160 }
-  - name: k_bay
-    type: compute
-    format: "u24_be"
-    function: "to_kelvin"
-    offset: "255.37"
-    scale: "0.0078"
-    editor: { x: 240, y: 280 }
-  - name: mean_temp
-    type: compute
-    function: "mean"
-    inputs: "in0,in1,in2"
-    editor: { x: 460, y: 160 }
-  # setpoint is set from the ground; above and below are the two degrees
-  # either side that the heaters are switched at.
-  - name: thermostat
-    type: compute
-    above: "2.0"
-    below: "2.0"
-    function: "hysteresis"
-    setpoint: "293.15"
-    editor: { x: 660, y: 240 }
-  - name: moc
-    type: moc
-    address: "10.0.0.1"
-    port: "5000"
-    editor: { x: 660, y: 40 }
   # Three circuits, driven together.
   - name: heaters
     type: gpio
@@ -96,30 +115,6 @@ nodes:
     lines: "3,4,5"
     path: "/dev/gpiochip0"
     editor: { x: 860, y: 240 }
-  - name: housekeeping
-    type: log
-    directory: "/var/log/tcspecial"
-    format: "variable_ts_rc"
-    editor: { x: 460, y: 380 }
-
-links:
-  - { from: temp_fore, to: k_fore }
-  - { from: temp_aft, to: k_aft }
-  - { from: temp_bay, to: k_bay }
-  - { from: k_fore, to: moc }
-  - { from: k_fore, to: mean_temp.in0 }
-  - { from: k_fore, to: housekeeping }
-  - { from: k_aft, to: moc }
-  - { from: k_aft, to: mean_temp.in1 }
-  - { from: k_aft, to: housekeeping }
-  - { from: k_bay, to: moc }
-  - { from: k_bay, to: mean_temp.in2 }
-  - { from: k_bay, to: housekeeping }
-  - { from: mean_temp, to: moc }
-  - { from: mean_temp, to: thermostat }
-  # asserted below the setpoint, unasserted above it
-  - { from: thermostat, to: heaters }
-  - { from: thermostat, to: housekeeping }
 
 commands:
   # the cabin temperature the heaters are held at, in kelvin

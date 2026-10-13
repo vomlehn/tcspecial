@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::journal::{Edit, Link};
 use crate::pane::{confine, is_payload, size_of};
 use tcslibgs::endpoint_config::Scalar;
+use tcslibgs::graph::{section_of, Section};
 use crate::style::NodeType;
 use crate::subdiagram::{file_for, Home, Qualified};
 
@@ -1124,67 +1125,62 @@ impl Document {
 
         if home.is_none() {
             for (name, interval) in &self.groups {
-                out.push_str("    <groups>\n");
+                out.push_str("    <payload_groups>\n");
                 out.push_str(&format!("        <name>{}</name>\n", escape(name)));
                 out.push_str(&format!(
                     "        <interval>{}</interval>\n",
                     escape(interval)
                 ));
-                out.push_str("    </groups>\n");
+                out.push_str("    </payload_groups>\n");
             }
         }
 
-        for node in self.nodes_in(home) {
-            if let Some(comment) = &node.comment {
-                for line in comment.lines() {
-                    out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+        // The three sections, as the YAML writer does them: one file shape in
+        // two spellings. Several destinations are several elements of one
+        // name, which is how XML says a list.
+        for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
+            for node in self
+                .nodes_in(home)
+                .into_iter()
+                .filter(|node| section_of(&node.node_type) == section)
+            {
+                if let Some(comment) = &node.comment {
+                    for line in comment.lines() {
+                        out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+                    }
                 }
-            }
-            out.push_str("    <nodes>\n");
-            out.push_str(&format!("        <name>{}</name>\n", escape(&node.name)));
-            out.push_str(&format!(
-                "        <type>{}</type>\n",
-                escape(&node.node_type)
-            ));
-            for (attribute, value) in &node.attributes {
+                let tag = section.name();
+                out.push_str(&format!("    <{tag}>\n"));
+                out.push_str(&format!("        <name>{}</name>\n", escape(&node.name)));
                 out.push_str(&format!(
-                    "        <{attribute}>{}</{attribute}>\n",
-                    escape(value)
+                    "        <type>{}</type>\n",
+                    escape(&node.node_type)
                 ));
-            }
-            out.push_str(&format!(
-                "        <editor><x>{}</x><y>{}</y></editor>\n",
-                node.at.0, node.at.1
-            ));
-            out.push_str("    </nodes>\n");
-        }
-
-        for link in self.links_from(home) {
-            if let Some(comment) = &link.comment {
-                for line in comment.lines() {
-                    out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+                for (attribute, value) in &node.attributes {
+                    out.push_str(&format!(
+                        "        <{attribute}>{}</{attribute}>\n",
+                        escape(value)
+                    ));
                 }
-            }
-            // The terminal after a dot, as the YAML writer does it: one file
-            // shape in two spellings.
-            let from = match &link.origin {
-                Some(origin) => {
-                    format!("{}.{origin}", Qualified::parse(&link.from).written_from(home))
+                for (terminal, destinations, comment) in self.leaving(node, home) {
+                    if let Some(comment) = &comment {
+                        for line in comment.lines() {
+                            out.push_str(&format!("        <!-- {} -->\n", escape(line)));
+                        }
+                    }
+                    for to in destinations {
+                        out.push_str(&format!(
+                            "        <{terminal}>{}</{terminal}>\n",
+                            escape(&to)
+                        ));
+                    }
                 }
-                None => Qualified::parse(&link.from).written_from(home),
-            };
-            let to = Qualified::parse(&link.to).written_from(home);
-            out.push_str("    <links>\n");
-            out.push_str(&format!("        <from>{}</from>\n", escape(&from)));
-            match &link.input {
-                Some(input) => out.push_str(&format!(
-                    "        <to>{}.{}</to>\n",
-                    escape(&to),
-                    escape(input)
-                )),
-                None => out.push_str(&format!("        <to>{}</to>\n", escape(&to))),
+                out.push_str(&format!(
+                    "        <editor><x>{}</x><y>{}</y></editor>\n",
+                    node.at.0, node.at.1
+                ));
+                out.push_str(&format!("    </{tag}>\n"));
             }
-            out.push_str("    </links>\n");
         }
 
         // The command bindings, which only the top file declares: what the
@@ -1281,7 +1277,7 @@ impl Document {
         // The groups, which only the top file declares: a group is a property
         // of the whole configuration rather than of one page of it.
         if home.is_none() && !self.groups.is_empty() {
-            out.push_str("\ngroups:\n");
+            out.push_str("\npayload_groups:\n");
             for (name, interval) in &self.groups {
                 out.push_str(&format!(
                     "  - name: {}\n    interval: {}\n",
@@ -1291,61 +1287,74 @@ impl Document {
             }
         }
 
-        out.push_str("\nnodes:\n");
-        for node in self.nodes_in(home) {
-            // Above the entry it belongs to, as a comment and not as a field:
-            // this is what a person hand-editing the file expects to find, and
-            // it is what they would have written themselves.
-            if let Some(comment) = &node.comment {
-                for line in comment.lines() {
-                    out.push_str(&format!("  # {line}\n"));
-                }
+        // The nodes, in three sections: the ground links, what the vehicle
+        // itself runs, and what it carries. The same three working panes the
+        // canvas is divided into, and which section a node belongs in is its
+        // type's own answer -- see tcslibgs::graph::section_of -- so the file
+        // and the drawing cannot come to disagree about what a node is.
+        //
+        // A section with nothing in it is left out rather than written empty:
+        // a configuration with no payloads yet is a configuration somebody is
+        // partway through, and `payloads:` with nothing under it reads back as
+        // nothing anyway.
+        for section in [Section::Moc, Section::Vehicle, Section::Payloads] {
+            let theirs: Vec<&Node> = self
+                .nodes_in(home)
+                .into_iter()
+                .filter(|node| section_of(&node.node_type) == section)
+                .collect();
+            if theirs.is_empty() {
+                continue;
             }
-            out.push_str(&format!(
-                "  - name: {}\n    type: {}\n",
-                node.name, node.node_type
-            ));
-            for (attribute, value) in &node.attributes {
-                // Quoted, which is not fussiness. A YAML reader turns 0x48
-                // into the integer 72 and 2.0 into 2 before anything sees the
-                // text, where an XML reader hands over what was written -- so
-                // the same configuration in the two formats would read
-                // differently, and the digest of one would not match the
-                // other. Quoting keeps the spelling the person wrote.
-                out.push_str(&format!("    {attribute}: {}\n", quoted(value)));
-            }
-            // Two named numbers rather than a list, and the same shape in
-            // XML: a reader of either format wants one struct, and `at: [x,
-            // y]` in YAML against `<at>x,y</at>` in XML would be two.
-            out.push_str(&format!(
-                "    editor: {{ x: {}, y: {} }}\n",
-                node.at.0, node.at.1
-            ));
-        }
-
-        out.push_str("\nlinks:\n");
-        for link in self.links_from(home) {
-            if let Some(comment) = &link.comment {
-                for line in comment.lines() {
-                    out.push_str(&format!("  # {line}\n"));
+            out.push_str(&format!("\n{}:\n", section.name()));
+            for node in theirs {
+                // Above the entry it belongs to, as a comment and not as a
+                // field: this is what a person hand-editing the file expects
+                // to find, and it is what they would have written themselves.
+                if let Some(comment) = &node.comment {
+                    for line in comment.lines() {
+                        out.push_str(&format!("  # {line}\n"));
+                    }
                 }
-            }
-            // Each end as the file writes it: the node, and the terminal
-            // after a dot where the link names one. A node with one data
-            // source and one data sink needs neither, which is every type but
-            // the `null` node -- see tcslibgs::graph::terminals.
-            let from = match &link.origin {
-                Some(origin) => {
-                    format!("{}.{origin}", Qualified::parse(&link.from).written_from(home))
+                out.push_str(&format!(
+                    "  - name: {}\n    type: {}\n",
+                    plain(&node.name),
+                    plain(&node.node_type)
+                ));
+                for (attribute, value) in &node.attributes {
+                    // Quoted, which is not fussiness. A YAML reader turns 0x48
+                    // into the integer 72 and 2.0 into 2 before anything sees
+                    // the text, where an XML reader hands over what was
+                    // written -- so the same configuration in the two formats
+                    // would read differently, and the digest of one would not
+                    // match the other. Quoting keeps the spelling the person
+                    // wrote.
+                    out.push_str(&format!("    {attribute}: {}\n", quoted(value)));
                 }
-                None => Qualified::parse(&link.from).written_from(home),
-            };
-            let to = Qualified::parse(&link.to).written_from(home);
-            match &link.input {
-                Some(input) => out.push_str(&format!(
-                    "  - {{ from: {from}, to: {to}.{input} }}\n"
-                )),
-                None => out.push_str(&format!("  - {{ from: {from}, to: {to} }}\n")),
+                // And the links out of it, each under the data source it
+                // leaves by. One destination is written as itself and several
+                // as a list, which is what a reader of either would write.
+                for (terminal, destinations, comment) in self.leaving(node, home) {
+                    if let Some(comment) = &comment {
+                        for line in comment.lines() {
+                            out.push_str(&format!("    # {line}\n"));
+                        }
+                    }
+                    match destinations.as_slice() {
+                        [one] => out.push_str(&format!("    {terminal}: {one}\n")),
+                        many => out.push_str(&format!(
+                            "    {terminal}: [{}]\n",
+                            many.join(", ")
+                        )),
+                    }
+                }
+                // Two named numbers rather than a list, and the same shape in
+                // XML: a reader of either format wants one struct, and `at:
+                // [x, y]` in YAML against `<at>x,y</at>` in XML would be two.
+                out.push_str(&format!(
+                    "    editor: {{ x: {}, y: {} }}\n",
+                    node.at.0, node.at.1
+                ));
             }
         }
 
@@ -1368,17 +1377,63 @@ impl Document {
         out
     }
 
-    /// The links written in `home`'s file: the ones whose source lives there.
+    /// What leaves a node, by the data source it leaves by.
     ///
-    /// By the source and not by both ends, so that every link is written
-    /// exactly once however far it reaches. A link written in both files it
-    /// touches would be read as two.
-    fn links_from(&self, home: &Home) -> Vec<&Link> {
-        self.links
-            .iter()
-            .filter(|l| &Qualified::parse(&l.from).in_ == home)
-            .collect()
+    /// A link is an attribute of the node it leaves -- `to_moc: k_fore` -- so
+    /// writing a node means writing the links out of it, named after their
+    /// terminal. Which terminal is the editor's own table where the link does
+    /// not say: a payload has one data source and the line was drawn from it.
+    ///
+    /// In the order the file writes them, which is the order the terminals are
+    /// named in: one file for one document, however the links were drawn.
+    ///
+    /// Written where the node is, which is what makes every link written
+    /// exactly once however far it reaches: a link from a node on one page to
+    /// a node on another is an attribute of the first, so the file holding the
+    /// second says nothing about it. A link written in both files it touched
+    /// would be read as two.
+    fn leaving(
+        &self,
+        node: &Node,
+        home: &Home,
+    ) -> Vec<(&'static str, Vec<String>, Option<String>)> {
+        let mut leaving: Vec<(&'static str, Vec<String>, Option<String>)> = Vec::new();
+        for terminal in ["to_moc", "to_payload"] {
+            let mut destinations: Vec<String> = Vec::new();
+            // One line carries one comment, so the attribute's comment is the
+            // first thing written about any of the links under it. Nothing in
+            // the editor sets one -- a link's comment is read from a file
+            // somebody wrote -- so in practice they agree or there is one.
+            let mut comment: Option<String> = None;
+            // The links this node is the source of. Compared as the document
+            // holds them -- `cabin/temp_fore` from outside the subdiagram it
+            // is in -- because a node's own name is the one inside its file.
+            let ours = Qualified::of(&node.name, home).absolute();
+            for link in self.links.iter().filter(|l| l.from == ours) {
+                let by = crate::style::terminal_for(
+                    &node.node_type,
+                    link.origin.as_deref(),
+                    false,
+                );
+                if by != Some(terminal) {
+                    continue;
+                }
+                let to = Qualified::parse(&link.to).written_from(home);
+                destinations.push(match &link.input {
+                    Some(input) => format!("{to}.{input}"),
+                    None => to,
+                });
+                if comment.is_none() {
+                    comment = link.comment.clone();
+                }
+            }
+            if !destinations.is_empty() {
+                leaving.push((terminal, destinations, comment));
+            }
+        }
+        leaving
     }
+
 }
 
 /// Which language a file's name asks for.
@@ -1424,6 +1479,45 @@ fn format_of(path: &std::path::Path) -> Result<Format, String> {
 /// quote on every value is uniform and cannot be wrong.
 fn quoted(value: &str) -> String {
     format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// A name or a type, written bare where bare says the same thing.
+///
+/// Most of them do: `temp_fore` and `i2c` are plain scalars in YAML and read
+/// back as themselves, and a file where every name is in quotes reads as a
+/// file written by a program. The exceptions are the words YAML gives a
+/// meaning of its own -- `null` is nothing at all, `yes` is true, `0x48` is a
+/// number -- and the `null` node is exactly one of them: written bare, its
+/// type reads back as nothing and the file no longer says what it says.
+///
+/// So: bare where the text is a letter or an underscore followed by letters,
+/// digits and the punctuation a name uses, and quoted otherwise. That is
+/// narrower than YAML's own rule on purpose -- what is safe here is what is
+/// safe in both formats and in every YAML reader, and a name this quotes
+/// unnecessarily is a name with quotes round it rather than a file that is
+/// wrong.
+fn plain(value: &str) -> String {
+    const RESERVED: &[&str] = &[
+        "null", "Null", "NULL", "~", "true", "True", "TRUE", "false", "False",
+        "FALSE", "yes", "Yes", "YES", "no", "No", "NO", "on", "On", "ON", "off",
+        "Off", "OFF",
+    ];
+
+    let bare = !value.is_empty()
+        && !RESERVED.contains(&value)
+        && value
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "_-./".contains(c));
+
+    if bare {
+        value.to_string()
+    } else {
+        quoted(value)
+    }
 }
 
 /// XML's five, so that a comment or a value containing one of them is still
@@ -1577,30 +1671,35 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "housekeeping", "directory", "/var/log/tcspecial");
     set(&mut document, "housekeeping", "format", "variable_ts_rc");
 
-    let link = |document: &mut Document, from: &str, to: &str, input: Option<&str>| {
+    // Every link names the data source it leaves by, which is the attribute
+    // it is written under: the readings go groundward and what drives a
+    // payload goes vehicleward.
+    let link = |document: &mut Document, from: &str, by: &str, to: &str, input: Option<&str>| {
         document.apply(&Edit::AddLink {
-            link: Link::new(from, to, input),
+            link: Link::joining(from, Some(by), to, input),
         });
     };
 
-    link(&mut document, "temp_fore", "k_fore", None);
-    link(&mut document, "temp_aft", "k_aft", None);
-    link(&mut document, "temp_bay", "k_bay", None);
+    link(&mut document, "temp_fore", "to_moc", "k_fore", None);
+    link(&mut document, "temp_aft", "to_moc", "k_aft", None);
+    link(&mut document, "temp_bay", "to_moc", "k_bay", None);
 
     // The "T": each converted reading goes to the ground, into the mean, and
     // into the log.
     for (from, input) in [("k_fore", "in0"), ("k_aft", "in1"), ("k_bay", "in2")] {
-        link(&mut document, from, "moc", None);
-        link(&mut document, from, "mean_temp", Some(input));
-        link(&mut document, from, "housekeeping", None);
+        link(&mut document, from, "to_moc", "moc", None);
+        link(&mut document, from, "to_moc", "mean_temp", Some(input));
+        link(&mut document, from, "to_moc", "housekeeping", None);
     }
 
-    link(&mut document, "mean_temp", "moc", None);
-    link(&mut document, "mean_temp", "thermostat", None);
-    link(&mut document, "thermostat", "heaters", None);
-    link(&mut document, "thermostat", "housekeeping", None);
+    link(&mut document, "mean_temp", "to_moc", "moc", None);
+    link(&mut document, "mean_temp", "to_moc", "thermostat", None);
+    // The heaters are a payload, so what drives them leaves the thermostat by
+    // its to_payload: the vehicleward stream, which is what reaches a payload.
+    link(&mut document, "thermostat", "to_payload", "heaters", None);
+    link(&mut document, "thermostat", "to_moc", "housekeeping", None);
     document.apply(&Edit::SetLinkComment {
-        link: Link::new("thermostat", "heaters", None),
+        link: Link::joining("thermostat", Some("to_payload"), "heaters", None),
         was: None,
         now: Some("asserted below the setpoint, unasserted above it".to_string()),
     });
@@ -1782,8 +1881,11 @@ mod tests {
         // what a file means. The simulator's own file is different -- see
         // sim.rs -- because its reader wants the types.
         assert!(yaml.contains("  port: \"4000\"\n"), "{yaml}");
+        // Before the nodes, which this document has none of: a section about
+        // the configuration as a whole comes before the things in it.
+        let nodes = yaml.find("payloads:").unwrap_or(yaml.len());
         assert!(
-            yaml.find("tcspecial:") < yaml.find("nodes:"),
+            yaml.find("tcspecial:").expect("the section") < nodes,
             "the section should come first: {yaml}"
         );
         let xml = document.to_xml();
@@ -2905,18 +3007,27 @@ mod tests {
             }
         }
 
+        // Every link, written as an attribute of the node it leaves: the
+        // terminal is the attribute's name, and the destination its value --
+        // alone where the node has one, inside a list where it has several.
+        // Both spellings say it, each in its own way.
         for link in &document.links {
             let to = match &link.input {
                 Some(input) => format!("{}.{}", link.to, input),
                 None => link.to.clone(),
             };
+            let terminal = link.origin.as_deref().expect("a link names its source");
             assert!(
-                yaml.contains(&format!("from: {}, to: {to}", link.from)),
+                yaml.contains(&format!("{terminal}: {to}\n"))
+                    || yaml.contains(&format!("{terminal}: [{to},"))
+                    || yaml.contains(&format!("{terminal}: [{to}]"))
+                    || yaml.contains(&format!(", {to},"))
+                    || yaml.contains(&format!(", {to}]")),
                 "{} to {to} is missing from the YAML",
                 link.from
             );
             assert!(
-                xml.contains(&format!("<to>{to}</to>")),
+                xml.contains(&format!("<{terminal}>{to}</{terminal}>")),
                 "{} to {to} is missing from the XML",
                 link.from
             );
@@ -3069,17 +3180,20 @@ mod tests {
 
         let written: usize = files
             .iter()
-            .map(|(_, text)| text.matches("to: moc").count())
+            .map(|(_, text)| text.matches("to_moc: moc").count())
             .sum();
         assert_eq!(written, 1, "the crossing link was written {written} times");
 
-        // In the subdiagram's file, where its source lives, and plainly at
-        // this end because that is where it is at home.
+        // In the subdiagram's file, where its source lives: a link is an
+        // attribute of the node it leaves, so the file holding that node is
+        // the only file that says anything about it. The far end is plain
+        // because `moc` is in the top diagram and has no subdiagram to
+        // qualify it with.
         let (_, inner) = files
             .iter()
             .find(|(path, _)| path.ends_with("cabin.yaml"))
             .expect("the subdiagram's file");
-        assert!(inner.contains("{ from: temp_fore, to: moc }"), "{inner}");
+        assert!(inner.contains("to_moc: moc"), "{inner}");
 
         // And the top file says what it includes.
         let (_, top) = &files[0];
@@ -3156,9 +3270,15 @@ mod tests {
         // Quoted: a YAML reader would otherwise turn 0x48 into 72. See
         // `quoted`.
         assert!(yaml.contains("address: \"0x48\""), "{yaml}");
+        // The three sections, and the link as an attribute of the node it
+        // leaves: a payload's readings leave by its to_moc, and the input
+        // they arrive at is named after the dot.
+        assert!(yaml.contains("\npayloads:\n"), "{yaml}");
+        assert!(yaml.contains("\nvehicle:\n"), "{yaml}");
         assert!(
-            yaml.contains("{ from: temp_fore, to: mean_temp.in0 }"),
+            yaml.contains("    to_moc: mean_temp.in0\n"),
             "a link into a named input is written as one: {yaml}"
         );
+        assert!(!yaml.contains("\nlinks:"), "there is no links section: {yaml}");
     }
 }

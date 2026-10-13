@@ -390,22 +390,22 @@ mod tests {
         let by_hand = "\
 version: \"2.0\"
 
-nodes:
+moc:
+  - name: moc
+    type: moc
+    address: \"10.0.0.1\"
+    port: \"5000\"
+    to_payload: temp_fore
+    editor: { x: 240, y: 40 }
+
+payloads:
   - name: temp_fore
     type: i2c
     path: \"/dev/i2c-1\"
     address: \"0x48\"
     trigger: \"01\"
-    editor: { x: 40, y: 120 }
-  - name: moc
-    type: moc
-    address: \"10.0.0.1\"
-    port: \"5000\"
-    editor: { x: 240, y: 40 }
-
-links:
-  - { from: temp_fore, to: moc }
-  - { from: moc, to: temp_fore }
+    to_moc: moc
+    editor: { x: 40, y: 240 }
 ";
         std::fs::write(&path, by_hand).expect("a file");
 
@@ -420,8 +420,11 @@ links:
             sensor.at
         );
         // At the same height it was drawn at: the smallest move that obeys
-        // the rule, so a diagram is not rearranged by being opened.
-        assert_eq!(sensor.at.1, 120);
+        // the rule, so a diagram is not rearranged by being opened. Drawn
+        // well below the ground link, which is the tallest node there is: a
+        // node that came home on top of another steps down the grid, and that
+        // is a rule of its own rather than this one.
+        assert_eq!(sensor.at.1, 240);
         // And the ground link, which the file drew in the vehicle's pane: it
         // belongs in the moc pane now, so it comes home at the same height.
         let moc = editor.document().node("moc").expect("the ground link");
@@ -611,7 +614,7 @@ links:
         let sim = where_.path().join("vehiclesim.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\nnodes:\n  - name: payload\n    type: network\n",
+            "version: \"2.0\"\npayloads:\n  - name: payload\n    type: network\n",
         )
         .expect("a configuration");
 
@@ -652,8 +655,9 @@ links:
         // nothing standing in for it, so it has no settings to offer.
         std::fs::write(
             &path,
-            "version: \"2.0\"\nnodes:\n  - name: sensor\n    type: i2c\n  \
-             - name: payload\n    type: network\n  - name: mean\n    type: compute\n",
+            "version: \"2.0\"\npayloads:\n  - name: sensor\n    type: i2c\n  \
+             - name: payload\n    type: network\nvehicle:\n  - name: mean\n    \
+             type: compute\n",
         )
         .expect("a configuration");
 
@@ -970,13 +974,16 @@ links:
         // The subdiagram holds its node, and the crossing link is written
         // where its source lives -- qualified at the far end only.
         assert!(inner.contains("name: temp_fore"), "{inner}");
+        // A link is an attribute of the node it leaves, so a link that
+        // crosses the boundary is written in the file its *source* is in --
+        // once, and with the far end plain, moc having no subdiagram to
+        // qualify it with.
         assert!(
-            inner.contains("{ from: temp_fore, to: moc }"),
-            "the crossing link should be plain at home and plain at the top, \
-             since moc has no subdiagram to qualify it with: {inner}"
+            inner.contains("to_moc: moc"),
+            "the crossing link should be written on the node it leaves: {inner}"
         );
         assert!(
-            !top.contains("to: moc }"),
+            !top.contains("to_moc:"),
             "the crossing link is written twice: {top}"
         );
     }

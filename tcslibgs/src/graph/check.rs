@@ -25,7 +25,15 @@ pub enum Problem {
     /// A node with no name, which nothing can link to.
     NamelessNode,
     /// A link naming a node that is not in the configuration.
-    NoSuchNode { link: String, missing: String },
+    ///
+    /// `from` is the node the link leaves, which is where the link is written:
+    /// a link is an attribute of that node, so a complaint about one belongs
+    /// on its line.
+    NoSuchNode {
+        from: String,
+        link: String,
+        missing: String,
+    },
     /// A link from a node to itself.
     SelfLink { node: String },
     /// A node in a group the configuration does not have.
@@ -42,16 +50,27 @@ pub enum Problem {
     /// A link end naming a terminal its node does not have, or naming one at
     /// the wrong end, or naming none where the node has several to choose
     /// between. See [`crate::graph::terminals`].
-    BadTerminal { link: String, why: String },
+    BadTerminal {
+        from: String,
+        link: String,
+        why: String,
+    },
     /// A link whose two ends carry different streams: one of them is drawn
     /// backwards.
     CrossedStreams {
+        from: String,
         link: String,
         leaves: String,
         arrives: String,
     },
     /// A payload or a ground link with no link on it at all.
     NodeOnNoLink { node: String, node_type: String },
+    /// One link written twice: the same data source to the same data sink.
+    ///
+    /// Two deliveries of every datum, and nothing in the drawing to show it:
+    /// two lines between one pair of terminals lie on top of each other. The
+    /// editor will not draw the second; a file may still say it.
+    DuplicateLink { from: String, to: String },
     /// A command binding naming a node that is not there.
     NoSuchTarget { sets: String },
     /// A command binding that does not name an attribute.
@@ -142,17 +161,16 @@ impl Problem {
             Problem::DuplicateGroup { name } => About::NodeGroup(name.clone()),
             Problem::BadInterval { group, .. } => About::NodeGroup(group.clone()),
             // A link's problem is reported on the node it leaves, which is
-            // where a reader looks: the links section says `from: a`, and `a`
-            // is what they will search for.
-            Problem::NoSuchNode { .. } => About::Section("links"),
+            // where the link is written: a link is an attribute of that node.
+            Problem::NoSuchNode { from, .. } => About::Node(from.clone()),
             Problem::SelfLink { node } => About::Node(node.clone()),
             Problem::NoSuchGroup { node, .. } => About::Node(node.clone()),
             Problem::IntervalInAGroup { node, .. } => About::Node(node.clone()),
             Problem::InputBoundTwice { node, .. } => About::Node(node.clone()),
-            // A terminal's problem is the link's, which is reported where the
-            // links are written.
-            Problem::BadTerminal { .. } => About::Section("links"),
-            Problem::CrossedStreams { .. } => About::Section("links"),
+            // And so is a terminal's problem, and a crossed link's.
+            Problem::BadTerminal { from, .. } => About::Node(from.clone()),
+            Problem::CrossedStreams { from, .. } => About::Node(from.clone()),
+            Problem::DuplicateLink { from, .. } => About::Node(from.clone()),
             Problem::NodeOnNoLink { node, .. } => About::Node(node.clone()),
             Problem::NoSuchTarget { .. } | Problem::NoAttributeNamed { .. } => {
                 About::Section("commands")
@@ -190,7 +208,7 @@ impl Problem {
                 format!("two groups are called \"{name}\"")
             }
             Problem::NamelessNode => "a node has no name".to_string(),
-            Problem::NoSuchNode { link, missing } => {
+            Problem::NoSuchNode { link, missing, .. } => {
                 format!("{link}: there is no node called \"{missing}\"")
             }
             Problem::SelfLink { node } => {
@@ -209,11 +227,12 @@ impl Problem {
             Problem::InputBoundTwice { node, input } => {
                 format!("two links arrive at \"{node}.{input}\"")
             }
-            Problem::BadTerminal { link, why } => format!("{link}: {why}"),
+            Problem::BadTerminal { link, why, .. } => format!("{link}: {why}"),
             Problem::CrossedStreams {
                 link,
                 leaves,
                 arrives,
+                ..
             } => format!(
                 "{link}: it leaves by \"{leaves}\" and arrives at \"{arrives}\", \
                  which are opposite ways for the data to be going -- one end of \
@@ -223,6 +242,11 @@ impl Problem {
                 "\"{node}\" is a {node_type} node with no link on it: a payload \
                  or a ground link needs a data sink or a data source, or there \
                  is nothing for it to do"
+            ),
+            Problem::DuplicateLink { from, to } => format!(
+                "\"{from}\" is linked to \"{to}\" twice: one link is one \
+                 delivery, and the second is a datum sent again with nothing in \
+                 the drawing to show it"
             ),
             Problem::NoSuchTarget { sets } => {
                 format!("a command sets \"{sets}\", and there is no such node")
@@ -381,6 +405,10 @@ impl Graph {
         // node has, the two ends must carry the same stream, and no sink
         // twice.
         let mut bound: BTreeMap<(String, String), usize> = BTreeMap::new();
+        // Every link, as the pair of ends it joins: a link written twice is
+        // two deliveries of every datum, and two lines in the drawing lying on
+        // top of each other.
+        let mut drawn: BTreeSet<(String, String)> = BTreeSet::new();
         // Which nodes have a link on a sink and which on a source, for the
         // rule below that a payload and the ground need one or the other.
         let mut linked: BTreeMap<&str, (bool, bool)> = BTreeMap::new();
@@ -391,6 +419,7 @@ impl Graph {
             let leaves = match self.node(&origin.node) {
                 None => {
                     problems.push(Problem::NoSuchNode {
+                        from: origin.node.clone(),
                         link: described(&link.to.each().join(", ")),
                         missing: origin.node.clone(),
                     });
@@ -408,6 +437,7 @@ impl Graph {
                         Ok(terminal) => terminal,
                         Err(why) => {
                             problems.push(Problem::BadTerminal {
+                                from: origin.node.clone(),
                                 link: described(&link.to.each().join(", ")),
                                 why,
                             });
@@ -418,6 +448,13 @@ impl Graph {
             };
 
             for destination in link.to.each() {
+                if !drawn.insert((link.from.clone(), destination.to_string())) {
+                    problems.push(Problem::DuplicateLink {
+                        from: origin.node.clone(),
+                        to: destination.to_string(),
+                    });
+                    continue;
+                }
                 let Destination { node, input } = Destination::parse(destination);
                 if node == origin.node {
                     problems.push(Problem::SelfLink { node });
@@ -426,6 +463,7 @@ impl Graph {
                 let arrives = match self.node(&node) {
                     None => {
                         problems.push(Problem::NoSuchNode {
+                            from: origin.node.clone(),
                             link: described(destination),
                             missing: node,
                         });
@@ -448,6 +486,7 @@ impl Graph {
                             }
                             Err(why) => {
                                 problems.push(Problem::BadTerminal {
+                                    from: origin.node.clone(),
                                     link: described(destination),
                                     why,
                                 });
@@ -468,6 +507,7 @@ impl Graph {
                     ) {
                         (Some((_, one)), Some((_, two))) if one != two => {
                             problems.push(Problem::CrossedStreams {
+                                from: origin.node.clone(),
                                 link: described(destination),
                                 leaves: leaves.clone(),
                                 arrives: arrives.clone(),
@@ -1749,12 +1789,13 @@ mod tests {
             .unwrap_or_else(|| panic!("{problems:?}"));
         // Saying what it does have, which is the one thing a reader needs.
         assert!(why.contains("telemetry") && why.contains("from_payload"), "{why}");
-        // Reported where the links are written.
+        // Reported on the node the link leaves, which is where the link is
+        // written: a link is an attribute of that node.
         let said = problems
             .iter()
             .find(|p| matches!(p, Problem::BadTerminal { .. }))
             .unwrap();
-        assert_eq!(said.about(), About::Section("links"));
+        assert_eq!(said.about(), About::Node("a".to_string()));
 
         // A name at the wrong end: the right word, the wrong half of the
         // link, and worth saying in those words rather than as a name nothing
@@ -1957,6 +1998,7 @@ mod tests {
             Problem::DuplicateGroup { name: "g".into() },
             Problem::NamelessNode,
             Problem::NoSuchNode {
+                from: "a".into(),
                 link: "\"a\" to \"b\"".into(),
                 missing: "b".into(),
             },
@@ -1978,13 +2020,19 @@ mod tests {
                 input: "in0".into(),
             },
             Problem::BadTerminal {
+                from: "a".into(),
                 link: "\"a\" to \"c.telemetry\"".into(),
                 why: "a moc node has no data sink called \"telemetry\"".into(),
             },
             Problem::CrossedStreams {
+                from: "n".into(),
                 link: "\"n\" to \"c\"".into(),
                 leaves: "to_moc".into(),
                 arrives: "to_payload".into(),
+            },
+            Problem::DuplicateLink {
+                from: "a".into(),
+                to: "c".into(),
             },
             Problem::NodeOnNoLink {
                 node: "a".into(),

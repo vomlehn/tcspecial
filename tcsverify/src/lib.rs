@@ -417,14 +417,13 @@ tcspecial:
     interval_ms: 5000
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
-groups:
+payload_groups:
   - name: temps
     interval: \"3s\"
-nodes:
-  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\" }
+payloads:
+  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\", to_moc: moc }
+moc:
   - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
-links:
-  - { from: sensor, to: moc }
 ";
 
     /// A sound version 2 configuration is accepted in silence.
@@ -464,15 +463,14 @@ links:
             ".yaml",
             "\
 version: \"2.0\"
-groups:
+payload_groups:
   - name: temps
     interval: soon
-nodes:
-  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\" }
+payloads:
+  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\", to_moc: nowhere }
   - { name: a, type: spi, path: \"/dev/spidev0.0\" }
+vehicle:
   - { name: m, type: compute, function: mean, inputs: \"in0\" }
-links:
-  - { from: a, to: nowhere }
 ",
         );
 
@@ -504,14 +502,14 @@ links:
         let top = dir.path().join("vehicle.yaml");
         std::fs::write(
             &top,
-            "version: \"2.0\"\ninclude:\n  - cabin\nnodes:\n  \
-             - { name: moc, type: moc }\nlinks:\n  - { from: moc, to: moc }\n",
+            "version: \"2.0\"\ninclude:\n  - cabin\nmoc:\n  \
+             - { name: moc, type: moc, to_payload: moc }\n",
         )
         .unwrap();
         // The included file holds a node nothing links to.
         std::fs::write(
             dir.path().join("cabin.yaml"),
-            "version: \"2.0\"\nnodes:\n  - { name: lonely, type: i2c }\n",
+            "version: \"2.0\"\npayloads:\n  - { name: lonely, type: i2c }\n",
         )
         .unwrap();
 
@@ -555,8 +553,12 @@ links:
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <configuration>
     <version>2.0</version>
-    <nodes><name>a</name><type>i2c</type><path>/dev/i2c-1</path></nodes>
-    <links><from>a</from><to>nowhere</to></links>
+    <payloads>
+        <name>a</name>
+        <type>i2c</type>
+        <path>/dev/i2c-1</path>
+        <to_moc>nowhere</to_moc>
+    </payloads>
 </configuration>
 ",
         );

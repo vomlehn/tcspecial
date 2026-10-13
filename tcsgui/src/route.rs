@@ -121,9 +121,11 @@ impl Ends {
     /// Left to right at both ends, which is how every link was drawn before
     /// there were terminals.
     ///
-    /// Still the answer for the nodes whose terminals are their own business
-    /// and for the tests of the shapes themselves, which are about geometry
-    /// and not about which corner a stream leaves by.
+    /// For the tests of the shapes themselves, which are about geometry and
+    /// not about which corner a stream leaves by. Every line the canvas draws
+    /// leaves a terminal and arrives at one, so every line it draws says which
+    /// way each of its ends points.
+    #[cfg(test)]
     pub fn forward(x1: f32, y1: f32, x2: f32, y2: f32) -> Ends {
         Ends {
             from: (x1, y1),

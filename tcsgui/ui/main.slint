@@ -233,9 +233,10 @@ component Terminal inherits Rectangle {
     in property <color> ink;
     // Whether the arrow points right, which is to say towards the payloads.
     in property <bool> rightward;
-    // Whether this is where data arrives. A link is drawn *from* a data
-    // source, so only a source answers a press; a sink is a place to let go
-    // of one, and where it was let go of is worked out from the pointer.
+    // Whether this is where data arrives. Both kinds answer a press, because
+    // a link may be drawn either way about: from the source that feeds it or
+    // from the sink that wants feeding. Which was pressed is what says which
+    // end of the link the other one is.
     in property <bool> sink;
 
     // A link is being drawn from this terminal, and then let go of -- at this
@@ -265,10 +266,10 @@ component Terminal inherits Rectangle {
         height: 100%;
         mouse-cursor: MouseCursor.crosshair;
         pointer-event(event) => {
-            if (!sink && event.kind == PointerEventKind.down) {
+            if (event.kind == PointerEventKind.down) {
                 grabbed();
             }
-            if (!sink && event.kind == PointerEventKind.up) {
+            if (event.kind == PointerEventKind.up) {
                 released(self.mouse-x, self.mouse-y);
             }
         }
@@ -590,6 +591,10 @@ component NodeShape inherits Rectangle {
         rightward: node.from-moc.rightward;
         sink: true;
         ink: ink;
+        grabbed => { link-from("from_moc"); }
+        released(x, y) => {
+            link-dropped(node.x + node.from-moc.x + x, node.y + node.from-moc.y + y);
+        }
     }
     if node.to-payload.shown: Terminal {
         x: node.to-payload.x + drag-x;
@@ -612,6 +617,13 @@ component NodeShape inherits Rectangle {
         rightward: node.from-payload.rightward;
         sink: true;
         ink: ink;
+        grabbed => { link-from("from_payload"); }
+        released(x, y) => {
+            link-dropped(
+                node.x + node.from-payload.x + x,
+                node.y + node.from-payload.y + y
+            );
+        }
     }
     if node.to-moc.shown: Terminal {
         x: node.to-moc.x + drag-x;

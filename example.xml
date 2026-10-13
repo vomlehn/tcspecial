@@ -1,76 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- One payload on a UDP link, its telemetry going to the ground.
-
-     Equivalent to example.yaml -- a configuration may be written in either
-     format, and both of this one are kept. The YAML is the one to read: it
-     carries the comments, including how to run it.
-
-     Conventions, which are what XML and YAML agree on:
-       - every value is a child element, never an attribute
-       - a sequence is repeated sibling elements named for the field,
-         and the repeats must be contiguous
-       - an absent optional field is simply an omitted element -->
 <configuration>
     <version>2.0</version>
     <description>One payload on a UDP link, its telemetry going to the ground</description>
-    <!-- What tcspecial itself is configured with: where commands are taken,
-         where beacons go, and where the telemetry log is written. Required of
-         every configuration; see example.yaml for what the two ports are
-         for. -->
     <tcspecial>
-        <tcs_cmd>
-            <recv>0.0.0.0:4000</recv>
-            <send>127.0.0.1:4100</send>
-        </tcs_cmd>
-        <payload_command>
-            <source_base>127.0.0.1:4300</source_base>
-            <dest_base>0.0.0.0:4200</dest_base>
-        </payload_command>
-        <payload_telemetry>
-            <source_base>0.0.0.0:6000</source_base>
-            <dest_base>127.0.0.1:6100</dest_base>
-        </payload_telemetry>
         <beacon>
             <interval_ms>5000</interval_ms>
-            <send>0.0.0.0:5550</send>
             <recv>127.0.0.1:5650</recv>
+            <send>0.0.0.0:5550</send>
         </beacon>
         <log>
             <directory>/var/log/tcspecial</directory>
             <segment_size>65536</segment_size>
         </log>
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:6100</dest_base>
+            <source_base>0.0.0.0:6000</source_base>
+        </payload_telemetry>
+        <tcs_cmd>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:4100</send>
+        </tcs_cmd>
     </tcspecial>
-    <groups>
+    <payload_groups>
         <name>every_second</name>
         <interval>1s</interval>
-    </groups>
-    <nodes>
+    </payload_groups>
+    <payloads>
         <name>payload</name>
         <type>network</type>
-        <protocol>udp</protocol>
         <address>127.0.0.1</address>
-        <port>5100</port>
         <group>every_second</group>
-        <!-- What is written to ask for the next reading, and what allows the
-             link down to this payload at all: see example.yaml -->
+        <port>5100</port>
+        <protocol>udp</protocol>
         <trigger>01</trigger>
-        <!-- In the payload working pane, the right-hand quarter of the
-             editor's canvas -->
+        <!-- Up: every datagram the payload sends goes to the ground as it
+             arrives. A link is an attribute of the node it leaves, named
+             after the data source it leaves by. -->
+        <to_moc>moc</to_moc>
         <editor><x>744</x><y>160</y></editor>
-    </nodes>
-    <nodes>
+    </payloads>
+    <moc>
         <name>moc</name>
         <type>moc</type>
         <address>127.0.0.1</address>
         <port>5000</port>
+        <!-- Down: what the ground sends reaches the payload, leaving by the
+             ground link's own to_payload. -->
+        <to_payload>payload</to_payload>
         <editor><x>24</x><y>40</y></editor>
-    </nodes>
-    <links>
-        <from>payload</from>
-        <to>moc</to>
-    </links>
-    <links>
-        <from>moc</from>
-        <to>payload</to>
-    </links>
+    </moc>
 </configuration>

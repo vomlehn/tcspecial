@@ -10,6 +10,7 @@ use crate::node::serial::{Parity, StopBits};
 use crate::node::spi::{BitOrder, CsActive, SpiMode};
 use crate::verify::Problem;
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A time, in milliseconds since the UNIX epoch.
@@ -308,6 +309,30 @@ pub fn collisions(handlers: &[DHConfig]) -> Vec<(DHName, String)> {
     }
 
     found
+}
+
+/// Whether a datagram came from the socket a configuration names.
+///
+/// Every link in the `tcspecial` section is written down at both ends, which
+/// is what makes this possible at all: a beacon, a command, a response and a
+/// payload's telemetry each have one place they are supposed to come from, and
+/// anything else arriving at that socket is somebody else's traffic or
+/// somebody's mistake. Acting on it would be acting on what the configuration
+/// did not describe.
+///
+/// The port must match. The address must too -- `localhost`, `127.0.0.1` and
+/// `::1` counting as one host, as they do everywhere else in these rules --
+/// unless the configuration names every interface, in which case the address a
+/// datagram carries is whichever interface the route chose and there is
+/// nothing written down to compare it with.
+pub fn came_from(stated: &HostPort, from: &SocketAddr) -> bool {
+    if from.port() != stated.port {
+        return false;
+    }
+    if binds_every_interface(&stated.address) {
+        return true;
+    }
+    one_host(&stated.address) == one_host(&from.ip().to_string())
 }
 
 /// Whether an address binds every interface rather than one of them.
@@ -2886,6 +2911,43 @@ mod tests {
     use std::time::Duration;
 
     use crate::ConfigFormat;
+
+    /// A datagram is taken only from the socket the configuration names.
+    ///
+    /// Four programs ask this of four links -- a beacon, a command, a
+    /// response, a payload's telemetry -- so the rule is here and not in any
+    /// of them. What it has to get right is the wildcard: a link bound to
+    /// every interface sends from whichever one the route chose, so there is
+    /// nothing written down to compare the address with and only the port can
+    /// be asked about.
+    #[test]
+    fn a_datagram_is_taken_only_from_where_the_configuration_says() {
+        use super::*;
+        use std::net::SocketAddr;
+
+        let at = |text: &str| text.parse::<SocketAddr>().expect(text);
+        let stated = |address: &str, port: u16| HostPort {
+            address: address.to_string(),
+            port,
+        };
+
+        // The plain case: one host, one port, both as written.
+        assert!(came_from(&stated("127.0.0.1", 4100), &at("127.0.0.1:4100")));
+        // The port is asked about always.
+        assert!(!came_from(&stated("127.0.0.1", 4100), &at("127.0.0.1:4101")));
+        // And the address, where the configuration names one.
+        assert!(!came_from(&stated("127.0.0.1", 4100), &at("10.0.0.1:4100")));
+        // The names that mean this host are one host, as they are everywhere
+        // else in these rules.
+        assert!(came_from(&stated("localhost", 4100), &at("127.0.0.1:4100")));
+
+        // Every interface: the port is all there is to go on, which is the
+        // shipped case -- 0.0.0.0:5550 sends beacons that arrive from
+        // whichever interface carried them.
+        assert!(came_from(&stated("0.0.0.0", 5550), &at("127.0.0.1:5550")));
+        assert!(came_from(&stated("0.0.0.0", 5550), &at("10.0.0.1:5550")));
+        assert!(!came_from(&stated("0.0.0.0", 5550), &at("127.0.0.1:5551")));
+    }
 
     /// A tcspecial configuration that says nothing about the mode describes the
     /// kind of payload that sends on its own, which is what every file written

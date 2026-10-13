@@ -1525,6 +1525,27 @@ A command sent to the wrong one of the two is refused rather than served: it
 means one end is not reading the configuration the other is, and that is the
 last fault to hide on the link the spacecraft is restarted over.
 
+A spacecraft command is also taken only from where the configuration says the
+MOC sends them -- ``tcs_cmd.send``, which the MOC binds for that link -- and
+anything else arriving there is ignored, with nothing sent back to the sender.
+The other three links are checked the same way: the MOC takes a response only
+from the socket its command went to, a beacon only from ``beacon.send``, and a
+payload's telemetry only from ``payload_telemetry.source_base`` counted on by
+that payload's id. Where the configuration names every interface --
+``0.0.0.0``, which the vehicle's side usually is -- the port is all there is to
+compare against, the address a datagram carries then being whichever interface
+it came in on.
+
+Each ignored datagram says so on the console, naming where it came from and
+where the configuration expected it from:
+
+.. code-block:: console
+
+   a command came from 127.0.0.1:53124 and not from 127.0.0.1:4100, which is where the configuration says the MOC sends from -- ignored
+
+Which is the message to look for when a link is deaf: it tells a link nothing
+is sending on from a link whose two ends have been given different files.
+
 The MOC opens both when it connects, and says so:
 
 .. code-block:: console

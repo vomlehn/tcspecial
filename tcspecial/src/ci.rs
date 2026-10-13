@@ -3,7 +3,7 @@
 //! The CI processes commands from the OC and manages data handlers.
 
 use std::collections::BTreeMap;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use crate::beacon_send::BeaconSend;
 use std::net::UdpSocket;
 //use std::os::unix::io::AsRawFd;
@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tcslibgs::{
-    answer_to, ArmKey, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
+    answer_to, came_from, ArmKey, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry,
     DHConfig, DHName, DHSample, DHState, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
@@ -344,6 +344,14 @@ pub struct CommandInterpreter {
     beacon_send: tcslibgs::HostPort,
     /// And where they go, which the ground station binds.
     beacon_recv: tcslibgs::HostPort,
+    /// Where the MOC's commands come from, as the configuration said:
+    /// `tcs_cmd.send`, which is the socket the MOC binds to send them and to
+    /// receive the responses on.
+    ///
+    /// Held so that the loop below can refuse a command from anywhere else. A
+    /// command is a command to restart a spacecraft; taking one from whoever
+    /// sent it would be taking the ground's word from a stranger.
+    moc_cmd_send: tcslibgs::HostPort,
     _config: CIConfig,
     /// The spacecraft command link: ping, arm, restart, configure.
     socket: UdpSocket,
@@ -585,6 +593,7 @@ impl CommandInterpreter {
             beacon_send: config.beacon_send.clone(),
             beacon_recv: config.beacon_recv.clone(),
             beacon: None,
+            moc_cmd_send: config.moc_cmd_send.clone(),
             _config: config,
             socket,
             payload_socket: Some(payload_socket),
@@ -742,6 +751,19 @@ impl CommandInterpreter {
         while self.running {
             // Try to receive a command
             match self.socket.recv_from(&mut recv_buffer) {
+                // Only from where the configuration says the MOC commands
+                // from. Nothing is sent back: an answer would tell whoever
+                // sent it that something is listening here, and the one end
+                // that is supposed to be talking to this socket is written
+                // down in the file both ends read.
+                Ok((_, addr)) if !came_from(&self.moc_cmd_send, &addr) => {
+                    warn!(
+                        "a command came from {addr} and not from {}, which is where \
+                         the configuration says the MOC sends from -- ignored",
+                        self.moc_cmd_send
+                    );
+                    continue;
+                }
                 Ok((size, addr)) => {
                     trace!("run: received from {:?}", addr);
                     _last_client_addr = Some(addr);
@@ -1642,6 +1664,15 @@ mod tests {
 
     /// A command interpreter on a port the OS picks, with no payloads.
     fn interpreter() -> CommandInterpreter {
+        interpreter_commanded_from(std::net::SocketAddr::from(([127, 0, 0, 1], 4100)))
+    }
+
+    /// An interpreter that takes its commands from a particular socket.
+    ///
+    /// For a test that really sends one: the loop refuses a command from
+    /// anywhere but `tcs_cmd.send`, so a test's ground socket is bound first
+    /// and the configuration is told where it is.
+    fn interpreter_commanded_from(from: std::net::SocketAddr) -> CommandInterpreter {
         CommandInterpreter::new(
             CIConfig {
                 address: "127.0.0.1".to_string(),
@@ -1653,8 +1684,8 @@ mod tests {
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
-                    address: "127.0.0.1".to_string(),
-                    port: 4100,
+                    address: from.ip().to_string(),
+                    port: from.port(),
                 },
                 payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
@@ -1862,6 +1893,57 @@ mod tests {
             .expect("it served without failing");
     }
 
+    /// A command from anywhere but the MOC's own socket is ignored.
+    ///
+    /// Not answered, not logged as a command, not acted on. A command is a
+    /// command to restart a spacecraft, and the one end that is supposed to
+    /// send them is written down in the file both ends read -- so a datagram
+    /// from elsewhere is somebody else's, and answering it would tell whoever
+    /// sent it that something is listening here.
+    ///
+    /// The real socket is asked afterwards, so that this is about where the
+    /// command came from and not about the loop having stopped.
+    #[test]
+    fn a_command_from_the_wrong_socket_is_ignored() {
+        let expected = UdpSocket::bind("127.0.0.1:0").expect("the MOC's own socket");
+        expected
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+
+        let mut ci = interpreter_commanded_from(expected.local_addr().expect("where it is"));
+        let link = ci.command_address().expect("where it is");
+        thread::spawn(move || {
+            let _ = ci.run();
+        });
+
+        // A stranger's ping, which must go unanswered.
+        let stranger = UdpSocket::bind("127.0.0.1:0").expect("another socket");
+        stranger
+            .set_read_timeout(Some(Duration::from_millis(500)))
+            .expect("a timeout");
+        let ping = |sequence: u32| {
+            serde_json::to_vec(&Command::Ping(tcslibgs::PingCommand::new(sequence)))
+                .expect("it serializes")
+        };
+        stranger.send_to(&ping(30), link).expect("it is sent");
+        let mut buffer = [0u8; 65535];
+        assert!(
+            stranger.recv_from(&mut buffer).is_err(),
+            "a command from the wrong socket was answered"
+        );
+
+        // And the loop is still there, answering the socket the
+        // configuration names.
+        expected.send_to(&ping(31), link).expect("it is sent");
+        let (size, _) = expected
+            .recv_from(&mut buffer)
+            .expect("the MOC's own socket is answered");
+        match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
+            Telemetry::Ping(tm) => assert_eq!(tm.header.sequence, 31),
+            other => panic!("expected PING telemetry, got {other:?}"),
+        }
+    }
+
     /// A spacecraft command is answered while a payload command waits.
     ///
     /// This is the whole of why there are two links. The payload command here
@@ -1872,7 +1954,14 @@ mod tests {
     /// is busy.
     #[test]
     fn a_spacecraft_command_is_answered_while_a_payload_command_waits() {
-        let mut ci = interpreter();
+        // Bound first, because the loop takes commands only from where its
+        // configuration says the MOC sends them.
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+
+        let mut ci = interpreter_commanded_from(ground.local_addr().expect("where it is"));
         let spacecraft_link = ci.command_address().expect("where it is");
         let payload_link = ci.payload_command_address().expect("where it is");
         let handlers = ci.data_handlers.clone();
@@ -1883,11 +1972,6 @@ mod tests {
         thread::spawn(move || {
             let _ = ci.run();
         });
-
-        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
-        ground
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .expect("a timeout");
 
         let stuck = serde_json::to_vec(&Command::StartDH(StartDHCommand::new(
             20,

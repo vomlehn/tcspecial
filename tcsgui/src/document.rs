@@ -1146,7 +1146,10 @@ impl Document {
             {
                 if let Some(comment) = &node.comment {
                     for line in comment.lines() {
-                        out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+                        out.push_str(&format!(
+                            "    <!-- {} -->\n",
+                            escape(&comment_safe(line))
+                        ));
                     }
                 }
                 let tag = section.name();
@@ -1169,7 +1172,10 @@ impl Document {
                 for (terminal, destinations, comment) in self.leaving(node, home) {
                     if let Some(comment) = &comment {
                         for line in comment.lines() {
-                            out.push_str(&format!("        <!-- {} -->\n", escape(line)));
+                            out.push_str(&format!(
+                                "        <!-- {} -->\n",
+                                escape(&comment_safe(line))
+                            ));
                         }
                     }
                     for to in destinations {
@@ -1194,7 +1200,10 @@ impl Document {
             for command in &self.commands {
                 if let Some(comment) = &command.comment {
                     for line in comment.lines() {
-                        out.push_str(&format!("    <!-- {} -->\n", escape(line)));
+                        out.push_str(&format!(
+                            "    <!-- {} -->\n",
+                            escape(&comment_safe(line))
+                        ));
                     }
                 }
                 out.push_str("    <commands>\n");
@@ -1546,6 +1555,37 @@ fn escape(text: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+/// A line of a comment, as XML will carry it.
+///
+/// XML forbids two hyphens in a row inside a comment and forbids a comment
+/// ending in one: there is no escape for them, the sequence being how a
+/// comment ends. This project writes `--` as an em dash all over its prose, so
+/// a note somebody wrote in the editor would otherwise make the file
+/// unreadable rather than merely different -- which is the one thing a writer
+/// must not do.
+///
+/// A run of hyphens becomes one, which reads as the dash it was and is the
+/// smallest change that makes the file legal. It is a thing the XML spelling
+/// does not preserve, and is listed with the others in `docs/design.rst`.
+pub(crate) fn comment_safe(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut hyphen = false;
+    for c in line.chars() {
+        if c == '-' {
+            if hyphen {
+                continue;
+            }
+            hyphen = true;
+        } else {
+            hyphen = false;
+        }
+        out.push(c);
+    }
+    // And not ending in one, for the same reason: `-->` would close the
+    // comment a character early.
+    out.trim_end_matches('-').trim_end().to_string()
 }
 
 /// The worked example from `design.rst`: a cabin thermostat.
@@ -3017,7 +3057,13 @@ mod tests {
             if let Some(comment) = &node.comment {
                 let first = comment.lines().next().unwrap();
                 assert!(yaml.contains(first), "a comment is missing from the YAML");
-                assert!(xml.contains(first), "a comment is missing from the XML");
+                // The XML spelling folds a run of hyphens to one, there being
+                // no way to write two of them inside a comment: see
+                // `comment_safe`.
+                assert!(
+                    xml.contains(&comment_safe(first)),
+                    "a comment is missing from the XML"
+                );
             }
         }
 

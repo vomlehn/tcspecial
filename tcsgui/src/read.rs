@@ -395,7 +395,23 @@ mod tests {
                     .iter()
                     .find(|n| n.name == written.name)
                     .unwrap_or_else(|| panic!("{name}: {} was not read back", written.name));
-                assert_eq!(found, written, "{name}: {}", written.name);
+
+                // Everything comes back as it went out, with one exception
+                // the XML spelling cannot avoid: a comment may not contain two
+                // hyphens in a row, there being no escape for the sequence
+                // that ends one, so a run of them is folded to a single
+                // hyphen on the way out. See `document::comment_safe`.
+                let mut written = written.clone();
+                if name.ends_with(".xml") {
+                    written.comment = written.comment.as_deref().map(|comment| {
+                        comment
+                            .lines()
+                            .map(crate::document::comment_safe)
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    });
+                }
+                assert_eq!(found, &written, "{name}: {}", written.name);
             }
             assert_eq!(read.links.len(), document.links.len(), "{name}: links");
             for written in &document.links {

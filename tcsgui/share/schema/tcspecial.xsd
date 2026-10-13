@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A version 2 tcspecial configuration, written in XML.
+
+  What this checks is the shape of the file: which sections there are, what an
+  entry may say, and which words are words. What it cannot check is whether the
+  configuration can be flown. Which attributes a node of a given type must
+  state, whether two payloads claim one socket, whether a mean's inputs are the
+  ones its links bind: those are rules about meaning, they are tested against
+  real buses, and tcsverify is the one place they live. A file this accepts may
+  still be refused, and the refusal will say why.
+
+  Two consequences worth knowing before reading further.
+
+  A node's content is a choice of known element names repeated in any order,
+  which is as close as XSD 1.0 comes to "these words and no others". It cannot
+  say that `name` appears exactly once, because `to_moc` may appear many times
+  (several destinations are several elements) and XSD 1.0's xs:all allows
+  neither repeats nor a mixture. A node with two names is refused where the
+  file is read instead.
+
+  The attribute names below are the union over every node type: a bus address,
+  a baud rate and a setpoint are all here, and which of them a given type may
+  state is that type's own rule. A schema that knew those rules would be a
+  second copy of them, and the copy would be the one that was wrong.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <!-- Where data leaves a node: a link, written as an attribute of the node
+       it leaves. The value is the data sink it reaches, as `node` or
+       `node.terminal`. -->
+  <xs:simpleType name="destination">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Za-z_][A-Za-z0-9_./-]*(\.[A-Za-z_][A-Za-z0-9_-]*)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Where the editor drew a node, which the flight software ignores. -->
+  <xs:complexType name="editor">
+    <xs:all>
+      <xs:element name="x" type="xs:integer"/>
+      <xs:element name="y" type="xs:integer"/>
+    </xs:all>
+  </xs:complexType>
+
+  <xs:complexType name="node">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <!-- What every node says about itself. -->
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="type" type="xs:string"/>
+      <xs:element name="group" type="xs:string"/>
+      <xs:element name="editor" type="editor"/>
+      <!-- The two data sources, which are where links are written. -->
+      <xs:element name="to_moc" type="destination"/>
+      <xs:element name="to_payload" type="destination"/>
+      <!-- Where a node is. -->
+      <xs:element name="path" type="xs:string"/>
+      <xs:element name="address" type="xs:string"/>
+      <xs:element name="port" type="xs:string"/>
+      <xs:element name="protocol" type="xs:string"/>
+      <xs:element name="interface" type="xs:string"/>
+      <xs:element name="can_id" type="xs:string"/>
+      <!-- How it is read. -->
+      <xs:element name="read_size" type="xs:string"/>
+      <xs:element name="trigger" type="xs:string"/>
+      <xs:element name="max_length" type="xs:string"/>
+      <xs:element name="read_timeout" type="xs:string"/>
+      <xs:element name="terminators" type="xs:string"/>
+      <!-- The terms of a line. -->
+      <xs:element name="datarate" type="xs:string"/>
+      <xs:element name="byte_length" type="xs:string"/>
+      <xs:element name="stop_bits" type="xs:string"/>
+      <xs:element name="parity" type="xs:string"/>
+      <xs:element name="standard" type="xs:string"/>
+      <xs:element name="clock_rate" type="xs:string"/>
+      <xs:element name="clock_type" type="xs:string"/>
+      <xs:element name="encoding" type="xs:string"/>
+      <xs:element name="frame_check" type="xs:string"/>
+      <xs:element name="loopback" type="xs:string"/>
+      <xs:element name="rs485" type="xs:string"/>
+      <xs:element name="rs485_rts_on_send" type="xs:string"/>
+      <xs:element name="rs485_delay_before_send_ms" type="xs:string"/>
+      <xs:element name="rs485_delay_after_send_ms" type="xs:string"/>
+      <!-- A device on a bus, and a peripheral on one. -->
+      <xs:element name="ten_bit" type="xs:string"/>
+      <xs:element name="pec" type="xs:string"/>
+      <xs:element name="retries" type="xs:string"/>
+      <xs:element name="timeout" type="xs:string"/>
+      <xs:element name="max_speed" type="xs:string"/>
+      <xs:element name="spi_mode" type="xs:string"/>
+      <xs:element name="bits_per_word" type="xs:string"/>
+      <xs:element name="bit_order" type="xs:string"/>
+      <xs:element name="cs_active" type="xs:string"/>
+      <xs:element name="can_fd" type="xs:string"/>
+      <!-- A channel to another core. -->
+      <xs:element name="service" type="xs:string"/>
+      <xs:element name="max_message_bytes" type="xs:string"/>
+      <!-- Discrete lines. -->
+      <xs:element name="lines" type="xs:string"/>
+      <xs:element name="direction" type="xs:string"/>
+      <xs:element name="edge" type="xs:string"/>
+      <xs:element name="bias" type="xs:string"/>
+      <xs:element name="debounce_us" type="xs:string"/>
+      <!-- A computation, and what each of them is told. -->
+      <xs:element name="function" type="xs:string"/>
+      <xs:element name="inputs" type="xs:string"/>
+      <xs:element name="format" type="xs:string"/>
+      <xs:element name="scale" type="xs:string"/>
+      <xs:element name="offset" type="xs:string"/>
+      <xs:element name="setpoint" type="xs:string"/>
+      <xs:element name="above" type="xs:string"/>
+      <xs:element name="below" type="xs:string"/>
+      <xs:element name="program" type="xs:string"/>
+      <xs:element name="restart" type="xs:string"/>
+      <!-- A log. -->
+      <xs:element name="directory" type="xs:string"/>
+      <xs:element name="segment_bytes" type="xs:string"/>
+      <!-- A page of its own. -->
+      <xs:element name="file" type="xs:string"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- A set of payloads read on one interval. -->
+  <xs:complexType name="payload_group">
+    <xs:all>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="interval" type="xs:string"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- A command from the ground that sets an attribute of a node. -->
+  <xs:complexType name="command">
+    <xs:all>
+      <xs:element name="from" type="xs:string"/>
+      <xs:element name="sets" type="xs:string"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- An address and a port in one value, which is how every socket of the
+       tcspecial section is written: two things only ever used together are
+       one fact. -->
+  <xs:simpleType name="socket">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[^:]+:[0-9]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What tcspecial itself is configured with: where commands are taken,
+       where beacons go, where the telemetry log is written. Enumerated, unlike
+       a node's attributes, because this section's words are fixed and the
+       software refuses any other.
+
+       Everything optional, because the editor has to be able to write a
+       section somebody is halfway through filling in. What must be answered
+       before a configuration flies is tcsverify's to say. -->
+  <xs:complexType name="tcspecial">
+    <xs:all>
+      <xs:element name="tcs_cmd" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="recv" type="socket" minOccurs="0"/>
+            <xs:element name="send" type="socket" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="payload_command" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="source_base" type="socket" minOccurs="0"/>
+            <xs:element name="dest_base" type="socket" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="payload_telemetry" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="source_base" type="socket" minOccurs="0"/>
+            <xs:element name="dest_base" type="socket" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="beacon" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="interval_ms" type="xs:string" minOccurs="0"/>
+            <xs:element name="send" type="socket" minOccurs="0"/>
+            <xs:element name="recv" type="socket" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="log" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="directory" type="xs:string" minOccurs="0"/>
+            <xs:element name="segment_size" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- The file itself.
+
+       The sections may be written in any order, and each as many times as it
+       has entries: that is how XML spells a list. Nothing is required here,
+       for the reason the tcspecial section's attributes are not: a file
+       somebody is partway through writing must still open. That a
+       configuration says which version it is, and has a tcspecial section, is
+       checked where a complaint can name the file and the line. -->
+  <xs:element name="configuration">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="version" type="xs:string"/>
+        <xs:element name="description" type="xs:string"/>
+        <xs:element name="include" type="xs:string"/>
+        <xs:element name="tcspecial" type="tcspecial"/>
+        <xs:element name="payload_groups" type="payload_group"/>
+        <xs:element name="moc" type="node"/>
+        <xs:element name="vehicle" type="node"/>
+        <xs:element name="payloads" type="node"/>
+        <xs:element name="commands" type="command"/>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

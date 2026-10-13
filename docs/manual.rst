@@ -1610,11 +1610,13 @@ configuration that has not been asked where to send them has not answered.
 ``tcspecial.yaml`` states them too, and a set's section wins over it; the
 file's are what place a set whose configuration states no section at all.
 
-``beacon_send`` is where beacons come from, which tcspecial binds, and
-``beacon_recv`` is where they are received, which the ground station binds and
-tcspecial sends to. Both are an address and a port, like the links above, and
-both ends read both of them out of the same file -- which is how the two come
-to name one pair.
+``beacon_send`` is where beacons come from: tcspecial makes the socket it
+sends them on out of it, binding that address and port, so every beacon leaves
+from there. ``beacon_recv`` is where they are received: tcsmoc makes the socket
+it receives them on out of it, binding that address and port, and it is where
+tcspecial sends. Both are an address and a port, like the links above, and both
+ends read both of them out of the same file -- which is how the two come to
+name one pair.
 
 Beacons went to a multicast group, with a second attribute naming the local
 interface to join it on. That bought something real: any number of ground

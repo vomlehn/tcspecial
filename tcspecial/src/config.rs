@@ -22,14 +22,17 @@ pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
 /// The two ends of the beacon link.
 ///
 /// Both ends resolve this the same way, out of the same two files, which is
-/// the whole point of its being a function: tcspecial binds `send` and sends
-/// to `recv`, tcsmoc binds `recv`, and a pair that disagreed would lose every
-/// beacon with nothing to show for it.
+/// the whole point of its being a function: tcspecial makes its sending socket
+/// out of `send` and sends to `recv`, tcsmoc makes its receiving socket out of
+/// `recv`, and a pair that disagreed would lose every beacon with nothing to
+/// show for it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Beacon {
-    /// Where beacons originate, which tcspecial binds.
+    /// Where beacons originate: the address and port tcspecial binds the
+    /// socket it sends them on to.
     pub send: HostPort,
-    /// Where they are received, which the MOC binds.
+    /// Where they are received: the address and port tcsmoc binds the socket
+    /// it receives them on to.
     pub recv: HostPort,
 }
 

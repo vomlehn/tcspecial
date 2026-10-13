@@ -5225,10 +5225,12 @@ Requirement
     states it.
 
 Requirement
-    A beacon is sent from one stated socket to another. ``beacon_send`` is
-    where beacons originate, which tcspecial binds; ``beacon_recv`` is where
-    they are received, which the ground station binds and tcspecial sends to.
-    Each is an address and a port.
+    A beacon is sent from one stated socket to another. Tcspecial makes the
+    socket it sends beacons on out of ``beacon_send`` -- that is the address
+    and port it binds, so every beacon leaves from there -- and sends to
+    ``beacon_recv``. Tcsmoc makes the socket it receives beacons on out of
+    ``beacon_recv``, binding the same address and port. Each is an address and
+    a port.
 
 A beacon was sent to a multicast group, with a second attribute naming the
 local interface to join it on. That bought something real: a beacon is an

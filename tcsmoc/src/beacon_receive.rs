@@ -269,9 +269,11 @@ pub struct BeaconReceive {
     contact:            Arc<Mutex<Contact>>,
     /// What the last beacon said, kept for the passes that find nothing.
     last_message:       Arc<Mutex<String>>,
-    /// Where beacons are received, which this binds, and where they come
-    /// from. Both come from the command interpreter's configuration, which is
-    /// also where tcspecial reads them, so the two cannot differ.
+    /// Where beacons are received -- `beacon_recv`, which the socket this
+    /// receives on is bound to -- and where they come from, which is what
+    /// tcspecial binds its sending socket to. Both come from the command
+    /// interpreter's configuration, which is also where tcspecial reads them,
+    /// so the two cannot differ.
     beacon:             Beacon,
     ui_weak:            Weak<MainWindow>,
     indicator_states:   IndicatorStates,

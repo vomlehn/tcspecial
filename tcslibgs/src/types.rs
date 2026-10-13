@@ -2589,7 +2589,9 @@ pub struct CIConfigJson {
     pub log_segment_bytes: u32,
     /// Where beacons originate, as `address:port`.
     ///
-    /// tcspecial binds this and sends from it. Required, like the interval
+    /// tcspecial makes the socket it sends beacons on out of this: it is the
+    /// address and port that socket is bound to, so every beacon leaves from
+    /// here. Required, like the interval
     /// beside it: beacons are how the ground knows the spacecraft is alive, so
     /// where they come from and where they go is not something to be left to a
     /// default that a file silently takes. A payload set's `tcspecial` section
@@ -2598,8 +2600,9 @@ pub struct CIConfigJson {
     pub beacon_send: String,
     /// And where they are received, as `address:port`.
     ///
-    /// The MOC binds this and tcspecial sends to it. Plain UDP between two
-    /// stated ends.
+    /// tcsmoc makes the socket it receives beacons on out of this: it is the
+    /// address and port that socket is bound to, and it is where tcspecial
+    /// sends. Plain UDP between two stated ends.
     ///
     /// Beacons went to a multicast group, which bought something real -- any
     /// number of ground stations could join it and neither end needed the

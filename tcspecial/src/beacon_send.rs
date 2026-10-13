@@ -24,9 +24,11 @@ use crate::telemetry_log::TelemetryLog;
 pub struct BeaconSend {
     pair:       ArcCondPair<SystemTime>,
     interval:   Arc<Mutex<Duration>>,
-    /// Where beacons go, which the ground station binds.
+    /// Where beacons go: `beacon_recv`, which is what tcsmoc makes its
+    /// receiving socket out of.
     dest_addr:  tcslibgs::HostPort,
-    /// Where they come from, which this binds.
+    /// Where they come from: `beacon_send`, which is what the socket below is
+    /// bound to, so every beacon this sends leaves from there.
     ///
     /// Stated rather than left to the system, and that is the whole of what
     /// replaced multicast: a beacon goes from one named place to one other, so

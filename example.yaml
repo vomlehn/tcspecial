@@ -1,73 +1,54 @@
 version: "2.0"
-description: One payload on a UDP link, its telemetry going to the ground
+description: "One payload on a UDP link, its telemetry going to the ground"
 
-# What tcspecial itself is configured with: where commands are taken, where
-# beacons go, and where the telemetry log is written. The same section a
-# payload set's file holds, and required of every configuration -- a graph
-# that describes what the vehicle carries says nothing about how any of it
-# reaches the ground until this is answered.
-#
-# Most of it is a subsection, because most of it is one thing with more than
-# one attribute to it: tcs_cmd is the spacecraft command link and has two ends,
-# payload_telemetry has two, beacon has two and a timing, log has a place and a
-# size.
-#
-# Two command links, because what the ground needs in a hurry must never be
-# queued behind what it asked for at leisure: a command about the spacecraft --
-# ping it, arm it, restart it -- is taken on tcs_cmd.recv, and one about a
-# payload on payload_interface. tcs_cmd.send is the MOC's own end of the same
-# conversation, which it sends commands from and receives responses on.
-#
-# Each is an address and a port in one attribute: two things only ever used
-# together are one fact, and writing them apart invites a file that states one
-# and not the other. The protocol is not stated and cannot be -- every link
-# here is UDP.
-#
-# The two bases under payload_telemetry are where the payloads' own data links
-# are counted from, on the vehicle's side and the ground's: a payload's port is
-# that side's base plus its own id, which is the position it has in this file.
-# One base and an arithmetic rule rather than an address and a port written on
-# every payload.
 tcspecial:
-  tcs_cmd:
-    recv: 0.0.0.0:4000
-    send: 127.0.0.1:4100
-  payload_command:
-    source_base: 127.0.0.1:4300
-    dest_base: 0.0.0.0:4200
-  payload_telemetry:
-    source_base: 0.0.0.0:6000
-    dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
-    send: "0.0.0.0:5550"
+    interval_ms: "5000"
     recv: "127.0.0.1:5650"
+    send: "0.0.0.0:5550"
   log:
-    directory: /var/log/tcspecial
-    segment_size: 65536
+    directory: "/var/log/tcspecial"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
 
-# How often the payload is read.
-#
-# The interval belongs to a group and not to a node: a node that stated one of
-# its own would be stating a value nothing applies, the schedule being by
-# group. A group of one is how a single node gets an interval.
-groups:
+payload_groups:
   - name: "every_second"
     interval: "1s"
 
-nodes:
+moc:
+  # The ground. tcspecial waits at this address for a ground station to speak
+  # to it, and sends telemetry back where the datagrams came from.
+  - name: moc
+    type: moc
+    address: "127.0.0.1"
+    port: "5000"
+    # Down: what the ground sends reaches the payload. A link is an attribute
+    # of the node it leaves, named after the data source it leaves by -- and
+    # what travels towards a payload leaves by to_payload.
+    to_payload: payload
+    editor: { x: 24, y: 40 }
+
+payloads:
   # The payload: software or a device that sends a datagram a second.
-  #
+  # 
   # tcspecial binds this address and the payload sends to it. That is the way
   # round a datagram link has to work: a UDP connect sends nothing, so a
   # payload waiting to be reached would hear nothing and -- producing data
   # because it is running rather than because it was asked -- would have
   # nowhere to send it. The payload speaks first, and tcspecial learns where
   # it is from the datagram that arrives.
-  #
+  # 
   # The second is the group's: the link is read once a second, and once a
   # second the trigger below is sent to ask for the next reading.
-  #
+  # 
   # The trigger is also what allows the downward link at all. A payload that
   # is read is asked for its readings, and the bytes that ask are its
   # trigger -- so a payload that states none is one the configuration
@@ -76,47 +57,11 @@ nodes:
   # asks with.
   - name: payload
     type: network
-    protocol: "udp"
     address: "127.0.0.1"
-    port: "5100"
     group: "every_second"
+    port: "5100"
+    protocol: "udp"
     trigger: "01"
-    # In the payload working pane, which is the right-hand quarter of the
-    # editor's canvas: everything the vehicle carries is drawn on that side,
-    # and the rest of the graph on the other.
+    # Up: every datagram the payload sends goes to the ground as it arrives.
+    to_moc: moc
     editor: { x: 744, y: 160 }
-
-  # The ground. tcspecial waits at this address for a ground station to speak
-  # to it, and sends telemetry back where the datagrams came from.
-  - name: moc
-    type: moc
-    address: "127.0.0.1"
-    port: "5000"
-    editor: { x: 24, y: 40 }
-
-links:
-  # Up: every datagram the payload sends goes to the ground as it arrives.
-  - { from: payload, to: moc }
-  # And down: what the ground sends reaches the payload.
-  - { from: moc, to: payload }
-
-# Running this one
-# ----------------
-#
-#   make run TCSPECIAL_CONFIG_FILE=example      # or: tcspecial example.yaml
-#
-# Both ends have to announce themselves once, because tcspecial binds both
-# addresses and a datagram's sender is the only statement of where it came
-# from. So the first thing each end sends is what tells tcspecial where to
-# answer, and until then a datum going that way is refused and counted --
-# which is reported rather than hidden:
-#
-#   payload: the write failed: ... nothing has been received on this socket
-#   yet, so there is no address to send to
-#
-# A session, with two sockets standing in for the two ends:
-#
-#   the ground sends to 127.0.0.1:5000   -- now telemetry has somewhere to go
-#   the payload sends to 127.0.0.1:5100  -- now commands have somewhere to go
-#   ... and from then on every datagram the payload sends reaches the ground,
-#   and everything the ground sends reaches the payload.

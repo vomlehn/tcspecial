@@ -2010,13 +2010,14 @@ struct Drawing {
 
 /// The link a gesture made, where it made one.
 ///
-/// `from` is the terminal the line was drawn from and `(x, y)` is where the
+/// `pressed` is the terminal the line was drawn from and `(x, y)` is where the
 /// pointer was let go of, in the canvas's own coordinates. `None` for every
 /// gesture that is not a link, and there are four of those -- each refused
 /// here, as the gesture, rather than drawn and then reported. An editor that
 /// cannot make a bad link is worth more than one that explains it afterwards:
 ///
-/// let go of over nothing, which is how a gesture is abandoned;
+/// let go of over nothing, or over a terminal of the same kind as the one the
+/// drag started at, which is how a gesture is abandoned;
 ///
 /// let go of over the node it started on, which is a loop and not a link --
 /// and releasing on the terminal you pressed is a gesture that changed its
@@ -2034,22 +2035,35 @@ struct Drawing {
 fn joined(
     document: &Document,
     home: &Home,
-    from: &Drawing,
+    pressed: &Drawing,
     (x, y): (f32, f32),
 ) -> Option<Link> {
-    let to = terminal_under(document, home, (x, y), true)?;
-    if to.node == from.node {
+    // Either way about. A link may be drawn from the data source that feeds
+    // it or from the data sink that wants feeding -- the same link, and a
+    // person drawing a diagram works in whichever direction they are reading
+    // it. So which end was pressed decides what is being looked for under the
+    // pointer, and the link is put back in its own order afterwards: a link
+    // leaves a source and arrives at a sink however it was drawn.
+    let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
+    let dropped = terminal_under(document, home, (x, y), !sink_pressed)?;
+    let (source, sink) = if sink_pressed {
+        (&dropped, pressed)
+    } else {
+        (pressed, &dropped)
+    };
+
+    if source.node == sink.node {
         return None;
     }
-    if !tcslibgs::graph::terminals::pairs_with(&from.terminal, &to.terminal) {
+    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal) {
         return None;
     }
 
     let link = Link::joining(
-        &from.node,
-        leaving_by(document, from).as_deref(),
-        &to.node,
-        arriving_at(document, &to.node, &to.terminal).as_deref(),
+        &source.node,
+        leaving_by(source).as_deref(),
+        &sink.node,
+        arriving_at(document, &sink.node, &sink.terminal).as_deref(),
     );
     if document.links.iter().any(|theirs| theirs.same_connection(&link)) {
         return None;
@@ -2121,11 +2135,13 @@ fn arriving_at(document: &Document, node: &str, terminal: &str) -> Option<String
     must_name(document, node, true).then(|| terminal.to_string())
 }
 
-/// And about the end it leaves by, which is the same question without the
-/// named inputs: only a computation has those, and nothing is read out of one
-/// by name.
-fn leaving_by(document: &Document, from: &Drawing) -> Option<String> {
-    must_name(document, &from.node, false).then(|| from.terminal.clone())
+/// And about the end it leaves by, which is always the terminal pressed.
+///
+/// Always, because a link *is* an attribute of the node it leaves, named after
+/// that terminal: `to_moc: k_fore` is where the link is written, so there is no
+/// such thing as a link whose source terminal the file does not say.
+fn leaving_by(from: &Drawing) -> Option<String> {
+    Some(from.terminal.clone())
 }
 
 /// Whether a link at this end of this node has to name its terminal.
@@ -3399,8 +3415,12 @@ mod tests {
         )
         .expect("a payload's readings reach the ground");
         assert_eq!(link.from, "sensor");
-        assert_eq!(link.origin, None);
+        // The terminal it leaves by, always: a link is written as an
+        // attribute of its own node, named after that terminal.
+        assert_eq!(link.origin.as_deref(), Some("to_moc"));
         assert_eq!(link.to, "ground");
+        // And nothing at the arriving end, the ground link having one data
+        // sink: the schema reads an unnamed end as that one.
         assert_eq!(link.input, None);
 
         // And back the other way, which is the other stream: a to_payload let
@@ -3467,6 +3487,31 @@ mod tests {
                 &None,
                 &drawn("through", "to_moc"),
                 over("through", "from_moc"),
+            ),
+            None
+        );
+
+        // Drawn the other way about, which is the same link: pressed on the
+        // ground link's data sink and let go of over the payload's data
+        // source. A person drawing a diagram works in whichever direction they
+        // are reading it.
+        let backwards = joined(
+            &document,
+            &None,
+            &drawn("ground", "from_payload"),
+            over("sensor", "to_moc"),
+        )
+        .expect("a link drawn from the sink end");
+        assert_eq!(backwards, link, "the same link, whichever end it was drawn from");
+
+        // But not between two ends of the same kind: a source feeds a sink,
+        // and two sources have nothing to say to each other.
+        assert_eq!(
+            joined(
+                &document,
+                &None,
+                &drawn("sensor", "to_moc"),
+                over("through", "to_moc"),
             ),
             None
         );
@@ -4176,9 +4221,11 @@ mod tests {
              link: {links:?}"
         );
         assert_eq!((links[0].from.as_str(), links[0].to.as_str()), ("sensor", "ground"));
-        // Neither end names its terminal: both types have one of each, and the
-        // schema reads an unnamed end as that one.
-        assert_eq!((&links[0].origin, &links[0].input), (&None, &None));
+        // The end it leaves by is named, that being the attribute the link is
+        // written under; the end it arrives at is not, the ground link having
+        // one data sink.
+        assert_eq!(links[0].origin.as_deref(), Some("to_moc"));
+        assert_eq!(links[0].input, None);
 
         // And the node did not move: a press on a terminal draws a link, and
         // the drag the same press would otherwise have started is what the
@@ -4240,9 +4287,12 @@ mod tests {
                 .filter_map(|row| ui.get_nodes().row_data(row))
                 .map(|node| node.name.to_string())
                 .collect();
+            // In the order the file's sections are read: the ground link,
+            // then the vehicle's own graph, then what it carries -- which is
+            // the three working panes left to right.
             assert_eq!(
                 names,
-                vec!["payload".to_string(), "moc".to_string()],
+                vec!["moc".to_string(), "payload".to_string()],
                 "example.{extension} should put its nodes on the canvas"
             );
             assert_eq!(

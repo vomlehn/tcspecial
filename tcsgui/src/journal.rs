@@ -261,8 +261,10 @@ impl Link {
 
     /// A link joining these, with nothing written about it.
     ///
-    /// Neither end naming a terminal, which is every link between two nodes
-    /// that have one of each: see [`Link::joining`] for the other case.
+    /// Neither end naming a terminal. For the tests: a link the editor makes
+    /// always names the data source it leaves by, that being the attribute it
+    /// is written under -- see [`Link::joining`].
+    #[cfg(test)]
     pub fn new(from: &str, to: &str, input: Option<&str>) -> Link {
         Link::joining(from, None, to, input)
     }

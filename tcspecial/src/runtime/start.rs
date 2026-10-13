@@ -172,11 +172,11 @@ mod tests {
         std::fs::write(
             &path,
             "version: \"2.0\"\n\
-             nodes:\n\
-             \x20 - { name: a, type: i2c, path: /dev/i2c-1, address: \"0x48\" }\n\
-             \x20 - { name: a, type: compute, function: mean }\n\
-             links:\n\
-             \x20 - { from: a, to: nobody }\n",
+             payloads:\n\
+             \x20 - { name: a, type: i2c, path: /dev/i2c-1, address: \"0x48\", \
+             to_moc: nobody }\n\
+             vehicle:\n\
+             \x20 - { name: a, type: compute, function: mean }\n",
         )
         .expect("the file is written");
 

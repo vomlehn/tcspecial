@@ -119,7 +119,9 @@ link
     A directed connection from one node to one or more destinations. A link
     with several destinations is how one reading reaches both the ground and an
     on-board computation; it is the "T" such an arrangement is usually drawn
-    as.
+    as. It is written as an attribute of the node it leaves rather than in a
+    section of its own, so a node and what leaves it are read and written
+    together.
 
 terminal
     Where a link is attached: a node's **data source** is where data leaves it
@@ -134,10 +136,11 @@ terminal
     node has all four. With no vehicle node in the way, a payload's ``to_moc``
     connects to a MOC link's ``from_payload``.
 
-    A link end is written ``node.terminal``, and ``node`` alone will do
-    wherever the type has one terminal of the kind that end needs -- which is
-    every type but ``null``, so ``{ from: temp_fore, to: moc }`` is complete as
-    it stands. A data sink takes one data source; a data source may reach
+    A link is written as an attribute of the node it leaves, named after the
+    data source it leaves by -- ``to_moc: k_fore``, or ``to_moc: [moc,
+    mean_temp.in0]`` where it reaches several sinks. The destination names the
+    terminal it arrives at after a dot where it has to; ``node`` alone will do
+    wherever the type has one data sink, which is every type but ``null``. A data sink takes one data source; a data source may reach
     several sinks; and a MOC link's sink takes as many as the configuration
     gives it, every payload's telemetry arriving at the ground on its own
     socket.

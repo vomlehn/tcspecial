@@ -645,7 +645,76 @@ component SelectionPane inherits Rectangle {
     }
 }
 
-// The editing surface: a bar, two selection panes and two working panes.
+// One divider between two working panes: the line, its handle, and what a
+// press lands on.
+//
+// A component because there are two of them and they are the same control. The
+// line follows the pointer while the handle is held and the divider settles
+// when the gesture ends: one change for one gesture, as a node's drag is.
+component PaneDivider inherits Rectangle {
+    // Where the divider is, in the window's own coordinates.
+    in property <length> at: 0px;
+    // How far the handle was dragged, said once when the gesture ends.
+    callback moved(length);
+
+    // The grip is a sibling of the line and not a child, so its coordinates
+    // stay where the line was for as long as the gesture lasts -- an offset
+    // measured in a frame the offset moves cancels itself, which is a mistake
+    // this file has made once already.
+    x: 0;
+    y: 0;
+    width: 100%;
+    height: 100%;
+
+    Rectangle {
+        x: at + (grip.pressed ? grip.mouse-x - grip.pressed-x : 0px);
+        y: 0;
+        width: grip.has-hover || grip.pressed ? 2px : 1px;
+        height: 100%;
+        background: grip.has-hover || grip.pressed ? #6b7280 : #cbcdd1;
+
+        // The handle: a grooved pill halfway down the line. A line that can be
+        // dragged and one that cannot look identical without it, and a control
+        // nobody can see is a control nobody uses.
+        Rectangle {
+            x: -6px;
+            y: parent.height / 2 - 20px;
+            width: 13px;
+            height: 40px;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: grip.has-hover || grip.pressed ? #6b7280 : #b4b7bd;
+            background: grip.pressed ? #e8e9eb : white;
+
+            for groove in 3: Rectangle {
+                x: 4px;
+                y: 14px + groove * 6px;
+                width: 5px;
+                height: 1px;
+                background: #9ca3af;
+            }
+        }
+    }
+
+    // What a press lands on. Wider than the line, because a line a pixel wide
+    // is a line nobody can hit; before the nodes in the surface, so that a
+    // node held against a divider takes a press on itself rather than losing
+    // it to the divider.
+    grip := TouchArea {
+        x: at - 7px;
+        y: 0;
+        width: 15px;
+        height: 100%;
+        mouse-cursor: MouseCursor.col-resize;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.up) {
+                root.moved(self.mouse-x - self.pressed-x);
+            }
+        }
+    }
+}
+
+// The editing surface: a bar, three selection panes and three working panes.
 //
 // One component because there are two windows that need it -- the top diagram
 // and each open subdiagram -- and two copies of a canvas would be two places
@@ -662,9 +731,11 @@ component Surface inherits Rectangle {
     // configuration rather than about a window, and they are checked by tests
     // there. Stating the divider in this file as well would be stating it
     // twice.
+    in property <[PaletteEntry]> moc-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
-    in property <length> divider: 0px;
+    in property <length> moc-divider: 0px;
+    in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
 
     // How deep undo currently goes, shown rather than guessed at: a person
@@ -686,8 +757,12 @@ component Surface inherits Rectangle {
     callback redo-clicked();
     callback place-node(string);
     callback node-moved(string, length, length);
-    // The divider between the two working panes was dragged by this much.
-    callback divider-moved(length);
+    // One of the two dividers between the three working panes was dragged by
+    // this much. Two callbacks and not one with a name in it: which divider
+    // moved is known where the gesture happened, and a string crossing the
+    // boundary would be a name to keep in step in two files.
+    callback moc-divider-moved(length);
+    callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
     // Write every file of the configuration now.
     callback save-clicked();
@@ -772,20 +847,31 @@ component Surface inherits Rectangle {
         HorizontalLayout {
             spacing: Space.step;
 
-            // The two selection panes: one of every node type, drawn as it
-            // will be drawn on the canvas, so that what a shape means can be
-            // looked up rather than remembered.
+            // The three selection panes: one of every node type, drawn as
+            // it will be drawn on the canvas, so that what a shape means can
+            // be looked up rather than remembered.
             //
-            // Two of them because the canvas has two working panes, and a
-            // shape's pane is decided by which list it came from: everything
-            // the vehicle carries is a payload and goes on the right, and the
-            // rest of the graph goes on the left. A single list would leave
-            // that rule to be discovered by placing something and watching
-            // where it lands.
+            // Three of them because the canvas has three working panes, and a
+            // shape's pane is decided by which list it came from: the ground
+            // link goes on the left, everything the vehicle carries is a
+            // payload and goes on the right, and the rest of the graph goes
+            // in between. A single list would leave that rule to be
+            // discovered by placing something and watching where it lands.
+            //
+            // Top to bottom in the order the panes are left to right, so the
+            // two readings of the same rule agree.
             VerticalLayout {
                 width: 180px;
                 spacing: Space.step;
 
+                SelectionPane {
+                    heading: "MOC node types";
+                    palette: root.moc-palette;
+                    // One type, so one row: the ground link is the only thing
+                    // that goes in its pane.
+                    vertical-stretch: 0;
+                    place-node(t) => { root.place-node(t); }
+                }
                 SelectionPane {
                     heading: "Vehicle node types";
                     palette: root.vehicle-palette;
@@ -833,74 +919,22 @@ component Surface inherits Rectangle {
                     background: #f3f4f6;
                 }
 
-                // The two working panes.
+                // The three working panes, told apart by two dividers.
                 //
-                // The divider is at a fixed place in the coordinates the file
-                // holds and not at three quarters of the window. A node's
-                // pane decides what it is allowed to be, so it must not
-                // change when somebody resizes a window: the same
-                // configuration opened on a laptop and on a desk has to show
-                // the same two panes, or a payload would become a vehicle
-                // node by being looked at on a smaller screen.
-                // The line itself follows the pointer while the handle is
-                // held, and the divider settles when the gesture ends: one
-                // change for one gesture, as a node's drag is. The grip is a
-                // sibling and not a child, so its coordinates stay where the
-                // line was for as long as the gesture lasts -- an offset
-                // measured in a frame the offset moves cancels itself, which
-                // is a mistake this file has made once already.
-                Rectangle {
-                    x: divider + (divider-grip.pressed
-                        ? divider-grip.mouse-x - divider-grip.pressed-x
-                        : 0px);
-                    y: 0;
-                    width: divider-grip.has-hover || divider-grip.pressed ? 2px : 1px;
-                    height: 100%;
-                    background: divider-grip.has-hover || divider-grip.pressed
-                        ? #6b7280
-                        : #cbcdd1;
-
-                    // The handle: a grooved pill halfway down the line. A line
-                    // that can be dragged and one that cannot look identical
-                    // without it, and a control nobody can see is a control
-                    // nobody uses.
-                    Rectangle {
-                        x: -6px;
-                        y: parent.height / 2 - 20px;
-                        width: 13px;
-                        height: 40px;
-                        border-radius: 6px;
-                        border-width: 1px;
-                        border-color: divider-grip.has-hover || divider-grip.pressed
-                            ? #6b7280
-                            : #b4b7bd;
-                        background: divider-grip.pressed ? #e8e9eb : white;
-
-                        for groove in 3: Rectangle {
-                            x: 4px;
-                            y: 14px + groove * 6px;
-                            width: 5px;
-                            height: 1px;
-                            background: #9ca3af;
-                        }
-                    }
+                // Each divider is at a fixed place in the coordinates the file
+                // holds and not at a fraction of the window. A node's pane
+                // decides what it is allowed to be, so it must not change when
+                // somebody resizes a window: the same configuration opened on
+                // a laptop and on a desk has to show the same three panes, or
+                // a payload would become a vehicle node by being looked at on
+                // a smaller screen.
+                PaneDivider {
+                    at: root.moc-divider;
+                    moved(dx) => { root.moc-divider-moved(dx); }
                 }
-
-                // What a press lands on. Wider than the line, because a line
-                // a pixel wide is a line nobody can hit; before the nodes in
-                // this file, so that a node held against the divider takes a
-                // press on itself rather than losing it to the divider.
-                divider-grip := TouchArea {
-                    x: divider - 7px;
-                    y: 0;
-                    width: 15px;
-                    height: 100%;
-                    mouse-cursor: MouseCursor.col-resize;
-                    pointer-event(event) => {
-                        if (event.kind == PointerEventKind.up) {
-                            divider-moved(self.mouse-x - self.pressed-x);
-                        }
-                    }
+                PaneDivider {
+                    at: root.vehicle-divider;
+                    moved(dx) => { root.vehicle-divider-moved(dx); }
                 }
                 // Beyond the right-hand edge of the working area, which is
                 // nowhere a node can be put. Shaded rather than left white,
@@ -913,19 +947,32 @@ component Surface inherits Rectangle {
                     height: 100%;
                     background: #f6f6f4;
                 }
-                // And which pane is which. Named, because the rule about what
-                // may go where is worth one word at the top of each.
+                // And which pane is which, left to right. Named, because
+                // the rule about what may go where is worth one word at the
+                // top of each: the ground link on the left, the vehicle's own
+                // graph in the middle, and what it carries on the right.
+                //
+                // Grey, and the same grey as the hint below: a label is not
+                // part of the drawing, and one in the colour of a node would
+                // read as something placed.
                 Text {
                     x: Space.step;
+                    y: Space.tight;
+                    text: "moc";
+                    font-size: Type.small;
+                    color: #9ca3af;
+                }
+                Text {
+                    x: root.moc-divider + Space.step;
                     y: Space.tight;
                     text: "vehicle";
                     font-size: Type.small;
                     color: #9ca3af;
                 }
                 Text {
-                    x: divider + Space.step;
+                    x: root.vehicle-divider + Space.step;
                     y: Space.tight;
-                    text: "payload";
+                    text: "payloads";
                     font-size: Type.small;
                     color: #9ca3af;
                 }
@@ -988,9 +1035,11 @@ export component MainWindow inherits Window {
     // configuration rather than about a window, and they are checked by tests
     // there. Stating the divider in this file as well would be stating it
     // twice.
+    in property <[PaletteEntry]> moc-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
-    in property <length> divider: 0px;
+    in property <length> moc-divider: 0px;
+    in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
@@ -1003,8 +1052,12 @@ export component MainWindow inherits Window {
     callback redo-clicked();
     callback place-node(string);
     callback node-moved(string, length, length);
-    // The divider between the two working panes was dragged by this much.
-    callback divider-moved(length);
+    // One of the two dividers between the three working panes was dragged by
+    // this much. Two callbacks and not one with a name in it: which divider
+    // moved is known where the gesture happened, and a string crossing the
+    // boundary would be a name to keep in step in two files.
+    callback moc-divider-moved(length);
+    callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
     callback save-clicked();
     callback link-started(string);
@@ -1084,9 +1137,11 @@ export component MainWindow inherits Window {
         height: 100%;
         nodes: root.nodes;
         links: root.links;
+        moc-palette: root.moc-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
-        divider: root.divider;
+        moc-divider: root.moc-divider;
+        vehicle-divider: root.vehicle-divider;
         working-width: root.working-width;
         save-clicked => { root.save-clicked(); }
         undo-depth: root.undo-depth;
@@ -1098,7 +1153,8 @@ export component MainWindow inherits Window {
         redo-clicked => { root.redo-clicked(); }
         place-node(t) => { root.place-node(t); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
-        divider-moved(dx) => { root.divider-moved(dx); }
+        moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
+        vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         open-subdiagram(n) => { root.open-subdiagram(n); }
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
@@ -1134,9 +1190,11 @@ export component SubWindow inherits Window {
     // configuration rather than about a window, and they are checked by tests
     // there. Stating the divider in this file as well would be stating it
     // twice.
+    in property <[PaletteEntry]> moc-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
-    in property <length> divider: 0px;
+    in property <length> moc-divider: 0px;
+    in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
@@ -1149,8 +1207,12 @@ export component SubWindow inherits Window {
     callback redo-clicked();
     callback place-node(string);
     callback node-moved(string, length, length);
-    // The divider between the two working panes was dragged by this much.
-    callback divider-moved(length);
+    // One of the two dividers between the three working panes was dragged by
+    // this much. Two callbacks and not one with a name in it: which divider
+    // moved is known where the gesture happened, and a string crossing the
+    // boundary would be a name to keep in step in two files.
+    callback moc-divider-moved(length);
+    callback vehicle-divider-moved(length);
     callback save-clicked();
     callback link-started(string);
     callback link-finished(string);
@@ -1226,9 +1288,11 @@ export component SubWindow inherits Window {
         editing: root.editing;
         nodes: root.nodes;
         links: root.links;
+        moc-palette: root.moc-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
-        divider: root.divider;
+        moc-divider: root.moc-divider;
+        vehicle-divider: root.vehicle-divider;
         working-width: root.working-width;
         save-clicked => { root.save-clicked(); }
         undo-depth: root.undo-depth;
@@ -1240,7 +1304,8 @@ export component SubWindow inherits Window {
         redo-clicked => { root.redo-clicked(); }
         place-node(t) => { root.place-node(t); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
-        divider-moved(dx) => { root.divider-moved(dx); }
+        moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
+        vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         link-started(n) => { root.link-started(n); }
         link-finished(n) => { root.link-finished(n); }
         selected: root.selected;

@@ -1,10 +1,11 @@
 //! What tcsgui remembers between sessions, in
 //! `$HOME/.tcsgui/preferences.xml`.
 //!
-//! One setting so far: how much of the working pane the vehicle working pane
-//! takes, as a percentage. The vehicle working pane is always the left-hand
-//! one, so a percentage and that sentence are the whole of where the divider
-//! is.
+//! Two settings: how much of the working pane the moc working pane takes and
+//! how much the vehicle's takes, as percentages. The panes are always in the
+//! same order -- moc, vehicle, payloads -- so two percentages and that
+//! sentence are the whole of where the two dividers are, the payload pane
+//! taking what is left.
 //!
 //! Here rather than in the configuration, which is the distinction worth
 //! stating. A node's position is in the configuration because it is part of
@@ -34,28 +35,58 @@ use std::path::PathBuf;
 /// hard to understand afterwards.
 pub const LEAST: i32 = 5;
 
-/// And the most, which is the same rule from the other side.
-pub const MOST: i32 = 100 - LEAST;
+/// And the most one pane may take, which is the same rule from the other
+/// side: the other two keep a twentieth each.
+pub const MOST: i32 = 100 - 2 * LEAST;
 
 /// How the canvas is divided until somebody divides it differently.
 ///
-/// Three quarters to the vehicle: its own graph -- the computations, the log,
-/// the ground link -- is most of a configuration, and what it carries this
-/// flight is a column down one side.
-pub const DEFAULT: i32 = 75;
+/// A narrow column for the ground link, which is one node; most of the rest to
+/// the vehicle, its own graph being most of a configuration; and a column for
+/// what it carries this flight.
+///
+/// The moc pane's share is enough for a node to sit in rather than overhang
+/// with a margin either side: a node is 152 pixels of a working pane of 960,
+/// so a seventh would not do.
+pub const DEFAULT_MOC: i32 = 20;
+pub const DEFAULT_VEHICLE: i32 = 55;
 
 /// What the editor remembers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Settings {
-    /// How much of the working pane the vehicle working pane takes.
+    /// How much of the working pane the moc working pane takes.
+    pub moc_percent: i32,
+    /// And how much the vehicle working pane takes. The payload working pane
+    /// takes what is left.
     pub vehicle_percent: i32,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            vehicle_percent: DEFAULT,
+            moc_percent: DEFAULT_MOC,
+            vehicle_percent: DEFAULT_VEHICLE,
         }
+    }
+}
+
+/// Two shares that leave every pane something to show.
+///
+/// Each of the three keeps at least [`LEAST`] per cent, and the two stated
+/// here are brought inside that however they were asked for -- by a file
+/// somebody edited by hand, or by a divider dragged to the edge. The payload
+/// pane's share is what is left, so it is the one that gives way when the
+/// first two ask for too much between them.
+pub fn shares(moc_percent: i32, vehicle_percent: i32) -> (i32, i32) {
+    let moc = moc_percent.clamp(LEAST, MOST);
+    let vehicle = vehicle_percent.clamp(LEAST, MOST - moc + LEAST);
+    // And the payload pane's own floor, which the two above can still have
+    // eaten between them.
+    let over = (moc + vehicle) - (100 - LEAST);
+    if over > 0 {
+        (moc, (vehicle - over).max(LEAST))
+    } else {
+        (moc, vehicle)
     }
 }
 
@@ -121,10 +152,7 @@ pub fn load() -> Settings {
         Err(why) if why.kind() == std::io::ErrorKind::NotFound => {
             let settings = older()
                 .and_then(|older| std::fs::read_to_string(older).ok())
-                .map(|text| Settings {
-                    vehicle_percent: percent_in(&text, "the file this one \
-                                                        replaced"),
-                })
+                .map(|text| settings_in(&text, "the file this one replaced"))
                 .unwrap_or_default();
             save(settings);
             return settings;
@@ -135,35 +163,64 @@ pub fn load() -> Settings {
         }
     };
 
-    Settings {
-        vehicle_percent: percent_in(&text, &path.display().to_string()),
-    }
+    settings_in(&text, &path.display().to_string())
 }
 
-/// The vehicle working pane's share, as this text states it.
+/// The two shares, as this text states them.
 ///
 /// `whose` names the file in anything said about it, because a complaint about
 /// a percentage is only useful with the file it came from.
-fn percent_in(text: &str, whose: &str) -> i32 {
-    let said = element(text, "vehicle_pane_percent");
+///
+/// A file that says nothing about the moc working pane is a file written
+/// before there was one. The default share is then taken out of the vehicle's
+/// rather than out of the payloads': the column somebody arranged was the
+/// payload column, and the vehicle pane is the one with room to give.
+fn settings_in(text: &str, whose: &str) -> Settings {
+    let vehicle = percent_in(text, whose, "vehicle_pane_percent", DEFAULT_VEHICLE);
+    let (moc, vehicle) = match (
+        element(text, "moc_pane_percent"),
+        element(text, "vehicle_pane_percent"),
+    ) {
+        // Both stated, which is every file this build writes.
+        (Some(_), _) => (
+            percent_in(text, whose, "moc_pane_percent", DEFAULT_MOC),
+            vehicle,
+        ),
+        // A file written before there was a moc working pane: it arranged the
+        // other two, so the new pane's share comes out of the vehicle's.
+        (None, Some(_)) => (DEFAULT_MOC, vehicle - DEFAULT_MOC),
+        // And a file that says nothing about either -- or is not a settings
+        // file at all -- which is the defaults and not arithmetic on them.
+        (None, None) => (DEFAULT_MOC, DEFAULT_VEHICLE),
+    };
+
+    let (moc_percent, vehicle_percent) = shares(moc, vehicle);
+    Settings {
+        moc_percent,
+        vehicle_percent,
+    }
+}
+
+/// One share, as this text states it, or `default`.
+fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
+    let said = element(text, name);
     match said.and_then(|said| said.parse::<i32>().ok()) {
         Some(percent) if (LEAST..=MOST).contains(&percent) => percent,
         Some(percent) => {
             eprintln!(
-                "tcsgui: {whose} asks for a vehicle working pane of \
-                 {percent}%, which is outside {LEAST}% to {MOST}%; using \
-                 {DEFAULT}%"
+                "tcsgui: {whose} asks for a {name} of {percent}%, which is \
+                 outside {LEAST}% to {MOST}%; using {default}%"
             );
-            DEFAULT
+            default
         }
         None => {
             if said.is_some() {
                 eprintln!(
-                    "tcsgui: {whose} does not say a number of percent; using \
-                     {DEFAULT}%"
+                    "tcsgui: {whose} does not say a number of percent for \
+                     {name}; using {default}%"
                 );
             }
-            DEFAULT
+            default
         }
     }
 }
@@ -178,8 +235,10 @@ pub fn save(settings: Settings) {
         Some(path) => path,
         None => return,
     };
-    let percent = settings.vehicle_percent.clamp(LEAST, MOST);
-    if let Err(why) = crate::save::write_atomically(&path, written(percent).as_bytes()) {
+    let (moc, vehicle) = shares(settings.moc_percent, settings.vehicle_percent);
+    if let Err(why) =
+        crate::save::write_atomically(&path, written(moc, vehicle).as_bytes())
+    {
         eprintln!("tcsgui: {} cannot be written: {why}", path.display());
     }
 }
@@ -190,7 +249,7 @@ pub fn save(settings: Settings) {
 /// element, never an attribute -- so that a person who has read one file has
 /// read both. With a comment saying what the number means, because a bare 75
 /// in a file is a number somebody will guess at.
-fn written(percent: i32) -> String {
+fn written(moc: i32, vehicle: i32) -> String {
     format!(
         "\
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -200,19 +259,21 @@ fn written(percent: i32) -> String {
      This is not a configuration: nothing here flies. It is where the editor
      keeps what the person using it arranged. -->
 <settings>
-    <!-- How much of the working pane the vehicle working pane takes, as a
-         percentage of the whole. The vehicle working pane is the left-hand
-         one and holds the graph itself; the payload working pane is the
-         right-hand one and holds what the vehicle carries. The rest of the
-         working pane is the payload working pane's, so {rest}% here.
+    <!-- How much of the working pane each of the first two working panes
+         takes, as a percentage of the whole. The three are always in this
+         order, left to right: the moc working pane, which holds the ground
+         link; the vehicle working pane, which holds the graph itself; and the
+         payload working pane, which holds what the vehicle carries. The
+         payload pane takes what is left, so {rest}% here.
 
-         Between {LEAST} and {MOST}: neither pane may be squeezed below a
-         twentieth of the working pane, because a pane with nothing visible in
-         it is a pane whose nodes cannot be reached. -->
-    <vehicle_pane_percent>{percent}</vehicle_pane_percent>
+         Each between {LEAST} and {MOST}, and every pane keeps at least
+         {LEAST}%: a pane with nothing visible in it is a pane whose nodes
+         cannot be reached. -->
+    <moc_pane_percent>{moc}</moc_pane_percent>
+    <vehicle_pane_percent>{vehicle}</vehicle_pane_percent>
 </settings>
 ",
-        rest = 100 - percent
+        rest = 100 - moc - vehicle
     )
 }
 
@@ -242,22 +303,65 @@ mod tests {
     /// setting not being saved at all.
     #[test]
     fn a_percentage_written_is_the_percentage_read() {
-        for percent in [LEAST, 25, DEFAULT, 80, MOST] {
-            let text = written(percent);
-            assert_eq!(
-                element(&text, "vehicle_pane_percent")
-                    .and_then(|said| said.parse::<i32>().ok()),
-                Some(percent)
-            );
+        for (moc, vehicle) in [
+            (LEAST, LEAST),
+            (10, 25),
+            (DEFAULT_MOC, DEFAULT_VEHICLE),
+            (LEAST, MOST),
+            (MOST, LEAST),
+        ] {
+            let text = written(moc, vehicle);
+            let said = |name| {
+                element(&text, name).and_then(|said| said.parse::<i32>().ok())
+            };
+            assert_eq!(said("moc_pane_percent"), Some(moc));
+            assert_eq!(said("vehicle_pane_percent"), Some(vehicle));
+            // And through the reader, which is what the editor would use.
+            let settings = settings_in(&text, "a test");
+            assert_eq!((settings.moc_percent, settings.vehicle_percent), (moc, vehicle));
         }
     }
 
-    /// The file says what the other pane gets, too.
+    /// The file says what the third pane gets, too.
     #[test]
-    fn the_file_says_what_both_panes_take() {
-        let text = written(60);
+    fn the_file_says_what_every_pane_takes() {
+        let text = written(15, 60);
+        assert!(text.contains("15"), "{text}");
         assert!(text.contains("60"), "{text}");
-        assert!(text.contains("40%"), "the payload pane's share: {text}");
+        assert!(text.contains("25%"), "the payload pane's share: {text}");
+    }
+
+    /// Two shares that leave the third pane nothing are brought inside the
+    /// rule.
+    ///
+    /// However they were asked for: by a file somebody edited by hand, or by
+    /// a divider dragged to the edge. The payload pane is the one that gives
+    /// way, being the one that is not stated.
+    #[test]
+    fn every_pane_keeps_a_twentieth() {
+        assert_eq!(shares(15, 60), (15, 60));
+        // Between them they asked for everything.
+        assert_eq!(shares(50, 50), (50, 45));
+        assert_eq!(shares(MOST, MOST), (MOST, LEAST));
+        // And neither may be squeezed out itself.
+        assert_eq!(shares(0, 200), (LEAST, MOST));
+        assert_eq!(shares(-3, -3), (LEAST, LEAST));
+    }
+
+    /// A file written before there was a moc working pane keeps the payload
+    /// column it arranged.
+    ///
+    /// The new pane's share comes out of the vehicle's, which is the one with
+    /// room to give: taking it out of the payloads' would quietly narrow the
+    /// column somebody had set.
+    #[test]
+    fn a_file_with_no_moc_pane_takes_its_share_from_the_vehicle() {
+        let settings = settings_in(
+            "<settings><vehicle_pane_percent>75</vehicle_pane_percent></settings>",
+            "a test",
+        );
+        assert_eq!(settings.moc_percent, DEFAULT_MOC);
+        assert_eq!(settings.vehicle_percent, 75 - DEFAULT_MOC);
     }
 
     /// An element that is not there is not an error.
@@ -281,20 +385,32 @@ mod tests {
     #[test]
     fn a_percentage_outside_the_rule_is_refused() {
         for (said, expected) in [
-            ("75", 75),
+            ("60", 60),
             ("5", LEAST),
-            ("95", MOST),
-            ("0", DEFAULT),
-            ("100", DEFAULT),
-            ("-20", DEFAULT),
-            ("three quarters", DEFAULT),
-            ("", DEFAULT),
+            ("90", MOST),
+            ("0", DEFAULT_VEHICLE),
+            ("100", DEFAULT_VEHICLE),
+            ("-20", DEFAULT_VEHICLE),
+            ("three quarters", DEFAULT_VEHICLE),
+            ("", DEFAULT_VEHICLE),
         ] {
             let text = format!("<vehicle_pane_percent>{said}</vehicle_pane_percent>");
-            assert_eq!(percent_in(&text, "a test"), expected, "{said:?}");
+            assert_eq!(
+                percent_in(&text, "a test", "vehicle_pane_percent", DEFAULT_VEHICLE),
+                expected,
+                "{said:?}"
+            );
         }
         // And a file that says nothing about it at all.
-        assert_eq!(percent_in("<settings></settings>", "a test"), DEFAULT);
+        assert_eq!(
+            percent_in(
+                "<settings></settings>",
+                "a test",
+                "vehicle_pane_percent",
+                DEFAULT_VEHICLE
+            ),
+            DEFAULT_VEHICLE
+        );
     }
 
     /// The settings live under the home directory, in their own place.
@@ -318,19 +434,21 @@ mod tests {
         // an empty directory is a worse answer to "where do I set this" than
         // a file whose comments say.
         assert!(!path.exists());
-        assert_eq!(load().vehicle_percent, DEFAULT);
+        assert_eq!(load(), Settings::default());
         assert!(path.exists(), "the settings file should be created");
-        assert_eq!(load().vehicle_percent, DEFAULT);
+        assert_eq!(load(), Settings::default());
 
         // And a round trip through the file itself.
         save(Settings {
+            moc_percent: 20,
             vehicle_percent: 40,
         });
+        assert_eq!(load().moc_percent, 20);
         assert_eq!(load().vehicle_percent, 40);
 
-        // A file nobody can make sense of leaves the default standing.
+        // A file nobody can make sense of leaves the defaults standing.
         std::fs::write(&path, "not xml at all").expect("a file");
-        assert_eq!(load().vehicle_percent, DEFAULT);
+        assert_eq!(load(), Settings::default());
 
         // The file was called config.xml before it was called
         // preferences.xml, and the rename does not forget what somebody had
@@ -343,14 +461,19 @@ mod tests {
             "<settings><vehicle_pane_percent>30</vehicle_pane_percent></settings>",
         )
         .expect("a file");
-        assert_eq!(load().vehicle_percent, 30);
+        assert_eq!(load().vehicle_percent, 30 - DEFAULT_MOC);
         assert!(path.exists(), "the value should be carried into the new name");
-        assert_eq!(load().vehicle_percent, 30, "and read from it afterwards");
+        assert_eq!(
+            load().vehicle_percent,
+            30 - DEFAULT_MOC,
+            "and read from it afterwards"
+        );
         assert!(older.exists(), "the old file is left for its owner to delete");
 
         // The current name wins where both are there, it being the one that
         // is written.
         save(Settings {
+            moc_percent: DEFAULT_MOC,
             vehicle_percent: 60,
         });
         assert_eq!(load().vehicle_percent, 60);

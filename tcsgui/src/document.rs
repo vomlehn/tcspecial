@@ -408,12 +408,12 @@ impl Document {
     /// row would otherwise become one node with eleven behind it.
     ///
     /// Returns how many were moved, which is what a caller would log.
-    pub fn settle(&mut self, divider: i32) -> usize {
+    pub fn settle(&mut self, dividers: crate::pane::Dividers) -> usize {
         let mut moved = 0;
 
         for at in 0..self.nodes.len() {
             let node = &self.nodes[at];
-            let want = confine(&node.node_type, divider, node.at);
+            let want = confine(&node.node_type, dividers, node.at);
             if want == node.at {
                 continue;
             }
@@ -1915,7 +1915,8 @@ mod tests {
     /// file written before the canvas was divided at all.
     #[test]
     fn reading_a_configuration_settles_its_nodes_into_their_panes() {
-        let divider = crate::pane::divider_for(crate::settings::DEFAULT);
+        let dividers = crate::pane::default_dividers();
+        let (moc, divider) = (dividers.moc, dividers.vehicle);
         let mut document = Document::new();
 
         // A payload on the wrong side, a vehicle node on the wrong side, and
@@ -1924,7 +1925,7 @@ mod tests {
             ("stray_sensor", "i2c", (40, 120)),
             ("stray_compute", "compute", (divider + 40, 200)),
             ("good_sensor", "i2c", (divider + 16, 320)),
-            ("good_compute", "compute", (240, 40)),
+            ("good_compute", "compute", (moc + 240, 40)),
         ] {
             document.apply(&add(name, node_type));
             document.apply(&Edit::MoveNode {
@@ -1934,7 +1935,7 @@ mod tests {
             });
         }
 
-        let moved = document.settle(divider);
+        let moved = document.settle(dividers);
         assert_eq!(moved, 2, "only the two out of place should have moved");
 
         let at = |name: &str| document.node(name).unwrap().at;
@@ -1948,11 +1949,11 @@ mod tests {
         // The two that were already right are untouched, which matters: a
         // reader who arranged a diagram should find it as they left it.
         assert_eq!(at("good_sensor"), (divider + 16, 320));
-        assert_eq!(at("good_compute"), (240, 40));
+        assert_eq!(at("good_compute"), (moc + 240, 40));
 
         // Settling twice changes nothing, which is what makes it safe to do
         // on every open.
-        assert_eq!(document.settle(divider), 0);
+        assert_eq!(document.settle(dividers), 0);
     }
 
     /// Nodes settled into one pane do not land on top of each other.
@@ -1962,7 +1963,8 @@ mod tests {
     /// the same edge, at whatever height it already had.
     #[test]
     fn settling_does_not_stack_nodes_on_one_another() {
-        let divider = crate::pane::divider_for(crate::settings::DEFAULT);
+        let dividers = crate::pane::default_dividers();
+        let divider = dividers.vehicle;
         let mut document = Document::new();
 
         // Four sensors in a row at one height, all of them in the wrong pane.
@@ -1975,7 +1977,7 @@ mod tests {
             });
         }
 
-        assert_eq!(document.settle(divider), 4);
+        assert_eq!(document.settle(dividers), 4);
 
         // Every one in its pane, and no two overlapping.
         let boxes: Vec<((i32, i32), (u32, u32))> = document

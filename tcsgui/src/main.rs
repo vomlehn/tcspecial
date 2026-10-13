@@ -55,7 +55,10 @@ use slint::{ModelRc, VecModel};
 
 use document::Document;
 use editor::Editor;
-use pane::{confine, divider_for, is_payload, percent_for, size_of, GRID, WORKING_WIDTH};
+use pane::{
+    confine, dividers_for, edges_of, is_payload, pane_of, percents_for, size_of, Dividers,
+    Pane, GRID, WORKING_WIDTH,
+};
 use journal::{Edit, Link};
 use subdiagram::{Home, Qualified};
 use style::{Face, NodeType, Outline, Shading, Tint, Weight, ERROR_TINT};
@@ -71,40 +74,55 @@ slint::include_modules!();
 const FIRST_PLACE: (i32, i32) = (240, 40);
 const PLACE_OFFSET: i32 = 32;
 
-/// How far the divider may be dragged, given what is already on the canvas.
+/// How far one divider may be dragged, given what is already on the canvas.
 ///
-/// Two rules, and the narrower of the two wins. Neither pane may be squeezed
-/// below a twentieth of the working pane, which is what was asked for and is
-/// in `settings.rs` as the percentages that are allowed. And the divider does
-/// not pass a node: it stops against the right edge of the rightmost vehicle
-/// node and against the left edge of the leftmost payload.
+/// Two rules, and the narrower of the two wins. No pane may be squeezed below
+/// a twentieth of the working pane, which is what was asked for and is in
+/// `settings.rs` as the percentages that are allowed -- so a divider also
+/// stops a twentieth short of its neighbour. And a divider does not pass a
+/// node: it stops against the right edge of the rightmost node of the pane on
+/// its left and against the left edge of the leftmost node of the pane on its
+/// right.
 ///
 /// The second rule is what keeps the panes honest without moving anything. The
-/// alternative was to let the divider go where it liked and shunt the nodes it
+/// alternative was to let a divider go where it liked and shunt the nodes it
 /// passed, which is a gesture that quietly rearranges a diagram -- and one
 /// that would have to carry every node it moved through the history to be
 /// undoable. A line that stops against a node says what it is doing while it
 /// does it.
 ///
-/// A node already on the wrong side of the divider holds nothing: it is a node
-/// a file put there, it comes home when it is next dragged, and letting it
-/// pin the divider would mean one such node froze the control.
-fn divider_range(document: &Document, divider: i32) -> (i32, i32) {
-    let mut low = WORKING_WIDTH * settings::LEAST / 100;
-    let mut high = WORKING_WIDTH * settings::MOST / 100;
+/// A node already on the wrong side of a divider holds nothing: it is a node a
+/// file put there, it comes home when it is next dragged, and letting it pin
+/// the divider would mean one such node froze the control.
+fn divider_range(document: &Document, dividers: Dividers, which: Pane) -> (i32, i32) {
+    // Which panes this divider is between, and the room its neighbours keep.
+    let step = WORKING_WIDTH * settings::LEAST / 100;
+    let (left, right, mut low, mut high) = match which {
+        // The moc divider: between the moc pane and the vehicle's.
+        Pane::Moc => (Pane::Moc, Pane::Vehicle, step, dividers.vehicle - step),
+        // And the vehicle divider, between the vehicle's and the payloads'.
+        _ => (
+            Pane::Vehicle,
+            Pane::Payloads,
+            dividers.moc + step,
+            WORKING_WIDTH - step,
+        ),
+    };
 
+    let (_, here) = edges_of(left, dividers);
     for node in &document.nodes {
         let (width, _) = size_of(&node.node_type);
-        let right = node.at.0 + width as i32;
-        if is_payload(&node.node_type) {
-            if node.at.0 >= divider {
+        let pane = pane_of(&node.node_type);
+        let edge = node.at.0 + width as i32;
+        if pane == right {
+            if node.at.0 >= here {
                 high = high.min(node.at.0);
             }
-        } else if right <= divider {
-            low = low.max(right);
+        } else if pane == left && edge <= here {
+            low = low.max(edge);
         }
     }
-    (low, high)
+    (low, high.max(low))
 }
 
 /// Where the ground station goes in a configuration that is new.
@@ -121,7 +139,7 @@ const MOC_PLACE: (i32, i32) = (24, 40);
 struct Views {
     top: slint::Weak<MainWindow>,
     open: BTreeMap<String, SubWindow>,
-    /// Where the divider between the two working panes sits, in the
+    /// Where the two dividers between the three working panes sit, in the
     /// coordinates the file holds.
     ///
     /// One for every window, because it is one canvas divided one way: a
@@ -132,7 +150,7 @@ struct Views {
     ///
     /// Not in the document: it is a working preference and not part of the
     /// diagram. See `settings.rs`.
-    divider: Rc<std::cell::Cell<i32>>,
+    divider: Rc<std::cell::Cell<Dividers>>,
     /// Which node each window's panel is showing, by the window's home.
     ///
     /// Per window, because two windows looking at two subdiagrams are looking
@@ -259,8 +277,9 @@ impl Views {
 macro_rules! furnish {
     ($window:expr) => {{
         let window = $window;
-        window.set_vehicle_palette(palette_of(false));
-        window.set_payload_palette(palette_of(true));
+        window.set_moc_palette(palette_of(Pane::Moc));
+        window.set_vehicle_palette(palette_of(Pane::Vehicle));
+        window.set_payload_palette(palette_of(Pane::Payloads));
         window.set_working_width(WORKING_WIDTH as f32);
     }};
 }
@@ -300,11 +319,13 @@ fn main() -> Result<(), slint::PlatformError> {
     // it is also what makes the directory, so it exists from the first run
     // whether or not anything has been saved into it.
     //
-    // Before the configuration, because where the divider is decides which
+    // Before the configuration, because where the dividers are decides which
     // pane each node belongs in, and a node the file draws in the wrong one is
     // brought into its own as the file is read.
-    let divider = Rc::new(std::cell::Cell::new(divider_for(
-        settings::load().vehicle_percent,
+    let settings = settings::load();
+    let divider = Rc::new(std::cell::Cell::new(dividers_for(
+        settings.moc_percent,
+        settings.vehicle_percent,
     )));
 
     // The configuration: see Editor::open.
@@ -586,36 +607,27 @@ macro_rules! wiring {
                 });
             }
             {
-                // Moving the divider between the two working panes.
+                // Moving either divider between the three working panes.
                 //
                 // Told once, when the gesture finishes, as a node's drag is:
                 // the line follows the pointer in the window and this is what
                 // it settles on. Not an edit -- there is nothing to undo,
                 // because the configuration has not changed -- so it is
                 // written to the settings instead of to the history.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_divider_moved(move |dx: f32| {
-                    let divider = views.borrow().divider.clone();
-                    {
-                        let editor = editor.borrow();
-                        let (low, high) = divider_range(editor.document(), divider.get());
-                        let wanted = snap((divider.get() + dx.round() as i32, 0)).0;
-                        let now = wanted.clamp(low, high);
-                        if now == divider.get() {
-                            // It did not move, or it was already against what
-                            // stops it. Nothing to redraw and nothing to
-                            // write: a settings file rewritten on every press
-                            // of the handle is a file written for nothing.
-                            return;
-                        }
-                        divider.set(now);
-                    }
-                    settings::save(settings::Settings {
-                        vehicle_percent: percent_for(divider.get()),
+                {
+                    let editor = editor.clone();
+                    let views = views.clone();
+                    window.on_moc_divider_moved(move |dx: f32| {
+                        drag_divider(&editor, &views, Pane::Moc, dx);
                     });
-                    views.borrow().refresh(&editor.borrow());
-                });
+                }
+                {
+                    let editor = editor.clone();
+                    let views = views.clone();
+                    window.on_vehicle_divider_moved(move |dx: f32| {
+                        drag_divider(&editor, &views, Pane::Vehicle, dx);
+                    });
+                }
             }
             {
                 // Drawing a link: the handle pressed is remembered, and the
@@ -711,9 +723,10 @@ fn put(
     editor: &Editor,
     home: &Home,
     chosen: Option<&str>,
-    divider: i32,
+    dividers: Dividers,
 ) {
-    ui.set_divider(divider as f32);
+    ui.set_moc_divider(dividers.moc as f32);
+    ui.set_vehicle_divider(dividers.vehicle as f32);
     ui.set_has_simulator(editor.document().simulator.is_some());
     let (nodes, links) = views_of(editor, home);
     ui.set_selected(chosen.unwrap_or_default().into());
@@ -732,9 +745,10 @@ fn put_sub(
     editor: &Editor,
     home: &str,
     chosen: Option<&str>,
-    divider: i32,
+    dividers: Dividers,
 ) {
-    window.set_divider(divider as f32);
+    window.set_moc_divider(dividers.moc as f32);
+    window.set_vehicle_divider(dividers.vehicle as f32);
     window.set_has_simulator(editor.document().simulator.is_some());
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home);
@@ -929,6 +943,47 @@ fn wire_node(
 /// directory made read-only -- because leaving a session's work in a process
 /// that is ending is the one way this editor could lose anything.
 ///
+/// Settle one divider where a gesture left it.
+///
+/// `which` is the pane on the divider's left -- `Pane::Moc` for the line
+/// between the moc pane and the vehicle's, `Pane::Vehicle` for the one between
+/// the vehicle's and the payloads'. Both gestures are the same work, and
+/// writing it twice is two places for the clamping to be got wrong in.
+fn drag_divider(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    which: Pane,
+    dx: f32,
+) {
+    let dividers = views.borrow().divider.clone();
+    {
+        let editor = editor.borrow();
+        let was = dividers.get();
+        let (low, high) = divider_range(editor.document(), was, which);
+        let from = if which == Pane::Moc { was.moc } else { was.vehicle };
+        let now = snap((from + dx.round() as i32, 0)).0.clamp(low, high);
+        if now == from {
+            // It did not move, or it was already against what stops it.
+            // Nothing to redraw and nothing to write: a settings file
+            // rewritten on every press of a handle is a file written for
+            // nothing.
+            return;
+        }
+        dividers.set(if which == Pane::Moc {
+            Dividers { moc: now, ..was }
+        } else {
+            Dividers { vehicle: now, ..was }
+        });
+    }
+
+    let (moc_percent, vehicle_percent) = percents_for(dividers.get());
+    settings::save(settings::Settings {
+        moc_percent,
+        vehicle_percent,
+    });
+    views.borrow().refresh(&editor.borrow());
+}
+
 /// The offer and not the saving: somebody who has been told the device is full
 /// may want to leave and deal with it, and a program that insisted on writing
 /// first would be a program they cannot get out of.
@@ -1972,28 +2027,31 @@ fn next_place(
     document: &Document,
     home: &Home,
     node_type: &str,
-    divider: i32,
+    dividers: Dividers,
 ) -> (i32, i32) {
-    let payload = is_payload(node_type);
+    let pane = pane_of(node_type);
     let placed = document
         .nodes_in(home)
         .iter()
-        .filter(|node| is_payload(&node.node_type) == payload)
+        .filter(|node| pane_of(&node.node_type) == pane)
         .count() as i32;
+    let (left, _) = edges_of(pane, dividers);
 
-    // Down the pane for a payload, and diagonally for everything else. The
-    // payload working pane is a quarter as wide as the other, with room for
-    // one node and little more: a diagonal there would walk two nodes into the
-    // right-hand edge and then stack the rest on top of each other.
-    let at = if payload {
-        (divider + GRID * 3, FIRST_PLACE.1 + placed * PLACE_OFFSET)
-    } else {
-        (
-            FIRST_PLACE.0 + placed * PLACE_OFFSET,
+    // Diagonally down the vehicle pane, and straight down the other two. They
+    // are columns with room for a node and little more: a diagonal there would
+    // walk two nodes into the right-hand edge and then stack the rest on top
+    // of each other.
+    let at = match pane {
+        Pane::Vehicle => (
+            left + FIRST_PLACE.0 + placed * PLACE_OFFSET,
             FIRST_PLACE.1 + placed * PLACE_OFFSET,
-        )
+        ),
+        _ => (
+            left + GRID * 3,
+            FIRST_PLACE.1 + placed * PLACE_OFFSET,
+        ),
     };
-    confine(node_type, divider, snap(at))
+    confine(node_type, dividers, snap(at))
 }
 
 /// The nearest point on the grid.
@@ -2019,14 +2077,18 @@ fn snap((x, y): (i32, i32)) -> (i32, i32) {
 /// -- and a flat list of fourteen shapes hides the pattern that would make
 /// them learnable.
 ///
-/// Two lists rather than one, because there are two working panes and a
+/// Three lists rather than one, because there are three working panes and a
 /// shape's pane follows from the list it came from. A single list would leave
 /// the rule to be found out by placing something and watching where it went.
-fn palette_of(payloads: bool) -> ModelRc<PaletteEntry> {
+fn palette_of(pane: Pane) -> ModelRc<PaletteEntry> {
     let mut entries: Vec<PaletteEntry> = Vec::new();
     let mut family = "";
 
-    for t in NodeType::ALL.iter().copied().filter(|t| t.is_payload() == payloads) {
+    for t in NodeType::ALL
+        .iter()
+        .copied()
+        .filter(|t| pane_of(t.spelling()) == pane)
+    {
         if t.family() != family {
             family = t.family();
             entries.push(PaletteEntry {
@@ -2192,33 +2254,35 @@ mod tests {
     use document::Document;
     use slint::Model;
 
-    /// Where the divider sits until somebody moves it.
+    /// Where the dividers sit until somebody moves them.
     ///
-    /// Most of what follows is about the two panes rather than about moving
-    /// the line between them, so it is worked in the division the editor
-    /// opens with.
-    const DIVIDER: i32 = WORKING_WIDTH * settings::DEFAULT / 100;
+    /// Most of what follows is about the panes rather than about moving the
+    /// lines between them, so it is worked in the division the editor opens
+    /// with.
+    fn dividers() -> Dividers {
+        dividers_for(settings::DEFAULT_MOC, settings::DEFAULT_VEHICLE)
+    }
 
     /// Every row of one selection pane.
-    fn rows_of(payloads: bool) -> Vec<PaletteEntry> {
-        let palette = palette_of(payloads);
+    fn rows_of(pane: Pane) -> Vec<PaletteEntry> {
+        let palette = palette_of(pane);
         (0..palette.row_count())
             .map(|i| palette.row_data(i).unwrap())
             .collect()
     }
 
-    /// The two selection panes offer every type the editor can place, and
+    /// The three selection panes offer every type the editor can place, and
     /// each type in exactly one of them.
     ///
-    /// A type missing from both is a type nobody can place, which is a failure
-    /// a person would find only by going looking for it. A type in both would
-    /// be a type whose pane depends on which list it was pressed in, and the
-    /// pane is what says whether it is a payload.
+    /// A type missing from all three is a type nobody can place, which is a
+    /// failure a person would find only by going looking for it. A type in two
+    /// of them would be a type whose pane depends on which list it was pressed
+    /// in, and the pane is what says what the node is allowed to be.
     #[test]
     fn the_selection_panes_offer_every_node_type_once() {
         let mut offered: Vec<String> = Vec::new();
-        for payloads in [false, true] {
-            let rows = rows_of(payloads);
+        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+            let rows = rows_of(pane);
 
             // Grouped, and every shape sits under a heading rather than above
             // the first one.
@@ -2246,8 +2310,8 @@ mod tests {
                     .copied()
                     .unwrap_or_else(|| panic!("{spelling} is not a type"));
                 assert_eq!(
-                    t.is_payload(),
-                    payloads,
+                    pane_of(t.spelling()),
+                    pane,
                     "{spelling} is offered in the wrong selection pane"
                 );
                 assert!(
@@ -2276,8 +2340,8 @@ mod tests {
     #[test]
     fn the_palette_holds_no_red() {
         let error = colour(ERROR_TINT);
-        for payloads in [false, true] {
-            for row in rows_of(payloads) {
+        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+            for row in rows_of(pane) {
                 if row.is_heading {
                     continue;
                 }
@@ -2760,31 +2824,38 @@ mod tests {
         assert!(view.wide, "a link into a named input is drawn wide");
     }
 
-    /// Both working panes have room for a node.
+    /// Every working pane has room for a node.
     ///
-    /// The payload working pane is a quarter of the working area, and every
-    /// node is one width: a quarter narrower than that width would be a pane
-    /// nothing fits in, and every payload placed would land in the same
-    /// place because the clamp had nowhere to put it.
+    /// Each pane is a share of the working area and every node is one width:
+    /// a pane narrower than that width is a pane nothing fits in, and every
+    /// node placed there would land in the same place because the clamp had
+    /// nowhere to put it.
     #[test]
-    fn both_panes_have_room_for_a_node() {
+    fn every_pane_has_room_for_a_node() {
         let width = style::WIDTH as i32;
-        assert!(
-            WORKING_WIDTH - DIVIDER >= width + GRID * 2,
-            "the payload working pane is {}px wide and a node is {width}px",
-            WORKING_WIDTH - DIVIDER
-        );
+        let dividers = dividers();
+        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+            let (left, right) = edges_of(pane, dividers);
+            assert!(
+                right - left >= width + GRID * 2,
+                "the {} working pane is {}px wide and a node is {width}px",
+                pane.label(),
+                right - left
+            );
+        }
+
         // And the vehicle pane has room for several across, which is what it
-        // is the larger of the two for.
+        // is the largest of the three for.
+        let (left, right) = edges_of(Pane::Vehicle, dividers);
         assert!(
-            DIVIDER >= width * 3,
-            "the vehicle working pane is {DIVIDER}px wide and a node is {width}px"
+            right - left >= width * 3,
+            "the vehicle working pane is {}px wide and a node is {width}px",
+            right - left
         );
-        // Three quarters and one quarter to begin with, as asked for, and
-        // on the grid so that a node held against the divider is on it too.
-        assert_eq!(DIVIDER, divider_for(settings::DEFAULT));
-        assert_eq!(DIVIDER, WORKING_WIDTH * 3 / 4);
-        assert_eq!(DIVIDER % GRID, 0);
+
+        // On the grid, so that a node held against a divider is on it too.
+        assert_eq!(dividers.moc % GRID, 0);
+        assert_eq!(dividers.vehicle % GRID, 0);
     }
 
     /// A node is held in the pane its type belongs to.
@@ -2796,72 +2867,71 @@ mod tests {
     #[test]
     fn a_node_is_held_in_its_own_pane() {
         let width = style::WIDTH as i32;
+        let d = dividers();
+        let (moc, vehicle) = (d.moc, d.vehicle);
 
-        // A payload: left to the divider, right to the far edge.
-        assert_eq!(confine("i2c", DIVIDER, (0, 100)), (DIVIDER, 100));
-        assert_eq!(confine("i2c", DIVIDER, (DIVIDER - 1, 100)), (DIVIDER, 100));
-        assert_eq!(confine("i2c", DIVIDER, (DIVIDER + 8, 100)), (DIVIDER + 8, 100));
+        // A payload: left to the vehicle divider, right to the far edge.
+        assert_eq!(confine("i2c", d, (0, 100)), (vehicle, 100));
+        assert_eq!(confine("i2c", d, (vehicle - 1, 100)), (vehicle, 100));
+        assert_eq!(confine("i2c", d, (vehicle + 8, 100)), (vehicle + 8, 100));
         assert_eq!(
-            confine("i2c", DIVIDER, (WORKING_WIDTH, 100)),
+            confine("i2c", d, (WORKING_WIDTH, 100)),
             (WORKING_WIDTH - width, 100)
         );
 
-        // And everything else: nowhere past the divider, and nowhere left of
-        // the canvas.
-        assert_eq!(confine("compute", DIVIDER, (0, 100)), (0, 100));
-        assert_eq!(confine("compute", DIVIDER, (-40, 100)), (0, 100));
+        // The ground link: the leftmost pane, and nowhere right of its own
+        // divider.
+        assert_eq!(confine("moc", d, (0, 100)), (0, 100));
+        assert_eq!(confine("moc", d, (-40, 100)), (0, 100));
+        assert_eq!(confine("moc", d, (WORKING_WIDTH, 100)), (moc - width, 100));
+
+        // And the vehicle's own graph, between the two.
+        assert_eq!(confine("compute", d, (0, 100)), (moc, 100));
+        assert_eq!(confine("compute", d, (-40, 100)), (moc, 100));
         assert_eq!(
-            confine("compute", DIVIDER, (DIVIDER, 100)),
-            (DIVIDER - width, 100)
-        );
-        assert_eq!(
-            confine("moc", DIVIDER, (WORKING_WIDTH, 100)),
-            (DIVIDER - width, 100)
+            confine("compute", d, (WORKING_WIDTH, 100)),
+            (vehicle - width, 100)
         );
 
         // A node is never dragged off the top, whichever pane it is in: a
         // negative y is a node nobody can reach to drag back.
-        for node_type in ["i2c", "compute"] {
-            assert_eq!(confine(node_type, DIVIDER, (DIVIDER, -80)).1, 0, "{node_type}");
+        for node_type in ["i2c", "compute", "moc"] {
+            assert_eq!(confine(node_type, d, (vehicle, -80)).1, 0, "{node_type}");
         }
 
         // A type this build does not know goes in the vehicle pane, which is
         // where something that needs looking at should be.
         assert!(!is_payload("contraption"));
-        let (left, right) = pane::pane_for("contraption", DIVIDER);
-        assert_eq!(left, 0);
-        assert!(right < DIVIDER);
+        let (left, right) = pane::pane_for("contraption", d);
+        assert_eq!(left, moc);
+        assert!(right < vehicle);
     }
 
     /// Every type is placed in the pane its list is in.
     ///
     /// The rule that was asked for: a payload can only be created in the
-    /// payload working pane and everything else only in the vehicle working
-    /// pane. Checked for every type rather than for one of each, because the
-    /// thing that would break it is a new type whose family says one thing and
-    /// whose placement says another.
+    /// payload working pane, the ground link only in the moc working pane,
+    /// and the rest of the graph only in the vehicle's. Checked for every
+    /// type rather than for one of each, because the thing that would break
+    /// it is a new type whose family says one thing and whose placement says
+    /// another.
     #[test]
     fn every_type_is_placed_in_its_own_pane() {
         let document = Document::new();
+        let d = dividers();
         for t in NodeType::ALL {
-            let (x, y) = next_place(&document, &None, t.spelling(), DIVIDER);
+            let (x, y) = next_place(&document, &None, t.spelling(), d);
             let (width, _) = size_of(t.spelling());
             let right = x + width as i32;
-            if t.is_payload() {
-                assert!(
-                    x >= DIVIDER && right <= WORKING_WIDTH,
-                    "{} is placed at {x} and reaches {right}, outside the \
-                     payload working pane",
-                    t.spelling()
-                );
-            } else {
-                assert!(
-                    x >= 0 && right <= DIVIDER,
-                    "{} is placed at {x} and reaches {right}, outside the \
-                     vehicle working pane",
-                    t.spelling()
-                );
-            }
+            let pane = pane_of(t.spelling());
+            let (left, edge) = edges_of(pane, d);
+            assert!(
+                x >= left && right <= edge,
+                "{} is placed at {x} and reaches {right}, outside the {} \
+                 working pane ({left}..{edge})",
+                t.spelling(),
+                pane.label()
+            );
             assert!(y > 0, "{} is placed off the top", t.spelling());
         }
     }
@@ -2875,7 +2945,8 @@ mod tests {
     #[test]
     fn placing_in_one_pane_does_not_move_the_other_along() {
         let mut document = Document::new();
-        let first_payload = next_place(&document, &None, "i2c", DIVIDER);
+        let d = dividers();
+        let first_payload = next_place(&document, &None, "i2c", d);
 
         for name in ["a", "b", "c"] {
             document.apply(&Edit::AddNode {
@@ -2885,7 +2956,7 @@ mod tests {
             });
         }
         assert_eq!(
-            next_place(&document, &None, "i2c", DIVIDER),
+            next_place(&document, &None, "i2c", d),
             first_payload,
             "three computations moved where the first payload goes"
         );
@@ -2897,7 +2968,7 @@ mod tests {
             node_type: "i2c".into(),
             home: None,
         });
-        let second = next_place(&document, &None, "i2c", DIVIDER);
+        let second = next_place(&document, &None, "i2c", d);
         assert_ne!(second, first_payload);
         assert_eq!(second.0, first_payload.0, "payloads go down their pane");
         assert!(second.1 > first_payload.1);
@@ -2910,52 +2981,74 @@ mod tests {
     /// by a step every time the editor started. Every position the control can
     /// settle on, round tripped.
     #[test]
-    fn the_divider_survives_being_written_down() {
-        for percent in settings::LEAST..=settings::MOST {
-            let divider = divider_for(percent);
-            assert_eq!(divider % GRID, 0, "{percent}% is off the grid");
-            // And a percentage means what it says: that much of the working
-            // pane, to the left-hand pane, within the grid step it is
-            // snapped to.
-            assert!(
-                (divider - WORKING_WIDTH * percent / 100).abs() <= GRID / 2,
-                "a vehicle pane of {percent}% was placed at {divider} of \
-                 {WORKING_WIDTH}"
-            );
-            let again = divider_for(percent_for(divider));
-            assert_eq!(
-                again, divider,
-                "a vehicle pane of {percent}% comes back as {}%",
-                percent_for(divider)
-            );
+    fn the_dividers_survive_being_written_down() {
+        for moc in settings::LEAST..=settings::MOST {
+            for vehicle in [settings::LEAST, 25, settings::DEFAULT_VEHICLE] {
+                let (moc, vehicle) = settings::shares(moc, vehicle);
+                let dividers = dividers_for(moc, vehicle);
+                assert_eq!(dividers.moc % GRID, 0, "{moc}% is off the grid");
+                assert_eq!(dividers.vehicle % GRID, 0, "{vehicle}% is off the grid");
+                // And a percentage means what it says: that much of the
+                // working pane, within the grid step it is snapped to.
+                assert!(
+                    (dividers.moc - WORKING_WIDTH * moc / 100).abs() <= GRID / 2,
+                    "a moc pane of {moc}% was placed at {} of {WORKING_WIDTH}",
+                    dividers.moc
+                );
+                assert!(
+                    (dividers.vehicle - WORKING_WIDTH * (moc + vehicle) / 100).abs()
+                        <= GRID / 2,
+                    "a vehicle pane of {vehicle}% left the divider at {} of \
+                     {WORKING_WIDTH}",
+                    dividers.vehicle
+                );
+                let (moc_again, vehicle_again) = percents_for(dividers);
+                assert_eq!(
+                    dividers_for(moc_again, vehicle_again),
+                    dividers,
+                    "{moc}% and {vehicle}% come back as {moc_again}% and \
+                     {vehicle_again}%"
+                );
+            }
         }
 
-        // And a percentage outside the rule is brought inside it rather than
+        // And percentages outside the rule are brought inside it rather than
         // obeyed: a hand-edited settings file is still a file the editor has
         // to open.
-        assert_eq!(divider_for(0), divider_for(settings::LEAST));
-        assert_eq!(divider_for(100), divider_for(settings::MOST));
-        assert_eq!(divider_for(-5), divider_for(settings::LEAST));
+        assert_eq!(
+            dividers_for(0, 200),
+            dividers_for(settings::LEAST, settings::MOST)
+        );
+        assert_eq!(
+            dividers_for(-5, -5),
+            dividers_for(settings::LEAST, settings::LEAST)
+        );
     }
 
-    /// Neither working pane can be squeezed away.
+    /// No working pane can be squeezed away.
     ///
     /// The rule that was asked for: each pane keeps at least a twentieth of
-    /// the working pane, so neither can be dragged shut. A pane with nothing
-    /// visible in it is a pane whose nodes cannot be reached, and the drag
-    /// that does it is one press away.
+    /// the working pane, so none can be dragged shut -- and with three of
+    /// them, a divider stops a twentieth short of its neighbour as well as of
+    /// the edge. A pane with nothing visible in it is a pane whose nodes
+    /// cannot be reached, and the drag that does it is one press away.
     #[test]
-    fn neither_pane_can_be_squeezed_away() {
+    fn no_pane_can_be_squeezed_away() {
         let document = Document::new();
-        let (low, high) = divider_range(&document, DIVIDER);
+        let d = dividers();
+        let step = WORKING_WIDTH * settings::LEAST / 100;
 
-        assert_eq!(low, WORKING_WIDTH * settings::LEAST / 100);
-        assert_eq!(high, WORKING_WIDTH * settings::MOST / 100);
-        // Said the way it was asked: neither pane below five per cent, so
-        // neither above ninety-five.
-        assert_eq!(percent_for(low), settings::LEAST);
-        assert_eq!(percent_for(high), settings::MOST);
-        assert!(100 - percent_for(high) >= settings::LEAST);
+        let (low, high) = divider_range(&document, d, Pane::Moc);
+        assert_eq!(low, step, "the moc pane keeps a twentieth");
+        assert_eq!(high, d.vehicle - step, "and so does the vehicle's");
+
+        let (low, high) = divider_range(&document, d, Pane::Vehicle);
+        assert_eq!(low, d.moc + step);
+        assert_eq!(
+            high,
+            WORKING_WIDTH - step,
+            "the payload pane keeps a twentieth"
+        );
         assert!(low > 0 && high < WORKING_WIDTH);
     }
 
@@ -2968,6 +3061,7 @@ mod tests {
     fn the_divider_stops_against_a_node() {
         let mut document = Document::new();
         let width = style::WIDTH as i32;
+        let d = dividers();
 
         // A computation in the vehicle pane and a payload in the payload
         // pane, both where they belong.
@@ -2989,13 +3083,13 @@ mod tests {
         document.apply(&Edit::MoveNode {
             node: "temp_fore".into(),
             was: (0, 0),
-            now: (DIVIDER + 48, 40),
+            now: (d.vehicle + 48, 40),
         });
 
-        let (low, high) = divider_range(&document, DIVIDER);
+        let (low, high) = divider_range(&document, d, Pane::Vehicle);
         assert_eq!(low, 400 + width, "the computation's right edge stops it");
-        assert_eq!(high, DIVIDER + 48, "the payload's left edge stops it");
-        assert!(low <= DIVIDER && DIVIDER <= high, "{low}..{high}");
+        assert_eq!(high, d.vehicle + 48, "the payload's left edge stops it");
+        assert!(low <= d.vehicle && d.vehicle <= high, "{low}..{high}");
 
         // A node on the wrong side of the divider holds nothing. Otherwise one
         // such node -- read from a file that put it there -- would freeze the
@@ -3012,7 +3106,7 @@ mod tests {
             now: (40, 200),
         });
         assert_eq!(
-            divider_range(&document, DIVIDER),
+            divider_range(&document, d, Pane::Vehicle),
             (low, high),
             "a payload left of the divider should not pin it"
         );
@@ -3050,7 +3144,7 @@ mod tests {
     fn a_new_configuration_starts_with_the_ground_station() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
-        let mut editor = Editor::open(&path, DIVIDER);
+        let mut editor = Editor::open(&path, dividers());
         seed(&mut editor);
 
         // And what tcspecial is configured with: every attribute of it, and
@@ -3081,8 +3175,9 @@ mod tests {
         let moc = editor.document().node("moc").expect("a ground station");
         assert_eq!(moc.node_type, "moc");
         assert_eq!(moc.at, MOC_PLACE);
-        // The upper left of the vehicle working pane.
-        let (left, right) = pane::pane_for("moc", DIVIDER);
+        // The upper left of the moc working pane, which is where the ground
+        // link belongs.
+        let (left, right) = pane::pane_for("moc", dividers());
         assert!(moc.at.0 >= left && moc.at.0 <= right);
 
         // Undoable, like any other edit: somebody drawing a page of a bigger
@@ -3109,7 +3204,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
 
         // One that has something in it.
-        let mut editor = Editor::open(&where_.path().join("a.yaml"), DIVIDER);
+        let mut editor = Editor::open(&where_.path().join("a.yaml"), dividers());
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -3119,7 +3214,7 @@ mod tests {
         assert!(editor.document().node("moc").is_none());
 
         // One somebody has emptied, which has a history behind it.
-        let mut editor = Editor::open(&where_.path().join("b.yaml"), DIVIDER);
+        let mut editor = Editor::open(&where_.path().join("b.yaml"), dividers());
         editor.edit(Edit::AddNode {
             name: "to_kelvin".into(),
             node_type: "compute".into(),
@@ -3137,7 +3232,7 @@ mod tests {
         // than a file to write over.
         let damaged = where_.path().join("c.yaml");
         std::fs::write(&damaged, "version: \"2.0\"\nnodes: [[[\n").expect("a file");
-        let mut editor = Editor::open(&damaged, DIVIDER);
+        let mut editor = Editor::open(&damaged, dividers());
         assert!(editor.trouble().is_some(), "a damaged file should be reported");
         seed(&mut editor);
         assert!(editor.document().node("moc").is_none());
@@ -3166,7 +3261,7 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
         for extension in ["yaml", "xml"] {
-            let editor = Editor::open(&root.join(format!("example.{extension}")), DIVIDER);
+            let editor = Editor::open(&root.join(format!("example.{extension}")), dividers());
             let document = editor.document();
 
             // The same boxes and the same ends views_of works out, because
@@ -3246,7 +3341,7 @@ mod tests {
 
         for extension in ["yaml", "xml"] {
             let path = root.join(format!("example.{extension}"));
-            let editor = Rc::new(RefCell::new(Editor::open(&path, DIVIDER)));
+            let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
             assert_eq!(
                 editor.borrow().trouble(),
                 None,
@@ -3255,7 +3350,7 @@ mod tests {
 
             let ui = MainWindow::new().expect("a window");
             furnish!(&ui);
-            put(&ui, &editor.borrow(), &None, None, DIVIDER);
+            put(&ui, &editor.borrow(), &None, None, dividers());
 
             let names: Vec<String> = (0..ui.get_nodes().row_count())
                 .filter_map(|row| ui.get_nodes().row_data(row))
@@ -3311,7 +3406,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("graph.yaml"),
-            DIVIDER,
+            dividers(),
         )));
         // A compute rather than a device: a device is a payload and is held
         // in the payload working pane, so a drag of one measures the pane's
@@ -3322,13 +3417,14 @@ mod tests {
             node_type: "compute".to_string(),
             home: None,
         });
-        // Somewhere on the canvas rather than in its corner: a node at the
-        // origin is a node whose own position cannot be told from the
-        // canvas's.
+        // Somewhere inside its own pane rather than in a corner: a node at
+        // the origin is a node whose own position cannot be told from the
+        // canvas's, and one left of its pane would be brought into it by the
+        // drag rather than moved by it.
         editor.borrow_mut().edit(Edit::MoveNode {
             node: "to_kelvin".to_string(),
             was: (0, 0),
-            now: (120, 88),
+            now: (dividers().moc + 120, 88),
         });
         let was = editor
             .borrow()
@@ -3343,7 +3439,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -3449,7 +3545,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("graph.yaml"),
-            DIVIDER,
+            dividers(),
         )));
         editor.borrow_mut().edit(Edit::AddNode {
             name: "temp_fore".to_string(),
@@ -3457,7 +3553,7 @@ mod tests {
             home: None,
         });
         // In its own pane, a little in from the divider.
-        let was = (DIVIDER + 24, 88);
+        let was = (dividers().vehicle + 24, 88);
         editor.borrow_mut().edit(Edit::MoveNode {
             node: "temp_fore".to_string(),
             was: (0, 0),
@@ -3470,7 +3566,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -3521,7 +3617,7 @@ mod tests {
             .at;
         assert_eq!(
             now,
-            (DIVIDER, was.1 + by.1 as i32),
+            (dividers().vehicle, was.1 + by.1 as i32),
             "a payload dragged {by:?} from {was:?} left its pane and is at {now:?}"
         );
     }
@@ -3541,7 +3637,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("vehicle.yaml"),
-            DIVIDER,
+            dividers(),
         )));
 
         let ui = MainWindow::new().expect("a window");
@@ -3549,7 +3645,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -3644,7 +3740,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("vehicle.yaml"),
-            DIVIDER,
+            dividers(),
         )));
         for (name, interval) in [("cabin_temps", "3s"), ("bay", "5s")] {
             editor.borrow_mut().edit(Edit::AddGroup {
@@ -3658,7 +3754,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -3715,13 +3811,13 @@ mod tests {
         std::fs::create_dir(&locked).unwrap();
         let path = locked.join("vehicle.yaml");
 
-        let editor = Rc::new(RefCell::new(Editor::open(&path, DIVIDER)));
+        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
         let ui = MainWindow::new().expect("a window");
         let views = Rc::new(RefCell::new(Views {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -3816,11 +3912,17 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("vehicle.yaml"),
-            DIVIDER,
+            dividers(),
         )));
         {
             let mut editor = editor.borrow_mut();
-            for (name, at) in [("to_kelvin", (120, 88)), ("mean_temp", (120, 240))] {
+            // Inside the vehicle working pane, which is where a computation
+            // belongs: a click lands on a node where it is drawn.
+            let left = dividers().moc;
+            for (name, at) in [
+                ("to_kelvin", (left + 120, 88)),
+                ("mean_temp", (left + 120, 240)),
+            ] {
                 editor.edit(Edit::AddNode {
                     name: name.to_string(),
                     node_type: "compute".to_string(),
@@ -3840,7 +3942,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -3883,7 +3985,7 @@ mod tests {
 
         assert!(views.borrow().attributes.is_empty(), "nothing open yet");
 
-        click((120, 88));
+        click((dividers().moc + 120, 88));
         assert!(
             views.borrow().attributes.contains_key("to_kelvin"),
             "a click should open what the node says: {:?}",
@@ -3907,7 +4009,7 @@ mod tests {
 
         // A second node opens a second window, and the first stays: which is
         // the whole point of this not being a panel.
-        click((120, 240));
+        click((dividers().moc + 120, 240));
         assert_eq!(
             views.borrow().attributes.len(),
             2,
@@ -3918,7 +4020,7 @@ mod tests {
 
         // Clicking the same node again raises its window rather than making a
         // second one saying the same thing.
-        click((120, 88));
+        click((dividers().moc + 120, 88));
         assert_eq!(views.borrow().attributes.len(), 2);
 
         // Typing in it reaches the document, and the other window is
@@ -3958,7 +4060,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("vehicle.yaml"),
-            DIVIDER,
+            dividers(),
         )));
         {
             let mut editor = editor.borrow_mut();
@@ -4019,7 +4121,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -4071,7 +4173,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("vehicle.yaml"),
-            DIVIDER,
+            dividers(),
         )));
         editor
             .borrow_mut()
@@ -4082,7 +4184,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -4161,7 +4263,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Rc::new(RefCell::new(Editor::open(
             &where_.path().join("vehicle.yaml"),
-            DIVIDER,
+            dividers(),
         )));
         {
             let mut editor = editor.borrow_mut();
@@ -4189,7 +4291,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
-            divider: Rc::new(std::cell::Cell::new(DIVIDER)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -4290,12 +4392,21 @@ mod tests {
 
         let window = MainWindow::new().expect("a window");
         furnish!(&window);
-        window.set_divider(DIVIDER as f32);
+        window.set_moc_divider(dividers().moc as f32);
+        window.set_vehicle_divider(dividers().vehicle as f32);
 
+        // Both of them, because there are two and each should report its own
+        // gesture: a window that wired one callback to both lines would pass
+        // this test for the wrong reason.
         let moved: Rc<Cell<Option<f32>>> = Rc::new(Cell::new(None));
+        let moc_moved: Rc<Cell<Option<f32>>> = Rc::new(Cell::new(None));
         {
             let moved = moved.clone();
-            window.on_divider_moved(move |dx| moved.set(Some(dx)));
+            window.on_vehicle_divider_moved(move |dx| moved.set(Some(dx)));
+        }
+        {
+            let moc_moved = moc_moved.clone();
+            window.on_moc_divider_moved(move |dx| moc_moved.set(Some(dx)));
         }
         window.show().expect("the window shows");
 
@@ -4305,7 +4416,8 @@ mod tests {
         let at = canvas.absolute_position();
 
         // On the line, halfway down it, which is where the handle is.
-        let from = slint::LogicalPosition::new(at.x + DIVIDER as f32, at.y + 200.0);
+        let from =
+            slint::LogicalPosition::new(at.x + dividers().vehicle as f32, at.y + 200.0);
         let by = -120.0;
         let to = slint::LogicalPosition::new(from.x + by, from.y);
 
@@ -4330,6 +4442,38 @@ mod tests {
         assert!(
             (said - by).abs() < 1.0,
             "the divider dragged by {by} reported {said}"
+        );
+        assert_eq!(
+            moc_moved.get(),
+            None,
+            "dragging the vehicle divider moved the moc divider too"
+        );
+
+        // And the other line, which is its own control.
+        let from =
+            slint::LogicalPosition::new(at.x + dividers().moc as f32, at.y + 200.0);
+        let by = 40.0;
+        let to = slint::LogicalPosition::new(from.x + by, from.y);
+        window
+            .window()
+            .dispatch_event(WindowEvent::PointerMoved { position: from });
+        window.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+        window
+            .window()
+            .dispatch_event(WindowEvent::PointerMoved { position: to });
+        window.window().dispatch_event(WindowEvent::PointerReleased {
+            position: to,
+            button: PointerEventButton::Left,
+        });
+        let said = moc_moved
+            .get()
+            .expect("dragging the moc divider should report how far it went");
+        assert!(
+            (said - by).abs() < 1.0,
+            "the moc divider dragged by {by} reported {said}"
         );
     }
 

@@ -138,15 +138,58 @@ pub fn difference(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
     ((one.0 - two.0).powi(2) + (one.1 - two.1).powi(2) + (one.2 - two.2).powi(2)).sqrt()
 }
 
-/// The contrast ratio of `rgb` against white, as the accessibility guidelines
+/// The contrast ratio between two colours, as the accessibility guidelines
 /// define it.
 ///
-/// Three to one is the threshold for something that is not text -- a border, a
-/// line, a shape -- and the canvas is white.
+/// Three to one is the threshold for something that is not text: a border, a
+/// line, a shape. What a node is drawn against is its own working pane, which
+/// is a tinted ground rather than the white it used to be -- so the question
+/// is asked of the pair and not of the colour alone.
+pub fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
+    let light = |rgb: (u8, u8, u8)| {
+        0.2126 * linear(rgb.0) + 0.7152 * linear(rgb.1) + 0.0722 * linear(rgb.2)
+    };
+    let (one, two) = (light(a), light(b));
+    (one.max(two) + 0.05) / (one.min(two) + 0.05)
+}
+
+/// And against white, which is what a line on the canvas is drawn on.
 pub fn contrast_on_white(rgb: (u8, u8, u8)) -> f64 {
-    let light =
-        0.2126 * linear(rgb.0) + 0.7152 * linear(rgb.1) + 0.0722 * linear(rgb.2);
-    1.05 / (light + 0.05)
+    contrast(rgb, (0xff, 0xff, 0xff))
+}
+
+/// How light a colour is, in CIE terms: nought is black and a hundred is
+/// white.
+///
+/// For the rule that a node is darker than its own pane, which is what makes
+/// a shape read as something drawn on a ground rather than as a hole in it.
+pub fn lightness(rgb: (u8, u8, u8)) -> f64 {
+    lab(rgb).0
+}
+
+/// How saturated a colour is.
+///
+/// For the rule that a pane's ground is neutral: a pale wash reads as tinted
+/// paper, where the same hue at full chroma reads as a coloured panel and
+/// fights everything drawn on it.
+pub fn chroma(rgb: (u8, u8, u8)) -> f64 {
+    let (_, a, b) = lab(rgb);
+    (a * a + b * b).sqrt()
+}
+
+/// Which hue a colour is, in degrees around the CIE wheel.
+///
+/// For the rule that a node is in the hue family of its own pane, which is
+/// what makes a colour say which pane a node belongs in.
+pub fn hue(rgb: (u8, u8, u8)) -> f64 {
+    let (_, a, b) = lab(rgb);
+    b.atan2(a).to_degrees().rem_euclid(360.0)
+}
+
+/// How far apart two hues are, in degrees, the short way round.
+pub fn hue_apart(one: f64, two: f64) -> f64 {
+    let apart = (one - two).abs() % 360.0;
+    apart.min(360.0 - apart)
 }
 
 #[cfg(test)]

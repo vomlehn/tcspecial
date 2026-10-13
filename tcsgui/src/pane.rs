@@ -146,15 +146,15 @@ pub enum Pane {
 impl Pane {
     /// What the pane is called where a person can see it.
     ///
-    /// The label at the top of the pane is in the markup, that being window
-    /// text; this is the same word, for what the tests say when a pane rule is
-    /// broken.
+    /// The label in the pane's top left corner is in the markup, that being
+    /// window text; these are the same words, for what the tests say when a
+    /// pane rule is broken.
     #[cfg(test)]
     pub fn label(self) -> &'static str {
         match self {
-            Pane::Moc => "moc",
-            Pane::Vehicle => "vehicle",
-            Pane::Payloads => "payloads",
+            Pane::Moc => "MOC",
+            Pane::Vehicle => "Vehicle",
+            Pane::Payloads => "Payloads",
         }
     }
 }

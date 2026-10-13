@@ -733,9 +733,14 @@ component LinkLine inherits Rectangle {
 component SelectionPane inherits Rectangle {
     in property <string> heading: "";
     in property <[PaletteEntry]> palette: [];
+    // The ground of the working pane these go in, which is what the shapes in
+    // this list are coloured against: a reader picking a shape out of a list
+    // on a blush ground and putting it on a blush pane has been told where it
+    // goes twice, by the colour of the shape and by the colour under it.
+    in property <color> ground: #f2f2f0;
     callback place-node(string, string, string);
 
-    background: #f2f2f0;
+    background: root.ground;
     border-width: 1px;
     border-color: #d8d8d4;
 
@@ -879,6 +884,14 @@ component Surface inherits Rectangle {
     // for all three panes, which is what makes them scroll together. From
     // Rust -- see tcsgui::pane::WORKING_HEIGHT -- as the width is.
     in property <length> working-height: 0px;
+    // What each working pane is painted: light, neutral, and the light end of
+    // the hue family its own nodes are drawn in, so that a node's colour says
+    // which pane it belongs in. From Rust -- see tcsgui::style::Ground -- for
+    // the reason the tints come from there: what a colour means is a rule with
+    // tests on it, and this file paints.
+    in property <color> moc-ground: white;
+    in property <color> vehicle-ground: white;
+    in property <color> payload-ground: white;
 
     // How deep undo currently goes, shown rather than guessed at: a person
     // about to abandon an afternoon's work deserves to know how much of it is
@@ -1026,6 +1039,7 @@ component Surface inherits Rectangle {
 
                 SelectionPane {
                     heading: "MOC node types";
+                    ground: root.moc-ground;
                     palette: root.moc-palette;
                     // One type, so one row: the ground link is the only thing
                     // that goes in its pane.
@@ -1034,12 +1048,14 @@ component Surface inherits Rectangle {
                 }
                 SelectionPane {
                     heading: "Vehicle node types";
+                    ground: root.vehicle-ground;
                     palette: root.vehicle-palette;
                     vertical-stretch: 1;
                     place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
                 SelectionPane {
                     heading: "Payload node types";
+                    ground: root.payload-ground;
                     palette: root.payload-palette;
                     // The taller share: ten of the fourteen types are
                     // payloads, and a pane that scrolls through ten rows four
@@ -1075,6 +1091,35 @@ component Surface inherits Rectangle {
                     border-width: 1px;
                     border-color: #d8d8d4;
 
+                // The three working panes, each on its own ground.
+                //
+                // Under the grid and under everything else: a ground is what
+                // the pane is made of, and the grid, the labels, the lines and
+                // the nodes are drawn on it. The dividers are drawn over the
+                // sheet, so the edge between two grounds is also a line
+                // somebody can take hold of.
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: root.moc-divider;
+                    height: 100%;
+                    background: root.moc-ground;
+                }
+                Rectangle {
+                    x: root.moc-divider;
+                    y: 0;
+                    width: root.vehicle-divider - root.moc-divider;
+                    height: 100%;
+                    background: root.vehicle-ground;
+                }
+                Rectangle {
+                    x: root.vehicle-divider;
+                    y: 0;
+                    width: root.working-width - root.vehicle-divider;
+                    height: 100%;
+                    background: root.payload-ground;
+                }
+
                 // A faint grid, which the nodes snap to.
                 //
                 // It gives the surface some depth and makes the alignment
@@ -1102,28 +1147,39 @@ component Surface inherits Rectangle {
                 // top of each: the ground link on the left, the vehicle's own
                 // graph in the middle, and what it carries on the right.
                 //
-                // Grey, and the same grey as the hint below: a label is not
-                // part of the drawing, and one in the colour of a node would
-                // read as something placed.
+                // Light grey and italic, which is this window's way of saying
+                // "not part of the drawing": a label in the colour and the
+                // face of a node would read as something placed. The same grey
+                // as the hint below.
+                //
+                // In the top left corner of each pane and *under* the nodes,
+                // which is the order they are written in here. A node may
+                // cover a label: the label is there to be found when the pane
+                // is empty and when somebody has lost their bearings, and a
+                // pane that reserved a row for it would be a pane with a row
+                // nothing can be put in.
                 Text {
                     x: Space.step;
                     y: Space.tight;
-                    text: "moc";
+                    text: "MOC";
                     font-size: Type.small;
+                    font-italic: true;
                     color: #9ca3af;
                 }
                 Text {
                     x: root.moc-divider + Space.step;
                     y: Space.tight;
-                    text: "vehicle";
+                    text: "Vehicle";
                     font-size: Type.small;
+                    font-italic: true;
                     color: #9ca3af;
                 }
                 Text {
                     x: root.vehicle-divider + Space.step;
                     y: Space.tight;
-                    text: "payloads";
+                    text: "Payloads";
                     font-size: Type.small;
+                    font-italic: true;
                     color: #9ca3af;
                 }
 
@@ -1227,6 +1283,9 @@ export component MainWindow inherits Window {
     // because a person scrolling moves it and placing a node sets it.
     in-out property <length> canvas-offset: 0px;
     out property <length> canvas-view-height: surface.canvas-view-height;
+    in property <color> moc-ground: white;
+    in property <color> vehicle-ground: white;
+    in property <color> payload-ground: white;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1343,6 +1402,9 @@ export component MainWindow inherits Window {
         vehicle-divider: root.vehicle-divider;
         working-width: root.working-width;
         working-height: root.working-height;
+        moc-ground: root.moc-ground;
+        vehicle-ground: root.vehicle-ground;
+        payload-ground: root.payload-ground;
         save-clicked => { root.save-clicked(); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
@@ -1406,6 +1468,9 @@ export component SubWindow inherits Window {
     // because a person scrolling moves it and placing a node sets it.
     in-out property <length> canvas-offset: 0px;
     out property <length> canvas-view-height: surface.canvas-view-height;
+    in property <color> moc-ground: white;
+    in property <color> vehicle-ground: white;
+    in property <color> payload-ground: white;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1518,6 +1583,9 @@ export component SubWindow inherits Window {
         vehicle-divider: root.vehicle-divider;
         working-width: root.working-width;
         working-height: root.working-height;
+        moc-ground: root.moc-ground;
+        vehicle-ground: root.vehicle-ground;
+        payload-ground: root.payload-ground;
         save-clicked => { root.save-clicked(); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;

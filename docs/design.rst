@@ -1151,14 +1151,20 @@ So a hand-written configuration opened and saved stays correct and stops
 looking hand-written. For the shipped examples that is what ``git diff`` is
 for; for a working configuration it is worth knowing before the first Save.
 
-The canvas is divided in three, and each part says at the top what it is for.
-Left to right: the *moc working pane*, labelled ``moc``, which holds the ground
-link; the *vehicle working pane*, labelled ``vehicle``, which holds the
-vehicle's own graph -- the computations, the log, a page of its own; and the
-*payload working pane*, labelled ``payloads``, which holds everything the
+The canvas is divided in three, and each part says in its top left corner what
+it is for. Left to right: the *moc working pane*, labelled ``MOC``, which holds
+the ground link; the *vehicle working pane*, labelled ``Vehicle``, which holds
+the vehicle's own graph -- the computations, the log, a page of its own; and the
+*payload working pane*, labelled ``Payloads``, which holds everything the
 vehicle carries: a device on a bus, a line it drives, a link to something
-aboard. The labels are grey, that being a word about the drawing rather than
-part of it.
+aboard.
+
+The labels are light grey and italic, which is this window's way of saying "not
+part of the drawing": one in the colour and the face of a node would read as
+something placed. They are drawn under the nodes, so a node may cover one. A
+label is there to be found when a pane is empty and when somebody has lost
+their bearings, and a pane that reserved a row for its own name would be a pane
+with a row nothing can be put in.
 
 There is a selection pane for each, one above another in the same order the
 working panes are in, and which one a shape was pressed in is what decides
@@ -1242,28 +1248,49 @@ edge to line up on, and a diagram built from them looks approximate however
 carefully each node was placed; height is still per type, because it is one of
 the channels that tells two types apart.
 
-Every node type has its own colour, and the fifteen were chosen for one thing
-before anything else: that a reader with any of the three dichromacies can tell
-them apart. They are the output of a search over sRGB that maximised the
-smallest perceived difference between any two of them, measured in CIE
-L\*a\*b\* under normal vision and under simulated protanopia, deuteranopia and
-tritanopia at once. The worst pair of the fifteen is seventeen CIE units apart
-under every one of the four, where two or three is "the same colour in two
-printings" and ten is "clearly two colours". Each also has a contrast against
-white of at least three to one, so that a one-pixel border of it is legible on
-the canvas. What aesthetics the first priority left room for went on keeping
-the chroma moderate and spreading the lightness over five levels -- which is
-useful as well as calmer, lightness being the one channel every kind of colour
-blindness keeps, the total ones included. The simulation and the check are in
-the editor's own tests, run against the colours the window is actually given,
-because a fifteenth colour added by hand would be a near-copy of one of the
-other fourteen under one of the dichromacies and nobody with normal vision
-would see it. The fifteenth was searched for in the gap the first fourteen left
--- which was not in the band they occupy: fourteen colours of moderate chroma
-between about 28 and 60 in lightness leave no room for another as far from all
-of them as they are from each other, and the room was below them. So the
-palette now has six levels of lightness, and the ``null`` node is the dark
-one.
+Each working pane is painted, and every node type has its own colour inside its
+pane's family. The MOC pane is a pale blue, the vehicle pane a pale green and
+the payload pane a pale blush: all three light and neutral -- no chroma above
+14 -- so that a pane reads as tinted paper rather than as a coloured panel. The
+nodes drawn on one are darker members of its own hue family: a payload is a
+plum or a maroon, a vehicle node a green or an olive, the ground link an azure.
+
+So a node's colour says two things at once. The hue says which family it is in,
+which makes a node drawn in the wrong pane visible as one; the step within the
+family -- lightness mostly, with chroma and a little hue beside it -- says
+which type it is. The selection panes carry their family's ground too, so
+picking a shape out of a list on a blush ground and putting it on a blush pane
+says where it goes twice.
+
+The colours were searched for rather than chosen, and three things were asked
+of the search at once: that every tint stay in the hue family of its own pane,
+that it be dark enough against that pane to read as a shape -- a contrast of
+three to one, which is the threshold for something that is not text, and at
+least 25 CIE units darker -- and that, subject to those, the smallest perceived
+difference between any two of the fifteen node tints be as large as it can be,
+measured in CIE L\*a\*b\* under normal vision and under simulated protanopia,
+deuteranopia and tritanopia at once.
+
+It is fourteen CIE units, where two or three is "the same colour in two
+printings" and ten is "clearly two colours". So a pair anybody can tell apart
+is a pair everybody can tell apart, which is what colour blindness asks of a
+palette; the three pane grounds are fifteen apart under all four.
+
+Fourteen and not the seventeen the earlier family-free palette managed, and the
+three units are the price of the families: a palette free to put its colours
+anywhere spreads them further than one whose reds must stay red. What the
+families buy is a colour that says which pane a node belongs in, which no
+amount of separation would have told anybody. The families are told apart by
+more than hue as well, because hue is what a dichromacy takes: the payload
+family is dark, the vehicle family light, and the ground link's one tint sits
+where nothing else does. Lightness is the one channel every kind of colour
+blindness keeps, the total ones included.
+
+The simulation and all of these checks are in the editor's own tests, run
+against the colours the window is actually given, because a tint nudged by hand
+would be a near-copy of another under one of the dichromacies and nobody with
+normal vision would see it. A failure there means the search has to be run
+again rather than a value adjusted.
 
 A link is drawn as an orthogonal route rather than a straight line -- out of
 the source, across, into the target, corners rounded -- and it goes around

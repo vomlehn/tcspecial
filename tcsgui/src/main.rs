@@ -44,6 +44,7 @@ mod sim;
 /// the palette's tests and by nothing at run time.
 #[cfg(test)]
 mod sight;
+mod nodes;
 mod style;
 mod subdiagram;
 
@@ -275,11 +276,12 @@ impl Views {
 /// moved: a refresh after every edit would rebuild two models that cannot have
 /// changed. Where the divider is does change, so that is in `put`.
 macro_rules! furnish {
-    ($window:expr) => {{
+    ($window:expr, $described:expr) => {{
         let window = $window;
-        window.set_moc_palette(palette_of(Pane::Moc));
-        window.set_vehicle_palette(palette_of(Pane::Vehicle));
-        window.set_payload_palette(palette_of(Pane::Payloads));
+        let described = $described;
+        window.set_moc_palette(palette_of(Pane::Moc, described));
+        window.set_vehicle_palette(palette_of(Pane::Vehicle, described));
+        window.set_payload_palette(palette_of(Pane::Payloads, described));
         window.set_working_width(WORKING_WIDTH as f32);
     }};
 }
@@ -341,7 +343,7 @@ fn main() -> Result<(), slint::PlatformError> {
     seed(&mut editor.borrow_mut());
 
     let ui = MainWindow::new()?;
-    furnish!(&ui);
+    furnish!(&ui, descriptions());
 
     let views = Rc::new(RefCell::new(Views {
         top: ui.as_weak(),
@@ -395,7 +397,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
             };
             window.set_editing(name.clone().into());
-            furnish!(&window);
+            furnish!(&window, descriptions());
             wire_sub(&window, &editor, &views, &drawing, &chosen, &name);
             put_sub(
                 &window,
@@ -474,10 +476,14 @@ macro_rules! wiring {
                 let editor = editor.clone();
                 let views = views.clone();
                 let home = home.clone();
-                window.on_place_node(move |node_type| {
+                window.on_place_node(move |called, node_type, sets| {
                     {
                         let mut editor = editor.borrow_mut();
-                        let name = fresh_name(editor.document(), &node_type, &home);
+                        // Named after what was pressed rather than after the
+                        // type: a described node is "mean" and not
+                        // "compute-3", which is what a reader of the
+                        // configuration will be looking for.
+                        let name = fresh_name(editor.document(), &called, &home);
                         let at = next_place(
                             editor.document(),
                             &home,
@@ -492,6 +498,19 @@ macro_rules! wiring {
                             node_type: node_type.to_string(),
                             home: home.clone(),
                         });
+                        // What the description answers for it, before it is
+                        // placed: a compute node from the `mean` entry is a
+                        // mean from the moment it exists, so the panel asks
+                        // for a mean's attributes and the checking holds it to
+                        // a mean's rules.
+                        for (attribute, value) in stated(&sets) {
+                            editor.edit(Edit::SetAttribute {
+                                node: Qualified::of(&name, &home).absolute(),
+                                attribute,
+                                was: None,
+                                now: Some(value),
+                            });
+                        }
                         editor.edit(Edit::MoveNode {
                             node: Qualified::of(&name, &home).absolute(),
                             was: (0, 0),
@@ -1687,18 +1706,34 @@ fn panel_of(
         None => return empty,
     };
 
-    let declared = NodeType::ALL
-        .iter()
-        .find(|t| t.spelling() == node.node_type)
-        .map(|t| t.attributes())
-        .unwrap_or(&[]);
+    // What this node is asked for. The description tree first, where it
+    // describes this node: a compute node whose function is `mean` is a mean,
+    // and a mean is asked for a mean's attributes rather than for every
+    // attribute any computation has. See nodes::matching.
+    //
+    // Otherwise the type's own list, which is what every node was asked for
+    // before there was a tree and what a payload is asked for still.
+    let declared: Vec<(String, bool)> =
+        match nodes::matching(descriptions(), &node.node_type, &node.attributes) {
+            Some(described) => described.asked(),
+            None => NodeType::ALL
+                .iter()
+                .find(|t| t.spelling() == node.node_type)
+                .map(|t| {
+                    t.attributes()
+                        .iter()
+                        .map(|(name, required)| ((*name).to_string(), *required))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        };
 
     let mut fields: Vec<FieldView> = declared
         .iter()
         .map(|(name, required)| {
-            let value = node.attributes.get(*name).cloned().unwrap_or_default();
+            let value = node.attributes.get(name).cloned().unwrap_or_default();
             FieldView {
-                name: (*name).into(),
+                name: name.clone().into(),
                 value: value.clone().into(),
                 required: *required,
                 is_heading: false,
@@ -2285,7 +2320,7 @@ fn snap((x, y): (i32, i32)) -> (i32, i32) {
 /// Three lists rather than one, because there are three working panes and a
 /// shape's pane follows from the list it came from. A single list would leave
 /// the rule to be found out by placing something and watching where it went.
-fn palette_of(pane: Pane) -> ModelRc<PaletteEntry> {
+fn palette_of(pane: Pane, described: &[nodes::Described]) -> ModelRc<PaletteEntry> {
     let mut entries: Vec<PaletteEntry> = Vec::new();
     let mut family = "";
 
@@ -2294,21 +2329,93 @@ fn palette_of(pane: Pane) -> ModelRc<PaletteEntry> {
         .copied()
         .filter(|t| pane_of(t.spelling()) == pane)
     {
+        // What the description tree says about this type, where it says
+        // anything. A type the tree describes is offered as its descriptions
+        // and not as itself: `compute` is one node type, and the tree turns it
+        // into `mean`, `hysteresis`, `to_kelvin` and `process` -- four things
+        // to place, each a compute node with its function already answered. A
+        // bare `compute` would be a fifth entry that is refused until somebody
+        // types the function in by hand.
+        //
+        // And a type the tree says nothing about is offered as itself, which
+        // is what every type was before there was a tree and what they all are
+        // again if the tree cannot be found.
+        let theirs: Vec<&nodes::Described> = described
+            .iter()
+            .filter(|one| one.node_type == t.spelling())
+            .collect();
+
         if t.family() != family {
             family = t.family();
             entries.push(PaletteEntry {
                 heading: family.into(),
                 node: view_of("", "", (0, 0), None, false, None),
                 is_heading: true,
+                sets: "".into(),
             });
         }
-        entries.push(PaletteEntry {
-            heading: "".into(),
-            node: view_of(t.spelling(), t.spelling(), (8, 2), None, false, None),
-            is_heading: false,
-        });
+
+        if theirs.is_empty() {
+            entries.push(PaletteEntry {
+                heading: "".into(),
+                node: view_of(t.spelling(), t.spelling(), (8, 2), None, false, None),
+                is_heading: false,
+                sets: "".into(),
+            });
+            continue;
+        }
+        for one in theirs {
+            entries.push(PaletteEntry {
+                heading: "".into(),
+                node: view_of(&one.node, t.spelling(), (8, 2), None, false, None),
+                is_heading: false,
+                sets: written(&one.sets).into(),
+            });
+        }
     }
     ModelRc::from(Rc::new(VecModel::from(entries)))
+}
+
+/// Every description the editor found, read once.
+///
+/// Once because the tree is data on the disk and the same for every window:
+/// re-reading it per window would mean two windows of one session could offer
+/// different things. What is wrong with the tree goes to the error output, as a
+/// preferences file that cannot be read does -- an editor that refused to start
+/// because one description has a typo in it would be an editor a typo turns
+/// off.
+fn descriptions() -> &'static [nodes::Described] {
+    static FOUND: std::sync::OnceLock<Vec<nodes::Described>> = std::sync::OnceLock::new();
+    FOUND.get_or_init(|| {
+        let (described, trouble) = nodes::described();
+        for said in trouble {
+            eprintln!("tcsgui: {said}");
+        }
+        described
+    })
+}
+
+/// What a palette entry fills in, as the one string a callback can carry.
+///
+/// `name=value`, several of them separated by semicolons. Neither character
+/// can appear in an attribute's name, and a value that held one would be a
+/// value this could not carry -- so the pairs are the ones a *description*
+/// states, which are the ones that pick a variant of a type: a function's
+/// name, not a path or a program's arguments.
+fn written(sets: &BTreeMap<String, String>) -> String {
+    sets.iter()
+        .map(|(name, value)| format!("{name}={value}"))
+        .collect::<Vec<String>>()
+        .join(";")
+}
+
+/// And back: what a placed node is given.
+fn stated(sets: &str) -> Vec<(String, String)> {
+    sets.split(';')
+        .filter(|pair| !pair.trim().is_empty())
+        .filter_map(|pair| pair.split_once('='))
+        .map(|(name, value)| (name.trim().to_string(), value.trim().to_string()))
+        .collect()
 }
 
 /// What a node of this type looks like, as the window wants it.
@@ -2510,7 +2617,12 @@ mod tests {
 
     /// Every row of one selection pane.
     fn rows_of(pane: Pane) -> Vec<PaletteEntry> {
-        let palette = palette_of(pane);
+        rows_from(pane, descriptions())
+    }
+
+    /// The same, from a tree given rather than found.
+    fn rows_from(pane: Pane, described: &[nodes::Described]) -> Vec<PaletteEntry> {
+        let palette = palette_of(pane, described);
         (0..palette.row_count())
             .map(|i| palette.row_data(i).unwrap())
             .collect()
@@ -2567,13 +2679,74 @@ mod tests {
             }
         }
 
-        offered.sort();
-        let mut expected: Vec<String> = NodeType::ALL
+        // Every type is offered somewhere, and a type the description tree
+        // says nothing about is offered exactly once -- as itself. A type the
+        // tree describes is offered once per description instead, which is
+        // what the test below is about.
+        for t in NodeType::ALL {
+            let how_many = offered.iter().filter(|said| *said == t.spelling()).count();
+            let described = descriptions()
+                .iter()
+                .filter(|one| one.node_type == t.spelling())
+                .count();
+            assert_eq!(
+                how_many,
+                described.max(1),
+                "{} is offered {how_many} times and has {described} descriptions",
+                t.spelling()
+            );
+        }
+    }
+
+    /// The description tree is what the vehicle pane offers.
+    ///
+    /// A type the tree describes is offered as its descriptions and not as
+    /// itself: `compute` is one node type, and the tree turns it into `mean`,
+    /// `hysteresis`, `to_kelvin` and `process`. Each entry is named after the
+    /// description and carries what the description answers for it, so placing
+    /// one puts down a compute node that is already a mean.
+    #[test]
+    fn the_vehicle_pane_offers_what_the_tree_describes() {
+        let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes");
+        let (described, trouble) = nodes::read_tree(&tree);
+        assert_eq!(trouble, Vec::<String>::new());
+
+        let rows = rows_from(Pane::Vehicle, &described);
+        let named: Vec<String> = rows
             .iter()
-            .map(|t| t.spelling().to_string())
+            .filter(|row| !row.is_heading)
+            .map(|row| row.node.name.to_string())
             .collect();
-        expected.sort();
-        assert_eq!(offered, expected, "the two panes do not offer every type");
+        for one in &described {
+            assert!(named.contains(&one.node), "{} is not offered: {named:?}", one.node);
+        }
+        // And the bare type is not offered beside them: a compute node with no
+        // function is refused until somebody types one in.
+        assert!(!named.contains(&"compute".to_string()), "{named:?}");
+        // A page of its own is in no description -- what a page holds is what
+        // has terminals -- so it is still offered as itself.
+        assert!(named.contains(&"subdiagram".to_string()), "{named:?}");
+
+        // What a placed node is given, as the one string a callback carries.
+        let mean = rows
+            .iter()
+            .find(|row| row.node.name == "mean")
+            .expect("the mean entry");
+        assert_eq!(mean.node.node_type, "compute");
+        assert_eq!(mean.sets, "function=mean");
+        assert_eq!(stated(&mean.sets), vec![("function".to_string(), "mean".to_string())]);
+
+        // With no tree at all the pane is what it was before there was one:
+        // every type offered as itself. An editor whose descriptions are not
+        // installed is an editor, not a blank palette.
+        let bare: Vec<String> = rows_from(Pane::Vehicle, &[])
+            .iter()
+            .filter(|row| !row.is_heading)
+            .map(|row| row.node.name.to_string())
+            .collect();
+        assert!(bare.contains(&"compute".to_string()), "{bare:?}");
+        assert!(bare.contains(&"null".to_string()), "{bare:?}");
+        assert!(!bare.contains(&"mean".to_string()), "{bare:?}");
     }
 
     /// Nothing in the palette is red.
@@ -3807,6 +3980,93 @@ mod tests {
         a_node_follows_the_pointer_and_reports_where_it_went();
         an_existing_configuration_is_on_the_canvas();
         a_link_is_drawn_by_dragging_from_a_terminal();
+        placing_a_described_node_answers_what_it_describes();
+    }
+
+    /// Placing a described node puts down a node that already is one.
+    ///
+    /// The whole point of the description tree at the palette: pressing `mean`
+    /// should give a compute node whose function is mean, named `mean`, with a
+    /// panel asking for a mean's attributes. Before the tree it gave a node
+    /// called `compute` with nothing answered, and a person had to know that
+    /// `function` was a word and that `mean` was one of its values.
+    fn placing_a_described_node_answers_what_it_describes() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("placed.yaml"),
+            dividers(),
+        )));
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
+        views.borrow_mut().chosen = chosen.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+
+        // The entry the palette offers, pressed.
+        let mean = rows_of(Pane::Vehicle)
+            .into_iter()
+            .find(|row| row.node.name == "mean")
+            .expect("the palette offers a mean");
+        ui.invoke_place_node(mean.node.name.clone(), mean.node.node_type.clone(), mean.sets);
+
+        let placed = editor
+            .borrow()
+            .document()
+            .node("mean")
+            .cloned()
+            .expect("a node called mean");
+        assert_eq!(placed.node_type, "compute");
+        assert_eq!(
+            placed.attributes.get("function").map(String::as_str),
+            Some("mean"),
+            "a mean placed from the palette is a mean"
+        );
+
+        // And the panel asks it for a mean's attributes rather than for every
+        // attribute any computation has.
+        chosen.borrow_mut().insert(String::new(), "mean".to_string());
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("mean"));
+        let asked: Vec<String> = fields
+            .iter()
+            .filter(|field| !field.is_heading)
+            .map(|field| field.name.to_string())
+            .collect();
+        assert_eq!(asked, vec!["function".to_string(), "inputs".to_string()]);
+
+        // Undoable in one step per edit, as everything is: the attribute the
+        // description answered is an edit of its own, so taking it back leaves
+        // a compute node with nothing answered rather than no node at all.
+        editor.borrow_mut().undo();
+        assert_eq!(
+            editor
+                .borrow()
+                .document()
+                .node("mean")
+                .expect("still there")
+                .attributes
+                .get("function"),
+            Some(&"mean".to_string()),
+            "the first undo takes back the placing and not the function"
+        );
     }
 
     /// Dragging from one terminal to another makes the link.
@@ -3847,7 +4107,7 @@ mod tests {
         }
 
         let ui = MainWindow::new().expect("a window");
-        furnish!(&ui);
+        furnish!(&ui, descriptions());
         let views = Rc::new(RefCell::new(Views {
             top: ui.as_weak(),
             open: BTreeMap::new(),
@@ -3973,7 +4233,7 @@ mod tests {
             );
 
             let ui = MainWindow::new().expect("a window");
-            furnish!(&ui);
+            furnish!(&ui, descriptions());
             put(&ui, &editor.borrow(), &None, None, dividers());
 
             let names: Vec<String> = (0..ui.get_nodes().row_count())
@@ -4058,7 +4318,7 @@ mod tests {
             .at;
 
         let ui = MainWindow::new().expect("a window");
-        furnish!(&ui);
+        furnish!(&ui, descriptions());
         let views = Rc::new(RefCell::new(Views {
             top: ui.as_weak(),
             open: BTreeMap::new(),
@@ -4185,7 +4445,7 @@ mod tests {
         });
 
         let ui = MainWindow::new().expect("a window");
-        furnish!(&ui);
+        furnish!(&ui, descriptions());
         let views = Rc::new(RefCell::new(Views {
             top: ui.as_weak(),
             open: BTreeMap::new(),
@@ -4561,7 +4821,7 @@ mod tests {
         }
 
         let ui = MainWindow::new().expect("a window");
-        furnish!(&ui);
+        furnish!(&ui, descriptions());
         let views = Rc::new(RefCell::new(Views {
             top: ui.as_weak(),
             open: BTreeMap::new(),
@@ -5015,7 +5275,7 @@ mod tests {
         use std::rc::Rc;
 
         let window = MainWindow::new().expect("a window");
-        furnish!(&window);
+        furnish!(&window, descriptions());
         window.set_moc_divider(dividers().moc as f32);
         window.set_vehicle_divider(dividers().vehicle as f32);
 

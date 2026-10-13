@@ -1,0 +1,16 @@
+# A sensor's raw bytes, scaled and offset into kelvin.
+node: to_kelvin
+type: compute
+about: Reads a sensor's bytes as a number and scales it into kelvin.
+sets:
+  function: to_kelvin
+attributes:
+  - name: format
+    required: true
+    about: "How the bytes are laid out: i16_be, u16_le and the rest."
+  - name: scale
+    required: true
+    about: What one count is worth. Nought would make every reading the same.
+  - name: offset
+    required: true
+    about: What is added after scaling.

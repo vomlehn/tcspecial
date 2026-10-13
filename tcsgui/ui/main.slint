@@ -122,6 +122,15 @@ export struct PaletteEntry {
     heading: string,
     node: NodeView,
     is-heading: bool,
+    // What the editor fills in on a node placed from this entry, as
+    // `name=value` pairs separated by semicolons.
+    //
+    // What makes one node type into several things to place: `compute` is one
+    // type, and `mean`, `hysteresis`, `to_kelvin` and `process` are four
+    // entries, each a compute node with its `function` already answered. The
+    // pairs come from the description tree -- see tcsgui/share/nodes -- and
+    // travel as text because a callback's arguments do.
+    sets: string,
 }
 
 // One field of the panel: an attribute of the selected node.
@@ -712,7 +721,7 @@ component LinkLine inherits Rectangle {
 component SelectionPane inherits Rectangle {
     in property <string> heading: "";
     in property <[PaletteEntry]> palette: [];
-    callback place-node(string);
+    callback place-node(string, string, string);
 
     background: #f2f2f0;
     border-width: 1px;
@@ -754,7 +763,7 @@ component SelectionPane inherits Rectangle {
                 // and a press there should still place one.
                 if !p.is-heading: TouchArea {
                     mouse-cursor: MouseCursor.pointer;
-                    clicked => { root.place-node(p.node.node-type); }
+                    clicked => { root.place-node(p.node.name, p.node.node-type, p.sets); }
                 }
             }
             Rectangle { }
@@ -872,7 +881,7 @@ component Surface inherits Rectangle {
 
     callback undo-clicked();
     callback redo-clicked();
-    callback place-node(string);
+    callback place-node(string, string, string);
     callback node-moved(string, length, length);
     // One of the two dividers between the three working panes was dragged by
     // this much. Two callbacks and not one with a name in it: which divider
@@ -987,13 +996,13 @@ component Surface inherits Rectangle {
                     // One type, so one row: the ground link is the only thing
                     // that goes in its pane.
                     vertical-stretch: 0;
-                    place-node(t) => { root.place-node(t); }
+                    place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
                 SelectionPane {
                     heading: "Vehicle node types";
                     palette: root.vehicle-palette;
                     vertical-stretch: 1;
-                    place-node(t) => { root.place-node(t); }
+                    place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
                 SelectionPane {
                     heading: "Payload node types";
@@ -1002,7 +1011,7 @@ component Surface inherits Rectangle {
                     // payloads, and a pane that scrolls through ten rows four
                     // at a time is a pane nobody finds the tenth in.
                     vertical-stretch: 2;
-                    place-node(t) => { root.place-node(t); }
+                    place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
             }
 
@@ -1167,7 +1176,7 @@ export component MainWindow inherits Window {
 
     callback undo-clicked();
     callback redo-clicked();
-    callback place-node(string);
+    callback place-node(string, string, string);
     callback node-moved(string, length, length);
     // One of the two dividers between the three working panes was dragged by
     // this much. Two callbacks and not one with a name in it: which divider
@@ -1268,7 +1277,7 @@ export component MainWindow inherits Window {
         trouble: root.trouble;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
-        place-node(t) => { root.place-node(t); }
+        place-node(name, t, sets) => { root.place-node(name, t, sets); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
         moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
@@ -1322,7 +1331,7 @@ export component SubWindow inherits Window {
 
     callback undo-clicked();
     callback redo-clicked();
-    callback place-node(string);
+    callback place-node(string, string, string);
     callback node-moved(string, length, length);
     // One of the two dividers between the three working panes was dragged by
     // this much. Two callbacks and not one with a name in it: which divider
@@ -1419,7 +1428,7 @@ export component SubWindow inherits Window {
         trouble: root.trouble;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
-        place-node(t) => { root.place-node(t); }
+        place-node(name, t, sets) => { root.place-node(name, t, sets); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
         moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }

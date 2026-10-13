@@ -132,6 +132,27 @@ pub fn functions() -> &'static str {
     "to_kelvin, mean, hysteresis, or process"
 }
 
+/// What a computation is told, by name.
+///
+/// The list every computation is held to: `params_of` refuses an attribute
+/// that is not on it, and this is the same list said out loud so that a tool
+/// can ask. tcsgui's description tree is what asks -- a description of a
+/// computation names the attributes its panel offers, and a test holds those
+/// against this -- because a description that asked for something else would
+/// be a panel filling in a field the checking then refuses.
+///
+/// `function` is on every list, it being how a node says which computation it
+/// is. `None` for a name that is not a computation.
+pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
+    match function {
+        "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
+        "mean" => Some(&["function", "inputs"]),
+        "hysteresis" => Some(&["function", "setpoint", "above", "below"]),
+        "process" => Some(&["function", "program", "timeout", "restart"]),
+        _ => None,
+    }
+}
+
 /// What this compute node computes, or what is wrong with what it says.
 pub fn params_of(
     what: &str,
@@ -153,18 +174,14 @@ pub fn params_of(
     // for the typo -- and a reader comparing the two words is the only way
     // anybody would find it.
     let named = |why: String| format!("\"{what}\" ({function}): {why}");
-    let own: &[&str] = match function.as_str() {
-        "to_kelvin" => &["function", "format", "scale", "offset"],
-        "mean" => &["function", "inputs"],
-        "hysteresis" => &["function", "setpoint", "above", "below"],
-        "process" => &["function", "program", "timeout", "restart"],
-        other => {
-            return Err(format!(
-                "\"{what}\": there is no computation called \"{other}\". The \
-                 built-in ones are to_kelvin, mean and hysteresis; \"process\" \
-                 runs a program of your own"
-            ))
-        }
+    // One list, read here and said out loud by `attributes_of`: two would be
+    // two places for a parameter to be added to.
+    let Some(own) = attributes_of(function.as_str()) else {
+        return Err(format!(
+            "\"{what}\": there is no computation called \"{function}\". The \
+             built-in ones are to_kelvin, mean and hysteresis; \"process\" \
+             runs a program of your own"
+        ));
     };
     for attribute in attributes.keys() {
         if !own.contains(&attribute.as_str()) {

@@ -13,6 +13,8 @@ pub mod compute;
 // Somewhere data stops, which is a node type like any other for the same
 // reasons: see node/log.
 pub mod log;
+// A node that carries both streams through and does nothing to what passes.
+pub mod null;
 pub mod i2c;
 pub mod spi;
 pub mod can;

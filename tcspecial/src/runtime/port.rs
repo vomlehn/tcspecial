@@ -52,6 +52,7 @@ use tcslibgs::{EndpointConfig, TcsError, TcsResult};
 
 use crate::node::compute::{self, Function};
 use crate::node::log::LogNode;
+use crate::node::null::Through;
 
 use crate::endpoint::{
     bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
@@ -582,30 +583,15 @@ impl Port for LogPort {
 
 /// A `null` node, as a node of the graph.
 ///
-/// What arrives goes on unchanged. It is the simplest vehicle node there is
-/// and it is here for two reasons: it is the one type with all four terminals,
-/// so it is what says what a vehicle node *is* -- see
-/// `tcslibgs::graph::terminals` -- and it is what a configuration reaches for
-/// when a stream has to pass through the vehicle on its way somewhere, with
-/// nothing yet to do to it.
-///
-/// Both streams through one node, and nothing here keeps them apart. A datum
-/// arriving at `from_payload` and one arriving at `from_moc` are both passed
-/// on, in the order they arrived, to every destination of the node's sources
-/// -- which is the one thing a `null` node cannot be asked to get right, and
-/// is why a sink is held to one source: see the cardinality rules in
-/// `design.rst`. A node with one source into it and one sink out of it per
-/// stream carries each stream to where it was going.
+/// The thinnest adapter of the four, because the node itself holds what there
+/// is to hold: see [`crate::node::null::Through`], which is where the queue and
+/// the rule about a datum that will not fit live. Here for the reason the log's
+/// adapter and the computation's are here -- the questions a port answers are
+/// the same whatever is behind it, and answers kept together stay the same.
 pub struct NullPort {
     /// The node's name in the configuration, which every complaint names.
     what: String,
-    /// What has arrived and not yet been taken.
-    ///
-    /// A queue and not a slot, for ComputePort's reason: the alternative when
-    /// a second datum arrives before the first is taken is to overwrite it,
-    /// and a reading dropped where nothing says so is the one outcome this
-    /// project will not have.
-    waiting: VecDeque<Vec<u8>>,
+    through: Through,
 }
 
 impl NullPort {
@@ -613,37 +599,18 @@ impl NullPort {
     pub fn of(what: &str) -> NullPort {
         NullPort {
             what: what.to_string(),
-            waiting: VecDeque::new(),
+            through: Through::new(),
         }
     }
 }
 
 impl Port for NullPort {
     fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
-        let Some(datum) = self.waiting.pop_front() else {
-            return Ok(0);
-        };
-
-        // A datum that will not fit is reported and not cut down: part of a
-        // value is not a smaller value, and the queue keeps it so that a
-        // caller with a larger buffer can still have it.
-        if datum.len() > buffer.len() {
-            let wanted = datum.len();
-            self.waiting.push_front(datum);
-            return Err(format!(
-                "{}: what arrived is {wanted} bytes and the buffer holds {}: part \
-                 of a value is not a smaller value",
-                self.what,
-                buffer.len()
-            ));
-        }
-
-        buffer[..datum.len()].copy_from_slice(&datum);
-        Ok(datum.len())
+        self.through.take(&self.what, buffer)
     }
 
     fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<(), String> {
-        self.waiting.push_back(data.to_vec());
+        self.through.give(data);
         Ok(())
     }
 
@@ -654,7 +621,7 @@ impl Port for NullPort {
     /// delivery would leave the datum here until something else happened to
     /// read the node.
     fn ready(&self) -> bool {
-        !self.waiting.is_empty()
+        self.through.waiting()
     }
 }
 

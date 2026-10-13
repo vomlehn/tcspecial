@@ -1,0 +1,670 @@
+//! The description tree: what vehicle nodes there are, as files rather than
+//! as code in the editor.
+//!
+//! A vehicle node is a thing the vehicle itself runs -- a computation, a log, a
+//! pass-through -- and a new one arrives as a Rust file in tcspecial and a
+//! description here. Two trees with one structure: a description at
+//! `compute/mean.yaml` has its Rust at `tcspecial/src/node/compute/mean.rs`,
+//! and one at `serial/keypad.yaml` would have `node/serial/keypad.rs` or a
+//! directory `node/serial/keypad/` with files under it.
+//!
+//! Two trees rather than one, which was a decision and is worth the reason.
+//! The descriptions are data the editor reads at run time and will be able to
+//! edit; the Rust is compiled into the flight software. Keeping them apart
+//! means the thing that is installed on a workstation is not the thing that is
+//! built for the vehicle -- and a `.yaml` beside a `.rs` in `src/` is a file
+//! `cargo` neither builds nor ships, sitting where everything else is both.
+//! What the structure buys is that the correspondence is checkable, and
+//! `tests::every_description_has_its_rust` is where it is checked.
+//!
+//! Either format, file by file: a description is YAML or XML as its extension
+//! says, and nothing cares which a given node used. One of the shipped ones is
+//! XML for exactly that reason.
+//!
+//! # What a description says
+//!
+//! ```yaml
+//! node: mean                 # what the palette shows, and the name a placed
+//!                            # node starts with
+//! type: compute              # the configuration's own word for the type
+//! about: The mean of the readings arriving at its named inputs.
+//! sets:                      # attributes the editor fills in and does not ask
+//!   function: mean
+//! attributes:                # what a node of this kind says for itself
+//!   - name: inputs
+//!     required: true
+//!     about: Which inputs it is over, comma separated.
+//! ```
+//!
+//! `sets` is what makes a type with variants into several entries in the
+//! palette: `compute` is one node type and `mean`, `hysteresis`, `to_kelvin`
+//! and `process` are four things to place, each of which is a compute node with
+//! its `function` already answered.
+
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
+
+use tcslibgs::Scalar;
+
+/// One vehicle node, as its description file says it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Described {
+    /// What the palette shows, and the name a placed node starts with.
+    pub node: String,
+    /// The configuration's word for the node type.
+    pub node_type: String,
+    /// One line about what it does, for the palette and the node window.
+    pub about: String,
+    /// Attributes the editor fills in rather than asking for: the `function`
+    /// of a computation, and whatever else picks one variant of a type.
+    pub sets: BTreeMap<String, String>,
+    /// What a node of this kind says for itself: the name, whether it must be
+    /// stated, and a line about it.
+    pub attributes: Vec<Attribute>,
+    /// Where the description was read from, relative to the tree's root.
+    ///
+    /// Kept because it is the other half of the correspondence: the Rust for
+    /// this node is at the same path under `tcspecial/src/node`, and a test
+    /// says so.
+    pub path: PathBuf,
+}
+
+/// One attribute of a described node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attribute {
+    pub name: String,
+    pub required: bool,
+    pub about: String,
+}
+
+/// A description as a file writes it.
+///
+/// Apart from [`Described`] because the two have different jobs: this is the
+/// file's shape, with everything optional that a file may leave out, and that
+/// is what the editor works in.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Said {
+    node: Scalar,
+    #[serde(rename = "type")]
+    node_type: Scalar,
+    #[serde(default)]
+    about: Option<Scalar>,
+    #[serde(default)]
+    sets: BTreeMap<String, Scalar>,
+    /// Repeated in XML and a list in YAML, which serde reads as the same Vec.
+    #[serde(default)]
+    attributes: Vec<SaidAttribute>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SaidAttribute {
+    name: Scalar,
+    #[serde(default)]
+    required: Option<Scalar>,
+    #[serde(default)]
+    about: Option<Scalar>,
+}
+
+/// Every description in the tree at `root`, and everything wrong with it.
+///
+/// Both, and neither instead of the other. A tree with one unreadable file in
+/// it still describes every other node, and an editor that offered nothing
+/// because one file has a typo in it would be an editor a typo turns off; but a
+/// file that was meant to describe a node and does not is worth saying out
+/// loud, because the node it describes has silently stopped being offered.
+///
+/// In the order a reader meets them: sorted by path, which puts a directory's
+/// descriptions together and keeps the palette's order stable from one run to
+/// the next.
+pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
+    let mut described = Vec::new();
+    let mut trouble = Vec::new();
+
+    let mut found = Vec::new();
+    walk(root, root, &mut found, &mut trouble);
+    found.sort();
+
+    for path in found {
+        match read_one(root, &path) {
+            Ok(one) => described.push(one),
+            Err(why) => trouble.push(why),
+        }
+    }
+
+    // A name picks out one node, here as in a configuration: two descriptions
+    // of one name would be two palette entries nothing could tell apart, and
+    // the second would place the first's attributes.
+    let mut seen: BTreeMap<&str, usize> = BTreeMap::new();
+    for one in &described {
+        *seen.entry(one.node.as_str()).or_insert(0) += 1;
+    }
+    for (name, count) in seen {
+        if count > 1 {
+            trouble.push(format!(
+                "{count} descriptions are of a node called \"{name}\", and a name \
+                 picks out one node"
+            ));
+        }
+    }
+
+    (described, trouble)
+}
+
+/// Every description file under `where_`, as paths relative to `root`.
+fn walk(root: &Path, where_: &Path, found: &mut Vec<PathBuf>, trouble: &mut Vec<String>) {
+    let entries = match std::fs::read_dir(where_) {
+        Ok(entries) => entries,
+        Err(e) => {
+            trouble.push(format!("{}: {e}", where_.display()));
+            return;
+        }
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) => {
+                trouble.push(format!("{}: {e}", where_.display()));
+                continue;
+            }
+        };
+        let path = entry.path();
+        if path.is_dir() {
+            walk(root, &path, found, trouble);
+            continue;
+        }
+        // Only the two formats, and silently: a tree people edit has a README
+        // in it and an editor's leftovers beside it, and a complaint about
+        // every one of those would bury the complaint that matters.
+        if tcslibgs::ConfigFormat::from_path(&path).is_none() {
+            continue;
+        }
+        match path.strip_prefix(root) {
+            Ok(relative) => found.push(relative.to_path_buf()),
+            Err(_) => trouble.push(format!("{}: not under the tree", path.display())),
+        }
+    }
+}
+
+/// One description, read from `root`-relative `path`.
+fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
+    let whole = root.join(path);
+    let said: Said = tcslibgs::load_config_file(&whole)
+        .map_err(|e| format!("{}: {e}", whole.display()))?;
+
+    let named = |what: &str| format!("{}: {what}", whole.display());
+    let node = said.node.as_str().trim().to_string();
+    if node.is_empty() {
+        return Err(named("a description says which node it is about, and this says nothing"));
+    }
+    let node_type = said.node_type.as_str().trim().to_string();
+    if node_type.is_empty() {
+        return Err(named(&format!(
+            "\"{node}\" says no type: a description names the configuration's own \
+             word for what it is"
+        )));
+    }
+
+    let mut attributes = Vec::new();
+    for attribute in &said.attributes {
+        let name = attribute.name.as_str().trim().to_string();
+        if name.is_empty() {
+            return Err(named(&format!("\"{node}\" has an attribute with no name")));
+        }
+        let required = match attribute.required.as_ref().map(|r| r.as_str().trim().to_string()) {
+            None => false,
+            Some(said) => match said.as_str() {
+                "true" => true,
+                "false" => false,
+                other => {
+                    return Err(named(&format!(
+                        "\"{node}\", attribute \"{name}\": required is true or false, \
+                         and this says \"{other}\""
+                    )))
+                }
+            },
+        };
+        attributes.push(Attribute {
+            name,
+            required,
+            about: said_about(attribute.about.as_ref()),
+        });
+    }
+
+    Ok(Described {
+        node,
+        node_type,
+        about: said_about(said.about.as_ref()),
+        sets: said
+            .sets
+            .iter()
+            .map(|(name, value)| (name.clone(), value.as_str().trim().to_string()))
+            .collect(),
+        attributes,
+        path: path.to_path_buf(),
+    })
+}
+
+/// A line of prose as the file wrote it, with its line breaks folded away.
+///
+/// A description is written for people and wraps where it suits the file; what
+/// shows it is one line of a palette or one row of a panel.
+fn said_about(said: Option<&Scalar>) -> String {
+    said.map(|about| {
+        about
+            .as_str()
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join(" ")
+    })
+    .unwrap_or_default()
+}
+
+impl Described {
+    /// What a node of this kind is asked for, in the order the panel asks.
+    ///
+    /// What the description answers for it first -- a computation's function,
+    /// which is what makes this node a mean rather than a thermostat -- and
+    /// then what it says for itself. Both are required: an attribute the
+    /// description fills in is one the node cannot do without, that being why
+    /// it is filled in.
+    ///
+    /// Shown rather than hidden, for the reason an unrecognised attribute is
+    /// shown: a value that is in the file and not on the panel is a value
+    /// somebody has to open the file to find.
+    pub fn asked(&self) -> Vec<(String, bool)> {
+        let mut asked: Vec<(String, bool)> = self
+            .sets
+            .keys()
+            .map(|name| (name.clone(), true))
+            .collect();
+        for attribute in &self.attributes {
+            if !asked.iter().any(|(named, _)| named == &attribute.name) {
+                asked.push((attribute.name.clone(), attribute.required));
+            }
+        }
+        asked
+    }
+}
+
+/// The description that fits a node, where the tree has one.
+///
+/// The type has to match and so does everything the description answers: a
+/// compute node whose `function` is `mean` is described by `compute/mean`, and
+/// one whose function is something else is not described by it at all. Where
+/// several fit, the one that answers the most -- a description that states two
+/// attributes is about a narrower thing than one that states one, and the
+/// narrower is the one a panel should ask for.
+///
+/// `None` for a node the tree says nothing about, which is every payload: the
+/// editor then asks for what the *type* says it needs, as it did before there
+/// was a tree.
+pub fn matching<'a>(
+    described: &'a [Described],
+    node_type: &str,
+    attributes: &BTreeMap<String, String>,
+) -> Option<&'a Described> {
+    described
+        .iter()
+        .filter(|one| one.node_type == node_type)
+        .filter(|one| {
+            one.sets
+                .iter()
+                .all(|(name, value)| attributes.get(name) == Some(value))
+        })
+        .max_by_key(|one| one.sets.len())
+}
+
+/// Where tcsgui's own data is: the description tree, and the schemas beside it.
+///
+/// The first of these that exists, which is a search and not one path because
+/// the same program is run from three places. In order:
+///
+/// * `$TCSGUI_DATA`, for a copy somebody is working on;
+/// * `$XDG_DATA_HOME/tcsgui`, or `~/.local/share/tcsgui`, which is where a
+///   person's own descriptions belong and where edited ones will be written;
+/// * `/usr/local/share/tcsgui` and `/usr/share/tcsgui`, which is where
+///   installing puts them -- see the `install-data` target;
+/// * `tcsgui/share` and `share` under the working directory, which is the
+///   source tree: running the editor out of a checkout should find the
+///   checkout's own descriptions.
+///
+/// `None` if none of them is there, and that is not an error: an editor with no
+/// description tree offers the node types it was built knowing, which is what
+/// it offered before there was a tree at all.
+pub fn data_dir() -> Option<PathBuf> {
+    let mut tried: Vec<PathBuf> = Vec::new();
+
+    if let Some(said) = std::env::var_os("TCSGUI_DATA") {
+        tried.push(PathBuf::from(said));
+    }
+    if let Some(home) = std::env::var_os("XDG_DATA_HOME") {
+        tried.push(PathBuf::from(home).join("tcsgui"));
+    } else if let Some(home) = std::env::var_os("HOME") {
+        tried.push(PathBuf::from(home).join(".local/share/tcsgui"));
+    }
+    tried.push(PathBuf::from("/usr/local/share/tcsgui"));
+    tried.push(PathBuf::from("/usr/share/tcsgui"));
+    tried.push(PathBuf::from("tcsgui/share"));
+    tried.push(PathBuf::from("share"));
+
+    tried.into_iter().find(|where_| where_.is_dir())
+}
+
+/// The description tree inside a data directory.
+pub fn nodes_in(data: &Path) -> PathBuf {
+    data.join("nodes")
+}
+
+/// Every description the editor can find, and everything wrong with the tree.
+///
+/// Nothing and no complaint where there is no tree: see [`data_dir`].
+pub fn described() -> (Vec<Described>, Vec<String>) {
+    match data_dir().map(|data| nodes_in(&data)) {
+        Some(tree) if tree.is_dir() => read_tree(&tree),
+        _ => (Vec::new(), Vec::new()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The tree this repository ships.
+    fn shipped() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes")
+    }
+
+    /// The shipped tree reads, and says what it is expected to say.
+    #[test]
+    fn the_shipped_descriptions_read() {
+        let (described, trouble) = read_tree(&shipped());
+        assert_eq!(trouble, Vec::<String>::new());
+
+        let names: Vec<&str> = described.iter().map(|one| one.node.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["hysteresis", "mean", "process", "to_kelvin", "log", "null"],
+            "sorted by path, which puts a directory's descriptions together"
+        );
+
+        // A computation is a compute node with its function already answered,
+        // which is what `sets` is for.
+        let mean = described.iter().find(|one| one.node == "mean").expect("mean");
+        assert_eq!(mean.node_type, "compute");
+        assert_eq!(mean.sets.get("function").map(String::as_str), Some("mean"));
+        assert_eq!(mean.attributes.len(), 1);
+        assert_eq!(mean.attributes[0].name, "inputs");
+        assert!(mean.attributes[0].required);
+        assert!(mean.attributes[0].about.contains("comma separated"), "{mean:?}");
+        // Folded into one line, however the file wrapped it.
+        assert!(!mean.attributes[0].about.contains('\n'));
+
+        // The one written in XML says the same kind of thing, which is the
+        // point of it being written in XML.
+        let process = described
+            .iter()
+            .find(|one| one.node == "process")
+            .expect("process");
+        assert_eq!(process.node_type, "compute");
+        assert_eq!(
+            process.sets.get("function").map(String::as_str),
+            Some("process")
+        );
+        let asked: Vec<&str> = process
+            .attributes
+            .iter()
+            .map(|a| a.name.as_str())
+            .collect();
+        assert_eq!(asked, vec!["program", "timeout", "restart"]);
+        assert!(process.attributes.iter().all(|a| a.required));
+
+        // And a node with nothing to be told says nothing.
+        let null = described.iter().find(|one| one.node == "null").expect("null");
+        assert_eq!(null.node_type, "null");
+        assert!(null.attributes.is_empty());
+        assert!(null.sets.is_empty());
+        assert!(!null.about.is_empty(), "every description says what it is");
+    }
+
+    /// Every description has its Rust, and every vehicle node its description.
+    ///
+    /// The correspondence the two trees exist for. One way round, a description
+    /// with no Rust is a node the editor offers and the vehicle cannot run; the
+    /// other, a computation implemented and not described is a node nobody can
+    /// place -- which is how a feature gets built and never used.
+    ///
+    /// The second direction is asked only of the directories the descriptions
+    /// cover. The code tree holds the payload kinds as well, and those are not
+    /// vehicle nodes; but once a family has one description in it, all of its
+    /// files need one, which is what keeps a family from being half described.
+    #[test]
+    fn every_description_has_its_rust() {
+        let code = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcspecial/src/node");
+        let (described, _) = read_tree(&shipped());
+        assert!(!described.is_empty());
+
+        let mut families: Vec<PathBuf> = Vec::new();
+        for one in &described {
+            // The same path, with the extension taken off: `compute/mean.yaml`
+            // is `compute/mean.rs`, or the directory `compute/mean/`.
+            let stem = one.path.with_extension("");
+            let file = code.join(&stem).with_extension("rs");
+            let directory = code.join(&stem);
+            assert!(
+                file.is_file() || directory.is_dir(),
+                "{}: nothing at {} or {}",
+                one.path.display(),
+                file.display(),
+                directory.display()
+            );
+            if let Some(family) = stem.parent() {
+                if !family.as_os_str().is_empty() && !families.contains(&family.to_path_buf()) {
+                    families.push(family.to_path_buf());
+                }
+            }
+        }
+
+        for family in families {
+            let where_ = code.join(&family);
+            for entry in std::fs::read_dir(&where_).expect("the family's code") {
+                let path = entry.expect("an entry").path();
+                // `mod.rs` is the family's own module rather than one of its
+                // nodes, and a directory is a node whose code is several
+                // files -- described by the entry above it.
+                if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                    continue;
+                }
+                if path.file_name().and_then(|n| n.to_str()) == Some("mod.rs") {
+                    continue;
+                }
+                let stem = path.file_stem().expect("a name").to_string_lossy().to_string();
+                assert!(
+                    described
+                        .iter()
+                        .any(|one| one.path.with_extension("") == family.join(&stem)),
+                    "{} is implemented and nothing in {} describes it",
+                    path.display(),
+                    shipped().join(&family).display()
+                );
+            }
+        }
+    }
+
+    /// A computation's description asks for what the computation takes.
+    ///
+    /// The other correspondence, and the one that would drift: the parameters
+    /// of each computation are the flight software's own list -- see
+    /// `tcslibgs::node::compute::attributes_of` -- and a description that asked
+    /// for something else would be a panel that fills in a field the checking
+    /// then refuses, or leaves out one it requires.
+    #[test]
+    fn a_computations_description_asks_for_what_it_takes() {
+        let (described, _) = read_tree(&shipped());
+        let computations: Vec<&Described> = described
+            .iter()
+            .filter(|one| one.node_type == "compute")
+            .collect();
+        assert_eq!(computations.len(), 4, "every computation is described");
+
+        for one in computations {
+            let function = one
+                .sets
+                .get("function")
+                .unwrap_or_else(|| panic!("{}: a computation says which", one.node));
+            let takes = tcslibgs::node::compute::attributes_of(function)
+                .unwrap_or_else(|| panic!("{}: there is no such computation", one.node));
+
+            // What the file asks for, plus what it fills in itself, is what
+            // the computation takes -- no more and no less.
+            let mut said: Vec<&str> = one.attributes.iter().map(|a| a.name.as_str()).collect();
+            said.extend(one.sets.keys().map(String::as_str));
+            said.sort_unstable();
+            let mut wanted: Vec<&str> = takes.to_vec();
+            wanted.sort_unstable();
+            assert_eq!(said, wanted, "{}", one.node);
+        }
+    }
+
+    /// A node is described by the description that answers what it says.
+    ///
+    /// Which is how one node type becomes several things to place and several
+    /// things to ask about: a compute node whose function is `mean` is a mean,
+    /// and the panel should ask it for a mean's attributes rather than for
+    /// every attribute any computation has.
+    #[test]
+    fn a_node_is_matched_to_the_description_that_fits_it() {
+        let (described, _) = read_tree(&shipped());
+
+        let said = |pairs: &[(&str, &str)]| {
+            pairs
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect::<BTreeMap<String, String>>()
+        };
+
+        let mean = matching(&described, "compute", &said(&[("function", "mean")]))
+            .expect("a compute node with a function is described");
+        assert_eq!(mean.node, "mean");
+        // What the panel asks: the function it is, and then what a mean says.
+        assert_eq!(
+            mean.asked(),
+            vec![("function".to_string(), true), ("inputs".to_string(), true)]
+        );
+
+        let thermostat = matching(
+            &described,
+            "compute",
+            &said(&[("function", "hysteresis"), ("setpoint", "293.15")]),
+        )
+        .expect("and so is this one");
+        assert_eq!(thermostat.node, "hysteresis");
+
+        // A computation that says no function yet is not described by any of
+        // them: a node halfway through being filled in is not a mean because
+        // mean is the first description in the tree.
+        assert_eq!(matching(&described, "compute", &said(&[])), None);
+        // Nor one whose function is not a computation at all.
+        assert_eq!(
+            matching(&described, "compute", &said(&[("function", "fourier")])),
+            None
+        );
+
+        // A type described without answering anything matches whatever it is
+        // told, there being nothing to disagree with.
+        let null = matching(&described, "null", &said(&[])).expect("the null node");
+        assert_eq!(null.node, "null");
+        assert!(null.asked().is_empty(), "a null node says nothing");
+
+        // And a payload is described by nothing, so the editor asks its type.
+        assert_eq!(matching(&described, "i2c", &said(&[("address", "0x48")])), None);
+    }
+
+    /// A description that is not one is refused by name, and the rest are read.
+    ///
+    /// A tree people edit has a half-written file in it sooner or later, and an
+    /// editor that offered nothing because of one of them would be an editor a
+    /// typo turns off.
+    #[test]
+    fn a_description_that_is_not_one_is_refused_on_its_own() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let root = where_.path();
+        std::fs::create_dir_all(root.join("compute")).expect("a family");
+
+        std::fs::write(
+            root.join("compute/mean.yaml"),
+            "node: mean\ntype: compute\nabout: An average.\n",
+        )
+        .expect("a good one");
+        // A word nothing reads, which is a value silently ignored if it is not
+        // refused.
+        std::fs::write(
+            root.join("compute/odd.yaml"),
+            "node: odd\ntype: compute\nabuot: a typo\n",
+        )
+        .expect("a bad one");
+        // And one that says nothing about which node it is.
+        std::fs::write(root.join("nameless.yaml"), "node: \"\"\ntype: compute\n")
+            .expect("a nameless one");
+        // Not a description at all, and not complained about either.
+        std::fs::write(root.join("README"), "The tree.\n").expect("a readme");
+
+        let (described, trouble) = read_tree(root);
+        let names: Vec<&str> = described.iter().map(|one| one.node.as_str()).collect();
+        assert_eq!(names, vec!["mean"], "the good one is still read");
+        assert_eq!(trouble.len(), 2, "{trouble:?}");
+        assert!(
+            trouble.iter().any(|said| said.contains("abuot")),
+            "{trouble:?}"
+        );
+        assert!(
+            trouble.iter().any(|said| said.contains("nameless.yaml")),
+            "{trouble:?}"
+        );
+    }
+
+    /// Two descriptions of one name are refused, naming it.
+    #[test]
+    fn a_name_describes_one_node() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let root = where_.path();
+        std::fs::create_dir_all(root.join("compute")).expect("a family");
+        for path in ["compute/mean.yaml", "mean.yaml"] {
+            std::fs::write(
+                root.join(path),
+                "node: mean\ntype: compute\nabout: An average.\n",
+            )
+            .expect("a description");
+        }
+
+        let (described, trouble) = read_tree(root);
+        assert_eq!(described.len(), 2, "both are read");
+        assert!(
+            trouble.iter().any(|said| said.contains("\"mean\"")),
+            "{trouble:?}"
+        );
+    }
+
+    /// The editor finds the tree it was built beside.
+    ///
+    /// Run from the source tree, which is where the tests are run from: the
+    /// search has to end at the checkout's own descriptions rather than at
+    /// nothing, or every test of the palette would be a test of an empty one.
+    #[test]
+    fn the_tree_is_found_from_the_source_directory() {
+        // Whatever this machine has installed is not what is being tested, so
+        // the search starts where this crate is.
+        let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("share");
+        assert!(data.is_dir(), "{}", data.display());
+        let tree = nodes_in(&data);
+        assert!(tree.is_dir(), "{}", tree.display());
+
+        let (described, trouble) = read_tree(&tree);
+        assert!(!described.is_empty());
+        assert_eq!(trouble, Vec::<String>::new());
+    }
+}

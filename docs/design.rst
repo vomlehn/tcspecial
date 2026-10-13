@@ -1331,6 +1331,97 @@ as answered as one somebody thought about. Nothing of an unanswered section
 reaches the file -- a ``tcspecial:`` with nothing under it would read back as no
 section at all.
 
+The description tree
+--------------------
+
+What vehicle nodes there are is data rather than code in the editor. A vehicle
+node is a thing the vehicle itself runs -- a computation, a log, a
+pass-through -- and a new one arrives as two files: Rust in tcspecial, and a
+description tcsgui reads.
+
+Two trees with one structure. A description at ``compute/mean.yaml`` has its
+Rust at ``tcspecial/src/node/compute/mean.rs``, and one at
+``serial/keypad.xml`` would have ``node/serial/keypad.rs``, or a directory
+``node/serial/keypad/`` with as many files under it as it takes. The
+correspondence is checked both ways by
+``tcsgui::nodes::tests::every_description_has_its_rust``: a description with no
+Rust is a node the editor offers and the vehicle cannot run, and a computation
+implemented and not described is a node nobody can place. The second direction
+is asked only of the directories the descriptions already cover -- the code
+tree holds the payload kinds as well, and those are not vehicle nodes -- but
+once a family has one description in it, every file in that family needs one,
+which is what keeps a family from being half described.
+
+Two trees rather than one was a decision, and the reason is what each tree is
+for. The descriptions are data read at run time, installed on a workstation,
+and editable; the Rust is compiled into the flight software. A ``.yaml`` beside
+a ``.rs`` in ``src/`` would be a file cargo neither builds nor ships, sitting
+where everything else is both.
+
+A description is YAML or XML as its extension says, file by file, and nothing
+cares which a given node used -- one of the shipped ones is XML for exactly
+that reason. What it says:
+
+.. code-block:: yaml
+
+   node: mean                 # what the palette shows, and the name a placed
+                              # node starts with
+   type: compute              # the configuration's own word for the type
+   about: The mean of the readings arriving at its named inputs.
+   sets:                      # attributes the editor fills in and does not ask
+     function: mean
+   attributes:                # what a node of this kind says for itself
+     - name: inputs
+       required: true
+       about: Which inputs it is over, comma separated.
+
+``sets`` is what turns one node type into several things to place. ``compute``
+is one type, and the tree makes it four entries -- ``mean``, ``hysteresis``,
+``to_kelvin`` and ``process`` -- each a compute node with its ``function``
+already answered. Pressing ``mean`` puts down a node called ``mean`` that is a
+mean from the moment it exists, so the panel asks it for a mean's attributes
+and the checking holds it to a mean's rules. Before the tree it put down a node
+called ``compute`` with nothing answered, and a person had to know that
+``function`` was a word and that ``mean`` was one of its values.
+
+Which is also the rule for the selection panes: **a type the tree describes is
+offered as its descriptions; a type the tree says nothing about is offered as
+itself.** A page of its own is described by nothing -- what a page holds is
+what has terminals -- so it is still offered as itself, and so is every
+payload. An editor that cannot find the tree at all offers every type as
+itself, which is exactly what it offered before there was a tree.
+
+What a computation is told is the flight software's own list, and the tree is
+held to it: ``tcslibgs::node::compute::attributes_of`` says what each
+computation takes, ``params_of`` refuses anything else, and a test says each
+description asks for exactly that list. A description that asked for something
+else would be a panel filling in a field the checking then refuses, or leaving
+out one it requires.
+
+A file that is not a description is refused on its own and the rest of the tree
+is still read: a tree people edit has a half-written file in it sooner or
+later, and an editor that offered nothing because one file has a typo in it
+would be an editor a typo turns off. What is wrong goes to the error output, as
+an unreadable preferences file does. Two descriptions of one name are refused
+the same way -- a name picks out one node here as it does in a configuration.
+
+Each attribute's ``about`` is read and kept and is not yet shown: the panel has
+a row per attribute and nowhere to put a sentence. **Needs examination.** The
+obvious place is beside the field it describes, which is a change to the
+panel's layout rather than to the tree.
+
+Where the tree is, in order: ``$TCSGUI_DATA``, then
+``$XDG_DATA_HOME/tcsgui`` (or ``~/.local/share/tcsgui``), then
+``/usr/local/share/tcsgui``, then ``/usr/share/tcsgui``, then ``tcsgui/share``
+and ``share`` under the working directory. The user's own directory before the
+installed one, because that is where edited descriptions belong and where a
+person's own node goes; the working directory last, so that running the editor
+out of a checkout finds the checkout's own. ``make install-data`` puts them
+under ``$(PREFIX)/share/tcsgui``, which is ``/usr/local/share/tcsgui`` for
+software built locally and ``/usr/share/tcsgui`` for a distribution's package:
+architecture-independent data belonging to one package, which is where the
+filesystem hierarchy standard puts it.
+
 The editor is lazy
 ------------------
 

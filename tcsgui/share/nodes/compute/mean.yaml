@@ -1,0 +1,13 @@
+# The mean over a fixed set of named inputs.
+node: mean
+type: compute
+about: The mean of the readings arriving at its named inputs.
+sets:
+  function: mean
+attributes:
+  - name: inputs
+    required: true
+    about: >
+      Which inputs it is over, comma separated. The links must bind exactly
+      these: a mean whose third link was deleted would quietly become a mean
+      over two.

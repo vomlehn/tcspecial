@@ -1,0 +1,16 @@
+# Somewhere data stops rather than being passed on.
+#
+# Any number of sources may link into one, so a flight's housekeeping is one
+# log with the records interleaved as they happened. Its Rust is
+# tcspecial/src/node/log/.
+node: log
+type: log
+about: Records what reaches it rather than passing it on.
+attributes:
+  - name: directory
+    required: true
+    about: Where the segments are written.
+  - name: format
+    required: true
+    about: >
+      How a record is laid out: fixed:<n>, variable_simple or variable_ts_rc.

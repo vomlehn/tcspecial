@@ -1,0 +1,16 @@
+# A comparison against a setpoint with a band either side of it.
+node: hysteresis
+type: compute
+about: Switches at a setpoint, with a band either side so it does not chatter.
+sets:
+  function: hysteresis
+attributes:
+  - name: setpoint
+    required: true
+    about: What the reading is held at.
+  - name: above
+    required: true
+    about: How far above the setpoint it switches off.
+  - name: below
+    required: true
+    about: How far below the setpoint it switches on.

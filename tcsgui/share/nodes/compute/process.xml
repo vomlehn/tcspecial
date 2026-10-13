@@ -1,0 +1,27 @@
+<!-- A program of your own, run on what arrives.
+
+     In XML to say that either format is read here: the tree is described in
+     YAML or XML, file by file, and nothing cares which a given node used. -->
+<node>
+    <node>process</node>
+    <type>compute</type>
+    <about>Runs a program of your own on what arrives.</about>
+    <sets>
+        <function>process</function>
+    </sets>
+    <attributes>
+        <name>program</name>
+        <required>true</required>
+        <about>The program to run.</about>
+    </attributes>
+    <attributes>
+        <name>timeout</name>
+        <required>true</required>
+        <about>How long it is given before it is a failure.</about>
+    </attributes>
+    <attributes>
+        <name>restart</name>
+        <required>true</required>
+        <about>What to do when it fails: never, always or on_failure.</about>
+    </attributes>
+</node>

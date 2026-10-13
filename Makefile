@@ -12,6 +12,27 @@ DOCS_DIR := docs
 DESIGN=$(DOCS_DIR)/design.rst
 RUST = .
 
+# Where installing puts the files that are not programs.
+#
+# tcsgui reads two kinds of data at run time: the description tree, which says
+# what vehicle nodes there are, and the schemas for the configuration and
+# simulator files. Both are architecture-independent data belonging to one
+# package, which the filesystem hierarchy standard puts under
+# `<prefix>/share/<package>` -- so `/usr/local/share/tcsgui` by default, which
+# is the prefix for software built and installed locally, and
+# `/usr/share/tcsgui` for a distribution's own package:
+#
+#   make install-data                      # /usr/local/share/tcsgui
+#   make install-data PREFIX=/usr          # /usr/share/tcsgui
+#   make install-data DESTDIR=/tmp/package # staged, for building a package
+#
+# DESTDIR is prepended to everything and is not part of the path the program
+# looks in, which is what lets a package be built in a staging directory. See
+# `tcsgui::nodes::data_dir` for where the editor looks and in what order.
+PREFIX ?= /usr/local
+DESTDIR ?=
+TCSGUI_DATA := $(DESTDIR)$(PREFIX)/share/$(GUI_NAME)
+
 # The payload set to run, named without a suffix.
 #
 # One variable rather than two, because the two files of a set are named for
@@ -82,7 +103,8 @@ help:
 	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make distclean   - Remove everything that can be rebuilt"
-	@echo "  make install     - Install tcspecial globally"
+	@echo "  make install     - Install tcspecial globally, data and all"
+	@echo "  make install-data - Install tcsgui's descriptions and schemas"
 	@echo ""
 	@echo "Payload set: make runmocy TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial1"
 	@echo "Logging:     make runmocy RUST_LOG=debug"
@@ -465,9 +487,26 @@ distclean: clean
 # needs PAYLOAD_CONFIG_PATH and TCSPECIAL_CONFIG_PATH set, or a working
 # directory that has those files.
 .PHONY: install
-install:
+install: install-data
 	@echo "Installing $(PROJECT_NAME)..."
 	cargo install --path $(PROJECT_NAME)
+
+# Install tcsgui's data: the description tree and the schemas.
+#
+# The whole of tcsgui/share, with its structure: the description tree's shape
+# is part of what it means -- a description at compute/mean.yaml is about the
+# Rust at node/compute/mean.rs -- so a flat copy would lose half of it.
+#
+# Mode 644 and directories 755: these are read by everybody and written by
+# whoever installed them. A person's own descriptions belong in
+# $XDG_DATA_HOME/tcsgui, which the editor looks in first, rather than in a
+# directory that an upgrade overwrites.
+.PHONY: install-data
+install-data:
+	@echo "Installing $(GUI_NAME) data into $(TCSGUI_DATA)..."
+	@cd $(GUI_NAME)/share && find . -type d -exec install -d -m 755 $(TCSGUI_DATA)/{} \;
+	@cd $(GUI_NAME)/share && find . -type f -exec install -m 644 {} $(TCSGUI_DATA)/{} \;
+	@echo "✓ $(GUI_NAME) data installed"
 
 # Check code quality
 .PHONY: check

@@ -1160,6 +1160,17 @@ groups** opens the groups of settings it declares. The entry is greyed when
 there is no second file rather than hidden -- a menu whose entries come and go
 is a menu nobody learns.
 
+Requirement
+    That second file is YAML, and its name has to end in ``.yaml``. A name
+    that does not is refused on the command line, naming the file and saying
+    what is wanted, and the session does not start. A simulator configuration
+    is a YAML file -- that is what the shipped sets are -- and one spelling of
+    it is one thing for a reader to know rather than two. The editor could
+    write it as XML, the formats being two spellings of one set of values
+    everywhere else here, and does not: nothing wanted the second spelling,
+    and a file nobody writes is a format nobody has read back. ``.yml`` is
+    refused with the rest, being the same language under a second name.
+
 Nothing of it is on the canvas, and that is not a shortcut. The simulator file
 adds settings to payloads that are already drawn and declares groups of
 settings for them to share; it introduces no nodes and no connections, so a
@@ -1191,9 +1202,7 @@ it takes from the group it names -- so nothing in either place is marked.
 simulator file beside it, in YAML and in XML; ``TCSGUI_SIM`` names the second
 file and defaults to the first's stem with ``sim`` on the end, which is what
 the shipped sets are called. The simulator file is YAML whichever spelling the
-configuration is in: it chooses its parser from its extension like every
-configuration file here, and the shipped ones are YAML because that is what
-carries comments.
+configuration is in, that being the one spelling it has.
 
 What a node says about itself
 -----------------------------

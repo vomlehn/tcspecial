@@ -113,12 +113,46 @@ struct File {
     simulated_payloads: Vec<Entry>,
 }
 
+/// Whether this is a name a simulator configuration may have.
+///
+/// It must end in `.yaml`. A simulator configuration is a YAML file: that is
+/// what the shipped sets are, and one spelling of it is one thing for a reader
+/// to know rather than two. The editor could write it as XML -- the formats
+/// are two spellings of one set of values everywhere else in the project --
+/// and does not, because nothing wanted the second spelling and a file nobody
+/// writes is a format nobody has read back.
+///
+/// `.yml` is refused with the rest, for the same reason: it is the same
+/// language under a second name.
+///
+/// The case is not part of it, as it is not anywhere else a configuration's
+/// extension is read.
+pub fn must_be_yaml(path: &Path) -> Result<(), String> {
+    let yaml = path
+        .extension()
+        .map(|given| given.eq_ignore_ascii_case("yaml"))
+        .unwrap_or(false);
+    if yaml {
+        return Ok(());
+    }
+
+    Err(format!(
+        "{}: a simulator configuration is written as YAML, so its name has to \
+         end in \".yaml\"",
+        path.display()
+    ))
+}
+
 /// Read the simulator configuration at `path`.
 ///
 /// A file that is not there is not an error: a name that does not exist yet is
 /// how a new one is begun, and an empty simulator configuration is what that
-/// is.
+/// is. A name that is not YAML is an error whether or not the file exists --
+/// see [`must_be_yaml`] -- because it is the name this would be written back
+/// to.
 pub fn read(path: &Path) -> Result<Simulator, String> {
+    must_be_yaml(path)?;
+
     let mut simulator = Simulator::new(path);
     if !path.exists() {
         return Ok(simulator);
@@ -183,46 +217,6 @@ pub fn to_yaml(simulator: &Simulator) -> String {
     out
 }
 
-/// The simulator configuration as XML, by the conventions the other files use:
-/// every value a child element, and a sequence as repeated siblings.
-pub fn to_xml(simulator: &Simulator) -> String {
-    let mut out = String::new();
-    out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    out.push_str("<simulator>\n    <version>1.0</version>\n");
-    if let Some(description) = &simulator.description {
-        out.push_str(&format!(
-            "    <description>{}</description>\n",
-            escape(description)
-        ));
-    }
-
-    for (section, entries) in [
-        ("simulated_payload_groups", &simulator.groups),
-        ("simulated_payloads", &simulator.payloads),
-    ] {
-        for (name, said) in entries {
-            let stated: Vec<(&String, &String)> = said
-                .iter()
-                .filter(|(_, value)| !value.trim().is_empty())
-                .collect();
-            if stated.is_empty() {
-                continue;
-            }
-            out.push_str(&format!("    <{section}>\n"));
-            out.push_str(&format!("        <name>{}</name>\n", escape(name)));
-            for (setting, value) in stated {
-                out.push_str(&format!(
-                    "        <{setting}>{}</{setting}>\n",
-                    escape(value)
-                ));
-            }
-            out.push_str(&format!("    </{section}>\n"));
-        }
-    }
-    out.push_str("</simulator>\n");
-    out
-}
-
 /// A YAML scalar, quoted unless it is a plain whole number.
 ///
 /// Not the rule the configuration writer uses, and the difference is the
@@ -244,35 +238,23 @@ fn quoted(value: &str) -> String {
     format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-/// Text as XML character data.
-fn escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn written(simulator: &Simulator, as_xml: bool) -> String {
-        if as_xml {
-            to_xml(simulator)
-        } else {
-            to_yaml(simulator)
-        }
-    }
-
-    /// What is written is what is read, in both spellings.
+    /// What is written is what is read.
     ///
     /// The one thing a file format has to do. A writer and a reader that
     /// disagree leave an editor that loses a setting every time it is opened,
     /// which is a failure nobody sees until a simulated payload stops doing
     /// what it was asked.
+    ///
+    /// YAML alone, that being what a simulator configuration is: see
+    /// `must_be_yaml`.
     #[test]
     fn a_simulator_configuration_survives_a_round_trip() {
-        for extension in ["yaml", "xml"] {
+        {
+            let extension = "yaml";
             let where_ = tempfile::tempdir().expect("a directory");
             let path = where_.path().join(format!("vehiclesim.{extension}"));
 
@@ -300,8 +282,7 @@ mod tests {
                 .collect(),
             );
 
-            std::fs::write(&path, written(&simulator, extension == "xml"))
-                .expect("written");
+            std::fs::write(&path, to_yaml(&simulator)).expect("written");
             let read_back = read(&path).expect("read back");
 
             assert_eq!(read_back.description, simulator.description, "{extension}");

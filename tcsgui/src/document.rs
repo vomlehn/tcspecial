@@ -1022,12 +1022,13 @@ impl Document {
         // of the same set on purpose: the two files are edited together,
         // checked together and must agree, so one Save writes both and one
         // Undo takes back whichever of them the last edit touched.
+        //
+        // As YAML whatever the configuration beside it is written in: a
+        // simulator configuration is a YAML file, and its name has to say so
+        // -- see `sim::must_be_yaml` -- so there is one spelling of it and
+        // nothing here to choose between.
         if let Some(simulator) = &self.simulator {
-            let text = match format_of(&simulator.path)? {
-                Format::Yaml => crate::sim::to_yaml(simulator),
-                Format::Xml => crate::sim::to_xml(simulator),
-            };
-            written.push((simulator.path.clone(), text));
+            written.push((simulator.path.clone(), crate::sim::to_yaml(simulator)));
         }
         Ok(written)
     }

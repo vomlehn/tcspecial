@@ -375,11 +375,10 @@ endef
 # simulator configuration, by its stem.
 #
 # The simulator file is YAML whichever spelling the configuration is in, and
-# that is not an oversight: a simulator configuration may be written in either
-# -- it chooses its parser from its extension as every configuration file in
-# this project does -- and the shipped ones are YAML because that is what
-# carries comments. A session editing the XML spelling of a graph is still
-# editing the one simulator file beside it.
+# that is not an oversight: a simulator configuration is a YAML file, and
+# tcsgui refuses a second argument whose name does not say so. A session
+# editing the XML spelling of a graph is still editing the one simulator file
+# beside it.
 define tcssimgui_on
 	( \
 		set -eu; \

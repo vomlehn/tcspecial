@@ -148,6 +148,18 @@ impl Editor {
     /// configuration is: an editor that refused to start on a damaged file
     /// would be an editor that cannot be used to fix one.
     pub fn open_simulator(&mut self, path: &Path) {
+        // A name that is not YAML is refused outright, and nothing is opened
+        // for it: the editor writes a simulator configuration as YAML, so
+        // adopting such a name would mean writing YAML to a file called
+        // something else at the next Save. The configuration itself is still
+        // edited; what is lost is the simulator's half of the session, which
+        // is what the message says.
+        if let Err(why) = crate::sim::must_be_yaml(path) {
+            self.trouble = Some(why);
+            self.document.simulator = None;
+            return;
+        }
+
         match crate::sim::read(path) {
             Ok(simulator) => self.document.simulator = Some(simulator),
             Err(why) => {
@@ -578,6 +590,55 @@ links:
         // And there is somewhere to type, so the windows are not unreachable
         // for the rest of the session.
         assert!(editor.document().simulator.is_some());
+    }
+
+    /// A simulator configuration has to be named `.yaml`, and a name that is
+    /// not is refused with nothing opened for it.
+    ///
+    /// The editor writes one as YAML and only as YAML, so adopting another
+    /// name would mean writing YAML into a file called something else at the
+    /// next Save -- a file whose name says one thing and whose contents say
+    /// another, which nothing would read back. The configuration itself is
+    /// still open: what is refused is the simulator's half of the session.
+    #[test]
+    fn a_simulator_file_must_be_named_yaml() {
+        let where_ = tempfile::tempdir().expect("a directory");
+
+        for name in ["vehiclesim.xml", "vehiclesim.yml", "vehiclesim"] {
+            let sim = where_.path().join(name);
+            // Written, so that what refuses it is the name and not the
+            // reading.
+            std::fs::write(&sim, "simulated_payloads: []
+").expect("a file");
+
+            let mut editor = Editor::open(
+                &where_.path().join("vehicle.yaml"),
+                crate::pane::divider_for(crate::settings::DEFAULT),
+            );
+            editor.open_simulator(&sim);
+
+            let said = editor.trouble().expect("this should be reported");
+            assert!(said.contains(name) && said.contains(".yaml"), "{name}: {said}");
+            assert!(
+                editor.document().simulator.is_none(),
+                "{name}: nothing should be opened for a name that cannot be written"
+            );
+        }
+
+        // And the name it must have, which opens -- including one that does
+        // not exist yet, since that is how a new simulator configuration is
+        // begun.
+        for name in ["vehiclesim.yaml", "VEHICLESIM.YAML", "not-yet.yaml"] {
+            let sim = where_.path().join(name);
+            let mut editor = Editor::open(
+                &where_.path().join("vehicle.yaml"),
+                crate::pane::divider_for(crate::settings::DEFAULT),
+            );
+            editor.open_simulator(&sim);
+
+            assert!(editor.trouble().is_none(), "{name}: {:?}", editor.trouble());
+            assert!(editor.document().simulator.is_some(), "{name}");
+        }
     }
 
     /// A group is written out, and read back.

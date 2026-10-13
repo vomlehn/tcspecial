@@ -1629,12 +1629,16 @@ payloads based at 6000 and 6100 has tcspecial at 6000 to 6003 and the ground at
 6100 to 6103.
 
 Both ends come out of the one file both ends read, so neither has to be told
-the other's. The MOC says hello to tcspecial's end, which is why that is the
-end that has to be findable: over UDP the payload is the end that speaks
-first. The ground's end used to be whatever port the system chose, which
-worked and left the ground's own ports written down nowhere -- so nothing
-between the two ends could be checked, or firewalled by a rule anybody could
-state.
+the other's: tcspecial sends a payload's telemetry to the end the MOC binds,
+from its first datagram, and the MOC sends nothing on that link at all.
+
+It did have to be told. The ground's end used to be whatever port the system
+chose, so nothing said where it was, and the MOC taught tcspecial by saying
+hello -- an empty datagram to every payload, once a second, because Enable and
+Disable rebind the handler's socket and what it had learnt went with it. A
+ground station that said hello once was silently cut off by the next Enable.
+Naming the ground's end ended that, and with it the only traffic the MOC sent
+on its own.
 
 That is why a payload entry states no address for its ground link. It used to
 state ``oc_address`` and ``oc_port``, which for forty payloads was forty

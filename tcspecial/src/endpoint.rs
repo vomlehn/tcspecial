@@ -21,7 +21,7 @@ use std::os::fd::BorrowedFd;
 use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
-use tcslibgs::{EndpointConfig, NetworkProtocol, TcsError, TcsResult};
+use tcslibgs::{EndpointConfig, NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
 use crate::node::can::CanEndpoint;
 use crate::node::device_file::DeviceEndpoint;
@@ -132,6 +132,32 @@ pub(crate) fn pause_until_commanded(cmd_fd: RawFd, timeout_ms: i32) {
 /// `UdpSocket::bind` and `TcpListener::bind` both fail with `AddrInUse` the
 /// second time -- so the endpoint is opened once here and the second handle is
 /// a duplicate of the first.
+/// Open a payload's ground link: bound here, sending where the file says.
+///
+/// The one link in tcspecial whose far end is written down -- `ground` is
+/// `payload_telemetry.dest_base` counted on by the payload's id, which is what
+/// the MOC binds -- so this sends there rather than waiting to be spoken to.
+///
+/// Always UDP: that is what the link between a handler and the ground is. A
+/// configuration that said otherwise would be refused where it is read.
+///
+/// `ground` absent is a payload converted on its own, with no `tcspecial`
+/// section to count from; such a handler cannot be started, and this is here
+/// rather than refusing so that the one place that says so is
+/// `start_handler`.
+pub fn bind_oc_pair(
+    what: &str,
+    oc: &NetworkConfig,
+    ground: Option<&NetworkConfig>,
+) -> TcsResult<(Box<dyn EndpointReadable + Send>, Box<dyn EndpointWritable + Send>)> {
+    let reader = match ground {
+        Some(ground) => UdpEndpoint::sending_to(what, oc, ground)?,
+        None => UdpEndpoint::new(what, oc)?,
+    };
+    let writer = reader.try_clone()?;
+    Ok((Box::new(reader), Box::new(writer)))
+}
+
 pub fn bind_endpoint_pair(
     what: &str,
     config: &EndpointConfig,

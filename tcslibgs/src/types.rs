@@ -355,16 +355,30 @@ fn binds_every_interface(address: &str) -> bool {
 /// For a set that states none, the ports are in the command interpreter's own
 /// file and nothing here has seen it.
 fn interpreter_collisions(ci: &CIConfig, handlers: &[DHConfig]) -> Vec<(DHName, String)> {
-    // Each link where the file says it is: the two may be on different
-    // interfaces now, so each is asked about its own.
-    let links = [
-        (ci.address.as_str(), ci.port, "spacecraft command"),
-        (
-            ci.payload_interface.address.as_str(),
-            ci.payload_interface.port,
-            "payload command",
-        ),
-    ];
+    // Every socket the command interpreter binds, where the file says it is:
+    // the spacecraft command link, and one command socket per payload counted
+    // from the base by that payload's own id. All of them, for every payload,
+    // because a payload may collide with another payload's command socket as
+    // easily as with its own.
+    let mut links = vec![(
+        ci.address.clone(),
+        ci.port,
+        "spacecraft command".to_string(),
+    )];
+    // The position in this list is the payload's id: the file's order is what
+    // decides it, and this list is in that order.
+    for (id, _) in handlers.iter().enumerate() {
+        match ci.payload_command_dest_base.at(id) {
+            Ok(at) => links.push((
+                at.address,
+                at.port,
+                format!("command link of payload {id}"),
+            )),
+            // A base that leaves no room for this payload's port is refused
+            // where the bases are read; nothing to add here.
+            Err(_) => continue,
+        }
+    }
 
     let mut found = Vec::new();
     for dh in handlers {
@@ -372,7 +386,9 @@ fn interpreter_collisions(ci: &CIConfig, handlers: &[DHConfig]) -> Vec<(DHName, 
             let Claim::Port { host: theirs, port } = &claim else {
                 continue;
             };
-            for (address, mine, which) in links {
+            for (address, mine, which) in &links {
+                let address = address.as_str();
+                let mine = *mine;
                 let wildcard = binds_every_interface(address);
                 if *port == mine && (wildcard || *theirs == one_host(address)) {
                     found.push((
@@ -2783,6 +2799,28 @@ impl Default for LogJson {
     }
 }
 
+/// Where payload commands go, as a file states it.
+///
+/// One socket per payload on each side, counted from a base by the payload's
+/// own id, exactly as its telemetry is: a command about a payload goes to that
+/// payload's socket and the answer comes back on it. One base and an
+/// arithmetic rule rather than a socket written on every payload.
+///
+/// It was one socket for all of them -- `payload_interface` -- which worked
+/// and left two things undone. Nothing said which socket the ground sent from,
+/// so tcspecial could not be told what a payload command should come from the
+/// way it is told about every other link; and one socket meant one queue, so a
+/// command about a slow payload was ahead of a command about a quick one.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PayloadCommandJson {
+    /// Where payload commands come from, as `address:port`: the ground's end,
+    /// which the MOC binds, payload *k* at the port plus *k*.
+    pub source_base: String,
+    /// And where they go: the vehicle's end, which tcspecial binds, counted
+    /// the same way by the payload's id.
+    pub dest_base: String,
+}
+
 /// The file-level form of the command interpreter's configuration
 ///
 /// All but one of its entries are subsections -- `tcs_cmd`,
@@ -2800,28 +2838,22 @@ pub struct CIConfigJson {
     /// Where commands about a payload are taken, which is not the link above.
     ///
     /// A command about a payload -- start it, stop it, ask it for its
-    /// statistics -- arrives here; a command about the spacecraft -- ping it,
-    /// arm it, restart it -- arrives on `tcs_cmd.recv`. See
-    /// [`crate::CommandType::is_payload_command`], which is the one table
-    /// that says which is which, read by both ends.
+    /// statistics -- arrives on that payload's own socket here; a command
+    /// about the spacecraft -- ping it, arm it, restart it -- arrives on
+    /// `tcs_cmd.recv`. See [`crate::CommandType::is_payload_command`], which
+    /// is the one table that says which is which, read by both ends.
     ///
-    /// Two links because what the ground needs in a hurry must never be
+    /// Separate links because what the ground needs in a hurry must never be
     /// queued behind what it asked for at leisure: a RESTART waiting behind a
-    /// payload's statistics is a spacecraft that cannot be rescued while it
-    /// is busy. On a space link the two become two virtual channels, which is
-    /// where the priority between them is really decided; here they are two
-    /// ports, which is what an IP network has to divide traffic with.
+    /// payload's statistics is a spacecraft that cannot be rescued while it is
+    /// busy. On a space link these become virtual channels, which is where the
+    /// priority between them is really decided; here they are ports, which is
+    /// what an IP network has to divide traffic with.
     ///
     /// Required, with no default, for the reason the beacon attributes are:
     /// where commands are taken is not a question to be answered by whatever
     /// a file was silently given.
-    ///
-    /// An address of its own and not only a port. It was a bare port, taken at
-    /// the command interface's address on the grounds that there is one command
-    /// interpreter at one place -- but every other link in this section says
-    /// where it is in full, and one attribute written differently from its
-    /// neighbours is one a reader has to remember the exception for.
-    pub payload_interface: String,
+    pub payload_command: PayloadCommandJson,
     /// The beacon link and how often it carries one.
     pub beacon: BeaconJson,
     /// Where the telemetry log is written, and in what sized pieces.
@@ -2844,9 +2876,11 @@ pub struct CIConfig {
     /// From [`PayloadTelemetryJson`]; see [`HostPort::at`].
     pub payload_source_base: HostPort,
     pub payload_dest_base: HostPort,
-    /// Where commands about a payload are taken, from
-    /// [`CIConfigJson::payload_interface`].
-    pub payload_interface: HostPort,
+    /// The bases each payload's command socket is counted from: the ground's
+    /// side, which commands come from, and the vehicle's, which they go to.
+    /// From [`PayloadCommandJson`]; see [`HostPort::at`].
+    pub payload_command_source_base: HostPort,
+    pub payload_command_dest_base: HostPort,
     pub beacon_interval: BeaconTime,
     /// Where beacons originate: tcspecial binds this and sends from it.
     ///
@@ -2869,8 +2903,14 @@ impl CIConfigJson {
     pub fn to_ci_config(&self) -> Result<CIConfig, String> {
         let command = host_port_of("tcs_cmd.recv", &self.tcs_cmd.recv)?;
         let (address, port) = (command.address, command.port);
-        let payload_interface =
-            host_port_of("payload_interface", &self.payload_interface)?;
+        let payload_command_source_base = host_port_of(
+            "payload_command.source_base",
+            &self.payload_command.source_base,
+        )?;
+        let payload_command_dest_base = host_port_of(
+            "payload_command.dest_base",
+            &self.payload_command.dest_base,
+        )?;
         let moc_cmd_send = host_port_of("tcs_cmd.send", &self.tcs_cmd.send)?;
         let payload_source_base = host_port_of(
             "payload_telemetry.source_base",
@@ -2894,19 +2934,26 @@ impl CIConfigJson {
         // The whole interface and not only the port, now that each says where
         // it is: two links may share a port on different interfaces, which is
         // a configuration somebody may mean.
-        if payload_interface.address == address && payload_interface.port == port {
+        // The first payload's command socket is the base itself, so a base
+        // equal to the spacecraft link is a file that has put two links in one
+        // socket. The rest of the sum is checked where the payloads are known
+        // and the ids with them -- see `interpreter_collisions`.
+        if payload_command_dest_base.address == address
+            && payload_command_dest_base.port == port
+        {
             return Err(format!(
-                "tcs_cmd.recv and payload_interface are both \
+                "tcs_cmd.recv and payload_command.dest_base are both \
                  {address}:{port}, and the two links cannot be one socket: \
-                 spacecraft commands are taken on the one and payload commands \
-                 on the other"
+                 spacecraft commands are taken on the one and the first \
+                 payload's commands on the other"
             ));
         }
 
         Ok(CIConfig {
             address,
             port,
-            payload_interface,
+            payload_command_source_base,
+            payload_command_dest_base,
             moc_cmd_send,
             payload_source_base,
             payload_dest_base,
@@ -3457,7 +3504,9 @@ tcspecial:
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
-  payload_interface: 0.0.0.0:4001
+  payload_command:
+    source_base: 127.0.0.1:4300
+    dest_base: 0.0.0.0:4200
   payload_telemetry:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
@@ -3528,7 +3577,9 @@ tcspecial:
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
-  payload_interface: 0.0.0.0:4001
+  payload_command:
+    source_base: 127.0.0.1:4300
+    dest_base: 0.0.0.0:4200
   payload_telemetry:
     source_base: 0.0.0.0:65535
     dest_base: 127.0.0.1:6100
@@ -3719,7 +3770,9 @@ payloads:
         const BOTH: &str = "  tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
-  payload_interface: 0.0.0.0:4001
+  payload_command:
+    source_base: 127.0.0.1:4300
+    dest_base: 0.0.0.0:4200
   payload_telemetry:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
@@ -3727,30 +3780,29 @@ payloads:
 
         payload(&with(BOTH))
             .to_dh_configs()
-            .expect("two ports are two links");
+            .expect("two bases are two links");
 
-        let one_socket = BOTH.replace(
-            "payload_interface: 0.0.0.0:4001",
-            "payload_interface: 0.0.0.0:4000",
-        );
+        // The first payload's command socket is the base itself, so a base
+        // equal to the spacecraft link is one socket asked to be two.
+        let one_socket = BOTH.replace("dest_base: 0.0.0.0:4200", "dest_base: 0.0.0.0:4000");
         let said = payload(&with(&one_socket))
             .to_dh_configs()
             .expect_err("one socket cannot be two links");
         assert!(
-            said.contains("payload_interface") && said.contains("4000"),
+            said.contains("payload_command.dest_base") && said.contains("4000"),
             "{said}"
         );
 
         // And a section that names only one of them has not been asked the
         // question: the parser refuses it, as it refuses a section with no
         // beacon.
-        let only_one = BOTH.replace("  payload_interface: 0.0.0.0:4001\n", "");
+        let only_one = BOTH.replace("    dest_base: 0.0.0.0:4200\n", "");
         assert_ne!(only_one, BOTH, "the test removed nothing");
         assert!(
             ConfigFormat::Yaml
                 .parse::<PayloadConfig>(&with(&only_one))
                 .is_err(),
-            "a section with no payload_interface was accepted"
+            "a section with no payload_command.dest_base was accepted"
         );
     }
 
@@ -3770,7 +3822,9 @@ tcspecial:
   tcs_cmd:
     recv: {address}:4000
     send: 127.0.0.1:4100
-  payload_interface: 0.0.0.0:4001
+  payload_command:
+    source_base: 127.0.0.1:4300
+    dest_base: 0.0.0.0:4200
   payload_telemetry:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
@@ -3788,10 +3842,12 @@ payloads:
             )
         };
 
-        // Either link, and a wildcard link takes its port on every interface
-        // -- so a payload on localhost collides with one on 0.0.0.0 without
-        // either naming the other's host.
-        for port in [4000, 4001] {
+        // Either link -- the spacecraft's, or the one payload's own command
+        // socket, which is its base counted on by its id of nought -- and a
+        // wildcard link takes its port on every interface, so a payload on
+        // localhost collides with one on 0.0.0.0 without either naming the
+        // other's host.
+        for port in [4000, 4200] {
             let said = payload(&with("0.0.0.0", port))
                 .to_dh_configs()
                 .unwrap_err();
@@ -3807,10 +3863,11 @@ payloads:
             .to_dh_configs()
             .expect("another interface's port 4000 is not this link's");
 
-        // A port neither link wants is nobody's business.
-        payload(&with("0.0.0.0", 4002))
+        // A port neither link wants is nobody's business. 4201 is the
+        // command socket of payload 1, and this set has only payload 0.
+        payload(&with("0.0.0.0", 4201))
             .to_dh_configs()
-            .expect("4002 is not a command port");
+            .expect("4201 is no payload of this set's command port");
     }
 
     #[test]
@@ -4032,7 +4089,9 @@ tcspecial:
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
-  payload_interface: 0.0.0.0:4001
+  payload_command:
+    source_base: 127.0.0.1:4300
+    dest_base: 0.0.0.0:4200
   payload_telemetry:
     source_base: localhost:5000
     dest_base: 127.0.0.1:6100

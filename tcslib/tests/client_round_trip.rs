@@ -135,15 +135,19 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
     (addr, handle)
 }
 
-/// A client whose two links both go to the one stub.
+/// A client whose links all go to the one stub.
 ///
-/// The stub answers whatever arrives, so one socket stands in for both links
-/// here. What the two links are for is tested where they are served; this is
-/// about every operation reaching the far end and coming back.
+/// The stub answers whatever arrives, so one socket stands in for every link
+/// here. What the links are for is tested where they are served; this is
+/// about every operation reaching the far end and coming back. The one
+/// payload is DH2, which is the payload the operations below ask about.
 fn client_to(addr: &str) -> TcsClient {
     let spacecraft = UdpConnection::new("127.0.0.1:0", addr).expect("connection");
     let payload = UdpConnection::new("127.0.0.1:0", addr).expect("the payload link");
-    let mut client = TcsClient::new(Box::new(spacecraft), Box::new(payload));
+    let mut client = TcsClient::new(
+        Box::new(spacecraft),
+        vec![(DHName::new("DH2"), Box::new(payload) as _)],
+    );
     client.set_timeout(Duration::from_secs(10));
     client
 }
@@ -211,7 +215,10 @@ fn a_spacecraft_that_does_not_answer_times_out() {
 
     let connection = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
     let payload = UdpConnection::new("127.0.0.1:0", &addr).unwrap();
-    let mut client = TcsClient::new(Box::new(connection), Box::new(payload));
+    let mut client = TcsClient::new(
+        Box::new(connection),
+        vec![(DHName::new("DH2"), Box::new(payload) as _)],
+    );
     client.set_timeout(Duration::from_millis(250));
 
     assert!(client.ping().is_err(), "a silent link should be an error");

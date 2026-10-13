@@ -18,14 +18,14 @@ use tcslibgs::config::{
 use tcslibgs::config_digest::{digest_of_file, ConfigDigest, ConfigVersion};
 use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHState,
-    ResolvedSim, SimConfigFile, Timestamp, NO_TRANSFER_TIME,
+    HostPort, ResolvedSim, SimConfigFile, Timestamp, NO_TRANSFER_TIME,
 };
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
 
 use crate::beacon_receive::{BeaconReceive, Contact};
 use crate::oc_link::Arrivals;
 use tcslibgs::Edge;
-use crate::ci_link::{CiLink, NOT_CONNECTED};
+use crate::ci_link::{CiLink, PayloadLink, NOT_CONNECTED};
 use crate::endpoint::endpoint_description;
 use crate::config::constants::{self as constants, BEACON_INDICATOR};
 use crate::freshness::freshness_of;
@@ -98,15 +98,10 @@ fn tcspecial_already_running(address: &str) -> bool {
         Ok(connection) => connection,
         Err(_) => return false,
     };
-    // A PING is a spacecraft command, so the payload link is never sent
-    // anything here; it is given the same address because a client has two
-    // links and this question needs one.
-    let payload = match UdpConnection::new("0.0.0.0:0", address) {
-        Ok(connection) => connection,
-        Err(_) => return false,
-    };
-
-    let mut client = TcsClient::new(Box::new(connection), Box::new(payload));
+    // A PING is a spacecraft command, so no payload link is needed to ask
+    // it: a client with none can still send everything about the spacecraft
+    // itself.
+    let mut client = TcsClient::new(Box::new(connection), Vec::new());
     client.set_timeout(ALREADY_RUNNING_TIMEOUT);
     client.ping().is_ok()
 }
@@ -925,11 +920,12 @@ fn main() {
     // Open the link to the command interpreter on startup, by the same call
     // the Connect button makes, so the link the window comes up with is the
     // one that button would have given it.
-    // Where payload commands go. A MOC that cannot work this out cannot
+    // Where each payload is commanded: both ends of its own link, counted
+    // from the two bases by its id. A MOC that cannot work this out cannot
     // command a payload at all, so it says so and stops rather than coming up
     // with panels whose buttons would be refused.
-    let payload_port = match payload_command_port() {
-        Ok(port) => port,
+    let payload_links = match payload_command_links(&dh_configs) {
+        Ok(links) => links,
         Err(e) => {
             eprintln!("Cannot tell where payload commands go: {e}");
             exit(1);
@@ -949,7 +945,7 @@ fn main() {
         }
     };
 
-    let mut link = CiLink::down_from(&command_from, payload_port);
+    let mut link = CiLink::down_from(&command_from, payload_links);
     if let Err(e) = link.connect(DEFAULT_CI_ADDRESS) {
         eprintln!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e);
         ui.set_ci_status(SharedString::from(ERROR_STATUS));
@@ -957,18 +953,11 @@ fn main() {
         // Exit since we can't operate without a connection
         exit(1);
     }
-    match link.payload_address() {
-        Ok(payload) => eprintln!(
-            "Connected to {}, payload commands to {}",
-            DEFAULT_CI_ADDRESS, payload
-        ),
-        // The link is up, so the address parsed when it was opened; said
-        // rather than hidden all the same.
-        Err(e) => eprintln!(
-            "Connected to {}, and cannot say where payload commands go: {}",
-            DEFAULT_CI_ADDRESS, e
-        ),
-    }
+    eprintln!(
+        "Connected to {}, payload commands to {}",
+        DEFAULT_CI_ADDRESS,
+        link.payload_addresses()
+    );
     let link: Arc<Mutex<CiLink>> = Arc::new(Mutex::new(link));
     if let Some(digest) = digest {
         hear_what_tcspecial_read(&ui, &link, version, digest);
@@ -1520,22 +1509,39 @@ fn moc_command_socket() -> Result<String, String> {
     Ok(config.moc_cmd_send.to_string())
 }
 
-/// Which port the spacecraft takes payload commands on.
+/// Where each payload is commanded: both ends of its own link.
 ///
 /// From the command interpreter's own configuration, which is where tcspecial
-/// takes it from: one file, read by both ends, so they cannot name different
-/// ports. The payload set's section states one too and is not read for it,
-/// for the reason tcspecial does not read it there -- where commands are
-/// taken is the interpreter's own business, not the set's.
-fn payload_command_port() -> Result<u16, String> {
+/// takes them from: one file, read by both ends, so they cannot name
+/// different sockets. The payload set's section states them too and is not
+/// read for them, for the reason tcspecial does not read them there -- where
+/// commands are taken is the interpreter's own business, not the set's.
+///
+/// A payload's id is its position in the payload configuration, which is the
+/// order this walks.
+fn payload_command_links(dh_configs: &[DHConfig]) -> Result<Vec<PayloadLink>, String> {
     let config_path = tcspecial_config_path();
     let config = load_tcspecial_config(&config_path)
         .map_err(|e| format!("{config_path} could not be read: {e}"))?;
 
-    // The port of it. The MOC reaches the payload link at the host the
-    // operator connected to -- see CiLink::connect -- so what it needs from the
-    // file is which port, not which host: one typed address moves both links.
-    Ok(config.payload_interface.port)
+    let mut links = Vec::with_capacity(dh_configs.len());
+    for (id, dh) in dh_configs.iter().enumerate() {
+        let from = config.payload_command_source_base.at(id)?;
+        let to = config.payload_command_dest_base.at(id)?;
+        links.push(PayloadLink {
+            name: dh.name.clone(),
+            from: HostPort {
+                address: from.address,
+                port: from.port,
+            },
+            to: HostPort {
+                address: to.address,
+                port: to.port,
+            },
+        });
+    }
+
+    Ok(links)
 }
 
 /// Send what this MOC read, and hear what the spacecraft read.
@@ -1797,15 +1803,6 @@ fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<
 mod tests {
     use super::*;
 
-    /// The port a test's payload commands go to.
-    ///
-    /// Beside `UNANSWERED_ADDRESS` in the ephemeral range, and deliberately
-    /// not the 4001 a shipped configuration states: a test that wants both
-    /// links silent cannot use the port a real tcspecial binds, because one
-    /// running on the machine the tests run on would answer the payload
-    /// commands -- which is how `a_poll_leaves_the_window_its_link` came to
-    /// gather readings from a spacecraft nobody had asked for.
-    const A_PAYLOAD_PORT: u16 = 65124;
     use std::ffi::OsStr;
     use std::path::Path;
     use tcslibgs::{EndpointConfig, NetworkProtocol};

@@ -8,7 +8,9 @@ tcspecial:
   log:
     directory: "/var/log/tcspecial"
     segment_size: "65536"
-  payload_interface: "0.0.0.0:4001"
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
   payload_telemetry:
     dest_base: "127.0.0.1:6100"
     source_base: "0.0.0.0:6000"

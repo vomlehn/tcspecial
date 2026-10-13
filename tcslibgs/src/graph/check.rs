@@ -817,6 +817,13 @@ impl Graph {
     }
 
     /// Every named input of this node that a link binds.
+    ///
+    /// A terminal is not one of them. `in0` is which *of several* ways into a
+    /// computation and a mean is built on knowing; `from_moc` is which *way*
+    /// the data is going, and a link may name it on a computation as it does on
+    /// any other type. Counting one as an input would make a mean over `in0`
+    /// and `in1` look like a mean over three things the moment somebody drew a
+    /// line from the ground to it.
     fn inputs_bound_at(&self, node: &str) -> Vec<String> {
         let mut inputs = Vec::new();
         for link in &self.links {
@@ -824,7 +831,9 @@ impl Graph {
                 let Destination { node: to, input } = Destination::parse(destination);
                 if to == node {
                     if let Some(input) = input {
-                        inputs.push(input);
+                        if terminals::stream_of(&input).is_none() {
+                            inputs.push(input);
+                        }
                     }
                 }
             }
@@ -1609,6 +1618,50 @@ mod tests {
 
         // And the two agreeing, which says nothing.
         let problems = mean("in0,in1", both());
+        assert!(
+            !problems
+                .iter()
+                .any(|p| matches!(p, Problem::MeanInputs { .. })),
+            "{problems:?}"
+        );
+    }
+
+    /// A terminal named on a computation is not one of its inputs.
+    ///
+    /// A mean says which inputs it is over and the links say which arrive, and
+    /// the two are held against each other. A link that names a *terminal* --
+    /// which is what the editor writes when somebody draws a line to the
+    /// corner of a computation where what the ground sends arrives -- is not an
+    /// input, and counting it as one made a mean over two readings look like a
+    /// mean over three things.
+    #[test]
+    fn a_terminal_on_a_computation_is_not_an_input() {
+        let mut average = node("average", "compute");
+        average.attributes.clear();
+        average
+            .attributes
+            .insert("function".to_string(), Scalar::of("mean"));
+        average
+            .attributes
+            .insert("inputs".to_string(), Scalar::of("in0,in1"));
+
+        let g = graph(
+            vec![
+                node("a", "i2c"),
+                node("b", "i2c"),
+                average,
+                node("moc", "moc"),
+            ],
+            vec![
+                link("a", &["average.in0"]),
+                link("b", &["average.in1"]),
+                link("average", &["moc"]),
+                // And the ground reaching it, drawn to the corner where what
+                // the ground sends arrives.
+                link("moc.to_payload", &["average.from_moc"]),
+            ],
+        );
+        let problems = g.check();
         assert!(
             !problems
                 .iter()

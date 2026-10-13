@@ -648,21 +648,21 @@ impl NodeType {
     /// rule that keeps the editor from writing a name into every link in every
     /// file it saves. `sink` says which end: `true` for where data arrives.
     ///
-    /// Asked of the schema's table and not of [`NodeType::terminals`], because
-    /// the two differ on purpose: the canvas draws four terminals on a
-    /// computation so that a line can be dragged to one, and what a
-    /// computation's sinks *are* is the computation's business -- a name
-    /// written on one would be a name the checking reads as an input.
+    /// Asked of [`NodeType::terminals`], which is the table the canvas drew
+    /// from: the question is about the gesture, and what the gesture pointed at
+    /// is one of the boxes on the screen. Asking the schema's table instead
+    /// threw away what a person had just said -- a computation has two data
+    /// sinks drawn on it and the schema calls its sinks its own business, so a
+    /// line dragged to the `from_moc` in its upper left was recorded as a link
+    /// naming no terminal, and then drawn arriving at the other corner.
     pub fn must_name(self, sink: bool) -> bool {
-        tcslibgs::graph::terminals::terminals_of(self.spelling())
-            .map(|terminals| {
-                if sink {
-                    terminals.sinks.len()
-                } else {
-                    terminals.sources.len()
-                }
-            })
-            .is_some_and(|how_many| how_many > 1)
+        let terminals = self.terminals();
+        let how_many = if sink {
+            terminals.sinks.len()
+        } else {
+            terminals.sources.len()
+        };
+        how_many > 1
     }
 
     /// Which family this type belongs to.    /// Which family this type belongs to.
@@ -1101,18 +1101,31 @@ mod tests {
 
     /// A terminal is written into a file only where it has to be.
     ///
-    /// Which is the `null` node and nothing else: every other type has one
-    /// data source and one data sink at most, and the schema reads an unnamed
-    /// end as that one. So the editor keeps writing `{ from: temp_fore, to:
-    /// moc }`, and a file saved by it does not grow a terminal on every link.
+    /// Which is where the type has two of that kind, so that the file says
+    /// which of them a link means. A payload and the ground link have one of
+    /// each and their links name neither; a `null` node, a computation and a
+    /// page have two of each, and theirs do.
+    ///
+    /// Asked of the table the canvas draws from, because the question is about
+    /// a gesture: what somebody dragged a line to is one of the boxes on the
+    /// screen, and a type whose terminals the schema leaves open still has
+    /// them drawn.
     #[test]
     fn a_terminal_is_written_only_where_it_says_which() {
-        assert!(NodeType::Null.must_name(true));
-        assert!(NodeType::Null.must_name(false));
-        for t in NodeType::ALL.iter().filter(|t| **t != NodeType::Null) {
+        for t in [NodeType::Null, NodeType::Compute, NodeType::Subdiagram] {
+            assert!(t.must_name(true), "{}", t.spelling());
+            assert!(t.must_name(false), "{}", t.spelling());
+        }
+        // One data sink and one data source: nothing to say which.
+        for t in NodeType::ALL.iter().filter(|t| t.is_payload()) {
             assert!(!t.must_name(true), "{}", t.spelling());
             assert!(!t.must_name(false), "{}", t.spelling());
         }
+        assert!(!NodeType::Moc.must_name(true));
+        assert!(!NodeType::Moc.must_name(false));
+        // A log receives on one and sends on none.
+        assert!(!NodeType::Log.must_name(true));
+        assert!(!NodeType::Log.must_name(false));
     }
 
     /// Which terminal a line is drawn to, where the link does not say.

@@ -27,10 +27,16 @@ use std::time::Duration;
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{TcsError, TcsResult, Timestamp};
 
-/// The local address the MOC sends from: any interface, any port.
+/// The local address the MOC sends from where nothing says otherwise: any
+/// interface, any port.
 ///
-/// The MOC does not care which port it sends from, only which one it sends
-/// to, and the command interpreter answers whoever asked.
+/// What the payload link uses, and what a link that follows another one uses
+/// for the spacecraft's own: the command interpreter answers whoever asked, so
+/// a port the system chose works for a socket nobody has to find.
+///
+/// The window's own spacecraft link does not use this. It binds
+/// `tcs_cmd.send`, which the configuration states and tcspecial checks every
+/// command against -- see [`CiLink::down_from`].
 const LOCAL_BIND_ANY: &str = "0.0.0.0:0";
 
 /// The payload command link beside a spacecraft command link.
@@ -62,6 +68,14 @@ pub const NOT_CONNECTED: &str = "Not connected - press Connect first";
 /// window shows after a disconnect is still where it would reconnect to.
 pub struct CiLink {
     address: String,
+    /// What the spacecraft link binds locally: `tcs_cmd.send` for the
+    /// window's link, and any port at all for one that follows it.
+    ///
+    /// Stated because the other end checks it. tcspecial takes commands only
+    /// from where its configuration says the MOC sends them, so the socket
+    /// this sends from is a socket the file names -- which is also what lets
+    /// a firewall rule or a capture filter describe the link beforehand.
+    from: String,
     /// The port payload commands go to, which the spacecraft takes them on.
     ///
     /// Held rather than passed to [`CiLink::connect`], because a link that
@@ -80,8 +94,20 @@ impl CiLink {
     /// is where tcspecial takes it from: both ends read one file, so they
     /// cannot name different ports.
     pub fn down(payload_port: u16) -> Self {
+        Self::down_from(LOCAL_BIND_ANY, payload_port)
+    }
+
+    /// A link that is down and will send spacecraft commands from `from`.
+    ///
+    /// `tcs_cmd.send`, for the window's own link: tcspecial refuses a command
+    /// from anywhere else, both ends reading it out of the same file. One link
+    /// can bind it at a time, which is why a link that follows this one is
+    /// made by [`CiLink::down`] and sends its payload commands from a port the
+    /// system chose.
+    pub fn down_from(from: &str, payload_port: u16) -> Self {
         Self {
             address: String::new(),
+            from: from.to_string(),
             payload_port,
             client: None,
         }
@@ -152,7 +178,7 @@ impl CiLink {
         self.address = address.to_string();
 
         let payload_address = payload_link_at(address, self.payload_port)?;
-        let connection = UdpConnection::new(LOCAL_BIND_ANY, address)?;
+        let connection = UdpConnection::new(&self.from, address)?;
         let payload = UdpConnection::new(LOCAL_BIND_ANY, &payload_address)?;
         self.client = Some(TcsClient::new(Box::new(connection), Box::new(payload)));
         Ok(())

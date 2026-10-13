@@ -10,7 +10,7 @@ use slint::{Color, Weak};
 
 use crate::MainWindow;
 use slint::SharedString;
-use tcslibgs::{TcsResult, Telemetry, Timestamp, NO_TRANSFER_TIME};
+use tcslibgs::{came_from, TcsResult, Telemetry, Timestamp, NO_TRANSFER_TIME};
 use tcspecial::config::Beacon;
 
 const DEBUG_BEACON: bool = false;
@@ -556,7 +556,21 @@ impl BeaconReceive {
             socket.set_read_timeout(timeout)?;
 
             let arrived = match socket.recv_from(&mut buf) {
-                Ok((size, _addr)) => {
+                // Only from where the configuration says beacons come from:
+                // `beacon.send`, which is what tcspecial binds the socket it
+                // sends them on to. A datagram from anywhere else at this
+                // address is somebody else's traffic, and treating it as a
+                // beacon would be reporting the spacecraft alive on the word
+                // of whoever sent it.
+                Ok((_, from)) if !came_from(&self.beacon.send, &from) => {
+                    eprintln!(
+                        "a beacon came from {from} and not from {}, which is where \
+                         the configuration says they come from -- ignored",
+                        self.beacon.send
+                    );
+                    Arrived::Nothing
+                }
+                Ok((size, _from)) => {
                     let heard = hear(&buf[..size]);
 
                     // What its number says about the ones before it. Said on

@@ -972,7 +972,20 @@ fn main() {
         }
     };
 
-    let mut link = CiLink::down(payload_port);
+    // And where it sends spacecraft commands from, which tcspecial checks
+    // every one of them against: both ends read `tcs_cmd.send` out of the
+    // same file. A MOC that cannot work this out would have every command
+    // ignored by a spacecraft that says nothing about it, so it says so and
+    // stops.
+    let command_from = match moc_command_socket() {
+        Ok(from) => from,
+        Err(e) => {
+            eprintln!("Cannot tell where the MOC sends commands from: {e}");
+            exit(1);
+        }
+    };
+
+    let mut link = CiLink::down_from(&command_from, payload_port);
     if let Err(e) = link.connect(DEFAULT_CI_ADDRESS) {
         eprintln!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e);
         ui.set_ci_status(SharedString::from(ERROR_STATUS));
@@ -1583,6 +1596,20 @@ fn beacon_to_listen_for(payload_path: &str) -> Result<Beacon, String> {
         .map_err(|e| format!("{payload_path} could not be read: {e}"))?;
 
     beacon(&config, section.as_ref())
+}
+
+/// Where the MOC sends spacecraft commands from, as `address:port`.
+///
+/// `tcs_cmd.send`, from the command interpreter's own configuration -- the
+/// file tcspecial reads it from too, which is what lets tcspecial refuse a
+/// command from anywhere else. One file, read by both ends, so the two cannot
+/// name different sockets.
+fn moc_command_socket() -> Result<String, String> {
+    let config_path = tcspecial_config_path();
+    let config = load_tcspecial_config(&config_path)
+        .map_err(|e| format!("{config_path} could not be read: {e}"))?;
+
+    Ok(config.moc_cmd_send.to_string())
 }
 
 /// Which port the spacecraft takes payload commands on.

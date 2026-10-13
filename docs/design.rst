@@ -5199,6 +5199,30 @@ Requirement
     the first command of that type arrives.
 
 Requirement
+    Every link takes what arrives only from where the configuration says it
+    comes from, and ignores the rest. tcspecial takes a spacecraft command
+    only from ``tcs_cmd.send``, which is the socket the MOC binds to send
+    them; the MOC takes a response only from the socket its command went to,
+    which is ``tcs_cmd.recv``; it takes a beacon only from ``beacon.send``;
+    and it takes a payload's telemetry only from
+    ``payload_telemetry.source_base`` counted on by that payload's id. Where
+    the configuration names every interface -- ``0.0.0.0``, which the vehicle's
+    side of every link usually is -- the port is all there is to compare, the
+    address a datagram carries then being whichever interface the route chose.
+
+This is what writing both ends of every link down buys. A command is a command
+to restart a spacecraft, and a response is what the ground believes about one:
+before this, either would be acted on whoever sent it, which a bound port
+invites -- another program on the host, a stale process from an earlier run, a
+packet from the wrong mission on a shared network. Nothing is sent back to such
+a sender, either; an answer would tell it that something is listening.
+
+The dropped datagram is said on the console, with where it came from and where
+the configuration expected it from. A link that is deaf because two files
+disagree looks exactly like a link that is deaf because nothing is sending, and
+the two have nothing in common to do about them.
+
+Requirement
     A command that arrives on the link it does not belong on is refused with
     ``InvalidCommand``, and the refusal is of the telemetry type the command
     asks for. The type is how the ground pairs an answer with what it asked,

@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tcslibgs::{DHConfig, DHSample, NetworkConfig, Timestamp};
+use tcslibgs::{came_from, DHConfig, DHSample, HostPort, NetworkConfig, Timestamp};
 
 /// How long a listener waits for data before saying hello again.
 ///
@@ -111,7 +111,14 @@ pub fn listen(dh_configs: &[DHConfig]) -> Arrivals {
         }
 
         let slot = arrivals.clone();
-        thread::spawn(move || serve(socket, address, slot, row));
+        // Where this payload's telemetry is supposed to come from, which is
+        // the same place the hello goes to: `payload_telemetry.source_base`
+        // counted on by the payload's id.
+        let expected = HostPort {
+            address: oc.address.clone(),
+            port: oc.port,
+        };
+        thread::spawn(move || serve(socket, address, expected, slot, row));
     }
 
     arrivals
@@ -123,7 +130,13 @@ fn oc_address(oc: &NetworkConfig) -> Option<SocketAddr> {
 }
 
 /// Say hello, then keep what arrives.
-fn serve(socket: UdpSocket, handler: SocketAddr, arrivals: Arrivals, row: usize) {
+fn serve(
+    socket: UdpSocket,
+    handler: SocketAddr,
+    expected: HostPort,
+    arrivals: Arrivals,
+    row: usize,
+) {
     let mut buffer = vec![0u8; 65535];
 
     // How many have arrived from this payload. Kept here rather than read
@@ -149,6 +162,17 @@ fn serve(socket: UdpSocket, handler: SocketAddr, arrivals: Arrivals, row: usize)
         // as it does for the spacecraft's own samples.
         loop {
             match socket.recv_from(&mut buffer) {
+                // Only from the payload's own end of this link. A datagram
+                // from anywhere else is another payload's, or another
+                // program's, and showing it in this panel would be reporting
+                // one payload's telemetry as another's.
+                Ok((_, from)) if !came_from(&expected, &from) => {
+                    eprintln!(
+                        "a payload datagram came from {from} and not from \
+                         {expected}, which is where the configuration says this \
+                         payload sends from -- ignored"
+                    );
+                }
                 Ok((size, _from)) if size > 0 => {
                     let mut data = DHSample::new();
                     data.record(&buffer[..size]);
@@ -260,6 +284,48 @@ mod tests {
             })
             .expect("the second arrival was not counted");
         assert_eq!(counted.packets, 2);
+    }
+
+    /// Only what comes from the payload's own end is kept.
+    ///
+    /// A datagram from somewhere else at this socket is another payload's or
+    /// another program's, and putting it in this panel would be reporting one
+    /// payload's telemetry as another's. The payload's own datagram follows
+    /// the stranger's here, so this says which was kept rather than that
+    /// nothing arrived.
+    #[test]
+    fn a_datagram_from_elsewhere_is_not_this_payloads() {
+        let oc = UdpSocket::bind("127.0.0.1:0").expect("a handler's OC socket");
+        oc.set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+        let at = oc.local_addr().expect("where it is");
+
+        let arrivals = listen(&[handler(Some(at))]);
+
+        let mut buffer = [0u8; 64];
+        let (_, ground) = oc.recv_from(&mut buffer).expect("the ground said hello");
+
+        // A stranger first, then the payload: what the panel ends up with
+        // must be the payload's, and the count must be one.
+        let stranger = UdpSocket::bind("127.0.0.1:0").expect("another socket");
+        stranger.send_to(b"\xff\xff\xff", ground).expect("it is sent");
+        oc.send_to(b"from the payload", ground).expect("it is sent");
+
+        let found = (0..50)
+            .find_map(|_| {
+                thread::sleep(Duration::from_millis(20));
+                arrivals.lock().ok().and_then(|slots| slots[0].clone())
+            })
+            .expect("the ground kept what arrived");
+        let (_, data) = found.panel_lines();
+        assert!(
+            data.contains("66") && data.contains("72"),
+            "the payload's own bytes: {data}"
+        );
+        assert_eq!(
+            found.packets, 1,
+            "the stranger's datagram was counted as the payload's"
+        );
     }
 
     /// A handler with no OC address is not listened for.

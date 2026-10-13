@@ -228,6 +228,7 @@ mod tests {
                 port: 0,
             }),
             mode: DHMode::Periodic,
+            stale_interval_ms: None,
         }
     }
 

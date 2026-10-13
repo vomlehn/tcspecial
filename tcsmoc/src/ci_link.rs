@@ -22,8 +22,6 @@
 //! Following keeps one account of what the operator asked for -- the link the
 //! buttons control -- without the poller having to hold it.
 
-use std::time::Duration;
-
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{TcsError, TcsResult, Timestamp};
 
@@ -87,23 +85,13 @@ pub struct CiLink {
 }
 
 impl CiLink {
-    /// A link that is down and has not been anywhere yet, whose payload
-    /// commands will go to `payload_port`.
-    ///
-    /// The port comes from the command interpreter's own configuration, which
-    /// is where tcspecial takes it from: both ends read one file, so they
-    /// cannot name different ports.
-    pub fn down(payload_port: u16) -> Self {
-        Self::down_from(LOCAL_BIND_ANY, payload_port)
-    }
-
     /// A link that is down and will send spacecraft commands from `from`.
     ///
-    /// `tcs_cmd.send`, for the window's own link: tcspecial refuses a command
-    /// from anywhere else, both ends reading it out of the same file. One link
-    /// can bind it at a time, which is why a link that follows this one is
-    /// made by [`CiLink::down`] and sends its payload commands from a port the
-    /// system chose.
+    /// `tcs_cmd.send`, which tcspecial refuses a command from anywhere else
+    /// than -- both ends reading it out of the same file. One socket, so one
+    /// link: the MOC has one sender of spacecraft commands now that the panel
+    /// poller is gone, and `LOCAL_BIND_ANY` is what a test that does not care
+    /// passes.
     pub fn down_from(from: &str, payload_port: u16) -> Self {
         Self {
             address: String::new(),
@@ -129,38 +117,6 @@ impl CiLink {
     /// cannot go on using a client the link no longer has.
     pub fn client(&mut self) -> Option<&mut TcsClient> {
         self.client.as_mut()
-    }
-
-    /// Where this link is up, or `None` while it is down.
-    ///
-    /// This is what a link that follows another one is given: a follower has
-    /// to know both whether to talk at all and where to talk, and only the
-    /// two together say anything useful.
-    pub fn connected_to(&self) -> Option<&str> {
-        self.client.as_ref().map(|_| self.address.as_str())
-    }
-
-    /// Bring this link into step with `wanted`, another link's
-    /// [`connected_to`](Self::connected_to).
-    ///
-    /// Usually nothing happens, this link already being up at that address.
-    /// It is how the panel poller keeps a connection of its own without
-    /// keeping a second account of what the operator asked for: it reads the
-    /// link the buttons control and follows it.
-    ///
-    /// A failure to open is not reported. The address came from a link that
-    /// did open it, so a failure here is a passing one, and the follower is
-    /// back on its next pass; until then it is down, which is what it would
-    /// have been anyway.
-    pub fn follow(&mut self, wanted: Option<&str>) {
-        match wanted {
-            None => self.disconnect(),
-            Some(address) => {
-                if self.connected_to() != Some(address) {
-                    let _ = self.connect(address);
-                }
-            }
-        }
     }
 
     /// Bring the link up at `address`, replacing whatever it had.
@@ -215,16 +171,6 @@ impl CiLink {
             .map(|client| (client.last_sent(), client.last_received()))
     }
 
-    /// How long a command on this link waits for its answer.
-    ///
-    /// Does nothing while the link is down, and a link brought up later
-    /// starts from the client's own default, so a caller that wants a
-    /// particular timeout says so each time rather than once.
-    pub fn set_timeout(&mut self, timeout: Duration) {
-        if let Some(client) = self.client.as_mut() {
-            client.set_timeout(timeout);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -259,7 +205,7 @@ mod tests {
             spacecraft.send_to(&data, from).expect("the answer is sent");
         });
 
-        let mut link = CiLink::down(4001);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, 4001);
         assert_eq!(link.command_times(), None, "a link that is down has no times");
 
         link.connect(&at).expect("the link comes up");
@@ -269,7 +215,6 @@ mod tests {
             "a fresh link has sent nothing"
         );
 
-        link.set_timeout(Duration::from_secs(5));
         link.client()
             .expect("the link is up")
             .ping()
@@ -332,15 +277,14 @@ mod tests {
     /// having to be there.
     #[test]
     fn a_link_hands_out_a_client_only_while_it_is_up() {
-        let mut link = CiLink::down(A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
         assert!(!link.is_connected());
         assert!(link.client().is_none());
-        assert_eq!(link.connected_to(), None);
 
         link.connect("127.0.0.1:4000").unwrap();
         assert!(link.is_connected());
         assert!(link.client().is_some());
-        assert_eq!(link.connected_to(), Some("127.0.0.1:4000"));
+        assert_eq!(link.address(), "127.0.0.1:4000");
 
         link.disconnect();
         assert!(!link.is_connected());
@@ -351,7 +295,7 @@ mod tests {
     /// make, leaves a link that works.
     #[test]
     fn a_link_can_be_brought_back_up() {
-        let mut link = CiLink::down(A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.connect("127.0.0.1:4000").unwrap();
@@ -361,7 +305,7 @@ mod tests {
     /// Connecting somewhere else moves the link rather than adding one.
     #[test]
     fn connecting_elsewhere_moves_the_link() {
-        let mut link = CiLink::down(A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
         link.connect("127.0.0.1:4000").unwrap();
 
         link.connect("127.0.0.1:4001").unwrap();
@@ -373,7 +317,7 @@ mod tests {
     /// the address that was asked for.
     #[test]
     fn an_address_that_cannot_be_used_leaves_the_link_down() {
-        let mut link = CiLink::down(A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
         link.connect("127.0.0.1:4000").unwrap();
 
         assert!(link.connect("this is not an address").is_err());
@@ -381,42 +325,11 @@ mod tests {
         assert_eq!(link.address(), "this is not an address");
     }
 
-    /// A follower ends up where the link it follows is, whichever way that
-    /// link moved: up, elsewhere, or down.
-    #[test]
-    fn a_follower_goes_where_the_link_it_follows_is() {
-        let mut follower = CiLink::down(A_PAYLOAD_PORT);
-
-        follower.follow(Some("127.0.0.1:4000"));
-        assert_eq!(follower.connected_to(), Some("127.0.0.1:4000"));
-
-        follower.follow(Some("127.0.0.1:4001"));
-        assert_eq!(follower.connected_to(), Some("127.0.0.1:4001"));
-
-        // Following the same address again leaves it where it is.
-        follower.follow(Some("127.0.0.1:4001"));
-        assert_eq!(follower.connected_to(), Some("127.0.0.1:4001"));
-
-        follower.follow(None);
-        assert_eq!(follower.connected_to(), None);
-    }
-
-    /// A follower told to go somewhere it cannot is down rather than left
-    /// where it was, so nothing is polled from an address nobody asked for.
-    #[test]
-    fn a_follower_that_cannot_go_there_is_down() {
-        let mut follower = CiLink::down(A_PAYLOAD_PORT);
-        follower.follow(Some("127.0.0.1:4000"));
-
-        follower.follow(Some("this is not an address"));
-        assert_eq!(follower.connected_to(), None);
-    }
-
     /// Disconnecting a link that is already down is not an error, since the
     /// button can be pressed twice.
     #[test]
     fn disconnecting_twice_is_harmless() {
-        let mut link = CiLink::down(A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.disconnect();

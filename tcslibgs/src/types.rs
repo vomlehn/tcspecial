@@ -1053,6 +1053,25 @@ pub struct DHConfig {
     /// payload that sends on its own.
     #[serde(default)]
     pub mode: DHMode,
+    /// How long the ground waits for this payload's data before calling it
+    /// stale, in milliseconds.
+    ///
+    /// Read by the ground and by nothing aboard: an enabled payload that has
+    /// sent nothing for this long is a payload whose panel says so. It is a
+    /// property of the payload rather than of the display -- how often a
+    /// particular instrument has something to say is what decides it, and the
+    /// same figure is right for whoever is watching.
+    ///
+    /// `None` for a payload that does not say. The ground then has nothing to
+    /// judge by and says that rather than guessing: a figure nobody chose
+    /// would make a quiet payload look late, or a late one look well.
+    ///
+    /// **Needs examination.** It is the one attribute here that only the
+    /// ground reads, which is a shape this schema has not had before, and
+    /// what a sensible interval is for a payload that answers requests -- its
+    /// data arriving only when tcspecial asks -- has not been worked through.
+    #[serde(default)]
+    pub stale_interval_ms: Option<u32>,
 }
 
 /// What tcspecial opens to reach a payload on a line, a bus or a peripheral.
@@ -1626,6 +1645,10 @@ pub struct DHGroupJson {
     pub payload_interface: Option<String>,
     #[serde(default)]
     pub payload_port: Option<u16>,
+    /// How long the ground waits for these payloads' data before calling it
+    /// stale; see [`DHConfig::stale_interval_ms`].
+    #[serde(default)]
+    pub stale_interval_ms: Option<u32>,
     #[serde(default)]
     pub path: Option<String>,
     #[serde(default)]
@@ -1843,6 +1866,10 @@ pub struct DHConfigJson {
     /// went.
     #[serde(default)]
     pub payload_port: Option<u16>,
+    /// How long the ground waits for this payload's data before calling it
+    /// stale, in milliseconds. See [`DHConfig::stale_interval_ms`].
+    #[serde(default)]
+    pub stale_interval_ms: Option<u32>,
     #[serde(default)]
     pub path: Option<String>,
     #[serde(default)]
@@ -2526,6 +2553,11 @@ impl DHConfigJson {
             packet_size: packet_size.ok_or("Missing packet_size")?,
             oc,
             mode,
+            // Read by the ground alone, and taken from the group like
+            // anything else a payload does not state for itself.
+            stale_interval_ms: self
+                .stale_interval_ms
+                .or_else(|| group.and_then(|g| g.stale_interval_ms)),
         })
     }
 }
@@ -4050,6 +4082,7 @@ payloads:
             oc: None,
             ground: None,
             mode: DHMode::Periodic,
+            stale_interval_ms: None,
         };
 
         no_two_handlers_claim_one_thing(&[on_bus("DH0", 0x48), on_bus("DH1", 0x49)])
@@ -4082,6 +4115,7 @@ payloads:
             oc: None,
             ground: None,
             mode: DHMode::Periodic,
+            stale_interval_ms: None,
         };
 
         let said = no_two_handlers_claim_one_thing(&[socket("DH0", 0), socket("DH1", 7)])

@@ -21,6 +21,23 @@ pub mod constants {
     #[allow(dead_code)]
     fn transparent() -> Color { Color::from_argb_u8(0, 0, 0, 0) }
 
+    /// What a payload panel's data indicator shows, by what the ground can
+    /// say about it; see `crate::freshness`.
+    ///
+    /// Three colours and no red: a payload whose data has stopped may be a
+    /// payload with nothing to say, one somebody stopped, or a link that has
+    /// failed, and nothing on the ground can tell those apart. Red is for a
+    /// dangerous condition; this is one worth looking at.
+    pub fn freshness_color(freshness: crate::freshness::Freshness) -> Color {
+        use crate::freshness::Freshness;
+
+        match freshness {
+            Freshness::Unjudged => grey(),
+            Freshness::Current => green(),
+            Freshness::Stale => yellow(),
+        }
+    }
+
     // Information defining the behavior of the Beacon indicator
     pub static BEACON_INDICATOR: LazyLock<IndicatorStates> = LazyLock::new(|| {
         IndicatorStates::new(

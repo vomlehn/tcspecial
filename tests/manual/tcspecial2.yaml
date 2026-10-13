@@ -53,6 +53,7 @@ payloads:
     protocol: udp
     payload_interface: localhost:5000
     packet_size: 12
+    stale_interval_ms: 3000
 
   # Answers a request. The trigger and the rate it goes out at are both
   # flight behaviour -- tcspecial does the sending -- so both are here, and
@@ -69,3 +70,4 @@ payloads:
     mode: triggered
     trigger: '"go\n"'
     packet_interval_ms: 1000
+    stale_interval_ms: 3000

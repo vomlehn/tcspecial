@@ -50,3 +50,4 @@ payloads:
     protocol: tcp
     payload_interface: localhost:5000
     packet_size: 12
+    stale_interval_ms: 3000

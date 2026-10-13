@@ -414,6 +414,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
+                    stale_interval_ms: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -539,6 +540,7 @@ mod tests {
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 50,
             },
+            stale_interval_ms: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -682,6 +684,7 @@ mod tests {
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 20,
             },
+            stale_interval_ms: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -761,6 +764,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
+                    stale_interval_ms: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -862,6 +866,7 @@ mod tests {
             }),
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).expect("the handler is made");
@@ -943,6 +948,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
+                    stale_interval_ms: None,
         };
 
         let dh = DataHandler::new(config);

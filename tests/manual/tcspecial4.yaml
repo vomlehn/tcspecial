@@ -69,6 +69,7 @@ payloads:
   - name: serial-line
     group: payload_line
     path: /tmp/tcspecial4-line
+    stale_interval_ms: 3000
 
   # A datagram, which is what the other sets are mostly made of. No group,
   # because there is one of it: a group earns its place where two payloads
@@ -79,6 +80,7 @@ payloads:
     protocol: udp
     payload_interface: localhost:5400
     packet_size: 12
+    stale_interval_ms: 3000
 
   # A device file, read as it comes. /dev/urandom rather than a path under
   # /tmp because this is the one kind needing no stand-in: the file is already
@@ -88,6 +90,7 @@ payloads:
     type: device-file
     path: /dev/urandom
     packet_size: 8
+    stale_interval_ms: 1000
 
   # A device on a bus, at the address bin/mki2c loads the kernel's stub with
   # -- so this payload reaches the stand-in that script makes without being
@@ -102,6 +105,7 @@ payloads:
     path: /tmp/tcspecial4-bus
     payload_address: 0x48
     packet_size: 12
+    stale_interval_ms: 3000
 
   # A peripheral on a clocked link. The rate and the mode are the two terms a
   # SPI payload must state: no controller default is right for every
@@ -113,3 +117,4 @@ payloads:
     max_speed: 1000000
     spi_mode: 0
     packet_size: 12
+    stale_interval_ms: 3000

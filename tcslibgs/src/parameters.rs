@@ -66,6 +66,25 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
         }
     }
 
+    // How long the ground waits for this payload's data before saying so.
+    // Read by the ground and by nothing aboard, which is why it says where it
+    // is read: a line in this list is otherwise taken for something tcspecial
+    // acts on.
+    match dh.stale_interval_ms {
+        Some(ms) => {
+            let _ = writeln!(
+                out,
+                "  stale_interval   {ms} ms, after which the ground calls its data stale"
+            );
+        }
+        None => {
+            let _ = writeln!(
+                out,
+                "  stale_interval   none stated, so the ground does not judge its data"
+            );
+        }
+    }
+
     // And from the simulator configuration: how a stand-in for this payload
     // behaves. None of it reaches tcspecial.
     let _ = writeln!(out);
@@ -399,6 +418,7 @@ mod tests {
             }),
             ground: None,
             mode: DHMode::Periodic,
+            stale_interval_ms: None,
         }
     }
 

@@ -5051,16 +5051,13 @@ Requirement
     things about one beacon.
 
 Requirement
-    A panel starts unknown and the poller's first pass asks what its handler
-    is doing. A MOC that has just opened has been told nothing about any
-    handler, so a panel claiming anything is a panel claiming what nobody
-    said: it claimed Stopped, and was commonly wrong, since the MOC attaches
-    to a tcspecial that is already serving the set rather than starting a
-    second one, and that one's handlers may have been moving data for hours.
-    The asking does not wait for a beacon -- a set whose beacons never arrive
-    is still a set whose handlers can be asked about -- and it does not wait
-    out a poll interval either: the pass happens as the window opens and the
-    interval follows it.
+    A panel starts unknown and stays unknown until somebody asks. A MOC that
+    has just opened has been told nothing about any handler, so a panel
+    claiming anything is a panel claiming what nobody said: it claimed
+    Stopped, and was commonly wrong, since the MOC attaches to a tcspecial
+    that is already serving the set rather than starting a second one, and
+    that one's handlers may have been moving data for hours. Enable, Disable
+    and Query all are what ask.
 
 Requirement
     A panel's status is what a START_DH or STOP_DH was answered, and the
@@ -5077,29 +5074,68 @@ Requirement
     it has to go on.
 
 Requirement
-    When contact returns, the spacecraft is asked what its handlers are doing
-    and the panels say what it answers. Going back to what they said before
-    the silence would be a claim nothing has supported since: handlers may
-    have been stopped in it, or the process may have restarted with none of
-    them running. The answer's own state is what a panel then shows -- active
-    for a handler that is active, stopped for one created or stopped, and
-    unknown for a handler the spacecraft has not got or a command it could not
-    answer.
+    Nothing is asked when contact returns. The statuses stay unknown until
+    somebody presses a button, and what says meanwhile whether a payload is
+    alive is its data indicator, below.
 
 Requirement
-    A restoration owed to the panels survives a pass that could not ask. The
-    beacon says the spacecraft is there; what its handlers are doing is a
-    question for the command link, which may be down at that moment or may
-    leave the first pass unanswered. A restoration that was forgotten would
-    leave every panel unknown until the next time beacons stopped and came
-    back.
+    The ground does not poll its payloads. **Needs examination.**
+
+    An enabled payload sends on its own -- that is what enabling it does --
+    and every datagram it sends arrives on that payload's own telemetry
+    socket, where the ground times it. So the ground has what it needs to say
+    whether a payload is still delivering without asking anybody.
+
+    There was a poller: a thread that sent QUERY_DH to every payload once a
+    second and painted the panels from the answers. It cost a command and a
+    response per payload per second -- for forty payloads, eighty datagrams a
+    second of housekeeping on the link the spacecraft is also commanded over
+    -- and most of what it learnt the arrivals had already said. It was also
+    the MOC's second sender of payload commands, which is why the ground's end
+    of a payload command link could not be a socket the configuration names.
 
 Requirement
-    No other pass of the poller touches a panel's status. The ground asked for
-    a handler to start or stop and was answered, and a poll is not a second
-    opinion on that: the statistics a pass carries are what it is for. The
-    Query all button sets the status as well, that being somebody asking the
-    spacecraft directly.
+    Each payload states how long the ground should wait for its data before
+    saying so: ``stale_interval_ms``, in its own entry or in its group. It is
+    read by the ground and by nothing aboard, which is a shape no other
+    attribute in a payload configuration has; it is there because how often a
+    particular instrument has something to say is a property of the
+    instrument, and the same figure is right for whoever is watching.
+
+Requirement
+    Each panel carries a data indicator, shaped like the beacon's and beside
+    the time its payload's last datagram arrived. Grey where the ground has
+    nothing to judge by -- as far as it knows the payload is not enabled, or
+    the payload states no interval; green where data has arrived within that
+    interval; yellow where the payload is enabled and nothing has arrived for
+    longer than it.
+
+    Staleness is measured from the later of the last arrival and the moment
+    the ground came to believe the payload was running, so a payload just
+    enabled has its interval to produce something rather than being late the
+    moment it is switched on. A last arrival in the future is a clock that
+    moved and reads as stale, which is the conservative of the two.
+
+Requirement
+    No red. A payload whose data has stopped may be a payload with nothing to
+    say, a payload somebody stopped, or a link that has failed, and nothing on
+    the ground can tell those apart. Red is for a condition that is dangerous;
+    this is a condition worth looking at.
+
+What is still to be examined about this is written where the rule is, in
+``tcsmoc/src/freshness.rs``: what interval suits a payload that answers
+requests, since its data arrives only when tcspecial asks it; whether
+*enabled* should mean what the ground last commanded or what the spacecraft
+last said, which is a question about a MOC that has just attached to a running
+tcspecial; and whether a payload that states no interval should really look
+like a payload nobody has enabled, both being grey.
+
+Requirement
+    Query all still asks the spacecraft directly, and sets both the status and
+    the counters from what it answers. It is the one path by which the
+    spacecraft's own account of a handler -- its state, its byte counters,
+    the triggers it has sent -- reaches a panel, and somebody pressing it is
+    somebody who wants exactly that.
 
 Every program is pointed at its tcspecial configuration the same way: as a
 command line argument, failing that the program's own environment variable --

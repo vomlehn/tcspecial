@@ -64,18 +64,22 @@ payloads:
     protocol: tcp
     payload_interface: localhost:5000
     packet_size: 12
+    stale_interval_ms: 3000
 
   - name: udp-steady
     group: udp_localhost
     payload_interface: localhost:5001
     packet_size: 11
+    stale_interval_ms: 3000
 
   - name: random-device
     type: device-file
     path: /dev/urandom
     packet_size: 1
+    stale_interval_ms: 1000
 
   - name: udp-fast
     group: udp_localhost
     payload_interface: localhost:5003
     packet_size: 15
+    stale_interval_ms: 2000

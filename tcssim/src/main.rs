@@ -1168,6 +1168,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         }
     }
 
@@ -1564,6 +1565,7 @@ mod tests {
      oc: None,
      ground: None,
       mode: Default::default(),
+      stale_interval_ms: None,
  };
 
         let info = payload_info_from(0, &dh, &sim(500, 250, 5));

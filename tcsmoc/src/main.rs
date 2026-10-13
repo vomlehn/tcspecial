@@ -18,7 +18,7 @@ use tcslibgs::config::{
 use tcslibgs::config_digest::{digest_of_file, ConfigDigest, ConfigVersion};
 use tcslibgs::{
     payload_parameters, trigger_as_written, ArmKey, CommandStatus, DHConfig, DHState,
-    ResolvedSim, SimConfigFile, NO_TRANSFER_TIME,
+    ResolvedSim, SimConfigFile, Timestamp, NO_TRANSFER_TIME,
 };
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
 
@@ -27,7 +27,8 @@ use crate::oc_link::Arrivals;
 use tcslibgs::Edge;
 use crate::ci_link::{CiLink, NOT_CONNECTED};
 use crate::endpoint::endpoint_description;
-use crate::config::constants::BEACON_INDICATOR;
+use crate::config::constants::{self as constants, BEACON_INDICATOR};
+use crate::freshness::freshness_of;
 
 slint::include_modules!();
 
@@ -35,6 +36,7 @@ mod beacon_receive;
 mod ci_link;
 mod config;
 mod endpoint;
+mod freshness;
 mod oc_link;
 
 /// Default CI address
@@ -381,16 +383,18 @@ fn dh_info_from(dev_id: usize, dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHIn
         dev_id: i32::try_from(dev_id).unwrap_or(i32::MAX),
         config: SharedString::from(endpoint_description(&dh.endpoint)),
         packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
-        // Unknown until the spacecraft has been asked, which the poller does
-        // as it starts. It said Stopped, which is a claim: a MOC that has
-        // just come up has been told nothing, and a tcspecial it attached to
-        // may have been running handlers for hours.
+        // Unknown until the spacecraft has been asked, by Enable or by
+        // Query All. It said Stopped, which is a claim: a MOC that has just
+        // come up has been told nothing, and a tcspecial it attached to may
+        // have been running handlers for hours.
         status: SharedString::from(UNKNOWN_STATUS),
         // What the ground has received from this payload, which is nothing
         // until it has.
         oc_time: SharedString::from(NO_TRANSFER_TIME),
         oc_data: SharedString::new(),
         packets_recv: 0,
+        // Nothing to judge by yet: see crate::freshness.
+        data_color: crate::config::constants::freshness_color(crate::freshness::Freshness::Unjudged),
         // What both files said about this payload, ready for the panel's
         // Configuration button. `sim` is absent when the simulator file could
         // not be read, which is not an error here: the MOC controls payloads
@@ -464,16 +468,6 @@ struct PanelUpdate {
     status: Option<&'static str>,
 }
 
-impl PanelUpdate {
-    /// A panel whose handler nobody can speak for, the beacon having stopped.
-    fn unknown(row: usize) -> Self {
-        Self {
-            row,
-            status: Some(UNKNOWN_STATUS),
-        }
-    }
-}
-
 /// What a panel should say a handler is doing, from a QUERY_DH answer.
 ///
 /// Only the spacecraft's own account of it counts: a handler it answers for
@@ -486,36 +480,6 @@ fn status_from_answer(status: CommandStatus, state: Option<DHState>) -> &'static
         (CommandStatus::Success, Some(DHState::Active)) => ACTIVE_STATUS,
         (CommandStatus::Success, Some(DHState::Created | DHState::Stopped)) => STOPPED_STATUS,
         _ => UNKNOWN_STATUS,
-    }
-}
-
-/// What the poller remembers about the beacon between passes.
-struct ContactWatch {
-    /// What the pass before this one found, so a pass can tell a change from
-    /// a state of affairs. Starts lost: a MOC that has heard nothing knows
-    /// nothing, and the first beacon is then a restoration like any other --
-    /// which is what asks the spacecraft about handlers it may have been
-    /// running before this window opened.
-    seen: Contact,
-    /// Whether the panels are still owed a reading taken since contact came
-    /// back. Set when it comes back and cleared when a pass has actually
-    /// asked: contact may return while the command link is down, and the
-    /// asking has to wait for the link rather than be forgotten.
-    restore_pending: bool,
-}
-
-impl ContactWatch {
-    fn new() -> Self {
-        Self {
-            seen: Contact::Lost,
-            // Owed from the start. A MOC that has just come up knows nothing
-            // about any handler -- the panels say so -- and the first thing
-            // the poller does is ask, whether or not a beacon has arrived.
-            // Attaching to a tcspecial that was already serving a set is the
-            // case this is for: its handlers may have been running for hours,
-            // and nothing but asking would say so.
-            restore_pending: true,
-        }
     }
 }
 
@@ -1058,15 +1022,14 @@ fn main() {
     handle_main_menu(&ui, ui_weak.clone(), link.clone());
     query_dh_buttons(&ui, ui_weak.clone(), link.clone(), dh_configs.clone(), dh_model.clone());
     // The payload data path, one listener per handler: see oc_link. Opened
-    // before the poller, so a handler that is already running is heard from
-    // on the first pass.
+    // before the panels are refreshed, so a payload that is already sending
+    // is heard from on the first pass.
     let arrivals = oc_link::listen(&dh_configs);
-    poll_panels(
+    refresh_panels(
         ui_weak.clone(),
         link.clone(),
         dh_configs.clone(),
         dh_model.clone(),
-        payload_port,
         arrivals,
         contact.clone(),
     );
@@ -1370,100 +1333,78 @@ fn query_dh_buttons(
     });
 }
 
-/// How often the panels are refreshed without being asked.
-const PANEL_POLL_INTERVAL: Duration = Duration::from_millis(1000);
+/// How often the panels are repainted from what has arrived.
+///
+/// Nothing is sent to the spacecraft on this timer; see [`crate::freshness`]
+/// for what it replaced and why.
+const PANEL_REFRESH_INTERVAL: Duration = Duration::from_millis(1000);
 
-/// How long a poll waits for a handler's answer.
+/// Keep the panels current, without asking the spacecraft anything.
 ///
-/// Shorter than the client's own default, because the poller asks again in a
-/// second: an answer that arrives after the next question was already due is
-/// of no use to a panel, and waiting the default five seconds for one only
-/// makes a pass against a wedged tcspecial take tens of seconds. A panel
-/// whose handler did not answer keeps what it last showed either way.
-const POLL_TIMEOUT: Duration = Duration::from_millis(1000);
-
-/// Keep the panels current.
+/// A timer on the event loop. Each pass shows what arrived on each payload's
+/// own telemetry socket, works out each payload's data indicator from that and
+/// its `stale_interval_ms`, blanks the statuses when the beacons stop, and
+/// shows what the command link has been doing. No command goes out.
 ///
-/// Until this existed a panel only changed when someone pressed Query All, so
-/// a handler moving data looked exactly like one doing nothing: the byte
-/// counters and the two sample lines sat at whatever the last click had left.
+/// This replaced a poller that asked every payload what it was doing once a
+/// second, on a thread and a connection of its own. An enabled payload sends
+/// on its own, so its data arriving is the answer the poller was asking for --
+/// and the asking cost a command and a response per payload per second, which
+/// for forty payloads is eighty datagrams a second of housekeeping. What the
+/// poller alone could say -- the spacecraft's own counters -- Query All still
+/// asks for when somebody wants it.
 ///
-/// The asking happens on a thread of its own and the applying on the event
-/// loop. That split is the point: each command waits on the spacecraft for up
-/// to the client's timeout, and four handlers' worth of that on the event loop
-/// would be a window that stops repainting whenever tcspecial is slow. The
-/// thread leaves what it gathered where the timer can pick it up.
-///
-/// The thread asks over a connection of its own, following the link the
-/// buttons control rather than sharing it; see [`poll_pass`] for why.
-fn poll_panels(
+/// It does no I/O, so it cannot hold the window up, which is what the poller's
+/// thread was for.
+fn refresh_panels(
     ui_weak: slint::Weak<MainWindow>,
     link: Arc<Mutex<CiLink>>,
     dh_configs: Arc<Vec<DHConfig>>,
     dh_model: Rc<VecModel<DHInfo>>,
-    payload_port: u16,
     arrivals: Arrivals,
     contact: Arc<Mutex<Contact>>,
 ) {
-    let pending: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
-    // The link the window's buttons hold, for the two times shown under Last
-    // Response. The poller gets its own below.
-    let shown_link = link.clone();
+    // What the pass before this one found, so a pass can tell a change from a
+    // state of affairs. Starts lost: a MOC that has heard nothing knows
+    // nothing.
+    let mut seen = Contact::Lost;
+    // When the ground came to believe each payload was running, so a payload
+    // just enabled has its interval to produce something rather than being
+    // late the moment it is switched on.
+    let mut enabled_at: Vec<Option<u64>> = vec![None; dh_configs.len()];
 
-    {
-        let pending = pending.clone();
-        thread::spawn(move || {
-            // What was last said about each on the console, so a pass that
-            // found nothing new says nothing.
-            let mut said: Vec<Option<String>> = vec![None; dh_configs.len()];
-
-            // The poller's own link, kept wherever the window's link is.
-            let mut poll_link = CiLink::down(payload_port);
-
-            // What the beacon last said, so a pass can act on a change in it.
-            let mut watch = ContactWatch::new();
-
-            // Asking first and sleeping after, so the panels are filled in as
-            // the window opens rather than a second later: what each handler
-            // is doing is the one thing a panel cannot work out for itself,
-            // and the status it starts at is a statement that nobody has been
-            // asked yet.
-            loop {
-                let heard = contact.lock().map(|seen| *seen).unwrap_or(Contact::Lost);
-                let gathered = poll_pass(
-                    &link,
-                    &mut poll_link,
-                    &dh_configs,
-                    &mut said,
-                    heard,
-                    &mut watch,
-                );
-
-                if let Ok(mut queue) = pending.lock() {
-                    *queue = gathered;
-                }
-
-                thread::sleep(PANEL_POLL_INTERVAL);
-            }
-        });
-    }
-
-    // On the event loop, where the model may be touched. This does no I/O, so
-    // it cannot hold the window up.
     let timer = slint::Timer::default();
     timer.start(
         slint::TimerMode::Repeated,
-        PANEL_POLL_INTERVAL,
+        PANEL_REFRESH_INTERVAL,
         move || {
-            let updates = match pending.lock() {
-                Ok(mut queue) => std::mem::take(&mut *queue),
-                Err(_) => return,
-            };
-            for update in &updates {
-                apply_panel_update(&dh_model, update);
+            // The beacons stopping makes every status unknown. A status is
+            // the answer to a command and is worth exactly as much as the
+            // ground's hearing from the spacecraft: a handler could have
+            // stopped in the silence, or gone with a process that restarted.
+            //
+            // Nothing is asked when contact comes back, there being nothing
+            // to ask with -- the statuses stay unknown until somebody presses
+            // Enable or Query All. The data indicator is what says, meanwhile,
+            // whether a payload is still sending.
+            let heard = contact.lock().map(|seen| *seen).unwrap_or(Contact::Lost);
+            if statuses_go_unknown(seen, heard) {
+                for row in 0..dh_configs.len() {
+                    update_row(&dh_model, row, |info| {
+                        info.status = SharedString::from(UNKNOWN_STATUS);
+                    });
+                }
             }
+            seen = heard;
 
             show_arrivals(&dh_model, &arrivals);
+            show_freshness(
+                &dh_model,
+                &dh_configs,
+                &arrivals,
+                &mut enabled_at,
+                Timestamp::now().millis,
+            );
 
             // And what the command link has been doing, under Last Response.
             //
@@ -1472,7 +1413,7 @@ fn poll_panels(
             // exactly while a command was in flight -- which is when an
             // operator is watching it. A pass that cannot have it leaves the
             // times as they are and the next one is a second away.
-            if let (Some(ui), Ok(guard)) = (ui_weak.upgrade(), shown_link.try_lock()) {
+            if let (Some(ui), Ok(guard)) = (ui_weak.upgrade(), link.try_lock()) {
                 let (sent, received) = guard.command_times().unwrap_or((None, None));
                 ui.set_cmd_sent_time(SharedString::from(shown_time(sent)));
                 ui.set_cmd_recv_time(SharedString::from(shown_time(received)));
@@ -1484,99 +1425,66 @@ fn poll_panels(
     std::mem::forget(timer);
 }
 
-/// One pass of the poller: ask every handler what it has moved.
+/// Whether this pass should blank every panel's status.
 ///
-/// `link` is the link the window's buttons control and `poll_link` the
-/// poller's own, which follows it. The two are separate so that a pass never
-/// holds the lock the window needs: the shared link is locked only long
-/// enough to read where it went, never across a command.
+/// Only the change from being heard from to not: a pass that blanked them
+/// every time contact was lost would overwrite an answer somebody had just
+/// pressed a button for.
+fn statuses_go_unknown(was: Contact, now: Contact) -> bool {
+    was == Contact::Made && now == Contact::Lost
+}
+
+/// Set each panel's data indicator from what has arrived and what the payload
+/// said to expect.
 ///
-/// That matters most when the spacecraft has stopped answering. A pass then
-/// waits out its timeout on every handler, and when the poller shared the
-/// window's link, every click waited behind it -- Disconnect included, which
-/// is the one button wanted just then.
-///
-/// Asking over a second connection is also what makes a pass and a click
-/// safe to overlap, which is what the shared lock used to be held for: each
-/// socket gets its own answers, since tcspecial replies to whoever asked, so
-/// no panel can end up showing one handler's statistics beside another's
-/// samples.
-///
-/// `last` is what each panel last showed, carried in and out so a handler
-/// that answers the statistics but not the samples keeps its sample lines.
-/// It is left alone for a handler that did not answer at all.
-///
-/// `said` is what was last said on the console about each payload, carried the
-/// same way and for the same kind of reason: a pass happens every second
-/// whether or not anything moved, and what is worth saying is what changed.
-fn poll_pass(
-    link: &Mutex<CiLink>,
-    poll_link: &mut CiLink,
+/// `enabled_at` is carried in and out: it is when the ground came to believe
+/// each payload was running, which is where staleness is measured from until
+/// something arrives. `now` is given rather than read so that this can be
+/// tested at a time of the test's choosing.
+fn show_freshness(
+    dh_model: &Rc<VecModel<DHInfo>>,
     dh_configs: &[DHConfig],
-    said: &mut [Option<String>],
-    heard: Contact,
-    watch: &mut ContactWatch,
-) -> Vec<PanelUpdate> {
-    // What the beacon says about the spacecraft, which is what the panels'
-    // statuses are worth. The commands set them and this is what can take
-    // them away: a status is the answer to a command, and a beacon that has
-    // stopped makes that answer as old as the silence.
-    let was = std::mem::replace(&mut watch.seen, heard);
-    match (was, heard) {
-        // Gone quiet: nothing is known about any handler, and every panel
-        // says so. Before the link is looked at, because this is true whether
-        // or not there is one -- a MOC that has been disconnected is in no
-        // position to find out either.
-        (Contact::Made, Contact::Lost) => {
-            return (0..dh_configs.len()).map(PanelUpdate::unknown).collect();
-        }
-        // Heard from again: the spacecraft is asked what its handlers are
-        // really doing, rather than the panels going back to what they said
-        // before the silence. They may have been stopped in it, or the
-        // process may have restarted and have none of them running.
-        (Contact::Lost, Contact::Made) => watch.restore_pending = true,
-        _ => {}
-    }
-
-    // Where the buttons have the link now. A poisoned lock leaves the poller
-    // where it was rather than taking the panels down with it.
-    let wanted = match link.lock() {
-        Ok(guard) => guard.connected_to().map(str::to_string),
-        Err(_) => return Vec::new(),
+    arrivals: &Arrivals,
+    enabled_at: &mut [Option<u64>],
+    now: u64,
+) {
+    let last: Vec<Option<u64>> = match arrivals.lock() {
+        Ok(slots) => slots
+            .iter()
+            .map(|arrival| arrival.as_ref().map(|arrival| arrival.at.millis))
+            .collect(),
+        // Nothing can be said about arrivals this pass, and the indicators
+        // keep what they showed: the next pass is a second away.
+        Err(_) => return,
     };
 
-    poll_link.follow(wanted.as_deref());
-    // Said every pass, since `follow` may have just opened a fresh client
-    // and a fresh client starts from the default timeout.
-    poll_link.set_timeout(POLL_TIMEOUT);
-
-    // Nothing to ask while the link is down, and the panels keep what they
-    // last showed rather than being blanked: a disconnect says nothing about
-    // what the handlers did, and polling resumes on its own once Connect
-    // brings the link back up.
-    let client = match poll_link.client() {
-        Some(client) => client,
-        None => return Vec::new(),
-    };
-
-    let mut gathered = Vec::with_capacity(dh_configs.len());
     for (row, dh) in dh_configs.iter().enumerate() {
-        if let Some(update) =
-            panel_update_for(client, row, dh, &mut said[row], watch.restore_pending)
-        {
-            gathered.push(update);
+        // What the ground believes, which is what the panel says: the answer
+        // to the last command about this payload, or nothing.
+        let enabled = dh_model
+            .row_data(row)
+            .is_some_and(|info| info.status.as_str() == ACTIVE_STATUS);
+        match (enabled, enabled_at.get(row).copied().flatten()) {
+            (true, None) => enabled_at[row] = Some(now),
+            (false, Some(_)) => enabled_at[row] = None,
+            _ => {}
         }
-    }
 
-    // The restoration is owed until a pass has actually been answered. The
-    // link may have been down when contact came back, or the spacecraft slow
-    // to answer the first pass after it; either way the panels still say
-    // unknown, and the next pass is the one that asks.
-    if !gathered.is_empty() {
-        watch.restore_pending = false;
+        // The later of the two, so a payload that has sent something is
+        // judged by that and one just enabled by when it was enabled.
+        let since = [last.get(row).copied().flatten(), enabled_at[row]]
+            .into_iter()
+            .flatten()
+            .max();
+        let showing = constants::freshness_color(freshness_of(
+            enabled,
+            since,
+            dh.stale_interval_ms
+                .map(|ms| Duration::from_millis(u64::from(ms))),
+            now,
+        ));
+        update_row(dh_model, row, |info| info.data_color = showing);
     }
-
-    gathered
 }
 
 /// Where this MOC should listen for beacons.
@@ -1929,6 +1837,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         }
     }
 
@@ -1969,218 +1878,6 @@ mod tests {
         );
     }
 
-    /// Beacons stopping makes every panel's status unknown, link or no link.
-    ///
-    /// The status is the answer to a command, and it is worth exactly as much
-    /// as the ground's hearing from the spacecraft: a handler could have
-    /// stopped in the silence, or gone with a process that restarted. A panel
-    /// still saying Active would be read as a reading.
-    ///
-    /// With the link down, which is the case that says this is not a thing
-    /// the poller asks about: a MOC that has been disconnected cannot find
-    /// out either, and the beacon is what it has.
-    #[test]
-    fn beacons_stopping_makes_every_panel_unknown() {
-        let link = Arc::new(Mutex::new(CiLink::down(A_PAYLOAD_PORT)));
-        let mut poll_link = CiLink::down(A_PAYLOAD_PORT);
-        let dh_configs = vec![a_dh(), a_dh()];
-        let mut said = vec![None, None];
-
-        // Heard from, until this pass.
-        let mut watch = ContactWatch {
-            seen: Contact::Made,
-            restore_pending: false,
-        };
-
-        let gathered = poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Lost,
-            &mut watch,
-        );
-
-        assert_eq!(gathered.len(), dh_configs.len(), "every panel, not some");
-        for update in &gathered {
-            assert_eq!(update.status, Some(UNKNOWN_STATUS));
-        }
-
-        // And the silence going on is not the same event: the panels already
-        // say unknown, and a pass that said it again every second would be
-        // writing the same word into the model for as long as the spacecraft
-        // was quiet.
-        let again = poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Lost,
-            &mut watch,
-        );
-        assert!(again.is_empty(), "{again:?} was said twice");
-    }
-
-    /// The pass after contact comes back puts the spacecraft's own account of
-    /// each handler in its panel, and no other pass touches the status.
-    ///
-    /// Both halves. A restored link that left the panels saying unknown would
-    /// have gained nothing by asking, and a poll that set the status every
-    /// second would be a second opinion on what the ground asked for and was
-    /// answered -- the status is the answer to a command, and this path
-    /// exists only to say when that answer can no longer be trusted.
-    ///
-    /// Against a stub that answers QUERY_DH, which is all the poller asks of
-    /// a spacecraft here.
-    #[test]
-    fn the_pass_after_contact_returns_reads_the_state_from_the_spacecraft() {
-        use std::net::UdpSocket;
-        use tcslibgs::{Command, QueryDHTelemetry, Statistics, Telemetry};
-
-        // The payload link's far end: QUERY_DH is a payload command, so this
-        // is the socket the poller asks.
-        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let payload_port = socket.local_addr().unwrap().port();
-        socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-
-        let stub = thread::spawn(move || {
-            let mut buffer = vec![0u8; 65535];
-            // One answer per pass below.
-            for _ in 0..2 {
-                let (size, from) = match socket.recv_from(&mut buffer) {
-                    Ok(received) => received,
-                    Err(_) => return,
-                };
-                let command: Command =
-                    serde_json::from_slice(&buffer[..size]).expect("a command");
-                let mut moved = Statistics::new();
-                moved.bytes_received = 24;
-                let answer = Telemetry::QueryDH(QueryDHTelemetry::new(
-                    command.sequence(),
-                    CommandStatus::Success,
-                    DHName::new("DH0"),
-                    Some(DHState::Active),
-                    moved,
-                ));
-                let _ = socket.send_to(&serde_json::to_vec(&answer).unwrap(), from);
-            }
-        });
-
-        // The window's link, which the poller follows. Its own address is
-        // never asked anything here: the poller sends only payload commands.
-        let link = Arc::new(Mutex::new(CiLink::down(payload_port)));
-        link.lock().unwrap().connect(UNANSWERED_ADDRESS).unwrap();
-        let mut poll_link = CiLink::down(payload_port);
-
-        let dh_configs = vec![a_dh()];
-        let mut said = vec![None];
-        let mut watch = ContactWatch::new();
-
-        // The first beacon after knowing nothing, which is a restoration like
-        // any other.
-        let restored = poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Made,
-            &mut watch,
-        );
-        assert_eq!(restored.len(), 1, "the stub answered: {restored:?}");
-        assert_eq!(
-            restored[0].status,
-            Some(ACTIVE_STATUS),
-            "the panel was not given what the spacecraft said of its handler"
-        );
-        assert!(
-            !watch.restore_pending,
-            "the reading was taken, so nothing is owed"
-        );
-
-        // And the next pass, with contact unchanged, says nothing about the
-        // status.
-        let ordinary = poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Made,
-            &mut watch,
-        );
-        assert_eq!(ordinary.len(), 1);
-        assert_eq!(
-            ordinary[0].status, None,
-            "an ordinary poll is not a second opinion on what a command was answered"
-        );
-
-        stub.join().unwrap();
-    }
-
-    /// The poller's first pass asks what every handler is doing, beacon or no
-    /// beacon.
-    ///
-    /// This is what a window that has just opened knows about its payloads:
-    /// nothing. The panels say so, and a MOC that attached to a tcspecial
-    /// already serving the set -- which is what it does when one is running
-    /// -- would otherwise show them all as it found them until the next
-    /// beacon arrived, or for ever if none ever did.
-    ///
-    /// With contact lost throughout, which is the case that says this does
-    /// not depend on the beacon: nothing has been heard from and the first
-    /// pass still asks.
-    #[test]
-    fn the_first_pass_asks_what_every_handler_is_doing() {
-        use std::net::UdpSocket;
-        use tcslibgs::{Command, QueryDHTelemetry, Statistics, Telemetry};
-
-        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let payload_port = socket.local_addr().unwrap().port();
-        socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-
-        let stub = thread::spawn(move || {
-            let mut buffer = vec![0u8; 65535];
-            let (size, from) = match socket.recv_from(&mut buffer) {
-                Ok(received) => received,
-                Err(_) => return,
-            };
-            let command: Command = serde_json::from_slice(&buffer[..size]).expect("a command");
-            let answer = Telemetry::QueryDH(QueryDHTelemetry::new(
-                command.sequence(),
-                CommandStatus::Success,
-                DHName::new("DH0"),
-                Some(DHState::Active),
-                Statistics::new(),
-            ));
-            let _ = socket.send_to(&serde_json::to_vec(&answer).unwrap(), from);
-        });
-
-        let link = Arc::new(Mutex::new(CiLink::down(payload_port)));
-        link.lock().unwrap().connect(UNANSWERED_ADDRESS).unwrap();
-        let mut poll_link = CiLink::down(payload_port);
-
-        let dh_configs = vec![a_dh()];
-        let mut said = vec![None];
-        let mut watch = ContactWatch::new();
-
-        let first = poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Lost,
-            &mut watch,
-        );
-
-        assert_eq!(first.len(), 1, "the stub answered: {first:?}");
-        assert_eq!(
-            first[0].status,
-            Some(ACTIVE_STATUS),
-            "the first pass did not ask what the handler was doing"
-        );
-
-        stub.join().unwrap();
-    }
-
     /// A panel claims nothing about its handler until the spacecraft has been
     /// asked.
     ///
@@ -2192,137 +1889,6 @@ mod tests {
         let dh = a_dh();
         let info = dh_info_from(0, &dh, None);
         assert_eq!(info.status, SharedString::from(UNKNOWN_STATUS));
-    }
-
-    /// Contact coming back owes the panels a reading, and the debt survives a
-    /// pass that could not ask.
-    ///
-    /// The beacon says the spacecraft is there; what its handlers are doing
-    /// is a question for the command link, and that may be down at the moment
-    /// -- or the first pass after it may go unanswered. A restoration that
-    /// was forgotten would leave every panel saying unknown until the next
-    /// time beacons stopped and came back.
-    #[test]
-    fn contact_coming_back_is_remembered_until_it_can_be_asked_about() {
-        let link = Arc::new(Mutex::new(CiLink::down(A_PAYLOAD_PORT)));
-        let mut poll_link = CiLink::down(A_PAYLOAD_PORT);
-        let dh_configs = vec![a_dh()];
-        let mut said = vec![None];
-
-        let mut watch = ContactWatch::new();
-        assert_eq!(watch.seen, Contact::Lost, "a MOC starts knowing nothing");
-        assert!(
-            watch.restore_pending,
-            "and is owed a reading from the start, having asked nothing yet"
-        );
-
-        // A MOC that has settled: it asked, and was answered.
-        watch.restore_pending = false;
-
-        // The beacon coming back, with nowhere to ask: the link is down.
-        let gathered = poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Made,
-            &mut watch,
-        );
-        assert!(gathered.is_empty(), "there was nothing to ask over");
-        assert!(
-            watch.restore_pending,
-            "the panels are still owed a reading taken since the beacon came back"
-        );
-
-        // And it stays owed while the link stays down.
-        poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Made,
-            &mut watch,
-        );
-        assert!(watch.restore_pending);
-
-        // And through a link that is up and a spacecraft that does not
-        // answer, which is the other way a pass comes back with nothing: one
-        // timeout per handler and no reading taken. Clearing the debt here
-        // would leave the panels saying unknown until beacons next stopped
-        // and came back.
-        link.lock().unwrap().connect(UNANSWERED_ADDRESS).unwrap();
-        let unanswered = poll_pass(
-            &link,
-            &mut poll_link,
-            &dh_configs,
-            &mut said,
-            Contact::Made,
-            &mut watch,
-        );
-        assert!(unanswered.is_empty(), "nothing answers there: {unanswered:?}");
-        assert!(
-            watch.restore_pending,
-            "a pass that asked and was not answered took no reading"
-        );
-    }
-
-    /// A poll that is waiting on the spacecraft leaves the window's buttons
-    /// their link.
-    ///
-    /// This is what made Disconnect unusable as soon as it was worth using.
-    /// The poller held the shared link across its commands, so with nothing
-    /// answering, a pass sat on it for a timeout per handler and every click
-    /// waited behind -- a window that does nothing, at the moment the
-    /// operator is trying to take the link down. The poller now asks over a
-    /// link of its own and locks the shared one only to read where it went.
-    #[test]
-    fn a_poll_leaves_the_window_its_link() {
-        let link = Arc::new(Mutex::new(CiLink::down(A_PAYLOAD_PORT)));
-        link.lock().unwrap().connect(UNANSWERED_ADDRESS).unwrap();
-
-        let pass = {
-            let link = link.clone();
-            thread::spawn(move || {
-                let dh_configs = vec![a_dh()];
-                let mut poll_link = CiLink::down(A_PAYLOAD_PORT);
-                let mut said = vec![None];
-
-                let started = Instant::now();
-                let mut watch = ContactWatch::new();
-                let gathered = poll_pass(
-                    &link,
-                    &mut poll_link,
-                    &dh_configs,
-                    &mut said,
-                    Contact::Lost,
-                    &mut watch,
-                );
-                (gathered, started.elapsed())
-            })
-        };
-
-        // Far enough in for the pass to be waiting on its first command.
-        thread::sleep(POLL_TIMEOUT / 4);
-
-        let waited = Instant::now();
-        drop(link.lock().unwrap());
-        let waited = waited.elapsed();
-
-        let (gathered, pass_took) = pass.join().unwrap();
-        assert!(
-            gathered.is_empty(),
-            "nothing was answering, so there was nothing to show"
-        );
-        assert!(
-            pass_took >= POLL_TIMEOUT / 2,
-            "the pass answered in {:?}, so it was not waiting and this proves nothing",
-            pass_took
-        );
-        assert!(
-            waited < POLL_TIMEOUT / 2,
-            "a click waited {:?} behind a poll",
-            waited
-        );
     }
 
     /// The room the window opens with, which is a rule rather than a floor.
@@ -2924,6 +2490,7 @@ mod tests {
                 trigger: b"go".to_vec(),
                 interval_ms: 1000,
             },
+            stale_interval_ms: None,
         };
 
         let said = triggered_startup(&dh, STOPPED_STATUS).expect("a triggered payload");
@@ -3047,6 +2614,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: tcslibgs::DHMode::Periodic,
+            stale_interval_ms: None,
         };
 
         for kind in ["sends on its own", "answers requests"] {
@@ -3394,6 +2962,114 @@ mod tests {
     /// The count was the spacecraft's instead, and the wrong half of its
     /// statistics -- the bytes its handler had read from the ground, which is
     /// the direction nobody sends in -- so a payload sending steadily was
+    /// A panel's data indicator says what the ground can say about its
+    /// payload's data, and nothing more.
+    ///
+    /// Through the model, because what is being tested is the joining up: the
+    /// rule itself is `freshness::freshness_of` and is tested there. Three
+    /// payloads with one interval between them, so that the three answers are
+    /// distinguished by their state rather than by their configuration.
+    ///
+    /// **Needs examination**, as the feature is: see `crate::freshness`.
+    #[test]
+    fn a_panels_indicator_follows_its_payloads_data() {
+        use crate::oc_link::Arrival;
+        use tcslibgs::{DHSample, Timestamp};
+
+        let dh = |stale: Option<u32>| DHConfig {
+            name: DHName::new("DH0"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/null".to_string(),
+            }),
+            packet_size: 4,
+            oc: None,
+            ground: None,
+            mode: Default::default(),
+            stale_interval_ms: stale,
+        };
+        // Enabled and current, enabled and quiet, and one nobody has enabled.
+        let configs = vec![dh(Some(3_000)), dh(Some(3_000)), dh(Some(3_000))];
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(
+            configs
+                .iter()
+                .enumerate()
+                .map(|(row, dh)| dh_info_from(row, dh, None))
+                .collect::<Vec<_>>(),
+        ));
+        for row in [0, 1] {
+            update_row(&model, row, |info| {
+                info.status = SharedString::from(ACTIVE_STATUS);
+            });
+        }
+
+        let at = |millis: u64| {
+            let mut data = DHSample::new();
+            data.record(&[0x01]);
+            Arrival {
+                at: Timestamp::at(
+                    std::time::SystemTime::UNIX_EPOCH + Duration::from_millis(millis),
+                ),
+                data,
+                packets: 1,
+            }
+        };
+        // Neither of the enabled two has sent anything recently: the first
+        // has nothing at all, the second nothing for a minute.
+        let arrivals: Arrivals = Arc::new(Mutex::new(vec![
+            None,
+            Some(at(40_000)),
+            Some(at(99_000)),
+        ]));
+
+        let colour = |row| model.row_data(row).unwrap().data_color;
+        let unjudged = constants::freshness_color(crate::freshness::Freshness::Unjudged);
+        let current = constants::freshness_color(crate::freshness::Freshness::Current);
+        let stale = constants::freshness_color(crate::freshness::Freshness::Stale);
+
+        // The first pass is where the ground comes to believe the two are
+        // running, and a payload just enabled has its interval to produce
+        // something rather than being late the moment it is switched on.
+        let mut enabled_at = vec![None; configs.len()];
+        show_freshness(&model, &configs, &arrivals, &mut enabled_at, 100_000);
+        assert_eq!(colour(0), current, "a payload just enabled is given its interval");
+        assert_eq!(colour(1), current, "and so is this one");
+        assert_eq!(
+            colour(2),
+            unjudged,
+            "a payload nobody has enabled is not judged, whatever has arrived"
+        );
+        assert_eq!(enabled_at[0], Some(100_000), "when the ground came to believe it");
+        // And the one nobody enabled is not remembered as enabled, which is
+        // what would otherwise make it stale the moment it was switched on.
+        assert_eq!(enabled_at[2], None);
+
+        // A minute later: the first has sent something since, the second has
+        // not sent anything at all, and the interval it was given has run
+        // out.
+        if let Ok(mut slots) = arrivals.lock() {
+            slots[0] = Some(at(159_000));
+        }
+        show_freshness(&model, &configs, &arrivals, &mut enabled_at, 160_000);
+        assert_eq!(colour(0), current, "data a second old is current");
+        assert_eq!(
+            colour(1),
+            stale,
+            "nothing for a minute, against an interval of three seconds, is stale"
+        );
+        assert_eq!(colour(2), unjudged);
+    }
+
+    /// The statuses are blanked when the beacons stop, and only then.
+    #[test]
+    fn the_statuses_go_unknown_when_contact_is_lost() {
+        assert!(statuses_go_unknown(Contact::Made, Contact::Lost));
+        // Not on every pass of a silence: a panel that was blanked every
+        // second would overwrite an answer somebody had just asked for.
+        assert!(!statuses_go_unknown(Contact::Lost, Contact::Lost));
+        assert!(!statuses_go_unknown(Contact::Lost, Contact::Made));
+        assert!(!statuses_go_unknown(Contact::Made, Contact::Made));
+    }
+
     /// shown as having brought nothing.
     #[test]
     fn a_panel_counts_what_arrived_at_the_ground() {
@@ -3409,6 +3085,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         };
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
             dh_info_from(0, &dh, None),
@@ -3457,6 +3134,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
+                    stale_interval_ms: None,
         };
 
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
@@ -3510,6 +3188,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         };
 
         let info = dh_info_from(0, &dh, None);
@@ -3682,6 +3361,7 @@ mod tests {
                 oc: None,
                 ground: None,
                             mode: Default::default(),
+                            stale_interval_ms: None,
             },
             DHConfig {
                 name: DHName::new("DH9"),
@@ -3694,6 +3374,7 @@ mod tests {
                 oc: None,
                 ground: None,
                             mode: Default::default(),
+                            stale_interval_ms: None,
             },
         ];
 

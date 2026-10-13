@@ -980,6 +980,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1093,6 +1094,7 @@ mod tests {
                 trigger: b"go".to_vec(),
                 interval_ms: 50,
             },
+            stale_interval_ms: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1218,6 +1220,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
+                    stale_interval_ms: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1314,6 +1317,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
+                    stale_interval_ms: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1457,6 +1461,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1536,6 +1541,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
+                    stale_interval_ms: None,
         };
 
         let mut ci = CommandInterpreter::new(

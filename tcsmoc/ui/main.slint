@@ -28,6 +28,12 @@ export struct DHInfo {
     oc-time: string,
     oc-data: string,
     packets-recv: int,
+    /// What the data indicator shows: grey where the ground has nothing to
+    /// judge by, green where this payload's data is arriving within its
+    /// stale_interval_ms, yellow where it is not. Worked out in Rust -- see
+    /// freshness.rs -- because the rule is about times and intervals rather
+    /// than about layout.
+    data-color: color,
     // Everything both configuration files said about this handler, as Rust
     // read them at startup. Held ready rather than fetched when asked:
     // nothing can change the files while the window is up, and this is not
@@ -44,6 +50,7 @@ component DHPanel inherits Rectangle {
     in property <string> oc-time: "--:--:--";
     in property <string> oc-data: "";
     in property <int> packets-recv: 0;
+    in property <color> data-color: #c4c4c4;
     in property <string> parameters: "";
 
     callback enable-clicked();
@@ -205,6 +212,19 @@ component DHPanel inherits Rectangle {
         last-recv-row := HorizontalLayout {
             spacing: 4px;
             min-height: 14px;
+            // The indicator beside the time, because the two say one thing
+            // between them: when something last arrived, and whether that is
+            // recent enough for this payload. Shaped like the beacon's, which
+            // is the same kind of statement about the spacecraft as a whole.
+            Rectangle {
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background: data-color;
+                border-color: #808080;
+                border-width: 1px;
+                y: 2px;
+            }
             Text { text: "Last recv:"; font-size: 10px; vertical-alignment: center; }
             Text { text: oc-time; font-size: 10px; vertical-alignment: center; }
         }
@@ -651,6 +671,7 @@ export component MainWindow inherits Window {
                             oc-time: dh.oc-time;
                             oc-data: dh.oc-data;
                             packets-recv: dh.packets-recv;
+                            data-color: dh.data-color;
                             parameters: dh.parameters;
                             enable-clicked => { enable-dh(i); }
                             disable-clicked => { disable-dh(i); }

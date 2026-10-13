@@ -1,0 +1,33 @@
+Schemas for the files tcsgui edits.
+
+    tcspecial.xsd            a version 2 configuration, written in XML
+    tcspecial.schema.json    the same, written in YAML
+    tcspecial-sim.xsd        a simulator configuration, written in XML
+    tcspecial-sim.schema.json  the same, written in YAML
+
+What these are for is the thing an editor cannot do for a file somebody is
+writing by hand or with another tool: tell them, in their own editor, that
+`payloads` is a section and `payload` is not. They check the *shape* of a file --
+which sections there are, what an entry may say, and which words are words.
+
+What they do not check is whether a configuration can be flown. Which
+attributes a node of a given type must state, whether two payloads claim one
+socket, whether a mean's inputs are the ones its links bind: those are rules
+about meaning rather than shape, they are tested against real buses, and
+`tcsverify` is the one place they live. A file these schemas accept may still be
+refused, and the refusal will say why. See `docs/design.rst`, "What is checked
+before anything runs".
+
+A JSON Schema for YAML is not a category error: every YAML document is a JSON
+document in another spelling, and JSON Schema is what editors and language
+servers actually read. Point yours at the file:
+
+    # .yaml-language-server in a directory of configurations, or a comment
+    # at the top of one file:
+    # yaml-language-server: $schema=/usr/share/tcsgui/schema/tcspecial.schema.json
+
+And for the XML spelling, xmllint will check a file against the XSD:
+
+    xmllint --noout --schema /usr/share/tcsgui/schema/tcspecial.xsd vehicle.xml
+
+Installed by `make install-data` under $(PREFIX)/share/tcsgui/schema.

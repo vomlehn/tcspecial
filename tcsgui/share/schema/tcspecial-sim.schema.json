@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial-sim.schema.json",
+  "title": "tcspecial simulator configuration",
+  "description": "What tcssim needs in order to stand in for the payloads of a tcspecial configuration: how fast each one sends, and what it does wrong. Nothing here describes a payload -- the configuration does that, and the two are joined by name.\n\nThere is no version. A configuration states one so that it can be checked against the software that will read it on the vehicle, before anything opens a device; nothing aboard reads this file, the simulator not being something that flies. A file that states one is refused, saying so.\n\nA setting written with nothing after it is a setting not stated, which is what the editor writes into the form it makes: every payload of the configuration and every setting a payload may state, so that a reader can see what there is to answer.",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "simulated_payload_groups": {
+      "description": "Settings shared by the payloads that name them.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "description": "What kind of payload this stands in for. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "protocol": {
+            "description": "Which transport, for a network payload: udp, tcp or unix.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payload_address": {
+            "description": "Where the stand-in answers from, where it has an address of its own to bind.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payload_port": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "And the port with it."
+          },
+          "packet_interval_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often it sends. Nought is as fast as it can; a triggered payload states none, there being nothing for an interval to mean."
+          },
+          "segment_interval_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often a segment of a packet goes."
+          },
+          "segment_size": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How large a segment is."
+          },
+          "drop_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often a packet is thrown away."
+          },
+          "corrupt_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often one arrives altered."
+          },
+          "truncate_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often one arrives short."
+          },
+          "jitter_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How much the interval wanders."
+          },
+          "silent_after": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How many packets before it stops talking."
+          },
+          "close_after": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How many before it hangs up, where it has a connection to hang up."
+          },
+          "ignore_trigger_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often it does not answer when it is asked."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "simulated_payloads": {
+      "description": "One entry per payload of the configuration. Every data handler needs one, and a name here that no handler has is an error rather than a line with no effect.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "group": {
+            "description": "A group whose settings this payload takes for whatever it does not state itself.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "What kind of payload this stands in for. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "protocol": {
+            "description": "Which transport, for a network payload: udp, tcp or unix.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payload_address": {
+            "description": "Where the stand-in answers from, where it has an address of its own to bind.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payload_port": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "And the port with it."
+          },
+          "packet_interval_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often it sends. Nought is as fast as it can; a triggered payload states none, there being nothing for an interval to mean."
+          },
+          "segment_interval_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often a segment of a packet goes."
+          },
+          "segment_size": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How large a segment is."
+          },
+          "drop_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often a packet is thrown away."
+          },
+          "corrupt_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often one arrives altered."
+          },
+          "truncate_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often one arrives short."
+          },
+          "jitter_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How much the interval wanders."
+          },
+          "silent_after": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How many packets before it stops talking."
+          },
+          "close_after": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How many before it hangs up, where it has a connection to hang up."
+          },
+          "ignore_trigger_percent": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "How often it does not answer when it is asked."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

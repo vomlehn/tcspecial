@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A tcspecial simulator configuration, written in XML.
+
+  What tcssim needs in order to stand in for the payloads of a configuration:
+  how fast each one sends, and what it does wrong. Nothing here describes a
+  payload; the configuration does that, and the two are joined by name.
+
+  There is no version. A configuration states one so that it can be checked
+  against the software that will read it on the vehicle, before anything opens
+  a device. Nothing aboard reads this file, the simulator not being something
+  that flies, and a file that states one is refused saying so.
+
+  As with the configuration schema, this checks the shape of the file and not
+  whether it can be run: which settings a given kind of payload may state is
+  that kind's own rule, and tcsverify is where those live.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <!-- One entry of either list: a name, and the settings it states. A choice
+       repeated rather than xs:all, so that the order is free. -->
+  <xs:complexType name="entry">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="group" type="xs:string"/>
+      <xs:element name="type" type="xs:string"/>
+      <xs:element name="protocol" type="xs:string"/>
+      <xs:element name="payload_address" type="xs:string"/>
+      <xs:element name="payload_port" type="xs:string"/>
+      <xs:element name="packet_interval_ms" type="xs:string"/>
+      <xs:element name="segment_interval_ms" type="xs:string"/>
+      <xs:element name="segment_size" type="xs:string"/>
+      <xs:element name="drop_percent" type="xs:string"/>
+      <xs:element name="corrupt_percent" type="xs:string"/>
+      <xs:element name="truncate_percent" type="xs:string"/>
+      <xs:element name="jitter_ms" type="xs:string"/>
+      <xs:element name="silent_after" type="xs:string"/>
+      <xs:element name="close_after" type="xs:string"/>
+      <xs:element name="ignore_trigger_percent" type="xs:string"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:element name="simulator">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="description" type="xs:string"/>
+        <xs:element name="simulated_payload_groups" type="entry"/>
+        <xs:element name="simulated_payloads" type="entry"/>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

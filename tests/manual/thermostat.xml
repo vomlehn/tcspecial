@@ -123,7 +123,7 @@
         <to_moc>k_aft</to_moc>
         <editor><x>40</x><y>160</y></editor>
     </payloads>
-    <!-- Equipment bay. Three bytes, unsigned -- a different part, hence its -->
+    <!-- Equipment bay. Three bytes, unsigned - a different part, hence its -->
     <!-- own conversion. -->
     <payloads>
         <name>temp_bay</name>

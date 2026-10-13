@@ -1,0 +1,1732 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial.schema.json",
+  "title": "tcspecial configuration, version 2",
+  "description": "The shape of a version 2 configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a mean's inputs are the ones its links bind are rules about meaning, tested against real buses, and tcsverify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "Which language this file is written in. A configuration that has not said has not said what it is, and the beacon carries it so the ground can check what is flying.",
+      "const": "2.0"
+    },
+    "description": {
+      "type": "string"
+    },
+    "include": {
+      "description": "Other files this one is made of, by name without an extension: named rather than discovered, so the set of files a configuration is made of is itself written down.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tcspecial": {
+      "description": "What tcspecial itself is configured with: where commands are taken, where beacons go, where the telemetry log is written. Everything optional here, because the editor has to be able to write a section somebody is halfway through filling in; what must be answered before a configuration flies is tcsverify's to say.",
+      "type": "object",
+      "properties": {
+        "tcs_cmd": {
+          "type": "object",
+          "properties": {
+            "recv": {
+              "description": "Where tcspecial receives commands about the spacecraft and sends its responses.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            },
+            "send": {
+              "description": "Where the MOC sends them from and receives the responses.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "payload_command": {
+          "type": "object",
+          "properties": {
+            "source_base": {
+              "description": "The MOC's end, counted on by the payload's id.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            },
+            "dest_base": {
+              "description": "tcspecial's end, counted on by the payload's id.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "payload_telemetry": {
+          "type": "object",
+          "properties": {
+            "source_base": {
+              "description": "Where a payload's telemetry leaves tcspecial, counted on by its id.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            },
+            "dest_base": {
+              "description": "Where it arrives at the ground, counted on by its id.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "beacon": {
+          "type": "object",
+          "properties": {
+            "interval_ms": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ],
+              "description": "How often a beacon is sent."
+            },
+            "send": {
+              "description": "The socket tcspecial sends beacons from.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            },
+            "recv": {
+              "description": "The socket tcsmoc receives them on.",
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "log": {
+          "type": "object",
+          "properties": {
+            "directory": {
+              "type": "string"
+            },
+            "segment_size": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "payload_groups": {
+      "description": "Sets of payloads read on one interval, so that readings which will be compared are taken as close to together as the hardware allows.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "interval": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "A whole number with a unit: 500ms, 3s."
+          }
+        },
+        "required": [
+          "name",
+          "interval"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "moc": {
+      "description": "The ground links: what the editor's moc working pane holds.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "What this node is called, unique across the configuration.",
+            "type": "string"
+          },
+          "type": {
+            "description": "What it is: the configuration's own word for the type.",
+            "type": "string"
+          },
+          "group": {
+            "description": "The payload group that reads it, where it is in one.",
+            "type": "string"
+          },
+          "editor": {
+            "description": "Where the editor drew it, which the flight software ignores.",
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ],
+            "additionalProperties": false
+          },
+          "to_moc": {
+            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "oneOf": [
+              {
+                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "to_payload": {
+            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "oneOf": [
+              {
+                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "path": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "port": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "protocol": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "interface": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "can_id": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_size": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "trigger": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_length": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_timeout": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "terminators": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "datarate": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "byte_length": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "stop_bits": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "parity": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "standard": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "clock_rate": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "clock_type": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "encoding": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "frame_check": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "loopback": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_rts_on_send": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_delay_before_send_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_delay_after_send_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "ten_bit": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "pec": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "retries": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "timeout": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_speed": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "spi_mode": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bits_per_word": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bit_order": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "cs_active": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "can_fd": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "service": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_message_bytes": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "edge": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bias": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "debounce_us": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "function": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "inputs": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "format": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "scale": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "offset": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "setpoint": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "above": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "below": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "program": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "restart": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "directory": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "segment_bytes": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "file": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "vehicle": {
+      "description": "What the vehicle itself runs: computations, logs, pass-throughs, pages of their own.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "What this node is called, unique across the configuration.",
+            "type": "string"
+          },
+          "type": {
+            "description": "What it is: the configuration's own word for the type.",
+            "type": "string"
+          },
+          "group": {
+            "description": "The payload group that reads it, where it is in one.",
+            "type": "string"
+          },
+          "editor": {
+            "description": "Where the editor drew it, which the flight software ignores.",
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ],
+            "additionalProperties": false
+          },
+          "to_moc": {
+            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "oneOf": [
+              {
+                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "to_payload": {
+            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "oneOf": [
+              {
+                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "path": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "port": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "protocol": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "interface": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "can_id": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_size": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "trigger": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_length": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_timeout": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "terminators": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "datarate": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "byte_length": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "stop_bits": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "parity": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "standard": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "clock_rate": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "clock_type": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "encoding": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "frame_check": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "loopback": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_rts_on_send": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_delay_before_send_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_delay_after_send_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "ten_bit": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "pec": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "retries": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "timeout": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_speed": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "spi_mode": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bits_per_word": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bit_order": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "cs_active": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "can_fd": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "service": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_message_bytes": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "edge": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bias": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "debounce_us": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "function": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "inputs": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "format": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "scale": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "offset": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "setpoint": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "above": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "below": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "program": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "restart": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "directory": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "segment_bytes": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "file": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "payloads": {
+      "description": "What the vehicle carries this flight.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "What this node is called, unique across the configuration.",
+            "type": "string"
+          },
+          "type": {
+            "description": "What it is: the configuration's own word for the type.",
+            "type": "string"
+          },
+          "group": {
+            "description": "The payload group that reads it, where it is in one.",
+            "type": "string"
+          },
+          "editor": {
+            "description": "Where the editor drew it, which the flight software ignores.",
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ],
+            "additionalProperties": false
+          },
+          "to_moc": {
+            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "oneOf": [
+              {
+                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "to_payload": {
+            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "oneOf": [
+              {
+                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "path": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "port": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "protocol": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "interface": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "can_id": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_size": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "trigger": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_length": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_timeout": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "terminators": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "datarate": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "byte_length": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "stop_bits": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "parity": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "standard": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "clock_rate": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "clock_type": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "encoding": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "frame_check": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "loopback": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_rts_on_send": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_delay_before_send_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "rs485_delay_after_send_ms": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "ten_bit": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "pec": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "retries": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "timeout": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_speed": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "spi_mode": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bits_per_word": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bit_order": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "cs_active": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "can_fd": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "service": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "max_message_bytes": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "edge": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "bias": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "debounce_us": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "function": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "inputs": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "format": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "scale": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "offset": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "setpoint": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "above": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "below": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "program": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "restart": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "directory": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "segment_bytes": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "file": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commands": {
+      "description": "What a named command from the ground may set, so that what the ground can change in flight is written down.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "description": "The MOC link it arrives on.",
+            "type": "string"
+          },
+          "sets": {
+            "description": "What it sets, as node.attribute.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "sets"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

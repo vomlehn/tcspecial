@@ -361,6 +361,17 @@ pub fn data_dir() -> Option<PathBuf> {
     tried.into_iter().find(|where_| where_.is_dir())
 }
 
+/// The schemas inside a data directory.
+///
+/// What they are for is the one thing an editor cannot do for a file somebody
+/// is writing by hand or with another tool: tell them, in their own editor,
+/// that `payloads` is a section and `payload` is not. They check the shape of a
+/// file; whether a configuration can be flown is `tcsverify`'s to say. See
+/// `share/schema/README`.
+pub fn schema_in(data: &Path) -> PathBuf {
+    data.join("schema")
+}
+
 /// The description tree inside a data directory.
 pub fn nodes_in(data: &Path) -> PathBuf {
     data.join("nodes")

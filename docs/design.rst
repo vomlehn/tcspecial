@@ -1494,6 +1494,53 @@ a row per attribute and nowhere to put a sentence. **Needs examination.** The
 obvious place is beside the field it describes, which is a change to the
 panel's layout rather than to the tree.
 
+Schemas beside the tree
+-----------------------
+
+``tcsgui/share/schema`` holds a schema for each file tcsgui edits, in each
+spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
+configuration and for the simulator's file. They are installed with the
+description tree, under ``$(PREFIX)/share/tcsgui/schema``.
+
+What they are for is the one thing an editor cannot do for a file somebody is
+writing by hand or with another tool: tell them, in their own editor, that
+``payloads`` is a section and ``payload`` is not. A JSON Schema is what an
+editor's YAML language server actually reads, and a YAML document is a JSON
+document in another spelling, so the pair covers both.
+
+What they check is shape: which sections there are, what an entry may say, and
+which words are words. What they do not check is whether a configuration can be
+flown -- which attributes a node of a given type must state, whether two
+payloads claim one socket, whether a mean's inputs are the ones its links bind.
+Those are rules about meaning, they are tested against real buses, and
+``tcsverify`` is the one place they live. A file a schema accepts may still be
+refused, and the refusal will say why; the README beside the schemas says this
+to whoever installs them.
+
+Two things follow from that division. A node's attributes are the union over
+every node type -- a bus address, a baud rate and a setpoint are all allowed on
+any node -- because a schema that knew which type takes which would be a second
+copy of rules that already exist. And the XSD cannot say that a node's ``name``
+appears exactly once: ``to_moc`` may appear many times, several destinations
+being several elements, and XSD 1.0 allows neither repeats nor a mixture inside
+``xs:all``. A node with two names is refused where the file is read instead.
+
+A schema nothing is checked against is worse than no schema: it refuses files
+the software accepts, or accepts what the software refuses, and either way the
+person believes the schema. So ``tcsgui/tests/schema.rs`` holds each against
+the lists the software itself reads from -- the section's parameters from
+``graph::parameters::ATTRIBUTES``, the simulator's settings from
+``sim_config::SETTINGS`` -- rather than against a copy written out there, which
+would be the same problem one step further away. Every shipped XML file is
+validated with ``xmllint``, and every key of every shipped YAML file is looked
+for in the JSON Schema.
+
+That last test found a real fault the moment it was written: an XML comment may
+not contain two hyphens in a row, and this project writes ``--`` as an em dash
+everywhere -- so a note somebody typed in the editor made the file unreadable
+rather than merely different. The writer now folds a run of hyphens to one in
+an XML comment, which is a thing the XML spelling does not preserve.
+
 Where the tree is, in order: ``$TCSGUI_DATA``, then
 ``$XDG_DATA_HOME/tcsgui`` (or ``~/.local/share/tcsgui``), then
 ``/usr/local/share/tcsgui``, then ``/usr/share/tcsgui``, then ``tcsgui/share``

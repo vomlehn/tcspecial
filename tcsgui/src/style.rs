@@ -514,7 +514,7 @@ impl NodeType {
                 ("group", false),
                 ("trigger", false),
             ],
-            // An interface, not a path: see tcslibgs::node::hdlc. The
+            // An interface, not a path: see tcslibgs::node::payload::hdlc. The
             // standard and the clock are required because a line carries no
             // negotiation; the rate is required only where this end
             // generates the clock, which the palette cannot say, so it is

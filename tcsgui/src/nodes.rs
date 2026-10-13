@@ -4,9 +4,15 @@
 //! A vehicle node is a thing the vehicle itself runs -- a computation, a log, a
 //! pass-through -- and a new one arrives as a Rust file in tcspecial and a
 //! description here. Two trees with one structure: a description at
-//! `compute/mean.yaml` has its Rust at `tcspecial/src/node/compute/mean.rs`,
-//! and one at `serial/keypad.yaml` would have `node/serial/keypad.rs` or a
-//! directory `node/serial/keypad/` with files under it.
+//! `compute/mean.yaml` has its Rust at
+//! `tcspecial/src/node/vehicle/compute/mean.rs`, and one at
+//! `serial/keypad.yaml` would have `node/vehicle/serial/keypad.rs` or a
+//! directory `node/vehicle/serial/keypad/` with files under it.
+//!
+//! The vehicle family of that tree, which is the one this describes: what the
+//! vehicle itself runs. A payload's code is `node/payload` and what a file may
+//! say about one is the payload type's own rule -- see
+//! `tcslibgs::graph::reach` -- so there is nothing here for one.
 //!
 //! Two trees rather than one, which was a decision and is worth the reason.
 //! The descriptions are data the editor reads at run time and will be able to
@@ -444,7 +450,8 @@ mod tests {
     /// files need one, which is what keeps a family from being half described.
     #[test]
     fn every_description_has_its_rust() {
-        let code = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcspecial/src/node");
+        let code = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tcspecial/src/node/vehicle");
         let (described, _) = read_tree(&shipped());
         assert!(!described.is_empty());
 
@@ -499,7 +506,7 @@ mod tests {
     ///
     /// The other correspondence, and the one that would drift: the parameters
     /// of each computation are the flight software's own list -- see
-    /// `tcslibgs::node::compute::attributes_of` -- and a description that asked
+    /// `tcslibgs::node::vehicle::compute::attributes_of` -- and a description that asked
     /// for something else would be a panel that fills in a field the checking
     /// then refuses, or leaves out one it requires.
     #[test]
@@ -516,7 +523,7 @@ mod tests {
                 .sets
                 .get("function")
                 .unwrap_or_else(|| panic!("{}: a computation says which", one.node));
-            let takes = tcslibgs::node::compute::attributes_of(function)
+            let takes = tcslibgs::node::vehicle::compute::attributes_of(function)
                 .unwrap_or_else(|| panic!("{}: there is no such computation", one.node));
 
             // What the file asks for, plus what it fills in itself, is what

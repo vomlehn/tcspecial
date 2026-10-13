@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 
 use tcslibgs::graph::Graph;
 
-use crate::node::log::LogNode;
+use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
 use crate::runtime::port::{ComputePort, EndpointPort, LogPort, NullPort, Use};
 use crate::runtime::route::Routes;

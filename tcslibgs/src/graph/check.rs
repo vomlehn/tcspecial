@@ -279,7 +279,7 @@ impl Problem {
             ),
             Problem::BadLog { node, why } => format!("log \"{node}\": {why}"),
             // The reason already names the node and the computation: see
-            // crate::node::compute::params_of.
+            // crate::node::vehicle::compute::params_of.
             Problem::BadCompute { why, .. } => why.clone(),
             Problem::MeanInputs {
                 node,
@@ -632,7 +632,7 @@ impl Graph {
         // these rules used to live in the flight software, where this tool
         // could not reach them.
         for node in self.nodes.iter().filter(|n| n.node_type == "compute") {
-            let what = match crate::node::compute::params_of(&node.name, &node.attributes) {
+            let what = match crate::node::vehicle::compute::params_of(&node.name, &node.attributes) {
                 Ok(what) => what,
                 Err(why) => {
                     problems.push(Problem::BadCompute {
@@ -648,7 +648,7 @@ impl Graph {
             // three sensors whose third link was deleted has two inputs, each
             // bound exactly once, and would otherwise quietly become a mean
             // over two.
-            if let crate::node::compute::Computation::Mean(mean) = &what {
+            if let crate::node::vehicle::compute::Computation::Mean(mean) = &what {
                 let mut bound = self.inputs_bound_at(&node.name);
                 let mut declared = mean.inputs.clone();
                 bound.sort();
@@ -687,7 +687,7 @@ impl Graph {
         // would have to refuse a record in flight loses telemetry at the
         // moment telemetry is worth most.
         for node in self.nodes.iter().filter(|n| n.node_type == "log") {
-            let params = match crate::node::log::params_of(&node.name, &node.attributes) {
+            let params = match crate::node::vehicle::log::params_of(&node.name, &node.attributes) {
                 Ok(params) => params,
                 Err(why) => {
                     problems.push(Problem::BadLog {

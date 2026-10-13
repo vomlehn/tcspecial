@@ -5,9 +5,9 @@ use crate::endpoint_config::{ByteList, Scalar};
 
 use serde::{Deserialize, Serialize};
 
-use crate::node::hdlc::{ClockType, Encoding, FrameCheck};
-use crate::node::serial::{Parity, StopBits};
-use crate::node::spi::{BitOrder, CsActive, SpiMode};
+use crate::node::payload::hdlc::{ClockType, Encoding, FrameCheck};
+use crate::node::payload::serial::{Parity, StopBits};
+use crate::node::payload::spi::{BitOrder, CsActive, SpiMode};
 use crate::verify::Problem;
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
@@ -108,25 +108,25 @@ pub enum DHType {
     Spi,
     /// A handler whose payload is on a CAN bus.
     ///
-    /// Experimental; see [`crate::node::can`].
+    /// Experimental; see [`crate::node::payload::can`].
     Can,
     /// A handler whose payload is a sensor's buffered samples.
     ///
-    /// Experimental; see [`crate::node::iio`].
+    /// Experimental; see [`crate::node::payload::iio`].
     Iio,
     /// A handler whose payload is software on another core, reached over an
     /// rpmsg channel.
     ///
-    /// Experimental; see [`crate::node::rpmsg`].
+    /// Experimental; see [`crate::node::payload::rpmsg`].
     Rpmsg,
     /// A handler whose payload is a set of discrete lines.
     ///
-    /// Experimental; see [`crate::node::gpio`].
+    /// Experimental; see [`crate::node::payload::gpio`].
     Gpio,
     /// A handler whose payload is on a synchronous serial line, which Linux
     /// drives as a network interface.
     ///
-    /// Experimental; see [`crate::node::hdlc`].
+    /// Experimental; see [`crate::node::payload::hdlc`].
     Hdlc,
 }
 
@@ -790,7 +790,7 @@ pub struct SerialConfig {
     /// Applied rather than recorded, unlike the synchronous terms above: the
     /// kernel takes it through an ioctl on the same device file, which is the
     /// file a handler has open. Experimental; see
-    /// [`crate::node::serial::rs485`].
+    /// [`crate::node::payload::serial::rs485`].
     #[serde(default)]
     pub rs485: Option<crate::Rs485Params>,
 }
@@ -831,7 +831,7 @@ pub struct SpiConfig {
 
 /// Configuration for an endpoint that is a set of discrete lines
 ///
-/// Experimental; see [`crate::node::gpio`].
+/// Experimental; see [`crate::node::payload::gpio`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GpioConfig {
     /// The chip's character device: `/dev/gpiochip0`.
@@ -839,7 +839,7 @@ pub struct GpioConfig {
     /// The offsets of the lines, in the order the file gave them.
     pub lines: Vec<u32>,
     /// Whether they are watched or driven.
-    pub direction: crate::node::gpio::Direction,
+    pub direction: crate::node::payload::gpio::Direction,
     /// Which changes of a line are events. Only meaningful on lines that are
     /// watched, and refused on lines that are driven.
     pub edge: crate::LineEdge,
@@ -852,7 +852,7 @@ pub struct GpioConfig {
 
 /// Configuration for an endpoint that is an rpmsg channel
 ///
-/// Experimental; see [`crate::node::rpmsg`].
+/// Experimental; see [`crate::node::payload::rpmsg`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RpmsgConfig {
     /// The character device the channel is: `/dev/rpmsg0`.
@@ -863,26 +863,26 @@ pub struct RpmsgConfig {
     pub service: String,
     /// The greatest number of bytes one message carries, where the platform
     /// is not the usual one; see
-    /// [`crate::node::rpmsg::USUAL_MESSAGE_BYTES`].
+    /// [`crate::node::payload::rpmsg::USUAL_MESSAGE_BYTES`].
     pub max_message_bytes: Option<u32>,
 }
 
 /// Configuration for an endpoint that is a sensor's sample buffer
 ///
-/// Experimental; see [`crate::node::iio`].
+/// Experimental; see [`crate::node::payload::iio`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IioConfig {
     /// The character device the buffer is read from: `/dev/iio:device0`.
     ///
     /// All there is. Which channels are enabled and how fast the device
     /// samples are set through `sysfs` by whoever brought the sensor up, so a
-    /// payload says neither: see [`crate::node::iio`].
+    /// payload says neither: see [`crate::node::payload::iio`].
     pub path: String,
 }
 
 /// Configuration for an endpoint on a CAN bus
 ///
-/// Experimental; see [`crate::node::can`] for what each term means
+/// Experimental; see [`crate::node::payload::can`] for what each term means
 /// and which of them are applied.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanConfig {
@@ -905,13 +905,13 @@ pub struct CanConfig {
 /// An interface rather than a path: the kernel drives such a line as a network
 /// interface, and the terms of the line are set with an ioctl on it rather
 /// than with termios on a file descriptor. Experimental; see
-/// [`crate::node::hdlc`].
+/// [`crate::node::payload::hdlc`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HdlcConfig {
     /// The network interface the card presents: `hdlc0`.
     pub interface: String,
     /// Which electrical standard the port is wired as.
-    pub standard: crate::node::hdlc::Standard,
+    pub standard: crate::node::payload::hdlc::Standard,
     /// Whose clock the bits are on.
     pub clock_type: ClockType,
     /// The clock rate in bits per second where this end generates the clock,
@@ -1136,7 +1136,7 @@ fn link_of(
                 )
             })?;
         let can_id = crate::endpoint_config::parse_u32(name, "can_id", &can_id)
-            .and_then(|id| crate::node::can::check_can_id(name, id))
+            .and_then(|id| crate::node::payload::can::check_can_id(name, id))
             .map_err(|e| format!("{e}"))?;
 
         return crate::endpoint_config::endpoint_of(
@@ -1201,7 +1201,7 @@ fn link_of(
                 .unwrap_or(false);
             crate::endpoint_config::EndpointLocation::I2c {
                 bus: path,
-                address: crate::node::i2c::parse_i2c_address(name, &address, ten_bit)
+                address: crate::node::payload::i2c::parse_i2c_address(name, &address, ten_bit)
                     .map_err(|e| format!("{e}"))?,
             }
         }
@@ -1239,14 +1239,14 @@ pub(crate) fn kind_of_terms(
     wire: crate::endpoint_config::LinkTerms,
 ) -> Result<crate::endpoint_config::GroupKind, String> {
     match kind {
-        DHType::Serial => crate::node::serial::group_kind_of(name, wire),
-        DHType::I2c => crate::node::i2c::group_kind_of(name, wire),
-        DHType::Spi => crate::node::spi::group_kind_of(name, wire),
-        DHType::Can => crate::node::can::group_kind_of(name, wire),
-        DHType::Iio => crate::node::iio::group_kind_of(name, wire),
-        DHType::Rpmsg => crate::node::rpmsg::group_kind_of(name, wire),
-        DHType::Gpio => crate::node::gpio::group_kind_of(name, wire),
-        DHType::Hdlc => crate::node::hdlc::group_kind_of(name, wire),
+        DHType::Serial => crate::node::payload::serial::group_kind_of(name, wire),
+        DHType::I2c => crate::node::payload::i2c::group_kind_of(name, wire),
+        DHType::Spi => crate::node::payload::spi::group_kind_of(name, wire),
+        DHType::Can => crate::node::payload::can::group_kind_of(name, wire),
+        DHType::Iio => crate::node::payload::iio::group_kind_of(name, wire),
+        DHType::Rpmsg => crate::node::payload::rpmsg::group_kind_of(name, wire),
+        DHType::Gpio => crate::node::payload::gpio::group_kind_of(name, wire),
+        DHType::Hdlc => crate::node::payload::hdlc::group_kind_of(name, wire),
         other => {
             return Err(format!(
                 "{} is not a kind of link this describes",
@@ -1694,7 +1694,7 @@ pub struct DHGroupJson {
     pub datarate: Option<Scalar>,
     /// Which electrical standard a synchronous line's port is wired as, how
     /// fast this end clocks it, and what checks a frame. HDLC payloads only,
-    /// and experimental; see [`crate::node::hdlc`].
+    /// and experimental; see [`crate::node::payload::hdlc`].
     #[serde(default)]
     pub standard: Option<Scalar>,
     #[serde(default)]
@@ -1755,7 +1755,7 @@ pub struct DHGroupJson {
     pub cs_active: Option<Scalar>,
     /// Whether a start-stop line is a half-duplex RS-485 bus. Serial
     /// payloads only, and experimental; see
-    /// [`crate::node::serial::rs485`].
+    /// [`crate::node::payload::serial::rs485`].
     #[serde(default)]
     pub rs485: Option<Scalar>,
     /// The logical level of RTS while an RS-485 line transmits.
@@ -1769,7 +1769,7 @@ pub struct DHGroupJson {
     pub rs485_delay_after_send_ms: Option<Scalar>,
     /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
     /// kernel's virtual bus. CAN payloads only, and experimental; see
-    /// [`crate::node::can`].
+    /// [`crate::node::payload::can`].
     #[serde(default)]
     pub interface: Option<String>,
     /// The identifier a CAN payload's frames carry. CAN payloads only.
@@ -1787,7 +1787,7 @@ pub struct DHGroupJson {
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
     /// The service name an rpmsg channel was announced with. rpmsg payloads
-    /// only, and experimental; see [`crate::node::rpmsg`].
+    /// only, and experimental; see [`crate::node::payload::rpmsg`].
     #[serde(default)]
     pub service: Option<Scalar>,
     /// The greatest number of bytes one rpmsg message carries.
@@ -1795,7 +1795,7 @@ pub struct DHGroupJson {
     pub max_message_bytes: Option<Scalar>,
     /// Which discrete lines a GPIO payload watches: offsets, separated by
     /// commas or spaces. GPIO payloads only, and experimental; see
-    /// [`crate::node::gpio`].
+    /// [`crate::node::payload::gpio`].
     #[serde(default)]
     pub lines: Option<Scalar>,
     /// Which changes of a line are events: rising, falling or both.
@@ -1907,7 +1907,7 @@ pub struct DHConfigJson {
     pub datarate: Option<Scalar>,
     /// Which electrical standard a synchronous line's port is wired as, how
     /// fast this end clocks it, and what checks a frame. HDLC payloads only,
-    /// and experimental; see [`crate::node::hdlc`].
+    /// and experimental; see [`crate::node::payload::hdlc`].
     #[serde(default)]
     pub standard: Option<Scalar>,
     #[serde(default)]
@@ -1968,7 +1968,7 @@ pub struct DHConfigJson {
     pub cs_active: Option<Scalar>,
     /// Whether a start-stop line is a half-duplex RS-485 bus. Serial
     /// payloads only, and experimental; see
-    /// [`crate::node::serial::rs485`].
+    /// [`crate::node::payload::serial::rs485`].
     #[serde(default)]
     pub rs485: Option<Scalar>,
     /// The logical level of RTS while an RS-485 line transmits.
@@ -1982,7 +1982,7 @@ pub struct DHConfigJson {
     pub rs485_delay_after_send_ms: Option<Scalar>,
     /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
     /// kernel's virtual bus. CAN payloads only, and experimental; see
-    /// [`crate::node::can`].
+    /// [`crate::node::payload::can`].
     #[serde(default)]
     pub interface: Option<String>,
     /// The identifier a CAN payload's frames carry. CAN payloads only.
@@ -2000,7 +2000,7 @@ pub struct DHConfigJson {
     #[serde(default)]
     pub sample_rate: Option<Scalar>,
     /// The service name an rpmsg channel was announced with. rpmsg payloads
-    /// only, and experimental; see [`crate::node::rpmsg`].
+    /// only, and experimental; see [`crate::node::payload::rpmsg`].
     #[serde(default)]
     pub service: Option<Scalar>,
     /// The greatest number of bytes one rpmsg message carries.
@@ -2008,7 +2008,7 @@ pub struct DHConfigJson {
     pub max_message_bytes: Option<Scalar>,
     /// Which discrete lines a GPIO payload watches: offsets, separated by
     /// commas or spaces. GPIO payloads only, and experimental; see
-    /// [`crate::node::gpio`].
+    /// [`crate::node::payload::gpio`].
     #[serde(default)]
     pub lines: Option<Scalar>,
     /// Which changes of a line are events: rising, falling or both.
@@ -2401,7 +2401,7 @@ impl DHConfigJson {
         // exactly. A payload whose packets will not fit in one is refused
         // here rather than found out a frame at a time at run time.
         if let EndpointConfig::Can(can) = &endpoint {
-            let room = crate::node::can::frame_bytes(can.fd);
+            let room = crate::node::payload::can::frame_bytes(can.fd);
             if let Some(packet_size) = packet_size {
                 if packet_size > room {
                     return Err(format!(
@@ -2418,7 +2418,7 @@ impl DHConfigJson {
         // bytes anything sent, and an event is a fixed size: a packet that
         // was part of a record would be a reading nobody could use.
         if let EndpointConfig::Gpio(_) = &endpoint {
-            let event = crate::node::gpio::EVENT_BYTES;
+            let event = crate::node::payload::gpio::EVENT_BYTES;
             if let Some(packet_size) = packet_size {
                 if packet_size == 0 || packet_size % event != 0 {
                     return Err(format!(
@@ -2435,7 +2435,7 @@ impl DHConfigJson {
         // and rpmsg does not fragment: a payload whose packets are larger
         // would have every write refused by the driver.
         if let EndpointConfig::Rpmsg(rpmsg) = &endpoint {
-            let room = crate::node::rpmsg::message_bytes(rpmsg.max_message_bytes);
+            let room = crate::node::payload::rpmsg::message_bytes(rpmsg.max_message_bytes);
             if let Some(packet_size) = packet_size {
                 if packet_size > room as usize {
                     return Err(format!(
@@ -5392,7 +5392,7 @@ payloads:
     // -- a bus and what sits on it ------------------------------------------
 
     /// One peripheral on a bus, with the given terms.
-    fn bus(terms: &str) -> Result<crate::node::i2c::I2cParams, String> {
+    fn bus(terms: &str) -> Result<crate::node::payload::i2c::I2cParams, String> {
         match link_terms("i2c", &format!("    path: /dev/i2c-1\n{terms}"))? {
             crate::endpoint_config::GroupKind::I2c(i2c) => Ok(i2c),
             other => panic!("{other:?}"),
@@ -5551,7 +5551,7 @@ payloads:
     // -- a peripheral -------------------------------------------------------
 
     /// One peripheral with the given terms.
-    fn peripheral(terms: &str) -> Result<crate::node::spi::SpiParams, String> {
+    fn peripheral(terms: &str) -> Result<crate::node::payload::spi::SpiParams, String> {
         match link_terms("spi", &format!("    path: /dev/spidev0.0\n{terms}"))? {
             crate::endpoint_config::GroupKind::Spi(spi) => Ok(spi),
             other => panic!("{other:?}"),

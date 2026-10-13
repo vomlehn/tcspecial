@@ -9,16 +9,16 @@
 //! How the bytes actually leave depends on the endpoint, and each kind has a
 //! file of its own:
 //!
-//! * [`crate::node::network::tcp`] -- a stream the handler connects to
-//! * [`crate::node::network::udp`] -- datagrams sent to where the handler waits
-//! * [`crate::node::device_file`] -- a device, which produces rather than sends
-//! * [`crate::node::serial`] -- a line, which is a pty the configured path
+//! * [`crate::node::payload::network::tcp`] -- a stream the handler connects to
+//! * [`crate::node::payload::network::udp`] -- datagrams sent to where the handler waits
+//! * [`crate::node::payload::device_file`] -- a device, which produces rather than sends
+//! * [`crate::node::payload::serial`] -- a line, which is a pty the configured path
 //!   leads to
-//! * [`crate::node::i2c`] -- a device on a bus, which is a chip of the
+//! * [`crate::node::payload::i2c`] -- a device on a bus, which is a chip of the
 //!   kernel's `i2c-stub`
-//! * [`crate::node::spi`] -- a peripheral, which is a pty again: the bytes
+//! * [`crate::node::payload::spi`] -- a peripheral, which is a pty again: the bytes
 //!   of one, and none of its clocking
-//! * [`crate::node::network::unix`] -- a Unix-domain socket of either flavour, which
+//! * [`crate::node::payload::network::unix`] -- a Unix-domain socket of either flavour, which
 //!   the simulator simply is
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -59,7 +59,7 @@ pub struct PayloadConfig {
     ///
     /// Apart from `bus_address` because a CAN identifier is twenty-nine bits
     /// where an I2C address is ten, and because the two are compared against
-    /// different things. Experimental; see [`crate::node::can`].
+    /// different things. Experimental; see [`crate::node::payload::can`].
     pub can_id: u32,
     /// Whether a CAN payload's frames are CAN FD, which decides how much one
     /// carries.
@@ -68,7 +68,7 @@ pub struct PayloadConfig {
     ///
     /// Not bytes and not a size: what a simulated set of discretes produces
     /// is an edge on each of these every interval. Experimental; see
-    /// [`crate::node::gpio`].
+    /// [`crate::node::payload::gpio`].
     pub gpio_lines: Vec<u32>,
     /// Whether this payload answers requests rather than sending on its own.
     ///
@@ -102,33 +102,33 @@ pub enum PayloadProtocol {
     Udp,
     Device,
     /// A serial line, which the simulator stands in for with a pty: see
-    /// [`crate::node::serial`].
+    /// [`crate::node::payload::serial`].
     Serial,
     /// A device on an I2C bus, which the simulator stands in for with the
-    /// kernel's `i2c-stub`: see [`crate::node::i2c`].
+    /// kernel's `i2c-stub`: see [`crate::node::payload::i2c`].
     I2c,
     /// A SPI peripheral, which the simulator stands in for with a pty -- the
     /// bytes but not the clocking, there being nothing that emulates a
-    /// peripheral: see [`crate::node::spi`].
+    /// peripheral: see [`crate::node::payload::spi`].
     Spi,
     /// A Unix-domain stream, which the simulator listens at: see
-    /// [`crate::node::network::unix`].
+    /// [`crate::node::payload::network::unix`].
     UnixStream,
     /// A Unix-domain datagram socket, which the simulator sends to from a path
-    /// of its own: see [`crate::node::network::unix`].
+    /// of its own: see [`crate::node::payload::network::unix`].
     UnixDgram,
     /// A payload on a CAN bus, which the simulator joins as another member of
-    /// the same bus: see [`crate::node::can`]. Experimental.
+    /// the same bus: see [`crate::node::payload::can`]. Experimental.
     Can,
     /// A sensor's sample buffer, which the simulator stands in for with a pty
     /// -- the samples but not the sysfs around them: see
-    /// [`crate::node::iio`]. Experimental.
+    /// [`crate::node::payload::iio`]. Experimental.
     Iio,
     /// An rpmsg channel to another core, which the simulator stands in for
-    /// with a pty: see [`crate::node::rpmsg`]. Experimental.
+    /// with a pty: see [`crate::node::payload::rpmsg`]. Experimental.
     Rpmsg,
     /// A set of discrete lines, which the simulator moves through the
-    /// kernel's gpio-sim: see [`crate::node::gpio`]. Experimental.
+    /// kernel's gpio-sim: see [`crate::node::payload::gpio`]. Experimental.
     Gpio,
 }
 
@@ -211,37 +211,37 @@ impl SimulatedPayload {
 
         let handle = thread::spawn(move || {
             match config.protocol {
-                PayloadProtocol::Tcp => crate::node::network::tcp::run_tcp_node(config, running, stats),
-                PayloadProtocol::Udp => crate::node::network::udp::run_udp_node(config, running, stats),
+                PayloadProtocol::Tcp => crate::node::payload::network::tcp::run_tcp_node(config, running, stats),
+                PayloadProtocol::Udp => crate::node::payload::network::udp::run_udp_node(config, running, stats),
                 PayloadProtocol::Device => {
-                    crate::node::device_file::run_device_file_node(config, running, stats)
+                    crate::node::payload::device_file::run_device_file_node(config, running, stats)
                 }
                 PayloadProtocol::Serial => {
-                    crate::node::serial::run_serial_node(config, running, stats)
+                    crate::node::payload::serial::run_serial_node(config, running, stats)
                 }
                 PayloadProtocol::I2c => {
-                    crate::node::i2c::run_i2c_node(config, running, stats)
+                    crate::node::payload::i2c::run_i2c_node(config, running, stats)
                 }
                 PayloadProtocol::Spi => {
-                    crate::node::spi::run_spi_node(config, running, stats)
+                    crate::node::payload::spi::run_spi_node(config, running, stats)
                 }
                 PayloadProtocol::Can => {
-                    crate::node::can::run_can_node(config, running, stats)
+                    crate::node::payload::can::run_can_node(config, running, stats)
                 }
                 PayloadProtocol::Iio => {
-                    crate::node::iio::run_iio_node(config, running, stats)
+                    crate::node::payload::iio::run_iio_node(config, running, stats)
                 }
                 PayloadProtocol::Rpmsg => {
-                    crate::node::rpmsg::run_rpmsg_node(config, running, stats)
+                    crate::node::payload::rpmsg::run_rpmsg_node(config, running, stats)
                 }
                 PayloadProtocol::Gpio => {
-                    crate::node::gpio::run_gpio_node(config, running, stats)
+                    crate::node::payload::gpio::run_gpio_node(config, running, stats)
                 }
                 PayloadProtocol::UnixStream => {
-                    crate::node::network::unix::run_unix_stream_node(config, running, stats)
+                    crate::node::payload::network::unix::run_unix_stream_node(config, running, stats)
                 }
                 PayloadProtocol::UnixDgram => {
-                    crate::node::network::unix::run_unix_dgram_node(config, running, stats)
+                    crate::node::payload::network::unix::run_unix_dgram_node(config, running, stats)
                 }
             }
         });

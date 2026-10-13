@@ -11,7 +11,7 @@
 //! that address.
 //!
 //! What a payload then does with the endpoint is in the file for its kind:
-//! [`crate::node::network::tcp`], [`crate::node::network::udp`], [`crate::node::device_file`].
+//! [`crate::node::payload::network::tcp`], [`crate::node::payload::network::udp`], [`crate::node::payload::device_file`].
 
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
@@ -86,7 +86,7 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // A line the simulator can be: a pty's slave is a device file with a
         // line discipline behind it, so a handler opens it, sets its terms and
         // reads it exactly as it would a port. The path the handler was told
-        // to open is made to lead there; see node::serial.
+        // to open is made to lead there; see node::payload::serial.
         //
         // The line's terms do not come this way. A pty takes a data rate and
         // ignores it, so what the handler sets them to is between the handler
@@ -96,7 +96,7 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // kernel's i2c-stub is an adapter whose chips are a bank of registers
         // in memory, and every master on that bus reads and writes the same
         // bank. So the bank is the payload, and the simulator fills it; see
-        // node::i2c. The bus the handler was told to open is made to lead to
+        // node::payload::i2c. The bus the handler was told to open is made to lead to
         // the stub, as a line's path is made to lead to a pty.
         EndpointConfig::I2c(i2c) => (
             PayloadProtocol::I2c,

@@ -40,14 +40,14 @@ pub use commands::*;
 // by the time a handler holds one it is no longer a matter of configuration
 // files.
 pub use endpoint_config::Scalar;
-pub use node::serial::{ByteLength, Parity, StopBits};
-pub use node::hdlc::{ClockType, Encoding, FrameCheck, HdlcParams, Standard};
-pub use node::can::CanParams;
-pub use node::gpio::{Bias, Edge as LineEdge, GpioParams};
-pub use node::iio::IioParams;
-pub use node::rpmsg::RpmsgParams;
-pub use node::serial::rs485::Rs485Params;
-pub use node::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
+pub use node::payload::serial::{ByteLength, Parity, StopBits};
+pub use node::payload::hdlc::{ClockType, Encoding, FrameCheck, HdlcParams, Standard};
+pub use node::payload::can::CanParams;
+pub use node::payload::gpio::{Bias, Edge as LineEdge, GpioParams};
+pub use node::payload::iio::IioParams;
+pub use node::payload::rpmsg::RpmsgParams;
+pub use node::payload::serial::rs485::Rs485Params;
+pub use node::payload::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 pub use config::*;
 pub use display::{screen_height, Edge};
 pub use error::*;

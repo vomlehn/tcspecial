@@ -333,7 +333,7 @@ mod tests {
     /// Bind the OC side, past a race these tests have and a vehicle does not.
     ///
     /// Another test in this binary starts a child process -- see
-    /// `node::compute::process` -- and between the fork and the exec that
+    /// `node::vehicle::compute::process` -- and between the fork and the exec that
     /// follows it the child holds a copy of every descriptor this process has
     /// open. A socket one of these tests has just closed can therefore still
     /// look to be in use, and a bind of it fails with `AddrInUse`.

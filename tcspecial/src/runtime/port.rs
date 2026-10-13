@@ -50,9 +50,9 @@ use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::Node;
 use tcslibgs::{EndpointConfig, TcsError, TcsResult};
 
-use crate::node::compute::{self, Function};
-use crate::node::log::LogNode;
-use crate::node::null::Through;
+use crate::node::vehicle::compute::{self, Function};
+use crate::node::vehicle::log::LogNode;
+use crate::node::vehicle::null::Through;
 
 use crate::endpoint::{
     bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
@@ -584,7 +584,7 @@ impl Port for LogPort {
 /// A `null` node, as a node of the graph.
 ///
 /// The thinnest adapter of the four, because the node itself holds what there
-/// is to hold: see [`crate::node::null::Through`], which is where the queue and
+/// is to hold: see [`crate::node::vehicle::null::Through`], which is where the queue and
 /// the rule about a datum that will not fit live. Here for the reason the log's
 /// adapter and the computation's are here -- the questions a port answers are
 /// the same whatever is behind it, and answers kept together stay the same.
@@ -1113,8 +1113,8 @@ mod tests {
     /// A computation holds its result until it is taken.
     #[test]
     fn a_computation_has_a_result_when_it_has_enough() {
-        use crate::node::compute::mean::Mean;
-        use tcslibgs::node::compute::MeanParams;
+        use crate::node::vehicle::compute::mean::Mean;
+        use tcslibgs::node::vehicle::compute::MeanParams;
 
         let mut port = ComputePort::of(
             "mean_temp",
@@ -1185,8 +1185,8 @@ mod tests {
     /// A datum a computation cannot use is refused, naming both.
     #[test]
     fn a_datum_a_computation_cannot_use_is_refused() {
-        use crate::node::compute::mean::Mean;
-        use tcslibgs::node::compute::MeanParams;
+        use crate::node::vehicle::compute::mean::Mean;
+        use tcslibgs::node::vehicle::compute::MeanParams;
 
         let mut port = ComputePort::of(
             "mean_temp",
@@ -1207,8 +1207,8 @@ mod tests {
     /// A result that will not fit is reported and kept, not cut down.
     #[test]
     fn a_result_too_large_for_the_buffer_is_kept() {
-        use crate::node::compute::mean::Mean;
-        use tcslibgs::node::compute::MeanParams;
+        use crate::node::vehicle::compute::mean::Mean;
+        use tcslibgs::node::vehicle::compute::MeanParams;
 
         let mut port = ComputePort::of(
             "mean_temp",

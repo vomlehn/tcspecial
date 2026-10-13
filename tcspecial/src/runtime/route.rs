@@ -78,12 +78,26 @@ impl Routes {
         let mut routes = Routes::default();
 
         for link in &graph.links {
+            // The node it leaves, whatever terminal it leaves by. A terminal
+            // says which way the data is going -- see
+            // `tcslibgs::graph::terminals` -- and the routing question is
+            // which node, so `n.to_moc` and `n` are one source here.
+            let from = link.origin().node;
+
             for destination in link.to.each() {
                 let Destination { node, input } = Destination::parse(destination);
+                // And the same at the other end, with one difference: a
+                // computation's named input is which *of several* ways in, and
+                // the table is built on it. A terminal is not one of those, so
+                // it is dropped here rather than carried to a port that would
+                // refuse it as an input a device does not have.
+                let input = input.filter(|named| {
+                    tcslibgs::graph::terminals::stream_of(named).is_none()
+                });
 
                 routes
                     .deliveries
-                    .entry(link.from.clone())
+                    .entry(from.clone())
                     .or_default()
                     .push(Delivery {
                         to: node.clone(),
@@ -91,7 +105,7 @@ impl Routes {
                     });
 
                 if let Some(input) = input {
-                    routes.sources.insert((node, input), link.from.clone());
+                    routes.sources.insert((node, input), from.clone());
                 }
             }
         }
@@ -231,6 +245,58 @@ mod tests {
         assert_eq!(into_mean.input.as_deref(), Some("in0"));
         let to_moc = from_k_fore.iter().find(|d| d.to == "moc").unwrap();
         assert_eq!(to_moc.input, None);
+    }
+
+    /// A link that names its terminals routes as one that does not.
+    ///
+    /// A terminal says which way the data is going and not which of several
+    /// ways in -- see `tcslibgs::graph::terminals` -- so `a.to_moc` to
+    /// `c.from_payload` is the same delivery as `a` to `c`. It matters here
+    /// and not only in the checking: a terminal carried through as a named
+    /// input would reach a device's port, which refuses an input a device does
+    /// not have, and a configuration that passed the ground check would stop
+    /// delivering the moment it flew.
+    #[test]
+    fn a_terminal_on_a_link_is_not_a_named_input() {
+        use tcslibgs::graph::Destinations;
+
+        // Links and nothing else: the routing is a table of what arrives
+        // where, and a node's own attributes are no part of that.
+        let one_link = |from: &str, to: &str| Graph {
+            description: None,
+            tcspecial: None,
+            groups: Vec::new(),
+            nodes: Vec::new(),
+            links: vec![tcslibgs::graph::Link {
+                from: from.to_string(),
+                to: Destinations::of(vec![to.to_string()]),
+                comment: None,
+            }],
+            commands: Vec::new(),
+            files: Vec::new(),
+            homes: std::collections::BTreeMap::new(),
+        };
+
+        let plain = Routes::of(&one_link("a", "c"));
+        let named = Routes::of(&one_link("a.to_moc", "c.from_payload"));
+
+        for routes in [&plain, &named] {
+            let deliveries = routes.from("a");
+            assert_eq!(deliveries.len(), 1, "{deliveries:?}");
+            assert_eq!(deliveries[0].to, "c");
+            // Not an input: a device and a ground link have one way in and do
+            // not name it.
+            assert_eq!(deliveries[0].input, None);
+            assert!(routes.inputs_of("c").is_empty());
+        }
+        assert_eq!(plain.from("a"), named.from("a"));
+
+        // And a computation's named input is still carried, which is the
+        // distinction: `in0` is which of several ways in, and the mean is
+        // built on knowing.
+        let into_mean = Routes::of(&one_link("a.to_moc", "m.in0"));
+        assert_eq!(into_mean.from("a")[0].input.as_deref(), Some("in0"));
+        assert_eq!(into_mean.source_of("m", "in0"), Some("a"));
     }
 
     /// A node that computes over several inputs knows which is which.

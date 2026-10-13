@@ -580,6 +580,84 @@ impl Port for LogPort {
     }
 }
 
+/// A `null` node, as a node of the graph.
+///
+/// What arrives goes on unchanged. It is the simplest vehicle node there is
+/// and it is here for two reasons: it is the one type with all four terminals,
+/// so it is what says what a vehicle node *is* -- see
+/// `tcslibgs::graph::terminals` -- and it is what a configuration reaches for
+/// when a stream has to pass through the vehicle on its way somewhere, with
+/// nothing yet to do to it.
+///
+/// Both streams through one node, and nothing here keeps them apart. A datum
+/// arriving at `from_payload` and one arriving at `from_moc` are both passed
+/// on, in the order they arrived, to every destination of the node's sources
+/// -- which is the one thing a `null` node cannot be asked to get right, and
+/// is why a sink is held to one source: see the cardinality rules in
+/// `design.rst`. A node with one source into it and one sink out of it per
+/// stream carries each stream to where it was going.
+pub struct NullPort {
+    /// The node's name in the configuration, which every complaint names.
+    what: String,
+    /// What has arrived and not yet been taken.
+    ///
+    /// A queue and not a slot, for ComputePort's reason: the alternative when
+    /// a second datum arrives before the first is taken is to overwrite it,
+    /// and a reading dropped where nothing says so is the one outcome this
+    /// project will not have.
+    waiting: VecDeque<Vec<u8>>,
+}
+
+impl NullPort {
+    /// A pass-through for this node.
+    pub fn of(what: &str) -> NullPort {
+        NullPort {
+            what: what.to_string(),
+            waiting: VecDeque::new(),
+        }
+    }
+}
+
+impl Port for NullPort {
+    fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        let Some(datum) = self.waiting.pop_front() else {
+            return Ok(0);
+        };
+
+        // A datum that will not fit is reported and not cut down: part of a
+        // value is not a smaller value, and the queue keeps it so that a
+        // caller with a larger buffer can still have it.
+        if datum.len() > buffer.len() {
+            let wanted = datum.len();
+            self.waiting.push_front(datum);
+            return Err(format!(
+                "{}: what arrived is {wanted} bytes and the buffer holds {}: part \
+                 of a value is not a smaller value",
+                self.what,
+                buffer.len()
+            ));
+        }
+
+        buffer[..datum.len()].copy_from_slice(&datum);
+        Ok(datum.len())
+    }
+
+    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<(), String> {
+        self.waiting.push_back(data.to_vec());
+        Ok(())
+    }
+
+    /// It has something to pass on as a consequence of what arrived.
+    ///
+    /// A `null` node produces because something came in, as a computation
+    /// does, and never on a schedule of its own: a pass that ended with the
+    /// delivery would leave the datum here until something else happened to
+    /// read the node.
+    fn ready(&self) -> bool {
+        !self.waiting.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1096,6 +1174,45 @@ mod tests {
         // And it is gone once taken, rather than being handed out again.
         assert!(!port.ready());
         assert_eq!(port.take(&mut buffer), Ok(0));
+    }
+
+    /// A null node passes what arrives through, in order and unchanged.
+    ///
+    /// Both streams through the one node: what came from the payload side and
+    /// what came from the ground are both passed on, in the order they
+    /// arrived. Which is also why the arrivals are not labelled here -- a
+    /// terminal is resolved where the routing table is built and never reaches
+    /// a port, so a null node is handed data and not a name.
+    #[test]
+    fn a_null_node_carries_what_arrives_through() {
+        let mut port = NullPort::of("through");
+
+        assert!(!port.ready(), "nothing has arrived");
+        assert_eq!(port.take(&mut [0u8; 64]), Ok(0));
+
+        assert_eq!(port.give(None, b"290.0"), Ok(()));
+        assert_eq!(port.give(None, b"go\n"), Ok(()));
+        assert!(port.ready());
+
+        // In order, and whole.
+        let mut buffer = [0u8; 64];
+        let got = port.take(&mut buffer).expect("the first");
+        assert_eq!(&buffer[..got], b"290.0");
+        let got = port.take(&mut buffer).expect("the second");
+        assert_eq!(&buffer[..got], b"go\n");
+
+        // And gone once taken, rather than handed out again.
+        assert!(!port.ready());
+        assert_eq!(port.take(&mut buffer), Ok(0));
+
+        // A datum that will not fit is kept rather than cut down: part of a
+        // value is not a smaller value.
+        assert_eq!(port.give(None, b"2901234"), Ok(()));
+        let said = port.take(&mut [0u8; 4]).expect_err("it does not fit");
+        assert!(said.contains("through") && said.contains("7 bytes"), "{said}");
+        assert!(port.ready(), "the datum is still here");
+        let got = port.take(&mut buffer).expect("with room");
+        assert_eq!(&buffer[..got], b"2901234");
     }
 
     /// A datum a computation cannot use is refused, naming both.

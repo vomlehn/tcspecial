@@ -35,7 +35,7 @@ use tcslibgs::graph::Graph;
 
 use crate::node::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
-use crate::runtime::port::{ComputePort, EndpointPort, LogPort, Use};
+use crate::runtime::port::{ComputePort, EndpointPort, LogPort, NullPort, Use};
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
 
@@ -273,7 +273,10 @@ fn is_polled(node: &tcslibgs::graph::Node, routes: &Routes, port: &dyn Port) -> 
     node.group.is_none()
         && port.produces()
         && routes.fan_out(&node.name) > 0
-        && !matches!(node.node_type.as_str(), "compute" | "log")
+        // A computation and a `null` node produce because something arrived,
+        // which `Port::ready` has already said and the pass has already
+        // taken: polling one would be asking a question whose answer is gone.
+        && !matches!(node.node_type.as_str(), "compute" | "log" | "null")
 }
 
 /// What a node becomes: a port over whatever it is.
@@ -292,6 +295,9 @@ pub fn open(
             Ok(Box::new(ComputePort::make(node, &inputs)?))
         }
         "log" => Ok(Box::new(LogPort::of(LogNode::of(node)?))),
+        // A node that carries both streams through and does nothing to what
+        // passes. Nothing is opened for it: it is not an interface.
+        "null" => Ok(Box::new(NullPort::of(&node.name))),
         // Everything else is reached over an interface, and what a node says
         // about reaching it is tcslibgs::graph::reach's business.
         _ => Ok(Box::new(EndpointPort::open(node, routes)?)),
@@ -312,6 +318,7 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
             let how = match node.node_type.as_str() {
                 "compute" => "computes".to_string(),
                 "log" => "writes a log".to_string(),
+                "null" => "passes what arrives through".to_string(),
                 _ => match Use::of(&routes, &node.name) {
                     Ok(Use::Read) => "is read".to_string(),
                     Ok(Use::Driven) => "is driven".to_string(),

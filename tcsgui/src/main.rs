@@ -2074,7 +2074,7 @@ fn snap((x, y): (i32, i32)) -> (i32, i32) {
 /// shape on the canvas rather than a picture of one that may drift away from
 /// it. Grouped because the families *are* the shape grammar -- square is
 /// hardware, rounded is software aboard, a rounded end is an end of the graph
-/// -- and a flat list of fourteen shapes hides the pattern that would make
+/// -- and a flat list of fifteen shapes hides the pattern that would make
 /// them learnable.
 ///
 /// Three lists rather than one, because there are three working panes and a
@@ -2115,10 +2115,12 @@ fn view_of(
     selected: bool,
     comment: Option<&str>,
 ) -> NodeView {
-    let appearance = NodeType::ALL
-        .iter()
-        .find(|t| t.spelling() == node_type)
-        .map(|t| t.appearance());
+    let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type);
+    let appearance = found.map(|t| t.appearance());
+    let terminals = found.map(|t| t.terminals()).unwrap_or(style::Terminals {
+        sinks: &[],
+        sources: &[],
+    });
 
     // A type this build does not know is drawn as a small open square, which
     // is a shape no real type uses, and marked faulty. Showing it beats
@@ -2190,6 +2192,38 @@ fn view_of(
         comment: comment.unwrap_or_default().into(),
         // A diagram of its own can be opened; nothing else can.
         openable: node_type == "subdiagram",
+        // The terminals this type has, each drawn in its own corner. A type
+        // this build does not know has none: the shape already says it cannot
+        // be placed, and four arrows on it would be four claims about a type
+        // nothing here can describe.
+        from_moc: terminal_view("from_moc", terminals, size),
+        to_payload: terminal_view("to_payload", terminals, size),
+        from_payload: terminal_view("from_payload", terminals, size),
+        to_moc: terminal_view("to_moc", terminals, size),
+        terminal_column: style::TERMINAL_COLUMN as f32,
+    }
+}
+
+/// One terminal of a node, as the window wants it.
+///
+/// Whether this type has it and where it goes. The corner and the arrow are
+/// `style`'s to say -- see [`style::corner_of`] -- so that the rule "the
+/// vehicleward stream along the top going right, the groundward stream along
+/// the bottom going left" is stated once and tested where it is stated.
+fn terminal_view(
+    terminal: &str,
+    terminals: style::Terminals,
+    size: (u32, u32),
+) -> TerminalView {
+    let corner = style::corner_of(terminal);
+    let (x, y) = corner
+        .map(|corner| style::terminal_at(corner, size))
+        .unwrap_or_default();
+    TerminalView {
+        shown: terminals.has(terminal),
+        x: x as f32,
+        y: y as f32,
+        rightward: corner.is_some_and(|corner| corner.rightward),
     }
 }
 
@@ -2201,10 +2235,10 @@ fn view_of(
 /// the rules without knowing a single hex value.
 fn tint_of(tint: Tint) -> String {
     // Searched for rather than chosen by eye, and the thing searched for was
-    // not prettiness: these are the fourteen sRGB colours that maximise the
+    // not prettiness: these are the fifteen sRGB colours that maximise the
     // smallest perceived difference between any two of them, taken under
     // normal vision and under simulated protanopia, deuteranopia and
-    // tritanopia at once. The worst pair of the fourteen is 17 CIE units apart
+    // tritanopia at once. The worst pair of the fifteen is 17 CIE units apart
     // under every one of the four, which the test below checks against these
     // very values.
     //
@@ -2233,6 +2267,12 @@ fn tint_of(tint: Tint) -> String {
         Tint::Gold => "#a3911b",
         Tint::Blush => "#bb8095",
         Tint::Lavender => "#9b87c3",
+        // The fifteenth, searched for in the gap the other fourteen left: a
+        // sixth level of lightness, below the five they are spread over, at
+        // 18.9 CIE units from every one of them under every one of the four
+        // ways of seeing. Darker rather than another middle tone because
+        // there was no room left in the middle -- see the Tint enum.
+        Tint::Aubergine => "#4b0046",
     }
     .to_string()
 }
@@ -2378,13 +2418,74 @@ mod tests {
         }
     }
 
+    /// A node is drawn with the terminals its type has and no others.
+    ///
+    /// What the canvas says about what may be linked to what, which is the one
+    /// thing a reader of a diagram cannot work out from the shapes: a payload
+    /// is the right-hand end of both streams, so both of its terminals are on
+    /// its left, and the ground is the left-hand end, so both of its are on
+    /// its right. Checked at the view, which is what the markup draws from.
+    #[test]
+    fn a_node_is_drawn_with_the_terminals_its_type_has() {
+        let view = |node_type: &str| view_of("x", node_type, (0, 0), None, false, None);
+
+        // A payload: what the ground sends arrives, and its readings leave.
+        let sensor = view("i2c");
+        assert!(sensor.from_moc.shown && sensor.to_moc.shown);
+        assert!(!sensor.to_payload.shown && !sensor.from_payload.shown);
+        // Both on its left, and the arrows point the way the data travels:
+        // in from the ground along the top, back out along the bottom.
+        assert!(sensor.from_moc.x < sensor.width / 2.0);
+        assert!(sensor.to_moc.x < sensor.width / 2.0);
+        assert!(sensor.from_moc.y < sensor.to_moc.y);
+        assert!(sensor.from_moc.rightward && !sensor.to_moc.rightward);
+
+        // The ground: the other end of both, and both on its right.
+        let moc = view("moc");
+        assert!(moc.to_payload.shown && moc.from_payload.shown);
+        assert!(!moc.from_moc.shown && !moc.to_moc.shown);
+        assert!(moc.to_payload.x > moc.width / 2.0);
+        assert!(moc.from_payload.x > moc.width / 2.0);
+        assert!(moc.to_payload.y < moc.from_payload.y);
+
+        // A page claims none: what is inside it is what has terminals.
+        let page = view("subdiagram");
+        for terminal in [
+            &page.from_moc,
+            &page.to_payload,
+            &page.from_payload,
+            &page.to_moc,
+        ] {
+            assert!(!terminal.shown);
+        }
+
+        // Nor does a type this build does not know. The shape already says it
+        // cannot be placed; four arrows on it would be four claims about a
+        // type nothing here can describe.
+        let unknown = view("contraption");
+        assert!(!unknown.from_moc.shown && !unknown.to_moc.shown);
+
+        // Every terminal is drawn inside its node, which is what makes the box
+        // a person presses and the box a link arrives at the same box.
+        for (node, terminal) in [
+            (&sensor, &sensor.from_moc),
+            (&sensor, &sensor.to_moc),
+            (&moc, &moc.to_payload),
+            (&moc, &moc.from_payload),
+        ] {
+            assert!(terminal.x >= 0.0 && terminal.y >= 0.0);
+            assert!(terminal.x + style::TERMINAL.0 as f32 <= node.width);
+            assert!(terminal.y + style::TERMINAL.1 as f32 <= node.height);
+        }
+    }
+
     /// Every pair of tints is told apart by a colour blind reader.
     ///
     /// The rule the palette was chosen for, checked against the colours the
-    /// window is actually given rather than against the intention. Fourteen
+    /// window is actually given rather than against the intention. Fifteen
     /// colours is enough that no amount of care at the keyboard would keep
-    /// this true: the fourteenth tint added by hand would be a near-copy of
-    /// one of the other thirteen under one of the three dichromacies, and
+    /// this true: the fifteenth tint added by hand would be a near-copy of
+    /// one of the other fourteen under one of the three dichromacies, and
     /// nobody with normal vision would see it.
     ///
     /// The floor is fifteen CIE units, where two or three is "the same colour

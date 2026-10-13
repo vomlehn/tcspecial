@@ -47,6 +47,19 @@ export global Type {
 // width for a circle, and Rectangles a pixel or two wide for lines. No images
 // and no icon font, so nothing can fail to load.
 
+// One terminal of a node: whether this type has it, and where it is drawn.
+//
+// The geometry is computed in Rust -- see style::terminal_at -- for the reason
+// the link routes are: arithmetic in a layout language is hard to read and
+// impossible to test.
+export struct TerminalView {
+    shown: bool,
+    x: length,
+    y: length,
+    // Whether the arrow points right, which is to say towards the payloads.
+    rightward: bool,
+}
+
 export struct NodeView {
     name: string,
     // The type's spelling, which is the configuration's word for it.
@@ -76,6 +89,28 @@ export struct NodeView {
     comment: string,
     // Whether this node is a diagram of its own and can be opened.
     openable: bool,
+    // Which terminals this type has, drawn as a small rectangle in a corner
+    // with an arrow pointing the way the data goes. Only the ones the type
+    // actually has: a drawing that showed four on every node would be a
+    // drawing that says nothing about what may be linked to what.
+    //
+    // Two rows, which are the two streams. Along the top, left to right, what
+    // the ground sends: it arrives at `from-moc` and leaves at `to-payload`.
+    // Along the bottom, right to left, what comes back: it arrives at
+    // `from-payload` and leaves at `to-moc`. The arrows therefore point the
+    // way the canvas itself is laid out -- the ground is the leftmost working
+    // pane and the payloads the rightmost -- so a reader who has worked that
+    // out once need not read the names again. The table is in style.rs, taken
+    // from tcslibgs::graph::terminals.
+    from-moc: TerminalView,
+    to-payload: TerminalView,
+    from-payload: TerminalView,
+    to-moc: TerminalView,
+    // How much room a terminal takes along an edge, which is what the label
+    // is padded by on whichever side carries one. From style.rs, like the
+    // sizes above, so that the one statement of how large a terminal is
+    // drawn is the one the box and the padding are both taken from.
+    terminal-column: length,
 }
 
 // One row of the palette: a family's heading, or a type to place.
@@ -175,6 +210,39 @@ component Hatching inherits Rectangle {
         stroke: ink;
         stroke-width: 1px;
         commands: "M 0 40 L 40 0 M 0 70 L 70 0 M 0 100 L 100 0 M 30 100 L 100 30 M 60 100 L 100 60";
+    }
+}
+
+// One terminal of a node: where a link may be attached.
+//
+// A rectangle with an arrow in it, and the arrow is the whole point -- the
+// name says which way the data travels and so does the arrow, so the drawing
+// and the file say the same thing. Drawn as one filled path in a viewbox the
+// size of the box, which is how everything else here is drawn: no image and no
+// icon font, so nothing can fail to load.
+component Terminal inherits Rectangle {
+    in property <color> ink;
+    // Whether the arrow points right, which is to say towards the payloads.
+    in property <bool> rightward;
+
+    width: 24px;
+    height: 10px;
+    border-width: 1px;
+    border-color: ink;
+    border-radius: 1px;
+    background: ink.with-alpha(0.10);
+
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 10;
+        fill: ink;
+        commands: rightward
+            ? "M 4 3.5 L 13 3.5 L 13 1 L 20 5 L 13 9 L 13 6.5 L 4 6.5 Z"
+            : "M 20 3.5 L 11 3.5 L 11 1 L 4 5 L 11 9 L 11 6.5 L 20 6.5 Z";
     }
 }
 
@@ -321,11 +389,50 @@ component NodeShape inherits Rectangle {
             background: ink;
         }
 
+        // The terminals: a link may be attached to each, and a type is drawn
+        // with the ones it has and no others. Inside the shape and in its
+        // corners, so that the box a person presses and the box a link
+        // arrives at are the same box.
+        if node.from-moc.shown: Terminal {
+            x: node.from-moc.x;
+            y: node.from-moc.y;
+            rightward: node.from-moc.rightward;
+            ink: ink;
+        }
+        if node.to-payload.shown: Terminal {
+            x: node.to-payload.x;
+            y: node.to-payload.y;
+            rightward: node.to-payload.rightward;
+            ink: ink;
+        }
+        if node.from-payload.shown: Terminal {
+            x: node.from-payload.x;
+            y: node.from-payload.y;
+            rightward: node.from-payload.rightward;
+            ink: ink;
+        }
+        if node.to-moc.shown: Terminal {
+            x: node.to-moc.x;
+            y: node.to-moc.y;
+            rightward: node.to-moc.rightward;
+            ink: ink;
+        }
+
         // The name, and under it the type. The type is shown always and not only
         // on hover: a diagram whose shapes have to be remembered is a diagram that
         // is read wrongly under pressure.
+        //
+        // Padded away from whichever side carries terminals, and horizontally
+        // rather than vertically: the label stays where it was, in the middle
+        // of the node, and simply stops short of the corner boxes. Reserving
+        // a row at the top and the bottom instead would leave sixteen pixels
+        // for a name on the shortest node.
         VerticalLayout {
             padding: Space.tight;
+            padding-left: (node.from-moc.shown || node.to-moc.shown)
+                ? node.terminal-column : Space.tight;
+            padding-right: (node.to-payload.shown || node.from-payload.shown)
+                ? node.terminal-column : Space.tight;
             spacing: 1px;
             alignment: center;
 

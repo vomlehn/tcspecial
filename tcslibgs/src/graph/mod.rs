@@ -25,6 +25,7 @@
 pub mod check;
 pub mod parameters;
 pub mod reach;
+pub mod terminals;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -194,12 +195,26 @@ pub struct Editor {
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Link {
+    /// Where the data leaves, as `node` or `node.terminal`: see
+    /// [`Link::origin`].
     pub from: String,
     /// Where it goes. One destination or several: several is how one reading
     /// reaches the ground and an on-board computation at once.
     pub to: Destinations,
     #[serde(default)]
     pub comment: Option<String>,
+}
+
+impl Link {
+    /// Which node this link leaves, and by which of its data sources.
+    ///
+    /// Written the way a destination is -- `temp_fore.to_moc` -- because the
+    /// two ends of a link are the same kind of thing: a node and one of its
+    /// terminals. A node with one source needs no name after the dot, so every
+    /// file written before there were names for these still says what it said.
+    pub fn origin(&self) -> Destination {
+        Destination::parse(&self.from)
+    }
 }
 
 /// One or several destinations, however the file wrote them.
@@ -280,6 +295,9 @@ impl<'de> Deserialize<'de> for Destinations {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Destination {
     pub node: String,
+    /// The terminal named after the dot, where one was: a data sink at the end
+    /// a link arrives at, a data source at the end it leaves. Named `input`
+    /// from when the only terminals were a computation's inputs.
     pub input: Option<String>,
 }
 

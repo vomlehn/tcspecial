@@ -121,6 +121,31 @@ link
     on-board computation; it is the "T" such an arrangement is usually drawn
     as.
 
+terminal
+    Where a link is attached: a node's **data source** is where data leaves it
+    and a **data sink** is where data arrives. A terminal has a name, and the
+    name says which way the data is travelling and not what is at the other
+    end of it. There are four of them, two per stream:
+
+    ``to_moc`` is where a payload's readings leave and ``from_payload`` is
+    where they arrive; ``to_payload`` is where what the ground sends leaves and
+    ``from_moc`` is where it arrives. A payload has ``from_moc`` and
+    ``to_moc``; a MOC link has ``from_payload`` and ``to_payload``; a ``null``
+    node has all four. With no vehicle node in the way, a payload's ``to_moc``
+    connects to a MOC link's ``from_payload``.
+
+    A link end is written ``node.terminal``, and ``node`` alone will do
+    wherever the type has one terminal of the kind that end needs -- which is
+    every type but ``null``, so ``{ from: temp_fore, to: moc }`` is complete as
+    it stands. A data sink takes one data source; a data source may reach
+    several sinks; and a MOC link's sink takes as many as the configuration
+    gives it, every payload's telemetry arriving at the ground on its own
+    socket.
+
+``null`` node
+    A vehicle node that carries both streams through and does nothing to what
+    passes. It is the one type with all four terminals.
+
 command binding
     A statement that a named command from the MOC sets a named attribute of a
     node. It is how a setpoint reaches a control loop in flight.

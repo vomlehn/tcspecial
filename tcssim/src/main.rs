@@ -282,11 +282,7 @@ fn main() {
         sim_path
     );
     if let Some(description) = &sim_file.description {
-        eprintln!(
-            "Simulator configuration: {} (version {})",
-            description,
-            sim_file.version.as_deref().unwrap_or("unstated")
-        );
+        eprintln!("Simulator configuration: {description}");
     }
 
     let ui = MainWindow::new().unwrap();

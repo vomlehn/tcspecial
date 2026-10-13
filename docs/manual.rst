@@ -1320,11 +1320,16 @@ refused outright: a device, which tcspecial opens and reads directly, and a
 device on a bus, where the master's own read is the request and a second master
 cannot see it.
 
-This is the shipped ``tcspecial1sim.yaml``.
+This is the shipped ``tcspecial1sim.yaml``. It states no version, and that is
+deliberate: a configuration says which version it is so that it can be checked
+against the software that will read it on the vehicle, before anything opens a
+device. Nothing aboard reads this file -- the simulator does not fly -- so a
+version here would answer a question nobody is asking, and a field that is
+read, printed and never acted on is a field somebody will one day believe in. A
+file that states one is refused, saying this.
 
 .. code-block:: yaml
 
-   version: "1.0"
    description: Simulator settings for the payloads of tcspecial1.yaml
 
    simulated_payload_groups:

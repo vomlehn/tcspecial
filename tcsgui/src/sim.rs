@@ -199,7 +199,7 @@ pub fn read(path: &Path) -> Result<Simulator, String> {
 /// no payload.
 pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
     let mut out = String::new();
-    out.push_str("version: \"1.0\"\n");
+
     if let Some(description) = &simulator.description {
         out.push_str(&format!("description: {}\n", quoted(description)));
     }

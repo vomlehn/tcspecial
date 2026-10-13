@@ -58,6 +58,13 @@ pub struct Editor {
     /// an editor that lets a person keep working into a file that is not being
     /// written.
     trouble: Option<String>,
+    /// What the last command did, where it did something worth saying.
+    ///
+    /// Beside `trouble` and not in it: the window has one red text and this is
+    /// not red. Generating the Rust writes a file somebody named and nothing
+    /// else changes, so silence would leave them wondering whether the menu
+    /// item did anything.
+    said: Option<String>,
 }
 
 impl Editor {
@@ -69,6 +76,7 @@ impl Editor {
             path: path.to_path_buf(),
             unsaved: false,
             trouble: None,
+            said: None,
         }
     }
 
@@ -189,6 +197,44 @@ impl Editor {
         self.trouble.as_deref()
     }
 
+    /// What the last command did, where it said anything.
+    pub fn said(&self) -> Option<&str> {
+        self.said.as_deref()
+    }
+
+    /// Write this configuration as Rust, where the section says to.
+    ///
+    /// Asked for from the Edit menu and not done on every save: the generated
+    /// code is a second output of the editor, compiled into tcspecial along
+    /// with the node types this configuration uses -- see `crate::codegen` --
+    /// and writing it on every keystroke would put a half-finished
+    /// configuration into a file somebody's build is reading.
+    ///
+    /// The directory is made if it is not there: a person who typed
+    /// `generated/aurora.rs` meant the directory as much as the file.
+    pub fn write_rust_code(&mut self) {
+        self.trouble = None;
+        self.said = None;
+
+        let Some(path) = crate::codegen::where_to(&self.document, &self.path) else {
+            self.trouble = crate::codegen::trouble(&self.document, &self.path);
+            return;
+        };
+
+        if let Some(parent) = path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                self.trouble = Some(format!("{} cannot be made: {e}", parent.display()));
+                return;
+            }
+        }
+
+        let rust = crate::codegen::rust_of(&self.document, &self.path);
+        match write_atomically(&path, rust.as_bytes()) {
+            Ok(()) => self.said = Some(format!("wrote {}", path.display())),
+            Err(why) => self.trouble = Some(describe(&why)),
+        }
+    }
+
     /// Whether anything has been changed that the files do not have.
     pub fn unsaved(&self) -> bool {
         self.unsaved
@@ -268,6 +314,10 @@ impl Editor {
     /// why that order.
     fn persist(&mut self) {
         self.trouble = None;
+        // What the last command said is about that command and not about this
+        // one: an edit after generating the code is not a second report that
+        // the code was written.
+        self.said = None;
         // Until a write succeeds, there is something in the document that no
         // file has. Set before the writing rather than after a failure, so
         // that a path which returns early still leaves it true.
@@ -703,6 +753,61 @@ payloads:
         // nobody has filled in is still a file the simulator can read.
         tcslibgs::sim_config::SimConfigFile::load(&sim)
             .expect("the simulator should read the form the editor wrote");
+    }
+
+    /// Generating the Rust writes it where the section says, and says so.
+    ///
+    /// The whole path of the Edit menu's command: the parameter, the directory
+    /// that has to be made, the file, and the line of text that tells somebody
+    /// it happened. What the generated code *says* is `codegen`'s tests and
+    /// `tests/generated.rs`, where the compiler is the one asking.
+    #[test]
+    fn the_rust_is_written_where_the_section_says() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.edit(Edit::AddNode {
+            name: "sensor".to_string(),
+            node_type: "i2c".to_string(),
+            home: None,
+        });
+
+        // Asked for before anything says where it goes: told what to do about
+        // it, and nothing written.
+        editor.write_rust_code();
+        let said = editor.trouble().expect("a sentence").to_string();
+        assert!(said.contains("rust-code"), "{said}");
+        assert_eq!(editor.said(), None);
+
+        // And with the parameter set: a directory that is not there is made,
+        // the file is written, and the window is told where.
+        editor.edit(Edit::SetTcspecial {
+            attribute: "rust-code".to_string(),
+            was: None,
+            now: Some("generated/vehicle.rs".to_string()),
+        });
+        editor.write_rust_code();
+        assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
+
+        let written = where_.path().join("generated/vehicle.rs");
+        let rust = std::fs::read_to_string(&written).expect("the generated code");
+        assert!(rust.contains("pub fn configuration() -> Graph"), "{rust}");
+        assert!(rust.contains("\"sensor\""), "{rust}");
+        // The path it was written to is not in the code: that is where the
+        // code goes, not something the vehicle is told.
+        assert!(!rust.contains("rust-code"), "{rust}");
+
+        let said = editor.said().expect("it says what it did");
+        assert!(said.contains("generated/vehicle.rs"), "{said}");
+
+        // And the next edit stops saying it: what the last command did is
+        // about that command.
+        editor.edit(Edit::AddNode {
+            name: "moc".to_string(),
+            node_type: "moc".to_string(),
+            home: None,
+        });
+        assert_eq!(editor.said(), None);
     }
 
     /// A simulator configuration has to be named `.yaml`, and a name that is

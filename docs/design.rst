@@ -1375,6 +1375,14 @@ may want to go and deal with it, and a program that insisted on writing first
 would be one they cannot get out of -- and *Stay*, because the menu is next to
 everything else and gets pressed by accident.
 
+The section has one attribute that is not about running the software at all:
+``rust-code``, a path to a Rust source file. See `The configuration as Rust`_.
+It is in this section because this is the section about the configuration as a
+whole, and because the editor already has a window for that section; it is left
+out of the struct the command interpreter reads, because a field carried into
+the flight software and never acted on is a field somebody will one day believe
+in.
+
 What tcspecial itself is configured with is edited from the Edit menu, under
 **Edit tcspecial parameters**. That is the one part of a configuration which is about
 the whole of it rather than about anything in it -- so there is nothing on the
@@ -1552,6 +1560,60 @@ under ``$(PREFIX)/share/tcsgui``, which is ``/usr/local/share/tcsgui`` for
 software built locally and ``/usr/share/tcsgui`` for a distribution's package:
 architecture-independent data belonging to one package, which is where the
 filesystem hierarchy standard puts it.
+
+The configuration as Rust
+-------------------------
+
+What tcspecial does today is read a configuration file when it starts. The
+other way of building it is for the configuration to *become* Rust: a source
+file, compiled into the executable along with the node types it uses and the
+infrastructure around them. A vehicle built that way carries no configuration
+file at all and nothing aboard has to parse one.
+
+The editor's half of that is **Edit → Generate Rust code**. It writes the file
+where the configuration's own ``tcspecial`` section says, under ``rust-code``:
+a path, relative to the configuration's own directory or absolute. Relative to
+the configuration and not to wherever the editor was started from, because a
+configuration and the code generated from it belong together and a path that
+meant different files depending on the working directory would be a path nobody
+could check. The directory is made if it is not there -- somebody who typed
+``generated/aurora.rs`` meant the directory as much as the file -- and the
+window says where it wrote, in the line that otherwise says ``saved``.
+
+Asked for rather than done on every save. Generating the code is a second
+output of the editor and not part of what editing means, and a half-finished
+configuration in a file somebody's build is reading would be a build of
+something nobody meant.
+
+What is generated is the part that varies between configurations: the nodes,
+what each says about itself, the links, the payload groups, the command
+bindings, and what tcspecial itself is configured with. What does not vary --
+what an i2c node does, what a mean computes, what the command interpreter
+answers -- is the code that is already there, and the generated file names
+those types rather than repeating them.
+
+It builds a ``Graph``, which is what the flight software already works in:
+``Graph::check`` says whether a configuration can be flown and
+``runtime::start`` opens it, so a configuration compiled in arrives at the same
+two functions a configuration read from a file does. That is the point of
+generating this rather than something cleverer -- a second representation of a
+configuration would be a second thing to keep correct, and the one that is
+checked is this one.
+
+A generated file that nothing compiles is a generator that can emit something
+that does not build, and nobody would find out until a build of the flight
+software failed. So the generated form of the shipped thermostat is committed
+as ``tcsgui/tests/generated/thermostat.rs`` and compiled by
+``tcsgui/tests/generated.rs``, which then hands what it builds to
+``Graph::check`` and compares it against the same configuration read from its
+file. The compiler is the test: a change to ``Graph``, ``Node`` or ``Link``
+that the generator has not kept up with fails there.
+
+What is still to come is the build that uses it: a tcspecial whose ``main``
+calls ``configuration()`` instead of reading a path, and a build that compiles
+in only the node types a configuration names. **Needs examination.** That is a
+change to how the flight software is built rather than to what the editor
+writes, which is why the editor's half landed first.
 
 The editor is lazy
 ------------------

@@ -44,6 +44,7 @@ mod sim;
 /// the palette's tests and by nothing at run time.
 #[cfg(test)]
 mod sight;
+mod codegen;
 mod nodes;
 mod style;
 mod subdiagram;
@@ -595,6 +596,17 @@ macro_rules! wiring {
                 });
             }
             {
+                // The configuration as Rust, written where the section says.
+                // Asked for rather than done on every save: see
+                // `Editor::write_rust_code`.
+                let editor = editor.clone();
+                let views = views.clone();
+                window.on_generate_rust(move || {
+                    editor.borrow_mut().write_rust_code();
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
                 // And the simulator's groups of settings. A simulated
                 // payload's own settings are in its node's panel, under a
                 // rule: see panel_of.
@@ -759,6 +771,7 @@ fn put(
     ui.set_undo_label(label(editor.journal().next_undo()));
     ui.set_redo_label(label(editor.journal().next_redo()));
     ui.set_trouble(editor.trouble().unwrap_or_default().into());
+    ui.set_said(editor.said().unwrap_or_default().into());
 }
 
 /// The same, for one open subdiagram.
@@ -782,6 +795,7 @@ fn put_sub(
     window.set_undo_label(label(editor.journal().next_undo()));
     window.set_redo_label(label(editor.journal().next_redo()));
     window.set_trouble(editor.trouble().unwrap_or_default().into());
+    window.set_said(editor.said().unwrap_or_default().into());
 }
 
 /// Put what a node says about itself into its own window.

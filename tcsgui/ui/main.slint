@@ -886,6 +886,12 @@ component Surface inherits Rectangle {
     in property <string> redo-label: "";
     // What went wrong with saving, if anything. The window's one red text.
     in property <string> trouble: "";
+    // And what the last command did, where it did something worth saying:
+    // generating the Rust writes a file somebody named and changes nothing
+    // else, so silence would leave them wondering whether the menu item did
+    // anything. Not red, and in the same place as "saved", that line already
+    // meaning "what has just happened".
+    in property <string> said: "";
     // What this surface is editing: empty for the top diagram, the
     // subdiagram's name otherwise. Shown in the bar so that two windows side
     // by side cannot be confused for one another.
@@ -970,7 +976,7 @@ component Surface inherits Rectangle {
             // Saving needs no button: every edit is written as it is made.
             // What it needs is somewhere to say when that failed.
             Text {
-                text: trouble == "" ? "saved" : trouble;
+                text: trouble != "" ? trouble : (said != "" ? said : "saved");
                 color: trouble == "" ? #2d6a4f : #c0392b;
                 font-size: Type.body;
                 font-weight: trouble == "" ? 400 : 700;
@@ -1184,6 +1190,7 @@ export component MainWindow inherits Window {
     in property <string> undo-label: "";
     in property <string> redo-label: "";
     in property <string> trouble: "";
+    in property <string> said: "";
     in property <string> selected: "";
 
     callback undo-clicked();
@@ -1203,6 +1210,9 @@ export component MainWindow inherits Window {
     callback node-selected(string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
+    // Write this configuration as Rust, where the tcspecial section's
+    // `rust-code` says: see tcsgui::codegen.
+    callback generate-rust();
     // And for the groups, the simulator's groups of settings, and the way
     // out.
     callback edit-groups();
@@ -1267,6 +1277,15 @@ export component MainWindow inherits Window {
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
             }
+            MenuSeparator { }
+            // The configuration as Rust, compiled into tcspecial along with
+            // the node types it uses. Asked for rather than done on every
+            // save: a half-finished configuration in a file somebody's build
+            // is reading would be a build of something nobody meant.
+            MenuItem {
+                title: "Generate Rust code";
+                activated => { root.generate-rust(); }
+            }
         }
     }
 
@@ -1287,6 +1306,7 @@ export component MainWindow inherits Window {
         undo-label: root.undo-label;
         redo-label: root.redo-label;
         trouble: root.trouble;
+        said: root.said;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
         place-node(name, t, sets) => { root.place-node(name, t, sets); }
@@ -1339,6 +1359,7 @@ export component SubWindow inherits Window {
     in property <string> undo-label: "";
     in property <string> redo-label: "";
     in property <string> trouble: "";
+    in property <string> said: "";
     in property <string> selected: "";
 
     callback undo-clicked();
@@ -1356,6 +1377,9 @@ export component SubWindow inherits Window {
     callback link-finished(length, length);
     callback node-selected(string);
     callback edit-parameters();
+    // Write this configuration as Rust, where the tcspecial section's
+    // `rust-code` says: see tcsgui::codegen.
+    callback generate-rust();
     callback edit-groups();
     callback edit-simulator-groups();
     callback exit-requested();
@@ -1417,6 +1441,15 @@ export component SubWindow inherits Window {
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
             }
+            MenuSeparator { }
+            // The configuration as Rust, compiled into tcspecial along with
+            // the node types it uses. Asked for rather than done on every
+            // save: a half-finished configuration in a file somebody's build
+            // is reading would be a build of something nobody meant.
+            MenuItem {
+                title: "Generate Rust code";
+                activated => { root.generate-rust(); }
+            }
         }
     }
 
@@ -1438,6 +1471,7 @@ export component SubWindow inherits Window {
         undo-label: root.undo-label;
         redo-label: root.redo-label;
         trouble: root.trouble;
+        said: root.said;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
         place-node(name, t, sets) => { root.place-node(name, t, sets); }

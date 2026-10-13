@@ -1,0 +1,432 @@
+//! The configuration, as Rust.
+//!
+//! What tcspecial does today is read a configuration file when it starts. What
+//! this is for is the other way of building it: the configuration becomes a
+//! Rust source file, compiled into the executable along with the node types it
+//! uses and the infrastructure around them. A vehicle built that way carries no
+//! configuration file at all, and nothing aboard has to parse one.
+//!
+//! The file is written where the configuration's own `tcspecial` section says,
+//! under `rust-code` -- a path, relative to the configuration's own directory
+//! or absolute -- and it is written when somebody asks for it from the Edit
+//! menu, not on every save: generating it is a second output of the editor and
+//! not part of what editing means.
+//!
+//! # What is generated, and what is not
+//!
+//! This generates the part that varies between configurations: the nodes, what
+//! each of them says about itself, the links between them, the payload groups,
+//! the command bindings, and what tcspecial itself is configured with. The part
+//! that does not vary -- what an i2c node does, what a mean computes, what the
+//! command interpreter answers -- is the code that is already in `tcspecial`
+//! and `tcslibgs`, and the generated file names those types rather than
+//! repeating them.
+//!
+//! It builds a [`tcslibgs::graph::Graph`], which is what the flight software
+//! already works in: `Graph::check` is what says a configuration can be flown
+//! and `runtime::start` is what opens it, so a graph that was built in Rust
+//! rather than read from a file arrives at the same two functions. That is the
+//! whole point of generating this rather than something cleverer -- a second
+//! representation of a configuration would be a second thing to keep correct,
+//! and the one that is checked is this one.
+//!
+//! What is still to come is the build that uses it: a tcspecial whose
+//! `main` calls `configuration()` instead of reading a path. **Needs
+//! examination**, and it is a change to how the flight software is built
+//! rather than to what the editor writes, which is why it is not here.
+//!
+//! # Why it is generated rather than hand-written
+//!
+//! Because it is derived. A person who edits the diagram and then edits this
+//! file by hand has two configurations, and the one that flies is whichever
+//! was compiled last. So the file says, at the top, that it is generated and
+//! from what -- and every generation overwrites it whole.
+
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+use crate::document::Document;
+use crate::subdiagram::Qualified;
+
+/// Where a configuration's generated Rust goes, if it says.
+///
+/// `rust-code` in the `tcspecial` section: a path as somebody typed it, which
+/// may be relative. Relative to the configuration's own directory and not to
+/// wherever the editor happened to be started from -- a configuration and the
+/// code generated from it belong together, and a path that meant different
+/// files depending on the working directory would be a path nobody could
+/// check.
+pub fn where_to(document: &Document, configuration: &Path) -> Option<PathBuf> {
+    let said = document
+        .tcspecial
+        .get(tcslibgs::graph::parameters::RUST_CODE)
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())?;
+
+    let said = PathBuf::from(said);
+    if said.is_absolute() {
+        return Some(said);
+    }
+    Some(
+        configuration
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(said),
+    )
+}
+
+/// What is wrong with generating the code, where something is.
+///
+/// Said as the editor says everything else that cannot be done: in words, on
+/// the window, with nothing written. A configuration with no `rust-code` is
+/// not a fault -- it is a configuration nobody has asked this of -- but asking
+/// for the code without having said where it goes is worth a sentence.
+pub fn trouble(document: &Document, configuration: &Path) -> Option<String> {
+    if where_to(document, configuration).is_none() {
+        return Some(format!(
+            "this configuration does not say where its generated code goes: set \
+             {} in the tcspecial parameters, under Edit",
+            tcslibgs::graph::parameters::RUST_CODE
+        ));
+    }
+    None
+}
+
+/// The configuration as Rust, ready to be compiled into tcspecial.
+///
+/// `from` is the configuration this was generated from, which the file names
+/// at the top: a reader who finds it in a tree has to be able to get back to
+/// the thing it was made of.
+pub fn rust_of(document: &Document, from: &Path) -> String {
+    let mut out = String::new();
+    let named = from
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| from.display().to_string());
+
+    out.push_str(&format!(
+        "//! What this vehicle carries, as Rust.\n\
+         //!\n\
+         //! Generated by tcsgui from `{named}`. Every generation overwrites \
+         this file\n\
+         //! whole, so nothing written here by hand survives: the configuration \
+         is the\n\
+         //! thing to edit, and this is what comes of it.\n\
+         //!\n\
+         //! It builds the same `Graph` the configuration describes, which is \
+         what the\n\
+         //! flight software already works in: `Graph::check` says whether it \
+         can be\n\
+         //! flown and `runtime::start` opens it, so a configuration compiled \
+         in arrives\n\
+         //! at the same two functions a configuration read from a file does.\n\
+         \n"
+    ));
+
+    out.push_str(
+        "use std::collections::BTreeMap;\n\
+         \n\
+         use tcslibgs::graph::parameters::nest;\n\
+         use tcslibgs::graph::{\n    \
+             CommandBinding, Destinations, Editor, Graph, Group, Link, Node,\n\
+         };\n\
+         use tcslibgs::Scalar;\n\
+         \n",
+    );
+
+    out.push_str(
+        "/// The configuration this file was generated from.\n\
+         pub fn configuration() -> Graph {\n    \
+             Graph {\n",
+    );
+
+    out.push_str(&format!(
+        "        description: {},\n",
+        option_of(document.description.as_deref())
+    ));
+
+    // What tcspecial itself is configured with, flat and dotted as the rules
+    // name it: `nest` is what puts the file's subsections back, and calling it
+    // here keeps this file from spelling out a tree of `Parameter`s.
+    out.push_str("        tcspecial: Some(nest(&[\n");
+    for (attribute, value) in &document.tcspecial {
+        if value.trim().is_empty() || attribute == tcslibgs::graph::parameters::RUST_CODE {
+            continue;
+        }
+        out.push_str(&format!(
+            "            ({}.to_string(), Scalar::of({})),\n",
+            quoted(attribute),
+            quoted(value)
+        ));
+    }
+    out.push_str(
+        "        ]\n        .into_iter()\n        .collect())),\n",
+    );
+
+    out.push_str("        groups: vec![\n");
+    for (name, interval) in &document.groups {
+        out.push_str(&format!(
+            "            Group {{ name: {}.to_string(), interval: {}.to_string() }},\n",
+            quoted(name),
+            quoted(interval)
+        ));
+    }
+    out.push_str("        ],\n");
+
+    // The nodes, in the order the sections are read: the ground link, the
+    // vehicle's own graph, then what it carries. A reader of this file and a
+    // reader of the configuration meet them in the same order.
+    out.push_str("        nodes: vec![\n");
+    for section in [
+        tcslibgs::graph::Section::Moc,
+        tcslibgs::graph::Section::Vehicle,
+        tcslibgs::graph::Section::Payloads,
+    ] {
+        for node in document
+            .nodes
+            .iter()
+            .filter(|node| tcslibgs::graph::section_of(&node.node_type) == section)
+        {
+            out.push_str("            Node {\n");
+            out.push_str(&format!(
+                "                name: {}.to_string(),\n",
+                quoted(&Qualified::of(&node.name, &node.home).absolute())
+            ));
+            out.push_str(&format!(
+                "                node_type: {}.to_string(),\n",
+                quoted(&node.node_type)
+            ));
+            // The group it is read with, which the document holds as an
+            // attribute and the schema holds as a field of its own.
+            out.push_str(&format!(
+                "                group: {},\n",
+                option_of(node.attributes.get("group").map(String::as_str))
+            ));
+            if node.attributes.iter().all(|(_, value)| value.trim().is_empty()) {
+                out.push_str("                attributes: BTreeMap::new(),\n");
+            } else {
+                out.push_str("                attributes: [\n");
+                for (attribute, value) in &node.attributes {
+                    // An attribute nobody has answered is left out, as it is
+                    // left out of the file: absent and empty mean the same
+                    // thing to the rules.
+                    if value.trim().is_empty() {
+                        continue;
+                    }
+                    out.push_str(&format!(
+                        "                    ({}.to_string(), Scalar::of({})),\n",
+                        quoted(attribute),
+                        quoted(value)
+                    ));
+                }
+                out.push_str(
+                    "                ]\n                .into_iter()\n                \
+                     .collect(),\n",
+                );
+            }
+            out.push_str(&format!(
+                "                editor: Some(Editor {{ x: {}, y: {} }}),\n",
+                node.at.0, node.at.1
+            ));
+            out.push_str("            },\n");
+        }
+    }
+    out.push_str("        ],\n");
+
+    // The links, each naming the data source it leaves by: the same shape the
+    // file reader builds, so that a rule about a link reads the same either
+    // way. See `tcslibgs::graph::NodeFile::links`.
+    out.push_str("        links: vec![\n");
+    for link in &document.links {
+        let from = match &link.origin {
+            Some(origin) => format!("{}.{origin}", link.from),
+            None => link.from.clone(),
+        };
+        let to = match &link.input {
+            Some(input) => format!("{}.{input}", link.to),
+            None => link.to.clone(),
+        };
+        out.push_str(&format!(
+            "            Link {{\n                \
+                 from: {}.to_string(),\n                \
+                 to: Destinations::of(vec![{}.to_string()]),\n                \
+                 comment: None,\n            \
+             }},\n",
+            quoted(&from),
+            quoted(&to)
+        ));
+    }
+    out.push_str("        ],\n");
+
+    out.push_str("        commands: vec![\n");
+    for command in &document.commands {
+        out.push_str(&format!(
+            "            CommandBinding {{ from: {}.to_string(), sets: {}.to_string() }},\n",
+            quoted(&command.from),
+            quoted(&command.sets)
+        ));
+    }
+    out.push_str("        ],\n");
+
+    // Which files it was read from, and which file each node came from. Empty
+    // here, and that is the honest answer: a configuration compiled in was
+    // read from no file at all. They exist so that a complaint about a node can
+    // name the page it is on, and a complaint about this configuration names
+    // the source it was generated into.
+    out.push_str(
+        "        files: Vec::new(),\n        \
+         homes: BTreeMap::new(),\n    }\n}\n",
+    );
+
+    out
+}
+
+/// A string as Rust spells it.
+fn quoted(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// An `Option<String>` as Rust spells it.
+fn option_of(value: Option<&str>) -> String {
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) => format!("Some({}.to_string())", quoted(value)),
+        None => "None".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::journal::Edit;
+    use std::path::Path;
+
+    /// Where the code goes, as the section says it.
+    #[test]
+    fn the_section_says_where_the_code_goes() {
+        let mut document = Document::new();
+        let configuration = Path::new("/vehicles/aurora/vehicle.yaml");
+
+        // Nothing said, which is not a fault: a configuration nobody has asked
+        // this of. Asking for it anyway is told what to do about it.
+        assert_eq!(where_to(&document, configuration), None);
+        let said = trouble(&document, configuration).expect("a sentence");
+        assert!(said.contains("rust-code"), "{said}");
+
+        // Relative to the configuration's own directory, and not to wherever
+        // the editor was started from.
+        document.apply(&Edit::SetTcspecial {
+            attribute: "rust-code".to_string(),
+            was: None,
+            now: Some("generated/aurora.rs".to_string()),
+        });
+        assert_eq!(
+            where_to(&document, configuration),
+            Some(PathBuf::from("/vehicles/aurora/generated/aurora.rs"))
+        );
+        assert_eq!(trouble(&document, configuration), None);
+
+        // An absolute path is where it says.
+        document.apply(&Edit::SetTcspecial {
+            attribute: "rust-code".to_string(),
+            was: Some("generated/aurora.rs".to_string()),
+            now: Some("/tmp/aurora.rs".to_string()),
+        });
+        assert_eq!(
+            where_to(&document, configuration),
+            Some(PathBuf::from("/tmp/aurora.rs"))
+        );
+    }
+
+    /// The generated file says what it is and where it came from.
+    ///
+    /// A derived file that does not say so is a file somebody edits.
+    #[test]
+    fn the_generated_file_says_it_is_generated() {
+        let document = crate::document::thermostat_example();
+        let rust = rust_of(&document, Path::new("tests/manual/thermostat.yaml"));
+
+        assert!(rust.starts_with("//!"), "{}", &rust[..40]);
+        assert!(rust.contains("Generated by tcsgui from `thermostat.yaml`"), "{rust}");
+        assert!(
+            rust.contains("nothing written here by hand survives"),
+            "a generated file says not to edit it"
+        );
+    }
+
+    /// The committed generated example is what the generator writes.
+    ///
+    /// `tests/generated/thermostat.rs` is compiled by `tests/generated.rs`, so
+    /// the compiler checks that what this writes is Rust and the checker
+    /// checks that what it builds can be flown. Keeping it in step is this
+    /// test's job, and `TCSGUI_WRITE_EXAMPLE=1` writes it out, as it does the
+    /// shipped examples.
+    #[test]
+    fn the_generated_example_is_what_the_generator_writes() {
+        let document = crate::document::thermostat_example();
+        let rust = rust_of(&document, Path::new("tests/manual/thermostat.yaml"));
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/generated/thermostat.rs");
+
+        if std::env::var("TCSGUI_WRITE_EXAMPLE").is_ok() {
+            std::fs::write(&path, &rust).expect("the example is writable");
+            return;
+        }
+
+        let committed = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "{}: {e}. Run the tests with TCSGUI_WRITE_EXAMPLE=1 to write \
+                 the generated example out",
+                path.display()
+            )
+        });
+        assert_eq!(
+            committed,
+            rust,
+            "{} is not what the generator writes any more",
+            path.display()
+        );
+    }
+
+    /// Everything the configuration says reaches the generated code.
+    ///
+    /// The nodes, what they say about themselves, the links, the groups, the
+    /// bindings and the section. Checked by name here; that the result is Rust
+    /// that compiles and builds a sound graph is `tests/generated.rs`, where
+    /// the compiler is the one asking.
+    #[test]
+    fn everything_the_configuration_says_is_in_the_code() {
+        let document = crate::document::thermostat_example();
+        let rust = rust_of(&document, Path::new("thermostat.yaml"));
+
+        for node in &document.nodes {
+            assert!(rust.contains(&format!("\"{}\"", node.name)), "{}", node.name);
+            for (attribute, value) in &node.attributes {
+                assert!(
+                    rust.contains(&format!("(\"{attribute}\".to_string(), Scalar::of(\"{value}\"))")),
+                    "{}.{attribute}",
+                    node.name
+                );
+            }
+        }
+        for link in &document.links {
+            let from = format!("{}.{}", link.from, link.origin.as_deref().expect("a source"));
+            assert!(rust.contains(&format!("\"{from}\"")), "{from}");
+        }
+        for (name, interval) in &document.groups {
+            assert!(rust.contains(&format!("\"{name}\"")), "{name}");
+            assert!(rust.contains(&format!("\"{interval}\"")), "{interval}");
+        }
+        for command in &document.commands {
+            assert!(rust.contains(&format!("\"{}\"", command.sets)), "{}", command.sets);
+        }
+        for (attribute, value) in &document.tcspecial {
+            if value.trim().is_empty() {
+                continue;
+            }
+            assert!(rust.contains(&format!("\"{attribute}\"")), "{attribute}");
+        }
+
+        // And the path it is written to is not: that is where the code goes,
+        // not something the vehicle is told.
+        assert!(!rust.contains("rust-code"), "{rust}");
+    }
+}

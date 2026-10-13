@@ -188,7 +188,24 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("beacon.recv", true),
     ("log.directory", false),
     ("log.segment_size", false),
+    // Where this configuration's generated Rust is written, which is the one
+    // attribute of the section that is about building the software rather than
+    // about running it: see `rust-code` below and `tcsgui::codegen`.
+    ("rust-code", false),
 ];
+
+/// The attribute that is not the command interpreter's.
+///
+/// `rust-code` is a path, and nothing aboard reads it: it says where tcsgui
+/// writes the Rust it generates from this configuration, which is then
+/// compiled into tcspecial along with the node types the configuration uses.
+/// It is in this section because this is the section about the configuration
+/// as a whole, and because that is where the editor already has a window for
+/// one -- and it is named here so that
+/// [`ci_config_of`] can leave it out of the struct the interpreter reads: a
+/// field carried into the flight software and never acted on is a field
+/// somebody will one day believe in.
+pub const RUST_CODE: &str = "rust-code";
 
 /// The section as the command interpreter wants it, or what is wrong with it.
 ///

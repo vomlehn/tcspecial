@@ -4,7 +4,7 @@
 //! Here so that "nothing is told apart by colour alone" has a companion the
 //! tests can check: the rule in `style.rs` says colour is never the only
 //! channel, and this says the colours are worth having anyway. One tint per
-//! node type is only useful if a reader with a dichromacy gets fourteen
+//! node type is only useful if a reader with a dichromacy gets fifteen
 //! distinguishable tints rather than nine and a few coincidences, and that is
 //! not something a person can check by looking -- which is exactly the sort of
 //! claim that belongs in a test.

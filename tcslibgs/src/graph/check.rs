@@ -11,7 +11,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{Destination, Graph};
+use super::{terminals, Destination, Graph};
 use crate::verify::About;
 
 /// Something wrong with a configuration.
@@ -39,6 +39,19 @@ pub enum Problem {
     IntervalInAGroup { node: String, group: String },
     /// Two links arriving at one input of one node.
     InputBoundTwice { node: String, input: String },
+    /// A link end naming a terminal its node does not have, or naming one at
+    /// the wrong end, or naming none where the node has several to choose
+    /// between. See [`crate::graph::terminals`].
+    BadTerminal { link: String, why: String },
+    /// A link whose two ends carry different streams: one of them is drawn
+    /// backwards.
+    CrossedStreams {
+        link: String,
+        leaves: String,
+        arrives: String,
+    },
+    /// A payload or a ground link with no link on it at all.
+    NodeOnNoLink { node: String, node_type: String },
     /// A command binding naming a node that is not there.
     NoSuchTarget { sets: String },
     /// A command binding that does not name an attribute.
@@ -136,6 +149,11 @@ impl Problem {
             Problem::NoSuchGroup { node, .. } => About::Node(node.clone()),
             Problem::IntervalInAGroup { node, .. } => About::Node(node.clone()),
             Problem::InputBoundTwice { node, .. } => About::Node(node.clone()),
+            // A terminal's problem is the link's, which is reported where the
+            // links are written.
+            Problem::BadTerminal { .. } => About::Section("links"),
+            Problem::CrossedStreams { .. } => About::Section("links"),
+            Problem::NodeOnNoLink { node, .. } => About::Node(node.clone()),
             Problem::NoSuchTarget { .. } | Problem::NoAttributeNamed { .. } => {
                 About::Section("commands")
             }
@@ -191,6 +209,21 @@ impl Problem {
             Problem::InputBoundTwice { node, input } => {
                 format!("two links arrive at \"{node}.{input}\"")
             }
+            Problem::BadTerminal { link, why } => format!("{link}: {why}"),
+            Problem::CrossedStreams {
+                link,
+                leaves,
+                arrives,
+            } => format!(
+                "{link}: it leaves by \"{leaves}\" and arrives at \"{arrives}\", \
+                 which are opposite ways for the data to be going -- one end of \
+                 this link is drawn backwards"
+            ),
+            Problem::NodeOnNoLink { node, node_type } => format!(
+                "\"{node}\" is a {node_type} node with no link on it: a payload \
+                 or a ground link needs a data sink or a data source, or there \
+                 is nothing for it to do"
+            ),
             Problem::NoSuchTarget { sets } => {
                 format!("a command sets \"{sets}\", and there is no such node")
             }
@@ -344,33 +377,117 @@ impl Graph {
             }
         }
 
-        // Links: both ends must be nodes, and no input twice.
+        // Links: both ends must be nodes, each end must be a terminal that
+        // node has, the two ends must carry the same stream, and no sink
+        // twice.
         let mut bound: BTreeMap<(String, String), usize> = BTreeMap::new();
+        // Which nodes have a link on a sink and which on a source, for the
+        // rule below that a payload and the ground need one or the other.
+        let mut linked: BTreeMap<&str, (bool, bool)> = BTreeMap::new();
         for link in &self.links {
             let described = |to: &str| format!("\"{}\" to \"{to}\"", link.from);
+            let origin = link.origin();
 
-            if self.node(&link.from).is_none() {
-                problems.push(Problem::NoSuchNode {
-                    link: described(&link.to.each().join(", ")),
-                    missing: link.from.clone(),
-                });
-            }
-
-            for destination in link.to.each() {
-                let Destination { node, input } = Destination::parse(destination);
-                if node == link.from {
-                    problems.push(Problem::SelfLink { node });
-                    continue;
-                }
-                if self.node(&node).is_none() {
+            let leaves = match self.node(&origin.node) {
+                None => {
                     problems.push(Problem::NoSuchNode {
-                        link: described(destination),
-                        missing: node,
+                        link: described(&link.to.each().join(", ")),
+                        missing: origin.node.clone(),
                     });
                     continue;
                 }
-                if let Some(input) = input {
-                    *bound.entry((node, input)).or_insert(0) += 1;
+                Some(node) => {
+                    linked.entry(node.name.as_str()).or_default().1 = true;
+                    // Which of its data sources this link leaves by, and what
+                    // stream that carries.
+                    match terminals::terminal_at(
+                        &node.node_type,
+                        origin.input.as_deref(),
+                        false,
+                    ) {
+                        Ok(terminal) => terminal,
+                        Err(why) => {
+                            problems.push(Problem::BadTerminal {
+                                link: described(&link.to.each().join(", ")),
+                                why,
+                            });
+                            continue;
+                        }
+                    }
+                }
+            };
+
+            for destination in link.to.each() {
+                let Destination { node, input } = Destination::parse(destination);
+                if node == origin.node {
+                    problems.push(Problem::SelfLink { node });
+                    continue;
+                }
+                let arrives = match self.node(&node) {
+                    None => {
+                        problems.push(Problem::NoSuchNode {
+                            link: described(destination),
+                            missing: node,
+                        });
+                        continue;
+                    }
+                    Some(at) => {
+                        linked.entry(at.name.as_str()).or_default().0 = true;
+                        match terminals::terminal_at(
+                            &at.node_type,
+                            input.as_deref(),
+                            true,
+                        ) {
+                            // Carried with the terminal: whether this one is
+                            // held to a single source, which is the node
+                            // type's business and not the link's.
+                            Ok(terminal) => {
+                                terminal.map(|terminal| {
+                                    (terminal, terminals::merges(&at.node_type))
+                                })
+                            }
+                            Err(why) => {
+                                problems.push(Problem::BadTerminal {
+                                    link: described(destination),
+                                    why,
+                                });
+                                continue;
+                            }
+                        }
+                    }
+                };
+
+                // The same stream at both ends. A link from a source carrying
+                // the readings into a sink that takes commands is a link drawn
+                // backwards, and it would be found at run time as a payload
+                // that answers nothing.
+                if let (Some(leaves), Some((arrives, _))) = (&leaves, &arrives) {
+                    match (
+                        terminals::stream_of(leaves),
+                        terminals::stream_of(arrives),
+                    ) {
+                        (Some((_, one)), Some((_, two))) if one != two => {
+                            problems.push(Problem::CrossedStreams {
+                                link: described(destination),
+                                leaves: leaves.clone(),
+                                arrives: arrives.clone(),
+                            });
+                            continue;
+                        }
+                        _ => {}
+                    }
+                }
+
+                // A sink takes one source: two into one would be two streams
+                // interleaved, and nothing downstream could tell them apart.
+                // Except the ground's, which can: every payload's telemetry
+                // arrives at the ground labelled with the payload's id, so
+                // one moc node is where the whole vehicle reports. See
+                // `terminals::Terminals::merges`.
+                if let Some((arrives, merges)) = arrives {
+                    if !merges {
+                        *bound.entry((node, arrives)).or_insert(0) += 1;
+                    }
                 }
             }
         }
@@ -380,10 +497,40 @@ impl Graph {
             }
         }
 
+        // A payload and the ground link have to be joined to something.
+        //
+        // A payload with neither a sink nor a source linked is a payload the
+        // configuration describes and nothing reads or drives -- a sensor
+        // nobody looks at, which is a line somebody meant to connect. The
+        // ground link is the same the other way about: one with nothing on it
+        // receives no telemetry and sends no commands.
+        //
+        // Either will do. A payload that is only read has a source and no
+        // sink; one that is only driven -- a heater, a valve, a latch -- has a
+        // sink and no source; and both are configurations somebody means.
+        for node in self
+            .nodes
+            .iter()
+            .filter(|node| node.is_payload() || node.node_type == "moc")
+        {
+            let (sink, source) = linked.get(node.name.as_str()).copied().unwrap_or_default();
+            if !sink && !source {
+                problems.push(Problem::NodeOnNoLink {
+                    node: node.name.clone(),
+                    node_type: node.node_type.clone(),
+                });
+            }
+        }
+
         // A node nobody reaches and nobody reads.
         let mut touched: BTreeSet<&str> = BTreeSet::new();
         for link in &self.links {
-            touched.insert(link.from.as_str());
+            // The borrow has to outlive the loop, so the node is found in the
+            // graph rather than parsed into a String here.
+            let name = link.from.split('.').next().unwrap_or(&link.from);
+            if let Some(node) = self.node(name) {
+                touched.insert(node.name.as_str());
+            }
             for destination in link.to.each() {
                 // The borrow has to outlive the loop, so the node name is
                 // found in the graph rather than parsed into a String here.
@@ -473,6 +620,25 @@ impl Graph {
                         bound,
                     });
                 }
+            }
+        }
+
+        // A `null` node says nothing about itself.
+        //
+        // It has nothing to say: it is not opened, it has no parameters, and
+        // what it does is carry what arrives through. So an attribute on one
+        // is a word nothing reads -- most likely a node whose type was changed
+        // and whose attributes were left behind -- and it is refused by name
+        // rather than ignored, which is the rule every other type is held to.
+        for node in self.nodes.iter().filter(|n| n.node_type == "null") {
+            for attribute in node.attributes.keys() {
+                problems.push(Problem::BadNode {
+                    node: node.name.clone(),
+                    why: format!(
+                        "\"{}\": \"{attribute}\" is not an attribute of a null                          node: a null node carries what arrives through and has                          nothing to be told",
+                        node.name
+                    ),
+                });
             }
         }
 
@@ -591,7 +757,11 @@ impl Graph {
             if node.attributes.contains_key("trigger") {
                 continue;
             }
-            let read = self.links.iter().any(|link| link.from == node.name);
+            // Whatever terminal it leaves by: a payload read through its
+            // `to_moc` is a payload that is read.
+            let read = self.links.iter().any(|link| {
+                link.from.split('.').next().unwrap_or(&link.from) == node.name
+            });
             if !read {
                 continue;
             }
@@ -626,14 +796,19 @@ impl Graph {
     ///
     /// Each once: a node delivering to two inputs of one destination is one
     /// source of it, and naming it twice would read as two.
+    ///
+    /// Named as the node, whatever terminal the link left by: a complaint that
+    /// said `"n.to_moc" produces records of three bytes` would be naming a
+    /// thing the file has no entry for.
     fn sources_of(&self, node: &str) -> Vec<&str> {
         let mut sources: Vec<&str> = Vec::new();
         for link in &self.links {
             let arrives = link.to.each().iter().any(|destination| {
                 destination.split('.').next().unwrap_or(destination) == node
             });
-            if arrives && !sources.contains(&link.from.as_str()) {
-                sources.push(link.from.as_str());
+            let from = link.from.split('.').next().unwrap_or(&link.from);
+            if arrives && !sources.contains(&from) {
+                sources.push(from);
             }
         }
         sources
@@ -1552,6 +1727,228 @@ mod tests {
         }
     }
 
+    /// A link end naming a terminal its node does not have is refused.
+    ///
+    /// The names are the four of them and nothing else -- see
+    /// [`crate::graph::terminals`] -- so a link drawn to `moc.telemetry` is a
+    /// link to a terminal nothing will bind, which used to be a configuration
+    /// that passed here and delivered nowhere.
+    #[test]
+    fn a_link_end_names_a_terminal_its_node_has() {
+        let g = graph(
+            vec![node("a", "i2c"), node("c", "moc")],
+            vec![link("a", &["c.telemetry"])],
+        );
+        let problems = g.check();
+        let why = problems
+            .iter()
+            .find_map(|p| match p {
+                Problem::BadTerminal { why, .. } => Some(why.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{problems:?}"));
+        // Saying what it does have, which is the one thing a reader needs.
+        assert!(why.contains("telemetry") && why.contains("from_payload"), "{why}");
+        // Reported where the links are written.
+        let said = problems
+            .iter()
+            .find(|p| matches!(p, Problem::BadTerminal { .. }))
+            .unwrap();
+        assert_eq!(said.about(), About::Section("links"));
+
+        // A name at the wrong end: the right word, the wrong half of the
+        // link, and worth saying in those words rather than as a name nothing
+        // knows.
+        let g = graph(
+            vec![node("a", "i2c"), node("c", "moc")],
+            vec![link("a", &["c.to_payload"])],
+        );
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadTerminal { why, .. } if why.contains("leaves")
+            )),
+            "{problems:?}"
+        );
+
+        // And a node with two sinks has to be told which. The null node is
+        // both ends of both streams, so an unnamed link into it could be
+        // either, and guessing one would be guessing which stream it carries.
+        let g = graph(
+            vec![node("a", "i2c"), node("n", "null"), node("c", "moc")],
+            vec![link("a", &["n"]), link("n.to_moc", &["c"])],
+        );
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadTerminal { why, .. }
+                    if why.contains("from_payload") && why.contains("from_moc")
+            )),
+            "{problems:?}"
+        );
+    }
+
+    /// A link whose ends carry opposite streams is refused.
+    ///
+    /// One end of it is drawn backwards, and nothing else in the
+    /// configuration would show it: the file reads as a link, both nodes
+    /// exist, both terminals exist, and in flight it is a payload that
+    /// answers nothing.
+    #[test]
+    fn a_link_may_not_carry_two_streams() {
+        let g = graph(
+            vec![node("n", "null"), node("c", "moc")],
+            // A data source at one end and a data sink at the other, so the
+            // ends themselves are right -- and the stream is vehicleward
+            // where it leaves and groundward where it arrives.
+            vec![link("n.to_payload", &["c.from_payload"])],
+        );
+        let problems = g.check();
+        let said = problems
+            .iter()
+            .find(|p| matches!(p, Problem::CrossedStreams { .. }))
+            .unwrap_or_else(|| panic!("{problems:?}"));
+        assert!(
+            said.describe().contains("backwards"),
+            "{}",
+            said.describe()
+        );
+    }
+
+    /// The null node passes the rest of itself: all four terminals, each used.
+    ///
+    /// What a generic vehicle node is: a sink and a source at each end of each
+    /// stream, with nothing done to what goes through. A configuration built
+    /// of one is the smallest thing that exercises every terminal at once.
+    #[test]
+    fn a_null_vehicle_node_carries_both_streams_through() {
+        let mut sensor = node("a", "i2c");
+        // Written to in order to be read, which is what the trigger says.
+        sensor
+            .attributes
+            .insert("trigger".to_string(), Scalar::of("\"go\\n\""));
+        let g = graph(
+            vec![sensor, node("n", "null"), node("c", "moc")],
+            vec![
+                link("a.to_moc", &["n.from_payload"]),
+                link("n.to_moc", &["c.from_payload"]),
+                link("c.to_payload", &["n.from_moc"]),
+                link("n.to_payload", &["a.from_moc"]),
+            ],
+        );
+        assert_eq!(g.check(), Vec::new());
+
+        // And it has nothing to be told: an attribute on one is a word
+        // nothing reads, most likely left behind by a type that was changed.
+        let mut said_something = node("n", "null");
+        said_something
+            .attributes
+            .insert("address".to_string(), Scalar::of("0x48"));
+        let g = graph(
+            vec![node("a", "i2c"), said_something, node("c", "moc")],
+            vec![link("a", &["n.from_payload"]), link("n.to_moc", &["c"])],
+        );
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadNode { node, why } if node == "n" && why.contains("address")
+            )),
+            "{problems:?}"
+        );
+    }
+
+    /// Every payload aboard may report to the one ground link.
+    ///
+    /// A sink takes one source, and the ground's is the exception the whole
+    /// architecture rests on: each payload's telemetry arrives at its own
+    /// socket, `source_base` plus the payload's id, so the ground can tell
+    /// apart what a vehicle node could not. Four sensors into one moc node is
+    /// the shipped thermostat.
+    #[test]
+    fn the_ground_takes_every_payload_at_once() {
+        let g = graph(
+            vec![
+                node("a", "i2c"),
+                node("b", "i2c"),
+                node("c", "i2c"),
+                node("moc", "moc"),
+            ],
+            vec![
+                link("a", &["moc"]),
+                link("b", &["moc"]),
+                link("c", &["moc"]),
+            ],
+        );
+        assert_eq!(g.check(), Vec::new());
+
+        // And a vehicle node's sink is not: two streams into one link, in
+        // whatever order they were sent, with nothing to say which was which.
+        let g = graph(
+            vec![node("a", "i2c"), node("b", "i2c"), node("n", "null")],
+            vec![
+                link("a", &["n.from_payload"]),
+                link("b", &["n.from_payload"]),
+            ],
+        );
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::InputBoundTwice { node, input }
+                    if node == "n" && input == "from_payload"
+            )),
+            "{problems:?}"
+        );
+    }
+
+    /// A payload or a ground link with no link on it at all is refused.
+    ///
+    /// Either will do -- a payload that is only read has a source and no sink,
+    /// one that is only driven has a sink and no source -- but neither is a
+    /// payload the configuration describes and nothing reads or drives.
+    #[test]
+    fn a_payload_and_the_ground_need_a_link() {
+        // Reached by a command binding, so the older `Unconnected` rule is
+        // satisfied and this one is what is left to catch it: a ground link
+        // that commands a computation and carries no telemetry at all.
+        let mut g = graph(
+            vec![node("moc", "moc"), node("t", "compute")],
+            Vec::new(),
+        );
+        g.commands.push(CommandBinding {
+            from: "moc".to_string(),
+            sets: "t.setpoint".to_string(),
+        });
+        let problems = g.check();
+        let said = problems
+            .iter()
+            .find(|p| matches!(p, Problem::NodeOnNoLink { node, .. } if node == "moc"))
+            .unwrap_or_else(|| panic!("{problems:?}"));
+        assert_eq!(said.about(), About::Node("moc".to_string()));
+        assert!(
+            said.describe().contains("data sink"),
+            "{}",
+            said.describe()
+        );
+
+        // A payload that is only driven has a sink and nothing else, and is
+        // allowed: a heater is a configuration somebody means.
+        let g = graph(
+            vec![node("t", "compute"), node("heaters", "gpio"), node("moc", "moc")],
+            vec![link("t", &["heaters"]), link("t", &["moc"])],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::NodeOnNoLink { .. })),
+            "{:?}",
+            g.check()
+        );
+    }
+
     /// Every problem can be shown to a person.
     #[test]
     fn every_problem_describes_itself() {
@@ -1579,6 +1976,19 @@ mod tests {
             Problem::InputBoundTwice {
                 node: "m".into(),
                 input: "in0".into(),
+            },
+            Problem::BadTerminal {
+                link: "\"a\" to \"c.telemetry\"".into(),
+                why: "a moc node has no data sink called \"telemetry\"".into(),
+            },
+            Problem::CrossedStreams {
+                link: "\"n\" to \"c\"".into(),
+                leaves: "to_moc".into(),
+                arrives: "to_payload".into(),
+            },
+            Problem::NodeOnNoLink {
+                node: "a".into(),
+                node_type: "i2c".into(),
             },
             Problem::NoSuchTarget { sets: "x.y".into() },
             Problem::NoAttributeNamed { sets: "x".into() },

@@ -190,6 +190,11 @@ node
     *sinks* -- ``log`` -- somewhere data is kept rather than passed on. See
     `The logging node`_.
 
+    *generic vehicle nodes* -- ``null`` -- a node that carries both streams
+    through and does nothing to what passes. It is the one type with all four
+    terminals, which is what makes it the statement of what a vehicle node is:
+    see `Terminals: where a link is attached`_.
+
 group
     A set of devices read on one interval, so that readings which will be
     compared with one another are taken as close to together as the hardware
@@ -219,6 +224,108 @@ command binding
     node. A setpoint arrives this way. The binding is in the configuration, so
     what the ground is able to change in flight is written down and checkable,
     rather than being whatever the compute element happens to accept.
+
+Terminals: where a link is attached
+-----------------------------------
+
+A link joins one node's **data source** to another's **data sink**. Each end
+has a name, and the name says which way the data is travelling rather than
+what is at the other end of it. There are four:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 20 20 40
+
+   * - stream
+     - leaves at
+     - arrives at
+     - what it carries
+   * - groundward
+     - ``to_moc``
+     - ``from_payload``
+     - a payload's readings, on their way to the ground
+   * - vehicleward
+     - ``to_payload``
+     - ``from_moc``
+     - what the ground sends back: a command, a trigger, a setpoint
+
+So one stream is named twice -- ``to_moc`` where it leaves and
+``from_payload`` where it arrives -- and the two words are a sentence about the
+same bytes read from either end. The names describe the direction of flow and
+not the type at the far end: with no vehicle node in the way, a payload's
+``to_moc`` connects to a MOC link's ``from_payload``, and with one it connects
+to that node's ``from_payload`` instead and the node's own ``to_moc`` carries
+it the rest of the way.
+
+A link end is written ``node.terminal``, and may be written as ``node`` alone
+wherever the type has one terminal of the kind the end needs: ``{ from:
+temp_fore, to: moc }`` is unambiguous, because a payload has one data source
+and a MOC link has one data sink. A type with two of either has to be told
+which, which is why the ``null`` node's links name their terminals.
+
+Which types have which:
+
+payloads
+    ``from_moc`` and ``to_moc``. A payload receives what asks it for a reading
+    -- a trigger, a command, a byte written to a line -- and sends what it
+    read.
+
+MOC links
+    ``from_payload`` and ``to_payload``. The ground is the other end of both.
+
+``null``
+    all four.
+
+A computation's and a log's terminals are their own rules' business: a
+computation's data sinks are the inputs it declares, and a log's are whatever
+is written to it. Both are checked where the type is.
+
+Requirement
+    A data sink is either absent or linked to one data source. Two sources
+    into one sink would be two streams interleaved on one link, arriving in
+    whatever order they were sent, with nothing to say which was which.
+
+Requirement
+    A data source is either absent or linked to one data sink or several. One
+    reading reaching the ground and an on-board computation at once is the
+    ordinary case -- the arrangement drawn as a "T".
+
+Requirement
+    A MOC link's data sink takes as many sources as the configuration gives
+    it. The exception to the rule above, and not one made to let the examples
+    through: the ground is the one place that *can* tell interleaved streams
+    apart, because each payload's telemetry arrives at its own socket --
+    ``payload_telemetry.source_base`` plus the payload's id -- and the id is
+    what says whose a datagram is. Every payload aboard reporting to one
+    ``moc`` node is the ordinary shape of a configuration.
+
+Requirement
+    A payload or a MOC link with no link on it at all is refused. Either a
+    sink or a source will do: a payload that is only read has a source and no
+    sink, one that is only driven -- a heater, a valve, a latch -- has a sink
+    and no source, and both are configurations somebody means. Neither is a
+    payload the configuration describes and nothing reads or drives.
+
+Requirement
+    A link whose two ends carry opposite streams is refused. One end of it is
+    drawn backwards, and nothing else in the configuration would show it: both
+    nodes exist, both terminals exist, and in flight it is a payload that
+    answers nothing.
+
+Requirement
+    A link end naming a terminal its node does not have is refused, and a
+    terminal named at the wrong end of the link is refused as the mistake it is
+    rather than as a name nothing knows. The name is right and the end is
+    wrong, which is worth saying in those words.
+
+Requirement
+    A terminal is not a named input. ``in0`` is which *of several* ways into a
+    computation and the mean is built on knowing; a terminal is which *way* the
+    data is going, and a node that has one has only one of each kind. So a
+    terminal is resolved where the routing table is built and never reaches a
+    port -- a device's port refuses an input a device does not have, and a
+    configuration that passed the ground check and stopped delivering when it
+    flew would be the worst of both checks.
 
 What tcspecial itself is configured with
 ----------------------------------------
@@ -867,7 +974,10 @@ Requirement
     A link that names an input of a device is refused rather than delivered
     anyway. Only a computation has named inputs; a device has one way in and
     does not name it. Delivering it would make a file that says something it
-    does not mean work by accident.
+    does not mean work by accident. A *terminal* is not one of those -- see
+    `Terminals: where a link is attached`_ -- and never reaches a port: a
+    device's ``from_moc`` is its one way in, spelled, and is resolved where the
+    routing table is built.
 
 Requirement
     A device that must be asked before it answers is asked after it is read,
@@ -1041,12 +1151,12 @@ edge to line up on, and a diagram built from them looks approximate however
 carefully each node was placed; height is still per type, because it is one of
 the channels that tells two types apart.
 
-Every node type has its own colour, and the fourteen were chosen for one thing
+Every node type has its own colour, and the fifteen were chosen for one thing
 before anything else: that a reader with any of the three dichromacies can tell
 them apart. They are the output of a search over sRGB that maximised the
 smallest perceived difference between any two of them, measured in CIE
 L\*a\*b\* under normal vision and under simulated protanopia, deuteranopia and
-tritanopia at once. The worst pair of the fourteen is seventeen CIE units apart
+tritanopia at once. The worst pair of the fifteen is seventeen CIE units apart
 under every one of the four, where two or three is "the same colour in two
 printings" and ten is "clearly two colours". Each also has a contrast against
 white of at least three to one, so that a one-pixel border of it is legible on
@@ -1055,9 +1165,14 @@ the chroma moderate and spreading the lightness over five levels -- which is
 useful as well as calmer, lightness being the one channel every kind of colour
 blindness keeps, the total ones included. The simulation and the check are in
 the editor's own tests, run against the colours the window is actually given,
-because a fourteenth colour added by hand would be a near-copy of one of the
-other thirteen under one of the dichromacies and nobody with normal vision
-would see it.
+because a fifteenth colour added by hand would be a near-copy of one of the
+other fourteen under one of the dichromacies and nobody with normal vision
+would see it. The fifteenth was searched for in the gap the first fourteen left
+-- which was not in the band they occupy: fourteen colours of moderate chroma
+between about 28 and 60 in lightness leave no room for another as far from all
+of them as they are from each other, and the room was below them. So the
+palette now has six levels of lightness, and the ``null`` node is the dark
+one.
 
 A link is drawn as an orthogonal route rather than a straight line -- out of
 the source, across, into the target, corners rounded -- and it goes around
@@ -1077,6 +1192,30 @@ because a line along a node's edge reads as a line that touches it. Where
 nothing misses everything -- a target walled in on every side -- the best
 available is drawn anyway: a link with no line is a connection that does not
 appear in the drawing at all.
+
+A node is drawn with its terminals on it: a small rectangle in each corner it
+has one in, with an arrow in it. Two rows, which are the two streams -- along
+the top, left to right, what the ground sends, arriving at ``from_moc`` and
+leaving at ``to_payload``; along the bottom, right to left, what comes back,
+arriving at ``from_payload`` and leaving at ``to_moc``. The arrows therefore
+point the way the data travels across the canvas, because the canvas is laid
+out the same way: the ground is the leftmost working pane and the payloads the
+rightmost. A reader who has worked that out once need not read the names
+again.
+
+Only the terminals the type actually has. A payload carries its two on its
+left, a MOC link its two on its right, a ``null`` node all four, a log the one
+it receives on, and a page of its own none -- what a page has is what the nodes
+inside it have, and nothing outside it knows that. A drawing that showed four
+on every node would say nothing about what may be linked to what, which is the
+one thing about a graph that the shapes cannot say. The table is the schema's
+own, read rather than copied, so a terminal added there appears on the canvas
+without the editor being touched.
+
+The label is padded away from whichever side carries terminals rather than a
+row being reserved at the top and the bottom: the name stays in the middle of
+the node and stops short of the corner boxes, where reserving rows would leave
+sixteen pixels for a name on the shortest node.
 
 Colour remains the redundant channel for all that. Nothing is told apart by
 colour alone: every type differs from every other in at least two of outline,

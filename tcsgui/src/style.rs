@@ -112,19 +112,19 @@ pub struct Appearance {
 
 /// The palette: one tint per node type, and no two alike.
 ///
-/// Fourteen rather than nine, so that no two types share a colour. Colour is
+/// Fifteen rather than nine, so that no two types share a colour. Colour is
 /// still the redundant channel -- the outline, the shading, the border, the
 /// height and the way the label is set are what tell two types apart, and the
 /// test above says so -- but a reader who *can* use colour now gets it for
 /// every type instead of for most of them.
 ///
-/// The fourteen were chosen for one thing before anything else: that a reader
+/// The fifteen were chosen for one thing before anything else: that a reader
 /// with any of the three dichromacies can tell them apart. They are the output
 /// of a search over sRGB that maximised the smallest perceived difference
 /// between any two of them, taken under normal vision and under simulated
 /// protanopia, deuteranopia and tritanopia at once, and constrained to a
 /// moderate chroma and a contrast against white of at least three to one so
-/// that each is legible as a border. The worst pair of the fourteen is 17 CIE
+/// that each is legible as a border. The worst pair of the fifteen is 17 CIE
 /// units apart under every one of the four -- and `main.rs` has the test that
 /// says so, checked against the colours the window is actually given.
 ///
@@ -158,6 +158,13 @@ pub enum Tint {
     Gold,
     Blush,
     Lavender,
+    /// The fifteenth, and the darkest: a sixth level of lightness below the
+    /// five the other fourteen are spread over. Searched for in the gap they
+    /// left, which was not in the band they occupy -- fourteen colours at a
+    /// moderate chroma between about 28 and 60 in lightness leave no room for
+    /// a fifteenth as far from all of them as they are from each other, and
+    /// darker is where the room was.
+    Aubergine,
 }
 
 /// How wide every node is drawn, in pixels.
@@ -180,6 +187,118 @@ pub const WIDTH: u32 = 152;
 /// compute process that will not start. Nothing else.
 pub const ERROR_TINT: &str = "#c0392b";
 
+/// A type's terminals, as the canvas needs them.
+///
+/// The same two lists [`tcslibgs::graph::terminals::Terminals`] holds, and for
+/// most types literally those: this is a borrowed copy without the merge rule,
+/// which is a checking question rather than a drawing one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Terminals {
+    pub sinks: &'static [&'static str],
+    pub sources: &'static [&'static str],
+}
+
+impl Terminals {
+    /// Whether this type has the named terminal at either end.
+    pub fn has(&self, terminal: &str) -> bool {
+        self.sinks.contains(&terminal) || self.sources.contains(&terminal)
+    }
+
+    /// Every terminal of this type, sinks and then sources.
+    ///
+    /// For the tests, which ask questions about all of them at once. The
+    /// window asks about each by name, because the markup draws each in its
+    /// own corner.
+    #[cfg(test)]
+    pub fn each(&self) -> impl Iterator<Item = &&'static str> {
+        self.sinks.iter().chain(self.sources.iter())
+    }
+}
+
+/// Where a terminal is drawn, and which way its arrow points.
+///
+/// Two rows and two columns, and the arrangement is the two streams: the
+/// vehicleward one along the top, left to right, arriving from the ground at
+/// `from_moc` and leaving for the payload at `to_payload`; the groundward one
+/// along the bottom, right to left, arriving from the payload at
+/// `from_payload` and leaving for the ground at `to_moc`.
+///
+/// Which means the arrows all point the way the data actually travels across
+/// the canvas, because the canvas is laid out the same way: the ground is the
+/// leftmost pane and the payloads the rightmost. A reader who has noticed that
+/// once does not have to read the names again.
+///
+/// `None` for a name that is not one of the four, which is a computation's
+/// own input: those are drawn where the link arrives and not as a terminal.
+pub fn corner_of(terminal: &str) -> Option<Corner> {
+    match terminal {
+        "from_moc" => Some(Corner {
+            top: true,
+            left: true,
+            rightward: true,
+        }),
+        "to_payload" => Some(Corner {
+            top: true,
+            left: false,
+            rightward: true,
+        }),
+        "from_payload" => Some(Corner {
+            top: false,
+            left: false,
+            rightward: false,
+        }),
+        "to_moc" => Some(Corner {
+            top: false,
+            left: true,
+            rightward: false,
+        }),
+        _ => None,
+    }
+}
+
+/// Which corner of a node a terminal is drawn in, and which way its arrow
+/// points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Corner {
+    pub top: bool,
+    pub left: bool,
+    /// Whether the arrow points right, which is to say towards the payloads.
+    pub rightward: bool,
+}
+
+/// How large a terminal is drawn, in pixels: wide enough for an arrow and no
+/// wider, because four of them share the edges of a node with its name.
+pub const TERMINAL: (u32, u32) = (24, 10);
+
+/// How far a terminal sits from the corner it is in.
+///
+/// Inside the node and inside its border, so that the box a person presses and
+/// the box a link arrives at are the same box.
+pub const TERMINAL_INSET: u32 = 3;
+
+/// Where a terminal is drawn on a node of this size, relative to the node.
+///
+/// Here rather than in the markup for the reason the link routes are here:
+/// geometry is arithmetic, and arithmetic in a layout language cannot be
+/// tested. The test below is what says the four of them land in four
+/// different corners and clear each other.
+pub fn terminal_at(corner: Corner, (width, height): (u32, u32)) -> (i32, i32) {
+    let inset = TERMINAL_INSET as i32;
+    let far = |whole: u32, box_: u32| whole as i32 - box_ as i32 - inset;
+    (
+        if corner.left { inset } else { far(width, TERMINAL.0) },
+        if corner.top { inset } else { far(height, TERMINAL.1) },
+    )
+}
+
+/// How much of a node's width a terminal takes up, with room to spare.
+///
+/// What the label is padded by on whichever side carries terminals: the name
+/// stays in the middle of the node and stops short of the corner boxes, rather
+/// than a row being reserved at the top and the bottom -- which would leave
+/// sixteen pixels for a name on the shortest node.
+pub const TERMINAL_COLUMN: u32 = TERMINAL.0 + 2 * TERMINAL_INSET;
+
 /// Every node type the editor can place.
 ///
 /// The order is the order the palette shows them in: the devices a vehicle has,
@@ -198,6 +317,10 @@ pub enum NodeType {
     DeviceFile,
     Gpio,
     Compute,
+    /// A vehicle node that carries both streams through and does nothing to
+    /// what passes. The one type with all four terminals, which is what makes
+    /// it the statement of what a vehicle node is.
+    Null,
     Log,
     Moc,
     /// A diagram of its own, kept in its own file and shown here as one box.
@@ -206,7 +329,7 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 14] = [
+    pub const ALL: [NodeType; 15] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -218,6 +341,7 @@ impl NodeType {
         NodeType::DeviceFile,
         NodeType::Gpio,
         NodeType::Compute,
+        NodeType::Null,
         NodeType::Log,
         NodeType::Moc,
         NodeType::Subdiagram,
@@ -239,6 +363,7 @@ impl NodeType {
             NodeType::DeviceFile => "device-file",
             NodeType::Gpio => "gpio",
             NodeType::Compute => "compute",
+            NodeType::Null => "null",
             NodeType::Log => "log",
             NodeType::Moc => "moc",
             NodeType::Subdiagram => "subdiagram",
@@ -358,9 +483,64 @@ impl NodeType {
                 ("timeout", false),
                 ("restart", false),
             ],
+            // Nothing at all, and it is the one type with nothing. A null
+            // node carries what arrives through: its name and its type are
+            // the whole of what there is to say, and the configuration check
+            // refuses any attribute written on one.
+            NodeType::Null => &[],
             NodeType::Log => &[("directory", true), ("format", true)],
             NodeType::Moc => &[("address", true), ("port", true)],
             NodeType::Subdiagram => &[("file", true)],
+        }
+    }
+
+    /// Which terminals a node of this type has, as the canvas draws them.
+    ///
+    /// The four names and what each one is belong to
+    /// [`tcslibgs::graph::terminals`], and for every type that module has an
+    /// answer for -- a payload kind, the ground link, a `null` vehicle node --
+    /// this reads it rather than repeating it: a terminal added there appears
+    /// on the canvas without this file being touched, and the two cannot
+    /// disagree about what a payload has.
+    ///
+    /// The rest are the types whose terminals that module calls their own
+    /// business, and they are listed here because the canvas has to draw
+    /// something:
+    ///
+    /// * a computation sits in the vehicle and may be on either stream -- the
+    ///   readings arrive at it, its result goes to the ground, and the shipped
+    ///   thermostat drives a line with it -- so it is drawn with all four. Its
+    ///   named inputs, `in0` and the rest, are a mean's own affair and are not
+    ///   terminals;
+    /// * a log is written to and read by nobody aboard, so it has the one
+    ///   arriving terminal and no leaving one;
+    /// * a subdiagram is drawn with none. What a page has is what the nodes
+    ///   inside it have, and nothing out here knows that yet -- drawing four
+    ///   would be claiming four.
+    ///
+    /// Returned as two lists in the order a reader meets them, and the canvas
+    /// puts each in its own corner: see `Terminal::corner`.
+    pub fn terminals(self) -> Terminals {
+        // What tcslibgs says, where it says anything.
+        if let Some(terminals) = tcslibgs::graph::terminals::terminals_of(self.spelling()) {
+            return Terminals {
+                sinks: terminals.sinks,
+                sources: terminals.sources,
+            };
+        }
+        match self {
+            NodeType::Compute => Terminals {
+                sinks: &["from_payload", "from_moc"],
+                sources: &["to_moc", "to_payload"],
+            },
+            NodeType::Log => Terminals {
+                sinks: &["from_payload"],
+                sources: &[],
+            },
+            _ => Terminals {
+                sinks: &[],
+                sources: &[],
+            },
         }
     }
 
@@ -385,6 +565,7 @@ impl NodeType {
             | NodeType::DeviceFile => "Devices",
             NodeType::Gpio => "Driven",
             NodeType::Compute => "Computation",
+            NodeType::Null => "Pass-through",
             NodeType::Log | NodeType::Moc => "Ends of the graph",
             NodeType::Subdiagram => "Pages",
         }
@@ -420,6 +601,7 @@ impl NodeType {
             | NodeType::DeviceFile
             | NodeType::Gpio => true,
             NodeType::Compute
+            | NodeType::Null
             | NodeType::Log
             | NodeType::Moc
             | NodeType::Subdiagram => false,
@@ -553,6 +735,22 @@ impl NodeType {
                 tint: Tint::Olive,
             },
             // Software aboard.
+            // The one node that does nothing to what passes: rounded, because
+            // it is software aboard, and then open, narrow and the shortest
+            // thing on the canvas. A shape with the least in it for the node
+            // with the least in it -- and a height nothing else uses, which is
+            // what tells it from the other two rounded shapes without colour.
+            NodeType::Null => Appearance {
+                face: Face::Plain,
+                label_size: 10,
+                label_weight: 400,
+                label_italic: false,
+                outline: Rounded,
+                shading: Open,
+                weight: Narrow,
+                size: (WIDTH, 40),
+                tint: Tint::Aubergine,
+            },
             NodeType::Compute => Appearance {
                 face: Face::Plain,
                 label_size: 14,
@@ -673,7 +871,7 @@ mod tests {
     /// Every type has its own tint.
     ///
     /// Asked for, and worth a test rather than a glance down the table:
-    /// fourteen entries written one at a time is fourteen chances to reach for
+    /// fifteen entries written one at a time is fifteen chances to reach for
     /// the one above. Colour remains the redundant channel -- the rule at the
     /// top of this file is what tells types apart -- so this is not what makes
     /// the palette usable, only what makes it complete.
@@ -690,6 +888,120 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Every terminal a type has is drawn somewhere, and in the right corner.
+    ///
+    /// The arrangement is the argument: the vehicleward stream along the top
+    /// going right, the groundward stream along the bottom going left, so
+    /// every arrow points the way the data travels across a canvas whose
+    /// leftmost pane is the ground and whose rightmost is the payloads. A
+    /// terminal in the wrong corner would make the drawing say the opposite of
+    /// the file.
+    #[test]
+    fn every_terminal_is_drawn_in_the_corner_its_stream_runs_through() {
+        for t in NodeType::ALL {
+            for terminal in t.terminals().each() {
+                let corner = corner_of(terminal)
+                    .unwrap_or_else(|| panic!("{}: {terminal} has no corner", t.spelling()));
+                // The top row is what the ground sends and the bottom row is
+                // what comes back, and each row runs one way.
+                let vehicleward = *terminal == "from_moc" || *terminal == "to_payload";
+                assert_eq!(corner.top, vehicleward, "{terminal}");
+                assert_eq!(corner.rightward, vehicleward, "{terminal}");
+                // Arriving on the side the data comes from: the ground is to
+                // the left of the vehicle and the payloads to its right.
+                let from_the_left = *terminal == "from_moc" || *terminal == "to_moc";
+                assert_eq!(corner.left, from_the_left, "{terminal}");
+            }
+        }
+        // And a computation's own input is not a terminal: it is drawn where
+        // the link arrives, with its name on it.
+        assert_eq!(corner_of("in0"), None);
+    }
+
+    /// The editor draws the terminals the schema says a type has.
+    ///
+    /// Read from `tcslibgs` rather than copied, so this is a test that the
+    /// reading happens: a terminal added to the schema has to appear on the
+    /// canvas without anybody remembering to come here.
+    #[test]
+    fn the_canvas_shows_the_terminals_the_schema_gives_a_type() {
+        for t in NodeType::ALL {
+            let Some(schema) = tcslibgs::graph::terminals::terminals_of(t.spelling()) else {
+                continue;
+            };
+            assert_eq!(t.terminals().sinks, schema.sinks, "{}", t.spelling());
+            assert_eq!(t.terminals().sources, schema.sources, "{}", t.spelling());
+        }
+
+        // A payload is the right-hand end of both streams, so both of its
+        // terminals are drawn on its left; the ground is the left-hand end,
+        // and both of its are on its right. Spelled out here because it is
+        // the thing a reader of the canvas sees first.
+        for t in NodeType::ALL.iter().filter(|t| t.is_payload()) {
+            for terminal in t.terminals().each() {
+                assert!(corner_of(terminal).unwrap().left, "{terminal}");
+            }
+        }
+        for terminal in NodeType::Moc.terminals().each() {
+            assert!(!corner_of(terminal).unwrap().left, "{terminal}");
+        }
+    }
+
+    /// The types the schema leaves open are drawn as what they are.
+    ///
+    /// A log is written to and leaves nothing; a page's terminals are whatever
+    /// is inside it, which nothing out here knows, so it claims none.
+    #[test]
+    fn a_log_only_receives_and_a_page_claims_nothing() {
+        assert!(NodeType::Log.terminals().has("from_payload"));
+        assert!(NodeType::Log.terminals().sources.is_empty());
+        assert_eq!(NodeType::Subdiagram.terminals().each().count(), 0);
+        // A computation may be on either stream: readings in, a result to the
+        // ground, a line driven with it.
+        assert_eq!(NodeType::Compute.terminals().each().count(), 4);
+    }
+
+    /// The four terminals land in four corners, and clear each other.
+    ///
+    /// On the shortest node there is, which is where they would collide if
+    /// they were going to: two rows of ten pixels and the name between them.
+    #[test]
+    fn the_terminals_of_a_node_do_not_overlap() {
+        let shortest = NodeType::ALL
+            .iter()
+            .map(|t| t.appearance().size)
+            .min_by_key(|(_, height)| *height)
+            .expect("a type");
+
+        let mut boxes = Vec::new();
+        for terminal in ["from_moc", "to_payload", "from_payload", "to_moc"] {
+            let corner = corner_of(terminal).expect("a corner");
+            let (x, y) = terminal_at(corner, shortest);
+            assert!(x >= 0 && y >= 0, "{terminal} at {x},{y}");
+            // Inside the node, which is where a link may be attached to it.
+            assert!(x + TERMINAL.0 as i32 <= shortest.0 as i32, "{terminal}");
+            assert!(y + TERMINAL.1 as i32 <= shortest.1 as i32, "{terminal}");
+            boxes.push((terminal, x, y));
+        }
+
+        for (i, (one, x, y)) in boxes.iter().enumerate() {
+            for (two, other_x, other_y) in &boxes[i + 1..] {
+                let apart = (x - other_x).unsigned_abs() >= TERMINAL.0
+                    || (y - other_y).unsigned_abs() >= TERMINAL.1;
+                assert!(apart, "{one} and {two} overlap");
+            }
+        }
+
+        // And the name has room between them: the label is padded by a
+        // terminal column on each side that carries one.
+        let left = TERMINAL_COLUMN as i32;
+        assert!(
+            WIDTH as i32 - 2 * left > 80,
+            "a name between two terminal columns has {} pixels",
+            WIDTH as i32 - 2 * left
+        );
     }
 
     /// Red is not in the palette at all.
@@ -810,6 +1122,15 @@ mod tests {
     fn every_type_states_what_it_requires() {
         for t in NodeType::ALL {
             let attributes = t.attributes();
+            // A null node is the one type with nothing to say: it carries
+            // what arrives through, so its name and its type are the whole of
+            // it, and the configuration check refuses any attribute written
+            // on one. Every other type that said nothing would be a node that
+            // means nothing.
+            if t == NodeType::Null {
+                assert!(attributes.is_empty(), "a null node says nothing");
+                continue;
+            }
             assert!(!attributes.is_empty(), "{} says nothing", t.spelling());
             assert!(
                 attributes.iter().any(|(_, required)| *required),

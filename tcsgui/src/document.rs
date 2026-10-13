@@ -1157,6 +1157,10 @@ impl Document {
                     escape(&node.node_type)
                 ));
                 for (attribute, value) in &node.attributes {
+                    // Left out where it is empty, as the YAML writer does it.
+                    if value.trim().is_empty() {
+                        continue;
+                    }
                     out.push_str(&format!(
                         "        <{attribute}>{}</{attribute}>\n",
                         escape(value)
@@ -1322,6 +1326,16 @@ impl Document {
                     plain(&node.node_type)
                 ));
                 for (attribute, value) in &node.attributes {
+                    // Nothing written for an attribute nobody has answered.
+                    // Absent and empty mean the same thing to the checking,
+                    // and a file without the line is the one a person would
+                    // have written -- which is the rule the tcspecial section
+                    // follows too. It matters on the way back as much as on
+                    // the way out: a hand-written `address:` with nothing
+                    // after it would otherwise be saved as `address: ""`.
+                    if value.trim().is_empty() {
+                        continue;
+                    }
                     // Quoted, which is not fussiness. A YAML reader turns 0x48
                     // into the integer 72 and 2.0 into 2 before anything sees
                     // the text, where an XML reader hands over what was

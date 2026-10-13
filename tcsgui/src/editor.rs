@@ -683,10 +683,21 @@ payloads:
             !written.contains("mean"),
             "a computation is not simulated: {written}"
         );
-        // And every setting a payload may state, written empty.
+        // And every setting a payload may state, written with nothing after
+        // it: the question is in the file and the answer is not. Nothing
+        // rather than `""`, which would say somebody had typed two quotation
+        // marks -- and the two read the same, so the honest spelling is the
+        // one a person would have written.
         for setting in ["group", "packet_interval_ms", "drop_percent", "close_after"] {
-            assert!(written.contains(&format!("{setting}: \"\"")), "{setting}: {written}");
+            assert!(
+                written.contains(&format!("    {setting}:\n")),
+                "{setting}: {written}"
+            );
         }
+        assert!(
+            !written.contains("\"\""),
+            "an unanswered setting is nothing, not an empty string: {written}"
+        );
 
         // The form loads: an empty setting is one not stated, so a file
         // nobody has filled in is still a file the simulator can read.

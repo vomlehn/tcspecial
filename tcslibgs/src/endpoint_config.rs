@@ -547,9 +547,64 @@ impl<'de> Deserialize<'de> for Scalar {
                 // reports it.
                 Ok(Scalar(v.to_string()))
             }
+
+            /// A key with nothing after it: `payload_port:`, and nothing else
+            /// on the line.
+            ///
+            /// Read as no value at all, which is what it says and what the
+            /// rules already make of an empty one -- absent and empty mean the
+            /// same thing throughout this project, so the one spelling a
+            /// person would write is the one a reader should accept. It is
+            /// also what the editor writes for a question nobody has answered
+            /// yet: a form with `""` in every blank says somebody typed two
+            /// quotation marks.
+            fn visit_unit<E: de::Error>(self) -> Result<Scalar, E> {
+                Ok(Scalar(String::new()))
+            }
+
+            /// And the same thing where the reader offers it as an absent
+            /// option rather than as a unit.
+            fn visit_none<E: de::Error>(self) -> Result<Scalar, E> {
+                Ok(Scalar(String::new()))
+            }
         }
 
         d.deserialize_any(V)
+    }
+}
+
+#[cfg(test)]
+mod a_scalar_of_nothing {
+    use super::Scalar;
+
+    /// A key with nothing after it is a value nobody has supplied.
+    ///
+    /// Which is what the editor writes into a form: every question present and
+    /// the answers blank. `""` would read the same and say something else --
+    /// that somebody typed two quotation marks -- and the rules make no
+    /// distinction anyway, absent and empty meaning the same thing throughout.
+    #[test]
+    fn a_key_with_nothing_after_it_is_read_as_nothing() {
+        #[derive(Debug, serde::Deserialize)]
+        struct Said {
+            payload_port: Option<Scalar>,
+            packet_size: Option<Scalar>,
+        }
+
+        let said: Said =
+            serde_norway::from_str("payload_port:\npacket_size: 4\n").expect("it reads");
+        // An optional field never reaches the scalar: the reader answers the
+        // Option itself, and nothing is None. Which is the same meaning by a
+        // shorter road.
+        assert_eq!(said.payload_port.as_ref().map(Scalar::as_str), None);
+        assert_eq!(said.packet_size.as_ref().map(Scalar::as_str), Some("4"));
+
+        // And a map of them, which is how a node's attributes and a simulated
+        // payload's settings are read.
+        let mut settings: std::collections::BTreeMap<String, Scalar> =
+            serde_norway::from_str("drop_percent:\njitter_ms: 20\n").expect("it reads");
+        assert_eq!(settings.remove("drop_percent").map(|s| s.as_str().to_string()), Some(String::new()));
+        assert_eq!(settings.remove("jitter_ms").map(|s| s.as_str().to_string()), Some("20".to_string()));
     }
 }
 

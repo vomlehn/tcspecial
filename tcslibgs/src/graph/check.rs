@@ -673,7 +673,7 @@ mod tests {
             ("moc_command", "127.0.0.1:4100"),
             ("tcspecial_tc_base", "0.0.0.0:6000"),
             ("moc_tc_base", "127.0.0.1:6100"),
-            ("payload_port", "4001"),
+            ("payload_interface", "0.0.0.0:4001"),
             ("beacon_interval_ms", "5000"),
             ("beacon_address", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),

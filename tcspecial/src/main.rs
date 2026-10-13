@@ -97,12 +97,11 @@ fn main() {
     // or not anyone set RUST_LOG, and said above whatever a failure to bind
     // one then says.
     eprintln!(
-        "Commands are taken on {}:{} and payload commands on {}:{} as {} asked, \
+        "Commands are taken on {}:{} and payload commands on {} as {} asked, \
          and beacons go to the group {} on interface {}",
         tcspecial_config.address,
         tcspecial_config.port,
-        tcspecial_config.address,
-        tcspecial_config.payload_port,
+        tcspecial_config.payload_interface,
         config_path,
         beacon.group,
         beacon.interface

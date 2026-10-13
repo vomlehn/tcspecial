@@ -13,8 +13,7 @@
 #
 # The two command links. A command about the spacecraft -- ping it, arm it,
 # restart it -- is taken on tcspecial_command; a command about a payload --
-# start it, stop it, ask it for its statistics -- on payload_port at the same
-# address. moc_command is the other end of the same conversation, which is in
+# start it, stop it, ask it for its statistics -- on payload_interface. moc_command is the other end of the same conversation, which is in
 # this file because both ends read this file: a configuration that stated only
 # its own end would leave the other to be told separately, and two places to
 # say one thing is one place for them to disagree. One table says which is which, read by both ends, so neither can
@@ -38,7 +37,7 @@
 # happens not to be a number, which is a thin reason to rely on.
 tcspecial_command: "0.0.0.0:4000"
 moc_command: "127.0.0.1:4100"
-payload_port: 4001
+payload_interface: "0.0.0.0:4001"
 
 # Where each payload's own data link is, on each side. A payload's port is the
 # base plus the payload's own id -- the position it has in the payload

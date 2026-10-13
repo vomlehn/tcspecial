@@ -1597,7 +1597,10 @@ fn payload_command_port() -> Result<u16, String> {
     let config = load_tcspecial_config(&config_path)
         .map_err(|e| format!("{config_path} could not be read: {e}"))?;
 
-    Ok(config.payload_port)
+    // The port of it. The MOC reaches the payload link at the host the
+    // operator connected to -- see CiLink::connect -- so what it needs from the
+    // file is which port, not which host: one typed address moves both links.
+    Ok(config.payload_interface.port)
 }
 
 /// Send what this MOC read, and hear what the spacecraft read.

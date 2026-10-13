@@ -1497,17 +1497,17 @@ commands is in ``tcspecial.yaml``:
 
 .. code-block:: yaml
 
-   address: "0.0.0.0"
-   port: 4000          # commands about the spacecraft
-   payload_port: 4001  # commands about a payload
+   tcspecial_command: "0.0.0.0:4000"   # commands about the spacecraft
+   payload_interface: "0.0.0.0:4001"   # commands about a payload
 
 Two links, because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure: a restart waiting behind a payload's
 statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
-``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``port``; ``START_DH``,
-``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and ``CONFIGURE_DH`` go to
-``payload_port``; ``CONNECT`` is answered on either. One table in the library
-says which is which, so the two ends cannot disagree about it.
+``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``tcspecial_command``;
+``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and
+``CONFIGURE_DH`` go to ``payload_interface``; ``CONNECT`` is answered on
+either. One table in the library says which is which, so the two ends cannot
+disagree about it.
 
 Both are required, and they must differ -- one socket cannot be two links.
 Nothing else may bind either of them: a payload given port 4000 is refused
@@ -1561,17 +1561,17 @@ Four of the section's attributes are a host and a port written together, as
    tcspecial:
      tcspecial_command: 0.0.0.0:4000
      moc_command: 127.0.0.1:4100
-     payload_port: 4001
+     payload_interface: 0.0.0.0:4001
      tcspecial_tc_base: 0.0.0.0:6000
      moc_tc_base: 127.0.0.1:6100
 
 ``tcspecial_command`` is where tcspecial takes commands about the spacecraft
 and ``moc_command`` is where the MOC takes them -- both ends in one file,
 because both ends read this file, and two places to say one thing is one place
-for them to disagree. ``payload_port`` is a bare port: commands about a payload
-are taken at the command interface's address, there being one command
-interpreter at one place, so a second address would be a second answer to where
-that is.
+for them to disagree. ``payload_interface`` is where commands about a payload are taken:
+are taken at ``payload_interface``, which says where it is in full like its
+neighbours. The MOC reaches it at the host the operator connected to, taking
+only the port from the file, so one typed address moves both links.
 
 The two ``_tc_base`` attributes are where each payload's own data link is, and
 there are two because the link has two ends. Every payload has a UDP interface

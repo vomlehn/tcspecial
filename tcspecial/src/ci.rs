@@ -558,7 +558,9 @@ impl CommandInterpreter {
         // The payload link, bound here too. Two links, because what the
         // ground needs in a hurry must never be queued behind what it asked
         // for at leisure: see CommandType::link.
-        let payload_addr = format!("{}:{}", config.address, config.payload_port);
+        // Its own address and not the one above: the payload link says where
+        // it is in full, as every other link in the section does.
+        let payload_addr = config.payload_interface.to_string();
         let payload_socket = UdpSocket::bind(&payload_addr)
             .map_err(|e| bind_failed("payload command link", &payload_addr, e))?;
 
@@ -834,7 +836,10 @@ mod tests {
         let config = CIConfig {
             address: "127.0.0.1".to_string(),
             port: 0, // Let OS assign port
-            payload_port: 0, // and one for payload commands
+            payload_interface: tcslibgs::HostPort {
+                address: "0.0.0.0".to_string(),
+                port: 0,
+            }, // and one for payload commands
             // The far ends and the bases, which nothing in the
             // commanding reads: see tcslibgs::CIConfig.
             moc_command: tcslibgs::HostPort {
@@ -875,7 +880,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0, // and one for payload commands
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                }, // and one for payload commands
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {
@@ -952,7 +960,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0, // and one for payload commands
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                }, // and one for payload commands
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {
@@ -1062,7 +1073,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0, // and one for payload commands
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                }, // and one for payload commands
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {
@@ -1184,7 +1198,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0, // and one for payload commands
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                }, // and one for payload commands
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {
@@ -1277,7 +1294,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0, // and one for payload commands
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                }, // and one for payload commands
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {
@@ -1417,7 +1437,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0,
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {
@@ -1493,7 +1516,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0, // and one for payload commands
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                }, // and one for payload commands
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {
@@ -1568,7 +1594,10 @@ mod tests {
             port: addr.port(),
             // The port under test is the one already held; the other is the
             // OS's to choose, so what fails is the one this is about.
-            payload_port: 0,
+            payload_interface: tcslibgs::HostPort {
+                address: "0.0.0.0".to_string(),
+                port: 0,
+            },
             moc_command: tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 4100,
@@ -1613,7 +1642,10 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_port: 0, // and one for payload commands
+                payload_interface: tcslibgs::HostPort {
+                    address: "0.0.0.0".to_string(),
+                    port: 0,
+                }, // and one for payload commands
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_command: tcslibgs::HostPort {

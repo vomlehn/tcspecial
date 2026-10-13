@@ -331,12 +331,16 @@ fn binds_every_interface(address: &str) -> bool {
 /// For a set that states none, the ports are in the command interpreter's own
 /// file and nothing here has seen it.
 fn interpreter_collisions(ci: &CIConfig, handlers: &[DHConfig]) -> Vec<(DHName, String)> {
+    // Each link where the file says it is: the two may be on different
+    // interfaces now, so each is asked about its own.
     let links = [
-        (ci.port, "spacecraft command"),
-        (ci.payload_port, "payload command"),
+        (ci.address.as_str(), ci.port, "spacecraft command"),
+        (
+            ci.payload_interface.address.as_str(),
+            ci.payload_interface.port,
+            "payload command",
+        ),
     ];
-    let wildcard = binds_every_interface(&ci.address);
-    let host = one_host(&ci.address);
 
     let mut found = Vec::new();
     for dh in handlers {
@@ -344,14 +348,17 @@ fn interpreter_collisions(ci: &CIConfig, handlers: &[DHConfig]) -> Vec<(DHName, 
             let Claim::Port { host: theirs, port } = &claim else {
                 continue;
             };
-            for (mine, which) in links {
-                if *port == mine && (wildcard || *theirs == host) {
+            for (address, mine, which) in links {
+                let wildcard = binds_every_interface(address);
+                if *port == mine && (wildcard || *theirs == one_host(address)) {
                     found.push((
                         dh.name.clone(),
                         format!(
                             "{what} and the {which} link both want port {port}{}",
                             if wildcard {
-                                format!(", which the link takes on every interface ({})", ci.address)
+                                format!(
+                                    ", which the link takes on every interface ({address})"
+                                )
                             } else {
                                 String::new()
                             }
@@ -2598,10 +2605,12 @@ pub struct CIConfigJson {
     /// where commands are taken is not a question to be answered by whatever
     /// a file was silently given.
     ///
-    /// A port and not an `address:port`: it is taken on the same address as
-    /// `tcspecial_command`, there being one command interpreter at one place,
-    /// and a second address would be a second answer to where that is.
-    pub payload_port: u16,
+    /// An address of its own and not only a port. It was a bare port, taken at
+    /// the command interface's address on the grounds that there is one command
+    /// interpreter at one place -- but every other link in this section says
+    /// where it is in full, and one attribute written differently from its four
+    /// neighbours is one a reader has to remember the exception for.
+    pub payload_interface: String,
     pub beacon_interval_ms: u32,
     /// Directory holding the telemetry log's segment files. The directory
     /// must already exist. Telemetry logging is disabled when this is absent.
@@ -2642,9 +2651,9 @@ pub struct CIConfig {
     /// side, and the MOC's. See [`HostPort::at`].
     pub tcspecial_tc_base: HostPort,
     pub moc_tc_base: HostPort,
-    /// The port payload commands are taken on; see
-    /// [`CIConfigJson::payload_port`].
-    pub payload_port: u16,
+    /// Where commands about a payload are taken, from
+    /// [`CIConfigJson::payload_interface`].
+    pub payload_interface: HostPort,
     pub beacon_interval: BeaconTime,
     /// The multicast group beacons are sent to.
     ///
@@ -2666,6 +2675,8 @@ impl CIConfigJson {
     pub fn to_ci_config(&self) -> Result<CIConfig, String> {
         let command = host_port_of("tcspecial_command", &self.tcspecial_command)?;
         let (address, port) = (command.address, command.port);
+        let payload_interface =
+            host_port_of("payload_interface", &self.payload_interface)?;
         let moc_command = host_port_of("moc_command", &self.moc_command)?;
         let tcspecial_tc_base =
             host_port_of("tcspecial_tc_base", &self.tcspecial_tc_base)?;
@@ -2677,18 +2688,26 @@ impl CIConfigJson {
         // One socket cannot be two links. A file that gave both the same port
         // would describe a split it has not made, and the half of it that
         // bound second would fail at startup with the other half's address.
-        if self.payload_port == port {
+        // One socket cannot be two links. A file that put both at the same
+        // place would describe a split it has not made, and the half that
+        // bound second would fail at startup with the other half's address.
+        //
+        // The whole interface and not only the port, now that each says where
+        // it is: two links may share a port on different interfaces, which is
+        // a configuration somebody may mean.
+        if payload_interface.address == address && payload_interface.port == port {
             return Err(format!(
-                "tcspecial_command and payload_port are both port {port}, and \
-                 the two links cannot be one socket: spacecraft commands are \
-                 taken on the one and payload commands on the other"
+                "tcspecial_command and payload_interface are both \
+                 {address}:{port}, and the two links cannot be one socket: \
+                 spacecraft commands are taken on the one and payload commands \
+                 on the other"
             ));
         }
 
         Ok(CIConfig {
             address,
             port,
-            payload_port: self.payload_port,
+            payload_interface,
             moc_command,
             tcspecial_tc_base,
             moc_tc_base,
@@ -3205,7 +3224,7 @@ description: three payloads counted from one base
 tcspecial:
   tcspecial_command: 0.0.0.0:4000
   moc_command: 127.0.0.1:4100
-  payload_port: 4001
+  payload_interface: 0.0.0.0:4001
   tcspecial_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
@@ -3273,7 +3292,7 @@ description: a base at the top of the range
 tcspecial:
   tcspecial_command: 0.0.0.0:4000
   moc_command: 127.0.0.1:4100
-  payload_port: 4001
+  payload_interface: 0.0.0.0:4001
   tcspecial_tc_base: 0.0.0.0:65535
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
@@ -3429,13 +3448,16 @@ payloads:
     /// The version goes out in every beacon as three bytes, so a file whose
     /// version is not one, two or three decimal parts is refused rather than
     /// announced as something it is not.
-    /// A set states both command ports, and they are two ports.
+    /// A set states both command links, and they are two places.
     ///
-    /// One socket cannot be two links: a file that gave both the same port
-    /// would describe a split it has not made, and the half that bound second
-    /// would fail at startup with the other half's address.
+    /// One socket cannot be two links: a file that put both at the same
+    /// address and port would describe a split it has not made, and the half
+    /// that bound second would fail at startup with the other half's address.
+    /// The whole interface is compared and not only the port, each link saying
+    /// where it is in full -- two links may share a port on two interfaces,
+    /// which is a configuration somebody may mean.
     #[test]
-    fn a_set_states_two_command_ports() {
+    fn a_set_states_two_command_links() {
         let with = |ports: &str| {
             format!(
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n{ports}  \
@@ -3447,18 +3469,18 @@ payloads:
         };
 
         payload(&with("  tcspecial_command: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  \
-                 payload_port: 4001\n  tcspecial_tc_base: 0.0.0.0:6000\n  \
+                 payload_interface: 0.0.0.0:4001\n  tcspecial_tc_base: 0.0.0.0:6000\n  \
                  moc_tc_base: 127.0.0.1:6100\n"))
             .to_dh_configs()
             .expect("two ports are two links");
 
         let said = payload(&with(
-            "  tcspecial_command: 0.0.0.0:4000\n  payload_port: 4000\n  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n",
+            "  tcspecial_command: 0.0.0.0:4000\n  payload_interface: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n",
         ))
         .to_dh_configs()
         .expect_err("one socket cannot be two links");
         assert!(
-            said.contains("payload_port") && said.contains("4000"),
+            said.contains("payload_interface") && said.contains("4000"),
             "{said}"
         );
 
@@ -3471,7 +3493,7 @@ payloads:
                     "  tcspecial_command: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n"
                 ))
                 .is_err(),
-            "a section with no payload_port was accepted"
+            "a section with no payload_interface was accepted"
         );
     }
 
@@ -3485,7 +3507,7 @@ payloads:
         let with = |address: &str, port: u16| {
             format!(
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
-                 tcspecial_command: {address}:4000\n  payload_port: 4001\n  \
+                 tcspecial_command: {address}:4000\n  payload_interface: 0.0.0.0:4001\n  \
                  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  \
                  moc_tc_base: 127.0.0.1:6100\n  \
                  beacon_interval_ms: 5000\n  \
@@ -3742,7 +3764,7 @@ description: a ground link on the payload's own port
 tcspecial:
   tcspecial_command: 0.0.0.0:4000
   moc_command: 127.0.0.1:4100
-  payload_port: 4001
+  payload_interface: 0.0.0.0:4001
   tcspecial_tc_base: localhost:5000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000

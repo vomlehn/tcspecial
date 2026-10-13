@@ -776,13 +776,13 @@ payloads:
         // it, and nothing written.
         editor.write_rust_code();
         let said = editor.trouble().expect("a sentence").to_string();
-        assert!(said.contains("rust-code"), "{said}");
+        assert!(said.contains("rust-code-path"), "{said}");
         assert_eq!(editor.said(), None);
 
         // And with the parameter set: a directory that is not there is made,
         // the file is written, and the window is told where.
         editor.edit(Edit::SetTcspecial {
-            attribute: "rust-code".to_string(),
+            attribute: "rust-code-path".to_string(),
             was: None,
             now: Some("generated/vehicle.rs".to_string()),
         });
@@ -795,7 +795,7 @@ payloads:
         assert!(rust.contains("\"sensor\""), "{rust}");
         // The path it was written to is not in the code: that is where the
         // code goes, not something the vehicle is told.
-        assert!(!rust.contains("rust-code"), "{rust}");
+        assert!(!rust.contains("rust-code-path"), "{rust}");
 
         let said = editor.said().expect("it says what it did");
         assert!(said.contains("generated/vehicle.rs"), "{said}");

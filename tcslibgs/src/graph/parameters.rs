@@ -190,13 +190,33 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("log.segment_size", false),
     // Where this configuration's generated Rust is written, which is the one
     // attribute of the section that is about building the software rather than
-    // about running it: see `rust-code` below and `tcsgui::codegen`.
-    ("rust-code", false),
+    // about running it: see `RUST_CODE` below and `tcsgui::codegen`.
+    ("rust-code-path", false),
 ];
+
+/// What a new configuration is given, where anything.
+///
+/// Almost nothing, and that is the editor's whole argument about laziness: a
+/// configuration that was silently given an answer looks as answered as one
+/// somebody thought about, and where commands are taken and where beacons go
+/// are not questions to be answered by whatever a file was given.
+///
+/// The beacon's interval is the exception, and it is one because it is a
+/// different kind of question. A socket is a fact about this mission -- there
+/// is no value that is right until somebody says so -- where "how often does
+/// the vehicle say it is alive" has an answer that is right until somebody has
+/// a reason: once a second. A new configuration starts with that and can be
+/// argued with.
+pub fn default_of(attribute: &str) -> Option<&'static str> {
+    match attribute {
+        "beacon.interval_ms" => Some("1000"),
+        _ => None,
+    }
+}
 
 /// The attribute that is not the command interpreter's.
 ///
-/// `rust-code` is a path, and nothing aboard reads it: it says where tcsgui
+/// `rust-code-path` is a path, and nothing aboard reads it: it says where tcsgui
 /// writes the Rust it generates from this configuration, which is then
 /// compiled into tcspecial along with the node types the configuration uses.
 /// It is in this section because this is the section about the configuration
@@ -205,7 +225,7 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
 /// [`ci_config_of`] can leave it out of the struct the interpreter reads: a
 /// field carried into the flight software and never acted on is a field
 /// somebody will one day believe in.
-pub const RUST_CODE: &str = "rust-code";
+pub const RUST_CODE: &str = "rust-code-path";
 
 /// The section as the command interpreter wants it, or what is wrong with it.
 ///

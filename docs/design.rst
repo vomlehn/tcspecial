@@ -1376,7 +1376,7 @@ would be one they cannot get out of -- and *Stay*, because the menu is next to
 everything else and gets pressed by accident.
 
 The section has one attribute that is not about running the software at all:
-``rust-code``, a path to a Rust source file. See `The configuration as Rust`_.
+``rust-code-path``, a path to a Rust source file. See `The configuration as Rust`_.
 It is in this section because this is the section about the configuration as a
 whole, and because the editor already has a window for that section; it is left
 out of the struct the command interpreter reads, because a field carried into
@@ -1411,14 +1411,22 @@ what there is to answer. An unanswered setting is written with nothing after
 the colon rather than as ``""``: the two read the same, and ``""`` says
 somebody typed two quotation marks.
 
-A configuration that does not exist yet is given the section's attributes and
-none of its values. The window then has a field apiece and the configuration
+A configuration that does not exist yet is given the section's attributes and,
+with one exception, none of its values. The window then has a field apiece and the configuration
 answers nothing, which is the honest state of it: an editor that filled in a
 protocol and a beacon interval on the grounds that they are the same on every
 vehicle until somebody has a reason would be making a configuration that looks
 as answered as one somebody thought about. Nothing of an unanswered section
 reaches the file -- a ``tcspecial:`` with nothing under it would read back as no
 section at all.
+
+The exception is the beacon's interval, which a new configuration starts at
+1000 ms. It is an exception because it is a different kind of question. A
+socket is a fact about this mission and there is no value that is right until
+somebody says so; "how often does the vehicle say it is alive" has an answer
+that is right until somebody has a reason, and once a second is that answer.
+``parameters::default_of`` is where it is written, so the editor and anything
+else that makes a new section agree about it.
 
 The description tree
 --------------------
@@ -1571,7 +1579,7 @@ infrastructure around them. A vehicle built that way carries no configuration
 file at all and nothing aboard has to parse one.
 
 The editor's half of that is **Edit → Generate Rust code**. It writes the file
-where the configuration's own ``tcspecial`` section says, under ``rust-code``:
+where the configuration's own ``tcspecial`` section says, under ``rust-code-path``:
 a path, relative to the configuration's own directory or absolute. Relative to
 the configuration and not to wherever the editor was started from, because a
 configuration and the code generated from it belong together and a path that

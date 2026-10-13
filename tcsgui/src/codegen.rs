@@ -7,7 +7,7 @@
 //! configuration file at all, and nothing aboard has to parse one.
 //!
 //! The file is written where the configuration's own `tcspecial` section says,
-//! under `rust-code` -- a path, relative to the configuration's own directory
+//! under `rust-code-path` -- a path, relative to the configuration's own directory
 //! or absolute -- and it is written when somebody asks for it from the Edit
 //! menu, not on every save: generating it is a second output of the editor and
 //! not part of what editing means.
@@ -50,7 +50,7 @@ use crate::subdiagram::Qualified;
 
 /// Where a configuration's generated Rust goes, if it says.
 ///
-/// `rust-code` in the `tcspecial` section: a path as somebody typed it, which
+/// `rust-code-path` in the `tcspecial` section: a path as somebody typed it, which
 /// may be relative. Relative to the configuration's own directory and not to
 /// wherever the editor happened to be started from -- a configuration and the
 /// code generated from it belong together, and a path that meant different
@@ -78,7 +78,7 @@ pub fn where_to(document: &Document, configuration: &Path) -> Option<PathBuf> {
 /// What is wrong with generating the code, where something is.
 ///
 /// Said as the editor says everything else that cannot be done: in words, on
-/// the window, with nothing written. A configuration with no `rust-code` is
+/// the window, with nothing written. A configuration with no `rust-code-path` is
 /// not a fault -- it is a configuration nobody has asked this of -- but asking
 /// for the code without having said where it goes is worth a sentence.
 pub fn trouble(document: &Document, configuration: &Path) -> Option<String> {
@@ -310,12 +310,12 @@ mod tests {
         // this of. Asking for it anyway is told what to do about it.
         assert_eq!(where_to(&document, configuration), None);
         let said = trouble(&document, configuration).expect("a sentence");
-        assert!(said.contains("rust-code"), "{said}");
+        assert!(said.contains("rust-code-path"), "{said}");
 
         // Relative to the configuration's own directory, and not to wherever
         // the editor was started from.
         document.apply(&Edit::SetTcspecial {
-            attribute: "rust-code".to_string(),
+            attribute: "rust-code-path".to_string(),
             was: None,
             now: Some("generated/aurora.rs".to_string()),
         });
@@ -327,7 +327,7 @@ mod tests {
 
         // An absolute path is where it says.
         document.apply(&Edit::SetTcspecial {
-            attribute: "rust-code".to_string(),
+            attribute: "rust-code-path".to_string(),
             was: Some("generated/aurora.rs".to_string()),
             now: Some("/tmp/aurora.rs".to_string()),
         });
@@ -427,6 +427,6 @@ mod tests {
 
         // And the path it is written to is not: that is where the code goes,
         // not something the vehicle is told.
-        assert!(!rust.contains("rust-code"), "{rust}");
+        assert!(!rust.contains("rust-code-path"), "{rust}");
     }
 }

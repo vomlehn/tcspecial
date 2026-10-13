@@ -558,12 +558,27 @@ macro_rules! wiring {
                         // long it took is a gesture that does the wrong one
                         // under pressure.
                         //
-                        // It is also what keeps a drag out of the history:
-                        // without this, every press on a node would put an
-                        // entry in it.
-                        if now == was {
+                        // The *gesture* and not the position it works out to.
+                        // Those are different questions, and asking the second
+                        // one lost a node's first click: a node whose position
+                        // is not on the grid, or is outside the pane its type
+                        // belongs to -- a file somebody hand-edited, a
+                        // configuration from a build that drew the panes
+                        // differently -- resolves to somewhere other than
+                        // where it is, so `now != was` and a click on it was
+                        // read as a drag. It moved instead of opening, and the
+                        // second click opened it.
+                        if dx.round() as i32 == 0 && dy.round() as i32 == 0 {
                             drop(editor);
                             show_node(&editor_for_click, &views, &absolute);
+                            return;
+                        }
+                        // A drag that ends where it started: no edit, and no
+                        // window either. Dragging a node against a divider and
+                        // back is a gesture that changed nothing, and an entry
+                        // in the history for it would be an undo that does
+                        // nothing visible.
+                        if now == was {
                             return;
                         }
                         editor.edit(Edit::MoveNode {
@@ -1960,6 +1975,17 @@ fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
         let terminal = style::terminal_for(&node.node_type, named, sink)?;
         style::attachment(&node.node_type, node.at, terminal)
     };
+    // Which data sink the line arrives at, where the link does not say. The
+    // one that pairs with the source it left: a link leaving `to_payload`
+    // arrives at a `from_moc`, that being the same stream named at its other
+    // end -- see tcslibgs::graph::terminals::answers. Without this the drawing
+    // fell back to the groundward sink whatever the link carried, so a command
+    // from the ground was drawn arriving at the corner the readings leave by.
+    let pairing = |from: Option<&document::Node>, origin: Option<&str>| {
+        let from = from?;
+        let leaves = style::terminal_for(&from.node_type, origin, false)?;
+        tcslibgs::graph::terminals::answers(leaves)
+    };
 
     let ((x1, y1), leaves_right) = match from {
         Some(node) if here(&link.from) => joined(node, link.origin.as_deref(), false)
@@ -1984,7 +2010,21 @@ fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
     };
     let ((x2, y2), arrives_right) = match to {
         Some(node) if here(&link.to) => {
-            joined(node, link.input.as_deref(), true).unwrap_or_else(|| {
+            // What the link wrote, where that is a terminal this type has; the
+            // terminal that pairs with the source otherwise. A computation's
+            // own input -- `in0` -- is neither, and falls through to the
+            // pairing one: a mean's three lines arrive where its readings do.
+            let wanted = link
+                .input
+                .as_deref()
+                .filter(|input| {
+                    NodeType::ALL
+                        .iter()
+                        .find(|t| t.spelling() == node.node_type)
+                        .is_some_and(|t| t.terminals().has(input))
+                })
+                .or_else(|| pairing(from, link.origin.as_deref()));
+            joined(node, wanted, true).unwrap_or_else(|| {
                 let (_, h) = size_of(&node.node_type);
                 ((node.at.0 as f32, (node.at.1 + h as i32 / 2) as f32), true)
             })
@@ -2174,6 +2214,17 @@ fn must_name(document: &Document, node: &str, sink: bool) -> bool {
         .is_some_and(|t| t.must_name(sink))
 }
 
+/// Whether this node is a computation that declares its inputs.
+///
+/// Which is the one kind of destination whose arriving end is named by
+/// something that is not a terminal: a mean's `in0`. See `arriving_at`.
+#[cfg(test)]
+fn declares_inputs(document: &Document, node: &str) -> bool {
+    document
+        .node(node)
+        .is_some_and(|node| node.attributes.contains_key("inputs"))
+}
+
 fn free_input(document: &Document, node: &str) -> Option<String> {
     let inputs = document.node(node)?.attributes.get("inputs")?.clone();
     let taken: Vec<&str> = document
@@ -2224,10 +2275,16 @@ fn seed(editor: &mut Editor) {
     // looks as answered as one somebody thought about. So the fields are there
     // to be filled, empty, and marked until they are.
     for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
+        // Empty, with one exception the schema itself names: the beacon's
+        // interval has an answer that is right until somebody has a reason,
+        // where a socket has none. See `parameters::default_of`.
+        let now = tcslibgs::graph::parameters::default_of(attribute)
+            .unwrap_or_default()
+            .to_string();
         editor.edit(Edit::SetTcspecial {
             attribute: (*attribute).to_string(),
             was: None,
-            now: Some(String::new()),
+            now: Some(now),
         });
     }
 
@@ -3545,6 +3602,137 @@ mod tests {
         );
     }
 
+    /// A link to a terminal is recorded as the terminal that was pressed.
+    ///
+    /// The fault this is here for: a line dragged from the ground link's
+    /// `to_payload` to the upper left corner of a computation -- its `from_moc`
+    /// -- was recorded as a link naming no terminal at all, and then drawn
+    /// arriving at the computation's lower right. Twice wrong: what somebody
+    /// had just said was thrown away, and the drawing then guessed the other
+    /// stream.
+    ///
+    /// Thrown away because the question had been put to the schema's table,
+    /// which calls a computation's sinks its own business, rather than to the
+    /// table the canvas drew from. The gesture is about the boxes on the
+    /// screen.
+    #[test]
+    fn a_link_into_a_computation_remembers_which_terminal() {
+        use journal::Edit;
+
+        let mut document = Document::new();
+        for (name, node_type, at) in [
+            ("ground", "moc", (16, 120)),
+            ("to_kelvin", "compute", (300, 120)),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+            document.apply(&Edit::MoveNode {
+                node: name.into(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+
+        let over = |node: &str, node_type: &str, at: (i32, i32), terminal: &str| {
+            let (x, y, width, height) =
+                style::terminal_box(node_type, at, terminal).expect("a terminal");
+            let _ = node;
+            (x + width / 2.0, y + height / 2.0)
+        };
+
+        let link = joined(
+            &document,
+            &None,
+            &Drawing {
+                node: "ground".to_string(),
+                terminal: "to_payload".to_string(),
+            },
+            over("to_kelvin", "compute", (300, 120), "from_moc"),
+        )
+        .expect("the ground reaches a computation");
+
+        assert_eq!(link.from, "ground");
+        assert_eq!(link.origin.as_deref(), Some("to_payload"));
+        assert_eq!(link.to, "to_kelvin");
+        // The terminal that was pressed, which is the whole of what the
+        // gesture said: a computation has two data sinks, so the file has to
+        // say which.
+        assert_eq!(link.input.as_deref(), Some("from_moc"));
+
+        // And the line is drawn to that corner: the upper left, where what
+        // the ground sends arrives.
+        document.apply(&Edit::AddLink { link });
+        let ends = ends_of(&document, &document.links[0], &None);
+        let ((x, y), _) =
+            style::attachment("compute", (300, 120), "from_moc").expect("a terminal");
+        assert_eq!(ends.to, (x, y), "the line arrives at the terminal it was drawn to");
+
+        // A mean is the one destination whose arriving end is named by
+        // something that is not a terminal, and it still fills its inputs.
+        document.apply(&Edit::AddNode {
+            name: "mean_temp".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        document.apply(&Edit::SetAttribute {
+            node: "mean_temp".into(),
+            attribute: "inputs".into(),
+            was: None,
+            now: Some("in0,in1".into()),
+        });
+        assert!(declares_inputs(&document, "mean_temp"));
+        assert_eq!(
+            arriving_at(&document, "mean_temp", "from_payload").as_deref(),
+            Some("in0"),
+            "a mean is filled by name, not by terminal"
+        );
+    }
+
+    /// A link the file does not name a sink for is drawn at the pairing one.
+    ///
+    /// A link leaving `to_payload` carries what the ground sends, so it
+    /// arrives at a `from_moc`: the same stream, named at its other end. The
+    /// drawing used to fall back to the groundward sink whatever the link
+    /// carried, which drew a command from the ground arriving at the corner
+    /// the readings leave by.
+    #[test]
+    fn an_unnamed_sink_is_drawn_where_its_stream_arrives() {
+        use journal::{Edit, Link};
+
+        let mut document = Document::new();
+        for (name, node_type, at) in [
+            ("ground", "moc", (16, 120)),
+            ("through", "null", (300, 120)),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+            document.apply(&Edit::MoveNode {
+                node: name.into(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+        // Written by hand, naming the source and not the sink.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("ground", Some("to_payload"), "through", None),
+        });
+
+        let ends = ends_of(&document, &document.links[0], &None);
+        let ((x, y), _) =
+            style::attachment("null", (300, 120), "from_moc").expect("the sink");
+        assert_eq!(
+            ends.to,
+            (x, y),
+            "what the ground sends arrives where that stream arrives"
+        );
+    }
+
     /// Every working pane has room for a node.
     ///
     /// Each pane is a share of the working area and every node is one width:
@@ -3877,21 +4065,35 @@ mod tests {
         for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
             assert_eq!(
                 said.get(*attribute).map(String::as_str),
-                Some(""),
-                "{attribute} should be offered and empty"
+                Some(tcslibgs::graph::parameters::default_of(attribute).unwrap_or("")),
+                "{attribute} should be offered with whatever it defaults to"
             );
         }
+        // Which is nothing, for everything but the beacon's interval: a socket
+        // has no value that is right until somebody says so, and "how often
+        // does the vehicle say it is alive" has one.
+        assert_eq!(
+            said.get("beacon.interval_ms").map(String::as_str),
+            Some("1000")
+        );
         // And none of it is a fault: the editor is lazy, and a configuration
         // nobody has filled in yet is one nobody has filled in yet. What it
         // must say before it flies is the ground check's to insist on, with a
         // file and a line.
         assert!(editor.faults().is_empty(), "{:?}", editor.faults());
 
-        // And nothing of it reaches the file, because nothing of it is
-        // stated: a section with nothing under it would read back as no
-        // section at all.
+        // And what reaches the file is what is stated, which is the beacon's
+        // interval and nothing else: an unanswered attribute is written out of
+        // the file rather than written empty, and a `tcspecial:` with nothing
+        // under it would read back as no section at all.
         let written = std::fs::read_to_string(&path).expect("the file");
-        assert!(!written.contains("tcspecial"), "{written}");
+        assert!(written.contains("interval_ms: \"1000\""), "{written}");
+        for unanswered in ["tcs_cmd", "payload_telemetry", "log", "rust-code-path"] {
+            assert!(
+                !written.contains(unanswered),
+                "{unanswered} is not stated and should not be written: {written}"
+            );
+        }
 
         let moc = editor.document().node("moc").expect("a ground station");
         assert_eq!(moc.node_type, "moc");
@@ -4867,13 +5069,18 @@ mod tests {
             // Inside the vehicle working pane, which is where a computation
             // belongs: a click lands on a node where it is drawn.
             let left = dividers().moc;
-            for (name, at) in [
-                ("to_kelvin", (left + 120, 88)),
-                ("mean_temp", (left + 120, 240)),
+            for (name, node_type, at) in [
+                ("to_kelvin", "compute", (left + 120, 88)),
+                ("mean_temp", "compute", (left + 120, 240)),
+                // And a payload, in its own pane. Of a different type on
+                // purpose: a click has to open the window for whatever was
+                // clicked, and a payload is the one a person reaches for
+                // first.
+                ("sensor", "i2c", (dividers().vehicle + 24, 88)),
             ] {
                 editor.edit(Edit::AddNode {
                     name: name.to_string(),
-                    node_type: "compute".to_string(),
+                    node_type: node_type.to_string(),
                     home: None,
                 });
                 editor.edit(Edit::MoveNode {
@@ -4911,10 +5118,9 @@ mod tests {
             .next()
             .expect("the window has a canvas");
         let at = canvas.absolute_position();
-        let (width, height) = size_of("compute");
-
         // Pressed and released at one place, which is a click.
-        let click = |node: (i32, i32)| {
+        let click = |node: (i32, i32), node_type: &str| {
+            let (width, height) = size_of(node_type);
             let on = slint::LogicalPosition::new(
                 at.x + node.0 as f32 + width as f32 / 2.0,
                 at.y + node.1 as f32 + height as f32 / 2.0,
@@ -4933,14 +5139,16 @@ mod tests {
 
         assert!(views.borrow().attributes.is_empty(), "nothing open yet");
 
-        click((dividers().moc + 120, 88));
+        click((dividers().moc + 120, 88), "compute");
         assert!(
             views.borrow().attributes.contains_key("to_kelvin"),
             "a click should open what the node says: {:?}",
             views.borrow().attributes.keys().collect::<Vec<_>>()
         );
         // And it moved nothing, so nothing is in the history.
-        assert_eq!(editor.borrow().undo_depth(), 4, "a click is not an edit");
+        // Three nodes placed and moved, which is six edits: a click adds
+        // none.
+        assert_eq!(editor.borrow().undo_depth(), 6, "a click is not an edit");
 
         // The window shows that node and no other, and offers what the type
         // declares.
@@ -4957,7 +5165,7 @@ mod tests {
 
         // A second node opens a second window, and the first stays: which is
         // the whole point of this not being a panel.
-        click((dividers().moc + 120, 240));
+        click((dividers().moc + 120, 240), "compute");
         assert_eq!(
             views.borrow().attributes.len(),
             2,
@@ -4968,8 +5176,75 @@ mod tests {
 
         // Clicking the same node again raises its window rather than making a
         // second one saying the same thing.
-        click((dividers().moc + 120, 88));
+        click((dividers().moc + 120, 88), "compute");
         assert_eq!(views.borrow().attributes.len(), 2);
+
+        // A node whose position is not on the grid opens on the first click
+        // too, which it did not: a click used to be told from a drag by
+        // whether the position it *resolves to* was where the node already
+        // was, and a node off the grid -- a file somebody hand-edited, a
+        // configuration from a build that drew the panes differently --
+        // resolves to somewhere else. So the click moved it and the second
+        // click opened it. A click is a gesture that moved nothing.
+        {
+            let mut editor = editor.borrow_mut();
+            editor.edit(Edit::AddNode {
+                name: "askew".to_string(),
+                node_type: "i2c".to_string(),
+                home: None,
+            });
+            // Three pixels off the eight-pixel grid, and in its own pane.
+            editor.edit(Edit::MoveNode {
+                node: "askew".to_string(),
+                was: (0, 0),
+                now: (dividers().vehicle + 27, 203),
+            });
+        }
+        views.borrow().refresh(&editor.borrow());
+        let before = editor.borrow().undo_depth();
+
+        click((dividers().vehicle + 27, 203), "i2c");
+        assert!(
+            views.borrow().attributes.contains_key("askew"),
+            "a node off the grid should open on the first click: {:?}",
+            views.borrow().attributes.keys().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            editor.borrow().undo_depth(),
+            before,
+            "and the click should not have moved it"
+        );
+        assert_eq!(
+            editor.borrow().document().node("askew").expect("it").at,
+            (dividers().vehicle + 27, 203),
+            "nor snapped it"
+        );
+
+        // And a payload opens its own, which is the one a person reaches for
+        // first: a sensor is where an address and a bus are typed.
+        click((dividers().vehicle + 24, 88), "i2c");
+        assert!(
+            views.borrow().attributes.contains_key("sensor"),
+            "clicking a payload should open what it says: {:?}",
+            views.borrow().attributes.keys().collect::<Vec<_>>()
+        );
+        let payload = views
+            .borrow()
+            .attributes
+            .get("sensor")
+            .map(|window| window.as_weak())
+            .unwrap()
+            .upgrade()
+            .expect("still open");
+        assert_eq!(payload.get_node_type(), "i2c");
+        // With the fields an i2c node is asked for, so somebody can type a
+        // bus and an address into it.
+        let asked: Vec<String> = (0..payload.get_fields().row_count())
+            .filter_map(|row| payload.get_fields().row_data(row))
+            .map(|field| field.name.to_string())
+            .collect();
+        assert!(asked.contains(&"path".to_string()), "{asked:?}");
+        assert!(asked.contains(&"address".to_string()), "{asked:?}");
 
         // Typing in it reaches the document, and the other window is
         // untouched.
@@ -4986,12 +5261,13 @@ mod tests {
             Some("to_kelvin")
         );
 
-        // And closing takes a press of its own, and takes only that one.
+        // And closing takes a press of its own, and takes only that one: the
+        // other two windows are still open.
         window.invoke_closed();
         assert_eq!(
             views.borrow().attributes.keys().collect::<Vec<_>>(),
-            vec!["mean_temp"],
-            "Close should shut one window and leave the other"
+            vec!["askew", "mean_temp", "sensor"],
+            "Close should shut one window and leave the others"
         );
     }
 

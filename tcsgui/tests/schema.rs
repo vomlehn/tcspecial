@@ -107,7 +107,7 @@ fn the_tcspecial_section_is_what_the_parameters_say() {
     for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
         // Dotted in the rules, nested in the file: `beacon.send` is `send`
         // under `beacon`. One of them is not under a subsection at all --
-        // `rust-code`, which is about building the software rather than about
+        // `rust-code-path`, which is about building the software rather than
         // running it -- and sits at the top of the section.
         match attribute.split_once('.') {
             Some((parent, name)) => {

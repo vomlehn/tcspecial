@@ -24,9 +24,18 @@ use crate::telemetry_log::TelemetryLog;
 pub struct BeaconSend {
     pair:       ArcCondPair<SystemTime>,
     interval:   Arc<Mutex<Duration>>,
-    dest_addr:  std::net::SocketAddr,
-    /// The local interface beacons go out on; see `beacon_send`.
-    interface:  std::net::Ipv4Addr,
+    /// Where beacons go, which the ground station binds.
+    dest_addr:  tcslibgs::HostPort,
+    /// Where they come from, which this binds.
+    ///
+    /// Stated rather than left to the system, and that is the whole of what
+    /// replaced multicast: a beacon goes from one named place to one other, so
+    /// both are written down, and a firewall rule or a capture filter can
+    /// describe the link. Before this it was a multicast group and the name of
+    /// a local interface to join it on -- which bought any number of ground
+    /// stations and cost an attribute whose being wrong lost every beacon in
+    /// silence.
+    from_addr:  tcslibgs::HostPort,
     /// The telemetry log every beacon is recorded in, shared with the
     /// command interpreter so that one log holds all of the telemetry.
     log:        TelemetryLog,
@@ -51,8 +60,8 @@ pub struct BeaconSend {
 impl BeaconSend {
     pub fn new(
         interval: Duration,
-        dest_addr: std::net::SocketAddr,
-        interface: std::net::Ipv4Addr,
+        from_addr: tcslibgs::HostPort,
+        dest_addr: tcslibgs::HostPort,
         log: TelemetryLog,
         version: ConfigVersion,
         config_version: ConfigVersion,
@@ -73,7 +82,7 @@ impl BeaconSend {
             pair,
             interval: Arc::new(Mutex::new(interval)),
             dest_addr,
-            interface,
+            from_addr,
             log,
             version,
             config_version,
@@ -91,23 +100,15 @@ impl BeaconSend {
 
     // FIXME: check result type
     fn beacon_send(&self) -> TcsResult<()> {
-        // Bound to the interface the beacon is to go out on, not to every
-        // interface. A multicast datagram from a socket bound to 0.0.0.0 goes
-        // out the default route, which on a host with a second interface or a
-        // tunnel is not the interface the ground station joined the group on
-        // -- and then not one beacon arrives, with nothing anywhere to say so.
-        // Binding the interface's own address is how std selects it; there is
-        // no set_multicast_if.
-        let socket = UdpSocket::bind((self.interface, 0))?;
-
-        // Local scope. A beacon is for the ground station on this network,
-        // and a default of 1 is what keeps it from being forwarded off it;
-        // said rather than assumed because it is the one option that decides
-        // how far the thing travels.
-        socket.set_multicast_ttl_v4(1)?;
+        // Bound where the configuration says beacons come from, port and all.
+        // A port the system chose would work -- the datagram carries its
+        // source, so the ground could answer it -- and would leave the link
+        // describable from one end only: nothing could be filtered, captured
+        // or firewalled by a rule somebody could write down beforehand.
+        let socket = UdpSocket::bind(self.from_addr.to_string())?;
 
 // FIXME: add check for error
-        let _ = self.send_beacon(&socket, &self.dest_addr);
+        let _ = self.send_beacon(&socket, &self.dest_addr.to_string());
 
         loop {
             let mut expiration = self.pair.lock.lock().unwrap();
@@ -128,7 +129,7 @@ impl BeaconSend {
 
             // Send the beacon
 // FIXME: add check for error
-            let _ = self.send_beacon(&socket, &self.dest_addr);
+            let _ = self.send_beacon(&socket, &self.dest_addr.to_string());
 
             // Calculate next expiration time1G
             let interval = *self.interval.lock().unwrap();
@@ -137,7 +138,7 @@ impl BeaconSend {
         }
     }
 
-    pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &std::net::SocketAddr) -> TcsResult<()> {
+    pub fn send_beacon(&self, socket: &UdpSocket, dest_addr: &str) -> TcsResult<()> {
         // From one: the first beacon is the first beacon, and nought is what
         // every beacon used to carry.
         let sequence = self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
@@ -193,10 +194,11 @@ mod tests {
     /// called the send twice on one BeaconSend would not say that the beacons
     /// a running spacecraft emits are numbered in order.
     ///
-    /// Sent to a plain address on the loopback interface rather than to a
-    /// multicast group. What goes out is the same datagram, and a test that
-    /// joined a group would be testing the network stack's multicast rather
-    /// than this.
+    /// Sent from one stated address to another, which is what beacons are
+    /// now: the ground socket is bound first so that its port can be given to
+    /// the sender as the place to send to, and the sender's own end is a
+    /// loopback port the system chooses, because a test that named one would
+    /// fail whenever something else on the machine held it.
     #[test]
     fn the_beacons_are_numbered_in_order_from_one() {
         let ground = std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
@@ -225,8 +227,14 @@ mod tests {
                 port: 6100,
             },
             beacon_interval: BeaconTime(50),
-            beacon_send: at,
-            beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+            beacon_send: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
+            beacon_recv: tcslibgs::HostPort {
+                address: at.ip().to_string(),
+                port: at.port(),
+            },
             // Nothing to write: what is being tested is what goes out.
             log_dir: None,
             log_segment_bytes: 65_536,
@@ -235,8 +243,16 @@ mod tests {
 
         let _beacon = BeaconSend::new(
             Duration::from_millis(50),
-            at,
-            std::net::Ipv4Addr::LOCALHOST,
+            // From a port of the system's choosing, to where the ground
+            // socket above is bound.
+            tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
+            tcslibgs::HostPort {
+                address: at.ip().to_string(),
+                port: at.port(),
+            },
             log,
             ConfigVersion::of_this_build(),
             ConfigVersion::of_text("1.0").expect("a version"),

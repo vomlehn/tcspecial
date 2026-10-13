@@ -10,7 +10,7 @@ use slint::{Color, Weak};
 
 use crate::MainWindow;
 use slint::SharedString;
-use tcslibgs::{TcsError, TcsResult, Telemetry, Timestamp, NO_TRANSFER_TIME};
+use tcslibgs::{TcsResult, Telemetry, Timestamp, NO_TRANSFER_TIME};
 use tcspecial::config::Beacon;
 
 const DEBUG_BEACON: bool = false;
@@ -248,7 +248,7 @@ impl IndicatorStates {
 
 /*
  * last_beacon  Time of last received beacon message
- * beacon       The multicast group to join and the interface to join it on
+ * beacon       Where beacons come from and where they are received
  * ui_weak      Slint window with beacon information
  * indicators   Indicator state configuration
  */
@@ -269,9 +269,9 @@ pub struct BeaconReceive {
     contact:            Arc<Mutex<Contact>>,
     /// What the last beacon said, kept for the passes that find nothing.
     last_message:       Arc<Mutex<String>>,
-    /// The multicast group beacons arrive on, and the local interface to join
-    /// it on. Both come from the command interpreter's configuration, which
-    /// is also where tcspecial reads them, so the two cannot differ.
+    /// Where beacons are received, which this binds, and where they come
+    /// from. Both come from the command interpreter's configuration, which is
+    /// also where tcspecial reads them, so the two cannot differ.
     beacon:             Beacon,
     ui_weak:            Weak<MainWindow>,
     indicator_states:   IndicatorStates,
@@ -524,26 +524,16 @@ impl BeaconReceive {
      * Receive beacon messages in a loop
      */
     fn receive_beacon(&self) -> TcsResult<()> {
-        // Bound to the group's port on every interface, and then joined to
-        // the group on the one interface the configuration names. Binding the
-        // group address itself would work on Linux and not elsewhere; the
-        // join is what actually asks for the traffic.
+        // Bound where the configuration says beacons are received, address and
+        // port. Plain UDP from one named place to one other.
         //
-        // The interface has to be named: joining with INADDR_ANY joins on the
-        // default route, which on a host with a second interface or a tunnel
-        // is not where tcspecial is sending, and then nothing arrives with
-        // nothing to say so.
-        let socket = UdpSocket::bind((std::net::Ipv4Addr::UNSPECIFIED, self.beacon.group.port()))?;
-
-        let group = match self.beacon.group.ip() {
-            std::net::IpAddr::V4(group) => group,
-            std::net::IpAddr::V6(_) => {
-                return Err(TcsError::Config(
-                    "a beacon group must be IPv4 for now".to_string(),
-                ))
-            }
-        };
-        socket.join_multicast_v4(&group, &self.beacon.interface)?;
+        // It was a bind to the group's port on every interface followed by a
+        // join to a multicast group on a named local one. That bought any
+        // number of ground stations hearing one beacon, and cost two things:
+        // an address that was nobody's, and an interface attribute whose being
+        // wrong lost every beacon in silence. One stated sender and one stated
+        // listener is what a configuration can say plainly.
+        let socket = UdpSocket::bind(self.beacon.recv.to_string())?;
 
         let mut buf = [0u8; 65535];
 
@@ -656,7 +646,7 @@ use crate::config::constants::BEACON_INDICATOR; // Adjust path as needed
  *
     pub fn receive_beacon(&self, ui_handle: Weak<MainWindow>) -> TcsResult<()> {
         let socket = UdpSocket::bind("0.0.0.0:0")?; // Bind to any available port
-        // Note: You'll likely want to connect or join a multicast group here
+        // Note: You'll likely want to bind where beacons are received here
 
         loop {
             // 1. Get the current status from our configuration logic

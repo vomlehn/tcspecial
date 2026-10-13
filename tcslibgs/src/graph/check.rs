@@ -528,9 +528,9 @@ impl Graph {
             Some(said) => {
                 // Two rounds of rules, and both of them somebody else's. What
                 // the section may say and whether it says it is in
-                // parameters.rs; what the values have to be -- a multicast
-                // beacon address, a protocol that exists, two ports that are
-                // not one socket -- is in the struct the command interpreter
+                // parameters.rs; what the values have to be -- an address
+                // and a port wherever one is named, two links that are not
+                // one socket -- is in the struct the command interpreter
                 // itself reads.
                 match crate::graph::parameters::ci_config_of(said) {
                     Err(why) => problems.push(Problem::BadTcspecial { why }),
@@ -675,8 +675,8 @@ mod tests {
             ("moc_tc_base", "127.0.0.1:6100"),
             ("payload_interface", "0.0.0.0:4001"),
             ("beacon_interval_ms", "5000"),
-            ("beacon_send", "239.255.0.1:5550"),
-            ("beacon_interface", "127.0.0.1"),
+            ("beacon_send", "0.0.0.0:5550"),
+            ("beacon_recv", "127.0.0.1:5650"),
             ("log_dir", "/var/log/tcspecial"),
             ("log_segment_bytes", "65536"),
         ]
@@ -899,15 +899,17 @@ mod tests {
     fn a_tcspecial_section_that_does_not_hold_together_is_refused() {
         let wrong = [
             // A name belonging to nothing.
-            ("beacon_adress", "239.255.0.1:5550", "beacon_adress"),
+            ("beacon_adress", "0.0.0.0:5550", "beacon_adress"),
             // A command interface that is only half stated, which is the way
             // one attribute carrying two things goes wrong.
             ("tcs_cmd_recv", "0.0.0.0", "address:port"),
             // A port that is not one.
             ("payload_port", "nought", "payload_port"),
-            // And a beacon address that is not a multicast group, which is
-            // the rule the command interpreter's own struct knows.
-            ("beacon_send", "10.0.0.1:5550", "multicast"),
+            // And a beacon address with no port, which is the rule the
+            // command interpreter's own struct knows: beacons go from one
+            // socket to another, each written address:port.
+            ("beacon_send", "10.0.0.1", "address:port"),
+            ("beacon_recv", "127.0.0.1:0", "port 0"),
         ];
 
         for (attribute, value, expected) in wrong {

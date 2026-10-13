@@ -209,7 +209,7 @@ from the group it names, so a group holds what several handlers share.
 
    tcspecial                       optional
      ...          the command interpreter's own settings, of which
-                  beacon_send is read
+                  beacon_send and beacon_recv are read
 
    payload_groups                  optional
      name         the name payloads refer to
@@ -223,8 +223,8 @@ from the group it names, so a group holds what several handlers share.
 
 The shipped examples each carry a ``tcspecial`` section, first in the file, so
 one file says what the set is and where its command interpreter belongs.
-``beacon_send`` is read from it, since where a set's beacons go is the
-set's own business; the rest is not read yet, tcspecial being placed by the
+``beacon_send`` and ``beacon_recv`` are read from it, since where a set's
+beacons go is the set's own business; the rest is not read yet, tcspecial being placed by the
 file ``TCSPECIAL_CONFIG_PATH`` names. It is all checked when the file is
 loaded -- a section that could never place a command interpreter is refused
 where it is read.
@@ -1538,8 +1538,8 @@ command on the link it belongs on, and asks ``CONNECT`` of both -- if the two
 answer differently they are not one spacecraft, and ``Last Response`` says
 so.
 
-Where it sends beacons, on what interface, and how often belong to the payload
-set -- a set's ground station being what listens for its beacons -- and are
+Where its beacons come from, where they are received, and how often belong to
+the payload set -- a set's ground station being what listens for its beacons -- and are
 stated in the ``tcspecial`` section of the set's own payload configuration
 file:
 
@@ -1547,8 +1547,8 @@ file:
 
    tcspecial:
      beacon_interval_ms: 5000
-     beacon_send: "239.255.0.1:5550"
-     beacon_interface: "127.0.0.1"
+     beacon_send: "0.0.0.0:5550"
+     beacon_recv: "127.0.0.1:5650"
 
 Where the links are
 -------------------
@@ -1610,23 +1610,30 @@ configuration that has not been asked where to send them has not answered.
 ``tcspecial.yaml`` states them too, and a set's section wins over it; the
 file's are what place a set whose configuration states no section at all.
 
-The address is a **multicast group** -- in ``224.0.0.0/4``, and
-``239.0.0.0/8`` for one of local scope, which is what a mission network wants.
-Any number of ground stations join it, which a unicast beacon cannot offer: a
-port can be bound once, so a second listener could not even start. An address
-that is not a group is refused.
+``beacon_send`` is where beacons come from, which tcspecial binds, and
+``beacon_recv`` is where they are received, which the ground station binds and
+tcspecial sends to. Both are an address and a port, like the links above, and
+both ends read both of them out of the same file -- which is how the two come
+to name one pair.
 
-``beacon_interface`` is the address of a local interface, and both ends must
-name the same one -- which they do by reading the same file. It cannot be left
-out: a sender that does not say sends out the default route and a listener
-that does not say joins on the default route, and on a host where those differ
--- one with a wireless interface and a tunnel, say -- not one beacon arrives
-and nothing says why. ``127.0.0.1`` is what the shipped files state, both
+Beacons went to a multicast group, with a second attribute naming the local
+interface to join it on. That bought something real: any number of ground
+stations could listen without being named, which a unicast beacon cannot offer,
+a port being bindable once. It cost two things to get right -- a group address
+that is nobody's, and an interface attribute whose being wrong lost every
+beacon in silence, there being nothing to report when a datagram is simply not
+joined for. One stated sender and one stated listener is what a configuration
+can say plainly, and what a firewall rule or a capture filter can be written
+against beforehand. A mission that needs more than one ground station listening
+sends to a relay that fans the beacons out, which is a thing somebody
+configured rather than a thing the network did silently.
+
+``0.0.0.0:5550`` and ``127.0.0.1:5650`` are what the shipped files state, both
 programs being run on one machine; a real ground link names the interface
-facing it.
+facing it on each end.
 
-Tcsmoc reads the beacon group and interface from the same two files, the same
-way, so moving a beacon moves both ends of it. The command address is the one
+Tcsmoc reads both addresses from the same two files, the same way, so moving a
+beacon moves both ends of it. The command address is the one
 that can still drift: the two ends agree about it by reading the same default,
 so a file that moves it leaves the MOC sending where nothing is bound, and no
 error on either end reports that.
@@ -1636,7 +1643,7 @@ set to:
 
 .. code-block:: console
 
-   Commands are taken on 0.0.0.0:4000 as tcspecial/src/tcspecial.yaml asked, and beacons go to 0.0.0.0:5550
+   Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go from 0.0.0.0:5550 to 127.0.0.1:5650
 
 A payload set states its own version, which every beacon carries:
 
@@ -1885,10 +1892,10 @@ without anyone asking.
 
 Beaconing
 ^^^^^^^^^
-TCSpecial sends a beacon at the interval its configuration states, to the
-multicast group the payload set's ``tcspecial`` section names, or
-``tcspecial.yaml``'s for a set with no section. Tcsmoc joins that same group,
-on that same interface, having read the same files. Tcsmoc displays the
+TCSpecial sends a beacon at the interval its configuration states, from the
+address the payload set's ``tcspecial`` section names to the address beside it,
+or ``tcspecial.yaml``'s pair for a set with no section. Tcsmoc binds that same
+receiving address, having read the same files. Tcsmoc displays the
 following beacon colors:
 
 steady grey

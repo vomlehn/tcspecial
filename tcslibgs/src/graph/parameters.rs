@@ -47,7 +47,7 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("moc_tc_base", true),
     ("beacon_interval_ms", true),
     ("beacon_send", true),
-    ("beacon_interface", true),
+    ("beacon_recv", true),
     ("log_dir", false),
     ("log_segment_bytes", false),
 ];
@@ -98,7 +98,7 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
         moc_tc_base: text("moc_tc_base")?,
         beacon_interval_ms: number("beacon_interval_ms")?,
         beacon_send: text("beacon_send")?,
-        beacon_interface: text("beacon_interface")?,
+        beacon_recv: text("beacon_recv")?,
         // Absent is "run without a telemetry log", which is a configuration
         // somebody may mean: a vehicle with no writable storage.
         log_dir: said
@@ -146,8 +146,8 @@ mod tests {
             ("tcs_tc_base", "0.0.0.0:6000"),
             ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
-            ("beacon_send", "239.255.0.1:5550"),
-            ("beacon_interface", "127.0.0.1"),
+            ("beacon_send", "0.0.0.0:5550"),
+            ("beacon_recv", "127.0.0.1:5650"),
             ("log_dir", "/var/log/tcspecial"),
             ("log_segment_bytes", "65536"),
         ]
@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(config.moc_cmd_send, "127.0.0.1:4100");
         assert_eq!(config.payload_interface, "0.0.0.0:4001");
         assert_eq!(config.beacon_interval_ms, 5000);
-        assert_eq!(config.beacon_send, "239.255.0.1:5550");
+        assert_eq!(config.beacon_send, "0.0.0.0:5550");
         assert_eq!(config.log_dir.as_deref(), Some("/var/log/tcspecial"));
         assert_eq!(config.log_segment_bytes, 65536);
 
@@ -309,7 +309,7 @@ mod tests {
     #[test]
     fn a_misspelled_attribute_is_refused_by_name() {
         let mut wrong = whole();
-        wrong.push(("beacon_adress", "239.255.0.1:5550"));
+        wrong.push(("beacon_adress", "0.0.0.0:5550"));
         let why = ci_config_of(&said(&wrong)).expect_err("a typo should be refused");
         assert!(why.contains("beacon_adress"), "{why}");
         // And the complaint lists what there is, so the typo can be fixed

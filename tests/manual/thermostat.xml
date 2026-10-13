@@ -2,9 +2,9 @@
 <configuration>
     <version>2.0</version>
     <tcspecial>
-        <beacon_interface>127.0.0.1</beacon_interface>
         <beacon_interval_ms>5000</beacon_interval_ms>
-        <beacon_send>239.255.0.1:5550</beacon_send>
+        <beacon_recv>127.0.0.1:5650</beacon_recv>
+        <beacon_send>0.0.0.0:5550</beacon_send>
         <log_dir>/var/log/tcspecial</log_dir>
         <log_segment_bytes>65536</log_segment_bytes>
         <moc_cmd_send>127.0.0.1:4100</moc_cmd_send>

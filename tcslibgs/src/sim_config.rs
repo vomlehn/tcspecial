@@ -598,11 +598,11 @@ pub struct SimSettings {
     // copied from another one keeps.
     /// What kind of payload this is, in the payload configuration's own word
     /// for it: network, device, serial, i2c, or spi.
-    #[serde(rename = "type", default)]
+    #[serde(rename = "type", default, deserialize_with = "blank_is_unstated")]
     pub dh_type: Option<String>,
     /// Which transport, for a network payload, and refused for every other
     /// kind.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub protocol: Option<String>,
     // The socket the simulated payload binds for itself.
     //
@@ -622,23 +622,23 @@ pub struct SimSettings {
     ///
     /// Absent is what every simulator file asked for before this existed: any
     /// interface, and a port the system chooses.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub payload_address: Option<String>,
     /// The port the simulated payload binds for itself. Refused for a Unix
     /// datagram socket, which is named by a path.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub payload_port: Option<u16>,
 
     /// Milliseconds between packets. 0 is as fast as the payload can be driven.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub packet_interval_ms: Option<u32>,
     /// Milliseconds between the segments of one packet. Defaults to the packet
     /// interval.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub segment_interval_ms: Option<u32>,
     /// Bytes in one segment. Defaults to the whole packet, which is the packet
     /// size the payload configuration gives the data handler.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub segment_size: Option<u32>,
 
     // What the payload does wrong, which is the whole reason a simulator is
@@ -648,13 +648,13 @@ pub struct SimSettings {
     // nobody would fly. Every one of them is off when it is absent, so a file
     // that says nothing about faults describes a payload that works.
     /// Packets in a hundred that are not sent at all.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub drop_percent: Option<u32>,
     /// Packets in a hundred that go out with a byte of them altered.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub corrupt_percent: Option<u32>,
     /// Packets in a hundred that go out short of their packet size.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub truncate_percent: Option<u32>,
     /// How much later than it should a packet may be, in milliseconds.
     ///
@@ -662,7 +662,7 @@ pub struct SimSettings {
     /// for would be the simulator disobeying its own configuration. For a
     /// payload that answers requests this is the delay before an answer
     /// rather than an addition to an interval, there being no interval.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub jitter_ms: Option<u32>,
     /// Packets after which the payload stops sending, while staying
     /// connected.
@@ -670,19 +670,53 @@ pub struct SimSettings {
     /// A payload that has gone quiet without going away, which is what a
     /// wedged instrument looks like from the handler's end and is harder to
     /// notice than one that has closed.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub silent_after: Option<u64>,
     /// Packets after which the payload closes the link.
     ///
     /// Only for the kinds that have a connection to close.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub close_after: Option<u64>,
     /// Requests in a hundred that a triggered payload does not answer.
     ///
     /// What exercises a handler's own waiting: a trigger sent and nothing
     /// returned is the case a response timeout exists for.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "blank_is_unstated")]
     pub ignore_trigger_percent: Option<u32>,
+}
+
+/// A setting written empty is a setting not stated.
+///
+/// `packet_interval_ms: ""` and no `packet_interval_ms` at all mean the same
+/// thing here, which is the rule the editor states for every field it offers:
+/// absent and empty are one thing to the checking, and a cleared field is not
+/// an answer. It matters because the editor writes a new simulator
+/// configuration as a form -- every setting of every payload, empty until
+/// somebody fills it in -- and a form that nothing could load would be a file
+/// written to be rejected.
+///
+/// The value is taken as the text a file wrote, number or string alike, and
+/// parsed from that: see [`crate::Scalar`]. A value that is not empty and not
+/// what the setting takes is refused here, as it was before.
+fn blank_is_unstated<'de, D, T>(d: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    let said = Option::<crate::Scalar>::deserialize(d)?;
+    let Some(said) = said else { return Ok(None) };
+    let text = said.as_str();
+    if text.is_empty() {
+        return Ok(None);
+    }
+
+    // The value in the message, which the parse error alone does not carry:
+    // "invalid digit found in string" says nothing about which string, and a
+    // file has fourteen settings it could have been.
+    text.parse::<T>().map(Some).map_err(|e| {
+        serde::de::Error::custom(format!("\"{text}\" cannot be read here: {e}"))
+    })
 }
 
 /// Every setting a group or a simulated payload may state, by the name a file
@@ -1343,6 +1377,41 @@ simulated_payloads:
             path: "/dev/urandom".to_string(),
         });
         dh
+    }
+
+    /// A setting written empty is a setting not stated.
+    ///
+    /// Which is what lets the editor write a new simulator configuration as a
+    /// form -- every setting of every payload, empty until somebody fills one
+    /// in -- and have the file load all the same. Before this an empty
+    /// numeric setting was a type error, so a form was a file written to be
+    /// rejected.
+    #[test]
+    fn a_setting_written_empty_is_a_setting_not_stated() {
+        let file = parse(
+            "simulated_payloads:\n  - name: DH0\n    type: \"\"\n    \
+             protocol: \"\"\n    packet_interval_ms: \"\"\n    \
+             drop_percent: \"\"\n    silent_after: \"\"\n",
+        );
+        let said = &file.simulated_payloads[0].settings;
+        assert_eq!(said.dh_type, None, "an empty kind is no kind");
+        assert_eq!(said.protocol, None);
+        assert_eq!(said.packet_interval_ms, None);
+        assert_eq!(said.drop_percent, None);
+        assert_eq!(said.silent_after, None);
+
+        // And a value that is there and wrong is still refused, which is the
+        // half of this that must not have moved.
+        let said = format!(
+            "{}",
+            crate::ConfigFormat::Yaml
+                .parse::<SimConfigFile>(
+                    "simulated_payloads:\n  - name: DH0\n    \
+                     packet_interval_ms: often\n"
+                )
+                .expect_err("\"often\" is not a number of milliseconds")
+        );
+        assert!(said.contains("often"), "{said}");
     }
 
     /// The payload configuration's `address` and `port`, written here, are
@@ -2076,3 +2145,5 @@ simulated_payloads:
         assert_eq!(resolved[0].segment_size, 1);
     }
 }
+
+

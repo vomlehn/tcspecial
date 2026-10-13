@@ -14,13 +14,13 @@
     <version>1.0</version>
     <description>TCSpecial payload set 3</description>
     <tcspecial>
-        <tcspecial_command>0.0.0.0:4000</tcspecial_command>
-        <moc_command>127.0.0.1:4100</moc_command>
+        <tcs_cmd_recv>0.0.0.0:4000</tcs_cmd_recv>
+        <moc_cmd_send>127.0.0.1:4100</moc_cmd_send>
         <payload_interface>0.0.0.0:4001</payload_interface>
-        <tcspecial_tc_base>0.0.0.0:6000</tcspecial_tc_base>
+        <tcs_tc_base>0.0.0.0:6000</tcs_tc_base>
         <moc_tc_base>127.0.0.1:6100</moc_tc_base>
         <beacon_interval_ms>5000</beacon_interval_ms>
-        <beacon_address>239.255.0.1:5550</beacon_address>
+        <beacon_send>239.255.0.1:5550</beacon_send>
         <beacon_interface>127.0.0.1</beacon_interface>
         <log_dir>/var/log/tcspecial</log_dir>
         <log_segment_bytes>65536</log_segment_bytes>

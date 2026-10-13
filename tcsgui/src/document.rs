@@ -1410,13 +1410,13 @@ pub fn thermostat_example() -> Document {
     // must say: where commands are taken, where beacons go, where the
     // telemetry log is written.
     for (attribute, value) in [
-        ("tcspecial_command", "0.0.0.0:4000"),
-        ("moc_command", "127.0.0.1:4100"),
+        ("tcs_cmd_recv", "0.0.0.0:4000"),
+        ("moc_cmd_send", "127.0.0.1:4100"),
         ("payload_interface", "0.0.0.0:4001"),
-        ("tcspecial_tc_base", "0.0.0.0:6000"),
+        ("tcs_tc_base", "0.0.0.0:6000"),
         ("moc_tc_base", "127.0.0.1:6100"),
         ("beacon_interval_ms", "5000"),
-        ("beacon_address", "239.255.0.1:5550"),
+        ("beacon_send", "239.255.0.1:5550"),
         ("beacon_interface", "127.0.0.1"),
         ("log_dir", "/var/log/tcspecial"),
         ("log_segment_bytes", "65536"),
@@ -1740,13 +1740,13 @@ mod tests {
     #[test]
     fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
         let whole = [
-            ("tcspecial_command", "0.0.0.0:4000"),
-            ("moc_command", "127.0.0.1:4100"),
+            ("tcs_cmd_recv", "0.0.0.0:4000"),
+            ("moc_cmd_send", "127.0.0.1:4100"),
             ("payload_interface", "0.0.0.0:4001"),
-            ("tcspecial_tc_base", "0.0.0.0:6000"),
+            ("tcs_tc_base", "0.0.0.0:6000"),
             ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
-            ("beacon_address", "239.255.0.1:5550"),
+            ("beacon_send", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),
         ];
 
@@ -1771,11 +1771,11 @@ mod tests {
 
         // Complete and wrong, in the words of the rules that know why.
         for (attribute, instead, expected) in [
-            ("beacon_address", "10.0.0.1:5550", "multicast"),
+            ("beacon_send", "10.0.0.1:5550", "multicast"),
             // Half a command interface, which is the one way an attribute
             // carrying two things goes wrong.
-            ("tcspecial_command", "0.0.0.0", "address:port"),
-            ("tcspecial_command", "0.0.0.0:4001", "payload_interface"),
+            ("tcs_cmd_recv", "0.0.0.0", "address:port"),
+            ("tcs_cmd_recv", "0.0.0.0:4001", "payload_interface"),
             ("payload_interface", "nought", "payload_interface"),
         ] {
             let document = filled(Some((attribute, instead)));

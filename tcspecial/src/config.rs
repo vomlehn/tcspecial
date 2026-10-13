@@ -5,7 +5,7 @@ use std::path::Path;
 use std::net::{Ipv4Addr, SocketAddr};
 
 use tcslibgs::{
-    beacon_address_of, beacon_interface_of, load_config_file, CIConfig, CIConfigJson, TcsError,
+    beacon_send_of, beacon_interface_of, load_config_file, CIConfig, CIConfigJson, TcsError,
     TcsResult,
 };
 
@@ -46,11 +46,11 @@ pub struct Beacon {
 pub fn beacon(config: &CIConfig, section: Option<&CIConfigJson>) -> Result<Beacon, String> {
     match section {
         Some(section) => Ok(Beacon {
-            group: beacon_address_of(&section.beacon_address)?,
+            group: beacon_send_of(&section.beacon_send)?,
             interface: beacon_interface_of(&section.beacon_interface)?,
         }),
         None => Ok(Beacon {
-            group: config.beacon_address,
+            group: config.beacon_send,
             interface: config.beacon_interface,
         }),
     }
@@ -132,22 +132,22 @@ mod tests {
         load_tcspecial_config(file.path())
     }
 
-    const YAML: &str = "tcspecial_command: 0.0.0.0:4000\n\
-                        moc_command: 127.0.0.1:4100\n\
+    const YAML: &str = "tcs_cmd_recv: 0.0.0.0:4000\n\
+                        moc_cmd_send: 127.0.0.1:4100\n\
                         payload_interface: 0.0.0.0:4001\n\
-                        tcspecial_tc_base: 0.0.0.0:6000\n\
+                        tcs_tc_base: 0.0.0.0:6000\n\
                         moc_tc_base: 127.0.0.1:6100\n\
-                        beacon_interval_ms: 5000\nbeacon_address: 239.255.0.1:5550\n\
+                        beacon_interval_ms: 5000\nbeacon_send: 239.255.0.1:5550\n\
                         beacon_interface: 127.0.0.1\n";
 
     const XML: &str = "<tcspecial>\
-        <tcspecial_command>0.0.0.0:4000</tcspecial_command>\
-        <moc_command>127.0.0.1:4100</moc_command>\
+        <tcs_cmd_recv>0.0.0.0:4000</tcs_cmd_recv>\
+        <moc_cmd_send>127.0.0.1:4100</moc_cmd_send>\
         <payload_interface>0.0.0.0:4001</payload_interface>\
-        <tcspecial_tc_base>0.0.0.0:6000</tcspecial_tc_base>\
+        <tcs_tc_base>0.0.0.0:6000</tcs_tc_base>\
         <moc_tc_base>127.0.0.1:6100</moc_tc_base>\
         <beacon_interval_ms>5000</beacon_interval_ms>\
-        <beacon_address>239.255.0.1:5550</beacon_address>\
+        <beacon_send>239.255.0.1:5550</beacon_send>\
         <beacon_interface>127.0.0.1</beacon_interface>\
         </tcspecial>";
 
@@ -176,14 +176,14 @@ mod tests {
     /// to send them has not answered. The interval beside it is required the
     /// same way.
     #[test]
-    fn the_beacon_address_and_interval_are_required() {
+    fn the_beacon_send_and_interval_are_required() {
         let config = load_from(".yaml", YAML).expect("the configuration loads");
-        assert_eq!(config.beacon_address.to_string(), "239.255.0.1:5550");
+        assert_eq!(config.beacon_send.to_string(), "239.255.0.1:5550");
         assert_eq!(config.beacon_interface.to_string(), "127.0.0.1");
         assert_eq!(config.beacon_interval.0, 5000);
 
         for missing in [
-            "beacon_address: 239.255.0.1:5550\nbeacon_interface: 127.0.0.1\n",
+            "beacon_send: 239.255.0.1:5550\nbeacon_interface: 127.0.0.1\n",
             "beacon_interval_ms: 5000\n",
         ] {
             let without = YAML.replace(missing, "");
@@ -206,21 +206,21 @@ mod tests {
         let from_the_file = load_from(
             ".yaml",
             &YAML.replace(
-                "beacon_address: 239.255.0.1:5550",
-                "beacon_address: 239.255.0.9:5550",
+                "beacon_send: 239.255.0.1:5550",
+                "beacon_send: 239.255.0.9:5550",
             ),
         )
         .expect("the configuration loads");
-        assert_eq!(from_the_file.beacon_address.to_string(), "239.255.0.9:5550");
+        assert_eq!(from_the_file.beacon_send.to_string(), "239.255.0.9:5550");
 
         let section = |beacon: &str| CIConfigJson {
-            tcspecial_command: "0.0.0.0:4000".to_string(),
-            moc_command: "127.0.0.1:4100".to_string(),
+            tcs_cmd_recv: "0.0.0.0:4000".to_string(),
+            moc_cmd_send: "127.0.0.1:4100".to_string(),
             payload_interface: "0.0.0.0:4001".to_string(),
-            tcspecial_tc_base: "0.0.0.0:6000".to_string(),
+            tcs_tc_base: "0.0.0.0:6000".to_string(),
             moc_tc_base: "127.0.0.1:6100".to_string(),
             beacon_interval_ms: 5000,
-            beacon_address: beacon.to_string(),
+            beacon_send: beacon.to_string(),
             beacon_interface: "127.0.0.1".to_string(),
             log_dir: None,
             log_segment_bytes: 65_536,
@@ -251,7 +251,7 @@ mod tests {
         let said = beacon(&from_the_file, Some(&section("nowhere")))
             .expect_err("not an address")
             .to_string();
-        assert!(said.contains("beacon_address"), "{said}");
+        assert!(said.contains("beacon_send"), "{said}");
         assert!(said.contains("nowhere"), "{said}");
     }
 
@@ -262,7 +262,7 @@ mod tests {
     /// while someone is still reading errors. It used to be a constant parsed
     /// with `unwrap`, which could only ever have panicked.
     #[test]
-    fn a_beacon_address_that_is_not_one_is_refused() {
+    fn a_beacon_send_that_is_not_one_is_refused() {
         for bad in [
             "239.255.0.1",
             "nowhere:5550",
@@ -273,12 +273,12 @@ mod tests {
             "0.0.0.0:5550",
         ] {
             let text = YAML.replace(
-                "beacon_address: 239.255.0.1:5550",
-                &format!("beacon_address: \"{bad}\""),
+                "beacon_send: 239.255.0.1:5550",
+                &format!("beacon_send: \"{bad}\""),
             );
             let said = load_from(".yaml", &text).expect_err(bad).to_string();
             assert!(
-                said.contains("beacon_address"),
+                said.contains("beacon_send"),
                 "{bad}: the refusal does not name the attribute: {said}"
             );
         }
@@ -307,11 +307,11 @@ mod tests {
         // command interface took its place as the value that can be written
         // wrongly: half of it, or a port that is not one.
         for instead in [
-            "tcspecial_command: 0.0.0.0",
-            "tcspecial_command: 0.0.0.0:nought",
-            "tcspecial_command: :4000",
+            "tcs_cmd_recv: 0.0.0.0",
+            "tcs_cmd_recv: 0.0.0.0:nought",
+            "tcs_cmd_recv: :4000",
         ] {
-            let bad = YAML.replace("tcspecial_command: 0.0.0.0:4000", instead);
+            let bad = YAML.replace("tcs_cmd_recv: 0.0.0.0:4000", instead);
             assert_ne!(bad, YAML, "the test changed nothing");
             assert!(
                 load_from(".yaml", &bad).is_err(),

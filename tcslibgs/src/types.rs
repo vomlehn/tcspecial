@@ -1332,7 +1332,7 @@ pub struct PayloadConfig {
     /// First of the sections, in the files and here, because it is about the
     /// set as a whole where the two below are about the payloads in it.
     ///
-    /// Optional. `beacon_address` is read from here -- where a set's beacons
+    /// Optional. `beacon_send` is read from here -- where a set's beacons
     /// go is the set's own business, its ground station being what listens
     /// for them -- and the rest is carried and checked and not yet read,
     /// tcspecial taking the rest of its configuration from the file
@@ -1497,7 +1497,7 @@ impl PayloadConfig {
                         self.tcspecial.as_ref().map(CIConfigJson::to_ci_config)
                     {
                         match (
-                            ci.tcspecial_tc_base.at(dh.sequence),
+                            ci.tcs_tc_base.at(dh.sequence),
                             ci.moc_tc_base.at(dh.sequence),
                         ) {
                             (Ok(oc), Ok(ground)) => {
@@ -2421,14 +2421,14 @@ pub fn default_log_segment_bytes() -> u32 {
 /// Multicast is the primitive for that -- any number of stations join the
 /// group, and neither end needs the other's address -- and it is a UDP-only
 /// facility, which a beacon already was.
-pub fn beacon_address_of(stated: &str) -> Result<SocketAddr, String> {
+pub fn beacon_send_of(stated: &str) -> Result<SocketAddr, String> {
     let address: SocketAddr = stated
         .parse()
-        .map_err(|e| format!("beacon_address \"{stated}\" is not an address and port: {e}"))?;
+        .map_err(|e| format!("beacon_send \"{stated}\" is not an address and port: {e}"))?;
 
     if !address.ip().is_multicast() {
         return Err(format!(
-            "beacon_address \"{stated}\" is not a multicast group: beacons are sent to \
+            "beacon_send \"{stated}\" is not a multicast group: beacons are sent to \
              one, so the address is in 224.0.0.0/4 -- 239.0.0.0/8 for a group of local \
              scope, which is what a mission network wants"
         ));
@@ -2555,7 +2555,8 @@ pub fn beacon_interface_of(stated: &str) -> Result<Ipv4Addr, String> {
 /// The file-level form of the command interpreter's configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
-    /// Where tcspecial takes commands about the spacecraft, as `address:port`.
+    /// Where tcspecial receives commands about the spacecraft, as
+    /// `address:port`.
     ///
     /// One attribute and not two, as the beacon address beside it is: an
     /// address and a port only ever used together are one fact, and two
@@ -2564,15 +2565,20 @@ pub struct CIConfigJson {
     /// The protocol is not stated and cannot be: every link in this section is
     /// UDP. A configuration that could say otherwise would be a configuration
     /// that could say something untrue.
-    pub tcspecial_command: String,
-    /// And where the MOC takes them, which is the other end of the same
-    /// conversation.
+    pub tcs_cmd_recv: String,
+    /// And where the MOC sends them from, which is the other end of the same
+    /// conversation and where an answer goes back to.
     ///
     /// Both ends in one file, because both ends read this file: a configuration
     /// that stated only its own end would leave the other to be told
     /// separately, and two places to say one thing is one place for them to
     /// disagree.
-    pub moc_command: String,
+    ///
+    /// The names say which end and which way: `tcs_cmd_recv` is where
+    /// tcspecial receives, `moc_cmd_send` is where the MOC sends from. An
+    /// attribute that said only *where* a link is leaves a reader to work out
+    /// which of the two ends it belongs to.
+    pub moc_cmd_send: String,
     /// The base the per-payload data links are counted from on tcspecial's
     /// side, as `address:port`.
     ///
@@ -2582,7 +2588,7 @@ pub struct CIConfigJson {
     /// rather than an address and a port written on every payload: forty
     /// payloads were forty chances to repeat a port, and a repeated port is
     /// two payloads whose data arrives interleaved.
-    pub tcspecial_tc_base: String,
+    pub tcs_tc_base: String,
     /// And the base for the MOC's side of those links, counted the same way by
     /// the device's id.
     pub moc_tc_base: String,
@@ -2629,7 +2635,7 @@ pub struct CIConfigJson {
     /// it. A payload set's `tcspecial` section states this for the set, and
     /// the command interpreter's own file states it for a set that has no
     /// section.
-    pub beacon_address: String,
+    pub beacon_send: String,
     /// The local interface beacons are sent on and listened for on.
     ///
     /// Required for the reason the two above are, and one more: a wrong
@@ -2641,15 +2647,15 @@ pub struct CIConfigJson {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CIConfig {
     /// The address the command links are taken on, from
-    /// [`CIConfigJson::tcspecial_command`].
+    /// [`CIConfigJson::tcs_cmd_recv`].
     pub address: String,
     /// And the port of it, for commands about the spacecraft.
     pub port: u16,
-    /// Where the MOC takes commands, from [`CIConfigJson::moc_command`].
-    pub moc_command: HostPort,
+    /// Where the MOC sends commands from, from [`CIConfigJson::moc_cmd_send`].
+    pub moc_cmd_send: HostPort,
     /// The bases the per-payload data links are counted from: tcspecial's own
     /// side, and the MOC's. See [`HostPort::at`].
-    pub tcspecial_tc_base: HostPort,
+    pub tcs_tc_base: HostPort,
     pub moc_tc_base: HostPort,
     /// Where commands about a payload are taken, from
     /// [`CIConfigJson::payload_interface`].
@@ -2661,7 +2667,7 @@ pub struct CIConfig {
     /// because a beacon goes out on a timer with nobody to report to: an
     /// address that is not one, or not a multicast group, has to be refused
     /// while there is still someone reading the error.
-    pub beacon_address: SocketAddr,
+    pub beacon_send: SocketAddr,
     /// The local interface beacons are sent on and listened for on.
     pub beacon_interface: Ipv4Addr,
     /// Directory holding the telemetry log's segment files, or `None` to
@@ -2673,16 +2679,16 @@ pub struct CIConfig {
 
 impl CIConfigJson {
     pub fn to_ci_config(&self) -> Result<CIConfig, String> {
-        let command = host_port_of("tcspecial_command", &self.tcspecial_command)?;
+        let command = host_port_of("tcs_cmd_recv", &self.tcs_cmd_recv)?;
         let (address, port) = (command.address, command.port);
         let payload_interface =
             host_port_of("payload_interface", &self.payload_interface)?;
-        let moc_command = host_port_of("moc_command", &self.moc_command)?;
-        let tcspecial_tc_base =
-            host_port_of("tcspecial_tc_base", &self.tcspecial_tc_base)?;
+        let moc_cmd_send = host_port_of("moc_cmd_send", &self.moc_cmd_send)?;
+        let tcs_tc_base =
+            host_port_of("tcs_tc_base", &self.tcs_tc_base)?;
         let moc_tc_base = host_port_of("moc_tc_base", &self.moc_tc_base)?;
 
-        let beacon_address = beacon_address_of(&self.beacon_address)?;
+        let beacon_send = beacon_send_of(&self.beacon_send)?;
         let beacon_interface = beacon_interface_of(&self.beacon_interface)?;
 
         // One socket cannot be two links. A file that gave both the same port
@@ -2697,7 +2703,7 @@ impl CIConfigJson {
         // a configuration somebody may mean.
         if payload_interface.address == address && payload_interface.port == port {
             return Err(format!(
-                "tcspecial_command and payload_interface are both \
+                "tcs_cmd_recv and payload_interface are both \
                  {address}:{port}, and the two links cannot be one socket: \
                  spacecraft commands are taken on the one and payload commands \
                  on the other"
@@ -2708,11 +2714,11 @@ impl CIConfigJson {
             address,
             port,
             payload_interface,
-            moc_command,
-            tcspecial_tc_base,
+            moc_cmd_send,
+            tcs_tc_base,
             moc_tc_base,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
-            beacon_address,
+            beacon_send,
             beacon_interface,
             log_dir: self.log_dir.clone(),
             log_segment_bytes: self.log_segment_bytes,
@@ -3222,13 +3228,13 @@ payloads:
 version: \"1.0\"
 description: three payloads counted from one base
 tcspecial:
-  tcspecial_command: 0.0.0.0:4000
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0:4000
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: 0.0.0.0:6000
+  tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH0
@@ -3290,13 +3296,13 @@ payloads:
 version: \"1.0\"
 description: a base at the top of the range
 tcspecial:
-  tcspecial_command: 0.0.0.0:4000
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0:4000
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: 0.0.0.0:65535
+  tcs_tc_base: 0.0.0.0:65535
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH0
@@ -3461,21 +3467,21 @@ payloads:
         let with = |ports: &str| {
             format!(
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n{ports}  \
-                 beacon_interval_ms: 5000\n  beacon_address: 239.255.0.1:5550\n  \
+                 beacon_interval_ms: 5000\n  beacon_send: 239.255.0.1:5550\n  \
                  beacon_interface: 127.0.0.1\npayloads:\n  - \
                  name: p\n    type: device-file\n    path: /dev/null\n    \
                  packet_size: 1\n"
             )
         };
 
-        payload(&with("  tcspecial_command: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  \
-                 payload_interface: 0.0.0.0:4001\n  tcspecial_tc_base: 0.0.0.0:6000\n  \
+        payload(&with("  tcs_cmd_recv: 0.0.0.0:4000\n  moc_cmd_send: 127.0.0.1:4100\n  \
+                 payload_interface: 0.0.0.0:4001\n  tcs_tc_base: 0.0.0.0:6000\n  \
                  moc_tc_base: 127.0.0.1:6100\n"))
             .to_dh_configs()
             .expect("two ports are two links");
 
         let said = payload(&with(
-            "  tcspecial_command: 0.0.0.0:4000\n  payload_interface: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n",
+            "  tcs_cmd_recv: 0.0.0.0:4000\n  payload_interface: 0.0.0.0:4000\n  moc_cmd_send: 127.0.0.1:4100\n  tcs_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n",
         ))
         .to_dh_configs()
         .expect_err("one socket cannot be two links");
@@ -3490,7 +3496,7 @@ payloads:
         assert!(
             ConfigFormat::Yaml
                 .parse::<PayloadConfig>(&with(
-                    "  tcspecial_command: 0.0.0.0:4000\n  moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n"
+                    "  tcs_cmd_recv: 0.0.0.0:4000\n  moc_cmd_send: 127.0.0.1:4100\n  tcs_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n"
                 ))
                 .is_err(),
             "a section with no payload_interface was accepted"
@@ -3507,11 +3513,11 @@ payloads:
         let with = |address: &str, port: u16| {
             format!(
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n  \
-                 tcspecial_command: {address}:4000\n  payload_interface: 0.0.0.0:4001\n  \
-                 moc_command: 127.0.0.1:4100\n  tcspecial_tc_base: 0.0.0.0:6000\n  \
+                 tcs_cmd_recv: {address}:4000\n  payload_interface: 0.0.0.0:4001\n  \
+                 moc_cmd_send: 127.0.0.1:4100\n  tcs_tc_base: 0.0.0.0:6000\n  \
                  moc_tc_base: 127.0.0.1:6100\n  \
                  beacon_interval_ms: 5000\n  \
-                 beacon_address: 239.255.0.1:5550\n  \
+                 beacon_send: 239.255.0.1:5550\n  \
                  beacon_interface: 127.0.0.1\npayloads:\n  - \
                  name: p\n    type: network\n    protocol: udp\n    \
                  address: localhost\n    port: {port}\n    packet_size: 1\n"
@@ -3762,13 +3768,13 @@ payloads:
 version: \"1.0\"
 description: a ground link on the payload's own port
 tcspecial:
-  tcspecial_command: 0.0.0.0:4000
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0:4000
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: localhost:5000
+  tcs_tc_base: localhost:5000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH0

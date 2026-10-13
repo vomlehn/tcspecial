@@ -67,10 +67,10 @@ fn the_actual_file_has_expected_contents() {
         .tcspecial
         .as_ref()
         .expect("the payload actual file carries a tcspecial section");
-    assert_eq!(ci.tcspecial_command, "0.0.0.0:4000");
-    assert_eq!(ci.moc_command, "127.0.0.1:4100");
+    assert_eq!(ci.tcs_cmd_recv, "0.0.0.0:4000");
+    assert_eq!(ci.moc_cmd_send, "127.0.0.1:4100");
     // The two bases the per-payload data links are counted from.
-    assert_eq!(ci.tcspecial_tc_base, "0.0.0.0:6000");
+    assert_eq!(ci.tcs_tc_base, "0.0.0.0:6000");
     assert_eq!(ci.moc_tc_base, "127.0.0.1:6100");
     assert_eq!(ci.beacon_interval_ms, 5000);
     assert_eq!(ci.log_dir.as_deref(), Some("/var/log/tcspecial"));
@@ -240,13 +240,13 @@ payloads:
     path: /dev/null
     packet_size: 1
 tcspecial:
-  tcspecial_command: 0.0.0.0
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: 0.0.0.0:6000
+  tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 ",
         )
@@ -254,7 +254,7 @@ tcspecial:
 
     let message = config.to_dh_configs().expect_err("must be rejected");
     assert!(
-        message.contains("tcspecial_command") && message.contains("address:port"),
+        message.contains("tcs_cmd_recv") && message.contains("address:port"),
         "the error should name the section and say what the shape is, but \
          said: {message}"
     );
@@ -269,11 +269,11 @@ fn malformed_input_is_rejected_in_every_format() {
 
     // A required field is missing in each format, so each must refuse it.
     assert!(ConfigFormat::Yaml
-        .parse::<CIConfigJson>("tcspecial_command: 0.0.0.0:4000\n")
+        .parse::<CIConfigJson>("tcs_cmd_recv: 0.0.0.0:4000\n")
         .is_err());
     assert!(ConfigFormat::Xml
         .parse::<CIConfigJson>(
-            "<ci><tcspecial_command>0.0.0.0:4000</tcspecial_command></ci>"
+            "<ci><tcs_cmd_recv>0.0.0.0:4000</tcs_cmd_recv></ci>"
         )
         .is_err());
 }

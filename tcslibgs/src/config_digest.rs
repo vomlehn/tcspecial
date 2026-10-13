@@ -254,13 +254,13 @@ mod tests {
 version: \"1.0\"
 description: a set
 tcspecial:
-  tcspecial_command: 0.0.0.0:4000
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0:4000
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: 0.0.0.0:6000
+  tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH0
@@ -319,13 +319,13 @@ payloads:
     packet_size: 2
 description: a set
 tcspecial:
-  tcspecial_command: 0.0.0.0:4000
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0:4000
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: 0.0.0.0:6000
+  tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 version: \"1.0\"
 ";
@@ -351,13 +351,13 @@ version: \"1.0\"
 version: \"1.0\"
 description: a set
 tcspecial:
-  tcspecial_command: 0.0.0.0:4000
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0:4000
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: 0.0.0.0:6000
+  tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH1
@@ -405,13 +405,13 @@ payloads:
 version: \"1.0\"
 description: a set
 tcspecial:
-  tcspecial_command: 0.0.0.0:4000
-  moc_command: 127.0.0.1:4100
+  tcs_cmd_recv: 0.0.0.0:4000
+  moc_cmd_send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcspecial_tc_base: 0.0.0.0:6000
+  tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_address: 239.255.0.1:5550
+  beacon_send: 239.255.0.1:5550
   beacon_interface: 127.0.0.1
 payloads:
   - name: DH1

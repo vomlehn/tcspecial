@@ -204,7 +204,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 port: port_of(what, node)?,
             })
         }
-        // A file, opened: see node::device_file for why that is a type of its
+        // A file, opened: see node::payload::device_file for why that is a type of its
         // own and not every other type as well.
         DHType::Device => EndpointConfig::Device(DeviceConfig {
             path: required(
@@ -322,7 +322,7 @@ fn location_of(
             "the identifier its frames carry",
         )?;
         let can_id = parse_u32(what, "can_id", can_id)
-            .and_then(|id| crate::node::can::check_can_id(what, id))
+            .and_then(|id| crate::node::payload::can::check_can_id(what, id))
             .map_err(|e| format!("{e}"))?;
         return Ok(EndpointLocation::Can {
             interface: interface.as_str().to_string(),
@@ -375,7 +375,7 @@ fn location_of(
 
     Ok(EndpointLocation::I2c {
         bus: path,
-        address: crate::node::i2c::parse_i2c_address(what, address.as_str(), ten_bit)
+        address: crate::node::payload::i2c::parse_i2c_address(what, address.as_str(), ten_bit)
             .map_err(|e| format!("{e}"))?,
     })
 }
@@ -475,8 +475,8 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
 mod tests {
     use super::*;
     use crate::graph::Graph;
-    use crate::node::gpio::Direction;
-    use crate::node::spi::SpiMode;
+    use crate::node::payload::gpio::Direction;
+    use crate::node::payload::spi::SpiMode;
     use std::collections::BTreeMap;
     use std::path::Path;
 

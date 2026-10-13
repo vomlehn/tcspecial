@@ -1421,9 +1421,12 @@ pass-through -- and a new one arrives as two files: Rust in tcspecial, and a
 description tcsgui reads.
 
 Two trees with one structure. A description at ``compute/mean.yaml`` has its
-Rust at ``tcspecial/src/node/compute/mean.rs``, and one at
-``serial/keypad.xml`` would have ``node/serial/keypad.rs``, or a directory
-``node/serial/keypad/`` with as many files under it as it takes. The
+Rust at ``tcspecial/src/node/vehicle/compute/mean.rs``, and one at
+``serial/keypad.xml`` would have ``node/vehicle/serial/keypad.rs``, or a
+directory ``node/vehicle/serial/keypad/`` with as many files under it as it
+takes. The ``vehicle`` family of the code tree, which is what this tree
+describes: a payload's code is ``node/payload``, and what a file may say about
+a payload is the payload type's own rule rather than a description. The
 correspondence is checked both ways by
 ``tcsgui::nodes::tests::every_description_has_its_rust``: a description with no
 Rust is a node the editor offers and the vehicle cannot run, and a computation

@@ -10,10 +10,10 @@
 //! that open whichever kind a configuration asks for. Each kind itself lives
 //! in a file of its own, since they have nothing in common but these traits:
 //!
-//! * [`crate::node::network::udp`] -- datagram sockets
-//! * [`crate::node::network::tcp`] -- stream sockets
-//! * [`crate::node::device_file`] -- device files
-//! * [`crate::node::network`] -- the address family, socket type and
+//! * [`crate::node::payload::network::udp`] -- datagram sockets
+//! * [`crate::node::payload::network::tcp`] -- stream sockets
+//! * [`crate::node::payload::device_file`] -- device files
+//! * [`crate::node::payload::network`] -- the address family, socket type and
 //!   protocol tables the two socket kinds draw on
 
 use std::io;
@@ -23,18 +23,18 @@ use std::os::unix::io::RawFd;
 use nix::poll::{poll, PollFd, PollFlags};
 use tcslibgs::{EndpointConfig, NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
-use crate::node::can::CanEndpoint;
-use crate::node::device_file::DeviceEndpoint;
-use crate::node::gpio::GpioEndpoint;
-use crate::node::hdlc::HdlcEndpoint;
-use crate::node::i2c::I2cEndpoint;
-use crate::node::iio::IioEndpoint;
-use crate::node::rpmsg::RpmsgEndpoint;
-use crate::node::serial::SerialEndpoint;
-use crate::node::spi::SpiEndpoint;
-use crate::node::network::tcp::TcpEndpoint;
-use crate::node::network::udp::UdpEndpoint;
-use crate::node::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
+use crate::node::payload::can::CanEndpoint;
+use crate::node::payload::device_file::DeviceEndpoint;
+use crate::node::payload::gpio::GpioEndpoint;
+use crate::node::payload::hdlc::HdlcEndpoint;
+use crate::node::payload::i2c::I2cEndpoint;
+use crate::node::payload::iio::IioEndpoint;
+use crate::node::payload::rpmsg::RpmsgEndpoint;
+use crate::node::payload::serial::SerialEndpoint;
+use crate::node::payload::spi::SpiEndpoint;
+use crate::node::payload::network::tcp::TcpEndpoint;
+use crate::node::payload::network::udp::UdpEndpoint;
+use crate::node::payload::network::unix::{UnixDatagramEndpoint, UnixStreamEndpoint};
 
 /// Trait for endpoints that can wait for events
 pub trait EndpointWaitable {

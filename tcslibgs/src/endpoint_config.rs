@@ -26,25 +26,25 @@ use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::node::can::CanParams;
-use crate::node::iio::IioParams;
-use crate::node::gpio::GpioParams;
-use crate::node::rpmsg::RpmsgParams;
-use crate::node::i2c::I2cParams;
-use crate::node::serial::SerialParams;
-use crate::node::spi::SpiParams;
+use crate::node::payload::can::CanParams;
+use crate::node::payload::iio::IioParams;
+use crate::node::payload::gpio::GpioParams;
+use crate::node::payload::rpmsg::RpmsgParams;
+use crate::node::payload::i2c::I2cParams;
+use crate::node::payload::serial::SerialParams;
+use crate::node::payload::spi::SpiParams;
 
 // The per-kind types are named from here as well as from their own files, so
 // that a reader of a configuration document reaches everything it can hold
 // through the module that parses it.
-pub use crate::node::i2c::I2cParams as I2cGroupParams;
-pub use crate::node::can::CanParams as CanGroupParams;
-pub use crate::node::iio::IioParams as IioGroupParams;
-pub use crate::node::gpio::GpioParams as GpioGroupParams;
-pub use crate::node::rpmsg::RpmsgParams as RpmsgGroupParams;
-pub use crate::node::serial::rs485::Rs485Params;
-pub use crate::node::serial::{ByteLength, StopBits};
-pub use crate::node::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
+pub use crate::node::payload::i2c::I2cParams as I2cGroupParams;
+pub use crate::node::payload::can::CanParams as CanGroupParams;
+pub use crate::node::payload::iio::IioParams as IioGroupParams;
+pub use crate::node::payload::gpio::GpioParams as GpioGroupParams;
+pub use crate::node::payload::rpmsg::RpmsgParams as RpmsgGroupParams;
+pub use crate::node::payload::serial::rs485::Rs485Params;
+pub use crate::node::payload::serial::{ByteLength, StopBits};
+pub use crate::node::payload::spi::{BitOrder, BitsPerWord, CsActive, SpiMode};
 use crate::types::{
     CanConfig, EndpointConfig, GpioConfig, I2cConfig, IioConfig, RpmsgConfig, SerialConfig,
     SpiConfig,
@@ -238,16 +238,16 @@ pub enum GroupKind {
     Serial(SerialParams),
     I2c(I2cParams),
     Spi(SpiParams),
-    /// Experimental; see [`crate::node::can`].
+    /// Experimental; see [`crate::node::payload::can`].
     Can(CanParams),
-    /// Experimental; see [`crate::node::iio`].
+    /// Experimental; see [`crate::node::payload::iio`].
     Iio(IioParams),
-    /// Experimental; see [`crate::node::rpmsg`].
+    /// Experimental; see [`crate::node::payload::rpmsg`].
     Rpmsg(RpmsgParams),
-    /// Experimental; see [`crate::node::gpio`].
+    /// Experimental; see [`crate::node::payload::gpio`].
     Gpio(GpioParams),
-    /// Experimental; see [`crate::node::hdlc`].
-    Hdlc(crate::node::hdlc::HdlcParams),
+    /// Experimental; see [`crate::node::payload::hdlc`].
+    Hdlc(crate::node::payload::hdlc::HdlcParams),
 }
 
 impl GroupKind {
@@ -337,7 +337,7 @@ pub enum EndpointLocation {
     /// interface. One interface is one payload: a raw HDLC frame carries no
     /// address, so there is nothing to tell two payloads on one line apart --
     /// which is what makes this different from a CAN interface. Experimental;
-    /// see [`crate::node::hdlc`].
+    /// see [`crate::node::payload::hdlc`].
     Interface { interface: String },
     /// A CAN interface and the identifier a payload's frames carry.
     ///
@@ -345,7 +345,7 @@ pub enum EndpointLocation {
     /// interface, not a device file. Both are needed for the reason an I2C
     /// device needs both -- several payloads commonly share one bus and
     /// differ only in the identifier. Experimental; see
-    /// [`crate::node::can`].
+    /// [`crate::node::payload::can`].
     Can { interface: String, can_id: u32 },
 }
 
@@ -383,7 +383,7 @@ pub(crate) struct LinkTerms {
     /// Whose clock a synchronous line's bits are on, how they are carried,
     /// what checks a frame, how fast this end clocks them, and which
     /// electrical standard the port is wired as: an hdlc node's, every one.
-    /// See [`crate::node::hdlc`].
+    /// See [`crate::node::payload::hdlc`].
     pub(crate) clock_type: Option<Scalar>,
     pub(crate) encoding: Option<Scalar>,
     pub(crate) frame_check: Option<Scalar>,
@@ -413,28 +413,28 @@ pub(crate) struct LinkTerms {
     /// [`GroupKind::stream`].
     pub(crate) stream: Option<StreamTerms>,
     /// Whether a start-stop line is a half-duplex RS-485 bus, and what its
-    /// turnaround is; see [`crate::node::serial::rs485`].
+    /// turnaround is; see [`crate::node::payload::serial::rs485`].
     pub(crate) rs485: Option<Scalar>,
     pub(crate) rs485_rts_on_send: Option<Scalar>,
     pub(crate) rs485_delay_before_send_ms: Option<Scalar>,
     pub(crate) rs485_delay_after_send_ms: Option<Scalar>,
     /// Bits per second on a CAN bus, and whether its frames are CAN FD; see
-    /// [`crate::node::can`].
+    /// [`crate::node::payload::can`].
     pub(crate) can_fd: Option<Scalar>,
     /// What an IIO device is expected to be producing; see
-    /// [`crate::node::iio`].
+    /// [`crate::node::payload::iio`].
     /// Which rpmsg channel a payload is, and how much one message carries;
-    /// see [`crate::node::rpmsg`].
+    /// see [`crate::node::payload::rpmsg`].
     pub(crate) service: Option<Scalar>,
     pub(crate) max_message_bytes: Option<Scalar>,
     /// Which discrete lines a payload watches and how; see
-    /// [`crate::node::gpio`].
+    /// [`crate::node::payload::gpio`].
     pub(crate) lines: Option<Scalar>,
     pub(crate) edge: Option<Scalar>,
     pub(crate) bias: Option<Scalar>,
     pub(crate) debounce_us: Option<Scalar>,
     /// Whether a set of discrete lines is read or driven. See
-    /// `node::gpio::Direction`.
+    /// `node::payload::gpio::Direction`.
     pub(crate) direction: Option<Scalar>,
 }
 

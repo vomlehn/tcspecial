@@ -185,7 +185,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
             let _ = writeln!(
                 out,
                 "  max_message_bytes {} bytes{}",
-                crate::node::rpmsg::message_bytes(rpmsg.max_message_bytes),
+                crate::node::payload::rpmsg::message_bytes(rpmsg.max_message_bytes),
                 match rpmsg.max_message_bytes {
                     Some(_) => "",
                     None => ", which is what the usual transport leaves",
@@ -248,7 +248,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 out,
                 "  can_id           {:#x}, {}",
                 can.can_id,
-                if crate::node::can::is_extended(can.can_id) {
+                if crate::node::payload::can::is_extended(can.can_id) {
                     "extended"
                 } else {
                     "base"
@@ -258,7 +258,7 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 out,
                 "  can_fd           {}, so a frame carries up to {} bytes",
                 if can.fd { "yes" } else { "no" },
-                crate::node::can::frame_bytes(can.fd)
+                crate::node::payload::can::frame_bytes(can.fd)
             );
             let _ = writeln!(
                 out,

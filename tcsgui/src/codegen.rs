@@ -42,7 +42,6 @@
 //! was compiled last. So the file says, at the top, that it is generated and
 //! from what -- and every generation overwrites it whole.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::document::Document;

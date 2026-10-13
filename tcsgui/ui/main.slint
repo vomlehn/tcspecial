@@ -1,4 +1,4 @@
-import { Button, ComboBox, LineEdit, ScrollView } from "std-widgets.slint";
+import { Button, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
 
 // The two scales, stated once.
 //
@@ -875,6 +875,10 @@ component Surface inherits Rectangle {
     in property <length> moc-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
+    // How long the sheet is, in the coordinates the file holds: one length
+    // for all three panes, which is what makes them scroll together. From
+    // Rust -- see tcsgui::pane::WORKING_HEIGHT -- as the width is.
+    in property <length> working-height: 0px;
 
     // How deep undo currently goes, shown rather than guessed at: a person
     // about to abandon an afternoon's work deserves to know how much of it is
@@ -885,6 +889,18 @@ component Surface inherits Rectangle {
     in property <string> undo-label: "";
     in property <string> redo-label: "";
     // What went wrong with saving, if anything. The window's one red text.
+    // Where the sheet is scrolled to, and how much of it is in view.
+    //
+    // Two-way, because both ends of it have something to say: a person
+    // scrolling moves it, and placing a node sets it so the new node is at the
+    // top of the view -- see tcsgui::pane::place_in. The offset is the
+    // viewport's own, which is negative as it scrolls down; Rust reads it back
+    // as the top of the view.
+    in-out property <length> canvas-offset: 0px;
+    // How much of the sheet the window is showing, which is what decides
+    // whether a place is in view.
+    out property <length> canvas-view-height: sheet.visible-height;
+
     in property <string> trouble: "";
     // And what the last command did, where it did something worth saying:
     // generating the Rust writes a file somebody named and changes nothing
@@ -1033,13 +1049,31 @@ component Surface inherits Rectangle {
                 }
             }
 
-            // The canvas, with the panel beside it.
-            canvas := Rectangle {
-                background: white;
-                border-width: 1px;
-                border-color: #d8d8d4;
+            // The canvas: one sheet, scrolled.
+            //
+            // The three working panes are three columns of this one sheet
+            // rather than three panes of their own, which is what makes them
+            // the same length and makes them scroll together. Three that
+            // scrolled separately would put a link's two ends at two heights
+            // that have nothing to do with each other, and a diagram whose
+            // lines go off the top of one column and in at the middle of
+            // another cannot be read.
+            //
+            // The bars are the ScrollView's own, so the horizontal one sits
+            // along the bottom of all three panes and the vertical one down
+            // the right of them.
+            sheet := ScrollView {
                 horizontal-stretch: 1;
-                clip: true;
+                content-width: root.working-width;
+                content-height: root.working-height;
+                content-y <=> root.canvas-offset;
+
+                canvas := Rectangle {
+                    width: root.working-width;
+                    height: root.working-height;
+                    background: white;
+                    border-width: 1px;
+                    border-color: #d8d8d4;
 
                 // A faint grid, which the nodes snap to.
                 //
@@ -1063,34 +1097,6 @@ component Surface inherits Rectangle {
                     background: #f3f4f6;
                 }
 
-                // The three working panes, told apart by two dividers.
-                //
-                // Each divider is at a fixed place in the coordinates the file
-                // holds and not at a fraction of the window. A node's pane
-                // decides what it is allowed to be, so it must not change when
-                // somebody resizes a window: the same configuration opened on
-                // a laptop and on a desk has to show the same three panes, or
-                // a payload would become a vehicle node by being looked at on
-                // a smaller screen.
-                PaneDivider {
-                    at: root.moc-divider;
-                    moved(dx) => { root.moc-divider-moved(dx); }
-                }
-                PaneDivider {
-                    at: root.vehicle-divider;
-                    moved(dx) => { root.vehicle-divider-moved(dx); }
-                }
-                // Beyond the right-hand edge of the working area, which is
-                // nowhere a node can be put. Shaded rather than left white,
-                // because a bound that cannot be seen is a bound that feels
-                // like the drag sticking.
-                Rectangle {
-                    x: working-width;
-                    y: 0;
-                    width: max(0px, parent.width - working-width);
-                    height: 100%;
-                    background: #f6f6f4;
-                }
                 // And which pane is which, left to right. Named, because
                 // the rule about what may go where is worth one word at the
                 // top of each: the ground link on the left, the vehicle's own
@@ -1146,6 +1152,34 @@ component Surface inherits Rectangle {
                     link-dropped(x, y) => { link-finished(x, y); }
                     chosen => { node-selected(n.name); }
                 }
+                }
+
+                // The two lines between the three working panes, drawn over
+                // the sheet rather than on it.
+                //
+                // Over it because a divider is a property of the panes and not
+                // of what is drawn in them: on the sheet, its handle sat
+                // halfway down two thousand four hundred pixels and could not
+                // be reached, and the line scrolled away from the panes it
+                // divides. Here each is as tall as the window shows and its
+                // handle is halfway down *that*, wherever the sheet has been
+                // scrolled to.
+                //
+                // Shifted by the sheet's own horizontal offset, so a divider
+                // stays over the column it divides when the sheet is scrolled
+                // sideways.
+                PaneDivider {
+                    width: 100%;
+                    height: 100%;
+                    at: root.moc-divider + sheet.content-x;
+                    moved(dx) => { root.moc-divider-moved(dx); }
+                }
+                PaneDivider {
+                    width: 100%;
+                    height: 100%;
+                    at: root.vehicle-divider + sheet.content-x;
+                    moved(dx) => { root.vehicle-divider-moved(dx); }
+                }
             }
 
         }
@@ -1185,6 +1219,14 @@ export component MainWindow inherits Window {
     in property <length> moc-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
+    // How long the sheet is, in the coordinates the file holds: one length
+    // for all three panes, which is what makes them scroll together. From
+    // Rust -- see tcsgui::pane::WORKING_HEIGHT -- as the width is.
+    in property <length> working-height: 0px;
+    // Where the sheet is scrolled to, and how much of it is in view: two-way,
+    // because a person scrolling moves it and placing a node sets it.
+    in-out property <length> canvas-offset: 0px;
+    out property <length> canvas-view-height: surface.canvas-view-height;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1289,7 +1331,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    Surface {
+    surface := Surface {
         width: 100%;
         height: 100%;
         nodes: root.nodes;
@@ -1300,6 +1342,7 @@ export component MainWindow inherits Window {
         moc-divider: root.moc-divider;
         vehicle-divider: root.vehicle-divider;
         working-width: root.working-width;
+        working-height: root.working-height;
         save-clicked => { root.save-clicked(); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
@@ -1307,6 +1350,7 @@ export component MainWindow inherits Window {
         redo-label: root.redo-label;
         trouble: root.trouble;
         said: root.said;
+        canvas-offset <=> root.canvas-offset;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
         place-node(name, t, sets) => { root.place-node(name, t, sets); }
@@ -1354,6 +1398,14 @@ export component SubWindow inherits Window {
     in property <length> moc-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
+    // How long the sheet is, in the coordinates the file holds: one length
+    // for all three panes, which is what makes them scroll together. From
+    // Rust -- see tcsgui::pane::WORKING_HEIGHT -- as the width is.
+    in property <length> working-height: 0px;
+    // Where the sheet is scrolled to, and how much of it is in view: two-way,
+    // because a person scrolling moves it and placing a node sets it.
+    in-out property <length> canvas-offset: 0px;
+    out property <length> canvas-view-height: surface.canvas-view-height;
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -1453,7 +1505,7 @@ export component SubWindow inherits Window {
         }
     }
 
-    Surface {
+    surface := Surface {
         width: 100%;
         height: 100%;
         editing: root.editing;
@@ -1465,6 +1517,7 @@ export component SubWindow inherits Window {
         moc-divider: root.moc-divider;
         vehicle-divider: root.vehicle-divider;
         working-width: root.working-width;
+        working-height: root.working-height;
         save-clicked => { root.save-clicked(); }
         undo-depth: root.undo-depth;
         redo-depth: root.redo-depth;
@@ -1472,6 +1525,7 @@ export component SubWindow inherits Window {
         redo-label: root.redo-label;
         trouble: root.trouble;
         said: root.said;
+        canvas-offset <=> root.canvas-offset;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
         place-node(name, t, sets) => { root.place-node(name, t, sets); }
@@ -2015,20 +2069,36 @@ export component NodeWindow inherits Window {
                     }
                 }
 
-                Text {
-                    text: "comment";
-                    font-size: Type.small;
-                    color: #6b7280;
-                    height: 14px;
-                }
-                LineEdit {
-                    text: root.comment;
-                    font-size: Type.body;
-                    edited => { root.comment-set(self.text); }
-                }
-
                 Rectangle { }
             }
+        }
+
+        // What somebody wrote about this node, at the bottom and always
+        // there: several lines of it, scrolling on its own.
+        //
+        // Out of the list of fields above rather than at the end of it, which
+        // is where it was. Two reasons. A note is not an attribute -- it is
+        // not written as one, it is not checked as one, and a rule between
+        // them says so; and a note is the field most likely to be long, so a
+        // person typing one had to scroll the whole window to see what they
+        // were writing. Here it keeps its place while the attributes scroll
+        // past above it.
+        //
+        // Several lines because that is what a note is: "0x49 after the
+        // rework" and the reason for it, which the file writes as a run of
+        // comment lines above the node and reads back the same way.
+        Text {
+            text: "comment";
+            font-size: Type.small;
+            color: #6b7280;
+            height: 14px;
+        }
+        TextEdit {
+            height: 72px;
+            text: root.comment;
+            font-size: Type.body;
+            wrap: word-wrap;
+            edited => { root.comment-set(self.text); }
         }
 
         if root.trouble != "": Text {

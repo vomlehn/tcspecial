@@ -284,6 +284,9 @@ macro_rules! furnish {
         window.set_vehicle_palette(palette_of(Pane::Vehicle, described));
         window.set_payload_palette(palette_of(Pane::Payloads, described));
         window.set_working_width(WORKING_WIDTH as f32);
+        // How long the sheet is: one length for all three panes, which is what
+        // makes them scroll together. See pane::WORKING_HEIGHT.
+        window.set_working_height(pane::WORKING_HEIGHT as f32);
     }};
 }
 
@@ -477,8 +480,30 @@ macro_rules! wiring {
                 let editor = editor.clone();
                 let views = views.clone();
                 let home = home.clone();
+                // A weak handle to the window the press came from: the
+                // placement depends on what that window is showing, and
+                // scrolling it afterwards is half of what placing a node
+                // means. Weak because the closure outlives nothing and the
+                // window owns the closure.
+                let window_for_place = window.as_weak();
                 window.on_place_node(move |called, node_type, sets| {
-                    {
+                    // What the window is showing, which is what decides where
+                    // a new node goes: as high as it fits *in view*. The
+                    // window is asked rather than told, because the person
+                    // scrolling is the one who moved it.
+                    let visible = (
+                        (-window_for_place
+                            .upgrade()
+                            .map(|w| w.get_canvas_offset())
+                            .unwrap_or(0.0))
+                        .round() as i32,
+                        window_for_place
+                            .upgrade()
+                            .map(|w| w.get_canvas_view_height())
+                            .unwrap_or(0.0)
+                            .round() as i32,
+                    );
+                    let at = {
                         let mut editor = editor.borrow_mut();
                         // Named after what was pressed rather than after the
                         // type: a described node is "mean" and not
@@ -490,6 +515,7 @@ macro_rules! wiring {
                             &home,
                             &node_type,
                             views.borrow().divider.get(),
+                            visible,
                         );
                         // Two edits: a node exists, and then it is somewhere.
                         // Separate so that undoing a drag leaves the node
@@ -517,8 +543,17 @@ macro_rules! wiring {
                             was: (0, 0),
                             now: at,
                         });
-                    }
+                        at
+                    };
                     views.borrow().refresh(&editor.borrow());
+                    // And the sheet is scrolled so the new node is at the top
+                    // of the view. It was placed where it fits, which may be
+                    // above or below what the window was showing; a node
+                    // placed out of sight is a press that did nothing as far
+                    // as the person who made it can tell.
+                    if let Some(window) = window_for_place.upgrade() {
+                        window.set_canvas_offset(-(at.1 as f32));
+                    }
                 });
             }
             {
@@ -2355,30 +2390,20 @@ fn next_place(
     home: &Home,
     node_type: &str,
     dividers: Dividers,
+    visible: (i32, i32),
 ) -> (i32, i32) {
-    let pane = pane_of(node_type);
-    let placed = document
+    // Every box already on this page, whichever pane it is in: a node drawn
+    // over another is unreadable wherever the two came from.
+    let taken: Vec<(i32, i32, u32, u32)> = document
         .nodes_in(home)
         .iter()
-        .filter(|node| pane_of(&node.node_type) == pane)
-        .count() as i32;
-    let (left, _) = edges_of(pane, dividers);
+        .map(|node| {
+            let (width, height) = size_of(&node.node_type);
+            (node.at.0, node.at.1, width, height)
+        })
+        .collect();
 
-    // Diagonally down the vehicle pane, and straight down the other two. They
-    // are columns with room for a node and little more: a diagonal there would
-    // walk two nodes into the right-hand edge and then stack the rest on top
-    // of each other.
-    let at = match pane {
-        Pane::Vehicle => (
-            left + FIRST_PLACE.0 + placed * PLACE_OFFSET,
-            FIRST_PLACE.1 + placed * PLACE_OFFSET,
-        ),
-        _ => (
-            left + GRID * 3,
-            FIRST_PLACE.1 + placed * PLACE_OFFSET,
-        ),
-    };
-    confine(node_type, dividers, snap(at))
+    snap(pane::place_in(&taken, node_type, dividers, visible))
 }
 
 /// The nearest point on the grid.
@@ -2703,6 +2728,11 @@ mod tests {
     }
 
     /// Every row of one selection pane.
+    /// A screenful at the top of the sheet, which is what a window shows when
+    /// a configuration is opened: the top of the view and how much of it
+    /// there is.
+    const IN_VIEW: (i32, i32) = (0, 700);
+
     fn rows_of(pane: Pane) -> Vec<PaletteEntry> {
         rows_from(pane, descriptions())
     }
@@ -3602,6 +3632,43 @@ mod tests {
         );
     }
 
+    /// A node's comment may be several lines, and they reach the file.
+    ///
+    /// The comment field is at the bottom of a node's window and scrolls on
+    /// its own, because a note is the field most likely to be long: "0x49
+    /// after the rework" and the reason for it. The file writes it as a run of
+    /// comment lines above the node and reads it back the same way, so the
+    /// shape it is typed in is the shape it keeps.
+    #[test]
+    fn a_comment_of_several_lines_is_kept() {
+        use journal::Edit;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let mut editor = Editor::open(&path, dividers());
+        editor.edit(Edit::AddNode {
+            name: "sensor".to_string(),
+            node_type: "i2c".to_string(),
+            home: None,
+        });
+        editor.edit(Edit::SetNodeComment {
+            node: "sensor".to_string(),
+            was: None,
+            now: Some("0x49 after the rework.\nSee ECR-114.".to_string()),
+        });
+
+        let written = std::fs::read_to_string(&path).expect("the file");
+        assert!(written.contains("  # 0x49 after the rework.\n"), "{written}");
+        assert!(written.contains("  # See ECR-114.\n"), "{written}");
+
+        // And read back as the one note it is.
+        let read = crate::read::read(&path).expect("it reads");
+        assert_eq!(
+            read.node("sensor").expect("the node").comment.as_deref(),
+            Some("0x49 after the rework.\nSee ECR-114.")
+        );
+    }
+
     /// A link to a terminal is recorded as the terminal that was pressed.
     ///
     /// The fault this is here for: a line dragged from the ground link's
@@ -3829,7 +3896,7 @@ mod tests {
         let document = Document::new();
         let d = dividers();
         for t in NodeType::ALL {
-            let (x, y) = next_place(&document, &None, t.spelling(), d);
+            let (x, y) = next_place(&document, &None, t.spelling(), d, IN_VIEW);
             let (width, _) = size_of(t.spelling());
             let right = x + width as i32;
             let pane = pane_of(t.spelling());
@@ -3841,46 +3908,184 @@ mod tests {
                 t.spelling(),
                 pane.label()
             );
-            assert!(y > 0, "{} is placed off the top", t.spelling());
+            assert!(y >= 0, "{} is placed off the top", t.spelling());
         }
     }
 
-    /// Nodes placed in one pane do not step down the other.
+    /// Nodes placed in one pane do not move where the others go.
     ///
-    /// The offset is counted per pane, so a payload placed after three
-    /// computations starts at the top of its own pane: counted over the whole
-    /// page, the first payload would appear four steps down a column it had
-    /// never been in, which looks like three nodes went missing.
+    /// A new node goes as high as it fits in its *own* pane, and what is in
+    /// another pane cannot be in the way: three computations in the middle
+    /// column leave the top of the payload column empty, and a payload that
+    /// appeared three steps down one it had never been in would look like
+    /// three nodes gone missing.
     #[test]
     fn placing_in_one_pane_does_not_move_the_other_along() {
         let mut document = Document::new();
         let d = dividers();
-        let first_payload = next_place(&document, &None, "i2c", d);
+        let first_payload = next_place(&document, &None, "i2c", d, IN_VIEW);
 
-        for name in ["a", "b", "c"] {
+        for (name, at) in [("a", (0, 0)), ("b", (0, 60)), ("c", (0, 120))] {
             document.apply(&Edit::AddNode {
                 name: name.into(),
                 node_type: "compute".into(),
                 home: None,
             });
+            document.apply(&Edit::MoveNode {
+                node: name.into(),
+                was: (0, 0),
+                now: (d.moc + 24, at.1),
+            });
         }
         assert_eq!(
-            next_place(&document, &None, "i2c", d),
+            next_place(&document, &None, "i2c", d, IN_VIEW),
             first_payload,
             "three computations moved where the first payload goes"
         );
 
-        // And a payload placed does step the next one along, so two of them
-        // are not drawn on top of each other.
+        // And a payload already placed is in the way, so the next one goes
+        // beside it or below it rather than on top of it.
         document.apply(&Edit::AddNode {
             name: "temp_fore".into(),
             node_type: "i2c".into(),
             home: None,
         });
-        let second = next_place(&document, &None, "i2c", d);
+        document.apply(&Edit::MoveNode {
+            node: "temp_fore".into(),
+            was: (0, 0),
+            now: first_payload,
+        });
+        let second = next_place(&document, &None, "i2c", d, IN_VIEW);
         assert_ne!(second, first_payload);
-        assert_eq!(second.0, first_payload.0, "payloads go down their pane");
-        assert!(second.1 > first_payload.1);
+        let (width, height) = size_of("i2c");
+        let clear = second.0 >= first_payload.0 + width as i32
+            || second.1 >= first_payload.1 + height as i32;
+        assert!(clear, "{second:?} covers {first_payload:?}");
+    }
+
+    /// Neither line can squeeze a pane below a twentieth of the working area.
+    ///
+    /// Both lines and all three panes, which is three rules in one place: the
+    /// moc line keeps the moc pane and the vehicle's open, and the vehicle
+    /// line keeps the vehicle's and the payloads' open. A pane with nothing
+    /// visible in it is a pane whose nodes cannot be reached, and the drag
+    /// that does it is one press away.
+    #[test]
+    fn neither_divider_can_close_a_pane() {
+        let document = Document::new();
+        let least = WORKING_WIDTH * settings::LEAST / 100;
+
+        for (which, dividers) in [
+            (Pane::Moc, dividers()),
+            (Pane::Vehicle, dividers()),
+            // And from the ends of their travel, where an off-by-one would
+            // show: a line already against what stops it.
+            (
+                Pane::Moc,
+                Dividers {
+                    moc: least,
+                    vehicle: least * 2,
+                },
+            ),
+            (
+                Pane::Vehicle,
+                Dividers {
+                    moc: least,
+                    vehicle: WORKING_WIDTH - least,
+                },
+            ),
+        ] {
+            let (low, high) = divider_range(&document, dividers, which);
+            for at in [low, high] {
+                let settled = if which == Pane::Moc {
+                    Dividers { moc: at, ..dividers }
+                } else {
+                    Dividers {
+                        vehicle: at,
+                        ..dividers
+                    }
+                };
+                for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+                    let (left, right) = edges_of(pane, settled);
+                    assert!(
+                        right - left >= least,
+                        "{which:?} at {at} leaves the {} pane {} wide, and a \
+                         twentieth is {least}",
+                        pane.label(),
+                        right - left
+                    );
+                }
+            }
+        }
+    }
+
+    /// A new node goes as high as it fits, in view, covering nothing.
+    ///
+    /// The three places it may go, in the order somebody would look: the
+    /// highest in view, then the lowest above the view, then the highest below
+    /// it. A sheet is longer than a window, so all three happen.
+    #[test]
+    fn a_new_node_goes_as_high_as_it_fits_in_view() {
+        let d = dividers();
+        let (width, height) = size_of("i2c");
+        let (left, _) = pane::pane_for("i2c", d);
+
+        // An empty pane: the top of the view, wherever the view is.
+        let scrolled = (600, 400);
+        assert_eq!(
+            pane::place_in(&[], "i2c", d, scrolled),
+            (left, 600),
+            "a new node goes at the top of what is on the screen"
+        );
+
+        // A row of them across the pane, and the next goes under the row
+        // rather than on top of one.
+        let mut taken: Vec<(i32, i32, u32, u32)> = Vec::new();
+        let mut x = left;
+        while x <= pane::pane_for("i2c", d).1 {
+            taken.push((x, 600, width, height));
+            x += width as i32;
+        }
+        let under = pane::place_in(&taken, "i2c", d, scrolled);
+        assert!(under.1 >= 600 + height as i32, "{under:?}");
+        assert!(under.1 < 600 + 400, "and still in view: {under:?}");
+
+        // A view packed solid: the lowest place *above* it, which is the
+        // nearest and so the shortest scroll.
+        let mut packed: Vec<(i32, i32, u32, u32)> = Vec::new();
+        let mut y = 600 - 200;
+        while y < 600 + 400 {
+            let mut x = left;
+            while x <= pane::pane_for("i2c", d).1 {
+                packed.push((x, y, width, height));
+                x += GRID;
+            }
+            y += GRID;
+        }
+        let above = pane::place_in(&packed, "i2c", d, scrolled);
+        assert!(
+            above.1 + height as i32 <= 600 - 200,
+            "a node should go above the view when the view is full: {above:?}"
+        );
+
+        // And everything above as well: below the view, highest first.
+        let mut walled = packed.clone();
+        let mut y = 0;
+        while y < 600 - 200 {
+            let mut x = left;
+            while x <= pane::pane_for("i2c", d).1 {
+                walled.push((x, y, width, height));
+                x += GRID;
+            }
+            y += GRID;
+        }
+        let below = pane::place_in(&walled, "i2c", d, scrolled);
+        assert!(
+            below.1 >= 600 + 400,
+            "a node should go below the view when everything above is taken: \
+             {below:?}"
+        );
+        assert!(below.1 + height as i32 <= pane::WORKING_HEIGHT, "{below:?}");
     }
 
     /// The divider comes back where it was left.

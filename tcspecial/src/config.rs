@@ -133,7 +133,8 @@ mod tests {
     }
 
     const YAML: &str = "tcspecial_command: 0.0.0.0:4000\n\
-                        moc_command: 127.0.0.1:4100\npayload_port: 4001\n\
+                        moc_command: 127.0.0.1:4100\n\
+                        payload_interface: 0.0.0.0:4001\n\
                         tcspecial_tc_base: 0.0.0.0:6000\n\
                         moc_tc_base: 127.0.0.1:6100\n\
                         beacon_interval_ms: 5000\nbeacon_address: 239.255.0.1:5550\n\
@@ -142,7 +143,7 @@ mod tests {
     const XML: &str = "<tcspecial>\
         <tcspecial_command>0.0.0.0:4000</tcspecial_command>\
         <moc_command>127.0.0.1:4100</moc_command>\
-        <payload_port>4001</payload_port>\
+        <payload_interface>0.0.0.0:4001</payload_interface>\
         <tcspecial_tc_base>0.0.0.0:6000</tcspecial_tc_base>\
         <moc_tc_base>127.0.0.1:6100</moc_tc_base>\
         <beacon_interval_ms>5000</beacon_interval_ms>\
@@ -159,7 +160,7 @@ mod tests {
             // The one attribute becomes an address and a port.
             assert_eq!(config.address, "0.0.0.0", "{ext}");
             assert_eq!(config.port, 4000, "{ext}");
-            assert_eq!(config.payload_port, 4001, "{ext}");
+            assert_eq!(config.payload_interface.to_string(), "0.0.0.0:4001", "{ext}");
             assert_eq!(config.beacon_interval.0, 5000, "{ext}");
             // Absent in every actual input, so the serde defaults must apply.
             assert_eq!(config.log_dir, None, "{ext}");
@@ -215,7 +216,7 @@ mod tests {
         let section = |beacon: &str| CIConfigJson {
             tcspecial_command: "0.0.0.0:4000".to_string(),
             moc_command: "127.0.0.1:4100".to_string(),
-            payload_port: 4001,
+            payload_interface: "0.0.0.0:4001".to_string(),
             tcspecial_tc_base: "0.0.0.0:6000".to_string(),
             moc_tc_base: "127.0.0.1:6100".to_string(),
             beacon_interval_ms: 5000,

@@ -208,7 +208,10 @@ mod tests {
         let log = TelemetryLog::open(&CIConfig {
             address: "127.0.0.1".to_string(),
             port: 0,
-            payload_port: 0,
+            payload_interface: tcslibgs::HostPort {
+                address: "0.0.0.0".to_string(),
+                port: 0,
+            },
             moc_command: tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 4100,

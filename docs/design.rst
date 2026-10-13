@@ -232,7 +232,7 @@ section a payload set's file holds, which is required of every configuration.
    tcspecial:
      tcspecial_command: 0.0.0.0:4000
      moc_command: 127.0.0.1:4100
-     payload_port: 4001
+     payload_interface: 0.0.0.0:4001
      tcspecial_tc_base: 0.0.0.0:6000
      moc_tc_base: 127.0.0.1:6100
      beacon_interval_ms: 5000
@@ -266,11 +266,16 @@ for them to disagree.
 Two command links because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure: a command about the spacecraft -- ping it,
 arm it, restart it -- is taken on the command interface, and one about a payload
-on ``payload_port`` at the same address. On a space link the two become two
-virtual channels, which is where the priority between them is really decided;
-here they are two ports, which is what an IP network has to divide traffic
-with. ``payload_port`` is a bare port, there being one command interpreter at
-one place: a second address would be a second answer to where that is.
+on ``payload_interface``. On a space link the two become two virtual channels,
+which is where the priority between them is really decided; here they are two
+sockets, which is what an IP network has to divide traffic with.
+
+``payload_interface`` says where it is in full, like its four neighbours. It
+was a bare port, taken at the command interface's address on the grounds that
+there is one command interpreter at one place -- and one attribute written
+differently from the rest is one a reader has to remember the exception for.
+The MOC still reaches it at the host the operator connected to, taking only the
+port from the file, so one typed address moves both links.
 
 The two ``_tc_base`` attributes are where each payload's own data link is, and
 there are two of them because the link has two ends. tcspecial binds its end at
@@ -5108,9 +5113,10 @@ Requirement
 Requirement
     The command interpreter takes commands on two links. A command about the
     spacecraft -- ``PING``, ``RESTART_ARM``, ``RESTART``, ``CONFIGURE`` --
-    arrives on ``port``; a command about a payload -- ``START_DH``,
-    ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE``, ``CONFIGURE_DH`` --
-    arrives on ``payload_port``. ``CONNECT`` is answered on either.
+    arrives on ``tcspecial_command``; a command about a payload --
+    ``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE``,
+    ``CONFIGURE_DH`` -- arrives on ``payload_interface``. ``CONNECT`` is
+    answered on either.
 
 Two links because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure. A ``RESTART`` waiting behind a payload's
@@ -5124,8 +5130,8 @@ On a space link the division is by virtual channel, which is where the
 priority between them is really decided and where a command link gets COP-1's
 sequence control. Over IP there is no such thing, so it is two ports -- what
 an IP network has to divide traffic with. A payload set that is flown rather
-than tested would map ``port`` to the command virtual channel and
-``payload_port`` to a payload one.
+than tested would map ``tcspecial_command`` to the command virtual channel and
+``payload_interface`` to a payload one.
 
 Requirement
     One table says which link a command belongs on, read by the ground when

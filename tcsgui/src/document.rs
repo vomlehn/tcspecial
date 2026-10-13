@@ -1412,7 +1412,7 @@ pub fn thermostat_example() -> Document {
     for (attribute, value) in [
         ("tcspecial_command", "0.0.0.0:4000"),
         ("moc_command", "127.0.0.1:4100"),
-        ("payload_port", "4001"),
+        ("payload_interface", "0.0.0.0:4001"),
         ("tcspecial_tc_base", "0.0.0.0:6000"),
         ("moc_tc_base", "127.0.0.1:6100"),
         ("beacon_interval_ms", "5000"),
@@ -1742,7 +1742,7 @@ mod tests {
         let whole = [
             ("tcspecial_command", "0.0.0.0:4000"),
             ("moc_command", "127.0.0.1:4100"),
-            ("payload_port", "4001"),
+            ("payload_interface", "0.0.0.0:4001"),
             ("tcspecial_tc_base", "0.0.0.0:6000"),
             ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
@@ -1775,8 +1775,8 @@ mod tests {
             // Half a command interface, which is the one way an attribute
             // carrying two things goes wrong.
             ("tcspecial_command", "0.0.0.0", "address:port"),
-            ("tcspecial_command", "0.0.0.0:4001", "payload_port"),
-            ("payload_port", "nought", "payload_port"),
+            ("tcspecial_command", "0.0.0.0:4001", "payload_interface"),
+            ("payload_interface", "nought", "payload_interface"),
         ] {
             let document = filled(Some((attribute, instead)));
             let said = document

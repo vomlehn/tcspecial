@@ -10,7 +10,7 @@ description: One payload on a UDP link, its telemetry going to the ground
 # Two command links, because what the ground needs in a hurry must never be
 # queued behind what it asked for at leisure: a command about the spacecraft --
 # ping it, arm it, restart it -- is taken on the command interface, and one
-# about a payload on payload_port at the same address.
+# about a payload on payload_interface.
 #
 # Each is an address and a port in one attribute, as the beacon address is: two
 # things only ever used together are one fact, and writing them apart invites a
@@ -24,7 +24,7 @@ description: One payload on a UDP link, its telemetry going to the ground
 tcspecial:
   tcspecial_command: 0.0.0.0:4000
   moc_command: 127.0.0.1:4100
-  payload_port: 4001
+  payload_interface: 0.0.0.0:4001
   tcspecial_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000

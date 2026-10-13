@@ -42,7 +42,7 @@ use crate::types::{default_log_segment_bytes, CIConfigJson};
 pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("tcspecial_command", true),
     ("moc_command", true),
-    ("payload_port", true),
+    ("payload_interface", true),
     ("tcspecial_tc_base", true),
     ("moc_tc_base", true),
     ("beacon_interval_ms", true),
@@ -89,20 +89,11 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
         said.parse::<u32>()
             .map_err(|_| format!("{name} is \"{said}\", which is not a whole number"))
     };
-    let port = |name: &str| -> Result<u16, String> {
-        let value = number(name)?;
-        if value == 0 || value > u16::MAX as u32 {
-            return Err(format!(
-                "{name} is {value}, and a port is between 1 and 65535"
-            ));
-        }
-        Ok(value as u16)
-    };
 
     Ok(CIConfigJson {
         tcspecial_command: text("tcspecial_command")?,
         moc_command: text("moc_command")?,
-        payload_port: port("payload_port")?,
+        payload_interface: text("payload_interface")?,
         tcspecial_tc_base: text("tcspecial_tc_base")?,
         moc_tc_base: text("moc_tc_base")?,
         beacon_interval_ms: number("beacon_interval_ms")?,
@@ -151,7 +142,7 @@ mod tests {
         vec![
             ("tcspecial_command", "0.0.0.0:4000"),
             ("moc_command", "127.0.0.1:4100"),
-            ("payload_port", "4001"),
+            ("payload_interface", "0.0.0.0:4001"),
             ("tcspecial_tc_base", "0.0.0.0:6000"),
             ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
@@ -169,7 +160,7 @@ mod tests {
         let config = ci_config_of(&said(&whole())).expect("this one is complete");
         assert_eq!(config.tcspecial_command, "0.0.0.0:4000");
         assert_eq!(config.moc_command, "127.0.0.1:4100");
-        assert_eq!(config.payload_port, 4001);
+        assert_eq!(config.payload_interface, "0.0.0.0:4001");
         assert_eq!(config.beacon_interval_ms, 5000);
         assert_eq!(config.beacon_address, "239.255.0.1:5550");
         assert_eq!(config.log_dir.as_deref(), Some("/var/log/tcspecial"));
@@ -273,12 +264,13 @@ mod tests {
     /// A value that is not a number is refused, saying what it was.
     #[test]
     fn a_port_that_is_not_a_port_is_refused() {
+        // The numbers this module parses. The four attributes that are a host
+        // and a port are parsed where the rest of their rules are -- see
+        // CIConfigJson::to_ci_config -- so they are asked below.
         for (name, value) in [
-            ("payload_port", "four thousand"),
-            ("payload_port", "0"),
-            ("payload_port", "70000"),
-            ("payload_port", "-1"),
             ("beacon_interval_ms", "often"),
+            ("beacon_interval_ms", "-1"),
+            ("log_segment_bytes", "a few"),
         ] {
             let mut wrong = whole();
             wrong.retain(|(had, _)| *had != name);
@@ -286,6 +278,26 @@ mod tests {
             let why = ci_config_of(&said(&wrong))
                 .expect_err(&format!("{name} = {value} should be refused"));
             assert!(why.contains(name), "{why}");
+        }
+
+        // And the links, each of which is a host and a port.
+        for (name, value, expected) in [
+            ("payload_interface", "0.0.0.0:four thousand", "not a port"),
+            ("payload_interface", "0.0.0.0:0", "port 0"),
+            ("payload_interface", "0.0.0.0:70000", "not a port"),
+            ("payload_interface", "0.0.0.0", "address:port"),
+            ("moc_command", "nowhere", "address:port"),
+            ("tcspecial_tc_base", ":6000", "states no address"),
+        ] {
+            let mut wrong = whole();
+            wrong.retain(|(had, _)| *had != name);
+            wrong.push((name, value));
+            let why = ci_config_of(&said(&wrong))
+                .expect("the words are there")
+                .to_ci_config()
+                .expect_err(&format!("{name} = {value} should be refused"));
+            assert!(why.contains(name), "{why}");
+            assert!(why.contains(expected), "{name} = {value} said {why:?}");
         }
     }
 

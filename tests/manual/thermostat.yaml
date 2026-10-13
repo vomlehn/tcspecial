@@ -8,7 +8,7 @@ tcspecial:
   log_segment_bytes: "65536"
   moc_command: "127.0.0.1:4100"
   moc_tc_base: "127.0.0.1:6100"
-  payload_port: "4001"
+  payload_interface: "0.0.0.0:4001"
   tcspecial_command: "0.0.0.0:4000"
   tcspecial_tc_base: "0.0.0.0:6000"
 

@@ -25,14 +25,14 @@ description: TCSpecial payload set 2
 # queued behind what it asked for at leisure: a command about the spacecraft --
 # ping it, arm it, restart it -- is taken on the command interface, and one
 # about a payload -- start it, stop it, ask it for its statistics -- on
-# payload_port at the same address.
+# payload_interface.
 #
 # The protocol is not stated and cannot be: the link between tcspecial and the
 # ground is UDP.
 tcspecial:
   tcspecial_command: 0.0.0.0:4000
   moc_command: 127.0.0.1:4100
-  payload_port: 4001
+  payload_interface: 0.0.0.0:4001
   tcspecial_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000

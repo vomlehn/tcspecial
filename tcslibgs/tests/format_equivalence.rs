@@ -67,14 +67,14 @@ fn the_actual_file_has_expected_contents() {
         .tcspecial
         .as_ref()
         .expect("the payload actual file carries a tcspecial section");
-    assert_eq!(ci.tcs_cmd_recv, "0.0.0.0:4000");
-    assert_eq!(ci.moc_cmd_send, "127.0.0.1:4100");
+    assert_eq!(ci.tcs_cmd.recv, "0.0.0.0:4000");
+    assert_eq!(ci.tcs_cmd.send, "127.0.0.1:4100");
     // The two bases the per-payload data links are counted from.
-    assert_eq!(ci.tcs_tc_base, "0.0.0.0:6000");
-    assert_eq!(ci.moc_tc_base, "127.0.0.1:6100");
-    assert_eq!(ci.beacon_interval_ms, 5000);
-    assert_eq!(ci.log_dir.as_deref(), Some("/var/log/tcspecial"));
-    assert_eq!(ci.log_segment_bytes, 65_536);
+    assert_eq!(ci.payload_telemetry.source_base, "0.0.0.0:6000");
+    assert_eq!(ci.payload_telemetry.dest_base, "127.0.0.1:6100");
+    assert_eq!(ci.beacon.interval_ms, 5000);
+    assert_eq!(ci.log.directory.as_deref(), Some("/var/log/tcspecial"));
+    assert_eq!(ci.log.segment_size, 65_536);
 
     assert_eq!(config.payload_groups.len(), 1);
     let group = config.group("udp_localhost").expect("the group is defined");
@@ -240,21 +240,24 @@ payloads:
     path: /dev/null
     packet_size: 1
 tcspecial:
-  tcs_cmd_recv: 0.0.0.0
-  moc_cmd_send: 127.0.0.1:4100
+  tcs_cmd:
+    recv: 0.0.0.0
+    send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcs_tc_base: 0.0.0.0:6000
-  moc_tc_base: 127.0.0.1:6100
-  beacon_interval_ms: 5000
-  beacon_send: 0.0.0.0:5550
-  beacon_recv: 127.0.0.1:5650
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: 0.0.0.0:5550
+    recv: 127.0.0.1:5650
 ",
         )
         .expect("parses: half a command interface is not a syntax error");
 
     let message = config.to_dh_configs().expect_err("must be rejected");
     assert!(
-        message.contains("tcs_cmd_recv") && message.contains("address:port"),
+        message.contains("tcs_cmd.recv") && message.contains("address:port"),
         "the error should name the section and say what the shape is, but \
          said: {message}"
     );
@@ -269,11 +272,12 @@ fn malformed_input_is_rejected_in_every_format() {
 
     // A required field is missing in each format, so each must refuse it.
     assert!(ConfigFormat::Yaml
-        .parse::<CIConfigJson>("tcs_cmd_recv: 0.0.0.0:4000\n")
+        .parse::<CIConfigJson>("tcs_cmd:\n  recv: 0.0.0.0:4000\n  send: 127.0.0.1:4100\n")
         .is_err());
     assert!(ConfigFormat::Xml
         .parse::<CIConfigJson>(
-            "<ci><tcs_cmd_recv>0.0.0.0:4000</tcs_cmd_recv></ci>"
+            "<ci><tcs_cmd><recv>0.0.0.0:4000</recv>\
+             <send>127.0.0.1:4100</send></tcs_cmd></ci>"
         )
         .is_err());
 }

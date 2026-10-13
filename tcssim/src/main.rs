@@ -1274,9 +1274,19 @@ mod tests {
             // Whether the payload whose attributes are being read is one that
             // answers requests. Each payload starts with its name.
             let mut triggered = false;
+            // Whether the line being read is in the tcspecial section, which
+            // has a segment size of its own -- the telemetry log's, under
+            // `log` -- and is not about a payload at all.
+            let mut in_tcspecial = false;
 
             for (number, line) in text.lines().enumerate() {
+                if !line.starts_with(char::is_whitespace) && line.contains(':') {
+                    in_tcspecial = line.starts_with("tcspecial:");
+                }
                 let line = line.trim().trim_start_matches("- ");
+                if in_tcspecial {
+                    continue;
+                }
                 if line.starts_with('#') {
                     continue;
                 }

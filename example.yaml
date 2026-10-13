@@ -7,31 +7,42 @@ description: One payload on a UDP link, its telemetry going to the ground
 # that describes what the vehicle carries says nothing about how any of it
 # reaches the ground until this is answered.
 #
+# Most of it is a subsection, because most of it is one thing with more than
+# one attribute to it: tcs_cmd is the spacecraft command link and has two ends,
+# payload_telemetry has two, beacon has two and a timing, log has a place and a
+# size.
+#
 # Two command links, because what the ground needs in a hurry must never be
 # queued behind what it asked for at leisure: a command about the spacecraft --
-# ping it, arm it, restart it -- is taken on the command interface, and one
-# about a payload on payload_interface.
+# ping it, arm it, restart it -- is taken on tcs_cmd.recv, and one about a
+# payload on payload_interface. tcs_cmd.send is the MOC's own end of the same
+# conversation, which it sends commands from and receives responses on.
 #
-# Each is an address and a port in one attribute, as the beacon address is: two
-# things only ever used together are one fact, and writing them apart invites a
-# file that states one and not the other. The protocol is not stated and cannot
-# be -- every link here is UDP.
+# Each is an address and a port in one attribute: two things only ever used
+# together are one fact, and writing them apart invites a file that states one
+# and not the other. The protocol is not stated and cannot be -- every link
+# here is UDP.
 #
-# The two bases are where the payloads' own data links are counted from: a
-# payload's port is the base plus its own id, which is the position it has in
-# this file. One base and an arithmetic rule rather than an address and a port
-# written on every payload.
+# The two bases under payload_telemetry are where the payloads' own data links
+# are counted from, on the vehicle's side and the ground's: a payload's port is
+# that side's base plus its own id, which is the position it has in this file.
+# One base and an arithmetic rule rather than an address and a port written on
+# every payload.
 tcspecial:
-  tcs_cmd_recv: 0.0.0.0:4000
-  moc_cmd_send: 127.0.0.1:4100
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcs_tc_base: 0.0.0.0:6000
-  moc_tc_base: 127.0.0.1:6100
-  beacon_interval_ms: 5000
-  beacon_send: "0.0.0.0:5550"
-  beacon_recv: "127.0.0.1:5650"
-  log_dir: /var/log/tcspecial
-  log_segment_bytes: 65536
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: "0.0.0.0:5550"
+    recv: "127.0.0.1:5650"
+  log:
+    directory: /var/log/tcspecial
+    segment_size: 65536
 
 # How often the payload is read.
 #

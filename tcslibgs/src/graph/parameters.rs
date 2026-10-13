@@ -26,9 +26,145 @@
 //! the same arrangement a node's attributes have, and for the same reason.
 
 use std::collections::BTreeMap;
+use std::fmt;
+
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::endpoint_config::Scalar;
-use crate::types::{default_log_segment_bytes, CIConfigJson};
+use crate::types::{
+    default_log_segment_bytes, BeaconJson, CIConfigJson, LogJson, PayloadTelemetryJson, TcsCmdJson,
+};
+
+/// One entry of the section: a value, or a subsection of values.
+///
+/// The section has subsections because four of the things in it are one thing
+/// apiece with more than one attribute to it -- the spacecraft command link,
+/// where a payload's telemetry goes, the beacon, the log -- and a prefix
+/// repeated on two or three flat names is a subsection somebody declined to
+/// write. `beacon.send` says what `beacon_send` said, and says it where the
+/// reader is already looking at the beacon.
+///
+/// Read leniently, like everything else about a graph's section: a subsection
+/// is whatever the file wrote under a name, whether or not it belongs there,
+/// and [`ci_config_of`] is where it is told so by name.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Parameter {
+    /// A value written against a name at the top of the section.
+    Value(Scalar),
+    /// A subsection: the values written under one name.
+    Group(BTreeMap<String, Scalar>),
+}
+
+impl Serialize for Parameter {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Parameter::Value(value) => value.serialize(s),
+            Parameter::Group(group) => group.serialize(s),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Parameter {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Parameter, D::Error> {
+        struct V;
+
+        impl<'de> Visitor<'de> for V {
+            type Value = Parameter;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a value, or a subsection of values")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Parameter, E> {
+                Ok(Parameter::Value(Scalar::of(v)))
+            }
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<Parameter, E> {
+                Ok(Parameter::Value(Scalar::of(v.to_string())))
+            }
+            fn visit_i64<E: de::Error>(self, v: i64) -> Result<Parameter, E> {
+                Ok(Parameter::Value(Scalar::of(v.to_string())))
+            }
+            fn visit_f64<E: de::Error>(self, v: f64) -> Result<Parameter, E> {
+                Ok(Parameter::Value(Scalar::of(v.to_string())))
+            }
+            fn visit_bool<E: de::Error>(self, v: bool) -> Result<Parameter, E> {
+                Ok(Parameter::Value(Scalar::of(v.to_string())))
+            }
+
+            /// A subsection -- or, in XML, an element with text in it.
+            ///
+            /// quick-xml hands the text of an element as a map of one entry
+            /// named `$text`, which is how a value and a subsection arrive in
+            /// the same shape there. One entry so named is the value; anything
+            /// else is the subsection it looks like.
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Parameter, A::Error> {
+                let mut group: BTreeMap<String, Scalar> = BTreeMap::new();
+                while let Some((name, value)) = map.next_entry::<String, Scalar>()? {
+                    group.insert(name, value);
+                }
+                match group.len() {
+                    1 if group.contains_key("$text") => {
+                        Ok(Parameter::Value(group.remove("$text").unwrap()))
+                    }
+                    _ => Ok(Parameter::Group(group)),
+                }
+            }
+        }
+
+        d.deserialize_any(V)
+    }
+}
+
+/// The section as one flat set of names, a subsection's written `parent.child`.
+///
+/// What the rules and the editor work in: a complaint names the attribute the
+/// way the manual does, and a field in a window is one name. The file's shape
+/// is the file's business, and [`nest`] puts it back.
+pub fn flatten(said: &BTreeMap<String, Parameter>) -> BTreeMap<String, Scalar> {
+    let mut flat = BTreeMap::new();
+    for (name, parameter) in said {
+        match parameter {
+            Parameter::Value(value) => {
+                flat.insert(name.clone(), value.clone());
+            }
+            Parameter::Group(group) => {
+                for (child, value) in group {
+                    flat.insert(format!("{name}.{child}"), value.clone());
+                }
+            }
+        }
+    }
+    flat
+}
+
+/// And the other way, for writing a section back out.
+///
+/// Split at the first dot, so a name with none is a value at the top of the
+/// section and `beacon.send` is `send` under `beacon`.
+pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
+    let mut said: BTreeMap<String, Parameter> = BTreeMap::new();
+    for (name, value) in flat {
+        match name.split_once('.') {
+            None => {
+                said.insert(name.clone(), Parameter::Value(value.clone()));
+            }
+            Some((parent, child)) => match said
+                .entry(parent.to_string())
+                .or_insert_with(|| Parameter::Group(BTreeMap::new()))
+            {
+                Parameter::Group(group) => {
+                    group.insert(child.to_string(), value.clone());
+                }
+                // A file that wrote a value against a name and then something
+                // under it: the value is what it says, and the rules below
+                // name whichever of the two does not belong.
+                Parameter::Value(_) => {}
+            },
+        }
+    }
+    said
+}
 
 /// Every attribute of the section, and whether it must be stated.
 ///
@@ -40,16 +176,16 @@ use crate::types::{default_log_segment_bytes, CIConfigJson};
 /// Required ones first, so a panel built from this asks for what it must have
 /// before what it may.
 pub const ATTRIBUTES: &[(&str, bool)] = &[
-    ("tcs_cmd_recv", true),
-    ("moc_cmd_send", true),
+    ("tcs_cmd.recv", true),
+    ("tcs_cmd.send", true),
     ("payload_interface", true),
-    ("tcs_tc_base", true),
-    ("moc_tc_base", true),
-    ("beacon_interval_ms", true),
-    ("beacon_send", true),
-    ("beacon_recv", true),
-    ("log_dir", false),
-    ("log_segment_bytes", false),
+    ("payload_telemetry.source_base", true),
+    ("payload_telemetry.dest_base", true),
+    ("beacon.interval_ms", true),
+    ("beacon.send", true),
+    ("beacon.recv", true),
+    ("log.directory", false),
+    ("log.segment_size", false),
 ];
 
 /// The section as the command interpreter wants it, or what is wrong with it.
@@ -91,23 +227,32 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
     };
 
     Ok(CIConfigJson {
-        tcs_cmd_recv: text("tcs_cmd_recv")?,
-        moc_cmd_send: text("moc_cmd_send")?,
+        tcs_cmd: TcsCmdJson {
+            recv: text("tcs_cmd.recv")?,
+            send: text("tcs_cmd.send")?,
+        },
         payload_interface: text("payload_interface")?,
-        tcs_tc_base: text("tcs_tc_base")?,
-        moc_tc_base: text("moc_tc_base")?,
-        beacon_interval_ms: number("beacon_interval_ms")?,
-        beacon_send: text("beacon_send")?,
-        beacon_recv: text("beacon_recv")?,
-        // Absent is "run without a telemetry log", which is a configuration
-        // somebody may mean: a vehicle with no writable storage.
-        log_dir: said
-            .get("log_dir")
-            .map(|value| value.as_str().trim().to_string())
-            .filter(|value| !value.is_empty()),
-        log_segment_bytes: match said.get("log_segment_bytes") {
-            Some(value) if !value.as_str().trim().is_empty() => number("log_segment_bytes")?,
-            _ => default_log_segment_bytes(),
+        payload_telemetry: PayloadTelemetryJson {
+            source_base: text("payload_telemetry.source_base")?,
+            dest_base: text("payload_telemetry.dest_base")?,
+        },
+        beacon: BeaconJson {
+            interval_ms: number("beacon.interval_ms")?,
+            send: text("beacon.send")?,
+            recv: text("beacon.recv")?,
+        },
+        log: LogJson {
+            // Absent is "run without a telemetry log", which is a
+            // configuration somebody may mean: a vehicle with no writable
+            // storage.
+            directory: said
+                .get("log.directory")
+                .map(|value| value.as_str().trim().to_string())
+                .filter(|value| !value.is_empty()),
+            segment_size: match said.get("log.segment_size") {
+                Some(value) if !value.as_str().trim().is_empty() => number("log.segment_size")?,
+                _ => default_log_segment_bytes(),
+            },
         },
     })
 }
@@ -140,16 +285,16 @@ mod tests {
 
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("tcs_cmd_recv", "0.0.0.0:4000"),
-            ("moc_cmd_send", "127.0.0.1:4100"),
+            ("tcs_cmd.recv", "0.0.0.0:4000"),
+            ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_interface", "0.0.0.0:4001"),
-            ("tcs_tc_base", "0.0.0.0:6000"),
-            ("moc_tc_base", "127.0.0.1:6100"),
-            ("beacon_interval_ms", "5000"),
-            ("beacon_send", "0.0.0.0:5550"),
-            ("beacon_recv", "127.0.0.1:5650"),
-            ("log_dir", "/var/log/tcspecial"),
-            ("log_segment_bytes", "65536"),
+            ("payload_telemetry.source_base", "0.0.0.0:6000"),
+            ("payload_telemetry.dest_base", "127.0.0.1:6100"),
+            ("beacon.interval_ms", "5000"),
+            ("beacon.send", "0.0.0.0:5550"),
+            ("beacon.recv", "127.0.0.1:5650"),
+            ("log.directory", "/var/log/tcspecial"),
+            ("log.segment_size", "65536"),
         ]
     }
 
@@ -158,13 +303,13 @@ mod tests {
     #[test]
     fn a_whole_section_is_what_the_command_interpreter_takes() {
         let config = ci_config_of(&said(&whole())).expect("this one is complete");
-        assert_eq!(config.tcs_cmd_recv, "0.0.0.0:4000");
-        assert_eq!(config.moc_cmd_send, "127.0.0.1:4100");
+        assert_eq!(config.tcs_cmd.recv, "0.0.0.0:4000");
+        assert_eq!(config.tcs_cmd.send, "127.0.0.1:4100");
         assert_eq!(config.payload_interface, "0.0.0.0:4001");
-        assert_eq!(config.beacon_interval_ms, 5000);
-        assert_eq!(config.beacon_send, "0.0.0.0:5550");
-        assert_eq!(config.log_dir.as_deref(), Some("/var/log/tcspecial"));
-        assert_eq!(config.log_segment_bytes, 65536);
+        assert_eq!(config.beacon.interval_ms, 5000);
+        assert_eq!(config.beacon.send, "0.0.0.0:5550");
+        assert_eq!(config.log.directory.as_deref(), Some("/var/log/tcspecial"));
+        assert_eq!(config.log.segment_size, 65536);
 
         // And it holds together by the rules of the one piece of code that
         // knows them -- which is also where the one address and the one port
@@ -174,8 +319,8 @@ mod tests {
         assert_eq!(settled.port, 4000);
         assert_eq!(settled.moc_cmd_send.to_string(), "127.0.0.1:4100");
         // And the bases, which are counted on by a payload's own id.
-        assert_eq!(settled.tcs_tc_base.at(0).unwrap().port, 6000);
-        assert_eq!(settled.moc_tc_base.at(3).unwrap().port, 6103);
+        assert_eq!(settled.payload_source_base.at(0).unwrap().port, 6000);
+        assert_eq!(settled.payload_dest_base.at(3).unwrap().port, 6103);
     }
 
     /// Every attribute that must be stated is complained about by name.
@@ -207,11 +352,11 @@ mod tests {
     #[test]
     fn an_empty_attribute_is_a_missing_one() {
         let mut cleared = whole();
-        cleared.retain(|(name, _)| *name != "tcs_cmd_recv");
-        cleared.push(("tcs_cmd_recv", "   "));
+        cleared.retain(|(name, _)| *name != "tcs_cmd.recv");
+        cleared.push(("tcs_cmd.recv", "   "));
         let why = ci_config_of(&said(&cleared))
             .expect_err("an empty command interface is none");
-        assert!(why.contains("tcs_cmd_recv"), "{why}");
+        assert!(why.contains("tcs_cmd.recv"), "{why}");
     }
 
     /// A command interface is an address and a port, and says so when it is
@@ -224,7 +369,7 @@ mod tests {
     fn a_command_interface_is_an_address_and_a_port() {
         use crate::types::host_port_of;
 
-        let said = |text: &str| host_port_of("tcs_cmd_recv", text);
+        let said = |text: &str| host_port_of("tcs_cmd.recv", text);
 
         let one = said("0.0.0.0:4000").expect("a plain one");
         assert_eq!((one.address.as_str(), one.port), ("0.0.0.0", 4000));
@@ -257,7 +402,7 @@ mod tests {
             assert!(why.contains(expected), "{said_} was refused as {why:?}");
             // Every complaint names the attribute, there being four of these
             // in one section.
-            assert!(why.contains("tcs_cmd_recv"), "{why}");
+            assert!(why.contains("tcs_cmd.recv"), "{why}");
         }
     }
 
@@ -268,9 +413,9 @@ mod tests {
         // and a port are parsed where the rest of their rules are -- see
         // CIConfigJson::to_ci_config -- so they are asked below.
         for (name, value) in [
-            ("beacon_interval_ms", "often"),
-            ("beacon_interval_ms", "-1"),
-            ("log_segment_bytes", "a few"),
+            ("beacon.interval_ms", "often"),
+            ("beacon.interval_ms", "-1"),
+            ("log.segment_size", "a few"),
         ] {
             let mut wrong = whole();
             wrong.retain(|(had, _)| *had != name);
@@ -286,8 +431,8 @@ mod tests {
             ("payload_interface", "0.0.0.0:0", "port 0"),
             ("payload_interface", "0.0.0.0:70000", "not a port"),
             ("payload_interface", "0.0.0.0", "address:port"),
-            ("moc_cmd_send", "nowhere", "address:port"),
-            ("tcs_tc_base", ":6000", "states no address"),
+            ("tcs_cmd.send", "nowhere", "address:port"),
+            ("payload_telemetry.source_base", ":6000", "states no address"),
         ] {
             let mut wrong = whole();
             wrong.retain(|(had, _)| *had != name);
@@ -314,7 +459,7 @@ mod tests {
         assert!(why.contains("beacon_adress"), "{why}");
         // And the complaint lists what there is, so the typo can be fixed
         // without opening the manual.
-        assert!(why.contains("beacon_send"), "{why}");
+        assert!(why.contains("beacon.send"), "{why}");
     }
 
     /// What a configuration being started is given, and what it is not.

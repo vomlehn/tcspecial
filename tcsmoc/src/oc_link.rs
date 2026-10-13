@@ -74,7 +74,7 @@ pub type Arrivals = Arc<Mutex<Vec<Option<Arrival>>>>;
 /// nothing to listen for.
 ///
 /// Each socket is bound where the configuration says the ground's end of that
-/// payload's link is -- `moc_tc_base` counted on by the payload's id -- and
+/// payload's link is -- `payload_telemetry.dest_base` counted on by the payload's id -- and
 /// says hello to where tcspecial's end is. Both ends come out of the one file
 /// both ends read, so neither has to be told the other's.
 ///
@@ -92,7 +92,7 @@ pub fn listen(dh_configs: &[DHConfig]) -> Arrivals {
         };
 
         // The ground's own end of this payload's data link, where the
-        // configuration says it is: `moc_tc_base` counted on by the payload's
+        // configuration says it is: `payload_telemetry.dest_base` counted on by the payload's
         // id. It was whatever port the system chose, which worked because the
         // hello told tcspecial where to answer -- and left the ground's own
         // ports unwritten anywhere, so nothing between the two ends could be

@@ -230,37 +230,55 @@ section a payload set's file holds, which is required of every configuration.
 .. code-block:: yaml
 
    tcspecial:
-     tcs_cmd_recv: 0.0.0.0:4000
-     moc_cmd_send: 127.0.0.1:4100
+     tcs_cmd:
+       recv: 0.0.0.0:4000
+       send: 127.0.0.1:4100
      payload_interface: 0.0.0.0:4001
-     tcs_tc_base: 0.0.0.0:6000
-     moc_tc_base: 127.0.0.1:6100
-     beacon_interval_ms: 5000
-     beacon_send: "0.0.0.0:5550"
-     beacon_recv: "127.0.0.1:5650"
-     log_dir: /var/log/tcspecial
-     log_segment_bytes: 65536
+     payload_telemetry:
+       source_base: 0.0.0.0:6000
+       dest_base: 127.0.0.1:6100
+     beacon:
+       interval_ms: 5000
+       send: "0.0.0.0:5550"
+       recv: "127.0.0.1:5650"
+     log:
+       directory: /var/log/tcspecial
+       segment_size: 65536
 
-Eight of the ten must be stated, and are required rather than defaulted for
-one reason: a configuration that has not been asked the question has not
-answered it. Where commands are taken and where beacons go are mission facts,
-and a file that was silently given an answer to either is a vehicle nobody can
-reach whose configuration looks complete. ``log_dir`` absent means the
-telemetry log is not kept, which is a configuration somebody may mean -- a
-vehicle with no writable storage -- and ``log_segment_bytes`` is a tuning
-choice with a defensible answer, so it has one.
+Four of its five entries are subsections, because each of them is one thing
+with more than one attribute to it: the spacecraft command link has two ends,
+a payload's telemetry has two, the beacon has two and a timing, and the log
+has a place and a size. A prefix repeated on two or three flat names --
+``beacon.send``, ``beacon.recv``, ``beacon.interval_ms`` -- is a subsection
+somebody declined to write, and the names under one are short for the same
+reason: ``beacon.send`` says what ``beacon.send`` said, where the reader is
+already looking at the beacon.
 
-Seven of them are a host and a port written together, as ``address:port``: two things only ever used together are one fact about a
-configuration, and writing them apart invites a file that states one and not
-the other. Each is split at its last colon, so whatever a host is called the
-port is the part after it, and the address is kept as text -- what a name
-resolves to is the business of the moment the socket is made.
+Eight of the ten attributes must be stated, and are required rather than
+defaulted for one reason: a configuration that has not been asked the question
+has not answered it. Where commands are taken and where beacons go are mission
+facts, and a file that was silently given an answer to either is a vehicle
+nobody can reach whose configuration looks complete. The two in ``log`` are the
+exception, and so is ``log`` itself: no ``log.directory`` means the telemetry
+log is not kept, which is a configuration somebody may mean -- a vehicle with
+no writable storage -- and ``log.segment_size`` is a tuning choice with a
+defensible answer, so it has one.
 
-``tcs_cmd_recv`` is where tcspecial takes commands about the spacecraft
-and ``moc_cmd_send`` is where the MOC takes them. Both ends in one file because
-both ends read this file: a configuration stating only its own end would leave
-the other to be told separately, and two places to say one thing is one place
-for them to disagree.
+Five of them are a host and a port written together, as ``address:port``: two
+things only ever used together are one fact about a configuration, and writing
+them apart invites a file that states one and not the other. Each is split at
+its last colon, so whatever a host is called the port is the part after it, and
+the address is kept as text -- what a name resolves to is the business of the
+moment the socket is made.
+
+``tcs_cmd`` is the spacecraft command link, which is one conversation and two
+sockets. ``tcs_cmd.recv`` is tcspecial's own: it receives commands about the
+spacecraft there and sends its responses to the MOC from there, a response
+going back out of the socket its command arrived on. ``tcs_cmd.send`` is the
+MOC's own, which it sends those commands from and receives the responses on.
+Both ends in one file because both ends read this file: a configuration stating
+only its own end would leave the other to be told separately, and two places to
+say one thing is one place for them to disagree.
 
 Two command links because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure: a command about the spacecraft -- ping it,
@@ -269,18 +287,18 @@ on ``payload_interface``. On a space link the two become two virtual channels,
 which is where the priority between them is really decided; here they are two
 sockets, which is what an IP network has to divide traffic with.
 
-``payload_interface`` says where it is in full, like its four neighbours. It
+``payload_interface`` says where it is in full, like the rest of them. It
 was a bare port, taken at the command interface's address on the grounds that
 there is one command interpreter at one place -- and one attribute written
 differently from the rest is one a reader has to remember the exception for.
 The MOC still reaches it at the host the operator connected to, taking only the
 port from the file, so one typed address moves both links.
 
-The two ``_tc_base`` attributes are where each payload's own data link is, and
-there are two of them because the link has two ends. tcspecial binds its end at
-``tcs_tc_base`` plus the payload's own id -- the position the payload has
-in the configuration -- and the MOC binds its end at ``moc_tc_base`` plus the
-same id. Four payloads based at 6000 and 6100 are at 6000 to 6003 on the
+``payload_telemetry`` is where each payload's own data link is, and it has two
+bases because the link has two ends. tcspecial binds its end at
+``payload_telemetry.source_base`` plus the payload's own id -- the position the
+payload has in the configuration -- and the MOC binds its end at
+``payload_telemetry.dest_base`` plus the same id. Four payloads based at 6000 and 6100 are at 6000 to 6003 on the
 vehicle and 6100 to 6103 on the ground.
 
 Both ends come out of the one file both ends read, so neither has to be told
@@ -1985,27 +2003,31 @@ This is the shipped ``tcspecial/src/tcspecial.yaml``:
 
 .. code-block:: yaml
 
-   tcs_cmd_recv: "0.0.0.0:4000"
-   moc_cmd_send: "127.0.0.1:4100"
+   tcs_cmd:
+     recv: "0.0.0.0:4000"
+     send: "127.0.0.1:4100"
    payload_interface: "0.0.0.0:4001"
-   tcs_tc_base: "0.0.0.0:6000"
-   moc_tc_base: "127.0.0.1:6100"
-   beacon_interval_ms: 5000
-   beacon_send: "0.0.0.0:5550"
-   beacon_recv: "127.0.0.1:5650"
-   log_dir: telemetry
-   log_segment_bytes: 65536
+   payload_telemetry:
+     source_base: "0.0.0.0:6000"
+     dest_base: "127.0.0.1:6100"
+   beacon:
+     interval_ms: 5000
+     send: "0.0.0.0:5550"
+     recv: "127.0.0.1:5650"
+   log:
+     directory: telemetry
+     segment_size: 65536
 
-``tcs_cmd_recv`` is where the command interpreter binds for commands about the
+``tcs_cmd.recv`` is where the command interpreter binds for commands about the
 spacecraft, which is where the ground sends them, ``payload_interface`` is the
-same for commands about a payload, and ``beacon_send`` and ``beacon_recv`` are
+same for commands about a payload, and ``beacon.send`` and ``beacon.recv`` are
 the two ends of the beacon link.
 Every address tcspecial uses is in this file and nowhere else: see
 `Where the Addresses Are`_. The quotes on the addresses are deliberate:
 unquoted, ``0.0.0.0`` is a string in YAML only because it happens not to be a
-number, which is a thin reason to rely on. ``log_dir`` holds the telemetry log's
+number, which is a thin reason to rely on. ``log.directory`` holds the telemetry log's
 segment files and must already exist; logging is off when it is absent.
-``log_segment_bytes`` is the payload bytes in one segment file, the header
+``log.segment_size`` is the payload bytes in one segment file, the header
 being added on top of that.
 
 Tcspecial hass a command interpreter (CI) running on the spacecraft where the
@@ -2916,8 +2938,8 @@ carry them.
 ``tcspecial``
     What tcspecial itself is configured with for this payload set: the same
     section a ``tcspecial.yaml`` holds, with the same attributes. Optional.
-    Where the set's beacons go is read from here -- ``beacon_send`` and
-    ``beacon_recv``; see `Where the Addresses Are`_ -- and the rest is
+    Where the set's beacons go is read from here -- ``beacon.send`` and
+    ``beacon.recv``; see `Where the Addresses Are`_ -- and the rest is
     carried and checked and not read, tcspecial being placed by the file
     ``TCSPECIAL_CONFIG_PATH`` names. Which includes the two command ports: a
     set does not decide where the interpreter serving it takes commands. The section is here so
@@ -5117,7 +5139,7 @@ Requirement
 Requirement
     The command interpreter takes commands on two links. A command about the
     spacecraft -- ``PING``, ``RESTART_ARM``, ``RESTART``, ``CONFIGURE`` --
-    arrives on ``tcs_cmd_recv``; a command about a payload --
+    arrives on ``tcs_cmd.recv``; a command about a payload --
     ``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE``,
     ``CONFIGURE_DH`` -- arrives on ``payload_interface``. ``CONNECT`` is
     answered on either.
@@ -5134,7 +5156,7 @@ On a space link the division is by virtual channel, which is where the
 priority between them is really decided and where a command link gets COP-1's
 sequence control. Over IP there is no such thing, so it is two ports -- what
 an IP network has to divide traffic with. A payload set that is flown rather
-than tested would map ``tcs_cmd_recv`` to the command virtual channel and
+than tested would map ``tcs_cmd.recv`` to the command virtual channel and
 ``payload_interface`` to a payload one.
 
 Requirement
@@ -5226,10 +5248,10 @@ Requirement
 
 Requirement
     A beacon is sent from one stated socket to another. Tcspecial makes the
-    socket it sends beacons on out of ``beacon_send`` -- that is the address
+    socket it sends beacons on out of ``beacon.send`` -- that is the address
     and port it binds, so every beacon leaves from there -- and sends to
-    ``beacon_recv``. Tcsmoc makes the socket it receives beacons on out of
-    ``beacon_recv``, binding the same address and port. Each is an address and
+    ``beacon.recv``. Tcsmoc makes the socket it receives beacons on out of
+    ``beacon.recv``, binding the same address and port. Each is an address and
     a port.
 
 A beacon was sent to a multicast group, with a second attribute naming the
@@ -5259,8 +5281,8 @@ fans the beacons out -- rather than something the network did silently.
 
 Requirement
     Every command interpreter configuration states where beacons come from,
-    where they are received, and how often: ``beacon_send``, ``beacon_recv``
-    and ``beacon_interval_ms``. None has a default and none may be left out,
+    where they are received, and how often: ``beacon.send``, ``beacon.recv``
+    and ``beacon.interval_ms``. None has a default and none may be left out,
     in the command interpreter's own file or in a payload set's ``tcspecial``
     section.
 
@@ -5289,7 +5311,7 @@ runs without beacons, as it does without a simulator file: controlling payloads
 does not depend on it.
 
 Requirement
-    A ``beacon_send`` or ``beacon_recv`` that is not an address and a port is
+    A ``beacon.send`` or ``beacon.recv`` that is not an address and a port is
     refused where it is read, naming the attribute.
 
 Refused there rather than where a beacon is sent, because a beacon goes out on

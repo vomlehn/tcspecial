@@ -209,7 +209,7 @@ from the group it names, so a group holds what several handlers share.
 
    tcspecial                       optional
      ...          the command interpreter's own settings, of which
-                  beacon_send and beacon_recv are read
+                  beacon.send and beacon.recv are read
 
    payload_groups                  optional
      name         the name payloads refer to
@@ -223,7 +223,7 @@ from the group it names, so a group holds what several handlers share.
 
 The shipped examples each carry a ``tcspecial`` section, first in the file, so
 one file says what the set is and where its command interpreter belongs.
-``beacon_send`` and ``beacon_recv`` are read from it, since where a set's
+``beacon.send`` and ``beacon.recv`` are read from it, since where a set's
 beacons go is the set's own business; the rest is not read yet, tcspecial being placed by the
 file ``TCSPECIAL_CONFIG_PATH`` names. It is all checked when the file is
 loaded -- a section that could never place a command interpreter is refused
@@ -909,7 +909,7 @@ otherwise produces a payload that looks configured and is not:
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
   whole. A payload's own address and its end of the data link -- the section's
-  ``tcs_tc_base`` counted on by the payload's id -- are compared
+  ``payload_telemetry.dest_base`` counted on by the payload's id -- are compared
   together,
   since a port is a port whatever claims it, and ``localhost``, ``127.0.0.1``
   and ``::1`` count as one host. A Unix socket collides by its path, its port
@@ -1497,13 +1497,15 @@ commands is in ``tcspecial.yaml``:
 
 .. code-block:: yaml
 
-   tcs_cmd_recv: "0.0.0.0:4000"   # commands about the spacecraft
+   tcs_cmd:
+     recv: "0.0.0.0:4000"           # commands about the spacecraft
+     send: "127.0.0.1:4100"         # the MOC's own end of that link
    payload_interface: "0.0.0.0:4001"   # commands about a payload
 
 Two links, because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure: a restart waiting behind a payload's
 statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
-``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``tcs_cmd_recv``;
+``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``tcs_cmd.recv``;
 ``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and
 ``CONFIGURE_DH`` go to ``payload_interface``; ``CONNECT`` is answered on
 either. One table in the library says which is which, so the two ends cannot
@@ -1519,7 +1521,7 @@ it starts:
 
 .. code-block:: console
 
-   Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go to the group 239.255.0.1:5550 on interface 127.0.0.1
+   Commands are taken on 0.0.0.0:4000 and payload commands on 0.0.0.0:4001 as tcspecial/src/tcspecial.yaml asked, and beacons go from 0.0.0.0:5550 to 127.0.0.1:5650
 
 A command sent to the wrong one of the two is refused rather than served: it
 means one end is not reading the configuration the other is, and that is the
@@ -1546,40 +1548,50 @@ file:
 .. code-block:: yaml
 
    tcspecial:
-     beacon_interval_ms: 5000
-     beacon_send: "0.0.0.0:5550"
-     beacon_recv: "127.0.0.1:5650"
+     beacon:
+       interval_ms: 5000
+       send: "0.0.0.0:5550"
+       recv: "127.0.0.1:5650"
 
 Where the links are
 -------------------
 
-Four of the section's attributes are a host and a port written together, as
-``address:port``:
+Five of the section's attributes are a host and a port written together, as
+``address:port``, and most of them sit in a subsection with the rest of what
+they are about:
 
 .. code-block:: yaml
 
    tcspecial:
-     tcs_cmd_recv: 0.0.0.0:4000
-     moc_cmd_send: 127.0.0.1:4100
+     tcs_cmd:
+       recv: 0.0.0.0:4000
+       send: 127.0.0.1:4100
      payload_interface: 0.0.0.0:4001
-     tcs_tc_base: 0.0.0.0:6000
-     moc_tc_base: 127.0.0.1:6100
+     payload_telemetry:
+       source_base: 0.0.0.0:6000
+       dest_base: 127.0.0.1:6100
 
-``tcs_cmd_recv`` is where tcspecial takes commands about the spacecraft
-and ``moc_cmd_send`` is where the MOC takes them -- both ends in one file,
-because both ends read this file, and two places to say one thing is one place
-for them to disagree. ``payload_interface`` is where commands about a payload are taken:
-are taken at ``payload_interface``, which says where it is in full like its
-neighbours. The MOC reaches it at the host the operator connected to, taking
-only the port from the file, so one typed address moves both links.
+``tcs_cmd`` is the spacecraft command link, which is one conversation and two
+sockets. ``tcs_cmd.recv`` is tcspecial's own: it receives commands about the
+spacecraft there and sends its responses from there, a response going back out
+of the socket its command arrived on. ``tcs_cmd.send`` is the MOC's own, which
+it sends those commands from and receives the responses on. Both ends are in
+one file because both ends read this file, and two places to say one thing is
+one place for them to disagree.
 
-The two ``_tc_base`` attributes are where each payload's own data link is, and
-there are two because the link has two ends. Every payload has a UDP interface
-for exchanging data with the ground; tcspecial binds its end at
-``tcs_tc_base`` plus **the payload's own id** -- the position the payload
-has in the configuration, counting from nought -- and the MOC binds its end at
-``moc_tc_base`` plus the same id. So a set of four payloads based at 6000 and
-6100 has tcspecial at 6000 to 6003 and the ground at 6100 to 6103.
+``payload_interface`` is where commands about a payload are taken, and says
+where it is in full like its neighbours. The MOC reaches it at the host the
+operator connected to, taking only the port from the file, so one typed
+address moves both links.
+
+``payload_telemetry`` is where each payload's own data link is, and it has two
+bases because the link has two ends. Every payload has a UDP interface for
+exchanging data with the ground; tcspecial binds its end at
+``payload_telemetry.source_base`` plus **the payload's own id** -- the position
+the payload has in the configuration, counting from nought -- and the MOC binds
+its end at ``payload_telemetry.dest_base`` plus the same id. So a set of four
+payloads based at 6000 and 6100 has tcspecial at 6000 to 6003 and the ground at
+6100 to 6103.
 
 Both ends come out of the one file both ends read, so neither has to be told
 the other's. The MOC says hello to tcspecial's end, which is why that is the
@@ -1610,9 +1622,9 @@ configuration that has not been asked where to send them has not answered.
 ``tcspecial.yaml`` states them too, and a set's section wins over it; the
 file's are what place a set whose configuration states no section at all.
 
-``beacon_send`` is where beacons come from: tcspecial makes the socket it
+``beacon.send`` is where beacons come from: tcspecial makes the socket it
 sends them on out of it, binding that address and port, so every beacon leaves
-from there. ``beacon_recv`` is where they are received: tcsmoc makes the socket
+from there. ``beacon.recv`` is where they are received: tcsmoc makes the socket
 it receives them on out of it, binding that address and port, and it is where
 tcspecial sends. Both are an address and a port, like the links above, and both
 ends read both of them out of the same file -- which is how the two come to

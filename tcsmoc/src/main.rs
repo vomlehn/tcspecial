@@ -2945,8 +2945,8 @@ mod tests {
 
         // What the set itself says, which is what tcspecial will resolve.
         let said = section.expect("the shipped set has a tcspecial section");
-        assert_eq!(mine.send.to_string(), said.beacon_send);
-        assert_eq!(mine.recv.to_string(), said.beacon_recv);
+        assert_eq!(mine.send.to_string(), said.beacon.send);
+        assert_eq!(mine.recv.to_string(), said.beacon.recv);
 
         // And the two ends are two sockets. One address for both would be a
         // sender bound where the listener is, which is the listener's port

@@ -354,22 +354,42 @@ payloads:
     /// The section used to be carried and checked and nothing more. The
     /// beacon address is read from it now, so a set states where its own
     /// ground station listens.
+    /// A whole set, with a tcspecial section as a file writes it.
+    ///
+    /// Written out rather than escaped into one line, because the section is
+    /// mostly subsections now and the indentation is the point: `recv` under
+    /// `tcs_cmd` is a different attribute from `recv` under `beacon`.
+    const A_SET: &str = "\
+version: \"1.0\"
+description: a set
+tcspecial:
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
+  payload_interface: 0.0.0.0:4001
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: 0.0.0.0:5550
+    recv: 127.0.0.1:5650
+payloads:
+  - name: DH0
+    type: device
+    path: /dev/null
+    packet_size: 1
+";
+
     #[test]
     fn a_payload_sets_tcspecial_section_is_read() {
-        let stated = "version: \"1.0\"\ndescription: a set\n\
-                      tcspecial:\n  tcs_cmd_recv: 0.0.0.0:4000\n  \
-                     moc_cmd_send: 127.0.0.1:4100\n  payload_interface: 0.0.0.0:4001\n  \
-                     tcs_tc_base: 0.0.0.0:6000\n  \
-                     moc_tc_base: 127.0.0.1:6100\n  \
-                      beacon_interval_ms: 5000\n  beacon_send: 239.255.0.7:7550\n  beacon_recv: 127.0.0.1:5650\n\
-                      payloads:\n  - name: DH0\n    type: device\n    \
-                      path: /dev/null\n    packet_size: 1\n";
-        let file = write_temp(".yaml", stated);
+        let stated = A_SET.replace("send: 0.0.0.0:5550", "send: 0.0.0.0:7550");
+        let file = write_temp(".yaml", &stated);
         let section = load_tcspecial_section(file.path())
             .expect("it loads")
             .expect("the set states a section");
-        assert_eq!(section.beacon_send, "239.255.0.7:7550");
-        assert_eq!(section.beacon_recv, "127.0.0.1:5650");
+        assert_eq!(section.beacon.send, "0.0.0.0:7550");
+        assert_eq!(section.beacon.recv, "127.0.0.1:5650");
 
         // A payload set with no section at all.
         let bare = "version: \"1.0\"\ndescription: a set\n\
@@ -390,29 +410,21 @@ payloads:
     /// beacons going somewhere nobody is listening.
     #[test]
     fn a_tcspecial_section_states_both_beacon_attributes() {
-        let whole = "version: \"1.0\"\ndescription: a set\n\
-                     tcspecial:\n  tcs_cmd_recv: 0.0.0.0:4000\n  \
-                     moc_cmd_send: 127.0.0.1:4100\n  payload_interface: 0.0.0.0:4001\n  \
-                     tcs_tc_base: 0.0.0.0:6000\n  \
-                     moc_tc_base: 127.0.0.1:6100\n  \
-                     beacon_interval_ms: 5000\n  beacon_send: 0.0.0.0:5550\n  \
-                     beacon_recv: 127.0.0.1:5650\n\
-                     payloads:\n  - name: DH0\n    type: device\n    \
-                     path: /dev/null\n    packet_size: 1\n";
+        let whole = A_SET;
         let file = write_temp(".yaml", whole);
         let section = load_tcspecial_section(file.path())
             .expect("it loads")
             .expect("a section");
-        assert_eq!(section.beacon_interval_ms, 5000);
-        assert_eq!(section.beacon_send, "0.0.0.0:5550");
-        assert_eq!(section.beacon_recv, "127.0.0.1:5650");
+        assert_eq!(section.beacon.interval_ms, 5000);
+        assert_eq!(section.beacon.send, "0.0.0.0:5550");
+        assert_eq!(section.beacon.recv, "127.0.0.1:5650");
 
-        // Each of the three in turn: a section that leaves any of them out is
-        // a section that has not said where its beacons go.
+        // Each of the three in turn: a subsection that leaves any of them out
+        // is a section that has not said where its beacons go.
         for missing in [
-            "  beacon_interval_ms: 5000\n",
-            "  beacon_send: 0.0.0.0:5550\n",
-            "  beacon_recv: 127.0.0.1:5650\n",
+            "    interval_ms: 5000\n",
+            "    send: 0.0.0.0:5550\n",
+            "    recv: 127.0.0.1:5650\n",
         ] {
             let without = whole.replace(missing, "");
             assert_ne!(without, whole, "the test removed nothing");

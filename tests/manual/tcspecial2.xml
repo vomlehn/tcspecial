@@ -14,16 +14,24 @@
     <version>1.0</version>
     <description>TCSpecial payload set 2</description>
     <tcspecial>
-        <tcs_cmd_recv>0.0.0.0:4000</tcs_cmd_recv>
-        <moc_cmd_send>127.0.0.1:4100</moc_cmd_send>
+        <tcs_cmd>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:4100</send>
+        </tcs_cmd>
         <payload_interface>0.0.0.0:4001</payload_interface>
-        <tcs_tc_base>0.0.0.0:6000</tcs_tc_base>
-        <moc_tc_base>127.0.0.1:6100</moc_tc_base>
-        <beacon_interval_ms>5000</beacon_interval_ms>
-        <beacon_send>0.0.0.0:5550</beacon_send>
-        <beacon_recv>127.0.0.1:5650</beacon_recv>
-        <log_dir>/var/log/tcspecial</log_dir>
-        <log_segment_bytes>65536</log_segment_bytes>
+        <payload_telemetry>
+            <source_base>0.0.0.0:6000</source_base>
+            <dest_base>127.0.0.1:6100</dest_base>
+        </payload_telemetry>
+        <beacon>
+            <interval_ms>5000</interval_ms>
+            <send>0.0.0.0:5550</send>
+            <recv>127.0.0.1:5650</recv>
+        </beacon>
+        <log>
+            <directory>/var/log/tcspecial</directory>
+            <segment_size>65536</segment_size>
+        </log>
     </tcspecial>
     <payloads>
         <name>auto-send</name>

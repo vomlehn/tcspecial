@@ -452,7 +452,7 @@ fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
         TcsError::Config(format!(
             "data handler \"{}\" has nowhere to send what it reads: the payload \
              set states no tcspecial section, and a payload's ground link is \
-             the section's moc_tc_base counted on by the payload's own id",
+             the section's payload_telemetry.dest_base counted on by the id",
             config.name.0
         ))
     })?;
@@ -850,11 +850,11 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 4100,
             },
-            tcs_tc_base: tcslibgs::HostPort {
+            payload_source_base: tcslibgs::HostPort {
                 address: "0.0.0.0".to_string(),
                 port: 6000,
             },
-            moc_tc_base: tcslibgs::HostPort {
+            payload_dest_base: tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 6100,
             },
@@ -894,11 +894,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
@@ -974,11 +974,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
@@ -1087,11 +1087,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
@@ -1212,11 +1212,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
@@ -1308,11 +1308,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
@@ -1451,11 +1451,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
@@ -1530,11 +1530,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
@@ -1606,11 +1606,11 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 4100,
             },
-            tcs_tc_base: tcslibgs::HostPort {
+            payload_source_base: tcslibgs::HostPort {
                 address: "0.0.0.0".to_string(),
                 port: 6000,
             },
-            moc_tc_base: tcslibgs::HostPort {
+            payload_dest_base: tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 6100,
             },
@@ -1656,11 +1656,11 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 4100,
                 },
-                tcs_tc_base: tcslibgs::HostPort {
+                payload_source_base: tcslibgs::HostPort {
                     address: "0.0.0.0".to_string(),
                     port: 6000,
                 },
-                moc_tc_base: tcslibgs::HostPort {
+                payload_dest_base: tcslibgs::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },

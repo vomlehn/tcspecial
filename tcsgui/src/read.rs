@@ -53,9 +53,12 @@ pub fn read(path: &Path) -> Result<Document, String> {
     // tcslibgs::graph::parameters -- so a section somebody left halfway
     // through opens, says what is missing, and can be put right.
     if let Some(said) = &graph.tcspecial {
-        document.tcspecial = said
-            .iter()
-            .map(|(attribute, value)| (attribute.clone(), value.as_str().to_string()))
+        // Flat here, a subsection's attribute written `parent.child`: a field
+        // in a window is one name, and so is a complaint about it. The
+        // writers put the subsections back.
+        document.tcspecial = tcslibgs::graph::parameters::flatten(said)
+            .into_iter()
+            .map(|(attribute, value)| (attribute, value.as_str().to_string()))
             .collect();
     }
 

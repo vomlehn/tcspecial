@@ -76,6 +76,13 @@ pub enum Edit {
     RenameNode { was: String, now: String },
     /// A link was added.
     AddLink { link: Link },
+    /// One end of a link was dragged to another terminal.
+    ///
+    /// One edit and not a removal followed by an addition, because it is one
+    /// gesture: somebody took hold of the end of a line and put it somewhere
+    /// else, and an undo that put the line back in two steps would be an undo
+    /// that does half of what was done.
+    MoveLink { was: Link, now: Link },
     /// A link was removed, carried whole for the same reason a node is.
     RemoveLink { link: Link },
     /// What somebody wrote about a node was changed.
@@ -344,6 +351,10 @@ impl Edit {
             },
             Edit::AddLink { link } => Edit::RemoveLink { link: link.clone() },
             Edit::RemoveLink { link } => Edit::AddLink { link: link.clone() },
+            Edit::MoveLink { was, now } => Edit::MoveLink {
+                was: now.clone(),
+                now: was.clone(),
+            },
             Edit::MoveNode { node, was, now } => Edit::MoveNode {
                 node: node.clone(),
                 was: *now,
@@ -489,6 +500,10 @@ impl Edit {
             Edit::RemoveLink { link } => {
                 format!("unlink \"{}\" from \"{}\"", link.from, link.to)
             }
+            Edit::MoveLink { was, now } => format!(
+                "move the link from \"{}\" to \"{}\"",
+                was.to, now.to
+            ),
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
             Edit::SetTcspecial { attribute, .. } => {
                 format!("set tcspecial {attribute}")

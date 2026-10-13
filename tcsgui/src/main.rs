@@ -167,6 +167,12 @@ struct Views {
     /// the same form. Choosing another group re-points this one, which is also
     /// what makes the menu behave like a menu.
     group: Option<GroupWindow>,
+    /// The end of a link in somebody's hand, if any: see `Drawing::holding`.
+    ///
+    /// The one piece of a gesture the drawing needs to know about, because a
+    /// line being dragged away by its end is drawn nowhere until the hand puts
+    /// it down. Shared with the gesture's own handlers, as `chosen` is.
+    drawing: Rc<RefCell<Option<Drawing>>>,
     /// The nodes whose attributes are open, by the name a link would use.
     ///
     /// One window per node and several at once, which is what they are for: a
@@ -240,6 +246,14 @@ impl Views {
     fn refresh(&self, editor: &Editor) {
         let chosen = self.chosen.borrow();
         let divider = self.divider.get();
+        // The link whose end is in somebody's hand, which is drawn nowhere:
+        // a line that stayed put while its end was being dragged away would
+        // be a line saying the gesture had not started.
+        let held = self
+            .drawing
+            .borrow()
+            .as_ref()
+            .and_then(|drawing| drawing.holding.clone());
         if let Some(window) = &self.group {
             put_group(window, editor, &self.showing.borrow());
         }
@@ -256,7 +270,14 @@ impl Views {
             put_node(window, editor, node);
         }
         if let Some(top) = self.top.upgrade() {
-            put(&top, editor, &None, chosen.get("").map(|s| s.as_str()), divider);
+            put(
+                &top,
+                editor,
+                &None,
+                chosen.get("").map(|s| s.as_str()),
+                divider,
+                held.as_ref(),
+            );
         }
         for (name, window) in &self.open {
             put_sub(
@@ -265,6 +286,7 @@ impl Views {
                 name,
                 chosen.get(name).map(|s| s.as_str()),
                 divider,
+                held.as_ref(),
             );
         }
     }
@@ -287,6 +309,12 @@ macro_rules! furnish {
         // How long the sheet is: one length for all three panes, which is what
         // makes them scroll together. See pane::WORKING_HEIGHT.
         window.set_working_height(pane::WORKING_HEIGHT as f32);
+        // What each pane is painted. Here with the palette rather than in the
+        // markup, because which ground belongs to which pane is a rule with
+        // tests on it: see style::ground_of.
+        window.set_moc_ground(colour(&ground_of(style::Ground::Moc)));
+        window.set_vehicle_ground(colour(&ground_of(style::Ground::Vehicle)));
+        window.set_payload_ground(colour(&ground_of(style::Ground::Payloads)));
     }};
 }
 
@@ -353,6 +381,7 @@ fn main() -> Result<(), slint::PlatformError> {
         top: ui.as_weak(),
         open: BTreeMap::new(),
         chosen: Rc::new(RefCell::new(BTreeMap::new())),
+        drawing: Rc::new(RefCell::new(None)),
         divider: divider.clone(),
         group: None,
         parameters: None,
@@ -377,6 +406,9 @@ fn main() -> Result<(), slint::PlatformError> {
     views.borrow().refresh(&editor.borrow());
 
     views.borrow_mut().chosen = chosen.clone();
+    // The same half-drawn gesture the handlers hold, so the canvas can leave
+    // the line being dragged off the drawing: see Views::drawing.
+    views.borrow_mut().drawing = drawing.clone();
     wire(&ui, &editor, &views, &drawing, &chosen, &None);
 
     {
@@ -409,6 +441,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 &name,
                 None,
                 views.borrow().divider.get(),
+                None,
             );
             if let Err(e) = window.show() {
                 eprintln!("tcsgui: {name} cannot be shown: {e}");
@@ -715,11 +748,34 @@ macro_rules! wiring {
                 // terminal released over is the other end.
                 let drawing = drawing.clone();
                 let home = home.clone();
+                let editor_for_press = editor.clone();
+                let views_for_press = views.clone();
                 window.on_link_started(move |name, terminal| {
-                    *drawing.borrow_mut() = Some(Drawing {
+                    let at = Drawing {
                         node: Qualified::of(&name, &home).absolute(),
                         terminal: terminal.to_string(),
-                    });
+                        holding: None,
+                    };
+                    // A terminal with one link on it is a line being picked up
+                    // by its end; one with none, or with several, is a line
+                    // about to be drawn. See Drawing::holding.
+                    let sink = tcslibgs::graph::terminals::stream_of(&at.terminal)
+                        .map(|(sink, _)| sink)
+                        .unwrap_or(false);
+                    let held = {
+                        let editor = editor_for_press.borrow();
+                        let theirs = attached(editor.document(), &at, sink);
+                        match theirs.as_slice() {
+                            [one] => Some(one.clone()),
+                            _ => None,
+                        }
+                    };
+                    *drawing.borrow_mut() = Some(Drawing { holding: held, ..at });
+                    // Taken off the drawing while the gesture runs, so the
+                    // line follows the hand rather than staying where it was.
+                    views_for_press
+                        .borrow()
+                        .refresh(&editor_for_press.borrow());
                 });
             }
             {
@@ -732,22 +788,26 @@ macro_rules! wiring {
                         Some(from) => from,
                         None => return,
                     };
-                    let made = {
+                    {
                         let mut editor = editor.borrow_mut();
-                        match joined(editor.document(), &home, &from, (x, y)) {
-                            Some(link) => {
-                                editor.edit(Edit::AddLink { link });
-                                true
+                        // A line that was picked up by its end, or one being
+                        // drawn: two gestures that look the same and do
+                        // different things.
+                        let what = match &from.holding {
+                            Some(held) => {
+                                dropped(editor.document(), &home, held, &from, (x, y))
                             }
-                            None => false,
+                            None => joined(editor.document(), &home, &from, (x, y))
+                                .map(|link| Edit::AddLink { link }),
+                        };
+                        if let Some(edit) = what {
+                            editor.edit(edit);
                         }
-                    };
-                    // Only when something was made: a gesture let go of over
-                    // nothing has changed nothing, and rebuilding the canvas
-                    // for it would be a flicker that says something happened.
-                    if made {
-                        views.borrow().refresh(&editor.borrow());
                     }
+                    // Always, now: a gesture that changed nothing still has a
+                    // line to put back, the held one having been taken off the
+                    // drawing while the hand was moving.
+                    views.borrow().refresh(&editor.borrow());
                 });
             }
             {
@@ -808,11 +868,12 @@ fn put(
     home: &Home,
     chosen: Option<&str>,
     dividers: Dividers,
+    held: Option<&Link>,
 ) {
     ui.set_moc_divider(dividers.moc as f32);
     ui.set_vehicle_divider(dividers.vehicle as f32);
     ui.set_has_simulator(editor.document().simulator.is_some());
-    let (nodes, links) = views_of(editor, home);
+    let (nodes, links) = views_of(editor, home, held);
     ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     ui.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
@@ -831,12 +892,13 @@ fn put_sub(
     home: &str,
     chosen: Option<&str>,
     dividers: Dividers,
+    held: Option<&Link>,
 ) {
     window.set_moc_divider(dividers.moc as f32);
     window.set_vehicle_divider(dividers.vehicle as f32);
     window.set_has_simulator(editor.document().simulator.is_some());
     let home = Some(home.to_string());
-    let (nodes, links) = views_of(editor, &home);
+    let (nodes, links) = views_of(editor, &home, held);
     window.set_selected(chosen.unwrap_or_default().into());
     window.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
@@ -1877,7 +1939,11 @@ fn label(edit: Option<&Edit>) -> slint::SharedString {
 /// edge, labelled with the far node's full name. It cannot be drawn to the
 /// node itself -- that node is in another window -- and leaving it out
 /// altogether would make a subdiagram look unconnected when it is not.
-fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
+fn views_of(
+    editor: &Editor,
+    home: &Home,
+    held: Option<&Link>,
+) -> (Vec<NodeView>, Vec<LinkView>) {
     let document = editor.document();
     let faults = editor.faults();
 
@@ -1940,6 +2006,10 @@ fn views_of(editor: &Editor, home: &Home) -> (Vec<NodeView>, Vec<LinkView>) {
         .links
         .iter()
         .filter(|link| here(&link.from) || here(&link.to))
+        // Not the one whose end is in somebody's hand: a line that stayed put
+        // while its end was being dragged away would say the gesture had not
+        // started. It comes back where the hand put it down, or where it was.
+        .filter(|link| !held.is_some_and(|held| held.same_connection(link)))
         .map(|link| {
             let ends = ends_of(document, link, home);
 
@@ -2095,6 +2165,168 @@ fn far_end(link: &Link, home: &Home) -> String {
 struct Drawing {
     node: String,
     terminal: String,
+    /// The link this gesture took hold of, where the terminal had one.
+    ///
+    /// A terminal with a link on it is a line somebody can pick up by its end:
+    /// dragging it away takes that end off, and where it is let go of decides
+    /// what happens to the link -- see [`dropped`]. A terminal with none is a
+    /// line about to be drawn, and one with several is as well, because
+    /// nothing says which of them was meant.
+    ///
+    /// Which is the common case for a data source, a source being allowed to
+    /// reach several sinks: so a second line out of one is drawn from the
+    /// *sink* end, the gesture working either way about.
+    holding: Option<Link>,
+}
+
+/// What becomes of a link whose end was dragged somewhere.
+///
+/// `held` is the link and `pressed` is the end that was taken hold of; `(x, y)`
+/// is where the pointer was let go of. Four answers, which are the four things
+/// a person can do with the end of a line:
+///
+/// put it back where it was, or anywhere that is not a terminal at all but is
+/// still on a node: nothing changes. A gesture that has thought better of
+/// itself leaves no trace, and neither does one that landed on a node's label;
+///
+/// drop it on another terminal that suits that end: the link is moved, in one
+/// edit, so one undo puts it back;
+///
+/// drop it on a terminal that does not suit the end -- the wrong kind, the
+/// wrong stream, its own far node, or one the same link already reaches:
+/// nothing changes, as a line that cannot be drawn is not drawn;
+///
+/// and let go of it over no node at all: the link is deleted. Which is the
+/// only way to delete one, and it is the gesture a person reaches for -- pull
+/// the wire out and drop it on the floor.
+fn dropped(
+    document: &Document,
+    home: &Home,
+    held: &Link,
+    pressed: &Drawing,
+    (x, y): (f32, f32),
+) -> Option<Edit> {
+    let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
+
+    // Over nothing: the link goes. A node's own box and not its terminals,
+    // because letting go over a node is a gesture that missed and letting go
+    // over the canvas is one that meant it.
+    let Some(over) = terminal_under(document, home, (x, y), sink_pressed) else {
+        return if node_under(document, home, (x, y)).is_none() {
+            Some(Edit::RemoveLink { link: held.clone() })
+        } else {
+            None
+        };
+    };
+
+    // Back where it started.
+    if over.node == pressed.node && over.terminal == pressed.terminal {
+        return None;
+    }
+
+    // The far end stays where it is and the pressed end moves.
+    let mut now = held.clone();
+    if sink_pressed {
+        now.to = over.node.clone();
+        now.input = arriving_at(document, &over.node, &over.terminal);
+    } else {
+        now.from = over.node.clone();
+        now.origin = leaving_by(&over);
+    }
+
+    let source = Drawing {
+        node: now.from.clone(),
+        terminal: now.origin.clone().unwrap_or_default(),
+        holding: None,
+    };
+    let sink = Drawing {
+        node: now.to.clone(),
+        terminal: now
+            .input
+            .clone()
+            .filter(|input| tcslibgs::graph::terminals::stream_of(input).is_some())
+            .or_else(|| {
+                style::terminal_for(
+                    &document.node(&now.to)?.node_type.clone(),
+                    now.input.as_deref(),
+                    true,
+                )
+                .map(str::to_string)
+            })
+            .unwrap_or_default(),
+        holding: None,
+    };
+    if source.node == sink.node {
+        return None;
+    }
+    if !tcslibgs::graph::terminals::pairs_with(&source.terminal, &sink.terminal) {
+        return None;
+    }
+    if document
+        .links
+        .iter()
+        .any(|theirs| theirs.same_connection(&now) && !theirs.same_connection(held))
+    {
+        return None;
+    }
+
+    Some(Edit::MoveLink {
+        was: held.clone(),
+        now,
+    })
+}
+
+/// Which node is under this point, where one is.
+///
+/// For telling "let go of over a node" from "let go of over the canvas", which
+/// are two different things: the first is a gesture that missed a terminal and
+/// the second is one that meant to put the line down.
+fn node_under(document: &Document, home: &Home, (x, y): (f32, f32)) -> Option<String> {
+    document
+        .nodes_in(home)
+        .into_iter()
+        .find(|node| {
+            let (width, height) = size_of(&node.node_type);
+            x >= node.at.0 as f32
+                && x <= (node.at.0 + width as i32) as f32
+                && y >= node.at.1 as f32
+                && y <= (node.at.1 + height as i32) as f32
+        })
+        .map(|node| node.name.clone())
+}
+
+/// The links attached to this terminal of this node.
+///
+/// Both ends are asked: a line may be picked up by either of them.
+fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
+    document
+        .links
+        .iter()
+        .filter(|link| {
+            if sink {
+                link.to == at.node
+                    && style::terminal_for(
+                        &document
+                            .node(&link.to)
+                            .map(|node| node.node_type.clone())
+                            .unwrap_or_default(),
+                        link.input.as_deref(),
+                        true,
+                    ) == Some(at.terminal.as_str())
+            } else {
+                link.from == at.node
+                    && style::terminal_for(
+                        &document
+                            .node(&link.from)
+                            .map(|node| node.node_type.clone())
+                            .unwrap_or_default(),
+                        link.origin.as_deref(),
+                        false,
+                    ) == Some(at.terminal.as_str())
+            }
+        })
+        .cloned()
+        .collect()
 }
 
 /// The link a gesture made, where it made one.
@@ -2195,6 +2427,7 @@ fn terminal_under(
                 return Some(Drawing {
                     node: node.name.clone(),
                     terminal: (*terminal).to_string(),
+                    holding: None,
                 });
             }
         }
@@ -2655,48 +2888,65 @@ fn terminal_view(
 ///
 /// Held here rather than in `style.rs` on purpose: that module holds what a
 /// type *means* and the rules the looks obey, and this holds what the meanings
-/// are painted. Keeping them apart is what lets the accessibility test check
+/// are painted. Keeping them apart is what lets the accessibility tests check
 /// the rules without knowing a single hex value.
 fn tint_of(tint: Tint) -> String {
-    // Searched for rather than chosen by eye, and the thing searched for was
-    // not prettiness: these are the fifteen sRGB colours that maximise the
-    // smallest perceived difference between any two of them, taken under
-    // normal vision and under simulated protanopia, deuteranopia and
-    // tritanopia at once. The worst pair of the fifteen is 17 CIE units apart
-    // under every one of the four, which the test below checks against these
-    // very values.
+    // Searched for rather than chosen by eye, and three things were asked of
+    // the search at once: that every tint stay in the hue family of the pane
+    // its nodes are drawn on, that it be dark enough against that pane to read
+    // as a shape -- three to one, which is the threshold for something that is
+    // not text -- and that, subject to those, the smallest perceived
+    // difference between any two of the fifteen be as large as it can be,
+    // taken in CIE L*a*b* under normal vision and under simulated protanopia,
+    // deuteranopia and tritanopia at once.
     //
-    // Two constraints beside that, in this order. Each has a contrast against
-    // white of at least three to one, so that a one-pixel border of it is
-    // legible rather than nearly there. And the chroma is kept moderate and
-    // the lightness spread over five levels -- which is as much aesthetics as
-    // the first priority leaves room for, and is also useful: lightness is the
-    // one channel every kind of colour blindness keeps, the total ones
-    // included.
+    // It is 14 CIE units, where two or three is "the same colour in two
+    // printings" and ten is "clearly two colours". So a pair anybody can tell
+    // apart is a pair everybody can tell apart. The test below checks it
+    // against these very values, which is the point of its existing: tuning
+    // one of these means re-running the search.
     //
-    // Tuning any of these means re-running that test, which is the point of
-    // its existing.
+    // Three units less than the fourteen-colour palette that came before, and
+    // the three are the price of the families: a palette free to put its
+    // colours anywhere spreads them further than one whose reds must stay red.
+    // What the families buy is that a node's colour says which pane it belongs
+    // in, which no amount of separation would have told anybody.
     match tint {
-        Tint::Indigo => "#243a91",
-        Tint::Forest => "#254a2a",
-        Tint::Bronze => "#504100",
-        Tint::Plum => "#5f354c",
-        Tint::Purple => "#6b357b",
-        Tint::Magenta => "#9d4b82",
-        Tint::Blue => "#3768b0",
-        Tint::Rose => "#9b535c",
-        Tint::Olive => "#6b722e",
-        Tint::Taupe => "#9c9068",
-        Tint::Periwinkle => "#8387ea",
-        Tint::Gold => "#a3911b",
-        Tint::Blush => "#bb8095",
-        Tint::Lavender => "#9b87c3",
-        // The fifteenth, searched for in the gap the other fourteen left: a
-        // sixth level of lightness, below the five they are spread over, at
-        // 18.9 CIE units from every one of them under every one of the four
-        // ways of seeing. Darker rather than another middle tone because
-        // there was no room left in the middle -- see the Tint enum.
-        Tint::Aubergine => "#4b0046",
+        // The ground link, on its pale blue pane.
+        Tint::Azure => "#0080e8",
+        // The vehicle's own graph, on pale green.
+        Tint::Pine => "#206038",
+        Tint::Olive => "#686808",
+        Tint::Gold => "#a08800",
+        Tint::Moss => "#609850",
+        // What the vehicle carries, on pale blush: ten of them, which is why
+        // this is the family the search had the least room in.
+        Tint::Aubergine => "#481040",
+        Tint::Oxblood => "#481820",
+        Tint::Crimson => "#780008",
+        Tint::Magenta => "#780870",
+        Tint::Mulberry => "#683850",
+        Tint::Rose => "#a82038",
+        Tint::Plum => "#884078",
+        Tint::Orchid => "#a848a0",
+        Tint::Heather => "#906078",
+        Tint::Clay => "#a86060",
+    }
+    .to_string()
+}
+
+/// What each working pane is painted.
+///
+/// Light and neutral, as asked: 15 CIE units apart from each other under every
+/// one of the four ways of seeing, and none with a chroma above 14, so a pane
+/// reads as a tinted sheet of paper rather than as a coloured panel. Each is
+/// the light end of the hue family its nodes are drawn in -- see
+/// `style::Tint` -- which is what makes a node's colour say where it belongs.
+fn ground_of(ground: style::Ground) -> String {
+    match ground {
+        style::Ground::Moc => "#d4e6fe",
+        style::Ground::Vehicle => "#eff5da",
+        style::Ground::Payloads => "#ddced1",
     }
     .to_string()
 }
@@ -2979,21 +3229,27 @@ mod tests {
 
     /// Every pair of tints is told apart by a colour blind reader.
     ///
-    /// The rule the palette was chosen for, checked against the colours the
+    /// The rule the palette was searched for, checked against the colours the
     /// window is actually given rather than against the intention. Fifteen
-    /// colours is enough that no amount of care at the keyboard would keep
-    /// this true: the fifteenth tint added by hand would be a near-copy of
-    /// one of the other fourteen under one of the three dichromacies, and
-    /// nobody with normal vision would see it.
+    /// colours in three hue families is well past what care at the keyboard
+    /// would keep true: a tint nudged by hand would be a near-copy of another
+    /// under one of the three dichromacies, and nobody with normal vision
+    /// would see it.
     ///
-    /// The floor is fifteen CIE units, where two or three is "the same colour
-    /// in two printings" and ten is "clearly two colours". The palette in
-    /// `tint_of` manages seventeen, so there is room to adjust one -- and a
-    /// failure here says the adjustment has to be searched for again rather
-    /// than nudged.
+    /// The floor is fourteen CIE units, where two or three is "the same colour
+    /// in two printings" and ten is "clearly two colours". So a pair anybody
+    /// can tell apart is a pair everybody can tell apart, which is what was
+    /// asked for.
+    ///
+    /// Fourteen and not the seventeen the family-free palette managed, and the
+    /// three units are the price of the families: a palette free to put its
+    /// colours anywhere spreads them further than one whose reds must stay
+    /// red. What the families buy is a colour that says which pane a node
+    /// belongs in. A failure here means the search has to be run again rather
+    /// than a value nudged.
     #[test]
     fn no_two_tints_are_the_same_colour_to_a_colour_blind_reader() {
-        use sight::{contrast_on_white, difference, seen, Sight};
+        use sight::{difference, seen, Sight};
 
         let painted = |t: NodeType| {
             let c = colour(&tint_of(t.appearance().tint));
@@ -3015,21 +3271,99 @@ mod tests {
 
         let (apart, sight, a, b) = closest;
         assert!(
-            apart >= 15.0,
+            apart >= 14.0,
             "{a} and {b} are only {apart:.1} apart to a reader with \
-             {sight:?}, and the floor is 15"
+             {sight:?}, and the floor is 14"
         );
+    }
 
-        // And each is legible as a border on the white canvas, which is the
-        // other half of a colour being usable: three to one is the threshold
-        // for something that is not text.
+    /// Every node is legible on its own pane, and is in that pane's family.
+    ///
+    /// Which is the other half of what a colour is for here. A node is drawn
+    /// on a tinted ground rather than on white, so "is this colour usable" is
+    /// a question about the pair: three to one is the threshold for something
+    /// that is not text, and it is asked of the node against its own pane.
+    ///
+    /// And the hue says where the node belongs. A payload is a plum or a
+    /// maroon on pale blush, a vehicle node a green on pale green, the ground
+    /// link an azure on pale blue -- so somebody who has learned one pane's
+    /// colour can tell at a glance when a node is drawn in the wrong one.
+    #[test]
+    fn every_node_is_legible_on_its_own_pane_and_in_its_family() {
+        use sight::{chroma, contrast, hue, hue_apart, lightness};
+
+        let painted = |hex: &str| {
+            let c = colour(hex);
+            (c.red(), c.green(), c.blue())
+        };
+
         for t in NodeType::ALL {
-            let contrast = contrast_on_white(painted(t));
+            let node = painted(&tint_of(t.appearance().tint));
+            let pane = pane_of(t.spelling());
+            let ground = painted(&ground_of(style::ground_of(pane)));
+
+            let against = contrast(node, ground);
             assert!(
-                contrast >= 3.0,
-                "{}'s tint has {contrast:.2} contrast against the canvas",
-                t.spelling()
+                against >= 3.0,
+                "{} has {against:.2} contrast against the {} pane",
+                t.spelling(),
+                pane.label()
             );
+            // Darker than its ground, and by enough to read as something
+            // drawn on it rather than as a hole in it.
+            assert!(
+                lightness(ground) - lightness(node) >= 25.0,
+                "{} is {:.0} and its pane is {:.0}",
+                t.spelling(),
+                lightness(node),
+                lightness(ground)
+            );
+            // And in the pane's own hue family.
+            let apart = hue_apart(hue(node), hue(ground));
+            assert!(
+                apart <= 40.0,
+                "{}'s hue is {apart:.0} degrees from the {} pane's",
+                t.spelling(),
+                pane.label()
+            );
+        }
+
+        // The three grounds: light, neutral, and far enough apart that
+        // somebody with any of the three dichromacies can tell which pane
+        // they are looking at.
+        use sight::{difference, seen, Sight};
+        let grounds: Vec<(Pane, (u8, u8, u8))> = [Pane::Moc, Pane::Vehicle, Pane::Payloads]
+            .into_iter()
+            .map(|pane| (pane, painted(&ground_of(style::ground_of(pane)))))
+            .collect();
+        for (pane, ground) in &grounds {
+            assert!(
+                lightness(*ground) >= 84.0,
+                "the {} pane is {:.0} light, and a working pane is a light \
+                 ground",
+                pane.label(),
+                lightness(*ground)
+            );
+            assert!(
+                chroma(*ground) <= 14.0,
+                "the {} pane has a chroma of {:.0}, and a ground is neutral",
+                pane.label(),
+                chroma(*ground)
+            );
+        }
+        for (i, (one, a)) in grounds.iter().enumerate() {
+            for (two, b) in &grounds[i + 1..] {
+                for sight in Sight::ALL {
+                    let apart = difference(seen(*a, sight), seen(*b, sight));
+                    assert!(
+                        apart >= 15.0,
+                        "the {} and {} panes are {apart:.1} apart to a reader \
+                         with {sight:?}",
+                        one.label(),
+                        two.label()
+                    );
+                }
+            }
         }
     }
 
@@ -3262,11 +3596,11 @@ mod tests {
             home: Some("cabin".into()),
         });
 
-        let (top, _) = views_of(&editor, &None);
+        let (top, _) = views_of(&editor, &None, None);
         let names: Vec<String> = top.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["cabin".to_string(), "moc".to_string()]);
 
-        let (inside, _) = views_of(&editor, &Some("cabin".into()));
+        let (inside, _) = views_of(&editor, &Some("cabin".into()), None);
         let names: Vec<String> = inside.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["temp_fore".to_string()]);
 
@@ -3309,12 +3643,12 @@ mod tests {
         });
 
         // Seen from inside the subdiagram: one link, named for where it goes.
-        let (_, inside) = views_of(&editor, &Some("cabin".into()));
+        let (_, inside) = views_of(&editor, &Some("cabin".into()), None);
         assert_eq!(inside.len(), 1);
         assert_eq!(inside[0].label, "moc");
 
         // And seen from the top diagram, where its source is off the page.
-        let (_, top) = views_of(&editor, &None);
+        let (_, top) = views_of(&editor, &None, None);
         assert_eq!(top.len(), 1);
         assert_eq!(top[0].label, "cabin/temp_fore");
     }
@@ -3411,7 +3745,7 @@ mod tests {
             editor.edit(edit);
         }
 
-        let (_, links) = views_of(&editor, &None);
+        let (_, links) = views_of(&editor, &None, None);
         assert_eq!(links.len(), 1);
         let view = &links[0];
 
@@ -3502,6 +3836,7 @@ mod tests {
         let drawn = |node: &str, terminal: &str| Drawing {
             node: node.to_string(),
             terminal: terminal.to_string(),
+            holding: None,
         };
 
         // The readings, from the payload to the ground: a to_moc let go of
@@ -3716,6 +4051,7 @@ mod tests {
             &Drawing {
                 node: "ground".to_string(),
                 terminal: "to_payload".to_string(),
+                holding: None,
             },
             over("to_kelvin", "compute", (300, 120), "from_moc"),
         )
@@ -4471,6 +4807,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -4484,6 +4821,7 @@ mod tests {
             Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
+        views.borrow_mut().drawing = drawing.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
 
@@ -4578,6 +4916,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -4591,6 +4930,7 @@ mod tests {
             Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
+        views.borrow_mut().drawing = drawing.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
@@ -4702,7 +5042,7 @@ mod tests {
 
             let ui = MainWindow::new().expect("a window");
             furnish!(&ui, descriptions());
-            put(&ui, &editor.borrow(), &None, None, dividers());
+            put(&ui, &editor.borrow(), &None, None, dividers(), None);
 
             let names: Vec<String> = (0..ui.get_nodes().row_count())
                 .filter_map(|row| ui.get_nodes().row_data(row))
@@ -4794,6 +5134,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -4807,6 +5148,7 @@ mod tests {
             Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
+        views.borrow_mut().drawing = drawing.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
 
@@ -4921,6 +5263,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -4934,6 +5277,7 @@ mod tests {
             Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
+        views.borrow_mut().drawing = drawing.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
@@ -5000,6 +5344,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -5109,6 +5454,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -5172,6 +5518,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -5302,6 +5649,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -5315,6 +5663,7 @@ mod tests {
             Rc::new(RefCell::new(BTreeMap::new()));
         let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
         views.borrow_mut().chosen = chosen.clone();
+        views.borrow_mut().drawing = drawing.clone();
         wire(&ui, &editor, &views, &drawing, &chosen, &None);
         views.borrow().refresh(&editor.borrow());
         ui.show().expect("the window shows");
@@ -5550,6 +5899,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -5613,6 +5963,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,
@@ -5720,6 +6071,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             group: None,
             parameters: None,

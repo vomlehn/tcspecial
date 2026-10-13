@@ -641,6 +641,24 @@ impl Document {
             Edit::RemoveLink { link } => {
                 self.links.retain(|l| !l.same_connection(link));
             }
+            // One end of a line, put somewhere else. The old connection goes
+            // and the new one takes its place -- in place, so that a link
+            // keeps its position in the file and a save after a re-route is a
+            // one-line diff.
+            Edit::MoveLink { was, now } => {
+                let at = self.links.iter().position(|l| l.same_connection(was));
+                match at {
+                    Some(at) => self.links[at] = now.clone(),
+                    // Not there to move, which an undo of an undo can ask
+                    // for: added rather than refused, so the document ends up
+                    // saying what the edit says.
+                    None => {
+                        if !self.links.iter().any(|l| l.same_connection(now)) {
+                            self.links.push(now.clone());
+                        }
+                    }
+                }
+            }
             Edit::MoveNode { node, now, .. } => {
                 if let Some(node) = self.node_mut(node) {
                     node.at = *now;
@@ -2612,6 +2630,7 @@ mod tests {
                 Edit::RenameNode { .. } => (),
                 Edit::AddLink { .. } => (),
                 Edit::RemoveLink { .. } => (),
+                Edit::MoveLink { .. } => (),
                 Edit::SetNodeComment { .. } => (),
                 Edit::SetLinkComment { .. } => (),
                 Edit::MoveNode { .. } => (),
@@ -2729,6 +2748,10 @@ mod tests {
             },
             Edit::RemoveLink {
                 link: Link::new("a", "b", Some("in0")),
+            },
+            Edit::MoveLink {
+                was: Link::new("a", "b", Some("in0")),
+                now: Link::new("a", "b", Some("in1")),
             },
             Edit::SetNodeComment {
                 node: "a".into(),

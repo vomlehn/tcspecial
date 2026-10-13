@@ -1112,6 +1112,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
+            stale_interval_ms: None,
         }
     }
 
@@ -1779,6 +1780,7 @@ simulated_payloads:
             oc: None,
             ground: None,
             mode: DHMode::Periodic,
+            stale_interval_ms: None,
         };
 
         let file = parse(
@@ -1836,6 +1838,7 @@ simulated_payloads:
                 trigger: b"READ\r".to_vec(),
                 interval_ms: 500,
             },
+            stale_interval_ms: None,
         };
 
         for stated in ["packet_interval_ms: 1000", "segment_interval_ms: 1000"] {
@@ -1905,6 +1908,7 @@ simulated_payloads:
                 trigger: b"READ".to_vec(),
                 interval_ms: 500,
             },
+            stale_interval_ms: None,
         };
 
         // Stated, and refused in terms of where it belongs.

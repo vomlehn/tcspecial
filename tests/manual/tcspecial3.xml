@@ -39,5 +39,6 @@
         <protocol>tcp</protocol>
         <payload_interface>localhost:5000</payload_interface>
         <packet_size>12</packet_size>
+        <stale_interval_ms>3000</stale_interval_ms>
     </payloads>
 </payload>

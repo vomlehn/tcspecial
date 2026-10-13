@@ -51,6 +51,7 @@
         <name>serial-line</name>
         <group>payload_line</group>
         <path>/tmp/tcspecial4-line</path>
+        <stale_interval_ms>3000</stale_interval_ms>
     </payloads>
     <payloads>
         <name>udp-steady</name>
@@ -58,12 +59,14 @@
         <protocol>udp</protocol>
         <payload_interface>localhost:5400</payload_interface>
         <packet_size>12</packet_size>
+        <stale_interval_ms>3000</stale_interval_ms>
     </payloads>
     <payloads>
         <name>random-device</name>
         <type>device-file</type>
         <path>/dev/urandom</path>
         <packet_size>8</packet_size>
+        <stale_interval_ms>1000</stale_interval_ms>
     </payloads>
     <payloads>
         <name>bus-device</name>
@@ -71,6 +74,7 @@
         <path>/tmp/tcspecial4-bus</path>
         <payload_address>0x48</payload_address>
         <packet_size>12</packet_size>
+        <stale_interval_ms>3000</stale_interval_ms>
     </payloads>
     <payloads>
         <name>clocked-peripheral</name>
@@ -79,5 +83,6 @@
         <max_speed>1000000</max_speed>
         <spi_mode>0</spi_mode>
         <packet_size>12</packet_size>
+        <stale_interval_ms>3000</stale_interval_ms>
     </payloads>
 </payload>

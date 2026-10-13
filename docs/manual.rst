@@ -1770,10 +1770,9 @@ the ``Command`` menu
      Last Response: START_DH OK
      Last sent: 14:22:31   Last rcvd: 14:22:31
 
-  The ground's own clock, and the window's own commands -- what was pressed,
-  not the polling the panels do for themselves. A response that is slow to
-  come and one that never comes read alike until those two times are beside
-  it.
+  The ground's own clock, and the window's own commands -- what was pressed.
+  A response that is slow to come and one that never comes read alike until
+  those two times are beside it.
 
 Below that is one panel per data handler, filled across the window before
 another row is started under it, and a ``Quit`` button at the foot of the
@@ -1793,7 +1792,7 @@ beacons are arriving.
 ``Last recv``
   When the MOC last received anything from that payload, on the handler's OC
   address. The MOC's own clock, and read for whether anything is still
-  coming.
+  coming. Beside it is the **data indicator**, below.
 
 ``From payload``
   What arrived, as the ground received it.
@@ -1809,12 +1808,75 @@ them and are gone: a panel is watched for what reached the ground, and the
 claim about it cost a third of the panel to say nearly the same thing. The
 count was the spacecraft's too, and the wrong half of its statistics -- the
 bytes its handler had read from the ground, a direction nobody sends in, so
-the line read ``0 bytes`` beside a payload that was sending steadily. The panels refresh themselves about once a second;
-nothing has to be pressed to see traffic.
+the line read ``0 bytes`` beside a payload that was sending steadily. The
+panels refresh themselves about once a second; nothing has to be pressed to
+see traffic, and nothing is asked of the spacecraft to show it.
 
 Each panel has three buttons. ``Enable`` and ``Disable`` are described under
 `Starting and stopping a payload`_; ``Configuration`` shows what the files
 said about that handler: see `Seeing what was read`_.
+
+The data indicator
+^^^^^^^^^^^^^^^^^^
+.. note::
+   **Needs examination.** This is a first statement of the rule rather than a
+   settled one; what is unsettled is at the end of this section.
+
+Beside ``Last recv`` on each panel is a dot, shaped like the beacon's, saying
+what the ground can say about that payload's data:
+
+grey
+  Nothing to judge by: as far as the ground knows the payload is not enabled,
+  or the payload states no ``stale_interval_ms``.
+
+green
+  Data has arrived from that payload within its interval.
+
+yellow
+  The payload is enabled and nothing has arrived from it for longer than its
+  interval.
+
+There is no red. A payload whose data has stopped may be a payload with
+nothing to say, a payload somebody stopped, or a link that has failed, and
+nothing on the ground can tell those apart; red is for a condition that is
+dangerous, and this is one worth looking at.
+
+How long to wait is the payload's own to say, in its entry or its group:
+
+.. code-block:: yaml
+
+   payloads:
+     - name: auto-send
+       type: network
+       protocol: udp
+       payload_interface: localhost:5000
+       packet_size: 12
+       stale_interval_ms: 3000
+
+The figure is read by the ground and by nothing aboard. A payload that states
+none is never judged -- its dot stays grey -- because a figure nobody chose
+would make a payload that speaks once an hour look late every minute of it.
+
+Staleness is counted from the later of the last arrival and the moment the
+ground came to believe the payload was running, so a payload just enabled has
+its whole interval to produce something rather than going yellow the instant it
+is switched on.
+
+The MOC asks nothing to work any of this out. An enabled payload sends on its
+own, and its data arrives on that payload's own telemetry socket where the
+ground times it, so the panels are kept current without a command going out.
+There used to be a poller that asked every payload what it was doing once a
+second; for forty payloads that was eighty datagrams a second of housekeeping,
+and the arrivals had already said most of what it learnt. What only the
+spacecraft can say -- its own counters, and whether it has the handler at all
+-- is what ``Query all`` is for.
+
+Three things about this are still to be settled: what interval suits a payload
+that answers requests, since its data arrives only when tcspecial asks it;
+whether *enabled* should mean what the ground last commanded or what the
+spacecraft last said, which matters for a MOC that has just attached to a
+tcspecial already running; and whether a payload that states no interval should
+really look like a payload nobody has enabled, both being grey.
 
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1828,7 +1890,7 @@ by and asked with:
 
 .. code-block:: console
 
-   triggered payload triggered-send: TCP localhost:5003, trigger 0x67 6F ("go") every 1000 ms, OC 127.0.0.1:6003, status Stopped
+   triggered payload triggered-send: TCP localhost:5003, trigger 0x67 6F 0A every 1000 ms, OC 127.0.0.1:6003, status Stopped
 
 Then one line for every command sent about it. A press of its button:
 
@@ -1837,18 +1899,16 @@ Then one line for every command sent about it. A press of its button:
    triggered payload triggered-send: Enable pressed: sending START_DH as a Network handler
    triggered payload triggered-send: START_DH answered Success, so the panel now says Active
 
-and one from the refresh, carrying the status each answer came back with and
-the trigger count:
+and one from ``Query all``, carrying the status each answer came back with
+and the trigger count:
 
 .. code-block:: console
 
    triggered payload triggered-send: QUERY_DH Success: 5 triggers sent, 0 bytes to the ground, 0 from it; QUERY_DH_SAMPLE Success
 
-That one is said when it changes and not again until it changes once more. The
-panels poll every handler about once a second from the moment the link is up,
-started or not, so a line per pass meant a line a second about a payload
-sitting still; what is worth reading is the pass where something moved. A
-payload that is not transmitting therefore says this once and then nothing.
+That one is said when it changes and not again until it changes once more:
+what is worth reading is the answer where something moved. A payload that is
+not transmitting therefore says this once and then nothing.
 
 ``NotFound`` there is worth knowing: the panel shows zeroes either way, but it
 means the tcspecial being talked to has no such handler, which usually means it
@@ -1961,9 +2021,9 @@ beacon did arrive when it arrived.
 
 Panels start at ``Unknown``: a MOC that has just come up has been told
 nothing, and the tcspecial it attached to may have been running handlers for
-hours. The first thing the poller does is ask every handler what it is doing,
-so the panels are filled in as the window opens, whether or not a beacon has
-arrived yet.
+hours. They stay unknown until somebody presses ``Enable``, ``Disable`` or
+``Query all``; what says meanwhile whether a payload is alive is its data
+indicator.
 
 The indicator leaving green is also what the payload panels go by. A panel's
 status is what the spacecraft answered the last ``Enable`` or ``Disable``, and
@@ -1972,18 +2032,16 @@ handler may since have stopped, or gone with a process that restarted. So when
 the indicator leaves green every panel's status becomes ``Unknown``, whether
 or not the command link is up -- a disconnected MOC cannot find out either.
 
-When the indicator is green again, the MOC asks the spacecraft what each
-handler is doing and the panels say what it answers: ``Active`` for one that
-is running, ``Stopped`` for one that is not, and ``Unknown`` for a handler
-this tcspecial has not got -- which is what an operator sees when the MOC has
-attached to a tcspecial left running for another payload set. If the link is
-down when contact returns, the asking waits for it rather than being
-forgotten.
+When the indicator is green again, nothing is asked: the statuses stay
+``Unknown`` until somebody presses a button, and the data indicators say
+which payloads are delivering. ``Query all`` is what asks the spacecraft what
+each handler is doing, and the panels then say what it answers: ``Active`` for
+one that is running, ``Stopped`` for one that is not, and ``Unknown`` for a
+handler this tcspecial has not got -- which is what an operator sees when the
+MOC has attached to a tcspecial left running for another payload set.
 
-Nothing else changes a panel's status. The once-a-second refresh carries what
-each handler has moved and leaves the status to the commands and to the
-beacon; ``Query all`` sets it too, that being somebody asking the spacecraft
-directly.
+Nothing else changes a panel's status. The once-a-second refresh shows what has
+arrived and leaves the status to the commands and to the beacon.
 
 tcssim
 ------

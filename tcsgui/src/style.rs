@@ -291,6 +291,101 @@ pub fn terminal_at(corner: Corner, (width, height): (u32, u32)) -> (i32, i32) {
     )
 }
 
+/// Which terminal a link end means on a node of this type, for the drawing.
+///
+/// `named` is what the link wrote, where it wrote one, and `sink` says which
+/// end of the link this is. Three answers in order of authority: the terminal
+/// the link named, where the type has it; the only terminal of that kind,
+/// where there is one; and otherwise the groundward one -- `from_payload`
+/// where data arrives and `to_moc` where it leaves -- because telemetry on its
+/// way to the ground is what a node does unless the file says otherwise.
+///
+/// `None` only for a type this build does not know, which is drawn as a node
+/// with no terminals at all.
+///
+/// This is the drawing's question and not the checking's. A link into a
+/// computation that named `in0` resolves here to the sink the line should be
+/// drawn to; what `in0` *means* is the computation's business, and
+/// [`tcslibgs::graph::terminals::terminal_at`] is what the checking asks.
+pub fn terminal_for(node_type: &str, named: Option<&str>, sink: bool) -> Option<&'static str> {
+    let terminals = NodeType::ALL
+        .iter()
+        .find(|t| t.spelling() == node_type)?
+        .terminals();
+    let ours = if sink {
+        terminals.sinks
+    } else {
+        terminals.sources
+    };
+
+    if let Some(named) = named {
+        if let Some(found) = ours.iter().find(|terminal| **terminal == named) {
+            return Some(found);
+        }
+    }
+    match ours {
+        [only] => Some(only),
+        _ => {
+            let groundward = if sink { "from_payload" } else { "to_moc" };
+            ours.iter().find(|terminal| **terminal == groundward).copied()
+        }
+    }
+}
+
+/// Where a line joins a node at this terminal, and which way it points there.
+///
+/// The outer edge of the terminal's own box, halfway down it: a line that
+/// stopped at the node's edge beside the box would read as a line that misses
+/// it. The direction is the box's own arrow -- a terminal on the left side
+/// faces left -- which is what makes the line, the arrowhead and the arrow
+/// drawn inside the terminal all say the same thing.
+///
+/// `at` is where the node is. `None` for a type this build does not know, or a
+/// name that is not one of the four.
+pub fn attachment(
+    node_type: &str,
+    at: (i32, i32),
+    terminal: &str,
+) -> Option<((f32, f32), bool)> {
+    let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type)?;
+    let corner = corner_of(terminal)?;
+    let (width, height) = found.appearance().size;
+    let (_, y) = terminal_at(corner, (width, height));
+
+    let edge = if corner.left {
+        at.0 as f32
+    } else {
+        (at.0 + width as i32) as f32
+    };
+    Some((
+        (edge, at.1 as f32 + y as f32 + TERMINAL.1 as f32 / 2.0),
+        corner.rightward,
+    ))
+}
+
+/// The box a terminal is drawn in, relative to the node.
+///
+/// For working out what the pointer was let go of over: a link is drawn from
+/// the terminal that was pressed, and a press grabs the pointer, so the only
+/// thing the release says is where it happened -- and what is there is a
+/// question about these boxes. `None` for a type this build does not know or a
+/// name that is not one of the four.
+pub fn terminal_box(
+    node_type: &str,
+    at: (i32, i32),
+    terminal: &str,
+) -> Option<(f32, f32, f32, f32)> {
+    let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type)?;
+    let corner = corner_of(terminal)?;
+    let (x, y) = terminal_at(corner, found.appearance().size);
+    Some((
+        (at.0 + x) as f32,
+        (at.1 + y) as f32,
+        TERMINAL.0 as f32,
+        TERMINAL.1 as f32,
+    ))
+}
+
 /// How much of a node's width a terminal takes up, with room to spare.
 ///
 /// What the label is padded by on whichever side carries terminals: the name
@@ -504,22 +599,27 @@ impl NodeType {
     /// disagree about what a payload has.
     ///
     /// The rest are the types whose terminals that module calls their own
-    /// business, and they are listed here because the canvas has to draw
-    /// something:
+    /// business. The canvas has to draw something, because a terminal is the
+    /// only thing a link can be dragged from or to -- a node with none drawn
+    /// is a node nothing can be linked to -- and what is drawn is this:
     ///
-    /// * a computation sits in the vehicle and may be on either stream -- the
+    /// * a computation may be on either stream in either direction. The
     ///   readings arrive at it, its result goes to the ground, and the shipped
-    ///   thermostat drives a line with it -- so it is drawn with all four. Its
-    ///   named inputs, `in0` and the rest, are a mean's own affair and are not
-    ///   terminals;
+    ///   thermostat drives a line with it -- so it has all four. Its named
+    ///   inputs, `in0` and the rest, are a mean's own affair and are not
+    ///   terminals: a line dragged to a computation that declares inputs fills
+    ///   the next free one, and no terminal is written;
     /// * a log is written to and read by nobody aboard, so it has the one
-    ///   arriving terminal and no leaving one;
-    /// * a subdiagram is drawn with none. What a page has is what the nodes
-    ///   inside it have, and nothing out here knows that yet -- drawing four
-    ///   would be claiming four.
+    ///   arriving terminal and no leaving one. Nothing can be dragged out of a
+    ///   log, which is the rule the flight software enforces anyway;
+    /// * a page of its own has all four, because what is inside it may have
+    ///   any of them and nothing out here knows which.
     ///
-    /// Returned as two lists in the order a reader meets them, and the canvas
-    /// puts each in its own corner: see `Terminal::corner`.
+    /// What is *drawn* and what is *written* are not the same question. A
+    /// terminal is written into the file only where the type has more than one
+    /// of that kind -- see [`NodeType::must_name`] -- so the file keeps saying
+    /// `{ from: temp_fore, to: moc }`, which is what the schema reads it as
+    /// anyway.
     pub fn terminals(self) -> Terminals {
         // What tcslibgs says, where it says anything.
         if let Some(terminals) = tcslibgs::graph::terminals::terminals_of(self.spelling()) {
@@ -529,22 +629,43 @@ impl NodeType {
             };
         }
         match self {
-            NodeType::Compute => Terminals {
-                sinks: &["from_payload", "from_moc"],
-                sources: &["to_moc", "to_payload"],
-            },
             NodeType::Log => Terminals {
                 sinks: &["from_payload"],
                 sources: &[],
             },
+            // A computation and a page: both ends of both streams.
             _ => Terminals {
-                sinks: &[],
-                sources: &[],
+                sinks: &["from_payload", "from_moc"],
+                sources: &["to_moc", "to_payload"],
             },
         }
     }
 
-    /// Which family this type belongs to.
+    /// Whether a link leaving or arriving here has to say which terminal.
+    ///
+    /// Only where the type has more than one of that kind, which is the
+    /// schema's own rule for what a link end may leave unwritten -- and the
+    /// rule that keeps the editor from writing a name into every link in every
+    /// file it saves. `sink` says which end: `true` for where data arrives.
+    ///
+    /// Asked of the schema's table and not of [`NodeType::terminals`], because
+    /// the two differ on purpose: the canvas draws four terminals on a
+    /// computation so that a line can be dragged to one, and what a
+    /// computation's sinks *are* is the computation's business -- a name
+    /// written on one would be a name the checking reads as an input.
+    pub fn must_name(self, sink: bool) -> bool {
+        tcslibgs::graph::terminals::terminals_of(self.spelling())
+            .map(|terminals| {
+                if sink {
+                    terminals.sinks.len()
+                } else {
+                    terminals.sources.len()
+                }
+            })
+            .is_some_and(|how_many| how_many > 1)
+    }
+
+    /// Which family this type belongs to.    /// Which family this type belongs to.
     ///
     /// The families are the shape grammar: square corners are hardware,
     /// rounded are software aboard, a circle is an end of the graph, a keyed
@@ -951,60 +1072,107 @@ mod tests {
 
     /// The types the schema leaves open are drawn as what they are.
     ///
-    /// A log is written to and leaves nothing; a page's terminals are whatever
-    /// is inside it, which nothing out here knows, so it claims none.
+    /// Every one of them has something to drag a link from or to, because a
+    /// terminal is now the only thing a link can be dragged from or to: a node
+    /// drawn without one is a node nothing can be linked to. A log is the
+    /// exception that proves it -- nothing is read from a log, so it has no
+    /// data source and nothing can be dragged out of it, which is the rule the
+    /// flight software enforces anyway.
     #[test]
-    fn a_log_only_receives_and_a_page_claims_nothing() {
+    fn every_type_has_something_to_link_to() {
+        for t in NodeType::ALL {
+            assert!(
+                !t.terminals().sinks.is_empty() || !t.terminals().sources.is_empty(),
+                "{} has no terminal, so nothing can be linked to it",
+                t.spelling()
+            );
+        }
+
         assert!(NodeType::Log.terminals().has("from_payload"));
-        assert!(NodeType::Log.terminals().sources.is_empty());
-        assert_eq!(NodeType::Subdiagram.terminals().each().count(), 0);
-        // A computation may be on either stream: readings in, a result to the
-        // ground, a line driven with it.
-        assert_eq!(NodeType::Compute.terminals().each().count(), 4);
-    }
-
-    /// The four terminals land in four corners, and clear each other.
-    ///
-    /// On the shortest node there is, which is where they would collide if
-    /// they were going to: two rows of ten pixels and the name between them.
-    #[test]
-    fn the_terminals_of_a_node_do_not_overlap() {
-        let shortest = NodeType::ALL
-            .iter()
-            .map(|t| t.appearance().size)
-            .min_by_key(|(_, height)| *height)
-            .expect("a type");
-
-        let mut boxes = Vec::new();
-        for terminal in ["from_moc", "to_payload", "from_payload", "to_moc"] {
-            let corner = corner_of(terminal).expect("a corner");
-            let (x, y) = terminal_at(corner, shortest);
-            assert!(x >= 0 && y >= 0, "{terminal} at {x},{y}");
-            // Inside the node, which is where a link may be attached to it.
-            assert!(x + TERMINAL.0 as i32 <= shortest.0 as i32, "{terminal}");
-            assert!(y + TERMINAL.1 as i32 <= shortest.1 as i32, "{terminal}");
-            boxes.push((terminal, x, y));
-        }
-
-        for (i, (one, x, y)) in boxes.iter().enumerate() {
-            for (two, other_x, other_y) in &boxes[i + 1..] {
-                let apart = (x - other_x).unsigned_abs() >= TERMINAL.0
-                    || (y - other_y).unsigned_abs() >= TERMINAL.1;
-                assert!(apart, "{one} and {two} overlap");
-            }
-        }
-
-        // And the name has room between them: the label is padded by a
-        // terminal column on each side that carries one.
-        let left = TERMINAL_COLUMN as i32;
         assert!(
-            WIDTH as i32 - 2 * left > 80,
-            "a name between two terminal columns has {} pixels",
-            WIDTH as i32 - 2 * left
+            NodeType::Log.terminals().sources.is_empty(),
+            "nothing is read from a log"
         );
+        // A computation may be on either stream in either direction, and so
+        // may a page: what is inside a page may have any of the four.
+        assert_eq!(NodeType::Compute.terminals().each().count(), 4);
+        assert_eq!(NodeType::Subdiagram.terminals().each().count(), 4);
     }
 
-    /// Red is not in the palette at all.
+    /// A terminal is written into a file only where it has to be.
+    ///
+    /// Which is the `null` node and nothing else: every other type has one
+    /// data source and one data sink at most, and the schema reads an unnamed
+    /// end as that one. So the editor keeps writing `{ from: temp_fore, to:
+    /// moc }`, and a file saved by it does not grow a terminal on every link.
+    #[test]
+    fn a_terminal_is_written_only_where_it_says_which() {
+        assert!(NodeType::Null.must_name(true));
+        assert!(NodeType::Null.must_name(false));
+        for t in NodeType::ALL.iter().filter(|t| **t != NodeType::Null) {
+            assert!(!t.must_name(true), "{}", t.spelling());
+            assert!(!t.must_name(false), "{}", t.spelling());
+        }
+    }
+
+    /// Which terminal a line is drawn to, where the link does not say.
+    #[test]
+    fn a_line_is_drawn_to_the_terminal_the_link_means() {
+        // Named, and the type has it.
+        assert_eq!(
+            terminal_for("null", Some("from_moc"), true),
+            Some("from_moc")
+        );
+        // Named, and the type has not: a computation's own input, which is
+        // not a terminal. The groundward sink is where readings arrive.
+        assert_eq!(
+            terminal_for("compute", Some("in0"), true),
+            Some("from_payload")
+        );
+        // Nothing named, and one of that kind: the one.
+        assert_eq!(terminal_for("i2c", None, false), Some("to_moc"));
+        assert_eq!(terminal_for("moc", None, true), Some("from_payload"));
+        // Nothing named and two of that kind: the groundward one, which is
+        // what a node does unless the file says otherwise. The checking
+        // refuses such a file; the canvas still has to draw it.
+        assert_eq!(terminal_for("null", None, false), Some("to_moc"));
+        assert_eq!(terminal_for("null", None, true), Some("from_payload"));
+        // Nothing to read from a log, and nothing known about a type this
+        // build does not have.
+        assert_eq!(terminal_for("log", None, false), None);
+        assert_eq!(terminal_for("contraption", None, true), None);
+    }
+
+    /// A line joins a node at the outer edge of the terminal's own box.
+    #[test]
+    fn a_line_joins_a_node_at_its_terminals_edge() {
+        let (width, height) = NodeType::I2c.appearance().size;
+        let at = (400, 200);
+
+        // The groundward pair of a payload, both on its left: the readings
+        // leave at the bottom going left, what asks for them arrives at the
+        // top going right.
+        let ((x, y), rightward) = attachment("i2c", at, "to_moc").expect("a payload");
+        assert_eq!(x, at.0 as f32, "a terminal on the left joins the left edge");
+        assert!(!rightward, "the readings leave towards the ground");
+        assert!(y > at.1 as f32 + height as f32 / 2.0, "the lower corner");
+
+        let ((_, top), rightward) = attachment("i2c", at, "from_moc").expect("a payload");
+        assert!(rightward && top < y, "what asks arrives at the upper corner");
+
+        // And the ground link's pair, both on its right.
+        let ((x, _), _) = attachment("moc", at, "from_payload").expect("the ground");
+        let (moc_width, _) = NodeType::Moc.appearance().size;
+        assert_eq!(x, (at.0 + moc_width as i32) as f32);
+
+        // A terminal a node does not have is not a place to join it, and
+        // neither is a name that is not a terminal at all.
+        assert_eq!(attachment("i2c", at, "in0"), None);
+        assert_eq!(attachment("contraption", at, "to_moc"), None);
+        let _ = width;
+    }
+
+    /// Red is not in the palette at all.    /// Red is not in the palette at all.
     ///
     /// Checked against the names rather than against values, because the
     /// palette holds meanings and the window holds the colours: a `Tint` that

@@ -1165,7 +1165,14 @@ impl Document {
                     out.push_str(&format!("    <!-- {} -->\n", escape(line)));
                 }
             }
-            let from = Qualified::parse(&link.from).written_from(home);
+            // The terminal after a dot, as the YAML writer does it: one file
+            // shape in two spellings.
+            let from = match &link.origin {
+                Some(origin) => {
+                    format!("{}.{origin}", Qualified::parse(&link.from).written_from(home))
+                }
+                None => Qualified::parse(&link.from).written_from(home),
+            };
             let to = Qualified::parse(&link.to).written_from(home);
             out.push_str("    <links>\n");
             out.push_str(&format!("        <from>{}</from>\n", escape(&from)));
@@ -1323,7 +1330,16 @@ impl Document {
                     out.push_str(&format!("  # {line}\n"));
                 }
             }
-            let from = Qualified::parse(&link.from).written_from(home);
+            // Each end as the file writes it: the node, and the terminal
+            // after a dot where the link names one. A node with one data
+            // source and one data sink needs neither, which is every type but
+            // the `null` node -- see tcslibgs::graph::terminals.
+            let from = match &link.origin {
+                Some(origin) => {
+                    format!("{}.{origin}", Qualified::parse(&link.from).written_from(home))
+                }
+                None => Qualified::parse(&link.from).written_from(home),
+            };
             let to = Qualified::parse(&link.to).written_from(home);
             match &link.input {
                 Some(input) => out.push_str(&format!(

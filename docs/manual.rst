@@ -142,6 +142,13 @@ terminal
     gives it, every payload's telemetry arriving at the ground on its own
     socket.
 
+    Each terminal may be linked to one other: a ``to_moc`` to a
+    ``from_payload``, a ``from_payload`` to a ``to_moc``, a ``to_payload`` to a
+    ``from_moc``, a ``from_moc`` to a ``to_payload``. Anything else would carry
+    one stream into the other. In tcsgui the terminals are drawn as small
+    boxes in a node's corners, each with an arrow in it, and a link is made by
+    dragging from one to another -- a drag that does not pair makes nothing.
+
 ``null`` node
     A vehicle node that carries both streams through and does nothing to what
     passes. It is the one type with all four terminals.

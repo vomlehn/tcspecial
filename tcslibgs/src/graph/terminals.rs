@@ -69,6 +69,35 @@ pub fn stream_of(terminal: &str) -> Option<(bool, Stream)> {
         .map(|(_, sink, stream)| (*sink, *stream))
 }
 
+/// The terminal at the other end of this one's stream.
+///
+/// The pairing, as four sentences: a `to_moc` may only be linked to a
+/// `from_payload`, a `from_payload` only to a `to_moc`, a `to_payload` only to
+/// a `from_moc`, and a `from_moc` only to a `to_payload`. Which is one
+/// sentence twice over -- a stream leaves at one terminal and arrives at the
+/// other -- and that is why it is derived from [`KNOWN`] rather than written
+/// out again: the two halves of the table cannot drift apart.
+///
+/// `None` for a name that is not one of the four, which is a computation's own
+/// input: what may be linked to one of those is the computation's business.
+pub fn answers(terminal: &str) -> Option<&'static str> {
+    let (sink, stream) = stream_of(terminal)?;
+    KNOWN
+        .iter()
+        .find(|(_, theirs, carries)| *carries == stream && *theirs != sink)
+        .map(|(name, _, _)| *name)
+}
+
+/// Whether a link may leave by one terminal and arrive at the other.
+///
+/// Both ends of one stream, the source end and the sink end. Used by the
+/// checking, which refuses a configuration that says otherwise, and by the
+/// editor, which will not draw one in the first place: a gesture that cannot
+/// make a bad link is better than a bad link reported after the fact.
+pub fn pairs_with(leaves: &str, arrives: &str) -> bool {
+    answers(leaves) == Some(arrives) && stream_of(leaves).is_some_and(|(sink, _)| !sink)
+}
+
 /// A node type's data sinks and data sources, by name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Terminals {
@@ -258,6 +287,42 @@ mod tests {
                 .collect();
             assert_eq!(ends.len(), 2, "{}", stream.label());
             assert!(ends.contains(&true) && ends.contains(&false));
+        }
+    }
+
+    /// Each terminal may be linked to exactly one other, and which.
+    ///
+    /// The four sentences the editor is held to: a `to_moc` to a
+    /// `from_payload`, a `from_payload` to a `to_moc`, a `to_payload` to a
+    /// `from_moc`, a `from_moc` to a `to_payload`. Anything else is a link
+    /// that would carry one stream into the other.
+    #[test]
+    fn a_terminal_may_be_linked_to_one_other_terminal() {
+        assert_eq!(answers("to_moc"), Some("from_payload"));
+        assert_eq!(answers("from_payload"), Some("to_moc"));
+        assert_eq!(answers("to_payload"), Some("from_moc"));
+        assert_eq!(answers("from_moc"), Some("to_payload"));
+        assert_eq!(answers("in0"), None);
+
+        // And the pairing is from the source end to the sink end: a link
+        // leaves one and arrives at the other, so the same two names the
+        // other way about is a link drawn backwards.
+        assert!(pairs_with("to_moc", "from_payload"));
+        assert!(!pairs_with("from_payload", "to_moc"));
+        assert!(pairs_with("to_payload", "from_moc"));
+        assert!(!pairs_with("from_moc", "to_payload"));
+
+        // Nothing else pairs with anything: the two streams never meet.
+        let every = ["to_moc", "from_payload", "to_payload", "from_moc"];
+        for leaves in every {
+            for arrives in every {
+                assert_eq!(
+                    pairs_with(leaves, arrives),
+                    answers(leaves) == Some(arrives)
+                        && !stream_of(leaves).expect("one of the four").0,
+                    "{leaves} to {arrives}"
+                );
+            }
         }
     }
 

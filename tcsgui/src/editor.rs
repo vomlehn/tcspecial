@@ -592,6 +592,98 @@ links:
         assert!(editor.document().simulator.is_some());
     }
 
+    /// A setting typed into a simulated payload reaches the simulator's file.
+    ///
+    /// The whole path, because every piece of it was in place and nothing came
+    /// out the other end: the edit, the document, and the file the editor
+    /// writes on every edit. A session that showed the fields and wrote a file
+    /// with nothing in it is what this exists to catch.
+    #[test]
+    fn a_simulated_payloads_setting_reaches_the_file() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let sim = where_.path().join("vehiclesim.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\nnodes:\n  - name: payload\n    type: network\n",
+        )
+        .expect("a configuration");
+
+        let mut editor = Editor::open(
+            &path,
+            crate::pane::divider_for(crate::settings::DEFAULT),
+        );
+        editor.open_simulator(&sim);
+        assert!(editor.document().simulator.is_some(), "the session has one");
+
+        editor.edit(Edit::SetSimPayload {
+            payload: "payload".to_string(),
+            setting: "packet_interval_ms".to_string(),
+            was: None,
+            now: Some("1000".to_string()),
+        });
+
+        let written = std::fs::read_to_string(&sim).expect("the simulator file");
+        assert!(
+            written.contains("packet_interval_ms: 1000"),
+            "the setting did not reach the file: {written}"
+        );
+    }
+
+    /// A session given a simulator configuration writes a form, whether or
+    /// not anything has been typed into it.
+    ///
+    /// What the file said before was `version: "1.0"` and nothing else, so a
+    /// reader of it could not tell which payloads there were to configure or
+    /// what could be said about them. Every payload of the configuration and
+    /// every setting of a payload, empty until somebody fills one in.
+    #[test]
+    fn a_new_simulator_configuration_is_written_as_a_form() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let sim = where_.path().join("vehiclesim.yaml");
+        // Two payloads and something that is not one: a computation has
+        // nothing standing in for it, so it has no settings to offer.
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\nnodes:\n  - name: sensor\n    type: i2c\n  \
+             - name: payload\n    type: network\n  - name: mean\n    type: compute\n",
+        )
+        .expect("a configuration");
+
+        let mut editor = Editor::open(
+            &path,
+            crate::pane::divider_for(crate::settings::DEFAULT),
+        );
+        editor.open_simulator(&sim);
+        // One edit, so that the files are written: the editor writes on every
+        // edit, and this one is about the configuration rather than the
+        // simulator.
+        editor.edit(Edit::SetNodeComment {
+            node: "sensor".to_string(),
+            was: None,
+            now: Some("the forward bulkhead".to_string()),
+        });
+
+        let written = std::fs::read_to_string(&sim).expect("the simulator file");
+        for payload in ["sensor", "payload"] {
+            assert!(written.contains(&format!("name: \"{payload}\"")), "{written}");
+        }
+        assert!(
+            !written.contains("mean"),
+            "a computation is not simulated: {written}"
+        );
+        // And every setting a payload may state, written empty.
+        for setting in ["group", "packet_interval_ms", "drop_percent", "close_after"] {
+            assert!(written.contains(&format!("{setting}: \"\"")), "{setting}: {written}");
+        }
+
+        // The form loads: an empty setting is one not stated, so a file
+        // nobody has filled in is still a file the simulator can read.
+        tcslibgs::sim_config::SimConfigFile::load(&sim)
+            .expect("the simulator should read the form the editor wrote");
+    }
+
     /// A simulator configuration has to be named `.yaml`, and a name that is
     /// not is refused with nothing opened for it.
     ///
@@ -954,3 +1046,4 @@ links:
         );
     }
 }
+

@@ -1028,7 +1028,20 @@ impl Document {
         // -- see `sim::must_be_yaml` -- so there is one spelling of it and
         // nothing here to choose between.
         if let Some(simulator) = &self.simulator {
-            written.push((simulator.path.clone(), crate::sim::to_yaml(simulator)));
+            // The configuration's own payloads, in its order, because it is
+            // what decides which payloads there are to simulate: a file
+            // written from the simulator's entries alone would say nothing
+            // about a payload nobody had typed a setting for yet.
+            let payloads: Vec<String> = self
+                .nodes
+                .iter()
+                .filter(|node| crate::pane::is_payload(&node.node_type))
+                .map(|node| node.name.clone())
+                .collect();
+            written.push((
+                simulator.path.clone(),
+                crate::sim::to_yaml(simulator, &payloads),
+            ));
         }
         Ok(written)
     }

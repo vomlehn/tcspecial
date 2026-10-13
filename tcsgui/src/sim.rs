@@ -182,35 +182,70 @@ pub fn read(path: &Path) -> Result<Simulator, String> {
 }
 
 /// The simulator configuration as YAML.
-pub fn to_yaml(simulator: &Simulator) -> String {
+///
+/// A form, not a summary. Every payload the configuration has gets an entry
+/// and every entry gets every setting, written empty where nobody has filled
+/// it in -- so the file read on its own says what there is to configure
+/// instead of saying nothing until something has been typed. The simulator's
+/// own reader takes a setting written empty as a setting not stated, which is
+/// what makes a half-filled form a file that still loads: see
+/// `tcslibgs::sim_config`.
+///
+/// `payloads` is the configuration's payload nodes, in the order the
+/// configuration describes them, because it is the configuration that decides
+/// which payloads there are to simulate. An entry the simulator file holds for
+/// a name that is not among them is written out too, after them: it is
+/// somebody's typing, and `tcsverify` is what says a simulated payload names
+/// no payload.
+pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
     let mut out = String::new();
     out.push_str("version: \"1.0\"\n");
     if let Some(description) = &simulator.description {
         out.push_str(&format!("description: {}\n", quoted(description)));
     }
 
-    for (section, entries) in [
-        ("simulated_payload_groups", &simulator.groups),
-        ("simulated_payloads", &simulator.payloads),
+    // Each payload of the configuration, then whatever the file holds for a
+    // name that is not one.
+    let mut named: Vec<&String> = payloads.iter().collect();
+    named.extend(
+        simulator
+            .payloads
+            .keys()
+            .filter(|name| !payloads.contains(name)),
+    );
+
+    let empty = Settings::new();
+    let groups: Vec<(&String, &Settings)> = simulator.groups.iter().collect();
+    let payloads: Vec<(&String, &Settings)> = named
+        .into_iter()
+        .map(|name| (name, simulator.payloads.get(name).unwrap_or(&empty)))
+        .collect();
+
+    for (section, entries, payload) in [
+        ("simulated_payload_groups", groups, false),
+        ("simulated_payloads", payloads, true),
     ] {
-        let entries: Vec<(&String, &Settings)> = entries
-            .iter()
-            .filter(|(_, said)| said.values().any(|value| !value.trim().is_empty()))
-            .collect();
         if entries.is_empty() {
             continue;
         }
         out.push_str(&format!("\n{section}:\n"));
         for (name, said) in entries {
             out.push_str(&format!("  - name: {}\n", quoted(name)));
-            for (setting, value) in said {
-                // A setting somebody cleared is left out rather than written
-                // empty, as everything else the editor writes is: absent is
-                // what the simulator's own reader means by "not stated".
-                if value.trim().is_empty() {
-                    continue;
-                }
-                out.push_str(&format!("    {setting}: {}\n", quoted(value)));
+            // Every setting this kind of entry may state, in the order the
+            // window offers them, and then anything the file carried that
+            // this build does not know about -- which is kept for the reason
+            // the window shows it: a line nobody can see is a line that gets
+            // written back out without anybody knowing it is there.
+            let mut settings: Vec<&str> = Simulator::fields(payload);
+            let theirs: Vec<&str> = said
+                .keys()
+                .map(String::as_str)
+                .filter(|setting| !settings.contains(setting))
+                .collect();
+            settings.extend(theirs);
+            for setting in settings {
+                let value = said.get(setting).map(String::as_str).unwrap_or("");
+                out.push_str(&format!("    {setting}: {}\n", quoted(value.trim())));
             }
         }
     }
@@ -282,16 +317,32 @@ mod tests {
                 .collect(),
             );
 
-            std::fs::write(&path, to_yaml(&simulator)).expect("written");
+            let payloads = vec!["payload".to_string()];
+            std::fs::write(&path, to_yaml(&simulator, &payloads)).expect("written");
             let read_back = read(&path).expect("read back");
 
             assert_eq!(read_back.description, simulator.description, "{extension}");
-            assert_eq!(read_back.groups, simulator.groups, "{extension}");
-            // Everything but the setting that was cleared, which is left out
-            // of the file as everything else the editor clears is.
-            let mut expected = simulator.payloads.clone();
-            expected.get_mut("payload").unwrap().remove("jitter_ms");
-            assert_eq!(read_back.payloads, expected, "{extension}");
+            // The file is a form: every setting of every entry is written,
+            // empty where nobody has filled it in, so what comes back is what
+            // went in plus the blanks.
+            for (name, said) in &simulator.groups {
+                let back = read_back.groups.get(name).expect("the group");
+                for (setting, value) in said {
+                    assert_eq!(back.get(setting), Some(value), "{extension} {setting}");
+                }
+            }
+            let back = read_back.payloads.get("payload").expect("the payload");
+            for (setting, value) in &simulator.payloads["payload"] {
+                assert_eq!(back.get(setting), Some(value), "{extension} {setting}");
+            }
+            // Including the one that was cleared, which comes back empty: the
+            // simulator's own reader takes a setting written empty as a
+            // setting not stated, so a blank in the form is not a value.
+            assert_eq!(back.get("jitter_ms").map(String::as_str), Some(""));
+            assert!(
+                back.contains_key("segment_size"),
+                "{extension}: every setting is offered, filled in or not"
+            );
         }
     }
 
@@ -330,7 +381,8 @@ mod tests {
                 .collect(),
         );
 
-        std::fs::write(&path, to_yaml(&simulator)).expect("written");
+        let payloads = vec!["payload".to_string()];
+        std::fs::write(&path, to_yaml(&simulator, &payloads)).expect("written");
         let theirs = tcslibgs::sim_config::SimConfigFile::load(&path)
             .expect("the simulator should read what the editor wrote");
         assert_eq!(theirs.simulated_payloads.len(), 1);
@@ -371,7 +423,8 @@ mod tests {
             simulator.payloads["payload"].get("future_thing").map(String::as_str),
             Some("7")
         );
-        assert!(to_yaml(&simulator).contains("future_thing"));
+        let payloads = vec!["payload".to_string()];
+        assert!(to_yaml(&simulator, &payloads).contains("future_thing"));
     }
 
     /// Every field a window offers is a setting, and the group is one of them

@@ -1161,6 +1161,30 @@ there is no second file rather than hidden -- a menu whose entries come and go
 is a menu nobody learns.
 
 Requirement
+    The simulator configuration is written as a form: every payload the
+    configuration has gets an entry, and every entry gets every setting,
+    written empty where nobody has filled it in. A file holding nothing but
+    its version said nothing about which payloads there were to configure or
+    what could be said about them, which is what somebody opening it wanted to
+    know.
+
+    Which payloads there are is the configuration's to say, so the entries are
+    its payload nodes in its own order -- a computation, a log and the ground
+    link are not simulated and get none. An entry the file already held for a
+    name that is not a payload is written out after them: it is somebody's
+    typing, and ``tcsverify`` is what says a simulated payload names no
+    payload.
+
+Requirement
+    The simulator's own reader takes a setting written empty as a setting not
+    stated. Without that the form would be a file written to be rejected: an
+    empty numeric setting was a type error, so a half-filled form could not be
+    loaded at all. It is the rule the editor already states for every field it
+    offers -- absent and empty are one thing to the checking, and a cleared
+    field is not an answer -- and a value that is there and wrong is still
+    refused, naming it.
+
+Requirement
     That second file is YAML, and its name has to end in ``.yaml``. A name
     that does not is refused on the command line, naming the file and saying
     what is wanted, and the session does not start. A simulator configuration

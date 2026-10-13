@@ -1117,6 +1117,13 @@ often it produces a packet, and how it divides one into segments. Only tcssim
 acts on it; tcsmoc reads it too, to show what the tcssim it started is
 simulating, and does without it if it is not there.
 
+Every setting is optional, and **a setting written empty is a setting not
+stated**: ``packet_interval_ms: ""`` and no ``packet_interval_ms`` at all mean
+the same thing. That is what lets tcsgui write one of these files as a form --
+every payload of the configuration, every setting of a payload, blank until
+somebody fills one in -- and have the file load all the same. A value that is
+there and wrong is still refused, naming it.
+
 .. code-block:: text
 
    simulated_payload_groups        optional

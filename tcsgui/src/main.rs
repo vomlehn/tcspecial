@@ -275,14 +275,25 @@ fn main() -> Result<(), slint::PlatformError> {
         eprintln!(
             "tcsgui: a second file is the simulator's own configuration -- how fast \
              a simulated payload sends and what it does wrong -- and is edited from \
-             the menu"
+             the menu. It is written as YAML, so its name has to end in \".yaml\""
         );
         std::process::exit(2);
     });
     // The simulator's configuration, where one was named. A second argument
     // and not a name derived from the first: the shipped sets call it after
     // the configuration with `sim` on the end, and nothing requires that.
+    //
+    // Refused here rather than reported in the window when the name is not a
+    // YAML one: it is the command line that is wrong, the window would be
+    // showing a session with half of what was asked for, and the remedy is to
+    // type the name again. See `sim::must_be_yaml`.
     let simulator = std::env::args().nth(2);
+    if let Some(simulator) = &simulator {
+        if let Err(why) = sim::must_be_yaml(std::path::Path::new(simulator)) {
+            eprintln!("tcsgui: {why}");
+            std::process::exit(2);
+        }
+    }
 
     // How the canvas was divided when the editor was last used, which is a
     // preference and not part of the configuration: see settings.rs. Reading

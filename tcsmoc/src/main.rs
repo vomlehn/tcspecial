@@ -2944,7 +2944,7 @@ mod tests {
 
         // What the set itself says, which is what tcspecial will resolve.
         let said = section.expect("the shipped set has a tcspecial section");
-        assert_eq!(mine.group.to_string(), said.beacon_address);
+        assert_eq!(mine.group.to_string(), said.beacon_send);
         assert_eq!(mine.interface.to_string(), said.beacon_interface);
 
         // And it is a group, which is what makes more than one ground station

@@ -40,13 +40,13 @@ use crate::types::{default_log_segment_bytes, CIConfigJson};
 /// Required ones first, so a panel built from this asks for what it must have
 /// before what it may.
 pub const ATTRIBUTES: &[(&str, bool)] = &[
-    ("tcspecial_command", true),
-    ("moc_command", true),
+    ("tcs_cmd_recv", true),
+    ("moc_cmd_send", true),
     ("payload_interface", true),
-    ("tcspecial_tc_base", true),
+    ("tcs_tc_base", true),
     ("moc_tc_base", true),
     ("beacon_interval_ms", true),
-    ("beacon_address", true),
+    ("beacon_send", true),
     ("beacon_interface", true),
     ("log_dir", false),
     ("log_segment_bytes", false),
@@ -91,13 +91,13 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
     };
 
     Ok(CIConfigJson {
-        tcspecial_command: text("tcspecial_command")?,
-        moc_command: text("moc_command")?,
+        tcs_cmd_recv: text("tcs_cmd_recv")?,
+        moc_cmd_send: text("moc_cmd_send")?,
         payload_interface: text("payload_interface")?,
-        tcspecial_tc_base: text("tcspecial_tc_base")?,
+        tcs_tc_base: text("tcs_tc_base")?,
         moc_tc_base: text("moc_tc_base")?,
         beacon_interval_ms: number("beacon_interval_ms")?,
-        beacon_address: text("beacon_address")?,
+        beacon_send: text("beacon_send")?,
         beacon_interface: text("beacon_interface")?,
         // Absent is "run without a telemetry log", which is a configuration
         // somebody may mean: a vehicle with no writable storage.
@@ -140,13 +140,13 @@ mod tests {
 
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("tcspecial_command", "0.0.0.0:4000"),
-            ("moc_command", "127.0.0.1:4100"),
+            ("tcs_cmd_recv", "0.0.0.0:4000"),
+            ("moc_cmd_send", "127.0.0.1:4100"),
             ("payload_interface", "0.0.0.0:4001"),
-            ("tcspecial_tc_base", "0.0.0.0:6000"),
+            ("tcs_tc_base", "0.0.0.0:6000"),
             ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
-            ("beacon_address", "239.255.0.1:5550"),
+            ("beacon_send", "239.255.0.1:5550"),
             ("beacon_interface", "127.0.0.1"),
             ("log_dir", "/var/log/tcspecial"),
             ("log_segment_bytes", "65536"),
@@ -158,11 +158,11 @@ mod tests {
     #[test]
     fn a_whole_section_is_what_the_command_interpreter_takes() {
         let config = ci_config_of(&said(&whole())).expect("this one is complete");
-        assert_eq!(config.tcspecial_command, "0.0.0.0:4000");
-        assert_eq!(config.moc_command, "127.0.0.1:4100");
+        assert_eq!(config.tcs_cmd_recv, "0.0.0.0:4000");
+        assert_eq!(config.moc_cmd_send, "127.0.0.1:4100");
         assert_eq!(config.payload_interface, "0.0.0.0:4001");
         assert_eq!(config.beacon_interval_ms, 5000);
-        assert_eq!(config.beacon_address, "239.255.0.1:5550");
+        assert_eq!(config.beacon_send, "239.255.0.1:5550");
         assert_eq!(config.log_dir.as_deref(), Some("/var/log/tcspecial"));
         assert_eq!(config.log_segment_bytes, 65536);
 
@@ -172,9 +172,9 @@ mod tests {
         let settled = config.to_ci_config().expect("and sound");
         assert_eq!(settled.address, "0.0.0.0");
         assert_eq!(settled.port, 4000);
-        assert_eq!(settled.moc_command.to_string(), "127.0.0.1:4100");
+        assert_eq!(settled.moc_cmd_send.to_string(), "127.0.0.1:4100");
         // And the bases, which are counted on by a payload's own id.
-        assert_eq!(settled.tcspecial_tc_base.at(0).unwrap().port, 6000);
+        assert_eq!(settled.tcs_tc_base.at(0).unwrap().port, 6000);
         assert_eq!(settled.moc_tc_base.at(3).unwrap().port, 6103);
     }
 
@@ -207,11 +207,11 @@ mod tests {
     #[test]
     fn an_empty_attribute_is_a_missing_one() {
         let mut cleared = whole();
-        cleared.retain(|(name, _)| *name != "tcspecial_command");
-        cleared.push(("tcspecial_command", "   "));
+        cleared.retain(|(name, _)| *name != "tcs_cmd_recv");
+        cleared.push(("tcs_cmd_recv", "   "));
         let why = ci_config_of(&said(&cleared))
             .expect_err("an empty command interface is none");
-        assert!(why.contains("tcspecial_command"), "{why}");
+        assert!(why.contains("tcs_cmd_recv"), "{why}");
     }
 
     /// A command interface is an address and a port, and says so when it is
@@ -224,7 +224,7 @@ mod tests {
     fn a_command_interface_is_an_address_and_a_port() {
         use crate::types::host_port_of;
 
-        let said = |text: &str| host_port_of("tcspecial_command", text);
+        let said = |text: &str| host_port_of("tcs_cmd_recv", text);
 
         let one = said("0.0.0.0:4000").expect("a plain one");
         assert_eq!((one.address.as_str(), one.port), ("0.0.0.0", 4000));
@@ -257,7 +257,7 @@ mod tests {
             assert!(why.contains(expected), "{said_} was refused as {why:?}");
             // Every complaint names the attribute, there being four of these
             // in one section.
-            assert!(why.contains("tcspecial_command"), "{why}");
+            assert!(why.contains("tcs_cmd_recv"), "{why}");
         }
     }
 
@@ -286,8 +286,8 @@ mod tests {
             ("payload_interface", "0.0.0.0:0", "port 0"),
             ("payload_interface", "0.0.0.0:70000", "not a port"),
             ("payload_interface", "0.0.0.0", "address:port"),
-            ("moc_command", "nowhere", "address:port"),
-            ("tcspecial_tc_base", ":6000", "states no address"),
+            ("moc_cmd_send", "nowhere", "address:port"),
+            ("tcs_tc_base", ":6000", "states no address"),
         ] {
             let mut wrong = whole();
             wrong.retain(|(had, _)| *had != name);
@@ -314,7 +314,7 @@ mod tests {
         assert!(why.contains("beacon_adress"), "{why}");
         // And the complaint lists what there is, so the typo can be fixed
         // without opening the manual.
-        assert!(why.contains("beacon_address"), "{why}");
+        assert!(why.contains("beacon_send"), "{why}");
     }
 
     /// What a configuration being started is given, and what it is not.

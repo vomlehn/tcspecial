@@ -89,7 +89,7 @@ fn main() {
             process::exit(1);
         }
     };
-    tcspecial_config.beacon_address = beacon.group;
+    tcspecial_config.beacon_send = beacon.group;
     tcspecial_config.beacon_interface = beacon.interface;
 
     // On stderr rather than through the log, and before the bind: these are

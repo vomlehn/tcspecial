@@ -212,11 +212,11 @@ mod tests {
                 address: "0.0.0.0".to_string(),
                 port: 0,
             },
-            moc_command: tcslibgs::HostPort {
+            moc_cmd_send: tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 4100,
             },
-            tcspecial_tc_base: tcslibgs::HostPort {
+            tcs_tc_base: tcslibgs::HostPort {
                 address: "0.0.0.0".to_string(),
                 port: 6000,
             },
@@ -225,7 +225,7 @@ mod tests {
                 port: 6100,
             },
             beacon_interval: BeaconTime(50),
-            beacon_address: at,
+            beacon_send: at,
             beacon_interface: std::net::Ipv4Addr::LOCALHOST,
             // Nothing to write: what is being tested is what goes out.
             log_dir: None,

@@ -339,10 +339,11 @@ pub struct CommandInterpreter {
     /// Config command can retime it.
     beacon: Option<BeaconSend>,
     beacon_interval: BeaconTime,
-    /// Where beacons go, as the configuration said: the multicast group and
-    /// the interface to send it on.
-    beacon_send: std::net::SocketAddr,
-    beacon_interface: std::net::Ipv4Addr,
+    /// Where beacons come from, as the configuration said: the address and
+    /// port this binds to send them.
+    beacon_send: tcslibgs::HostPort,
+    /// And where they go, which the ground station binds.
+    beacon_recv: tcslibgs::HostPort,
     _config: CIConfig,
     /// The spacecraft command link: ping, arm, restart, configure.
     socket: UdpSocket,
@@ -581,8 +582,8 @@ impl CommandInterpreter {
 
         Ok(Self {
             beacon_interval: config.beacon_interval,
-            beacon_send: config.beacon_send,
-            beacon_interface: config.beacon_interface,
+            beacon_send: config.beacon_send.clone(),
+            beacon_recv: config.beacon_recv.clone(),
             beacon: None,
             _config: config,
             socket,
@@ -698,8 +699,8 @@ impl CommandInterpreter {
         let mut _last_client_addr: Option<std::net::SocketAddr> = None;
 
         debug!(
-            "beacon group {} on interface {}",
-            self.beacon_send, self.beacon_interface
+            "beacons from {} to {}",
+            self.beacon_send, self.beacon_recv
         );
         // Beacons go out at the configured interval, and the sender is kept
         // so that a Config command can retime it. It records into the same
@@ -707,8 +708,8 @@ impl CommandInterpreter {
         // went to the ground.
         self.beacon = BeaconSend::new(
             Duration::from_millis(self.beacon_interval.0 as u64),
-            self.beacon_send,
-            self.beacon_interface,
+            self.beacon_send.clone(),
+            self.beacon_recv.clone(),
             self.telemetry_log.clone(),
             self.version,
             self.config_version,
@@ -827,8 +828,11 @@ mod tests {
     /// Port 0 rather than the real one: these interpreters run in a test
     /// process, several at once, and a beacon sent to the port a real tcsmoc
     /// listens on would reach one that happened to be running.
-    fn a_beacon_send() -> std::net::SocketAddr {
-        "239.255.0.1:0".parse().expect("an address")
+    fn a_beacon_send() -> tcslibgs::HostPort {
+        tcslibgs::HostPort {
+            address: "127.0.0.1".to_string(),
+            port: 0,
+        }
     }
 
     #[test]
@@ -856,7 +860,7 @@ mod tests {
             },
             beacon_interval: BeaconTime(5000),
             beacon_send: a_beacon_send(),
-            beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+            beacon_recv: a_beacon_send(),
             log_dir: None,
             log_segment_bytes: 65_536,
         };
@@ -900,7 +904,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -980,7 +984,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -1093,7 +1097,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -1218,7 +1222,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -1314,7 +1318,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -1457,7 +1461,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -1536,7 +1540,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
@@ -1612,7 +1616,7 @@ mod tests {
             },
             beacon_interval: BeaconTime(5000),
             beacon_send: a_beacon_send(),
-            beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+            beacon_recv: a_beacon_send(),
             log_dir: None,
             log_segment_bytes: 65_536,
         };
@@ -1662,7 +1666,7 @@ mod tests {
                 },
                 beacon_interval: BeaconTime(5000),
                 beacon_send: a_beacon_send(),
-                beacon_interface: std::net::Ipv4Addr::LOCALHOST,
+                beacon_recv: a_beacon_send(),
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },

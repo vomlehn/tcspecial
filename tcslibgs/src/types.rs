@@ -1,6 +1,5 @@
 //! Type definitions shared between ground and space software
 
-use std::net::{Ipv4Addr, SocketAddr};
 
 use crate::endpoint_config::{ByteList, Scalar};
 
@@ -2413,30 +2412,6 @@ pub fn default_log_segment_bytes() -> u32 {
     65_536
 }
 
-/// The multicast group beacons are sent to, as a configuration states it.
-///
-/// A beacon is an announcement to whoever is listening: the spacecraft does
-/// not know how many ground stations there are, and a port can be bound once,
-/// so a unicast beacon can reach exactly one listener chosen in advance.
-/// Multicast is the primitive for that -- any number of stations join the
-/// group, and neither end needs the other's address -- and it is a UDP-only
-/// facility, which a beacon already was.
-pub fn beacon_send_of(stated: &str) -> Result<SocketAddr, String> {
-    let address: SocketAddr = stated
-        .parse()
-        .map_err(|e| format!("beacon_send \"{stated}\" is not an address and port: {e}"))?;
-
-    if !address.ip().is_multicast() {
-        return Err(format!(
-            "beacon_send \"{stated}\" is not a multicast group: beacons are sent to \
-             one, so the address is in 224.0.0.0/4 -- 239.0.0.0/8 for a group of local \
-             scope, which is what a mission network wants"
-        ));
-    }
-
-    Ok(address)
-}
-
 /// A host and a port, as one attribute writes them.
 ///
 /// Four of the tcspecial section's attributes are one of these: where tcspecial
@@ -2538,20 +2513,6 @@ pub fn host_port_of(attribute: &str, stated: &str) -> Result<HostPort, String> {
     })
 }
 
-/// The local interface beacons are sent on and listened for on.
-///
-/// Both ends have to name the same one, and on a host with more than one
-/// interface neither can be left to choose: a sender that does not say sends
-/// out the default route, a listener that does not say joins the group on the
-/// default route, and on a machine where those differ -- a laptop with a
-/// wireless interface and a tunnel, say -- not one beacon arrives. Both ends
-/// read this from the same file, which is how they come to agree.
-pub fn beacon_interface_of(stated: &str) -> Result<Ipv4Addr, String> {
-    stated.parse().map_err(|e| {
-        format!("beacon_interface \"{stated}\" is not the address of a local interface: {e}")
-    })
-}
-
 /// The file-level form of the command interpreter's configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CIConfigJson {
@@ -2626,21 +2587,28 @@ pub struct CIConfigJson {
     /// this, so it is the space available for telemetry records.
     #[serde(default = "default_log_segment_bytes")]
     pub log_segment_bytes: u32,
-    /// The multicast group beacons are sent to, as `address:port`.
+    /// Where beacons originate, as `address:port`.
     ///
-    /// Required, like the interval beside it. Beacons are how the ground
-    /// knows the spacecraft is alive, so where they go and how often is not
-    /// something to be left to a default that a file silently takes: a
-    /// configuration that has not been asked the question has not answered
-    /// it. A payload set's `tcspecial` section states this for the set, and
-    /// the command interpreter's own file states it for a set that has no
-    /// section.
+    /// tcspecial binds this and sends from it. Required, like the interval
+    /// beside it: beacons are how the ground knows the spacecraft is alive, so
+    /// where they come from and where they go is not something to be left to a
+    /// default that a file silently takes. A payload set's `tcspecial` section
+    /// states these for the set, and the command interpreter's own file states
+    /// them for a set that has no section.
     pub beacon_send: String,
-    /// The local interface beacons are sent on and listened for on.
+    /// And where they are received, as `address:port`.
     ///
-    /// Required for the reason the two above are, and one more: a wrong
-    /// interface loses every beacon silently. See [`beacon_interface_of`].
-    pub beacon_interface: String,
+    /// The MOC binds this and tcspecial sends to it. Plain UDP between two
+    /// stated ends.
+    ///
+    /// Beacons went to a multicast group, which bought something real -- any
+    /// number of ground stations could join it and neither end needed the
+    /// other's address -- and cost two things to get right: a group address
+    /// that is nobody's, and an interface attribute saying which wire to join
+    /// it on, whose being wrong lost every beacon silently. One named sender
+    /// and one named listener is what a configuration can state plainly and a
+    /// firewall rule can describe.
+    pub beacon_recv: String,
 }
 
 /// Command interpreter configuration
@@ -2661,15 +2629,16 @@ pub struct CIConfig {
     /// [`CIConfigJson::payload_interface`].
     pub payload_interface: HostPort,
     pub beacon_interval: BeaconTime,
-    /// The multicast group beacons are sent to.
+    /// Where beacons originate: tcspecial binds this and sends from it.
     ///
     /// Settled when the file is read rather than where the beacon is sent,
     /// because a beacon goes out on a timer with nobody to report to: an
-    /// address that is not one, or not a multicast group, has to be refused
-    /// while there is still someone reading the error.
-    pub beacon_send: SocketAddr,
-    /// The local interface beacons are sent on and listened for on.
-    pub beacon_interface: Ipv4Addr,
+    /// address that is not one has to be refused while there is still somebody
+    /// reading the error.
+    pub beacon_send: HostPort,
+    /// And where they are received: the MOC binds this and tcspecial sends to
+    /// it.
+    pub beacon_recv: HostPort,
     /// Directory holding the telemetry log's segment files, or `None` to
     /// run without a telemetry log.
     pub log_dir: Option<String>,
@@ -2688,8 +2657,8 @@ impl CIConfigJson {
             host_port_of("tcs_tc_base", &self.tcs_tc_base)?;
         let moc_tc_base = host_port_of("moc_tc_base", &self.moc_tc_base)?;
 
-        let beacon_send = beacon_send_of(&self.beacon_send)?;
-        let beacon_interface = beacon_interface_of(&self.beacon_interface)?;
+        let beacon_send = host_port_of("beacon_send", &self.beacon_send)?;
+        let beacon_recv = host_port_of("beacon_recv", &self.beacon_recv)?;
 
         // One socket cannot be two links. A file that gave both the same port
         // would describe a split it has not made, and the half of it that
@@ -2719,7 +2688,7 @@ impl CIConfigJson {
             moc_tc_base,
             beacon_interval: BeaconTime(self.beacon_interval_ms),
             beacon_send,
-            beacon_interface,
+            beacon_recv,
             log_dir: self.log_dir.clone(),
             log_segment_bytes: self.log_segment_bytes,
         })
@@ -3234,8 +3203,8 @@ tcspecial:
   tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_send: 239.255.0.1:5550
-  beacon_interface: 127.0.0.1
+  beacon_send: 0.0.0.0:5550
+  beacon_recv: 127.0.0.1:5650
 payloads:
   - name: DH0
     type: device-file
@@ -3302,8 +3271,8 @@ tcspecial:
   tcs_tc_base: 0.0.0.0:65535
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_send: 239.255.0.1:5550
-  beacon_interface: 127.0.0.1
+  beacon_send: 0.0.0.0:5550
+  beacon_recv: 127.0.0.1:5650
 payloads:
   - name: DH0
     type: device-file
@@ -3467,8 +3436,8 @@ payloads:
         let with = |ports: &str| {
             format!(
                 "version: \"1.0\"\ndescription: a set\ntcspecial:\n{ports}  \
-                 beacon_interval_ms: 5000\n  beacon_send: 239.255.0.1:5550\n  \
-                 beacon_interface: 127.0.0.1\npayloads:\n  - \
+                 beacon_interval_ms: 5000\n  beacon_send: 0.0.0.0:5550\n  \
+                 beacon_recv: 127.0.0.1:5650\npayloads:\n  - \
                  name: p\n    type: device-file\n    path: /dev/null\n    \
                  packet_size: 1\n"
             )
@@ -3517,8 +3486,8 @@ payloads:
                  moc_cmd_send: 127.0.0.1:4100\n  tcs_tc_base: 0.0.0.0:6000\n  \
                  moc_tc_base: 127.0.0.1:6100\n  \
                  beacon_interval_ms: 5000\n  \
-                 beacon_send: 239.255.0.1:5550\n  \
-                 beacon_interface: 127.0.0.1\npayloads:\n  - \
+                 beacon_send: 0.0.0.0:5550\n  \
+                 beacon_recv: 127.0.0.1:5650\npayloads:\n  - \
                  name: p\n    type: network\n    protocol: udp\n    \
                  address: localhost\n    port: {port}\n    packet_size: 1\n"
             )
@@ -3774,8 +3743,8 @@ tcspecial:
   tcs_tc_base: localhost:5000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_send: 239.255.0.1:5550
-  beacon_interface: 127.0.0.1
+  beacon_send: 0.0.0.0:5550
+  beacon_recv: 127.0.0.1:5650
 payloads:
   - name: DH0
     packet_size: 12

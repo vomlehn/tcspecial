@@ -58,14 +58,19 @@ moc_tc_base: "127.0.0.1:6100"
 # A payload set's section states them for that set and wins over these. These
 # are what place a set whose tcspecial configuration states no such section.
 #
-# The address is a multicast group, which is what a beacon wants: any number of
-# ground stations join it, and neither end needs the other's address. The
-# interface is the local one both ends use -- 127.0.0.1 because tcsmoc and
-# tcspecial are run on one machine here. Both read it from this file, which is
-# how they come to name the same one; a sender and a listener on different
-# interfaces lose every beacon with nothing to say so.
+# Two addresses, each with a port: beacon_send is where beacons come from,
+# which tcspecial binds, and beacon_recv is where they are received, which the
+# ground station binds and tcspecial sends to. Both read them from this file,
+# which is how the two ends come to name the same pair; a sender and a listener
+# that disagreed would lose every beacon with nothing to say so.
+#
+# It was a multicast group and the name of a local interface to join it on,
+# which bought any number of ground stations listening without being named and
+# cost an attribute whose being wrong lost every beacon in silence. One sender
+# and one receiver, both written down, can be described to a firewall or a
+# capture filter by somebody reading this file.
 beacon_interval_ms: 5000
-beacon_send: "239.255.0.1:5550"
-beacon_interface: "127.0.0.1"
+beacon_send: "0.0.0.0:5550"
+beacon_recv: "127.0.0.1:5650"
 log_dir: telemetry
 log_segment_bytes: 65536

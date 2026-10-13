@@ -410,8 +410,8 @@ tcspecial:
   tcs_tc_base: 0.0.0.0:6000
   moc_tc_base: 127.0.0.1:6100
   beacon_interval_ms: 5000
-  beacon_send: \"239.255.0.1:5550\"
-  beacon_interface: \"127.0.0.1\"
+  beacon_send: \"0.0.0.0:5550\"
+  beacon_recv: \"127.0.0.1:5650\"
 groups:
   - name: temps
     interval: \"3s\"

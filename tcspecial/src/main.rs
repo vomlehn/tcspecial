@@ -89,8 +89,8 @@ fn main() {
             process::exit(1);
         }
     };
-    tcspecial_config.beacon_send = beacon.group;
-    tcspecial_config.beacon_interface = beacon.interface;
+    tcspecial_config.beacon_send = beacon.send.clone();
+    tcspecial_config.beacon_recv = beacon.recv.clone();
 
     // On stderr rather than through the log, and before the bind: these are
     // the addresses the ground has to be pointed at, so they are said whether
@@ -98,13 +98,13 @@ fn main() {
     // one then says.
     eprintln!(
         "Commands are taken on {}:{} and payload commands on {} as {} asked, \
-         and beacons go to the group {} on interface {}",
+         and beacons go from {} to {}",
         tcspecial_config.address,
         tcspecial_config.port,
         tcspecial_config.payload_interface,
         config_path,
-        beacon.group,
-        beacon.interface
+        beacon.send,
+        beacon.recv
     );
 
     // Load configuration

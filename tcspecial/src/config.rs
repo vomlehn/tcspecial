@@ -2,11 +2,8 @@
 
 use std::path::Path;
 
-use std::net::{Ipv4Addr, SocketAddr};
-
 use tcslibgs::{
-    beacon_send_of, beacon_interface_of, load_config_file, CIConfig, CIConfigJson, TcsError,
-    TcsResult,
+    host_port_of, load_config_file, CIConfig, CIConfigJson, HostPort, TcsError, TcsResult,
 };
 
 /// Load tcspecial configuration from a YAML or XML file.
@@ -22,18 +19,18 @@ pub fn load_tcspecial_config<P: AsRef<Path>>(path: P) -> TcsResult<CIConfig> {
     Ok(tcspecial_config)
 }
 
-/// Where a beacon goes and on what interface.
+/// The two ends of the beacon link.
 ///
-/// Both ends of the link resolve this the same way, out of the same two
-/// files, which is the whole point of it being a function: tcspecial sends to
-/// the group on the interface, tcsmoc joins that group on that interface, and
-/// a pair that disagreed would lose every beacon with nothing to show for it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Both ends resolve this the same way, out of the same two files, which is
+/// the whole point of its being a function: tcspecial binds `send` and sends
+/// to `recv`, tcsmoc binds `recv`, and a pair that disagreed would lose every
+/// beacon with nothing to show for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Beacon {
-    /// The multicast group and port.
-    pub group: SocketAddr,
-    /// The local interface to send on, and to join the group on.
-    pub interface: Ipv4Addr,
+    /// Where beacons originate, which tcspecial binds.
+    pub send: HostPort,
+    /// Where they are received, which the MOC binds.
+    pub recv: HostPort,
 }
 
 /// Where beacons go: what the payload set said, or what the command
@@ -46,12 +43,12 @@ pub struct Beacon {
 pub fn beacon(config: &CIConfig, section: Option<&CIConfigJson>) -> Result<Beacon, String> {
     match section {
         Some(section) => Ok(Beacon {
-            group: beacon_send_of(&section.beacon_send)?,
-            interface: beacon_interface_of(&section.beacon_interface)?,
+            send: host_port_of("beacon_send", &section.beacon_send)?,
+            recv: host_port_of("beacon_recv", &section.beacon_recv)?,
         }),
         None => Ok(Beacon {
-            group: config.beacon_send,
-            interface: config.beacon_interface,
+            send: config.beacon_send.clone(),
+            recv: config.beacon_recv.clone(),
         }),
     }
 }
@@ -137,8 +134,8 @@ mod tests {
                         payload_interface: 0.0.0.0:4001\n\
                         tcs_tc_base: 0.0.0.0:6000\n\
                         moc_tc_base: 127.0.0.1:6100\n\
-                        beacon_interval_ms: 5000\nbeacon_send: 239.255.0.1:5550\n\
-                        beacon_interface: 127.0.0.1\n";
+                        beacon_interval_ms: 5000\nbeacon_send: 0.0.0.0:5550\n\
+                        beacon_recv: 127.0.0.1:5650\n";
 
     const XML: &str = "<tcspecial>\
         <tcs_cmd_recv>0.0.0.0:4000</tcs_cmd_recv>\
@@ -147,8 +144,8 @@ mod tests {
         <tcs_tc_base>0.0.0.0:6000</tcs_tc_base>\
         <moc_tc_base>127.0.0.1:6100</moc_tc_base>\
         <beacon_interval_ms>5000</beacon_interval_ms>\
-        <beacon_send>239.255.0.1:5550</beacon_send>\
-        <beacon_interface>127.0.0.1</beacon_interface>\
+        <beacon_send>0.0.0.0:5550</beacon_send>\
+        <beacon_recv>127.0.0.1:5650</beacon_recv>\
         </tcspecial>";
 
     #[test]
@@ -178,12 +175,12 @@ mod tests {
     #[test]
     fn the_beacon_send_and_interval_are_required() {
         let config = load_from(".yaml", YAML).expect("the configuration loads");
-        assert_eq!(config.beacon_send.to_string(), "239.255.0.1:5550");
-        assert_eq!(config.beacon_interface.to_string(), "127.0.0.1");
+        assert_eq!(config.beacon_send.to_string(), "0.0.0.0:5550");
+        assert_eq!(config.beacon_recv.to_string(), "127.0.0.1:5650");
         assert_eq!(config.beacon_interval.0, 5000);
 
         for missing in [
-            "beacon_send: 239.255.0.1:5550\nbeacon_interface: 127.0.0.1\n",
+            "beacon_send: 0.0.0.0:5550\nbeacon_recv: 127.0.0.1:5650\n",
             "beacon_interval_ms: 5000\n",
         ] {
             let without = YAML.replace(missing, "");
@@ -206,12 +203,12 @@ mod tests {
         let from_the_file = load_from(
             ".yaml",
             &YAML.replace(
-                "beacon_send: 239.255.0.1:5550",
-                "beacon_send: 239.255.0.9:5550",
+                "beacon_send: 0.0.0.0:5550",
+                "beacon_send: 0.0.0.0:5560",
             ),
         )
         .expect("the configuration loads");
-        assert_eq!(from_the_file.beacon_send.to_string(), "239.255.0.9:5550");
+        assert_eq!(from_the_file.beacon_send.to_string(), "0.0.0.0:5560");
 
         let section = |beacon: &str| CIConfigJson {
             tcs_cmd_recv: "0.0.0.0:4000".to_string(),
@@ -221,7 +218,7 @@ mod tests {
             moc_tc_base: "127.0.0.1:6100".to_string(),
             beacon_interval_ms: 5000,
             beacon_send: beacon.to_string(),
-            beacon_interface: "127.0.0.1".to_string(),
+            beacon_recv: "127.0.0.1:5650".to_string(),
             log_dir: None,
             log_segment_bytes: 65_536,
         };
@@ -229,11 +226,11 @@ mod tests {
         // A set with a section: the set wins. It always states an address,
         // the attribute being required of a section as of a file.
         assert_eq!(
-            beacon(&from_the_file, Some(&section("239.255.0.7:7550")))
+            beacon(&from_the_file, Some(&section("0.0.0.0:7550")))
                 .expect("it resolves")
-                .group
+                .send
                 .to_string(),
-            "239.255.0.7:7550"
+            "0.0.0.0:7550"
         );
 
         // No section at all, which a tcspecial configuration need not have.
@@ -241,9 +238,9 @@ mod tests {
         assert_eq!(
             beacon(&from_the_file, None)
                 .expect("it resolves")
-                .group
+                .send
                 .to_string(),
-            "239.255.0.9:5550"
+            "0.0.0.0:5560"
         );
 
         // And a set stating something that is not an address is refused
@@ -264,16 +261,17 @@ mod tests {
     #[test]
     fn a_beacon_send_that_is_not_one_is_refused() {
         for bad in [
-            "239.255.0.1",
-            "nowhere:5550",
-            "239.255.0.1:not-a-port",
+            // No port, which every beacon address states now that beacons go
+            // from one socket to another rather than to a multicast group.
+            "0.0.0.0",
+            "0.0.0.0:not-a-port",
+            // Port 0 is whatever is free, which the other end cannot find.
+            "0.0.0.0:0",
+            ":5550",
             "",
-            // Parses, and is not a group: a beacon is sent to one.
-            "127.0.0.1:5550",
-            "0.0.0.0:5550",
         ] {
             let text = YAML.replace(
-                "beacon_send: 239.255.0.1:5550",
+                "beacon_send: 0.0.0.0:5550",
                 &format!("beacon_send: \"{bad}\""),
             );
             let said = load_from(".yaml", &text).expect_err(bad).to_string();

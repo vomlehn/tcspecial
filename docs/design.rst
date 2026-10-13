@@ -236,8 +236,8 @@ section a payload set's file holds, which is required of every configuration.
      tcs_tc_base: 0.0.0.0:6000
      moc_tc_base: 127.0.0.1:6100
      beacon_interval_ms: 5000
-     beacon_send: "239.255.0.1:5550"
-     beacon_interface: "127.0.0.1"
+     beacon_send: "0.0.0.0:5550"
+     beacon_recv: "127.0.0.1:5650"
      log_dir: /var/log/tcspecial
      log_segment_bytes: 65536
 
@@ -250,8 +250,7 @@ telemetry log is not kept, which is a configuration somebody may mean -- a
 vehicle with no writable storage -- and ``log_segment_bytes`` is a tuning
 choice with a defensible answer, so it has one.
 
-Four of them are a host and a port written together, as ``address:port``, as
-``beacon_send`` is: two things only ever used together are one fact about a
+Seven of them are a host and a port written together, as ``address:port``: two things only ever used together are one fact about a
 configuration, and writing them apart invites a file that states one and not
 the other. Each is split at its last colon, so whatever a host is called the
 port is the part after it, and the address is kept as text -- what a name
@@ -1104,8 +1103,8 @@ information rather than a complaint.
 
 What *is* entered is held to the rules that have been tested against real
 buses. A bus address of ``0xZZ`` is wrong the moment it is typed, an attribute
-belonging to another type is wrong on this one, and a beacon address that is
-not a multicast group is wrong as soon as the section is complete -- each in
+belonging to another type is wrong on this one, and a beacon address with no
+port is wrong as soon as the section is complete -- each in
 the words the flight software would refuse it with, because the editor reaches
 those rules rather than restating them. A node is put to them once everything
 its type must have is there: until then the only thing to say is "this is
@@ -1986,16 +1985,21 @@ This is the shipped ``tcspecial/src/tcspecial.yaml``:
 
 .. code-block:: yaml
 
-   address: "0.0.0.0"
-   port: 4000
-   protocol: udp
+   tcs_cmd_recv: "0.0.0.0:4000"
+   moc_cmd_send: "127.0.0.1:4100"
+   payload_interface: "0.0.0.0:4001"
+   tcs_tc_base: "0.0.0.0:6000"
+   moc_tc_base: "127.0.0.1:6100"
    beacon_interval_ms: 5000
    beacon_send: "0.0.0.0:5550"
+   beacon_recv: "127.0.0.1:5650"
    log_dir: telemetry
    log_segment_bytes: 65536
 
-The address and port are where the command interpreter binds, which is where
-the ground sends commands, and ``beacon_send`` is where beacons are sent.
+``tcs_cmd_recv`` is where the command interpreter binds for commands about the
+spacecraft, which is where the ground sends them, ``payload_interface`` is the
+same for commands about a payload, and ``beacon_send`` and ``beacon_recv`` are
+the two ends of the beacon link.
 Every address tcspecial uses is in this file and nowhere else: see
 `Where the Addresses Are`_. The quotes on the addresses are deliberate:
 unquoted, ``0.0.0.0`` is a string in YAML only because it happens not to be a
@@ -2913,7 +2917,7 @@ carry them.
     What tcspecial itself is configured with for this payload set: the same
     section a ``tcspecial.yaml`` holds, with the same attributes. Optional.
     Where the set's beacons go is read from here -- ``beacon_send`` and
-    ``beacon_interface``; see `Where the Addresses Are`_ -- and the rest is
+    ``beacon_recv``; see `Where the Addresses Are`_ -- and the rest is
     carried and checked and not read, tcspecial being placed by the file
     ``TCSPECIAL_CONFIG_PATH`` names. Which includes the two command ports: a
     set does not decide where the interpreter serving it takes commands. The section is here so
@@ -5221,41 +5225,41 @@ Requirement
     states it.
 
 Requirement
-    A beacon is sent to a multicast group. ``beacon_send`` is a group
-    address -- in ``224.0.0.0/4``, and ``239.0.0.0/8`` for one of local scope
-    -- and an address that is not is refused.
+    A beacon is sent from one stated socket to another. ``beacon_send`` is
+    where beacons originate, which tcspecial binds; ``beacon_recv`` is where
+    they are received, which the ground station binds and tcspecial sends to.
+    Each is an address and a port.
 
-A beacon is an announcement to whoever is listening, and the spacecraft does
-not know how many ground stations there are or where they are. A unicast
-beacon can reach exactly one listener, chosen in advance by whoever wrote the
-configuration, because a port can be bound once: a second station cannot even
-listen. Multicast is the primitive for one-to-many with no knowledge of the
-many, it is a UDP-only facility, and a beacon was UDP already -- nothing about
-it wants an acknowledgement.
+A beacon was sent to a multicast group, with a second attribute naming the
+local interface to join it on. That bought something real: a beacon is an
+announcement to whoever is listening, the spacecraft does not know how many
+ground stations there are, and multicast is the primitive for one-to-many with
+no knowledge of the many. A unicast beacon reaches one listener, chosen in
+advance by whoever wrote the configuration, a port being bindable once.
+
+What it cost was two attributes that had to be right and said nothing when they
+were not. The group address is nobody's, so neither end could be reached at it
+to see whether the other was there. The interface attribute decided delivery
+and could not be defaulted: a sender bound to every interface sends a multicast
+datagram out the default route, a listener that joins with ``INADDR_ANY`` joins
+on the default route, and on a host where those differ -- one with a second
+interface, or a tunnel -- not one beacon arrives with nothing anywhere to say
+so. Measured on a development machine with three interfaces: of the four
+combinations of naming and not naming, only naming the same interface at both
+ends delivered anything. A mission whose beacons stop is a mission that cannot
+tell a silent spacecraft from a misjoined socket.
+
+Two stated sockets trade the many for the saying. Each end is an address and a
+port somebody wrote down, which means a firewall rule, a capture filter or a
+colleague can describe the link beforehand, and either end can be probed. More
+than one ground station listening is then something configured -- a relay that
+fans the beacons out -- rather than something the network did silently.
 
 Requirement
-    Both ends name the local interface the beacon goes out on and is joined
-    on: ``beacon_interface``, the address of an interface on the host.
-
-Neither end can be left to choose. A sender bound to every interface sends a
-multicast datagram out the default route; a listener that joins with
-``INADDR_ANY`` joins on the default route; and on a host where those differ --
-one with a second interface, or a tunnel -- not one beacon arrives, with
-nothing anywhere to say so. Measured on a development machine with three
-interfaces: of the four combinations of naming and not naming, only naming the
-same interface at both ends delivers anything.
-
-There is no ``set_multicast_if`` in the standard library, so the sender selects
-the interface by binding that interface's address rather than every address.
-The TTL is set to 1, which keeps a beacon on the network it was sent on; it is
-stated rather than left to the default because it is the one option that
-decides how far the thing travels.
-
-Requirement
-    Every command interpreter configuration states where beacons go, on what
-    interface, and how often: ``beacon_send``, ``beacon_interface`` and
-    ``beacon_interval_ms``. None has a default and none may be left out, in
-    the command interpreter's own file or in a payload set's ``tcspecial``
+    Every command interpreter configuration states where beacons come from,
+    where they are received, and how often: ``beacon_send``, ``beacon_recv``
+    and ``beacon_interval_ms``. None has a default and none may be left out,
+    in the command interpreter's own file or in a payload set's ``tcspecial``
     section.
 
 Beacons are how the ground knows the spacecraft is alive. A configuration that
@@ -5271,9 +5275,9 @@ Requirement
     states no section at all.
 
 Requirement
-    Tcsmoc reads the beacon group and interface from the same two
-    configurations, resolved the same way. The two programs call one function
-    over the same files, so they cannot name different ones.
+    Tcsmoc reads both beacon addresses from the same two configurations,
+    resolved the same way. The two programs call one function over the same
+    files, so they cannot name different ones.
 
 That is what makes the earlier drift impossible rather than merely unlikely.
 The MOC used to bind a compiled-in address and read neither file, so a mission
@@ -5283,9 +5287,8 @@ runs without beacons, as it does without a simulator file: controlling payloads
 does not depend on it.
 
 Requirement
-    A ``beacon_send`` that is not an address and a port, or not a multicast
-    group, is refused where it is read, naming the attribute. So is a
-    ``beacon_interface`` that is not an address.
+    A ``beacon_send`` or ``beacon_recv`` that is not an address and a port is
+    refused where it is read, naming the attribute.
 
 Refused there rather than where a beacon is sent, because a beacon goes out on
 a timer with nobody to report to: the address used to be a constant parsed with
@@ -5909,10 +5912,12 @@ CI must periodically send a Telemetry::Beacon message with a timestamp and uniqu
 .................................................................................................
 
 .. note::
-   Implemented, and to a multicast group so that any number of ground
-   stations can hear it. The number is counted by the sender from one, so it
-   starts again when tcspecial does, and the MOC tells a gap from a restart
-   by that. A beacon also carries what a CONNECT is answered with -- the
+   Implemented, from one stated socket to another: a beacon went to a
+   multicast group so that any number of ground stations could hear it, and
+   the two attributes that took were an address that was nobody's and an
+   interface whose being wrong lost every beacon in silence. The number is
+   counted by the sender from one, so it starts again when tcspecial does,
+   and the MOC tells a gap from a restart by that. A beacon also carries what a CONNECT is answered with -- the
    software version, the version the payload set states, and the digest of
    the configuration file the spacecraft read -- which this did not ask for.
 

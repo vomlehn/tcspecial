@@ -227,9 +227,9 @@ pub enum Fault {
     BadNode { node: String, why: String },
     /// A tcspecial section whose parameters do not hold together.
     ///
-    /// Strict in the same way and for the same reason: a beacon address that
-    /// is not a multicast group is wrong as soon as it is typed, and an
-    /// unanswered parameter is not wrong at all yet.
+    /// Strict in the same way and for the same reason: a beacon address with
+    /// no port is wrong as soon as it is typed, and an unanswered parameter is
+    /// not wrong at all yet.
     BadTcspecial { why: String },
     /// A link delivering into a payload that is read and states no trigger.
     ///
@@ -1416,8 +1416,8 @@ pub fn thermostat_example() -> Document {
         ("tcs_tc_base", "0.0.0.0:6000"),
         ("moc_tc_base", "127.0.0.1:6100"),
         ("beacon_interval_ms", "5000"),
-        ("beacon_send", "239.255.0.1:5550"),
-        ("beacon_interface", "127.0.0.1"),
+        ("beacon_send", "0.0.0.0:5550"),
+        ("beacon_recv", "127.0.0.1:5650"),
         ("log_dir", "/var/log/tcspecial"),
         ("log_segment_bytes", "65536"),
     ] {
@@ -1733,10 +1733,9 @@ mod tests {
     /// Once the section is complete, what it says has to hold together.
     ///
     /// The other half of being lazy: the editor requires nothing to be entered
-    /// and requires everything entered to be valid. A beacon address that is
-    /// not a multicast group is wrong the moment the last field is filled in,
-    /// and the words are the ones the command interpreter itself would refuse
-    /// it with.
+    /// and requires everything entered to be valid. A beacon address with no
+    /// port is wrong the moment the last field is filled in, and the words are
+    /// the ones the command interpreter itself would refuse it with.
     #[test]
     fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
         let whole = [
@@ -1746,8 +1745,8 @@ mod tests {
             ("tcs_tc_base", "0.0.0.0:6000"),
             ("moc_tc_base", "127.0.0.1:6100"),
             ("beacon_interval_ms", "5000"),
-            ("beacon_send", "239.255.0.1:5550"),
-            ("beacon_interface", "127.0.0.1"),
+            ("beacon_send", "0.0.0.0:5550"),
+            ("beacon_recv", "127.0.0.1:5650"),
         ];
 
         let filled = |wrong: Option<(&str, &str)>| {
@@ -1771,7 +1770,8 @@ mod tests {
 
         // Complete and wrong, in the words of the rules that know why.
         for (attribute, instead, expected) in [
-            ("beacon_send", "10.0.0.1:5550", "multicast"),
+            ("beacon_send", "10.0.0.1", "address:port"),
+            ("beacon_recv", "127.0.0.1:0", "port 0"),
             // Half a command interface, which is the one way an attribute
             // carrying two things goes wrong.
             ("tcs_cmd_recv", "0.0.0.0", "address:port"),

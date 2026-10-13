@@ -1022,8 +1022,8 @@ fn main() {
     let _beacon_receive = match beacon_to_listen_for(&payload_path) {
         Ok(beacon) => {
             eprintln!(
-                "Listening for beacons on the group {} on interface {}",
-                beacon.group, beacon.interface
+                "Listening for beacons at {}, which {} sends from",
+                beacon.recv, beacon.send
             );
             BeaconReceive::new(
                 beacon_ui_weak,
@@ -2923,10 +2923,11 @@ mod tests {
     /// The MOC listens where tcspecial sends, by reading the same files.
     ///
     /// Checked against the shipped configurations rather than a contrived
-    /// pair, because what matters is that the two programs resolve one group
-    /// and one interface out of the files as shipped. A listener that assumed
-    /// an address would go deaf the moment a mission moved the beacon, and
-    /// the only symptom would be an indicator saying nothing had arrived.
+    /// pair, because what matters is that the two programs resolve one pair of
+    /// addresses out of the files as shipped: the MOC binds the one beacons
+    /// are received on and tcspecial sends to it. A listener that assumed an
+    /// address would go deaf the moment a mission moved the beacon, and the
+    /// only symptom would be an indicator saying nothing had arrived.
     #[test]
     fn the_moc_listens_where_tcspecial_sends() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -2944,12 +2945,13 @@ mod tests {
 
         // What the set itself says, which is what tcspecial will resolve.
         let said = section.expect("the shipped set has a tcspecial section");
-        assert_eq!(mine.group.to_string(), said.beacon_send);
-        assert_eq!(mine.interface.to_string(), said.beacon_interface);
+        assert_eq!(mine.send.to_string(), said.beacon_send);
+        assert_eq!(mine.recv.to_string(), said.beacon_recv);
 
-        // And it is a group, which is what makes more than one ground station
-        // possible at all.
-        assert!(mine.group.ip().is_multicast(), "{} is not a group", mine.group);
+        // And the two ends are two sockets. One address for both would be a
+        // sender bound where the listener is, which is the listener's port
+        // taken from it at startup.
+        assert_ne!(mine.send, mine.recv, "the two ends of the beacon link are one");
     }
 
     /// The simulator file beside a tcspecial configuration is found and read.

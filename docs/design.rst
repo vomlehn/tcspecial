@@ -950,28 +950,36 @@ So a hand-written configuration opened and saved stays correct and stops
 looking hand-written. For the shipped examples that is what ``git diff`` is
 for; for a working configuration it is worth knowing before the first Save.
 
-The canvas is divided in two. The right-hand quarter is the *payload working
-pane* and holds everything the vehicle carries -- a device on a bus, a line it
-drives, a link to something aboard -- and the rest of the canvas is the
-*vehicle working pane* and holds the rest of the graph: the computations, the
-log, the ground link, a page of its own. There is a selection pane for each,
-one above the other, and which one a shape was pressed in is what decides
-where it lands. A node stays in its pane: a drag that would carry a payload
-across the divider stops at it.
+The canvas is divided in three, and each part says at the top what it is for.
+Left to right: the *moc working pane*, labelled ``moc``, which holds the ground
+link; the *vehicle working pane*, labelled ``vehicle``, which holds the
+vehicle's own graph -- the computations, the log, a page of its own; and the
+*payload working pane*, labelled ``payloads``, which holds everything the
+vehicle carries: a device on a bus, a line it drives, a link to something
+aboard. The labels are grey, that being a word about the drawing rather than
+part of it.
 
-What that buys is a drawing that can be compared with last mission's. The
-vehicle's own graph is the part that persists; what it is carrying is the part
-that changes between flights, and a diagram that puts the changing part in one
-column shows at a glance what is different. Links cross the divider freely --
+There is a selection pane for each, one above another in the same order the
+working panes are in, and which one a shape was pressed in is what decides
+where it lands. A node stays in its pane: a drag that would carry a payload
+leftwards across a divider stops at it.
+
+What that buys is a drawing that can be compared with last mission's. The three
+parts change on different schedules -- the ground is the other end of the link
+and not the vehicle at all, the vehicle's own graph persists, and what it
+carries changes between flights -- so a diagram that puts each in its own
+column shows at a glance what is different. Links cross the dividers freely --
 that is what a payload is for -- and only positions are confined.
 
-The divider is drawn, and it can be moved: it carries a handle halfway down it,
-and dragging that handle moves the line and resizes both panes. Neither pane
-may be squeezed below a twentieth of the working pane, so neither can be
-dragged shut -- a pane with nothing visible in it is a pane whose nodes cannot
-be reached, and the drag that does it is one press away. The divider also stops
-against a node rather than passing over it: against the right edge of the
-rightmost vehicle node and the left edge of the leftmost payload. The
+Each divider is drawn, and each can be moved: it carries a handle halfway down
+it, and dragging that handle moves the line and resizes the two panes either
+side of it. No pane may be squeezed below a twentieth of the working pane, so
+none can be dragged shut -- a pane with nothing visible in it is a pane whose
+nodes cannot be reached, and the drag that does it is one press away. With
+three panes that means a divider stops a twentieth short of its neighbour as
+well as of the edge. A divider also stops against a node rather than passing
+over it: against the right edge of the rightmost node of the pane on its left
+and the left edge of the leftmost node of the pane on its right. The
 alternative was to let it go where it liked and shunt the nodes it passed,
 which is a gesture that quietly rearranges a diagram -- and one that would have
 to carry every node it moved through the history to be undoable. A line that
@@ -979,18 +987,20 @@ stops where it would orphan something says what it is doing while it does it. A
 node already on the wrong side holds nothing, so one such node cannot freeze
 the control.
 
-Where the divider sits is kept in ``$HOME/.tcsgui/preferences.xml``, as the
-percentage of the working pane the vehicle working pane takes -- the vehicle
-working pane being always the left-hand one, so a percentage and that sentence
-are the whole of it. The file is read when the editor starts and is what places
-the divider; it is written whenever the line is moved. The directory is made
-automatically, and a preferences file that is missing, unreadable or
-hand-edited into nonsense leaves the default three quarters in place and says
-so on the error output: an editor that refused to start because it could not
-remember a pane width would be an editor traded for a preference. The file was
-called ``config.xml`` in one build and is still read under that name when the
-current one is absent, so the rename forgets nothing; the old file is left for
-its owner to delete.
+Where the dividers sit is kept in ``$HOME/.tcsgui/preferences.xml``, as the
+percentages of the working pane the moc and vehicle working panes take -- the
+panes being always in that order, so two percentages and that sentence are the
+whole of it, the payload pane taking what is left. The file is read when the
+editor starts and is what places the dividers; it is written whenever a line is
+moved. The directory is made automatically, and a preferences file that is
+missing, unreadable or hand-edited into nonsense leaves the defaults in place
+and says so on the error output: an editor that refused to start because it
+could not remember a pane width would be an editor traded for a preference. A
+file written before there was a moc working pane states only the vehicle's
+share, and the new pane's share is taken out of that one rather than out of the
+payload column somebody had arranged. The file was called ``config.xml`` in one
+build and is still read under that name when the current one is absent, so the
+rename forgets nothing; the old file is left for its owner to delete.
 
 That file and not the configuration, which is the distinction worth stating. A
 node's position is in the configuration because it is part of the diagram --
@@ -1255,7 +1265,7 @@ simulator's settings for it where there are any -- those with their labels in
 italic, which says on every row what the rule above them says once: a reader
 who has scrolled past the rule still knows which file they are typing into.
 Removing the panel also gave the canvas the 260 pixels it was using, which the
-two working panes now have.
+three working panes now have.
 
 Groups are edited in a window of their own, reached from **File -> Edit payload
 groups**. A group is not on the canvas and should not be: it is a set of

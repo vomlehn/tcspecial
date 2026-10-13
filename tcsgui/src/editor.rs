@@ -106,16 +106,16 @@ impl Editor {
     /// that refused to start on a damaged file would be an editor that cannot
     /// be used to fix one.
     ///
-    /// `divider` is where the two working panes meet, and it is here because
-    /// what is read has to obey the rule the editor enforces: a payload the
-    /// file draws in the vehicle working pane is brought into its own. See
-    /// [`Document::settle`], which says what that is and is not.
-    pub fn open(path: &Path, divider: i32) -> Self {
+    /// `dividers` is where the three working panes meet, and it is here
+    /// because what is read has to obey the rule the editor enforces: a
+    /// payload the file draws in the vehicle working pane is brought into its
+    /// own. See [`Document::settle`], which says what that is and is not.
+    pub fn open(path: &Path, dividers: crate::pane::Dividers) -> Self {
         let mut editor = Editor::new(path);
 
         match crate::read::read(path) {
             Ok(mut document) => {
-                document.settle(divider);
+                document.settle(dividers);
                 editor.document = document;
             }
             Err(why) => {
@@ -381,7 +381,7 @@ mod tests {
     /// anyway.
     #[test]
     fn opening_settles_the_panes_without_writing_the_file() {
-        let divider = crate::pane::divider_for(crate::settings::DEFAULT);
+        let dividers = crate::pane::default_dividers();
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
 
@@ -409,22 +409,28 @@ links:
 ";
         std::fs::write(&path, by_hand).expect("a file");
 
-        let mut editor = Editor::open(&path, divider);
+        let mut editor = Editor::open(&path, dividers);
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
         // The payload is in the payload working pane.
         let sensor = editor.document().node("temp_fore").expect("the sensor");
         assert!(
-            sensor.at.0 >= divider,
+            sensor.at.0 >= dividers.vehicle,
             "the payload opened at {:?}, outside its pane",
             sensor.at
         );
         // At the same height it was drawn at: the smallest move that obeys
         // the rule, so a diagram is not rearranged by being opened.
         assert_eq!(sensor.at.1, 120);
-        // And the ground link, which was already where it belongs, has not
-        // moved at all.
-        assert_eq!(editor.document().node("moc").unwrap().at, (240, 40));
+        // And the ground link, which the file drew in the vehicle's pane: it
+        // belongs in the moc pane now, so it comes home at the same height.
+        let moc = editor.document().node("moc").expect("the ground link");
+        assert!(
+            moc.at.0 + crate::style::WIDTH as i32 <= dividers.moc,
+            "the ground link opened at {:?}, outside its pane",
+            moc.at
+        );
+        assert_eq!(moc.at.1, 40);
 
         // The file is untouched.
         assert_eq!(
@@ -445,7 +451,7 @@ links:
         let written = std::fs::read_to_string(&path).unwrap();
         assert_ne!(written, by_hand);
         assert!(
-            written.contains(&format!("x: {divider}")),
+            written.contains(&format!("x: {}", dividers.vehicle)),
             "the settled position was not written: {written}"
         );
     }
@@ -528,7 +534,7 @@ links:
         let path = where_.path().join("vehicle.yaml");
         let sim = where_.path().join("vehiclesim.yaml");
 
-        let mut editor = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
         editor.open_simulator(&sim);
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
@@ -550,7 +556,7 @@ links:
         // And read back: a second session on the same pair finds what the
         // first left.
         let mut reopened =
-            Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+            Editor::open(&path, crate::pane::default_dividers());
         reopened.open_simulator(&sim);
         assert_eq!(
             reopened
@@ -581,7 +587,7 @@ links:
 
         let mut editor = Editor::open(
             &where_.path().join("vehicle.yaml"),
-            crate::pane::divider_for(crate::settings::DEFAULT),
+            crate::pane::default_dividers(),
         );
         editor.open_simulator(&sim);
 
@@ -611,7 +617,7 @@ links:
 
         let mut editor = Editor::open(
             &path,
-            crate::pane::divider_for(crate::settings::DEFAULT),
+            crate::pane::default_dividers(),
         );
         editor.open_simulator(&sim);
         assert!(editor.document().simulator.is_some(), "the session has one");
@@ -653,7 +659,7 @@ links:
 
         let mut editor = Editor::open(
             &path,
-            crate::pane::divider_for(crate::settings::DEFAULT),
+            crate::pane::default_dividers(),
         );
         editor.open_simulator(&sim);
         // One edit, so that the files are written: the editor writes on every
@@ -705,7 +711,7 @@ links:
 
             let mut editor = Editor::open(
                 &where_.path().join("vehicle.yaml"),
-                crate::pane::divider_for(crate::settings::DEFAULT),
+                crate::pane::default_dividers(),
             );
             editor.open_simulator(&sim);
 
@@ -724,7 +730,7 @@ links:
             let sim = where_.path().join(name);
             let mut editor = Editor::open(
                 &where_.path().join("vehicle.yaml"),
-                crate::pane::divider_for(crate::settings::DEFAULT),
+                crate::pane::default_dividers(),
             );
             editor.open_simulator(&sim);
 
@@ -763,7 +769,7 @@ links:
         assert!(written.contains("cabin_temps"), "{written}");
         assert!(written.contains("3s"), "{written}");
 
-        let reopened = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+        let reopened = Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(
             reopened.document().groups.get("cabin_temps").map(String::as_str),
             Some("3s"),
@@ -791,7 +797,7 @@ links:
             // And the process dies here, with no chance to tidy up.
         }
 
-        let mut recovered = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+        let mut recovered = Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(
             recovered.document().nodes.len(),
             3,
@@ -916,7 +922,7 @@ links:
         // What a recovery would find: one node and one edit of history, which
         // agree with each other. The second edit is lost, which is what a
         // device that could not be written to costs.
-        let recovered = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+        let recovered = Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(recovered.document().nodes.len(), 1);
         assert_eq!(recovered.undo_depth(), 1);
     }
@@ -1017,7 +1023,7 @@ links:
         // And the history is beside it as it is for YAML, so undo reaches past
         // a crash whichever format the configuration is written in.
         editor.edit(add("temp_aft", "i2c"));
-        let recovered = Editor::open(&path, crate::pane::divider_for(crate::settings::DEFAULT));
+        let recovered = Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(recovered.undo_depth(), 2);
         assert_eq!(recovered.document().nodes.len(), 2);
     }

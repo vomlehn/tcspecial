@@ -32,6 +32,22 @@ pub const GRID: i32 = 8;
 /// about where things may go.
 pub const WORKING_WIDTH: i32 = 960;
 
+/// How long the working panes are, in the coordinates the file holds.
+///
+/// One length for all three, which is what makes them scroll together: they
+/// are three columns of one sheet rather than three panes of their own, so a
+/// node at y 900 in the vehicle pane and one at y 900 in the payload pane are
+/// level, and one scrollbar moves all three. Three panes that scrolled
+/// separately would put a link's two ends at two heights that have nothing to
+/// do with each other, and a diagram whose lines go off the top of one column
+/// and in at the middle of another cannot be read.
+///
+/// Longer than a window on purpose. A vehicle with forty payloads needs room
+/// for forty, and a sheet the size of the window would mean the fortieth could
+/// not be put anywhere -- so the sheet is scrolled and a new node is placed as
+/// high as it fits, which is [`place_in`].
+pub const WORKING_HEIGHT: i32 = 2400;
+
 /// Where the three working panes meet: two positions in the coordinates the
 /// file holds.
 ///
@@ -196,6 +212,95 @@ pub fn confine(node_type: &str, dividers: Dividers, (x, y): (i32, i32)) -> (i32,
     // has a right bound to the left of its left one, and a node in it sits at
     // its left edge and overhangs.
     (x.clamp(left, right.max(left)), y.max(0))
+}
+
+/// Where a new node of this type goes.
+///
+/// As high as it will fit in its own pane without covering anything, and in
+/// view: a node placed where it cannot be seen is a press that did nothing as
+/// far as the person who made it can tell.
+///
+/// `taken` is every box already on the sheet and `visible` is the part of the
+/// sheet the window is showing: the top of the view and how much of it there
+/// is. Three places are tried, in the order somebody would look:
+///
+/// the highest place in view that covers nothing. This is the ordinary case
+/// and the only one that happens on a sheet with room in it;
+///
+/// then the *lowest* place above the view that covers nothing -- lowest
+/// because it is the nearest, so the scroll that follows is the shortest;
+///
+/// then the highest place below the view. Which is the last resort because
+/// scrolling down past what is already there is the longer journey.
+///
+/// Rows, left to right and top to bottom: at each height every place across
+/// the pane is tried before moving down. A column would fill the left of a
+/// wide pane and scroll away from three node widths of empty space.
+///
+/// Where nothing fits anywhere -- a full sheet -- the top of the pane, which
+/// is a node drawn over another and visibly so. The alternative is a press
+/// that does nothing.
+pub fn place_in(
+    taken: &[(i32, i32, u32, u32)],
+    node_type: &str,
+    dividers: Dividers,
+    visible: (i32, i32),
+) -> (i32, i32) {
+    let (width, height) = size_of(node_type);
+    let (left, right) = pane_for(node_type, dividers);
+    let right = right.max(left);
+    let bottom = WORKING_HEIGHT - height as i32;
+
+    let clear = |x: i32, y: i32| {
+        !taken.iter().any(|(theirs, tall, their_width, their_height)| {
+            x < theirs + *their_width as i32
+                && *theirs < x + width as i32
+                && y < tall + *their_height as i32
+                && *tall < y + height as i32
+        })
+    };
+    let across = |y: i32| {
+        let mut x = left;
+        while x <= right {
+            if clear(x, y) {
+                return Some((x, y));
+            }
+            x += GRID;
+        }
+        None
+    };
+
+    // In view, highest first. The view's own bottom, not the sheet's: a node
+    // hanging half off the bottom of the window is not in view.
+    let (top, how_much) = visible;
+    let top = top.max(0);
+    let mut y = top;
+    while y <= (top + how_much - height as i32).min(bottom) {
+        if let Some(at) = across(y) {
+            return at;
+        }
+        y += GRID;
+    }
+
+    // Above the view, lowest first: the nearest place is the shortest scroll.
+    let mut y = (top - height as i32).min(bottom);
+    while y >= 0 {
+        if let Some(at) = across(y) {
+            return at;
+        }
+        y -= GRID;
+    }
+
+    // Below it, highest first.
+    let mut y = (top + how_much).max(0);
+    while y <= bottom {
+        if let Some(at) = across(y) {
+            return at;
+        }
+        y += GRID;
+    }
+
+    (left, 0)
 }
 
 /// The nominal size of a type, for placing a link's ends.

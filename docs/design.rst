@@ -5085,9 +5085,32 @@ Requirement
     it has to go on.
 
 Requirement
-    Nothing is asked when contact returns. The statuses stay unknown until
-    somebody presses a button, and what says meanwhile whether a payload is
-    alive is its data indicator, below.
+    The spacecraft is asked what its handlers are doing at two moments, and
+    only two: when the first beacon arrives, and when a beacon outage ends.
+    Both are a MOC that has just learnt the spacecraft is there and knows
+    nothing about its payloads -- it may have been serving them for hours, or
+    have restarted during the silence with none of them running.
+
+Requirement
+    A payload whose last press was Disable is not asked about. The operator
+    said to stop it; asking the spacecraft would spend a command to be told
+    what the ground already knows, and a panel saying Stopped because
+    somebody stopped it is not a panel with a question hanging over it. An
+    Enable clears that, a Disable sets it, and a payload nobody has pressed
+    anything about is asked.
+
+Requirement
+    The asking happens off the event loop, and what comes back is painted by
+    the next pass of the refresh. Each question waits on the spacecraft for as
+    long as the timeout allows, and a burst of them on the event loop would
+    stop the window repainting at exactly the moment an operator is watching
+    it.
+
+Nothing is asked while the command link is down, and the question is not held
+until it comes up: the panels keep saying unknown until contact is made again
+or somebody presses Query all. Contact returning while the link is down is
+rare -- the beacon and the link come back together -- and a question owed
+indefinitely is a question that goes out at a moment nobody chose.
 
 Requirement
     The ground does not poll its payloads. **Needs examination.**

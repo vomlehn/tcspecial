@@ -2037,9 +2037,9 @@ beacon did arrive when it arrived.
 
 Panels start at ``Unknown``: a MOC that has just come up has been told
 nothing, and the tcspecial it attached to may have been running handlers for
-hours. They stay unknown until somebody presses ``Enable``, ``Disable`` or
-``Query all``; what says meanwhile whether a payload is alive is its data
-indicator.
+hours. The first beacon is what fills them in -- the MOC then asks the
+spacecraft what each handler is doing -- and until it arrives the data
+indicator is what says whether a payload is delivering.
 
 The indicator leaving green is also what the payload panels go by. A panel's
 status is what the spacecraft answered the last ``Enable`` or ``Disable``, and
@@ -2048,13 +2048,21 @@ handler may since have stopped, or gone with a process that restarted. So when
 the indicator leaves green every panel's status becomes ``Unknown``, whether
 or not the command link is up -- a disconnected MOC cannot find out either.
 
-When the indicator is green again, nothing is asked: the statuses stay
-``Unknown`` until somebody presses a button, and the data indicators say
-which payloads are delivering. ``Query all`` is what asks the spacecraft what
-each handler is doing, and the panels then say what it answers: ``Active`` for
-one that is running, ``Stopped`` for one that is not, and ``Unknown`` for a
-handler this tcspecial has not got -- which is what an operator sees when the
-MOC has attached to a tcspecial left running for another payload set.
+When the indicator is green again, the MOC asks the spacecraft what each
+handler is doing, and the panels say what it answers: ``Active`` for one that
+is running, ``Stopped`` for one that is not, and ``Unknown`` for a handler
+this tcspecial has not got -- which is what an operator sees when the MOC has
+attached to a tcspecial left running for another payload set.
+
+That asking happens at two moments and no others: the first beacon, and the
+end of an outage. It is not a poll -- nothing is asked while contact simply
+holds -- and a payload whose last press was ``Disable`` is left out of it: the
+operator said to stop that one, so there is nothing to ask. ``Query all`` asks
+about every payload whenever it is pressed.
+
+If the link is down when contact returns, nothing is asked and nothing is
+owed: the panels keep saying ``Unknown`` until the next time contact is made
+or somebody presses ``Query all``.
 
 Nothing else changes a panel's status. The once-a-second refresh shows what has
 arrived and leaves the status to the commands and to the beacon.

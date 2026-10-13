@@ -12,7 +12,9 @@
 //! -- and told the panels little that the arrivals did not: a payload that is
 //! enabled and sending is a payload whose data keeps arriving. What the poller
 //! did say that this cannot is the spacecraft's own counters, which Query All
-//! still asks for when somebody wants them.
+//! still asks for when somebody wants them -- and what each handler is doing,
+//! which the MOC asks when the first beacon arrives and when an outage ends:
+//! see `ask_what_handlers_are_doing`.
 //!
 //! **Needs examination.** The rule below is a first statement of it. Three
 //! things in particular are unsettled: what interval suits a payload that

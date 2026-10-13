@@ -244,8 +244,19 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
                 .collect();
             settings.extend(theirs);
             for setting in settings {
-                let value = said.get(setting).map(String::as_str).unwrap_or("");
-                out.push_str(&format!("    {setting}: {}\n", quoted(value.trim())));
+                // A setting nobody has answered is written with nothing after
+                // the colon rather than with an empty string. The two read the
+                // same -- see `blank_is_unstated` -- and they do not say the
+                // same: `""` is a value somebody could have typed, and nothing
+                // at all is a question not yet answered, which is what the
+                // form is for. The name stays in the file either way, because
+                // what the form is for is saying which questions there are.
+                match said.get(setting).map(|value| value.trim()) {
+                    Some(value) if !value.is_empty() => {
+                        out.push_str(&format!("    {setting}: {}\n", quoted(value)));
+                    }
+                    _ => out.push_str(&format!("    {setting}:\n")),
+                }
             }
         }
     }

@@ -1391,7 +1391,17 @@ cleared on the way to typing another leaves a file that still opens, says what
 is missing, and can be put right, where a file read strictly would not open at
 all -- and a file the editor cannot read back is a file it has destroyed. A
 parameter somebody clears is written out of the file rather than written empty,
-absent and empty meaning the same thing to the checking.
+absent and empty meaning the same thing to the checking. The same goes for a
+node's attributes, and on the way in as well as the way out: a hand-written
+``address:`` with nothing after it is read as a question not yet answered -- as
+is ``address: ""`` -- and saved as neither, the line simply not being there.
+
+The simulator's file is the one place a blank is written out, because there the
+blank is the point: that file is a form, with every payload of the
+configuration and every setting a payload may state, so that a reader can see
+what there is to answer. An unanswered setting is written with nothing after
+the colon rather than as ``""``: the two read the same, and ``""`` says
+somebody typed two quotation marks.
 
 A configuration that does not exist yet is given the section's attributes and
 none of its values. The window then has a field apiece and the configuration

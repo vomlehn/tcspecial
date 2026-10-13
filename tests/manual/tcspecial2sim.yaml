@@ -22,7 +22,6 @@
 # its parser from its extension as every configuration file in this project
 # does, so the same settings in an .xml file would be read just as well; the
 # shipped ones are YAML because that is what carries comments.
-version: "1.0"
 description: Simulator settings for the payloads of tcspecial2.yaml
 
 simulated_payload_groups:

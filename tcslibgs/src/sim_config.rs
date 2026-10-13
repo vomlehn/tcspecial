@@ -132,6 +132,15 @@ pub enum SimConfigError {
         name: String,
         given: &'static str,
     },
+    /// A version, which this file no longer has.
+    ///
+    /// A configuration says which version it is so that it can be checked
+    /// against the software that will read it, on the vehicle, before anything
+    /// opens a device. Nothing aboard reads the simulator's file -- the
+    /// simulator does not fly -- so a version here answered a question nobody
+    /// was asking, and a field that is read, printed and never acted on is a
+    /// field somebody will one day believe in.
+    AVersion,
     /// A word that is not a setting at all, which is what a misspelled
     /// setting looks like.
     NoSuchSetting {
@@ -190,6 +199,13 @@ impl fmt::Display for SimConfigError {
                 f,
                 "simulated payload \"{}\" asks for {}, which it cannot have: {}",
                 payload, fault, why
+            ),
+            SimConfigError::AVersion => write!(
+                f,
+                "this file states a version, and a simulator configuration has \
+                 none: a version is there so that a configuration can be \
+                 checked against the software that will read it on the vehicle, \
+                 and nothing aboard reads this file"
             ),
             SimConfigError::NoSuchSetting { what, name, given } => write!(
                 f,
@@ -340,6 +356,10 @@ impl SimConfigError {
             SimConfigError::UnusedGroup { group } => About::SimGroup(group.clone()),
 
             SimConfigError::Unsimulated { .. } => About::Section("simulated_payloads"),
+
+            // About the file rather than anything in it: the line it is on is
+            // found by name, and `version` is not an entry.
+            SimConfigError::AVersion => About::File,
 
             SimConfigError::UnknownGroup { payload, .. }
             | SimConfigError::UnknownPayload { payload }
@@ -812,6 +832,15 @@ pub struct SimPayload {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SimConfigFile {
+    /// Kept only to be refused, with the reason.
+    ///
+    /// A configuration file says which version it is so that it can be checked
+    /// against the software that will read it -- on the vehicle, which is where
+    /// a file of the wrong language must be found out before anything opens a
+    /// device. The simulator is not run on the vehicle and nothing aboard reads
+    /// this file, so a version here answered a question nobody was asking; and
+    /// a field that is read, printed and never acted on is a field somebody
+    /// will one day believe in.
     #[serde(default)]
     pub version: Option<String>,
     #[serde(default)]
@@ -917,6 +946,10 @@ impl SimConfigFile {
     /// yields the payloads that have none.
     fn check(&self, handlers: &[DHConfig]) -> (Vec<ResolvedSim>, Vec<SimConfigError>) {
         let mut problems: Vec<SimConfigError> = Vec::new();
+
+        if self.version.is_some() {
+            problems.push(SimConfigError::AVersion);
+        }
 
         let mut groups: BTreeMap<&str, &SimSettings> = BTreeMap::new();
         for group in &self.simulated_payload_groups {

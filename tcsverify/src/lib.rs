@@ -532,7 +532,7 @@ vehicle:
     fn a_second_file_is_not_a_simulator_file_for_a_graph() {
         let (dir, path) = graph_written(".yaml", SOUND_GRAPH);
         let other = dir.path().join("setsim.yaml");
-        std::fs::write(&other, "version: \"1.0\"\n").unwrap();
+        std::fs::write(&other, "description: settings\n").unwrap();
 
         let report = verify(&path, Some(&other));
         let said = report
@@ -597,7 +597,6 @@ payloads:
 ";
 
     const GOOD_SIM: &str = "\
-version: \"1.0\"
 description: settings
 simulated_payloads:
   - name: DH0
@@ -780,7 +779,6 @@ payloads:
     #[test]
     fn the_simulator_file_is_checked_against_the_payload_file() {
         let sim = "\
-version: \"1.0\"
 description: settings
 simulated_payloads:
   - name: DH0
@@ -800,8 +798,8 @@ simulated_payloads:
             assert_eq!(finding.file, set.sim, "a problem in the wrong file");
         }
         assert!(
-            report.findings.iter().any(|f| f.line == 7),
-            "the entry that names nobody is on line 7: {:?}",
+            report.findings.iter().any(|f| f.line == 6),
+            "the entry that names nobody is on line 6: {:?}",
             report.findings
         );
     }

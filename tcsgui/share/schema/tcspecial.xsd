@@ -197,6 +197,10 @@
           </xs:all>
         </xs:complexType>
       </xs:element>
+      <!-- Where tcsgui writes the Rust it generates from this configuration.
+           The one attribute of this section about building the software rather
+           than about running it: nothing aboard reads it. -->
+      <xs:element name="rust-code" type="xs:string" minOccurs="0"/>
     </xs:all>
   </xs:complexType>
 

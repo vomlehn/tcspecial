@@ -106,16 +106,22 @@ fn the_tcspecial_section_is_what_the_parameters_say() {
     let mut wanted: BTreeSet<String> = BTreeSet::new();
     for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
         // Dotted in the rules, nested in the file: `beacon.send` is `send`
-        // under `beacon`.
-        let (parent, name) = attribute
-            .split_once('.')
-            .expect("every parameter of the section is under a subsection");
-        wanted.insert(parent.to_string());
-        let under = properties(&schema, &["tcspecial", parent]);
-        assert!(
-            under.contains(name),
-            "the schema's {parent} has no {name}: {under:?}"
-        );
+        // under `beacon`. One of them is not under a subsection at all --
+        // `rust-code`, which is about building the software rather than about
+        // running it -- and sits at the top of the section.
+        match attribute.split_once('.') {
+            Some((parent, name)) => {
+                wanted.insert(parent.to_string());
+                let under = properties(&schema, &["tcspecial", parent]);
+                assert!(
+                    under.contains(name),
+                    "the schema's {parent} has no {name}: {under:?}"
+                );
+            }
+            None => {
+                wanted.insert((*attribute).to_string());
+            }
+        }
     }
 
     let said = properties(&schema, &["tcspecial"]);

@@ -311,12 +311,17 @@ payload has in the configuration -- and the MOC binds its end at
 vehicle and 6100 to 6103 on the ground.
 
 Both ends come out of the one file both ends read, so neither has to be told
-the other's. The MOC says hello to tcspecial's end and tcspecial answers where
-the hello came from, which is why that is the end that has to be findable: over
-UDP the payload is the end that speaks first. The ground's end was whatever
-port the system chose, which worked and left the ground's own ports written
-down nowhere -- so nothing between the two ends could be checked, or firewalled
-by a rule anybody could state.
+the other's: tcspecial sends a payload's telemetry to the end the MOC binds,
+from the first datagram, and the MOC sends nothing at all.
+
+It did have to be told. The ground's end was whatever port the system chose, so
+nothing in the configuration said where it was; tcspecial's end learnt it from
+whatever arrived there, and the MOC taught it by saying hello -- an empty
+datagram, once a second, to every payload. Once a second because START_DH and
+STOP_DH rebind that socket and the learnt peer went with it, so a ground
+station that said hello once was silently cut off by the next Enable. Naming
+the ground's end removed the hello, the silence after it, and the last traffic
+the MOC sent without being asked.
 
 That is why a payload states no address for its ground link. It used to state
 ``oc_address`` and ``oc_port``, which for forty payloads was forty chances to
@@ -5564,29 +5569,33 @@ Requirement
     three to a row, and a fourth starts a row under the first.
 
 Requirement
-    The MOC opens the payload data path of every handler that has an OC
-    address: one socket per handler, which says hello and then reads what
-    arrives. A panel shows the latest arrival with the time it arrived.
-
-Two things were wrong without it. A handler's OC endpoint binds the address
-the ground sends to and learns where to answer from what arrives there, so
-with nobody on the ground it had no peer at all: every write to the ground
-failed, and a payload's data went into a handler and no further. And every
-reading in a panel was the spacecraft's own account -- the statistics it
-counted, the samples it kept -- which is worth having and is not evidence
-that anything reached the ground.
+    The MOC opens the payload data path of every payload that has a ground
+    link: one socket per payload, bound where
+    ``payload_telemetry.dest_base`` counted on by that payload's id says the
+    ground's end is, which reads what arrives and shows the latest in the
+    panel with the time it arrived. It sends nothing.
 
 Requirement
-    The hello is a datagram of no bytes. It teaches the handler where the
-    ground is, which is all it is for, and a handler hands nought bytes up to
-    a conduit that drops them rather than writing them on -- so nothing of
-    the ground's own making enters the payload's link.
+    tcspecial sends a payload's telemetry to the end the configuration names
+    -- ``payload_telemetry.dest_base`` counted on by the payload's id -- and
+    not to wherever that socket was last spoken to from. A payload's own
+    socket still learns its peer, because the payload is the end that speaks
+    first over UDP and no configuration says where it will speak from; the
+    ground link is the one whose far end is written down.
 
-Requirement
-    The hello is said again while nothing is arriving. A handler stopped and
-    started rebinds its OC socket, and the peer it had learnt goes with the
-    socket; a ground station that said hello once would be silently cut off,
-    which is the fault this exists to remove.
+Before the ground's end was named there was a hello: an empty datagram from
+the MOC to every payload's handler, once a second, because the handler learnt
+where to answer from what arrived and with nobody there it had no peer at all
+-- every write to the ground failed, and a payload's data went into a handler
+and no further. Once a second because START_DH and STOP_DH rebind that socket
+and the learnt peer went with it, so a ground station that said hello once was
+silently cut off by the next Enable, with nothing anywhere to say so.
+
+Naming both ends removed all of it: the hello, that silence, and the last
+traffic the MOC sent without being asked. What remains of the reason the
+listener exists is the other half of it -- every reading in a panel used to be
+the spacecraft's own account of itself, which is worth having and is not
+evidence that anything reached the ground.
 
 Requirement
     The window asks to be put against the top of the display, and tcssim's

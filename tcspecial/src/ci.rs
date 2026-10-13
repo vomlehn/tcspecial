@@ -21,7 +21,7 @@ use tcslibgs::{
 
 use crate::config::constants::RESTART_ARM_TIMEOUT;
 use crate::dh::DataHandler;
-use crate::endpoint::bind_endpoint_pair;
+use crate::endpoint::bind_oc_pair;
 use crate::telemetry_log::TelemetryLog;
 
 /// What serves the payload command link.
@@ -521,7 +521,7 @@ fn start_handler(dh: &mut DataHandler, config: &DHConfig) -> TcsResult<()> {
         ))
     })?;
     let (oc_reader, oc_writer) =
-        bind_endpoint_pair(&config.name.0, &EndpointConfig::Network(oc.clone()))?;
+        bind_oc_pair(&config.name.0, &oc, config.ground.as_ref())?;
     dh.start(oc_reader, oc_writer)?;
 
     // Said on the way out, not only on the way wrong. Until this was here

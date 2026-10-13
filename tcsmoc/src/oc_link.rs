@@ -7,33 +7,28 @@
 //! are not evidence that anything reached the ground, and the one reading an
 //! operator wants from a payload that sends on its own is the data itself.
 //!
-//! Worse, nothing on the ground sending to a handler's OC address meant the
-//! handler could not send at all. A handler's OC endpoint binds the address
-//! the ground sends to and learns where to answer from what arrives there:
-//! `recv_from`, then `send_to`. With nobody there it had no peer, so every
-//! write to the ground failed, and a payload's data went into a handler and
-//! no further.
+//! So each payload with a ground link gets a listener here, bound where the
+//! configuration says the ground's end of that link is --
+//! `payload_telemetry.dest_base` counted on by the payload's id -- which reads
+//! what the handler sends and keeps the latest for the panel.
 //!
-//! So each handler with an OC address gets a listener here. It says hello --
-//! an empty datagram, which teaches the handler where the ground is and
-//! carries nothing into the payload link -- and then reads what the handler
-//! sends, keeping the latest for the panel.
+//! It used to say hello first: an empty datagram once a second to the
+//! handler's own end, because a handler's OC endpoint learnt where to answer
+//! from what arrived there -- `recv_from`, then `send_to` -- and with nobody
+//! there it had no peer, so a payload's data went into a handler and no
+//! further. Repeated once a second because START_DH and STOP_DH rebind that
+//! socket and the learnt peer went with it, which made a ground station that
+//! said hello once silently cut off.
+//!
+//! None of that is needed now that both ends of the link are written down:
+//! tcspecial sends to the end this binds, from the first datagram, without
+//! being told where it is. See `tcspecial::endpoint::bind_oc_pair`.
 
-use std::net::{SocketAddr, UdpSocket};
+use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 
-use tcslibgs::{came_from, DHConfig, DHSample, HostPort, NetworkConfig, Timestamp};
-
-/// How long a listener waits for data before saying hello again.
-///
-/// Said again because a handler forgets: STOP_DH and START_DH rebind its OC
-/// socket, and the peer it learnt went with the socket. A ground station that
-/// said hello once would then be silently cut off, which is exactly the fault
-/// this exists to remove. One second, so a restarted handler is heard from
-/// again before an operator has finished reading the panel.
-const HELLO_INTERVAL: Duration = Duration::from_secs(1);
+use tcslibgs::{came_from, DHConfig, DHSample, HostPort, Timestamp};
 
 /// What one payload last sent to the ground, as the ground received it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,16 +82,14 @@ pub fn listen(dh_configs: &[DHConfig]) -> Arrivals {
 
     for (row, dh) in dh_configs.iter().enumerate() {
         let Some(oc) = &dh.oc else { continue };
-        let Some(address) = oc_address(oc) else {
-            continue;
-        };
 
         // The ground's own end of this payload's data link, where the
-        // configuration says it is: `payload_telemetry.dest_base` counted on by the payload's
-        // id. It was whatever port the system chose, which worked because the
-        // hello told tcspecial where to answer -- and left the ground's own
-        // ports unwritten anywhere, so nothing between the two ends could be
-        // checked or firewalled by a rule anybody could state.
+        // configuration says it is: `payload_telemetry.dest_base` counted on
+        // by the payload's id. It was whatever port the system chose, which
+        // worked because the hello told tcspecial where to answer -- and left
+        // the ground's own ports unwritten anywhere, so nothing between the
+        // two ends could be checked or firewalled by a rule anybody could
+        // state.
         //
         // A set with no section has no end to bind, as it has none to send
         // to.
@@ -106,37 +99,23 @@ pub fn listen(dh_configs: &[DHConfig]) -> Arrivals {
             Ok(socket) => socket,
             Err(_) => continue,
         };
-        if socket.set_read_timeout(Some(HELLO_INTERVAL)).is_err() {
-            continue;
-        }
 
         let slot = arrivals.clone();
-        // Where this payload's telemetry is supposed to come from, which is
-        // the same place the hello goes to: `payload_telemetry.source_base`
-        // counted on by the payload's id.
+        // Where this payload's telemetry is supposed to come from:
+        // `payload_telemetry.source_base` counted on by the payload's id,
+        // which is the socket tcspecial binds for it.
         let expected = HostPort {
             address: oc.address.clone(),
             port: oc.port,
         };
-        thread::spawn(move || serve(socket, address, expected, slot, row));
+        thread::spawn(move || serve(socket, expected, slot, row));
     }
 
     arrivals
 }
 
-/// Where a handler's OC endpoint is, as an address to send to.
-fn oc_address(oc: &NetworkConfig) -> Option<SocketAddr> {
-    format!("{}:{}", oc.address, oc.port).parse().ok()
-}
-
-/// Say hello, then keep what arrives.
-fn serve(
-    socket: UdpSocket,
-    handler: SocketAddr,
-    expected: HostPort,
-    arrivals: Arrivals,
-    row: usize,
-) {
+/// Keep what arrives from one payload.
+fn serve(socket: UdpSocket, expected: HostPort, arrivals: Arrivals, row: usize) {
     let mut buffer = vec![0u8; 65535];
 
     // How many have arrived from this payload. Kept here rather than read
@@ -144,24 +123,11 @@ fn serve(
     // cannot cost a count.
     let mut packets = 0u64;
 
+    // Everything that arrives, for as long as the window is up. Each datagram
+    // replaces the one before it: a panel shows the last thing that came, as
+    // it does for the spacecraft's own samples.
     loop {
-        // An empty datagram. The handler's reader records the address it came
-        // from and hands up nought bytes, which its conduit drops rather than
-        // writing on to the payload -- so this teaches the handler where the
-        // ground is without putting a byte into the payload's link.
-        if socket.send_to(&[], handler).is_err() {
-            // Nothing to be done about it here, and the next pass tries
-            // again: a handler that has not been started yet is the usual
-            // reason, and it will be.
-            thread::sleep(HELLO_INTERVAL);
-            continue;
-        }
-
-        // Everything that arrives until the hello is due again. Each datagram
-        // replaces the one before it: a panel shows the last thing that came,
-        // as it does for the spacecraft's own samples.
-        loop {
-            match socket.recv_from(&mut buffer) {
+        match socket.recv_from(&mut buffer) {
                 // Only from the payload's own end of this link. A datagram
                 // from anywhere else is another payload's, or another
                 // program's, and showing it in this panel would be reporting
@@ -187,12 +153,13 @@ fn serve(
                         }
                     }
                 }
-                // A datagram of no bytes is somebody else saying hello, which
-                // is not data from a payload.
-                Ok(_) => {}
-                // The read timed out, which is how often hello is said.
-                Err(_) => break,
-            }
+            // A datagram of no bytes carries nothing to show. Nothing sends
+            // one now -- the hello that did is gone -- and one that arrives is
+            // not data from a payload.
+            Ok(_) => {}
+            // Nothing to be done about a failed read here, and nothing to
+            // show: the next one is waited for.
+            Err(_) => {}
         }
     }
 }
@@ -200,15 +167,26 @@ fn serve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::{DHMode, DHName, EndpointConfig, NetworkProtocol};
+    use std::net::SocketAddr;
+    use std::time::Duration;
+    use tcslibgs::{DHMode, DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
+
+    /// A port nothing holds, found by binding one and letting it go.
+    ///
+    /// Both ends of a payload's data link are now named by the configuration,
+    /// so a test has to know the ground's port in advance -- the listener
+    /// binds it and the test's stand-in for a handler sends to it. A number
+    /// written here would fail whenever something else on the machine held it.
+    fn a_free_port() -> u16 {
+        let probe = UdpSocket::bind("127.0.0.1:0").expect("a free port");
+        let port = probe.local_addr().expect("where it is").port();
+        drop(probe);
+        port
+    }
 
     /// A handler as a payload set describes one: both ends of its data link,
     /// which the two bases of the tcspecial section give it.
-    ///
-    /// The ground's end is bound by the listener, so it is a port the system
-    /// chooses here: a test that named one would fail whenever something else
-    /// on the machine happened to hold it.
-    fn handler(oc: Option<SocketAddr>) -> DHConfig {
+    fn handler(oc: Option<SocketAddr>, ground: Option<SocketAddr>) -> DHConfig {
         DHConfig {
             name: DHName::new("auto-send"),
             endpoint: EndpointConfig::Network(NetworkConfig {
@@ -222,40 +200,37 @@ mod tests {
                 address: addr.ip().to_string(),
                 port: addr.port(),
             }),
-            ground: oc.map(|_| NetworkConfig {
+            ground: ground.map(|addr| NetworkConfig {
                 protocol: NetworkProtocol::Udp,
-                address: "127.0.0.1".to_string(),
-                port: 0,
+                address: addr.ip().to_string(),
+                port: addr.port(),
             }),
             mode: DHMode::Periodic,
             stale_interval_ms: None,
         }
     }
 
-    /// The ground says hello and then keeps what the handler sends.
+    /// The ground keeps what the handler sends, without saying anything
+    /// first.
     ///
-    /// Both halves matter. Without the hello a handler has no peer and cannot
-    /// send at all -- which is how a payload's data used to reach a handler
-    /// and go no further -- and without keeping what arrives there is nothing
-    /// for a panel to show.
+    /// Both ends of the link are in the configuration, so the handler sends to
+    /// the end this binds from its first datagram. The hello that used to
+    /// teach it where the ground was is gone, and so is the silence that
+    /// followed a START_DH rebinding the handler's socket.
     #[test]
-    fn the_ground_says_hello_and_keeps_what_arrives() {
-        // Standing in for a handler's OC endpoint, which binds the address
-        // the ground sends to.
+    fn the_ground_keeps_what_arrives() {
+        // Standing in for a handler's OC endpoint, which binds the vehicle's
+        // end and sends to the ground's.
         let oc = UdpSocket::bind("127.0.0.1:0").expect("a handler's OC socket");
-        oc.set_read_timeout(Some(Duration::from_secs(5)))
-            .expect("a timeout");
         let at = oc.local_addr().expect("where it is");
+        let ground: SocketAddr = format!("127.0.0.1:{}", a_free_port())
+            .parse()
+            .expect("the ground's end");
 
-        let arrivals = listen(&[handler(Some(at))]);
+        let arrivals = listen(&[handler(Some(at), Some(ground))]);
 
-        // The hello: a datagram of no bytes, which is what teaches a handler
-        // where the ground is without carrying anything into the payload.
-        let mut buffer = [0u8; 64];
-        let (size, ground) = oc.recv_from(&mut buffer).expect("the ground said hello");
-        assert_eq!(size, 0, "the hello must carry nothing into the payload link");
-
-        // What a payload sent, as a handler would forward it.
+        // What a payload sent, as a handler would forward it: straight to
+        // where the configuration says the ground is.
         oc.send_to(b"from the payload", ground).expect("it is sent");
 
         let found = (0..50)
@@ -297,14 +272,12 @@ mod tests {
     #[test]
     fn a_datagram_from_elsewhere_is_not_this_payloads() {
         let oc = UdpSocket::bind("127.0.0.1:0").expect("a handler's OC socket");
-        oc.set_read_timeout(Some(Duration::from_secs(5)))
-            .expect("a timeout");
         let at = oc.local_addr().expect("where it is");
+        let ground: SocketAddr = format!("127.0.0.1:{}", a_free_port())
+            .parse()
+            .expect("the ground's end");
 
-        let arrivals = listen(&[handler(Some(at))]);
-
-        let mut buffer = [0u8; 64];
-        let (_, ground) = oc.recv_from(&mut buffer).expect("the ground said hello");
+        let arrivals = listen(&[handler(Some(at), Some(ground))]);
 
         // A stranger first, then the payload: what the panel ends up with
         // must be the payload's, and the count must be one.
@@ -336,7 +309,7 @@ mod tests {
     /// waiting on nobody.
     #[test]
     fn a_handler_with_no_oc_address_is_not_listened_for() {
-        let arrivals = listen(&[handler(None)]);
+        let arrivals = listen(&[handler(None, None)]);
         assert_eq!(arrivals.lock().expect("the slots").len(), 1);
         assert!(
             arrivals.lock().expect("the slots")[0].is_none(),

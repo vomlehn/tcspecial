@@ -33,19 +33,59 @@ pub struct UdpEndpoint {
     socket: UdpSocket,
     /// Where the other end of this link last spoke from.
     ///
-    /// A handler's OC socket binds an address the ground sends to; sending
-    /// back needs the ground's own address, which no configuration states.
-    /// It is learnt from what arrives, which is how the command interpreter
-    /// already answers the ground: `recv_from` then `send_to`.
+    /// Learnt from what arrives, which is how the command interpreter answers
+    /// the ground: `recv_from` then `send_to`. It is what a payload's own
+    /// socket has to go on -- the payload is the end that speaks first over
+    /// UDP and no configuration says where it will speak from.
     ///
     /// Shared with every duplicate of this endpoint, so that the conduit
     /// reading the socket teaches the conduit writing it where to send.
     peer: Arc<Mutex<Option<SocketAddr>>>,
+    /// Or where the configuration says the other end is, for a link that is
+    /// written down at both ends.
+    ///
+    /// A payload's ground link is: `payload_telemetry.dest_base` counted on by
+    /// the payload's id, which is what the MOC binds. Stated beats learnt, so
+    /// this sends there from the first datagram -- a ground station does not
+    /// have to say hello to be sent to, and one that said hello once and was
+    /// then cut off by a START_DH rebinding this socket is a failure mode
+    /// that has gone with it.
+    told: Option<SocketAddr>,
     _buffer: Vec<u8>,
 }
 
 impl UdpEndpoint {
     pub fn new(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
+        Self::bound(what, config, None)
+    }
+
+    /// An endpoint that sends where the configuration says, not where it was
+    /// last spoken to from.
+    ///
+    /// For a link whose far end is written down: a payload's ground link, both
+    /// ends of which come out of `payload_telemetry`. `dest` is that far end.
+    pub fn sending_to(
+        what: &str,
+        config: &NetworkConfig,
+        dest: &NetworkConfig,
+    ) -> TcsResult<Self> {
+        let told = format!("{}:{}", dest.address, dest.port)
+            .parse::<SocketAddr>()
+            .map_err(|e| {
+                TcsError::Config(format!(
+                    "{what}: \"{}:{}\" is where the configuration says the ground \
+                     is, and it is not an address: {e}",
+                    dest.address, dest.port
+                ))
+            })?;
+        Self::bound(what, config, Some(told))
+    }
+
+    fn bound(
+        what: &str,
+        config: &NetworkConfig,
+        told: Option<SocketAddr>,
+    ) -> TcsResult<Self> {
         let addr = format!("{}:{}", config.address, config.port);
         let socket = UdpSocket::bind(&addr)
             .map_err(|e| bind_failed(&format!("{what} UDP endpoint"), &addr, e))?;
@@ -55,6 +95,7 @@ impl UdpEndpoint {
             what: what.to_string(),
             socket,
             peer: Arc::new(Mutex::new(None)),
+            told,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -76,6 +117,7 @@ impl UdpEndpoint {
             // conduit reads this socket while another writes it, and only the
             // reader learns where the far end is.
             peer: self.peer.clone(),
+            told: self.told,
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -116,13 +158,15 @@ impl EndpointReadable for UdpEndpoint {
 
 impl EndpointWritable for UdpEndpoint {
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
-        // Nowhere to send until the far end has spoken. Reported rather than
-        // counted as a write of no bytes, because the data is dropped and a
-        // write that moved nothing is not a write that succeeded.
-        let peer = self.peer().ok_or_else(|| {
+        // Where the configuration says, or where the far end last spoke
+        // from. Nowhere to send until one of the two is known: reported
+        // rather than counted as a write of no bytes, because the data is
+        // dropped and a write that moved nothing is not a write that
+        // succeeded.
+        let peer = self.told.or_else(|| self.peer()).ok_or_else(|| {
             TcsError::Endpoint(format!(
-                "{}: nothing has been received on this socket yet, so there is no \
-                 address to send to",
+                "{}: nothing says where the far end is -- the configuration \
+                 states none and nothing has been received on this socket yet",
                 self.what
             ))
         })?;
@@ -138,6 +182,77 @@ impl EndpointWritable for UdpEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An endpoint told where the far end is sends there, unprompted.
+    ///
+    /// Which is what a payload's ground link is: both ends are written in the
+    /// configuration, so the first datagram of telemetry goes to the ground
+    /// without the ground having said anything. It used to have to say hello
+    /// once a second, because this socket is rebound by every START_DH and
+    /// the peer it had learnt went with it.
+    #[test]
+    fn an_endpoint_told_where_the_ground_is_sends_there() {
+        use std::net::UdpSocket;
+        use std::time::Duration;
+        use tcslibgs::NetworkProtocol;
+
+        // The ground's end, bound and listening, and the vehicle's, which is
+        // a port the system chooses.
+        let ground = UdpSocket::bind("127.0.0.1:0").unwrap();
+        ground
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let at = ground.local_addr().unwrap();
+
+        let mine = NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: "127.0.0.1".to_string(),
+            port: 0,
+        };
+        let theirs = NetworkConfig {
+            protocol: NetworkProtocol::Udp,
+            address: at.ip().to_string(),
+            port: at.port(),
+        };
+
+        let reader = UdpEndpoint::sending_to("auto-send", &mine, &theirs).unwrap();
+        let mut writer = reader.try_clone().unwrap();
+
+        // Nothing has arrived on it, and it sends all the same.
+        assert_eq!(
+            writer.write(b"telemetry").expect("it knows where to send"),
+            b"telemetry".len()
+        );
+
+        let mut buffer = [0u8; 64];
+        let (size, _) = ground
+            .recv_from(&mut buffer)
+            .expect("the ground should be sent to without asking");
+        assert_eq!(&buffer[..size], b"telemetry");
+
+        // And what the configuration says beats what arrives: a datagram from
+        // somewhere else does not move the link.
+        let stranger = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let mut reading = reader;
+        stranger
+            .send_to(b"from the ground", mine_address(&writer))
+            .expect("it is sent");
+        let mut into = [0u8; 64];
+        // Read so that the peer is learnt, which is what would have taken the
+        // link over before.
+        let _ = reading.read(&mut into);
+        writer.write(b"again").expect("it still knows where to send");
+        let (size, _) = ground
+            .recv_from(&mut buffer)
+            .expect("the stranger should not have taken the link");
+        assert_eq!(&buffer[..size], b"again");
+    }
+
+    /// Where an endpoint's own socket is bound, for a test that has to send
+    /// to it.
+    fn mine_address(endpoint: &UdpEndpoint) -> std::net::SocketAddr {
+        endpoint.socket.local_addr().expect("where it is bound")
+    }
 
     /// A handler's OC socket cannot send until the ground has spoken, and can
     /// afterwards.

@@ -253,8 +253,7 @@ payloads:
   - name: DH0
     type: network
     protocol: udp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 ";
 

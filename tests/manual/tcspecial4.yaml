@@ -77,8 +77,7 @@ payloads:
   - name: udp-steady
     type: network
     protocol: udp
-    address: localhost
-    port: 5400
+    payload_interface: localhost:5400
     packet_size: 12
 
   # A device file, read as it comes. /dev/urandom rather than a path under
@@ -101,7 +100,7 @@ payloads:
   - name: bus-device
     type: i2c
     path: /tmp/tcspecial4-bus
-    address: 0x48
+    payload_address: 0x48
     packet_size: 12
 
   # A peripheral on a clocked link. The rate and the mode are the two terms a

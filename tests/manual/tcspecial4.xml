@@ -56,8 +56,7 @@
         <name>udp-steady</name>
         <type>network</type>
         <protocol>udp</protocol>
-        <address>localhost</address>
-        <port>5400</port>
+        <payload_interface>localhost:5400</payload_interface>
         <packet_size>12</packet_size>
     </payloads>
     <payloads>
@@ -70,7 +69,7 @@
         <name>bus-device</name>
         <type>i2c</type>
         <path>/tmp/tcspecial4-bus</path>
-        <address>0x48</address>
+        <payload_address>0x48</payload_address>
         <packet_size>12</packet_size>
     </payloads>
     <payloads>

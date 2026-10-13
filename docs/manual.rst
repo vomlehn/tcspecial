@@ -232,8 +232,8 @@ where it is read.
 What follows is the attributes every payload has, whatever it is, and then one
 section per type of payload for the attributes only that type has. A payload
 states its type in ``type`` and is then held to that type's attributes and no
-others: a device stating a ``port``, or a network payload stating a ``path``,
-is refused.
+others: a device stating a ``payload_interface``, or a network payload stating
+a ``path``, is refused.
 
 About the experimental interfaces
 ---------------------------------
@@ -361,8 +361,7 @@ YAML one states with the format's own escapes.
      - name: auto-send
        type: network
        protocol: tcp
-       address: localhost
-       port: 5000
+       payload_interface: localhost:5000
        packet_size: 12
 
      # Answers a request: both halves of the request are here, and the rate
@@ -370,8 +369,7 @@ YAML one states with the format's own escapes.
      - name: triggered-send
        type: network
        protocol: tcp
-       address: localhost
-       port: 5001
+       payload_interface: localhost:5001
        packet_size: 12
        mode: triggered
        trigger: '"READ\r"'      # or 52 45 41 44 0D, the same bytes
@@ -400,10 +398,11 @@ Keyword ``type: network``. A socket, which the transport decides the shape of.
 .. code-block:: text
 
    protocol       tcp | udp | unix_stream | unix_dgram
-   address        the host this payload is reached at, or the path of a
-                  Unix-domain socket
-   port           the port it is reached at; none for a Unix socket, which is
-                  named by its path alone
+   payload_interface
+                  where this payload is reached: the host and the port with a
+                  colon between them, as localhost:5000 -- or the path of a
+                  Unix-domain socket, which has no port and so is written
+                  alone
 
 Which end waits and which reaches out follows from the transport, and so does
 whether a handler can trigger the payload at all: a stream is connected, so
@@ -801,7 +800,7 @@ same bus and differ only in which device the master addresses.
 .. code-block:: text
 
    path           the bus
-   address        the address of the device on it
+   payload_address the address of the device on it
 
    ten_bit        true | false, ten address bits rather than seven
    pec            true | false, an SMBus packet error check on each transfer
@@ -876,8 +875,8 @@ otherwise produces a payload that looks configured and is not:
   two sets may name their payloads and their groups alike, and the shipped
   examples do.
 * An **attribute of another type** -- a device file payload stating
-  ``protocol``, ``address`` or ``port``, or a network payload stating
-  ``path``. The check is
+  ``protocol``, ``payload_address`` or ``payload_interface``, or a network
+  payload stating ``path`` or ``payload_address``. The check is
   made after the group has been laid under the payload, since an attribute
   inherited from a group reaches the payload just as one it states itself
   does: a payload of one type joining a group written for another is what this
@@ -937,19 +936,17 @@ in the MOC shows.
      - name: udp_localhost
        type: network
        protocol: udp
-       address: localhost
 
    payloads:
      - name: tcp-stream
        type: network
        protocol: tcp
-       address: localhost
-       port: 5000
+       payload_interface: localhost:5000
        packet_size: 12
 
      - name: udp-steady
        group: udp_localhost
-       port: 5001
+       payload_interface: localhost:5001
        packet_size: 11
 
      - name: random-device
@@ -959,7 +956,7 @@ in the MOC shows.
 
      - name: udp-fast
        group: udp_localhost
-       port: 5003
+       payload_interface: localhost:5003
        packet_size: 15
 
 The same set in the other format is the shipped ``tcspecial1.xml``. It
@@ -1162,9 +1159,10 @@ sends. Stating the type here makes that pairing an error instead.
                           a Unix datagram payload, which answers from a path
 
 Where the payload *is* is not stated here at all: the simulator takes it from
-the tcspecial configuration, which decides it. Writing ``address`` or ``port``
-here is refused with the place they belong -- they are the likeliest thing to
-be carried across from the other file.
+the tcspecial configuration, which decides it. Writing ``payload_interface``
+here -- or ``address`` or ``port``, which that file spelled them before -- is
+refused with the place they belong; they are the likeliest thing to be carried
+across from the other file.
 
 What this file may say about an address is the other end of the same link: the
 socket the simulated payload answers from.

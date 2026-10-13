@@ -346,7 +346,7 @@ payloads:
   - name: thermal
     type: i2c
     path: /dev/i2c-1
-    address: 0x48
+    payload_address: 0x48
     pec: true
     packet_size: 8
   - name: imu
@@ -364,7 +364,7 @@ payloads:
     <name>thermal</name>
     <type>i2c</type>
     <path>/dev/i2c-1</path>
-    <address>0x48</address>
+    <payload_address>0x48</payload_address>
     <pec>true</pec>
     <packet_size>8</packet_size>
   </payloads>

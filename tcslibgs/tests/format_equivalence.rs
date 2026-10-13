@@ -81,14 +81,17 @@ fn the_actual_file_has_expected_contents() {
     assert_eq!(group.dh_type.as_deref(), Some("network"));
     assert_eq!(group.protocol.as_deref(), Some("udp"));
     assert_eq!(group.packet_size, Some(12));
-    assert_eq!(group.port, None, "a port tells one handler of a group from another");
+    assert_eq!(
+        group.payload_interface, None,
+        "where a payload is tells one handler of a group from another"
+    );
 
     // A handler in the group states only what the group does not carry.
     let network = &config.payloads[0];
     assert_eq!(network.group.as_deref(), Some("udp_localhost"));
     assert_eq!(network.dh_type, None);
     assert_eq!(network.packet_size, None);
-    assert_eq!(network.port, Some(5000));
+    assert_eq!(network.payload_interface.as_deref(), Some("localhost:5000"));
     assert_eq!(network.path, None);
 
     // A handler in no group states everything itself.
@@ -96,7 +99,7 @@ fn the_actual_file_has_expected_contents() {
     assert_eq!(device.group, None);
     assert_eq!(device.dh_type.as_deref(), Some("device-file"));
     assert_eq!(device.path.as_deref(), Some("/dev/ttyS0"));
-    assert_eq!(device.port, None);
+    assert_eq!(device.payload_interface, None);
 }
 
 #[test]
@@ -137,7 +140,7 @@ description: one handler naming a group that is not there
 payloads:
   - name: DH0
     group: nonesuch
-    port: 5000
+    payload_port: 5000
     packet_size: 1
 ",
         )
@@ -160,14 +163,14 @@ payload_groups:
   - name: dup
     type: network
     protocol: udp
-    address: localhost
+    payload_address: localhost
   - name: dup
     type: device-file
     path: /dev/null
 payloads:
   - name: DH0
     group: dup
-    port: 5000
+    payload_port: 5000
     packet_size: 1
 ",
         )

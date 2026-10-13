@@ -37,20 +37,18 @@
         <name>udp_localhost</name>
         <type>network</type>
         <protocol>udp</protocol>
-        <address>localhost</address>
     </payload_groups>
     <payloads>
         <name>tcp-stream</name>
         <type>network</type>
         <protocol>tcp</protocol>
-        <address>localhost</address>
-        <port>5000</port>
+        <payload_interface>localhost:5000</payload_interface>
         <packet_size>12</packet_size>
     </payloads>
     <payloads>
         <name>udp-steady</name>
         <group>udp_localhost</group>
-        <port>5001</port>
+        <payload_interface>localhost:5001</payload_interface>
         <packet_size>11</packet_size>
     </payloads>
     <payloads>
@@ -62,7 +60,7 @@
     <payloads>
         <name>udp-fast</name>
         <group>udp_localhost</group>
-        <port>5003</port>
+        <payload_interface>localhost:5003</payload_interface>
         <packet_size>15</packet_size>
     </payloads>
 </payload>

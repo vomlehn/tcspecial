@@ -37,8 +37,7 @@
         <name>auto-send</name>
         <type>network</type>
         <protocol>tcp</protocol>
-        <address>localhost</address>
-        <port>5000</port>
+        <payload_interface>localhost:5000</payload_interface>
         <packet_size>12</packet_size>
     </payloads>
 </payload>

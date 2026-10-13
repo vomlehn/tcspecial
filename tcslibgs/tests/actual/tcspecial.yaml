@@ -41,14 +41,13 @@ payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
     packet_size: 12
 payloads:
   # Takes everything but its port from the group it names, so this is also
   # the proof that an attribute stated only by a group reaches the handler.
   - name: udp-grouped
     group: udp_localhost
-    port: 5000
+    payload_interface: localhost:5000
   # States every attribute for itself, naming no group.
   - name: device-alone
     type: device-file

@@ -1127,9 +1127,9 @@ fn link_of(
     let location = match kind {
         DHType::I2c => {
             let address = stated
-                .address
+                .payload_address
                 .clone()
-                .or_else(|| group.and_then(|g| g.address.clone()))
+                .or_else(|| group.and_then(|g| g.payload_address.clone()))
                 .ok_or_else(|| {
                     format!("payload \"{name}\" is on an I2C bus, so it needs an address on it")
                 })?;
@@ -1592,10 +1592,15 @@ pub struct DHGroupJson {
     pub dh_type: Option<String>,
     #[serde(default)]
     pub protocol: Option<String>,
+    /// Where the payloads of this group are; see
+    /// [`DHConfigJson::payload_address`] and
+    /// [`DHConfigJson::payload_interface`].
     #[serde(default)]
-    pub address: Option<String>,
+    pub payload_address: Option<String>,
     #[serde(default)]
-    pub port: Option<u16>,
+    pub payload_interface: Option<String>,
+    #[serde(default)]
+    pub payload_port: Option<u16>,
     #[serde(default)]
     pub path: Option<String>,
     #[serde(default)]
@@ -1785,10 +1790,34 @@ pub struct DHConfigJson {
     pub dh_type: Option<String>,
     #[serde(default)]
     pub protocol: Option<String>,
+    /// Where the payload itself is, for a payload that is not on a network:
+    /// the address a peripheral has on its bus, or the interface a CAN
+    /// payload is on.
+    ///
+    /// Named for the payload because that is whose address it is. The ground
+    /// link is not here and cannot be: it is `payload_telemetry` counted on by
+    /// the payload's own id, which only the file as a whole knows.
     #[serde(default)]
-    pub address: Option<String>,
+    pub payload_address: Option<String>,
+    /// Where a payload on a network is: `address:port`, or the path of a Unix
+    /// socket, which has no port.
+    ///
+    /// One attribute and not two, as every link in the `tcspecial` section
+    /// is: an address and a port only ever used together are one fact about a
+    /// payload, and two attributes are two chances to state half of it. A
+    /// network payload states this and not `payload_address`, and every other
+    /// kind the other way about -- each kind is told by name which of the two
+    /// is its own.
     #[serde(default)]
-    pub port: Option<u16>,
+    pub payload_interface: Option<String>,
+    /// Named here only to be refused.
+    ///
+    /// A network payload's port is the second half of `payload_interface`
+    /// now, and no other kind of payload has one at all. Kept as a field
+    /// rather than left unknown so that the refusal can say where the port
+    /// went.
+    #[serde(default)]
+    pub payload_port: Option<u16>,
     #[serde(default)]
     pub path: Option<String>,
     #[serde(default)]
@@ -1994,10 +2023,13 @@ impl DHConfigJson {
             .as_deref()
             .or_else(|| group.and_then(|g| g.protocol.as_deref()));
         let address = self
-            .address
+            .payload_address
             .as_deref()
-            .or_else(|| group.and_then(|g| g.address.as_deref()));
-        let port = self.port.or_else(|| group.and_then(|g| g.port));
+            .or_else(|| group.and_then(|g| g.payload_address.as_deref()));
+        let payload_interface = self
+            .payload_interface
+            .as_deref()
+            .or_else(|| group.and_then(|g| g.payload_interface.as_deref()));
         let path = self
             .path
             .as_deref()
@@ -2083,36 +2115,63 @@ impl DHConfigJson {
             ));
         }
 
+        // A port stated on a payload, which is the second half of a network
+        // payload's payload_interface now and nothing at all to any other
+        // kind. Said by name rather than left to the table below, because the
+        // remedy is to join it to the address rather than to delete it.
+        if self.payload_port.is_some() || group.is_some_and(|g| g.payload_port.is_some()) {
+            return Err(format!(
+                "payload \"{}\": payload_port is not an attribute any more -- a \
+                 payload on a network states payload_interface, which is its \
+                 address and its port with a colon between them, and no other \
+                 kind of payload has a port at all",
+                self.name
+            ));
+        }
+
         let stream = self.stream.is_some() || group.is_some_and(|g| g.stream.is_some());
+        let on_a_network = (
+            "payload_interface",
+            self.payload_interface.is_some(),
+            payload_interface.is_some(),
+        );
+        let its_own_address = (
+            "payload_address",
+            self.payload_address.is_some(),
+            address.is_some(),
+        );
         let foreign: &[(&str, bool, bool)] = match kind {
+            // A payload on a network says where it is in one attribute, so
+            // the address by itself is not its own.
             DHType::Network => &[
                 ("path", self.path.is_some(), path.is_some()),
+                its_own_address,
                 ("stream", self.stream.is_some(), stream),
             ],
             DHType::Device => &[
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
-                ("address", self.address.is_some(), address.is_some()),
-                ("port", self.port.is_some(), port.is_some()),
+                its_own_address,
+                on_a_network,
                 ("stream", self.stream.is_some(), stream),
             ],
             DHType::I2c => &[
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
-                ("port", self.port.is_some(), port.is_some()),
+                on_a_network,
             ],
             // A CAN payload is on an interface: it has no path, no host and
             // no port, and a frame is its own length so it has no stream
             // rule either.
             DHType::Can => &[
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
-                ("address", self.address.is_some(), address.is_some()),
-                ("port", self.port.is_some(), port.is_some()),
+                its_own_address,
+                on_a_network,
                 ("path", self.path.is_some(), path.is_some()),
                 ("stream", self.stream.is_some(), stream),
             ],
             _ => &[
                 ("protocol", self.protocol.is_some(), protocol.is_some()),
-                ("address", self.address.is_some(), address.is_some()),
-                ("port", self.port.is_some(), port.is_some()),
+                its_own_address,
+                on_a_network,
             ],
         };
         // And the two attributes that locate a CAN payload, which belong to
@@ -2201,10 +2260,54 @@ impl DHConfigJson {
                     })?,
                     None => return Err("Invalid or missing protocol".to_string()),
                 };
+                // One attribute, split where the protocol has a port to
+                // split off. A Unix socket is a path and has none, so the
+                // whole of it is the address -- which is why this is not
+                // `host_port_of`: that is for the links in the tcspecial
+                // section, every one of which has a port.
+                let said = payload_interface.ok_or_else(|| {
+                    format!(
+                        "payload \"{}\" is on a network, so it needs a \
+                         payload_interface saying where: address:port, or the \
+                         path of a Unix socket",
+                        self.name
+                    )
+                })?;
+                let (address, port) = match protocol {
+                    NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
+                        (said.trim().to_string(), 0)
+                    }
+                    NetworkProtocol::Tcp | NetworkProtocol::Udp => {
+                        let (address, port) = said.trim().rsplit_once(':').ok_or_else(|| {
+                            format!(
+                                "payload \"{}\": payload_interface \"{said}\" is not \
+                                 an address and a port: it is written as \
+                                 address:port, as localhost:5000",
+                                self.name
+                            )
+                        })?;
+                        let port: u16 = port.trim().parse().map_err(|_| {
+                            format!(
+                                "payload \"{}\": payload_interface \"{said}\" ends in \
+                                 \"{port}\", which is not a port: a port is a whole \
+                                 number between 1 and 65535",
+                                self.name
+                            )
+                        })?;
+                        if address.trim().is_empty() {
+                            return Err(format!(
+                                "payload \"{}\": payload_interface \"{said}\" states no \
+                                 address",
+                                self.name
+                            ));
+                        }
+                        (address.trim().to_string(), port)
+                    }
+                };
                 EndpointConfig::Network(NetworkConfig {
                     protocol,
-                    address: address.ok_or("Missing address")?.to_string(),
-                    port: port.ok_or("Missing port")?,
+                    address,
+                    port,
                 })
             }
             DHType::Device => EndpointConfig::Device(DeviceConfig {
@@ -2796,8 +2899,9 @@ mod tests {
             group: None,
             dh_type: Some("device-file".to_string()),
             protocol: None,
-            address: None,
-            port: None,
+            payload_address: None,
+            payload_interface: None,
+            payload_port: None,
             path: Some("/dev/urandom".to_string()),
             packet_size: Some(4),
             mode: None,
@@ -2821,8 +2925,7 @@ mod tests {
             group: None,
             dh_type: Some("network".to_string()),
             protocol: Some("tcp".to_string()),
-            address: Some("localhost".to_string()),
-            port: Some(5000),
+            payload_interface: Some("localhost:5000".to_string()),
             path: None,
             packet_size: Some(8),
             mode: Some("triggered".to_string()),
@@ -2859,8 +2962,7 @@ mod tests {
                 group: None,
                 dh_type: Some("network".to_string()),
                 protocol: Some("tcp".to_string()),
-                address: Some("localhost".to_string()),
-                port: Some(5000),
+                payload_interface: Some("localhost:5000".to_string()),
                 path: None,
                 packet_size: Some(8),
                 mode: mode.map(str::to_string),
@@ -2910,8 +3012,7 @@ mod tests {
                 group: None,
                 dh_type: Some("network".to_string()),
                 protocol: Some(protocol.to_string()),
-                address: Some("localhost".to_string()),
-                port: Some(5000),
+                payload_interface: Some("localhost:5000".to_string()),
                 path: None,
                 packet_size: Some(8),
                 mode: Some("triggered".to_string()),
@@ -3151,15 +3252,14 @@ payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
 payloads:
   - name: DH1
     group: udp_localhost
-    port: 5001
+    payload_interface: localhost:5001
     packet_size: 11
   - name: DH3
     group: udp_localhost
-    port: 5003
+    payload_interface: localhost:5003
     packet_size: 15
 ",
         );
@@ -3198,13 +3298,12 @@ payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
     packet_size: 11
 payloads:
   - name: DH0
     group: udp_localhost
     protocol: tcp
-    port: 5000
+    payload_interface: localhost:5000
 ",
         );
 
@@ -3389,7 +3488,7 @@ payloads:
     fn a_payload_file_describes_a_bus_and_a_peripheral() {
         let i2c = "version: \"1.0\"\ndescription: a bus\n\
                    payloads:\n  - name: sensor\n    type: i2c\n    \
-                   path: /dev/i2c-1\n    address: 0x48\n    pec: true\n    \
+                   path: /dev/i2c-1\n    payload_address: 0x48\n    pec: true\n    \
                    packet_size: 8\n";
         let config: PayloadConfig = ConfigFormat::Yaml.parse(i2c).expect("it parses");
         match &config.to_dh_configs().expect("it resolves")[0].endpoint {
@@ -3450,7 +3549,7 @@ payloads:
 
         let reserved = "version: \"1.0\"\ndescription: a bus\n\
                         payloads:\n  - name: sensor\n    type: i2c\n    \
-                        path: /dev/i2c-1\n    address: 0x00\n    packet_size: 8\n";
+                        path: /dev/i2c-1\n    payload_address: 0x00\n    packet_size: 8\n";
         let said = ConfigFormat::Yaml
             .parse::<PayloadConfig>(reserved)
             .expect("it parses")
@@ -3589,8 +3688,7 @@ payloads:
   - name: p
     type: network
     protocol: udp
-    address: localhost
-    port: {port}
+    payload_interface: localhost:{port}
     packet_size: 1
 "
             )
@@ -3715,13 +3813,11 @@ payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
 payloads:
   - name: DH0
     type: network
     protocol: tcp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 ",
         );
@@ -3750,8 +3846,7 @@ payloads:
   - name: DH0
     type: network
     protocol: udp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 {second}
 "
@@ -3760,7 +3855,7 @@ payloads:
 
         let same_name = payload(&two(
             "  - name: DH0\n    type: network\n    protocol: udp\n    \
-             address: localhost\n    port: 5001\n    packet_size: 12",
+             payload_interface: localhost:5001\n    packet_size: 12",
         ));
         let said = same_name
             .to_dh_configs()
@@ -3774,7 +3869,7 @@ payloads:
         // checks must not get in the way of.
         let distinct = payload(&two(
             "  - name: DH1\n    type: network\n    protocol: udp\n    \
-             address: localhost\n    port: 5001\n    packet_size: 12",
+             payload_interface: localhost:5001\n    packet_size: 12",
         ));
         assert_eq!(distinct.to_dh_configs().expect("both convert").len(), 2);
     }
@@ -3806,7 +3901,7 @@ payloads:
 
         let udp = |port: u16| {
             format!(
-                "    type: network\n    protocol: udp\n    address: localhost\n    port: {port}"
+                "    type: network\n    protocol: udp\n    payload_interface: localhost:{port}"
             )
         };
         let device = |path: &str| format!("    type: device-file\n    path: {path}");
@@ -3816,7 +3911,7 @@ payloads:
         // port.
         let said = payload(&pair(
             &udp(5000),
-            "    type: network\n    protocol: udp\n    address: 127.0.0.1\n    port: 5000",
+            "    type: network\n    protocol: udp\n    payload_interface: 127.0.0.1:5000",
         ))
         .to_dh_configs()
         .expect_err("two payloads at one port");
@@ -3960,11 +4055,10 @@ payload_groups:
   - name: localhost_udp
     type: network
     protocol: udp
-    address: localhost
 payloads:
   - name: DH0
     group: localhost_udp
-    port: {port}
+    payload_interface: localhost:{port}
     packet_size: {packet_size}
 "
             )
@@ -4002,8 +4096,7 @@ payloads:
     type: device-file
     path: /dev/urandom
     protocol: udp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 1
 ",
         );
@@ -4023,8 +4116,7 @@ payloads:
   - name: DH0
     type: network
     protocol: udp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     path: /dev/urandom
     packet_size: 12
 ",
@@ -4047,7 +4139,6 @@ payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
 payloads:
   - name: DH0
     group: udp_localhost
@@ -4078,8 +4169,7 @@ payloads:
   - name: DH0
     type: network
     protocol: udp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
     oc_adress: 127.0.0.1
 ",
@@ -4095,8 +4185,7 @@ payloads:
   - name: DH0
     group: g
     protocol: udp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 ",
             // And on the file.
@@ -4139,8 +4228,7 @@ payloads:
   - name: DH0
     type: network
     protocol: tcp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
     mode: triggered
     packet_interval_ms: 500
@@ -4202,8 +4290,7 @@ payloads:
   - name: DH0
     type: network
     protocol: tcp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 {extra}
 "
@@ -4265,14 +4352,13 @@ payload_groups:
   - name: asked
     type: network
     protocol: tcp
-    address: localhost
     mode: triggered
     trigger: \'\"READ\\r\"\'
     packet_interval_ms: 500
 payloads:
   - name: DH0
     group: asked
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 ";
         let handlers = payload(grouped)
@@ -4300,11 +4386,10 @@ payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
 payloads:
   - name: DH0
     group: udp_localhst
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 ",
         );
@@ -4328,11 +4413,10 @@ payload_groups:
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
 payloads:
   - name: DH0
     group: udp_localhost
-    port: 5000
+    payload_interface: localhost:5000
 ",
         );
 
@@ -4465,7 +4549,7 @@ payloads:
             let said = link(
                 "network",
                 &format!(
-                    "    protocol: udp\n    address: localhost\n    port: 5000\n    \
+                    "    protocol: udp\n    payload_interface: localhost:5000\n    \
                      packet_size: 8\n    {term}\n"
                 ),
             )
@@ -4489,7 +4573,7 @@ payloads:
     fn a_network_payloads_transport_is_its_own() {
         let fine = link(
             "network",
-            "    protocol: udp\n    address: localhost\n    port: 5000\n    \
+            "    protocol: udp\n    payload_interface: localhost:5000\n    \
              packet_size: 8\n",
         )
         .expect("it parses")
@@ -5134,9 +5218,9 @@ payloads:
             ("device-file", "    path: /dev/null\n"),
             (
                 "network",
-                "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n",
+                "    protocol: udp\n    payload_interface: 127.0.0.1:5000\n",
             ),
-            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n"),
+            ("i2c", "    path: /dev/i2c-1\n    payload_address: 0x40\n"),
             (
                 "spi",
                 "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n",
@@ -5171,7 +5255,7 @@ payloads:
     fn a_bus_reads_its_terms() {
         let i2c = bus(
             "    ten_bit: false\n    pec: true\n    retries: 3\n    timeout: 50ms\n    \
-             address: 0x48\n",
+             payload_address: 0x48\n",
         )
         .expect("every term of a bus");
         assert!(!i2c.ten_bit);
@@ -5184,7 +5268,7 @@ payloads:
     fn every_term_of_a_bus_has_a_default() {
         // Nothing but the kind and where it is is required: the protocol
         // fixes the framing, and every knob here has a quiet setting.
-        let i2c = bus("    address: 16\n").expect("a bus states little");
+        let i2c = bus("    payload_address: 16\n").expect("a bus states little");
         assert!(!i2c.ten_bit);
         assert!(!i2c.pec);
         assert_eq!(i2c.retries, 0);
@@ -5193,14 +5277,14 @@ payloads:
 
     #[test]
     fn a_bus_timeout_is_rounded_up_to_the_drivers_resolution() {
-        let i2c = bus("    timeout: 25ms\n    address: 8\n").expect("a timeout");
+        let i2c = bus("    timeout: 25ms\n    payload_address: 8\n").expect("a timeout");
         assert_eq!(i2c.timeout, Some(Duration::from_millis(25)));
         assert_eq!(i2c.effective_timeout(), Some(Duration::from_millis(30)));
     }
 
     #[test]
     fn a_payload_on_a_bus_carries_the_bus_and_its_place_on_it() {
-        let place = bus_place("    path: /dev/i2c-2\n    address: 0x49\n").expect("a place");
+        let place = bus_place("    path: /dev/i2c-2\n    payload_address: 0x49\n").expect("a place");
         assert_eq!(
             place,
             EndpointConfig::I2c(I2cConfig {
@@ -5214,12 +5298,12 @@ payloads:
 
     #[test]
     fn an_address_too_wide_for_the_addressing_is_refused() {
-        let said = bus_place("    path: /dev/i2c-2\n    address: 0x90\n")
+        let said = bus_place("    path: /dev/i2c-2\n    payload_address: 0x90\n")
             .expect_err("0x90 needs eight bits");
         assert!(said.contains("does not fit in 7 bits"), "{said}");
 
         // ...and the same address is fine once the payload says so.
-        let place = bus_place("    path: /dev/i2c-2\n    address: 0x90\n    ten_bit: true\n")
+        let place = bus_place("    path: /dev/i2c-2\n    payload_address: 0x90\n    ten_bit: true\n")
             .expect("ten bits hold it");
         match place {
             EndpointConfig::I2c(i2c) => {
@@ -5235,7 +5319,7 @@ payloads:
         // In range, but the specification keeps these, so no device can
         // answer to one.
         for address in ["0x00", "0x01", "0x07", "0x78", "0x7B", "0x7F"] {
-            let said = bus_place(&format!("    path: /dev/i2c-1\n    address: {address}\n"))
+            let said = bus_place(&format!("    path: /dev/i2c-1\n    payload_address: {address}\n"))
                 .expect_err(address);
             assert!(
                 said.contains("reserved by the I2C specification"),
@@ -5247,7 +5331,7 @@ payloads:
     #[test]
     fn the_addresses_either_side_of_the_reserved_blocks_are_accepted() {
         for (address, want) in [("0x08", 0x08), ("0x77", 0x77)] {
-            let place = bus_place(&format!("    path: /dev/i2c-1\n    address: {address}\n"))
+            let place = bus_place(&format!("    path: /dev/i2c-1\n    payload_address: {address}\n"))
                 .unwrap_or_else(|e| panic!("{address} should be usable: {e}"));
             match place {
                 EndpointConfig::I2c(i2c) => assert_eq!(i2c.address, want, "for {address}"),
@@ -5262,7 +5346,7 @@ payloads:
         // whole space is available and the 7-bit reservations do not apply.
         for address in ["0x00", "0x78", "0x3FF"] {
             bus_place(&format!(
-                "    path: /dev/i2c-1\n    ten_bit: true\n    address: {address}\n"
+                "    path: /dev/i2c-1\n    ten_bit: true\n    payload_address: {address}\n"
             ))
             .unwrap_or_else(|e| panic!("{address} should be usable with ten_bit: {e}"));
         }
@@ -5275,7 +5359,7 @@ payloads:
 
         // And which bus, the two together being what tells one device on a
         // bus from another.
-        let said = bus_place("    address: 0x48\n").expect_err("which bus");
+        let said = bus_place("    payload_address: 0x48\n").expect_err("which bus");
         assert!(said.contains("reached through"), "{said}");
     }
 
@@ -5289,7 +5373,7 @@ payloads:
             ("device-file", "    path: /dev/null\n"),
             (
                 "network",
-                "    protocol: udp\n    address: 127.0.0.1\n    port: 5000\n",
+                "    protocol: udp\n    payload_interface: 127.0.0.1:5000\n",
             ),
         ] {
             let said = link(
@@ -5371,7 +5455,7 @@ payloads:
         let said = link(
             "spi",
             "    path: /dev/spidev0.0\n    max_speed: 1000000\n    spi_mode: 0\n    \
-             packet_size: 8\n    address: 0x10\n    port: 1\n",
+             packet_size: 8\n    payload_address: 0x10\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -5384,7 +5468,7 @@ payloads:
         // A master clocks exactly as many bytes as it asks for, so there is
         // no rule to give for where a read ends.
         for (kind, rest) in [
-            ("i2c", "    path: /dev/i2c-1\n    address: 0x40\n"),
+            ("i2c", "    path: /dev/i2c-1\n    payload_address: 0x40\n"),
             (
                 "spi",
                 "    path: /dev/spidev0.0\n    max_speed: 1\n    spi_mode: 0\n",
@@ -5409,12 +5493,12 @@ payloads:
         for (kind, rest, foreign) in [
             (
                 "i2c",
-                "    path: /dev/i2c-1\n    address: 0x40\n",
+                "    path: /dev/i2c-1\n    payload_address: 0x40\n",
                 "    datarate: 9600\n",
             ),
             (
                 "i2c",
-                "    path: /dev/i2c-1\n    address: 0x40\n",
+                "    path: /dev/i2c-1\n    payload_address: 0x40\n",
                 "    spi_mode: 0\n",
             ),
             (
@@ -5456,7 +5540,7 @@ payloads:
         let yaml = "version: \"1.0\"\ndescription: a bus and a peripheral\n\
                     payloads:\n  \
                     - name: a\n    type: i2c\n    path: /dev/i2c-0\n    \
-                    address: 0x2A\n    pec: true\n    retries: 2\n    \
+                    payload_address: 0x2A\n    pec: true\n    retries: 2\n    \
                     packet_size: 8\n  \
                     - name: b\n    type: spi\n    path: /dev/spidev1.0\n    \
                     max_speed: 8000000\n    spi_mode: 1\n    bit_order: lsb\n    \
@@ -5469,7 +5553,7 @@ payloads:
     <name>a</name>
     <type>i2c</type>
     <path>/dev/i2c-0</path>
-    <address>0x2A</address>
+    <payload_address>0x2A</payload_address>
     <pec>true</pec>
     <retries>2</retries>
     <packet_size>8</packet_size>

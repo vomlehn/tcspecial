@@ -588,8 +588,7 @@ payloads:
   - name: DH1
     type: network
     protocol: udp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 4
 ";
 
@@ -642,7 +641,7 @@ payloads:
   - name: bad_kind
     type: device-file
     path: /dev/null
-    port: 5000
+    payload_port: 5000
     packet_size: 4
 ";
         let set = written(".yaml", text, GOOD_SIM);
@@ -850,7 +849,7 @@ simulated_payloads:
         for id in 0..150 {
             text.push_str(&format!(
                 "  - name: DH{id}\n    type: device-file\n    \
-                 path: /dev/null{id}\n    port: 1\n    packet_size: 4\n"
+                 path: /dev/null{id}\n    payload_port: 1\n    packet_size: 4\n"
             ));
         }
         let set = written(".yaml", &text, GOOD_SIM);
@@ -880,7 +879,7 @@ simulated_payloads:
         for id in 0..ERROR_LIMIT {
             text.push_str(&format!(
                 "  - name: DH{id}\n    type: device-file\n    \
-                 path: /dev/null{id}\n    port: 1\n    packet_size: 4\n"
+                 path: /dev/null{id}\n    payload_port: 1\n    packet_size: 4\n"
             ));
         }
         let set = written(".yaml", &text, GOOD_SIM);

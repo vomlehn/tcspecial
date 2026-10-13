@@ -3644,7 +3644,8 @@ Requirement
     on an I\ :superscript:`2`\ C bus from another.
 
 Requirement
-    A CAN payload states no ``path``, ``address``, ``port`` or ``protocol``,
+    A CAN payload states no ``path``, ``payload_address``,
+    ``payload_interface`` or ``protocol``,
     and an ``interface`` or a ``can_id`` on any other type is refused. A
     controller is not a device file and not a host and port, and a line that
     named an interface would be a line written for a bus it is not on.
@@ -4159,43 +4160,35 @@ is what a panel in the MOC shows.
      - name: udp_localhost
        type: network
        protocol: udp
-       address: localhost
 
    payloads:
      - name: tcp-stream
-       oc_address: 127.0.0.1
-       oc_port: 6000
        type: network
        protocol: tcp
-       address: localhost
-       port: 5000
+       payload_interface: localhost:5000
        packet_size: 12
 
      - name: udp-steady
-       oc_address: 127.0.0.1
-       oc_port: 6001
        group: udp_localhost
-       port: 5001
+       payload_interface: localhost:5001
        packet_size: 11
 
      - name: random-device
-       oc_address: 127.0.0.1
-       oc_port: 6002
        type: device-file
        path: /dev/urandom
        packet_size: 1
 
      - name: udp-fast
-       oc_address: 127.0.0.1
-       oc_port: 6003
        group: udp_localhost
-       port: 5003
+       payload_interface: localhost:5003
        packet_size: 15
 
-Every handler here shares an OC address and has a port of its own. The OC
-address could have been a group attribute for that reason; it is written out
-per handler so that the file reads as the four handlers it describes rather
-than as three attributes and an exception.
+Not one of them states where its telemetry goes. Each used to carry an
+``oc_address`` and an ``oc_port``, which for four handlers was four chances to
+repeat a port; it is ``payload_telemetry`` counted on by the payload's own id
+now, which the file as a whole says once. What a payload does state is where
+*it* is -- one attribute, ``payload_interface``, for the kinds that are on a
+network -- and the group holds what its members share.
 
 Simulator Configuration Files
 =============================
@@ -4366,8 +4359,9 @@ Requirement
 Requirement
     Where the payload is is not stated here. The simulator takes it from the
     payload configuration, which decides it, so this file stating it again
-    would be a second place to keep in step and nothing gained: ``address``
-    and ``port`` written here are refused with the file they belong in, and
+    would be a second place to keep in step and nothing gained:
+    ``payload_interface`` written here -- or ``address`` and ``port``, which
+    that file spelled it before -- is refused with the file it belongs in, and
     with the pair this file does have.
 
 What this file may say about an address is the other end of the same link: the

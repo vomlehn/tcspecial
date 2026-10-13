@@ -48,6 +48,5 @@ payloads:
   - name: auto-send
     type: network
     protocol: tcp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12

@@ -52,24 +52,22 @@ tcspecial:
 
 payload_groups:
   # udp-steady and udp-fast are reached the same way: a UDP socket on this
-  # host. What tells them apart is their port and packet size, so those stay
-  # with the handlers and everything they share is here.
+  # host. Where each one is and how big its packets are is what tells the two
+  # apart, so those stay with the handlers and everything they share is here.
   - name: udp_localhost
     type: network
     protocol: udp
-    address: localhost
 
 payloads:
   - name: tcp-stream
     type: network
     protocol: tcp
-    address: localhost
-    port: 5000
+    payload_interface: localhost:5000
     packet_size: 12
 
   - name: udp-steady
     group: udp_localhost
-    port: 5001
+    payload_interface: localhost:5001
     packet_size: 11
 
   - name: random-device
@@ -79,5 +77,5 @@ payloads:
 
   - name: udp-fast
     group: udp_localhost
-    port: 5003
+    payload_interface: localhost:5003
     packet_size: 15

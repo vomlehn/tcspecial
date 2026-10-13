@@ -420,7 +420,10 @@ fn nothing_unknown(
     // writes them the way that file does
     // -- so they are named here and answered with the file they belong in,
     // rather than reported as words nothing knows.
-    if let Some(given) = ["address", "port"].iter().find(|plain| *plain == given) {
+    if let Some(given) = ["address", "port", "payload_interface"]
+        .iter()
+        .find(|plain| *plain == given)
+    {
         return Err(SimConfigError::TheOtherFilesBusiness {
             what,
             name: name.to_string(),
@@ -1352,7 +1355,13 @@ simulated_payloads:
     /// confuse.
     #[test]
     fn where_the_payload_is_belongs_in_the_other_file() {
-        for plain in ["address: localhost", "port: 5000"] {
+        for plain in [
+            "address: localhost",
+            "port: 5000",
+            // What the payload configuration spells it now, which is the one
+            // likeliest of all to be copied across.
+            "payload_interface: localhost:5000",
+        ] {
             let file = parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
                  protocol: udp\n    packet_interval_ms: 100\n    {plain}\n"

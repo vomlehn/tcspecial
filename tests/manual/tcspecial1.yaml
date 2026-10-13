@@ -35,16 +35,20 @@ description: TCSpecial payload set 1
 # The protocol is not stated and cannot be: the link between tcspecial and the
 # ground is UDP.
 tcspecial:
-  tcs_cmd_recv: 0.0.0.0:4000
-  moc_cmd_send: 127.0.0.1:4100
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcs_tc_base: 0.0.0.0:6000
-  moc_tc_base: 127.0.0.1:6100
-  beacon_interval_ms: 5000
-  beacon_send: "0.0.0.0:5550"
-  beacon_recv: "127.0.0.1:5650"
-  log_dir: /var/log/tcspecial
-  log_segment_bytes: 65536
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: "0.0.0.0:5550"
+    recv: "127.0.0.1:5650"
+  log:
+    directory: /var/log/tcspecial
+    segment_size: 65536
 
 payload_groups:
   # udp-steady and udp-fast are reached the same way: a UDP socket on this

@@ -532,7 +532,11 @@ impl Graph {
                 // and a port wherever one is named, two links that are not
                 // one socket -- is in the struct the command interpreter
                 // itself reads.
-                match crate::graph::parameters::ci_config_of(said) {
+                // Flat, prefixes and all, which is how the rules and the
+                // complaints name an attribute: the file's shape is the
+                // file's business. See `parameters::flatten`.
+                let flat = crate::graph::parameters::flatten(said);
+                match crate::graph::parameters::ci_config_of(&flat) {
                     Err(why) => problems.push(Problem::BadTcspecial { why }),
                     Ok(section) => {
                         if let Err(why) = section.to_ci_config() {
@@ -667,22 +671,27 @@ mod tests {
     /// else has to have one: a graph without it is refused, and a test that
     /// read `check() == []` would be reading the wrong refusal. The values are
     /// the shipped examples'.
-    fn tcspecial() -> BTreeMap<String, Scalar> {
-        [
-            ("tcs_cmd_recv", "0.0.0.0:4000"),
-            ("moc_cmd_send", "127.0.0.1:4100"),
-            ("tcs_tc_base", "0.0.0.0:6000"),
-            ("moc_tc_base", "127.0.0.1:6100"),
-            ("payload_interface", "0.0.0.0:4001"),
-            ("beacon_interval_ms", "5000"),
-            ("beacon_send", "0.0.0.0:5550"),
-            ("beacon_recv", "127.0.0.1:5650"),
-            ("log_dir", "/var/log/tcspecial"),
-            ("log_segment_bytes", "65536"),
-        ]
-        .into_iter()
-        .map(|(name, value)| (name.to_string(), Scalar::of(value)))
-        .collect()
+    fn tcspecial() -> BTreeMap<String, crate::graph::parameters::Parameter> {
+        // Written flat and nested here, which is the arrangement everything
+        // but the file itself works in: `parameters::nest` is what puts the
+        // subsections back.
+        crate::graph::parameters::nest(
+            &[
+                ("tcs_cmd.recv", "0.0.0.0:4000"),
+                ("tcs_cmd.send", "127.0.0.1:4100"),
+                ("payload_telemetry.source_base", "0.0.0.0:6000"),
+                ("payload_telemetry.dest_base", "127.0.0.1:6100"),
+                ("payload_interface", "0.0.0.0:4001"),
+                ("beacon.interval_ms", "5000"),
+                ("beacon.send", "0.0.0.0:5550"),
+                ("beacon.recv", "127.0.0.1:5650"),
+                ("log.directory", "/var/log/tcspecial"),
+                ("log.segment_size", "65536"),
+            ]
+            .into_iter()
+            .map(|(name, value)| (name.to_string(), Scalar::of(value)))
+            .collect(),
+        )
     }
 
     /// A graph built here rather than read, so a test can make one wrong.
@@ -898,26 +907,28 @@ mod tests {
     #[test]
     fn a_tcspecial_section_that_does_not_hold_together_is_refused() {
         let wrong = [
-            // A name belonging to nothing.
+            // A name belonging to nothing, at the top of the section and
+            // under a subsection: both are a value silently ignored if they
+            // are not refused.
             ("beacon_adress", "0.0.0.0:5550", "beacon_adress"),
+            ("beacon.adress", "0.0.0.0:5550", "beacon.adress"),
             // A command interface that is only half stated, which is the way
             // one attribute carrying two things goes wrong.
-            ("tcs_cmd_recv", "0.0.0.0", "address:port"),
+            ("tcs_cmd.recv", "0.0.0.0", "address:port"),
             // A port that is not one.
             ("payload_port", "nought", "payload_port"),
             // And a beacon address with no port, which is the rule the
             // command interpreter's own struct knows: beacons go from one
             // socket to another, each written address:port.
-            ("beacon_send", "10.0.0.1", "address:port"),
-            ("beacon_recv", "127.0.0.1:0", "port 0"),
+            ("beacon.send", "10.0.0.1", "address:port"),
+            ("beacon.recv", "127.0.0.1:0", "port 0"),
         ];
 
         for (attribute, value, expected) in wrong {
             let mut g = graph(vec![node("a", "i2c"), node("c", "moc")], vec![link("a", &["c"])]);
-            g.tcspecial
-                .as_mut()
-                .unwrap()
-                .insert(attribute.to_string(), Scalar::of(value));
+            let mut flat = crate::graph::parameters::flatten(g.tcspecial.as_ref().unwrap());
+            flat.insert(attribute.to_string(), Scalar::of(value));
+            g.tcspecial = Some(crate::graph::parameters::nest(&flat));
 
             let problems = g.check();
             let said = problems

@@ -352,17 +352,37 @@ impl Document {
         self.nodes.iter().filter(|n| &n.home == home).collect()
     }
 
-    /// The parameters of the section that are actually stated.
+    /// The parameters of the section that are actually stated, by the
+    /// subsection each belongs to.
     ///
     /// The document holds every attribute the section may have, so that the
     /// window has a field for each; what the file holds is the ones somebody
     /// has answered. Both writers ask this, so neither can come to write a
     /// section the other would not.
-    fn tcspecial_stated(&self) -> Vec<(&String, &String)> {
-        self.tcspecial
-            .iter()
-            .filter(|(_, value)| !value.trim().is_empty())
-            .collect()
+    ///
+    /// Each entry is a subsection's name and what is under it, or an empty
+    /// name and the values at the top of the section. The document holds them
+    /// flat and dotted -- one name per field and per complaint -- and this is
+    /// where the file's shape comes back. The attributes are sorted, so a
+    /// subsection's members are already together.
+    fn tcspecial_stated(&self) -> Vec<(String, Vec<(String, String)>)> {
+        let mut out: Vec<(String, Vec<(String, String)>)> = Vec::new();
+        for (attribute, value) in &self.tcspecial {
+            if value.trim().is_empty() {
+                continue;
+            }
+            let (parent, name) = match attribute.split_once('.') {
+                Some((parent, child)) => (parent.to_string(), child.to_string()),
+                None => (String::new(), attribute.clone()),
+            };
+            match out.last_mut() {
+                Some((had, under)) if *had == parent => {
+                    under.push((name, value.clone()))
+                }
+                _ => out.push((parent, vec![(name, value.clone())])),
+            }
+        }
+        out
     }
 
     /// Put every node inside the pane its type belongs to.
@@ -1059,11 +1079,24 @@ impl Document {
             let said = self.tcspecial_stated();
             if !said.is_empty() {
                 out.push_str("    <tcspecial>\n");
-                for (attribute, value) in said {
-                    out.push_str(&format!(
-                        "        <{attribute}>{}</{attribute}>\n",
-                        escape(value)
-                    ));
+                for (parent, under) in said {
+                    if parent.is_empty() {
+                        for (attribute, value) in under {
+                            out.push_str(&format!(
+                                "        <{attribute}>{}</{attribute}>\n",
+                                escape(&value)
+                            ));
+                        }
+                        continue;
+                    }
+                    out.push_str(&format!("        <{parent}>\n"));
+                    for (attribute, value) in under {
+                        out.push_str(&format!(
+                            "            <{attribute}>{}</{attribute}>\n",
+                            escape(&value)
+                        ));
+                    }
+                    out.push_str(&format!("        </{parent}>\n"));
                 }
                 out.push_str("    </tcspecial>\n");
             }
@@ -1196,8 +1229,17 @@ impl Document {
             let said = self.tcspecial_stated();
             if !said.is_empty() {
                 out.push_str("\ntcspecial:\n");
-                for (attribute, value) in said {
-                    out.push_str(&format!("  {attribute}: {}\n", quoted(value)));
+                for (parent, under) in said {
+                    if parent.is_empty() {
+                        for (attribute, value) in under {
+                            out.push_str(&format!("  {attribute}: {}\n", quoted(&value)));
+                        }
+                        continue;
+                    }
+                    out.push_str(&format!("  {parent}:\n"));
+                    for (attribute, value) in under {
+                        out.push_str(&format!("    {attribute}: {}\n", quoted(&value)));
+                    }
                 }
             }
         }
@@ -1410,16 +1452,16 @@ pub fn thermostat_example() -> Document {
     // must say: where commands are taken, where beacons go, where the
     // telemetry log is written.
     for (attribute, value) in [
-        ("tcs_cmd_recv", "0.0.0.0:4000"),
-        ("moc_cmd_send", "127.0.0.1:4100"),
+        ("tcs_cmd.recv", "0.0.0.0:4000"),
+        ("tcs_cmd.send", "127.0.0.1:4100"),
         ("payload_interface", "0.0.0.0:4001"),
-        ("tcs_tc_base", "0.0.0.0:6000"),
-        ("moc_tc_base", "127.0.0.1:6100"),
-        ("beacon_interval_ms", "5000"),
-        ("beacon_send", "0.0.0.0:5550"),
-        ("beacon_recv", "127.0.0.1:5650"),
-        ("log_dir", "/var/log/tcspecial"),
-        ("log_segment_bytes", "65536"),
+        ("payload_telemetry.source_base", "0.0.0.0:6000"),
+        ("payload_telemetry.dest_base", "127.0.0.1:6100"),
+        ("beacon.interval_ms", "5000"),
+        ("beacon.send", "0.0.0.0:5550"),
+        ("beacon.recv", "127.0.0.1:5650"),
+        ("log.directory", "/var/log/tcspecial"),
+        ("log.segment_size", "65536"),
     ] {
         document.apply(&Edit::SetTcspecial {
             attribute: attribute.to_string(),
@@ -1739,14 +1781,14 @@ mod tests {
     #[test]
     fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
         let whole = [
-            ("tcs_cmd_recv", "0.0.0.0:4000"),
-            ("moc_cmd_send", "127.0.0.1:4100"),
+            ("tcs_cmd.recv", "0.0.0.0:4000"),
+            ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_interface", "0.0.0.0:4001"),
-            ("tcs_tc_base", "0.0.0.0:6000"),
-            ("moc_tc_base", "127.0.0.1:6100"),
-            ("beacon_interval_ms", "5000"),
-            ("beacon_send", "0.0.0.0:5550"),
-            ("beacon_recv", "127.0.0.1:5650"),
+            ("payload_telemetry.source_base", "0.0.0.0:6000"),
+            ("payload_telemetry.dest_base", "127.0.0.1:6100"),
+            ("beacon.interval_ms", "5000"),
+            ("beacon.send", "0.0.0.0:5550"),
+            ("beacon.recv", "127.0.0.1:5650"),
         ];
 
         let filled = |wrong: Option<(&str, &str)>| {
@@ -1770,12 +1812,12 @@ mod tests {
 
         // Complete and wrong, in the words of the rules that know why.
         for (attribute, instead, expected) in [
-            ("beacon_send", "10.0.0.1", "address:port"),
-            ("beacon_recv", "127.0.0.1:0", "port 0"),
+            ("beacon.send", "10.0.0.1", "address:port"),
+            ("beacon.recv", "127.0.0.1:0", "port 0"),
             // Half a command interface, which is the one way an attribute
             // carrying two things goes wrong.
-            ("tcs_cmd_recv", "0.0.0.0", "address:port"),
-            ("tcs_cmd_recv", "0.0.0.0:4001", "payload_interface"),
+            ("tcs_cmd.recv", "0.0.0.0", "address:port"),
+            ("tcs_cmd.recv", "0.0.0.0:4001", "payload_interface"),
             ("payload_interface", "nought", "payload_interface"),
         ] {
             let document = filled(Some((attribute, instead)));
@@ -2442,7 +2484,7 @@ mod tests {
             // What tcspecial is configured with, so that the edits which set
             // one of its parameters have something to change.
             for (attribute, value) in
-                [("port", "4000"), ("log_dir", "/var/log/tcspecial")]
+                [("port", "4000"), ("log.directory", "/var/log/tcspecial")]
             {
                 document.apply(&Edit::SetTcspecial {
                     attribute: attribute.into(),
@@ -2544,7 +2586,7 @@ mod tests {
             // And one that clears a parameter, which takes the line out of
             // the file rather than writing it empty.
             Edit::SetTcspecial {
-                attribute: "log_dir".into(),
+                attribute: "log.directory".into(),
                 was: Some("/var/log/tcspecial".into()),
                 now: None,
             },

@@ -220,11 +220,11 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 4100,
             },
-            tcs_tc_base: tcslibgs::HostPort {
+            payload_source_base: tcslibgs::HostPort {
                 address: "0.0.0.0".to_string(),
                 port: 6000,
             },
-            moc_tc_base: tcslibgs::HostPort {
+            payload_dest_base: tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 6100,
             },

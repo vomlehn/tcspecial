@@ -254,14 +254,17 @@ mod tests {
 version: \"1.0\"
 description: a set
 tcspecial:
-  tcs_cmd_recv: 0.0.0.0:4000
-  moc_cmd_send: 127.0.0.1:4100
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcs_tc_base: 0.0.0.0:6000
-  moc_tc_base: 127.0.0.1:6100
-  beacon_interval_ms: 5000
-  beacon_send: 0.0.0.0:5550
-  beacon_recv: 127.0.0.1:5650
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: 0.0.0.0:5550
+    recv: 127.0.0.1:5650
 payloads:
   - name: DH0
     type: device-file
@@ -319,14 +322,17 @@ payloads:
     packet_size: 2
 description: a set
 tcspecial:
-  tcs_cmd_recv: 0.0.0.0:4000
-  moc_cmd_send: 127.0.0.1:4100
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcs_tc_base: 0.0.0.0:6000
-  moc_tc_base: 127.0.0.1:6100
-  beacon_interval_ms: 5000
-  beacon_send: 0.0.0.0:5550
-  beacon_recv: 127.0.0.1:5650
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: 0.0.0.0:5550
+    recv: 127.0.0.1:5650
 version: \"1.0\"
 ";
         assert_eq!(digest(moved), digest(YAML));
@@ -351,14 +357,17 @@ version: \"1.0\"
 version: \"1.0\"
 description: a set
 tcspecial:
-  tcs_cmd_recv: 0.0.0.0:4000
-  moc_cmd_send: 127.0.0.1:4100
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcs_tc_base: 0.0.0.0:6000
-  moc_tc_base: 127.0.0.1:6100
-  beacon_interval_ms: 5000
-  beacon_send: 0.0.0.0:5550
-  beacon_recv: 127.0.0.1:5650
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: 0.0.0.0:5550
+    recv: 127.0.0.1:5650
 payloads:
   - name: DH1
     type: device-file
@@ -405,14 +414,17 @@ payloads:
 version: \"1.0\"
 description: a set
 tcspecial:
-  tcs_cmd_recv: 0.0.0.0:4000
-  moc_cmd_send: 127.0.0.1:4100
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
   payload_interface: 0.0.0.0:4001
-  tcs_tc_base: 0.0.0.0:6000
-  moc_tc_base: 127.0.0.1:6100
-  beacon_interval_ms: 5000
-  beacon_send: 0.0.0.0:5550
-  beacon_recv: 127.0.0.1:5650
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: 0.0.0.0:5550
+    recv: 127.0.0.1:5650
 payloads:
   - name: DH1
     type: device-file

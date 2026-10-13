@@ -46,8 +46,8 @@ pub struct Beacon {
 pub fn beacon(config: &CIConfig, section: Option<&CIConfigJson>) -> Result<Beacon, String> {
     match section {
         Some(section) => Ok(Beacon {
-            send: host_port_of("beacon_send", &section.beacon_send)?,
-            recv: host_port_of("beacon_recv", &section.beacon_recv)?,
+            send: host_port_of("beacon.send", &section.beacon.send)?,
+            recv: host_port_of("beacon.recv", &section.beacon.recv)?,
         }),
         None => Ok(Beacon {
             send: config.beacon_send.clone(),
@@ -132,23 +132,25 @@ mod tests {
         load_tcspecial_config(file.path())
     }
 
-    const YAML: &str = "tcs_cmd_recv: 0.0.0.0:4000\n\
-                        moc_cmd_send: 127.0.0.1:4100\n\
+    const YAML: &str = "tcs_cmd:\n  recv: 0.0.0.0:4000\n  send: 127.0.0.1:4100\n\
                         payload_interface: 0.0.0.0:4001\n\
-                        tcs_tc_base: 0.0.0.0:6000\n\
-                        moc_tc_base: 127.0.0.1:6100\n\
-                        beacon_interval_ms: 5000\nbeacon_send: 0.0.0.0:5550\n\
-                        beacon_recv: 127.0.0.1:5650\n";
+                        payload_telemetry:\n  source_base: 0.0.0.0:6000\n  \
+                        dest_base: 127.0.0.1:6100\n\
+                        beacon:\n  interval_ms: 5000\n  send: 0.0.0.0:5550\n  \
+                        recv: 127.0.0.1:5650\n";
 
     const XML: &str = "<tcspecial>\
-        <tcs_cmd_recv>0.0.0.0:4000</tcs_cmd_recv>\
-        <moc_cmd_send>127.0.0.1:4100</moc_cmd_send>\
+        <tcs_cmd><recv>0.0.0.0:4000</recv><send>127.0.0.1:4100</send></tcs_cmd>\
         <payload_interface>0.0.0.0:4001</payload_interface>\
-        <tcs_tc_base>0.0.0.0:6000</tcs_tc_base>\
-        <moc_tc_base>127.0.0.1:6100</moc_tc_base>\
-        <beacon_interval_ms>5000</beacon_interval_ms>\
-        <beacon_send>0.0.0.0:5550</beacon_send>\
-        <beacon_recv>127.0.0.1:5650</beacon_recv>\
+        <payload_telemetry>\
+          <source_base>0.0.0.0:6000</source_base>\
+          <dest_base>127.0.0.1:6100</dest_base>\
+        </payload_telemetry>\
+        <beacon>\
+          <interval_ms>5000</interval_ms>\
+          <send>0.0.0.0:5550</send>\
+          <recv>127.0.0.1:5650</recv>\
+        </beacon>\
         </tcspecial>";
 
     #[test]
@@ -183,8 +185,8 @@ mod tests {
         assert_eq!(config.beacon_interval.0, 5000);
 
         for missing in [
-            "beacon_send: 0.0.0.0:5550\nbeacon_recv: 127.0.0.1:5650\n",
-            "beacon_interval_ms: 5000\n",
+            "  send: 0.0.0.0:5550\n  recv: 127.0.0.1:5650\n",
+            "  interval_ms: 5000\n",
         ] {
             let without = YAML.replace(missing, "");
             assert_ne!(without, YAML, "the test removed nothing");
@@ -206,24 +208,29 @@ mod tests {
         let from_the_file = load_from(
             ".yaml",
             &YAML.replace(
-                "beacon_send: 0.0.0.0:5550",
-                "beacon_send: 0.0.0.0:5560",
+                "send: 0.0.0.0:5550",
+                "send: 0.0.0.0:5560",
             ),
         )
         .expect("the configuration loads");
         assert_eq!(from_the_file.beacon_send.to_string(), "0.0.0.0:5560");
 
         let section = |beacon: &str| CIConfigJson {
-            tcs_cmd_recv: "0.0.0.0:4000".to_string(),
-            moc_cmd_send: "127.0.0.1:4100".to_string(),
+            tcs_cmd: tcslibgs::TcsCmdJson {
+                recv: "0.0.0.0:4000".to_string(),
+                send: "127.0.0.1:4100".to_string(),
+            },
             payload_interface: "0.0.0.0:4001".to_string(),
-            tcs_tc_base: "0.0.0.0:6000".to_string(),
-            moc_tc_base: "127.0.0.1:6100".to_string(),
-            beacon_interval_ms: 5000,
-            beacon_send: beacon.to_string(),
-            beacon_recv: "127.0.0.1:5650".to_string(),
-            log_dir: None,
-            log_segment_bytes: 65_536,
+            payload_telemetry: tcslibgs::PayloadTelemetryJson {
+                source_base: "0.0.0.0:6000".to_string(),
+                dest_base: "127.0.0.1:6100".to_string(),
+            },
+            beacon: tcslibgs::BeaconJson {
+                interval_ms: 5000,
+                send: beacon.to_string(),
+                recv: "127.0.0.1:5650".to_string(),
+            },
+            log: tcslibgs::LogJson::default(),
         };
 
         // A set with a section: the set wins. It always states an address,
@@ -251,7 +258,7 @@ mod tests {
         let said = beacon(&from_the_file, Some(&section("nowhere")))
             .expect_err("not an address")
             .to_string();
-        assert!(said.contains("beacon_send"), "{said}");
+        assert!(said.contains("beacon.send"), "{said}");
         assert!(said.contains("nowhere"), "{said}");
     }
 
@@ -274,12 +281,12 @@ mod tests {
             "",
         ] {
             let text = YAML.replace(
-                "beacon_send: 0.0.0.0:5550",
-                &format!("beacon_send: \"{bad}\""),
+                "send: 0.0.0.0:5550",
+                &format!("send: \"{bad}\""),
             );
             let said = load_from(".yaml", &text).expect_err(bad).to_string();
             assert!(
-                said.contains("beacon_send"),
+                said.contains("beacon.send"),
                 "{bad}: the refusal does not name the attribute: {said}"
             );
         }
@@ -308,11 +315,11 @@ mod tests {
         // command interface took its place as the value that can be written
         // wrongly: half of it, or a port that is not one.
         for instead in [
-            "tcs_cmd_recv: 0.0.0.0",
-            "tcs_cmd_recv: 0.0.0.0:nought",
-            "tcs_cmd_recv: :4000",
+            "recv: 0.0.0.0",
+            "recv: 0.0.0.0:nought",
+            "recv: :4000",
         ] {
-            let bad = YAML.replace("tcs_cmd_recv: 0.0.0.0:4000", instead);
+            let bad = YAML.replace("recv: 0.0.0.0:4000", instead);
             assert_ne!(bad, YAML, "the test changed nothing");
             assert!(
                 load_from(".yaml", &bad).is_err(),

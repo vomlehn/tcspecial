@@ -76,7 +76,7 @@ pub struct GraphFile {
     /// read back is a file it has destroyed -- see `parameters.rs`, which has
     /// the argument.
     #[serde(default)]
-    pub tcspecial: Option<BTreeMap<String, Scalar>>,
+    pub tcspecial: Option<BTreeMap<String, parameters::Parameter>>,
     #[serde(default)]
     pub groups: Vec<Group>,
     #[serde(default)]
@@ -331,7 +331,7 @@ pub struct Graph {
     /// read rather than quietly ignored -- two sections would be two answers
     /// to one question, and whichever won would be an accident of the order
     /// the files happened to be read in.
-    pub tcspecial: Option<BTreeMap<String, Scalar>>,
+    pub tcspecial: Option<BTreeMap<String, parameters::Parameter>>,
     pub groups: Vec<Group>,
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
@@ -696,15 +696,26 @@ mod tests {
         // only the top file may: see Graph::tcspecial.
         std::fs::write(
             &top,
-            "version: \"2.0\"\ninclude:\n  - cabin\n\
-             tcspecial:\n  tcs_cmd_recv: 0.0.0.0:4000\n  \
-             moc_cmd_send: 127.0.0.1:4100\n  payload_interface: 0.0.0.0:4001\n  \
-             tcs_tc_base: 0.0.0.0:6000\n  moc_tc_base: 127.0.0.1:6100\n  \
-             beacon_interval_ms: 5000\n  \
-             beacon_send: \"0.0.0.0:5550\"\n  beacon_recv: \"127.0.0.1:5650\"\n\
-             nodes:\n  \
-             - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }\n\
-             links:\n  - { from: cabin_sensor, to: moc }\n",
+            "version: \"2.0\"
+include:
+  - cabin
+tcspecial:
+  tcs_cmd:
+    recv: 0.0.0.0:4000
+    send: 127.0.0.1:4100
+  payload_interface: 0.0.0.0:4001
+  payload_telemetry:
+    source_base: 0.0.0.0:6000
+    dest_base: 127.0.0.1:6100
+  beacon:
+    interval_ms: 5000
+    send: \"0.0.0.0:5550\"
+    recv: \"127.0.0.1:5650\"
+nodes:
+  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
+links:
+  - { from: cabin_sensor, to: moc }
+",
         )
         .unwrap();
         std::fs::write(

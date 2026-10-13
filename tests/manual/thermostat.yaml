@@ -1,16 +1,20 @@
 version: "2.0"
 
 tcspecial:
-  beacon_interval_ms: "5000"
-  beacon_recv: "127.0.0.1:5650"
-  beacon_send: "0.0.0.0:5550"
-  log_dir: "/var/log/tcspecial"
-  log_segment_bytes: "65536"
-  moc_cmd_send: "127.0.0.1:4100"
-  moc_tc_base: "127.0.0.1:6100"
+  beacon:
+    interval_ms: "5000"
+    recv: "127.0.0.1:5650"
+    send: "0.0.0.0:5550"
+  log:
+    directory: "/var/log/tcspecial"
+    segment_size: "65536"
   payload_interface: "0.0.0.0:4001"
-  tcs_cmd_recv: "0.0.0.0:4000"
-  tcs_tc_base: "0.0.0.0:6000"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
 
 groups:
   - name: "cabin_temps"

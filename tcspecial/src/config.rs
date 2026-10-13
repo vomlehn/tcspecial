@@ -133,7 +133,8 @@ mod tests {
     }
 
     const YAML: &str = "tcs_cmd:\n  recv: 0.0.0.0:4000\n  send: 127.0.0.1:4100\n\
-                        payload_interface: 0.0.0.0:4001\n\
+                        payload_command:\n  source_base: 127.0.0.1:4300\n  \
+                        dest_base: 0.0.0.0:4200\n\
                         payload_telemetry:\n  source_base: 0.0.0.0:6000\n  \
                         dest_base: 127.0.0.1:6100\n\
                         beacon:\n  interval_ms: 5000\n  send: 0.0.0.0:5550\n  \
@@ -141,7 +142,10 @@ mod tests {
 
     const XML: &str = "<tcspecial>\
         <tcs_cmd><recv>0.0.0.0:4000</recv><send>127.0.0.1:4100</send></tcs_cmd>\
-        <payload_interface>0.0.0.0:4001</payload_interface>\
+        <payload_command>\
+          <source_base>127.0.0.1:4300</source_base>\
+          <dest_base>0.0.0.0:4200</dest_base>\
+        </payload_command>\
         <payload_telemetry>\
           <source_base>0.0.0.0:6000</source_base>\
           <dest_base>127.0.0.1:6100</dest_base>\
@@ -162,7 +166,16 @@ mod tests {
             // The one attribute becomes an address and a port.
             assert_eq!(config.address, "0.0.0.0", "{ext}");
             assert_eq!(config.port, 4000, "{ext}");
-            assert_eq!(config.payload_interface.to_string(), "0.0.0.0:4001", "{ext}");
+            assert_eq!(
+                config.payload_command_dest_base.to_string(),
+                "0.0.0.0:4200",
+                "{ext}"
+            );
+            assert_eq!(
+                config.payload_command_source_base.to_string(),
+                "127.0.0.1:4300",
+                "{ext}"
+            );
             assert_eq!(config.beacon_interval.0, 5000, "{ext}");
             // Absent in every actual input, so the serde defaults must apply.
             assert_eq!(config.log_dir, None, "{ext}");
@@ -220,7 +233,10 @@ mod tests {
                 recv: "0.0.0.0:4000".to_string(),
                 send: "127.0.0.1:4100".to_string(),
             },
-            payload_interface: "0.0.0.0:4001".to_string(),
+            payload_command: tcslibgs::PayloadCommandJson {
+                source_base: "127.0.0.1:4300".to_string(),
+                dest_base: "0.0.0.0:4200".to_string(),
+            },
             payload_telemetry: tcslibgs::PayloadTelemetryJson {
                 source_base: "0.0.0.0:6000".to_string(),
                 dest_base: "127.0.0.1:6100".to_string(),

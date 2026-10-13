@@ -25,7 +25,9 @@ tcspecial:
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
-  payload_interface: 0.0.0.0:4001
+  payload_command:
+    source_base: 127.0.0.1:4300
+    dest_base: 0.0.0.0:4200
   payload_telemetry:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100

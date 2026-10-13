@@ -1498,15 +1498,17 @@ commands is in ``tcspecial.yaml``:
    tcs_cmd:
      recv: "0.0.0.0:4000"           # commands about the spacecraft
      send: "127.0.0.1:4100"         # the MOC's own end of that link
-   payload_interface: "0.0.0.0:4001"   # commands about a payload
+   payload_command:
+     source_base: "127.0.0.1:4300"  # a payload's commands come from here
+     dest_base: "0.0.0.0:4200"      # and are taken here, plus its own id
 
 Two links, because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure: a restart waiting behind a payload's
 statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
 ``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``tcs_cmd.recv``;
 ``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and
-``CONFIGURE_DH`` go to ``payload_interface``; ``CONNECT`` is answered on
-either. One table in the library says which is which, so the two ends cannot
+``CONFIGURE_DH`` go to that payload's own socket under ``payload_command``;
+``CONNECT`` is answered on either. One table in the library says which is which, so the two ends cannot
 disagree about it.
 
 Both are required, and they must differ -- one socket cannot be two links.
@@ -1585,7 +1587,9 @@ they are about:
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
-     payload_interface: 0.0.0.0:4001
+     payload_command:
+       source_base: 127.0.0.1:4300
+       dest_base: 0.0.0.0:4200
      payload_telemetry:
        source_base: 0.0.0.0:6000
        dest_base: 127.0.0.1:6100
@@ -1598,10 +1602,22 @@ it sends those commands from and receives the responses on. Both ends are in
 one file because both ends read this file, and two places to say one thing is
 one place for them to disagree.
 
-``payload_interface`` is where commands about a payload are taken, and says
-where it is in full like its neighbours. The MOC reaches it at the host the
-operator connected to, taking only the port from the file, so one typed
-address moves both links.
+``payload_command`` is where each payload is commanded, and it has two bases
+for the same reason ``payload_telemetry`` does: the link has two ends. A
+payload's socket on each side is that side's base plus **the payload's own
+id**, so a set of four payloads based at 4300 and 4200 is commanded from 4300
+to 4303 on the ground and takes those commands on 4200 to 4203 aboard.
+
+Both ends come out of the file, including the host: this is the one link the
+address box does not move. Every payload command link is written down at both
+ends so that tcspecial can refuse a payload command that came from anywhere
+else, which is the same rule the other three links are held to.
+
+It was one socket for all of them, ``payload_interface``, which worked and
+left two things undone. Nothing said which socket the ground sent from, so
+tcspecial could not be told what a payload command should come from; and one
+socket meant one queue, so a command about a slow payload was ahead of a
+command about a quick one.
 
 ``payload_telemetry`` is where each payload's own data link is, and it has two
 bases because the link has two ends. Every payload has a UDP interface for

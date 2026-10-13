@@ -11,7 +11,10 @@
             <directory>/var/log/tcspecial</directory>
             <segment_size>65536</segment_size>
         </log>
-        <payload_interface>0.0.0.0:4001</payload_interface>
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
         <payload_telemetry>
             <dest_base>127.0.0.1:6100</dest_base>
             <source_base>0.0.0.0:6000</source_base>

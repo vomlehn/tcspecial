@@ -23,35 +23,40 @@
 //! buttons control -- without the poller having to hold it.
 
 use tcslib::{TcsClient, UdpConnection};
-use tcslibgs::{TcsError, TcsResult, Timestamp};
+use tcslibgs::{DHName, HostPort, TcsResult, Timestamp};
 
 /// The local address the MOC sends from where nothing says otherwise: any
 /// interface, any port.
 ///
-/// What the payload link uses, and what a link that follows another one uses
-/// for the spacecraft's own: the command interpreter answers whoever asked, so
-/// a port the system chose works for a socket nobody has to find.
-///
-/// The window's own spacecraft link does not use this. It binds
-/// `tcs_cmd.send`, which the configuration states and tcspecial checks every
-/// command against -- see [`CiLink::down_from`].
-const LOCAL_BIND_ANY: &str = "0.0.0.0:0";
+/// What a test that does not care passes. Every link a running MOC opens
+/// binds an address the configuration states -- `tcs_cmd.send` for the
+/// spacecraft's, `payload_command.source_base` counted on by a payload's id
+/// for that payload's -- which is what lets tcspecial refuse a command from
+/// anywhere else.
+#[cfg(test)]
+pub const LOCAL_BIND_ANY: &str = "0.0.0.0:0";
 
-/// The payload command link beside a spacecraft command link.
+/// Where one payload is commanded: both ends of its own link.
 ///
-/// The same host, a different port: the two links are two sockets of one
-/// process, so an operator who moves the link moves both by typing one
-/// address. The port is the configuration's, not the operator's, for the
-/// same reason the beacon's is -- it is what the other end binds.
-fn payload_link_at(address: &str, payload_port: u16) -> TcsResult<String> {
-    let host = address.rsplit_once(':').map(|(host, _)| host).ok_or_else(|| {
-        TcsError::Config(format!(
-            "\"{address}\" is not a host and a port, so there is no host to reach \
-             the payload link at"
-        ))
-    })?;
-
-    Ok(format!("{host}:{payload_port}"))
+/// Counted from the two bases by the payload's id, which is its position in
+/// the payload configuration. Held as a pair because a connection needs both:
+/// the socket this binds and the socket it sends to.
+#[derive(Debug, Clone)]
+pub struct PayloadLink {
+    /// Which payload, by the name its commands carry.
+    pub name: DHName,
+    /// Where the MOC sends this payload's commands from, and receives its
+    /// answers: `payload_command.source_base` counted on by its id.
+    pub from: HostPort,
+    /// And where they go: `payload_command.dest_base` counted the same way,
+    /// which tcspecial binds.
+    ///
+    /// The file's host and not the operator's. Every other link the MOC opens
+    /// takes its host from the address box so that one typed address moves
+    /// them all; these take both ends from the file, because both ends of a
+    /// payload command link are written there and tcspecial checks the one it
+    /// receives on against it.
+    pub to: HostPort,
 }
 
 /// What a control says when it is pressed with the link down.
@@ -66,37 +71,35 @@ pub const NOT_CONNECTED: &str = "Not connected - press Connect first";
 /// window shows after a disconnect is still where it would reconnect to.
 pub struct CiLink {
     address: String,
-    /// What the spacecraft link binds locally: `tcs_cmd.send` for the
-    /// window's link, and any port at all for one that follows it.
+    /// What the spacecraft link binds locally: `tcs_cmd.send`.
     ///
     /// Stated because the other end checks it. tcspecial takes commands only
     /// from where its configuration says the MOC sends them, so the socket
     /// this sends from is a socket the file names -- which is also what lets
     /// a firewall rule or a capture filter describe the link beforehand.
     from: String,
-    /// The port payload commands go to, which the spacecraft takes them on.
+    /// One link per payload, both ends of each from the configuration.
     ///
-    /// Held rather than passed to [`CiLink::connect`], because a link that
-    /// follows another one is given an address and nothing else: see
-    /// [`CiLink::follow`]. One number for the life of the link, as the
-    /// configuration states it.
-    payload_port: u16,
+    /// Held rather than passed to [`CiLink::connect`]: they are the same for
+    /// the life of the link, as the file states them, and Connect moves only
+    /// the spacecraft link's host.
+    payloads: Vec<PayloadLink>,
     client: Option<TcsClient>,
 }
 
 impl CiLink {
-    /// A link that is down and will send spacecraft commands from `from`.
+    /// A link that is down, sending spacecraft commands from `from` and each
+    /// payload's commands on the link named for it.
     ///
-    /// `tcs_cmd.send`, which tcspecial refuses a command from anywhere else
-    /// than -- both ends reading it out of the same file. One socket, so one
-    /// link: the MOC has one sender of spacecraft commands now that the panel
-    /// poller is gone, and `LOCAL_BIND_ANY` is what a test that does not care
-    /// passes.
-    pub fn down_from(from: &str, payload_port: u16) -> Self {
+    /// `from` is `tcs_cmd.send`, which tcspecial refuses a command from
+    /// anywhere else than -- both ends reading it out of the same file. One
+    /// socket, so one link: the MOC has one sender of commands now that the
+    /// panel poller is gone.
+    pub fn down_from(from: &str, payloads: Vec<PayloadLink>) -> Self {
         Self {
             address: String::new(),
             from: from.to_string(),
-            payload_port,
+            payloads,
             client: None,
         }
     }
@@ -133,16 +136,31 @@ impl CiLink {
         self.disconnect();
         self.address = address.to_string();
 
-        let payload_address = payload_link_at(address, self.payload_port)?;
         let connection = UdpConnection::new(&self.from, address)?;
-        let payload = UdpConnection::new(LOCAL_BIND_ANY, &payload_address)?;
-        self.client = Some(TcsClient::new(Box::new(connection), Box::new(payload)));
+        let mut payloads = Vec::with_capacity(self.payloads.len());
+        for link in &self.payloads {
+            let connection =
+                UdpConnection::new(&link.from.to_string(), &link.to.to_string())?;
+            payloads.push((link.name.clone(), Box::new(connection) as _));
+        }
+        self.client = Some(TcsClient::new(Box::new(connection), payloads));
         Ok(())
     }
 
-    /// Where this link sends payload commands, up or down.
-    pub fn payload_address(&self) -> TcsResult<String> {
-        payload_link_at(&self.address, self.payload_port)
+    /// Where this link sends payload commands, as a line for the console.
+    ///
+    /// One line for however many payloads there are: they are a base counted
+    /// on by each payload's id, so the base and the count say where all of
+    /// them are.
+    pub fn payload_addresses(&self) -> String {
+        match (self.payloads.first(), self.payloads.len()) {
+            (None, _) => "no payloads, so no payload links".to_string(),
+            (Some(first), 1) => format!("{} for {}", first.to, first.name.0),
+            (Some(first), count) => format!(
+                "{} counted on by each payload's id, for {count} payloads",
+                first.to
+            ),
+        }
     }
 
     /// Take the link down.
@@ -205,7 +223,7 @@ mod tests {
             spacecraft.send_to(&data, from).expect("the answer is sent");
         });
 
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, 4001);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
         assert_eq!(link.command_times(), None, "a link that is down has no times");
 
         link.connect(&at).expect("the link comes up");
@@ -232,43 +250,25 @@ mod tests {
         assert_eq!(link.command_times(), None);
     }
 
-    /// The payload link is the operator's host and the configuration's port.
-    ///
-    /// The operator types one address, and both links move with it: they are
-    /// two sockets of one process. The port is not the operator's to type --
-    /// it is what the other end binds -- so it comes from the configuration
-    /// both ends read.
-    #[test]
-    fn the_payload_link_is_the_same_host_on_its_own_port() {
-        assert_eq!(
-            payload_link_at("127.0.0.1:4000", 4001).expect("a host and a port"),
-            "127.0.0.1:4001"
-        );
-
-        // A host of any shape: a name, or an address of either family.
-        assert_eq!(
-            payload_link_at("spacecraft.example:4000", 4001).expect("a name"),
-            "spacecraft.example:4001"
-        );
-        assert_eq!(
-            payload_link_at("[::1]:4000", 4001).expect("the other family"),
-            "[::1]:4001"
-        );
-
-        // And an address with no port at all is refused, saying why: there
-        // is no host to put a port beside.
-        let said = payload_link_at("127.0.0.1", 4001)
-            .expect_err("a port is what tells the two links apart")
-            .to_string();
-        assert!(said.contains("127.0.0.1"), "{said}");
-    }
-
-    /// The port a test's payload commands would go to.
+    /// The one payload link a test's link carries.
     ///
     /// Nothing answers on it in these tests: what they are about is the link
-    /// the operator controls, and the payload link is opened beside it by the
-    /// same call either way.
-    const A_PAYLOAD_PORT: u16 = 4001;
+    /// the operator controls, and a payload's link is opened beside it by the
+    /// same call either way. Both ends are ports of the system's choosing, so
+    /// that two tests running at once do not want one socket.
+    fn a_payload_link() -> Vec<PayloadLink> {
+        vec![PayloadLink {
+            name: DHName::new("auto-send"),
+            from: HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
+            to: HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 4200,
+            },
+        }]
+    }
 
     /// A link that is down has no client to hand out, and one that is up has.
     ///
@@ -277,7 +277,7 @@ mod tests {
     /// having to be there.
     #[test]
     fn a_link_hands_out_a_client_only_while_it_is_up() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
         assert!(!link.is_connected());
         assert!(link.client().is_none());
 
@@ -295,7 +295,7 @@ mod tests {
     /// make, leaves a link that works.
     #[test]
     fn a_link_can_be_brought_back_up() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.connect("127.0.0.1:4000").unwrap();
@@ -305,7 +305,7 @@ mod tests {
     /// Connecting somewhere else moves the link rather than adding one.
     #[test]
     fn connecting_elsewhere_moves_the_link() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
         link.connect("127.0.0.1:4000").unwrap();
 
         link.connect("127.0.0.1:4001").unwrap();
@@ -317,7 +317,7 @@ mod tests {
     /// the address that was asked for.
     #[test]
     fn an_address_that_cannot_be_used_leaves_the_link_down() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
         link.connect("127.0.0.1:4000").unwrap();
 
         assert!(link.connect("this is not an address").is_err());
@@ -329,7 +329,7 @@ mod tests {
     /// button can be pressed twice.
     #[test]
     fn disconnecting_twice_is_harmless() {
-        let mut link = CiLink::down_from(LOCAL_BIND_ANY, A_PAYLOAD_PORT);
+        let mut link = CiLink::down_from(LOCAL_BIND_ANY, a_payload_link());
         link.connect("127.0.0.1:4000").unwrap();
         link.disconnect();
         link.disconnect();

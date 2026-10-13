@@ -22,7 +22,10 @@
             <recv>0.0.0.0:4000</recv>
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
-        <payload_interface>0.0.0.0:4001</payload_interface>
+        <payload_command>
+            <source_base>127.0.0.1:4300</source_base>
+            <dest_base>0.0.0.0:4200</dest_base>
+        </payload_command>
         <payload_telemetry>
             <source_base>0.0.0.0:6000</source_base>
             <dest_base>127.0.0.1:6100</dest_base>

@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tcslibgs::{
-    answer_to, came_from, ArmKey, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
+    answer_to, came_from, ArmKey, HostPort, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry,
     DHConfig, DHName, DHSample, DHState, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
@@ -262,27 +262,66 @@ impl PayloadCommands {
         }
     }
 
-    /// Take payload commands on `socket` until the interpreter stops.
+    /// Take one payload's commands on `socket` until the interpreter stops.
     ///
-    /// A loop of its own, which is the whole point of the second link: a
-    /// command that takes time -- START_DH opens the payload's endpoint and
-    /// the handler's pair of OC sockets -- takes it here, where nothing the
-    /// ground needs in a hurry is waiting behind it.
+    /// A loop of its own, which is the whole point of these links: a command
+    /// that takes time -- START_DH opens the payload's endpoint and the
+    /// handler's pair of OC sockets -- takes it here, where nothing the ground
+    /// needs in a hurry is waiting behind it, and nothing about another
+    /// payload either.
+    ///
+    /// `from` is where commands about this payload are supposed to come from,
+    /// and anything else arriving here is ignored: see `tcslibgs::came_from`.
+    /// `name` and `id` are the payload this socket is for, so that a command
+    /// about another payload can be refused rather than served -- a command on
+    /// the wrong socket is one end not reading the configuration the other is,
+    /// which is the fault these links must not hide.
     ///
     /// Answers go back to the address the command came from, as the other
     /// link's do: a datagram's sender is the only statement of where the
     /// ground is.
-    pub fn serve(&self, socket: UdpSocket, serving: Arc<AtomicBool>) -> TcsResult<()> {
+    pub fn serve(
+        &self,
+        socket: UdpSocket,
+        from: &HostPort,
+        name: &DHName,
+        id: usize,
+        serving: Arc<AtomicBool>,
+    ) -> TcsResult<()> {
         socket.set_read_timeout(Some(PAYLOAD_LINK_POLL))?;
         let mut buffer = vec![0u8; 65535];
 
         while serving.load(Ordering::Relaxed) {
             match socket.recv_from(&mut buffer) {
+                // Only from where the configuration says the MOC commands
+                // this payload from. Nothing is sent back, for the reason the
+                // spacecraft link sends nothing back: an answer would tell
+                // whoever sent it that something is listening here.
+                Ok((_, addr)) if !came_from(from, &addr) => {
+                    warn!(
+                        "a command for payload {} came from {addr} and not from \
+                         {from}, which is where the configuration says the MOC \
+                         sends it from -- ignored",
+                        name.0
+                    );
+                }
                 Ok((size, addr)) => {
-                    trace!("payload link: received from {:?}", addr);
+                    trace!("payload {} link: received from {:?}", name.0, addr);
                     match serde_json::from_slice::<Command>(&buffer[..size]) {
                         Ok(command) => {
-                            let response = self.process(command);
+                            let response = match about_another_payload(&command, name) {
+                                Some(theirs) => {
+                                    error!(
+                                        "{:?} for payload {theirs} arrived on the link \
+                                         of payload {} ({id}): the two ends are not \
+                                         reading the same configuration",
+                                        command.cmd_type(),
+                                        name.0
+                                    );
+                                    answer_to(&command, CommandStatus::InvalidCommand)
+                                }
+                                None => self.process(command),
+                            };
                             if let Ok(data) = serde_json::to_vec(&response) {
                                 // Recorded before it is sent, as the other
                                 // link's answers are, so that one log holds
@@ -293,7 +332,10 @@ impl PayloadCommands {
                         }
                         // Not a command. Nothing to answer and nobody to
                         // answer it to: the sender is whatever sent this.
-                        Err(_) => error!("payload link: {} bytes that are not a command", size),
+                        Err(_) => error!(
+                            "payload {} link: {} bytes that are not a command",
+                            name.0, size
+                        ),
                     }
                 }
                 Err(ref e)
@@ -310,6 +352,19 @@ impl PayloadCommands {
         }
 
         Ok(())
+    }
+}
+
+/// The payload a command is about, when that is not the payload whose link it
+/// arrived on.
+///
+/// `None` where the command is about this payload, or about no payload at all:
+/// CONNECT is answered on any link, being about the configuration the far end
+/// read rather than about a payload.
+fn about_another_payload<'a>(command: &'a Command, mine: &DHName) -> Option<&'a str> {
+    match command.payload_name() {
+        Some(theirs) if theirs != mine => Some(theirs.0.as_str()),
+        _ => None,
     }
 }
 
@@ -355,16 +410,17 @@ pub struct CommandInterpreter {
     _config: CIConfig,
     /// The spacecraft command link: ping, arm, restart, configure.
     socket: UdpSocket,
-    /// The payload command link, until [`CommandInterpreter::run`] hands it
-    /// to the thread that serves it.
+    /// One command link per payload, until [`CommandInterpreter::run`] hands
+    /// each to the thread that serves it.
     ///
-    /// Bound in `new`, with the other, so that a port already in use is
-    /// reported where every other configuration error is -- at startup,
-    /// naming itself -- rather than when the first payload command arrives.
-    payload_socket: Option<UdpSocket>,
-    /// What serves that link, and what the thread serving it holds.
+    /// All bound in `new`, with the spacecraft's, so that a port already in
+    /// use is reported where every other configuration error is -- at
+    /// startup, naming itself -- rather than when the first command about
+    /// that payload arrives.
+    payload_links: Vec<PayloadLink>,
+    /// What serves those links, and what each thread serving one holds.
     payload: PayloadCommands,
-    /// Whether that thread should still be serving. Cleared by `stop` and
+    /// Whether those threads should still be serving. Cleared by `stop` and
     /// `shutdown`, which is how a loop in another thread is told.
     serving: Arc<AtomicBool>,
     data_handlers: Arc<Mutex<BTreeMap<DHName, DataHandler>>>,
@@ -552,6 +608,24 @@ fn endpoint_description(endpoint: &EndpointConfig) -> String {
     }
 }
 
+/// One payload's command link, as the interpreter holds it.
+struct PayloadLink {
+    /// The socket commands about this payload arrive on:
+    /// `payload_command.dest_base` counted on by its id. `None` once the
+    /// thread serving it has taken it.
+    socket: Option<UdpSocket>,
+    /// Where they are supposed to come from:
+    /// `payload_command.source_base` counted on by the same id, which is what
+    /// the MOC binds to send them. A command from anywhere else is ignored --
+    /// see [`PayloadCommands::serve`].
+    from: HostPort,
+    /// Which payload this link is for, by name and by id. The id is the
+    /// payload's position in the payload configuration, and the name is what
+    /// a command about it carries.
+    name: DHName,
+    id: usize,
+}
+
 impl CommandInterpreter {
     /// Create a new command interpreter
     pub fn new(
@@ -564,14 +638,42 @@ impl CommandInterpreter {
         let socket = UdpSocket::bind(&addr).map_err(|e| bind_failed("command interpreter", &addr, e))?;
         socket.set_nonblocking(false)?;
 
-        // The payload link, bound here too. Two links, because what the
-        // ground needs in a hurry must never be queued behind what it asked
-        // for at leisure: see CommandType::link.
-        // Its own address and not the one above: the payload link says where
-        // it is in full, as every other link in the section does.
-        let payload_addr = config.payload_interface.to_string();
-        let payload_socket = UdpSocket::bind(&payload_addr)
-            .map_err(|e| bind_failed("payload command link", &payload_addr, e))?;
+        // One command socket per payload, all bound here, before any loop
+        // runs: a port already in use is then reported at startup, naming
+        // itself, rather than when the first command about that payload
+        // arrives.
+        //
+        // Separate links because what the ground needs in a hurry must never
+        // be queued behind what it asked for at leisure -- see
+        // CommandType::link -- and one per payload because a command about a
+        // slow payload has nothing to do with a command about a quick one.
+        // Each socket's own address and the one the ground sends from are the
+        // two bases counted on by the payload's own id, which is its position
+        // in the payload configuration.
+        let mut payload_links = Vec::with_capacity(payload_config.len());
+        for (id, dh) in payload_config.iter().enumerate() {
+            let at = config
+                .payload_command_dest_base
+                .at(id)
+                .map_err(TcsError::Config)?;
+            let from = config
+                .payload_command_source_base
+                .at(id)
+                .map_err(TcsError::Config)?;
+            let addr = format!("{}:{}", at.address, at.port);
+            let socket = UdpSocket::bind(&addr).map_err(|e| {
+                bind_failed(&format!("command link of payload {}", dh.name.0), &addr, e)
+            })?;
+            payload_links.push(PayloadLink {
+                socket: Some(socket),
+                from: HostPort {
+                    address: from.address,
+                    port: from.port,
+                },
+                name: dh.name.clone(),
+                id,
+            });
+        }
 
         // Opened here, before the main loop: see TelemetryLog::open.
         let telemetry_log = TelemetryLog::open(&config)?;
@@ -596,7 +698,7 @@ impl CommandInterpreter {
             moc_cmd_send: config.moc_cmd_send.clone(),
             _config: config,
             socket,
-            payload_socket: Some(payload_socket),
+            payload_links,
             payload,
             serving: Arc::new(AtomicBool::new(true)),
             data_handlers,
@@ -621,15 +723,25 @@ impl CommandInterpreter {
         Ok(self.socket.local_addr()?)
     }
 
-    /// Where payload commands are taken, as that socket was bound.
-    pub fn payload_command_address(&self) -> TcsResult<std::net::SocketAddr> {
-        match &self.payload_socket {
-            Some(socket) => Ok(socket.local_addr()?),
-            // Taken by the thread serving it, which is the only other place
-            // it can be: ask it there.
-            None => Err(TcsError::Config(
-                "the payload command link is already being served".to_string(),
-            )),
+    /// Where one payload's commands are taken, as that socket was bound.
+    ///
+    /// By the payload's id, which is its position in the payload
+    /// configuration. Not what the configuration asked for, for the reason
+    /// [`CommandInterpreter::command_address`] is not: a port of 0 is the
+    /// system's to choose, and then the socket is the only statement of it.
+    pub fn payload_command_address(&self, id: usize) -> TcsResult<std::net::SocketAddr> {
+        match self.payload_links.get(id) {
+            Some(link) => match &link.socket {
+                Some(socket) => Ok(socket.local_addr()?),
+                // Taken by the thread serving it, which is the only other
+                // place it can be: ask it there.
+                None => Err(TcsError::Config(format!(
+                    "the command link of payload {id} is already being served"
+                ))),
+            },
+            None => Err(TcsError::Config(format!(
+                "there is no payload {id} in this configuration"
+            ))),
         }
     }
 
@@ -725,27 +837,39 @@ impl CommandInterpreter {
             self.digest,
         );
 
-        // The payload link, in a thread of its own. Its own loop and its own
-        // socket, so that a payload command taking its time -- opening a
-        // device node, binding a handler's sockets -- delays nothing on the
-        // link the ground restarts the spacecraft over.
-        match self.payload_socket.take() {
-            Some(socket) => {
-                let payload = self.payload.clone();
-                let serving = self.serving.clone();
-                let where_it_is = socket.local_addr();
-                thread::spawn(move || {
-                    if let Err(e) = payload.serve(socket, serving) {
-                        error!("the payload command link stopped: {}", e);
+        // Each payload's command link, in a thread of its own. Its own loop
+        // and its own socket, so that a payload command taking its time --
+        // opening a device node, binding a handler's sockets -- delays
+        // nothing on the link the ground restarts the spacecraft over, and
+        // nothing about another payload either.
+        for link in self.payload_links.iter_mut() {
+            match link.socket.take() {
+                Some(socket) => {
+                    let payload = self.payload.clone();
+                    let serving = self.serving.clone();
+                    let from = link.from.clone();
+                    let name = link.name.clone();
+                    let id = link.id;
+                    let where_it_is = socket.local_addr();
+                    thread::spawn(move || {
+                        if let Err(e) = payload.serve(socket, &from, &name, id, serving) {
+                            error!("the command link of payload {} stopped: {}", name.0, e);
+                        }
+                    });
+                    if let Ok(addr) = where_it_is {
+                        debug!(
+                            "commands for payload {} ({}) are taken on {}, from {}",
+                            link.id, link.name.0, addr, link.from
+                        );
                     }
-                });
-                if let Ok(addr) = where_it_is {
-                    debug!("payload commands are taken on {}", addr);
                 }
+                // run called twice. The first call has the link, and nothing
+                // about this one should take it from that thread.
+                None => error!(
+                    "the command link of payload {} is already being served",
+                    link.name.0
+                ),
             }
-            // run called twice. The first call has the link, and nothing
-            // about this one should take it from that thread.
-            None => error!("the payload command link is already being served"),
         }
 
         while self.running {
@@ -862,10 +986,17 @@ mod tests {
         let config = CIConfig {
             address: "127.0.0.1".to_string(),
             port: 0, // Let OS assign port
-            payload_interface: tcslibgs::HostPort {
-                address: "0.0.0.0".to_string(),
+            // And each payload's own command link, which a test binds at a
+            // port of the system's choosing: a test that named one would fail
+            // whenever something else on the machine held it.
+            payload_command_source_base: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
                 port: 0,
-            }, // and one for payload commands
+            },
+            payload_command_dest_base: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
             // The far ends and the bases, which nothing in the
             // commanding reads: see tcslibgs::CIConfig.
             moc_cmd_send: tcslibgs::HostPort {
@@ -906,10 +1037,17 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                // And each payload's own command link, which a test binds at a
+                // port of the system's choosing: a test that named one would fail
+                // whenever something else on the machine held it.
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
-                }, // and one for payload commands
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
@@ -987,10 +1125,17 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                // And each payload's own command link, which a test binds at a
+                // port of the system's choosing: a test that named one would fail
+                // whenever something else on the machine held it.
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
-                }, // and one for payload commands
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
@@ -1101,10 +1246,17 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                // And each payload's own command link, which a test binds at a
+                // port of the system's choosing: a test that named one would fail
+                // whenever something else on the machine held it.
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
-                }, // and one for payload commands
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
@@ -1227,10 +1379,17 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                // And each payload's own command link, which a test binds at a
+                // port of the system's choosing: a test that named one would fail
+                // whenever something else on the machine held it.
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
-                }, // and one for payload commands
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
@@ -1324,10 +1483,17 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                // And each payload's own command link, which a test binds at a
+                // port of the system's choosing: a test that named one would fail
+                // whenever something else on the machine held it.
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
-                }, // and one for payload commands
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
@@ -1468,8 +1634,12 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
                 },
                 // The far ends and the bases, which nothing in the
@@ -1548,10 +1718,17 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                // And each payload's own command link, which a test binds at a
+                // port of the system's choosing: a test that named one would fail
+                // whenever something else on the machine held it.
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
-                }, // and one for payload commands
+                },
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
@@ -1626,8 +1803,12 @@ mod tests {
             port: addr.port(),
             // The port under test is the one already held; the other is the
             // OS's to choose, so what fails is the one this is about.
-            payload_interface: tcslibgs::HostPort {
-                address: "0.0.0.0".to_string(),
+            payload_command_source_base: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
+                port: 0,
+            },
+            payload_command_dest_base: tcslibgs::HostPort {
+                address: "127.0.0.1".to_string(),
                 port: 0,
             },
             moc_cmd_send: tcslibgs::HostPort {
@@ -1683,10 +1864,20 @@ mod tests {
             CIConfig {
                 address: "127.0.0.1".to_string(),
                 port: 0,
-                payload_interface: tcslibgs::HostPort {
-                    address: "0.0.0.0".to_string(),
+                // Each payload's command link comes from the same socket the
+                // spacecraft's commands do, which is what a test has: one
+                // ground socket, and the payload at id 0 counted from it.
+                payload_command_source_base: tcslibgs::HostPort {
+                    address: from.ip().to_string(),
+                    port: from.port(),
+                },
+                // And is taken at a port of the system's choosing: a test
+                // that named one would fail whenever something else on the
+                // machine held it.
+                payload_command_dest_base: tcslibgs::HostPort {
+                    address: "127.0.0.1".to_string(),
                     port: 0,
-                }, // and one for payload commands
+                },
                 // The far ends and the bases, which nothing in the
                 // commanding reads: see tcslibgs::CIConfig.
                 moc_cmd_send: tcslibgs::HostPort {
@@ -1707,12 +1898,35 @@ mod tests {
                 log_dir: None,
                 log_segment_bytes: 65_536,
             },
-            vec![],
+            vec![a_payload()],
             a_config_version(),
             a_digest(),
         )
         .expect("an interpreter")
     }
+
+    /// The one payload a test interpreter carries.
+    ///
+    /// One, because the commanding needs a payload to have a command link for
+    /// at all: a set of none has no payload link to answer on. A device file,
+    /// which is the kind that needs nothing made for it.
+    fn a_payload() -> DHConfig {
+        DHConfig {
+            name: DHName::new(A_PAYLOAD),
+            endpoint: EndpointConfig::Device(tcslibgs::DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 1,
+            oc: None,
+            ground: None,
+            mode: Default::default(),
+            stale_interval_ms: None,
+        }
+    }
+
+    /// Its name, which a command about it has to carry: a command naming
+    /// another payload is refused on this payload's link.
+    const A_PAYLOAD: &str = "auto-send";
 
     /// CONFIG_DH is refused rather than answered with success.
     ///
@@ -1853,29 +2067,42 @@ mod tests {
         }
     }
 
-    /// The payload link answers on its own socket.
+    /// A payload's command link answers on its own socket.
     ///
     /// The loop, rather than what the loop calls: a link nothing serves is a
     /// command that goes unanswered, and nothing above this would notice.
     #[test]
     fn the_payload_link_answers_on_its_own_socket() {
-        let ci = interpreter();
-        let link = ci.payload_command_address().expect("where it is");
-        let serving = Arc::new(AtomicBool::new(true));
-
-        let payload = ci.payload.clone();
-        let socket = ci.payload_socket.as_ref().unwrap().try_clone().unwrap();
-        let stop = serving.clone();
-        let served = thread::spawn(move || payload.serve(socket, serving));
-
         let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         ground
             .set_read_timeout(Some(Duration::from_secs(2)))
             .expect("a timeout");
+        let from = ground.local_addr().expect("where it is");
+
+        let ci = interpreter_commanded_from(from);
+        let link = ci.payload_command_address(0).expect("where it is");
+        let serving = Arc::new(AtomicBool::new(true));
+
+        let payload = ci.payload.clone();
+        let socket = ci.payload_links[0]
+            .socket
+            .as_ref()
+            .unwrap()
+            .try_clone()
+            .unwrap();
+        let expected = tcslibgs::HostPort {
+            address: from.ip().to_string(),
+            port: from.port(),
+        };
+        let name = DHName::new(A_PAYLOAD);
+        let stop = serving.clone();
+        let served =
+            thread::spawn(move || payload.serve(socket, &expected, &name, 0, serving));
+
         let asked = serde_json::to_vec(&Command::StartDH(StartDHCommand::new(
             11,
             DHType::Network,
-            DHName::new("whoever"),
+            DHName::new(A_PAYLOAD),
         )))
         .expect("it serializes");
         ground.send_to(&asked, link).expect("it is sent");
@@ -1950,6 +2177,98 @@ mod tests {
         }
     }
 
+    /// A command about another payload is refused on this payload's link.
+    ///
+    /// Every payload command carries the name of its payload and arrives on
+    /// the socket that payload is commanded on, so the two disagreeing is one
+    /// end not reading the configuration the other is -- which is the fault
+    /// these links must not hide. Refused rather than served: it reached the
+    /// spacecraft, so something can be said about it.
+    ///
+    /// And a command from anywhere but the socket the configuration names is
+    /// ignored outright, with nothing sent back, as a spacecraft command is.
+    #[test]
+    fn a_command_about_another_payload_is_refused() {
+        let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        ground
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .expect("a timeout");
+        let from = ground.local_addr().expect("where it is");
+
+        let ci = interpreter_commanded_from(from);
+        let link = ci.payload_command_address(0).expect("where it is");
+        let serving = Arc::new(AtomicBool::new(true));
+        let payload = ci.payload.clone();
+        let socket = ci.payload_links[0]
+            .socket
+            .as_ref()
+            .unwrap()
+            .try_clone()
+            .unwrap();
+        let expected = tcslibgs::HostPort {
+            address: from.ip().to_string(),
+            port: from.port(),
+        };
+        let name = DHName::new(A_PAYLOAD);
+        let stop = serving.clone();
+        let served =
+            thread::spawn(move || payload.serve(socket, &expected, &name, 0, serving));
+
+        let asking = |sequence: u32, about: &str| {
+            serde_json::to_vec(&Command::QueryDH(tcslibgs::QueryDHCommand::new(
+                sequence,
+                DHName::new(about),
+            )))
+            .expect("it serializes")
+        };
+
+        // Another payload's name on this payload's link.
+        ground
+            .send_to(&asking(40, "someone-else"), link)
+            .expect("it is sent");
+        let mut buffer = [0u8; 65535];
+        let (size, _) = ground.recv_from(&mut buffer).expect("an answer");
+        match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
+            // The type the command asked for, which is how the ground pairs
+            // an answer with what it asked.
+            Telemetry::QueryDH(tm) => {
+                assert_eq!(tm.header.sequence, 40);
+                assert_eq!(tm.header.status, CommandStatus::InvalidCommand);
+            }
+            other => panic!("expected QUERY_DH telemetry, got {other:?}"),
+        }
+
+        // A stranger's command about the right payload, which is not answered
+        // at all.
+        let stranger = UdpSocket::bind("127.0.0.1:0").expect("another socket");
+        stranger
+            .set_read_timeout(Some(Duration::from_millis(500)))
+            .expect("a timeout");
+        stranger
+            .send_to(&asking(41, A_PAYLOAD), link)
+            .expect("it is sent");
+        assert!(
+            stranger.recv_from(&mut buffer).is_err(),
+            "a command from the wrong socket was answered"
+        );
+
+        // And this payload's own name, which is served.
+        ground
+            .send_to(&asking(42, A_PAYLOAD), link)
+            .expect("it is sent");
+        let (size, _) = ground.recv_from(&mut buffer).expect("an answer");
+        match serde_json::from_slice::<Telemetry>(&buffer[..size]).expect("telemetry") {
+            Telemetry::QueryDH(tm) => assert_eq!(tm.header.sequence, 42),
+            other => panic!("expected QUERY_DH telemetry, got {other:?}"),
+        }
+
+        stop.store(false, Ordering::Relaxed);
+        served
+            .join()
+            .expect("the thread ends")
+            .expect("it served without failing");
+    }
+
     /// A spacecraft command is answered while a payload command waits.
     ///
     /// This is the whole of why there are two links. The payload command here
@@ -1969,7 +2288,7 @@ mod tests {
 
         let mut ci = interpreter_commanded_from(ground.local_addr().expect("where it is"));
         let spacecraft_link = ci.command_address().expect("where it is");
-        let payload_link = ci.payload_command_address().expect("where it is");
+        let payload_link = ci.payload_command_address(0).expect("where it is");
         let handlers = ci.data_handlers.clone();
 
         // Held for as long as this test wants the payload link stuck.
@@ -1982,7 +2301,7 @@ mod tests {
         let stuck = serde_json::to_vec(&Command::StartDH(StartDHCommand::new(
             20,
             DHType::Network,
-            DHName::new("whoever"),
+            DHName::new(A_PAYLOAD),
         )))
         .expect("it serializes");
         ground.send_to(&stuck, payload_link).expect("it is sent");

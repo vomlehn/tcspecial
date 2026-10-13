@@ -31,13 +31,13 @@
 # command to the link the other does not expect it on.
 #
 # A command about a payload -- start it, stop it, ask it for its statistics --
-# is taken on payload_interface instead. Two links rather than one because what
-# the ground needs in a hurry must never be queued behind what it asked for at
-# leisure: a restart waiting behind a payload's statistics is a spacecraft that
-# cannot be rescued while it is busy. On a space link the two become two
-# virtual channels, which is where the priority between them is really decided;
-# here they are two ports, which is what an IP network has to divide traffic
-# with.
+# is taken on that payload's own socket instead, under payload_command below.
+# Separate links rather than one because what the ground needs in a hurry must
+# never be queued behind what it asked for at leisure: a restart waiting behind
+# a payload's statistics is a spacecraft that cannot be rescued while it is
+# busy. On a space link these become virtual channels, which is where the
+# priority between them is really decided; here they are ports, which is what
+# an IP network has to divide traffic with.
 #
 # Every address here is written with its port, as address:port: two things only
 # ever used together are one fact about a configuration, and writing them apart
@@ -51,7 +51,21 @@
 tcs_cmd:
   recv: "0.0.0.0:4000"
   send: "127.0.0.1:4100"
-payload_interface: "0.0.0.0:4001"
+
+# Where each payload is commanded: both ends of its own link. A payload's port
+# on each side is that side's base plus the payload's own id -- the position it
+# has in the payload configuration -- so these two lines say where all of them
+# are. source_base is the ground's end, which the MOC binds to send a payload's
+# commands and receive its answers; dest_base is the vehicle's, which tcspecial
+# binds.
+#
+# One socket per payload rather than one for all of them, which is what this
+# was: a command about a slow payload is then not ahead of a command about a
+# quick one, and the end a command comes from is a socket this file names --
+# which is what lets tcspecial refuse a payload command from anywhere else.
+payload_command:
+  source_base: "127.0.0.1:4300"
+  dest_base: "0.0.0.0:4200"
 
 # Where each payload's telemetry comes from and goes to. A payload's port on
 # each side is that side's base plus the payload's own id -- the position it has

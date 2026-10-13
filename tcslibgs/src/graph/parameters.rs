@@ -33,7 +33,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::endpoint_config::Scalar;
 use crate::types::{
-    default_log_segment_bytes, BeaconJson, CIConfigJson, LogJson, PayloadTelemetryJson, TcsCmdJson,
+    default_log_segment_bytes, BeaconJson, CIConfigJson, LogJson, PayloadCommandJson,
+    PayloadTelemetryJson, TcsCmdJson,
 };
 
 /// One entry of the section: a value, or a subsection of values.
@@ -178,7 +179,8 @@ pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
 pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("tcs_cmd.recv", true),
     ("tcs_cmd.send", true),
-    ("payload_interface", true),
+    ("payload_command.source_base", true),
+    ("payload_command.dest_base", true),
     ("payload_telemetry.source_base", true),
     ("payload_telemetry.dest_base", true),
     ("beacon.interval_ms", true),
@@ -231,7 +233,10 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
             recv: text("tcs_cmd.recv")?,
             send: text("tcs_cmd.send")?,
         },
-        payload_interface: text("payload_interface")?,
+        payload_command: PayloadCommandJson {
+            source_base: text("payload_command.source_base")?,
+            dest_base: text("payload_command.dest_base")?,
+        },
         payload_telemetry: PayloadTelemetryJson {
             source_base: text("payload_telemetry.source_base")?,
             dest_base: text("payload_telemetry.dest_base")?,
@@ -287,7 +292,8 @@ mod tests {
         vec![
             ("tcs_cmd.recv", "0.0.0.0:4000"),
             ("tcs_cmd.send", "127.0.0.1:4100"),
-            ("payload_interface", "0.0.0.0:4001"),
+            ("payload_command.source_base", "127.0.0.1:4300"),
+            ("payload_command.dest_base", "0.0.0.0:4200"),
             ("payload_telemetry.source_base", "0.0.0.0:6000"),
             ("payload_telemetry.dest_base", "127.0.0.1:6100"),
             ("beacon.interval_ms", "5000"),
@@ -305,7 +311,8 @@ mod tests {
         let config = ci_config_of(&said(&whole())).expect("this one is complete");
         assert_eq!(config.tcs_cmd.recv, "0.0.0.0:4000");
         assert_eq!(config.tcs_cmd.send, "127.0.0.1:4100");
-        assert_eq!(config.payload_interface, "0.0.0.0:4001");
+        assert_eq!(config.payload_command.source_base, "127.0.0.1:4300");
+        assert_eq!(config.payload_command.dest_base, "0.0.0.0:4200");
         assert_eq!(config.beacon.interval_ms, 5000);
         assert_eq!(config.beacon.send, "0.0.0.0:5550");
         assert_eq!(config.log.directory.as_deref(), Some("/var/log/tcspecial"));
@@ -427,10 +434,10 @@ mod tests {
 
         // And the links, each of which is a host and a port.
         for (name, value, expected) in [
-            ("payload_interface", "0.0.0.0:four thousand", "not a port"),
-            ("payload_interface", "0.0.0.0:0", "port 0"),
-            ("payload_interface", "0.0.0.0:70000", "not a port"),
-            ("payload_interface", "0.0.0.0", "address:port"),
+            ("payload_command.dest_base", "0.0.0.0:four thousand", "not a port"),
+            ("payload_command.dest_base", "0.0.0.0:0", "port 0"),
+            ("payload_command.source_base", "0.0.0.0:70000", "not a port"),
+            ("payload_command.source_base", "0.0.0.0", "address:port"),
             ("tcs_cmd.send", "nowhere", "address:port"),
             ("payload_telemetry.source_base", ":6000", "states no address"),
         ] {

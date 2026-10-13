@@ -380,6 +380,32 @@ impl Command {
         self.cmd_type().link()
     }
 
+    /// Which payload this command is about, where it is about one.
+    ///
+    /// Every payload command carries the name of its payload, and nothing
+    /// else does: that is what makes a payload command one. Both ends ask
+    /// this of the same table -- the ground to choose the socket that payload
+    /// is commanded on, the spacecraft to refuse a command that arrived on
+    /// another payload's -- so neither can come to disagree about which
+    /// payload a command is for.
+    ///
+    /// `None` for a spacecraft command, and for CONNECT, which is about the
+    /// configuration the far end read rather than about any payload.
+    pub fn payload_name(&self) -> Option<&DHName> {
+        match self {
+            Command::StartDH(cmd) => Some(&cmd.name),
+            Command::StopDH(cmd) => Some(&cmd.name),
+            Command::QueryDH(cmd) => Some(&cmd.name),
+            Command::QueryDHSample(cmd) => Some(&cmd.name),
+            Command::ConfigDH(cmd) => Some(&cmd.name),
+            Command::Ping(_)
+            | Command::Connect(_)
+            | Command::RestartArm(_)
+            | Command::Restart(_)
+            | Command::Config(_) => None,
+        }
+    }
+
     pub fn cmd_type(&self) -> CommandType {
         match self {
             Command::Ping(cmd) => cmd.header.cmd_type,

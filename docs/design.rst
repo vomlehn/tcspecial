@@ -233,7 +233,9 @@ section a payload set's file holds, which is required of every configuration.
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
-     payload_interface: 0.0.0.0:4001
+     payload_command:
+       source_base: 127.0.0.1:4300
+       dest_base: 0.0.0.0:4200
      payload_telemetry:
        source_base: 0.0.0.0:6000
        dest_base: 127.0.0.1:6100
@@ -280,19 +282,26 @@ Both ends in one file because both ends read this file: a configuration stating
 only its own end would leave the other to be told separately, and two places to
 say one thing is one place for them to disagree.
 
-Two command links because what the ground needs in a hurry must never be queued
-behind what it asked for at leisure: a command about the spacecraft -- ping it,
-arm it, restart it -- is taken on the command interface, and one about a payload
-on ``payload_interface``. On a space link the two become two virtual channels,
-which is where the priority between them is really decided; here they are two
-sockets, which is what an IP network has to divide traffic with.
+Separate command links because what the ground needs in a hurry must never be
+queued behind what it asked for at leisure: a command about the spacecraft --
+ping it, arm it, restart it -- is taken on ``tcs_cmd.recv``, and one about a
+payload on that payload's own socket. On a space link these become virtual
+channels, which is where the priority between them is really decided; here they
+are sockets, which is what an IP network has to divide traffic with.
 
-``payload_interface`` says where it is in full, like the rest of them. It
-was a bare port, taken at the command interface's address on the grounds that
-there is one command interpreter at one place -- and one attribute written
-differently from the rest is one a reader has to remember the exception for.
-The MOC still reaches it at the host the operator connected to, taking only the
-port from the file, so one typed address moves both links.
+``payload_command`` is where the payloads are commanded, and it has two bases
+for the reason ``payload_telemetry`` does: the link has two ends. A payload's
+socket on each side is that side's base plus the payload's own id, so four
+payloads based at 4300 and 4200 are commanded from 4300 to 4303 and take those
+commands on 4200 to 4203.
+
+One socket per payload rather than one for all of them, which is what
+``payload_interface`` was. That worked, and left two things undone. Nothing
+said which socket the ground sent from -- the MOC bound whatever port the
+system gave it -- so tcspecial could not be told what a payload command should
+come from, where every other link in this section is written down at both ends.
+And one socket is one queue: a command about a payload that takes its time to
+start was ahead of a command about one that would have answered at once.
 
 ``payload_telemetry`` is where each payload's own data link is, and it has two
 bases because the link has two ends. tcspecial binds its end at
@@ -2006,7 +2015,9 @@ This is the shipped ``tcspecial/src/tcspecial.yaml``:
    tcs_cmd:
      recv: "0.0.0.0:4000"
      send: "127.0.0.1:4100"
-   payload_interface: "0.0.0.0:4001"
+   payload_command:
+     source_base: "127.0.0.1:4300"
+     dest_base: "0.0.0.0:4200"
    payload_telemetry:
      source_base: "0.0.0.0:6000"
      dest_base: "127.0.0.1:6100"
@@ -2019,9 +2030,9 @@ This is the shipped ``tcspecial/src/tcspecial.yaml``:
      segment_size: 65536
 
 ``tcs_cmd.recv`` is where the command interpreter binds for commands about the
-spacecraft, which is where the ground sends them, ``payload_interface`` is the
-same for commands about a payload, and ``beacon.send`` and ``beacon.recv`` are
-the two ends of the beacon link.
+spacecraft, which is where the ground sends them; ``payload_command`` is the
+two ends of a payload's own command link, counted on by that payload's id; and
+``beacon.send`` and ``beacon.recv`` are the two ends of the beacon link.
 Every address tcspecial uses is in this file and nowhere else: see
 `Where the Addresses Are`_. The quotes on the addresses are deliberate:
 unquoted, ``0.0.0.0`` is a string in YAML only because it happens not to be a
@@ -5167,27 +5178,42 @@ Requirement
     configuration file.
 
 Requirement
-    The command interpreter takes commands on two links. A command about the
-    spacecraft -- ``PING``, ``RESTART_ARM``, ``RESTART``, ``CONFIGURE`` --
-    arrives on ``tcs_cmd.recv``; a command about a payload --
-    ``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE``,
-    ``CONFIGURE_DH`` -- arrives on ``payload_interface``. ``CONNECT`` is
-    answered on either.
+    The command interpreter takes commands on one link for the spacecraft and
+    one per payload. A command about the spacecraft -- ``PING``,
+    ``RESTART_ARM``, ``RESTART``, ``CONFIGURE`` -- arrives on
+    ``tcs_cmd.recv``; a command about a payload -- ``START_DH``, ``STOP_DH``,
+    ``QUERY_DH``, ``QUERY_DH_SAMPLE``, ``CONFIGURE_DH`` -- arrives on
+    ``payload_command.dest_base`` counted on by that payload's id, and is
+    answered there. ``CONNECT`` is answered on any of them.
 
-Two links because what the ground needs in a hurry must never be queued
+Requirement
+    A command about one payload that arrives on another payload's link is
+    refused with ``InvalidCommand``, as a command on the wrong kind of link
+    is: every payload command carries the name of its payload, and the socket
+    it arrived on says which payload it should be about, so the two
+    disagreeing is one end not reading the configuration the other is.
+
+Requirement
+    Each payload's link is served by a loop in a thread of its own, and every
+    socket is bound before any loop runs -- so a port already in use is
+    reported at startup, naming the payload whose link wanted it.
+
+Separate links because what the ground needs in a hurry must never be queued
 behind what it asked for at leisure. A ``RESTART`` waiting behind a payload's
 statistics is a spacecraft that cannot be rescued while it is busy, and the
 two types of command are unlike in every way that matters: one is rare,
 urgent, and about the vehicle, the other routine, bulky, and about an
 instrument. Missions divide them for the same reason, often between different
-operators with different authority.
+operators with different authority. One link per payload divides them again,
+for a smaller version of the same reason: a payload that takes a second to
+start should not hold up a question about one that would answer at once.
 
 On a space link the division is by virtual channel, which is where the
 priority between them is really decided and where a command link gets COP-1's
 sequence control. Over IP there is no such thing, so it is two ports -- what
 an IP network has to divide traffic with. A payload set that is flown rather
-than tested would map ``tcs_cmd.recv`` to the command virtual channel and
-``payload_interface`` to a payload one.
+than tested would map ``tcs_cmd.recv`` to the command virtual channel and the
+payload links to payload ones.
 
 Requirement
     One table says which link a command belongs on, read by the ground when

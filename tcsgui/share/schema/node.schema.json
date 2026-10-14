@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vomlehn/tcspecial/schema/node.schema.json",
+  "title": "One node type, as a description file says it",
+  "description": "The description tree says what node types there are: one file per type, in this shape, in YAML or XML as its extension says. The editor reads the tree at run time to build its palette and to say what a node of each type may be told. This is the YAML spelling; node.xsd is the same shape in XML, and a test holds the two against each other. What this says is shape: whether a type's terminals are the ones the flight software believes in is a question about meaning, answered by a test against tcslibgs::graph::terminals, which is the table the vehicle is flown by.",
+  "type": "object",
+  "properties": {
+    "node": {
+      "description": "What the palette shows, and the name a placed node starts with.",
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "description": "The configuration's own word for the type. Several descriptions may share one: `compute` is one node type, and `mean`, `hysteresis`, `to_kelvin` and `process` are four things to place, each a compute node with its function already answered.",
+      "type": "string",
+      "minLength": 1
+    },
+    "about": {
+      "description": "One line about what a node of this type does, for the palette and the node's own window.",
+      "type": "string"
+    },
+    "sets": {
+      "description": "Attributes the editor fills in rather than asking for: the `function` of a computation, and whatever else picks one variant of a type. The names are the configuration's own attribute names.",
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "attributes": {
+      "description": "What a node of this type says for itself.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "The attribute's name, as a configuration writes it.",
+            "type": "string",
+            "minLength": 1
+          },
+          "required": {
+            "description": "Whether it must be stated before the configuration can be flown. Absent is false.",
+            "type": "boolean"
+          },
+          "about": {
+            "description": "One line about it, for the field in the node's window.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "payload-sink": {
+      "description": "Whether the payload's own data arrives at a node of this type: the terminal `payload-in`. Absent is false.",
+      "type": "boolean"
+    },
+    "payload-source": {
+      "description": "Whether the payload's own data leaves a node of this type, on its way to the ground: the terminal `payload-out`. Absent is false.",
+      "type": "boolean"
+    },
+    "moc-sink": {
+      "description": "Whether what the ground sends arrives at a node of this type: the terminal `moc-in`. Absent is false.",
+      "type": "boolean"
+    },
+    "moc-source": {
+      "description": "Whether what the ground sends leaves a node of this type, on its way to a payload: the terminal `moc-out`. Absent is false.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "node",
+    "type"
+  ],
+  "additionalProperties": false
+}

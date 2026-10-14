@@ -69,12 +69,69 @@ pub struct Described {
     /// What a node of this kind says for itself: the name, whether it must be
     /// stated, and a line about it.
     pub attributes: Vec<Attribute>,
+    /// Which of the four terminals a node of this type has.
+    ///
+    /// A property of the type and not of a node, which is why it is here: a
+    /// configuration says what the vehicle carries and what each node is told,
+    /// and "an i2c node receives what asks it for a reading" is true of every
+    /// i2c node there will ever be. It was written in Rust, in
+    /// `tcslibgs::graph::terminals`, where nobody editing a node type could
+    /// see it; `tests::the_tree_agrees_with_the_schemas_terminals` keeps the
+    /// two in step.
+    pub terminals: Terminals,
     /// Where the description was read from, relative to the tree's root.
     ///
     /// Kept because it is the other half of the correspondence: the Rust for
     /// this node is at the same path under `tcspecial/src/node`, and a test
     /// says so.
     pub path: PathBuf,
+}
+
+/// Which terminals a node type has, as its description declares them.
+///
+/// Four flags rather than two lists of names, because that is what a file can
+/// state plainly and what a reader of one can check at a glance: a type either
+/// has somewhere for a stream to arrive or it has not. The names the four
+/// answer to are `tcslibgs::graph::terminals`'s -- `payload-sink` is the
+/// terminal called `payload-in` -- and [`Terminals::of`] is the one place that
+/// correspondence is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Terminals {
+    /// Where the payload's own data arrives: the terminal `payload-in`.
+    pub payload_sink: bool,
+    /// And where it leaves: `payload-out`.
+    pub payload_source: bool,
+    /// Where what the ground sends arrives: `moc-in`.
+    pub moc_sink: bool,
+    /// And where it leaves: `moc-out`.
+    pub moc_source: bool,
+}
+
+impl Terminals {
+    /// Whether this declares the terminal of that name.
+    ///
+    /// The one statement of which flag is which terminal, so that a test can
+    /// hold the tree against the schema's own table without either side
+    /// repeating the other.
+    pub fn has(&self, terminal: &str) -> bool {
+        match terminal {
+            "payload-in" => self.payload_sink,
+            "payload-out" => self.payload_source,
+            "moc-in" => self.moc_sink,
+            "moc-out" => self.moc_source,
+            _ => false,
+        }
+    }
+
+    /// The four, by the terminal name each answers to.
+    pub fn each(&self) -> [(&'static str, bool); 4] {
+        [
+            ("payload-in", self.payload_sink),
+            ("payload-out", self.payload_source),
+            ("moc-in", self.moc_sink),
+            ("moc-out", self.moc_source),
+        ]
+    }
 }
 
 /// One attribute of a described node.
@@ -103,6 +160,18 @@ struct Said {
     /// Repeated in XML and a list in YAML, which serde reads as the same Vec.
     #[serde(default)]
     attributes: Vec<SaidAttribute>,
+    /// The four terminal flags, each absent where a type has not got that one.
+    ///
+    /// Hyphenated, as `rust-code-path` is: the words a file holds are the
+    /// words a person writes, and these read as English either way about.
+    #[serde(default, rename = "payload-sink")]
+    payload_sink: Option<Scalar>,
+    #[serde(default, rename = "payload-source")]
+    payload_source: Option<Scalar>,
+    #[serde(default, rename = "moc-sink")]
+    moc_sink: Option<Scalar>,
+    #[serde(default, rename = "moc-source")]
+    moc_source: Option<Scalar>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -241,6 +310,28 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
         });
     }
 
+    // The four terminal flags, each true, false or unsaid. Unsaid is false:
+    // a type that does not mention a terminal has not got one, which is what
+    // every description written before these existed means.
+    let flag = |what: &str, said: Option<&Scalar>| -> Result<bool, String> {
+        match said.map(|s| s.as_str().trim().to_string()) {
+            None => Ok(false),
+            Some(said) => match said.as_str() {
+                "true" => Ok(true),
+                "false" => Ok(false),
+                other => Err(named(&format!(
+                    "\"{node}\": {what} is true or false, and this says \"{other}\""
+                ))),
+            },
+        }
+    };
+    let terminals = Terminals {
+        payload_sink: flag("payload-sink", said.payload_sink.as_ref())?,
+        payload_source: flag("payload-source", said.payload_source.as_ref())?,
+        moc_sink: flag("moc-sink", said.moc_sink.as_ref())?,
+        moc_source: flag("moc-source", said.moc_source.as_ref())?,
+    };
+
     Ok(Described {
         node,
         node_type,
@@ -251,6 +342,7 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
             .map(|(name, value)| (name.clone(), value.as_str().trim().to_string()))
             .collect(),
         attributes,
+        terminals,
         path: path.to_path_buf(),
     })
 }
@@ -446,6 +538,44 @@ mod tests {
         assert!(null.attributes.is_empty());
         assert!(null.sets.is_empty());
         assert!(!null.about.is_empty(), "every description says what it is");
+    }
+
+    /// The tree's terminals are the ones the vehicle is flown by.
+    ///
+    /// The flags in a description are what a person reads and edits; the table
+    /// in `tcslibgs::graph::terminals` is what the checking and the flight
+    /// software read. Two statements of one fact, so one has to be held
+    /// against the other -- and it is the tree that is checked, because the
+    /// table is the one the vehicle obeys.
+    ///
+    /// Only the types that module has an answer for. A computation's sinks are
+    /// the inputs it declares and a log's are whatever is written to it, so
+    /// the table says nothing about those and the description is the only
+    /// statement there is.
+    #[test]
+    fn the_trees_terminals_are_the_schemas() {
+        let (described, trouble) = read_tree(&shipped());
+        assert!(trouble.is_empty(), "{trouble:?}");
+        assert!(!described.is_empty());
+
+        for one in &described {
+            let Some(table) = tcslibgs::graph::terminals::terminals_of(&one.node_type)
+            else {
+                continue;
+            };
+            for (terminal, said) in one.terminals.each() {
+                let known =
+                    table.sinks.contains(&terminal) || table.sources.contains(&terminal);
+                assert_eq!(
+                    said,
+                    known,
+                    "{}: {terminal} is {} in the description and {} in the table",
+                    one.path.display(),
+                    if said { "declared" } else { "not declared" },
+                    if known { "declared" } else { "not" }
+                );
+            }
+        }
     }
 
     /// Every description has its Rust, and every vehicle node its description.

@@ -6,6 +6,10 @@
 node: log
 type: log
 about: Records what reaches it rather than passing it on.
+payload-sink: true
+payload-source: false
+moc-sink: false
+moc-source: false
 attributes:
   - name: directory
     required: true

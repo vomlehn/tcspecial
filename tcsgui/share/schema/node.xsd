@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One node type, as a description file says it.
+
+  The description tree says what node types there are: one file per type, in
+  this shape, in YAML or XML as its extension says. The editor reads the tree
+  at run time to build its palette and to say what a node of each type may be
+  told; this schema is what says the shape of one of those files, so that
+  somebody adding a node type is told about a misspelling by their own editor
+  rather than by a palette entry that quietly fails to appear.
+
+  The other half of it is `node.schema.json`, the same shape for the YAML
+  spelling. The two are held against each other by a test, and both are held
+  against the software's own reader: see `tcsgui/tests/schema.rs`.
+
+  What this checks is shape. Whether a type's terminals are the ones the
+  flight software believes in is a question about meaning, and the answer is a
+  test rather than a schema: `tcslibgs::graph::terminals` is the table the
+  vehicle is flown by, and the tree has to agree with it.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <!-- Whether a node of this type has a terminal of that kind. True, false,
+       or left out, which means false: a type that does not mention a terminal
+       has not got one. -->
+  <xs:simpleType name="terminal">
+    <xs:restriction base="xs:boolean"/>
+  </xs:simpleType>
+
+  <!-- One attribute a node of this type says for itself: its name, whether it
+       must be stated before the configuration can be flown, and a line about
+       it for the editor to show. -->
+  <xs:complexType name="attribute">
+    <xs:all>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="required" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="about" type="xs:string" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- The attributes the editor fills in rather than asking for: the
+       `function` of a computation, and whatever else picks one variant of a
+       type. Any element name, because the names are the configuration's own
+       attribute names and the schema for those is the configuration's. -->
+  <xs:complexType name="sets">
+    <xs:sequence>
+      <xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:element name="node">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <!-- What the palette shows, and the name a placed node starts with.
+             Exactly one, which XSD 1.0 cannot say here: `attributes` repeats,
+             and xs:all allows neither repeats nor a mixture. A description
+             with two names is refused where the file is read. -->
+        <xs:element name="node" type="xs:string"/>
+        <!-- The configuration's own word for the type. Several descriptions
+             may share one: `compute` is one node type, and `mean`,
+             `hysteresis`, `to_kelvin` and `process` are four things to place. -->
+        <xs:element name="type" type="xs:string"/>
+        <xs:element name="about" type="xs:string"/>
+        <xs:element name="sets" type="sets"/>
+        <xs:element name="attributes" type="attribute"/>
+        <!-- Which of the four terminals a node of this type has. The names
+             say whose data it is and whether it arrives or leaves: a payload
+             sink is where the payload's own data arrives, on its way to the
+             ground, and a moc source is where what the ground sends leaves,
+             on its way to a payload. -->
+        <xs:element name="payload-sink" type="terminal"/>
+        <xs:element name="payload-source" type="terminal"/>
+        <xs:element name="moc-sink" type="terminal"/>
+        <xs:element name="moc-source" type="terminal"/>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

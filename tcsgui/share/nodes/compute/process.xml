@@ -9,6 +9,10 @@
     <sets>
         <function>process</function>
     </sets>
+    <payload-sink>true</payload-sink>
+    <payload-source>true</payload-source>
+    <moc-sink>true</moc-sink>
+    <moc-source>true</moc-source>
     <attributes>
         <name>program</name>
         <required>true</required>

@@ -77,11 +77,12 @@ export struct NodeView {
     y: length,
     width: length,
     height: length,
-    // square | rounded | keyed | barred | store | pointed | parallelogram
+    // square | rounded | keyed | barred | store | parallelogram
     outline: string,
     // The outline as path data, in this node's own coordinates, for the
-    // outlines a corner radius cannot draw. Empty for the ones it can, which
-    // is every outline but the pointed one. Rust's arithmetic rather than the
+    // outlines a corner radius cannot draw: a side left out, or a side that
+    // leans. Empty for the square, rounded, keyed and barred ones, which is
+    // what says to draw the ordinary rectangle. Rust's arithmetic rather than
     // markup's, for the same reason the link routes are: see style::shape_of.
     shape: string,
     // solid | hatched | open | double

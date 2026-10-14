@@ -3526,7 +3526,6 @@ fn view_of(
             Outline::Parallelogram => "parallelogram",
             Outline::Keyed => "keyed",
             Outline::Barred => "barred",
-            Outline::Pointed => "pointed",
         }
         .into(),
         // The outlines a corner radius cannot draw, as a path in the node's

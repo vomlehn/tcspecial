@@ -1668,8 +1668,9 @@ of the graph.
 
 The two ends of the graph are two shapes rather than one. A log is a data
 store -- two long sides and a cap on the right, the left end left open -- and
-the ground station is a rectangle with its left end drawn to a point, which is
-the one node on the canvas that is not part of the vehicle at all. They were
+the ground station is a plain rectangle with square corners, the **external
+entity**: the thing outside the system that data comes from and goes to, which
+is what the ground is. They were
 both pills, under one heading, on the strength of both being "an end"; but a
 file written on board and everybody on the ground are not the same kind of
 end, and the two were never in the same pane for the shared heading to group
@@ -1720,29 +1721,30 @@ corner the log's own terminal is drawn in, and put that arrow about fifteen
 pixels outside the outline; leaving an end open is the one way to stop being a
 rectangle without touching a corner at all.
 
-The point is on the left, and only on the left, for two reasons that agree. A
-node's ``payload-out`` is on its left side and its ``payload-in`` on its right,
-so the ground is leftward of everything in the diagram and the shape aims the
-way the telemetry goes. And a terminal is drawn in the corner of a node's box,
-so a shape that cuts a corner off cuts a terminal loose: the ground station's
-own two terminals are both on its right side, which is the side the shape keeps
-square. A test holds the shape to that -- every terminal of a type drawn from a
-path has to be inside that path -- because the reasoning is about where the
-terminals are, and a shape kept while a terminal moved would otherwise draw an
-arrow floating beside the node.
+The ground station has worn a pill and a five-sided point before this. Both
+said "not like the others" by being unlike anything; the rectangle says it by
+being the one shape a reader of these notations already knows the meaning of,
+and it is free to say it now that the payloads wear the data symbol. It is the
+same proportion as everything else -- 152 by 72, where the rest of the canvas
+runs 40 to 96 tall at the same width -- and it is still wide, solid, azure and
+the tallest of the ordinary band, so it catches the eye without being the node
+shaped oddly.
 
-It is also the same proportion as everything else: 152 by 72, where the rest of
-the canvas runs 40 to 96 tall at the same width. It was 128, which made it the
-one node whose shape *and* whose proportion were unlike every other, and that
-is two statements where one was meant.
+A side left out and a side that leans are not corner radii, so those shapes
+arrive as path data from ``style::shape_of`` and the markup draws them with a
+``Path`` -- the same arrangement as the link routes, and for the same reason:
+geometry that can be read and tested belongs in Rust rather than in a layout
+language. A ``Path`` has no drop shadow, so the lift such a node gets while it
+is being dragged is a second copy of the shape, three pixels lower and barely
+visible, drawn under the first.
 
-A point is not a corner radius, so it arrives as path data from
-``style::shape_of`` and the markup draws it with a ``Path`` -- the same
-arrangement as the link routes, and for the same reason: geometry that can be
-read and tested belongs in Rust rather than in a layout language. A ``Path``
-has no drop shadow, so the lift a node gets while it is being dragged is a
-second copy of the shape, three pixels lower and barely visible, drawn under
-the first.
+A terminal is drawn in the corner of a node's box, so a shape that gives a
+corner away has to answer for the terminal that was in it. A test holds every
+shape drawn from a path to that: each terminal of the type has to be inside
+the path, and anything the markup draws inside the shape has to be inside it
+too. It is checked as the rule rather than as the shape, because the reasoning
+is about where the terminals are, and a shape kept while a terminal moved
+would otherwise draw an arrow floating beside the node.
 
 Colour remains the redundant channel for all that. Nothing is told apart by
 colour alone: every type differs from every other in at least two of outline,

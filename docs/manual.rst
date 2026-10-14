@@ -174,7 +174,9 @@ terminal
     ``from_moc``, a ``from_moc`` to a ``to_payload``. Anything else would carry
     one stream into the other. In tcsgui the terminals are drawn as small
     boxes in a node's corners, each with an arrow in it, and a link is made by
-    dragging from one to another -- a drag that does not pair makes nothing.
+    dragging from one of them onto the node the line is to reach: anywhere on
+    that node will do, and the line is drawn to whichever of its terminals the
+    stream arrives at. A node with no terminal of that stream takes nothing.
 
 ``null`` node
     A vehicle node that carries both streams through and does nothing to what

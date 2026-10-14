@@ -436,8 +436,8 @@ Requirement
     derived from the table above rather than written out again.
 
     The editor is held to it as a *gesture*: a line dragged from a terminal
-    will not join to one that does not pair with it, so a bad link cannot be
-    drawn in the first place. The checking refuses a written-out configuration
+    goes to the terminal that pairs with it and to no other, and a node with
+    none takes nothing -- so a bad link cannot be drawn in the first place. The checking refuses a written-out configuration
     for the same reason, which is what a file edited by hand is still held to.
     What that rules out is a link that carries one stream into the other, and
     with it the circular link a drawing could otherwise be made to say.
@@ -1429,25 +1429,42 @@ row being reserved at the top and the bottom: the name stays in the middle of
 the node and stops short of the corner boxes, where reserving rows would leave
 sixteen pixels for a name on the shortest node.
 
-A link is drawn by dragging from one terminal to another, and the terminals are
-the only handles there are. There were two round handles on every node -- one
-on each side, meaning "a link leaves here" and "a link arrives here" -- and
-they are gone: a node has two places a link may leave and two it may arrive at,
-and a handle in the middle of an edge could not say which of them was meant. So
-the boxes a reader looks at to see what may be linked to what are the boxes a
-person presses to link them, which is one thing to learn instead of two.
+A link is drawn by dragging from a terminal onto the node it is to reach. The
+terminal is where a line is taken *from*, and it is the only handle there is:
+there were two round handles on every node -- one on each side, meaning "a link
+leaves here" and "a link arrives here" -- and they are gone, because a node has
+two places a link may leave and two it may arrive at, and a handle in the
+middle of an edge could not say which of them was meant. So the boxes a reader
+looks at to see what may be linked to what are the boxes a person presses to
+link them, which is one thing to learn instead of two.
+
+Where it is let go of is a node and not a terminal. Anywhere on the node will
+do -- its name, its middle, a corner box, the wrong corner box -- because
+there is nothing else the gesture could have meant: a stream has one name at
+each of its ends, so a line drawn from a ``to_moc`` can only arrive at a
+``from_payload``, and the editor works out which terminal that is and draws the
+line to it. The terminals stay drawn, since they are what says which streams a
+type carries and which way; what has gone is having to hit a sixteen-pixel
+square in a corner to say something the stream already said.
+
+Which does not widen what may be joined to what. A node with no terminal of
+that stream takes nothing: the ground receives readings and is sent nothing, so
+a line carrying what the ground sends has nowhere to land on a ``moc`` node,
+and a log has nothing to leave it by. The rule is still
+``tcslibgs::graph::terminals``; only the aiming has changed.
 
 A link that is already there can be taken hold of by either of its ends. Press
 the terminal it is attached to and the line comes off the drawing; where it is
-let go of decides what happens to it. Back where it started, or anywhere on a
-node that is not a terminal: nothing changes, a gesture that has thought better
-of itself leaving no trace. On another terminal that suits that end: the link
-moves, in one edit, so one undo puts it back. On a terminal that does not suit
-it -- the wrong kind, the wrong stream, its own far node, or one the same link
-already reaches: nothing changes, as a line that cannot be drawn is not drawn.
-And over no node at all: the link is deleted. Which is the only way to delete
-one, and it is the gesture a person reaches for -- pull the wire out and drop
-it on the floor.
+let go of decides what happens to it. Anywhere on the node it is already
+attached to: nothing changes, a gesture that has thought better of itself
+leaving no trace. On another node that has that terminal: the link moves there,
+in one edit, so one undo puts it back -- the end being carried keeps its own
+name, a ``from_payload`` taken off one node going on another node's
+``from_payload`` and nowhere else. On a node that has no such terminal, or one
+the same link already reaches: nothing changes, as a line that cannot be drawn
+is not drawn. And over no node at all: the link is deleted. Which is the only
+way to delete one, and it is the gesture a person reaches for -- pull the wire
+out and drop it on the floor.
 
 A terminal with one link on it hands that link over; one with none starts a new
 one, and so does one with several, because nothing says which of several was
@@ -1467,19 +1484,20 @@ are reading it, and an editor that insisted on one would be an editor to be
 remembered rather than used.
 
 The gesture will not make a link that the configuration check would refuse.
-Letting go over a terminal that does not pair with the one the drag started at
-does nothing at all, and so does letting go over a terminal of the same kind as
-the one the drag started at, over the node the drag started on, over empty
-canvas, or over a terminal the same link is already drawn to. An editor that cannot make a bad link is worth more than one
-that makes it and marks it red -- and the four refusals are the four ways a
-person's hand slips, not four ways of being wrong about the vehicle.
+Letting go over a node that has no terminal of the stream being drawn does
+nothing at all, and so does letting go over the node the drag started on, over
+empty canvas, or over a node the same link is already drawn to. An editor that
+cannot make a bad link is worth more than one that makes it and marks it red --
+and these refusals are the ways a person's hand slips, not ways of being wrong
+about the vehicle.
 
 Which terminal was pressed is the whole of what the first half of the gesture
 says. The second half is a point: a press grabs the pointer, so every event up
-to the release goes to the terminal that was pressed, and what is under the
-pointer at the end is worked out from where the nodes are. That arithmetic is
-in Rust, with the rest of the geometry, where it can be tested without a
-window.
+to the release goes to the terminal that was pressed, and which node is under
+the pointer at the end is worked out from where the nodes are. That arithmetic
+is in Rust, with the rest of the geometry, where it can be tested without a
+window -- and it is now a question about one rectangle per node rather than
+four small ones, which is the whole of what made aiming hard.
 
 A terminal is drawn inside its node and over the area a drag is taken from, so
 a press on a corner draws a link and a press anywhere else moves the node. That

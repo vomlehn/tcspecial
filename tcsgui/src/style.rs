@@ -403,11 +403,15 @@ pub fn attachment(
 
 /// The box a terminal is drawn in, relative to the node.
 ///
-/// For working out what the pointer was let go of over: a link is drawn from
-/// the terminal that was pressed, and a press grabs the pointer, so the only
-/// thing the release says is where it happened -- and what is there is a
-/// question about these boxes. `None` for a type this build does not know or a
-/// name that is not one of the four.
+/// For the tests, which let a line go of over a terminal because that is where
+/// a person naturally aims. The gesture itself does not ask: a line is drawn
+/// from the terminal that was pressed, and where it lands is a question about
+/// the node under the pointer and not about these boxes -- see `landed` in
+/// `main.rs`, which is what made aiming at them unnecessary.
+///
+/// `None` for a type this build does not know or a name that is not one of the
+/// four.
+#[cfg(test)]
 pub fn terminal_box(
     node_type: &str,
     at: (i32, i32),

@@ -2650,6 +2650,18 @@ fn views_of(
                 label_x,
                 label_y,
                 wide: named_input.is_some(),
+                // Which stream it carries, as a colour: see `line_ink`.
+                ink: colour(&line_ink(
+                    document
+                        .node(&link.from)
+                        .and_then(|node| {
+                            style::terminal_for(
+                                &node.node_type,
+                                link.origin.as_deref(),
+                                false,
+                            )
+                        }),
+                )),
                 label: label.into(),
                 comment: link.comment.clone().unwrap_or_default().into(),
             }
@@ -3365,7 +3377,39 @@ fn palette_of(pane: Pane, described: &[nodes::Described]) -> ModelRc<PaletteEntr
             });
         }
     }
+
+    alphabetical(&mut entries);
     ModelRc::from(Rc::new(VecModel::from(entries)))
+}
+
+/// Put each heading's entries in alphabetical order.
+///
+/// Within a heading and not across the panel, because a heading is a statement
+/// about the entries under it -- "Devices", "Ends of the graph" -- and a list
+/// sorted past its headings would file a device under whichever heading its
+/// first letter landed in.
+///
+/// Alphabetical because a palette is a thing people look *in*, not a thing
+/// they read: the order it had was the order the table happens to declare the
+/// types in, which is no order at all to somebody hunting for `rpmsg`. The
+/// headings themselves keep the order they are declared in, which is the one
+/// place the table's own order says something -- devices before the things
+/// that are driven, and the ends of the graph last.
+fn alphabetical(entries: &mut [PaletteEntry]) {
+    let mut at = 0;
+    while at < entries.len() {
+        if entries[at].is_heading {
+            at += 1;
+            continue;
+        }
+        let from = at;
+        while at < entries.len() && !entries[at].is_heading {
+            at += 1;
+        }
+        entries[from..at].sort_by(|one, two| {
+            one.node.name.to_lowercase().cmp(&two.node.name.to_lowercase())
+        });
+    }
 }
 
 /// Every description the editor found, read once.
@@ -3534,6 +3578,41 @@ fn terminal_view(
     }
 }
 
+/// What a line is drawn in, by the stream it carries.
+///
+/// A line used to be grey, whichever way its data went, so a reader tracing a
+/// control loop had to tell the two streams apart by which corner each line
+/// left -- which is reading a diagram by its arithmetic. Now the colour says
+/// it: a line carrying the payload's own data is of the payload family, and
+/// one carrying what the ground sends is of the ground's.
+///
+/// One shade lighter than the lightest node in that panel, which is what makes
+/// a line read as a line and not as a node's own outline: the payloads' panel
+/// is lightest at Clay and the ground's has Azure alone, and these are those
+/// two with ten more of CIE lightness. Written down rather than computed
+/// because the palette is written down -- the maths lives in `sight.rs`, which
+/// is test-only -- and
+/// `tests::a_line_is_one_shade_lighter_than_its_lightest_node` is what holds
+/// these against it.
+///
+/// Grey for a line whose stream cannot be told, which is a line this build
+/// does not understand: it is drawn, because a connection missing from a
+/// drawing is worse than one drawn in the wrong colour.
+fn line_ink(leaves_by: Option<&str>) -> String {
+    match leaves_by {
+        Some("payload-out") => PAYLOAD_LINE,
+        Some("moc-out") => MOC_LINE,
+        _ => "#6b7280",
+    }
+    .to_string()
+}
+
+/// The payload stream's line: Clay, one shade lighter.
+pub const PAYLOAD_LINE: &str = "#c47979";
+
+/// And what the ground sends: Azure, one shade lighter.
+pub const MOC_LINE: &str = "#459aff";
+
 /// The palette's colours.
 ///
 /// Held here rather than in `style.rs` on purpose: that module holds what a
@@ -3643,6 +3722,130 @@ mod tests {
         (0..palette.row_count())
             .map(|i| palette.row_data(i).unwrap())
             .collect()
+    }
+
+    /// A line is one shade lighter than the lightest node of its own panel.
+    ///
+    /// Which is what makes a line read as a line: lighter than everything in
+    /// the family, so it is not taken for a node's outline, and of that family
+    /// all the same, so the colour says which stream it carries. One shade
+    /// means about ten of CIE lightness here -- the steps between neighbouring
+    /// tints are two to eight, so ten is one step and a little more.
+    ///
+    /// The lightest node of the panel is the comparison the rule is written
+    /// against, so it is taken from the panel: every type the pane offers, by
+    /// the tint it is drawn in. A palette change that made a node lighter than
+    /// its lines fails here.
+    #[test]
+    fn a_line_is_one_shade_lighter_than_its_lightest_node() {
+        use sight::{difference, hue, hue_apart, lightness, seen, Sight};
+
+        let painted = |hex: &str| {
+            let c = colour(hex);
+            (c.red(), c.green(), c.blue())
+        };
+
+        // The lightest tint the pane offers, which is what the panel shows.
+        let lightest = |pane: Pane| {
+            NodeType::ALL
+                .iter()
+                .filter(|t| pane_of(t.spelling()) == pane)
+                .map(|t| painted(&tint_of(t.appearance().tint)))
+                .max_by(|one, two| {
+                    lightness(*one)
+                        .partial_cmp(&lightness(*two))
+                        .expect("a lightness")
+                })
+                .expect("a pane offers something")
+        };
+
+        for (pane, line) in [
+            (Pane::Payloads, PAYLOAD_LINE),
+            (Pane::Moc, MOC_LINE),
+        ] {
+            let line = painted(line);
+            let node = lightest(pane);
+            let step = lightness(line) - lightness(node);
+            assert!(
+                (6.0..=16.0).contains(&step),
+                "the {} line is {step:.1} lighter than the lightest node, \
+                 which is not one shade",
+                pane.label()
+            );
+
+            // Of the same family: a line that had wandered into another hue
+            // would say the wrong thing about which stream it carries.
+            assert!(
+                hue_apart(hue(line), hue(node)) < 25.0,
+                "the {} line is not of its own family's hue",
+                pane.label()
+            );
+
+            // And lighter than every node of the panel, not merely than the
+            // one it was derived from.
+            for t in NodeType::ALL.iter().filter(|t| pane_of(t.spelling()) == pane) {
+                let tint = painted(&tint_of(t.appearance().tint));
+                assert!(
+                    lightness(line) > lightness(tint),
+                    "{} is lighter than the {} line",
+                    t.spelling(),
+                    pane.label()
+                );
+            }
+        }
+
+        // And the two lines are told apart by anybody: the whole point of
+        // colouring them is that a reader can see which stream a line
+        // carries without tracing it to its corner.
+        let payload = painted(PAYLOAD_LINE);
+        let moc = painted(MOC_LINE);
+        for sight in [Sight::Normal, Sight::Protanopia, Sight::Deuteranopia, Sight::Tritanopia] {
+            let apart = difference(seen(payload, sight), seen(moc, sight));
+            assert!(
+                apart >= 14.0,
+                "the two lines are {apart:.1} apart under {sight:?}, which is \
+                 the floor the palette is held to"
+            );
+        }
+    }
+
+    /// Each heading of each selection panel is in alphabetical order.
+    ///
+    /// A palette is a thing people look in rather than read, and the order it
+    /// had was the order the type table happens to declare things in -- which
+    /// is no order at all to somebody hunting for `rpmsg`. Within a heading
+    /// and not across the panel: a heading is a statement about the entries
+    /// under it, and a list sorted past its headings would file a device under
+    /// whichever heading its first letter landed in.
+    #[test]
+    fn every_panel_is_in_alphabetical_order_under_each_heading() {
+        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+            let rows = rows_from(pane, descriptions());
+            let mut heading = String::new();
+            let mut under: Vec<String> = Vec::new();
+            let mut check = |heading: &str, under: &mut Vec<String>| {
+                let mut sorted = under.clone();
+                sorted.sort_by_key(|name| name.to_lowercase());
+                assert_eq!(
+                    *under,
+                    sorted,
+                    "{}, under \"{heading}\", is not in alphabetical order",
+                    pane.label()
+                );
+                under.clear();
+            };
+
+            for row in &rows {
+                if row.is_heading {
+                    check(&heading, &mut under);
+                    heading = row.heading.to_string();
+                    continue;
+                }
+                under.push(row.node.name.to_string());
+            }
+            check(&heading, &mut under);
+            assert!(!rows.is_empty(), "{} offers nothing", pane.label());
+        }
     }
 
     /// The three selection panes offer every type the editor can place, and

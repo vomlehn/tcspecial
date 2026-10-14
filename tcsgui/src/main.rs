@@ -3659,7 +3659,14 @@ pub const MARK: &str = "#ffffff";
 
 /// The payload stream's line: the blush family, between its pane and its
 /// bodies at 58.8 of lightness.
-pub const PAYLOAD_LINE: &str = "#c47979";
+///
+/// The mauve end of the family rather than the red end. It was a dusty red at
+/// hue 23, which is the fault red's own side of the family -- 27 CIE units
+/// from it, which is "another colour" to measure and "something is wrong with
+/// that line" to look at. This is hue 333, 53 units away, and it reads as a
+/// violet while still being of the blush family its pane and its nodes are
+/// drawn in. See `tests::no_line_is_mistakable_for_a_fault`.
+pub const PAYLOAD_LINE: &str = "#ba78ac";
 
 /// And what the ground sends: the blue family, at 63.0.
 pub const MOC_LINE: &str = "#459aff";
@@ -4228,6 +4235,49 @@ mod tests {
             assert!(terminal.x >= 0.0 && terminal.y >= 0.0);
             assert!(terminal.x + style::TERMINAL.0 as f32 <= node.width);
             assert!(terminal.y + style::TERMINAL.1 as f32 <= node.height);
+        }
+    }
+
+    /// No line can be mistaken for something being wrong.
+    ///
+    /// Red is reserved for faults, and a line is the one thing on the canvas
+    /// drawn in a hue family's own colour at full strength across the whole
+    /// sheet: a line in the fault's own corner of the colour space reads as a
+    /// warning about the connection it draws. The payload family *is* the
+    /// reddish one, so the line cannot leave the family -- it would stop
+    /// saying which stream it carries -- and goes to the far side of it
+    /// instead: the mauves, 53 units from the fault red where it used to be
+    /// 27.
+    ///
+    /// Thirty-five is the floor, where ten is "clearly two colours": a line
+    /// has to be unmistakable rather than merely distinguishable, because
+    /// nobody compares it with a fault side by side. Asked under each of the
+    /// four ways of seeing, since a dichromacy is exactly what collapses a red
+    /// and a green into one another.
+    ///
+    /// The node bodies are *not* held to this. A faulty node is drawn in the
+    /// fault's colour and in the one shape no real type uses, so what says it
+    /// is wrong is the shape as much as the colour -- which is the rule that
+    /// lets a dark green body exist at all. A line has no second channel.
+    #[test]
+    fn no_line_is_mistakable_for_a_fault() {
+        use sight::{difference, seen, Sight};
+
+        let painted = |hex: &str| {
+            let c = colour(hex);
+            (c.red(), c.green(), c.blue())
+        };
+        let fault = painted(ERROR_TINT);
+
+        for (what, line) in [("payload", PAYLOAD_LINE), ("moc", MOC_LINE)] {
+            for sight in Sight::ALL {
+                let apart = difference(seen(painted(line), sight), seen(fault, sight));
+                assert!(
+                    apart >= 35.0,
+                    "the {what} line is {apart:.1} from the fault red under \
+                     {sight:?}, which is close enough to read as one"
+                );
+            }
         }
     }
 

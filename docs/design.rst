@@ -1806,6 +1806,19 @@ that and is not light enough: the payload pane is the darkest of the three at
 the floor for text somebody has to read. White clears 4.5 to one against every
 body, and a test says so.
 
+A link line also has to be unmistakable from the fault red, which is the one
+colour that means something on its own. The payload line was a dusty red at
+hue 23 -- the fault's own side of the family, 27 CIE units from it, which is
+"another colour" to measure and "something is wrong with that line" to look
+at. The family is the reddish one and the line cannot leave it without
+stopping saying which stream it carries, so it went to the far side of it
+instead: a mauve at hue 333, 53 units from the fault red, at the same
+lightness and the same contrast against the panes as before. The floor is 35,
+asked under each of the four ways of seeing, and it is a floor for lines only.
+A node body is not held to it: a faulty node is drawn in the fault's colour
+*and* in the one shape no real type uses, so a dark green body can exist
+because the shape carries the warning too. A line has no second channel.
+
 Getting the tiers cost two units of separation. Every colour of the scheme is
 held apart from every other -- the twenty of them, panes and lines and bodies
 together, under normal vision and each of the three dichromacies -- and the

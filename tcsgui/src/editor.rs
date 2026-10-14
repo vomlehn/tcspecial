@@ -306,6 +306,25 @@ impl Editor {
         self.persist();
     }
 
+    /// Lay every node out afresh: each at the top of its own pane, nothing
+    /// covering anything.
+    ///
+    /// One edit, so one undo puts the whole layout back -- see
+    /// [`Edit::Arrange`] -- and nothing at all where there is nothing to move,
+    /// because an entry in the history that changes nothing is an undo that
+    /// does nothing visible.
+    ///
+    /// `dividers` is where the panes meet in the window asking, since that is
+    /// what says how wide a pane is.
+    pub fn arrange(&mut self, dividers: crate::pane::Dividers) {
+        let now = self.document.arranged(dividers);
+        if now.is_empty() {
+            return;
+        }
+        let was = self.document.where_each_is(&now);
+        self.edit(Edit::Arrange { was, now });
+    }
+
     /// Take back the last edit.
     pub fn undo(&mut self) -> bool {
         match self.journal.undo() {

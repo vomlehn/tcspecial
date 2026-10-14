@@ -1778,26 +1778,36 @@ else that makes a new section agree about it.
 The description tree
 --------------------
 
-What vehicle nodes there are is data rather than code in the editor. A vehicle
-node is a thing the vehicle itself runs -- a computation, a log, a
-pass-through -- and a new one arrives as two files: Rust in tcspecial, and a
-description tcsgui reads.
+What node types there are is data rather than code in the editor. A node type
+arrives as two files: Rust in tcspecial, and a description tcsgui reads.
 
-Two trees with one structure. A description at ``compute/mean.yaml`` has its
-Rust at ``tcspecial/src/node/vehicle/compute/mean.rs``, and one at
-``serial/keypad.xml`` would have ``node/vehicle/serial/keypad.rs``, or a
-directory ``node/vehicle/serial/keypad/`` with as many files under it as it
-takes. The ``vehicle`` family of the code tree, which is what this tree
-describes: a payload's code is ``node/payload``, and what a file may say about
-a payload is the payload type's own rule rather than a description. The
-correspondence is checked both ways by
+Two trees with one structure, family by family. A description at
+``vehicle/compute/mean.yaml`` has its Rust at
+``tcspecial/src/node/vehicle/compute/mean.rs``; one at ``payload/i2c.yaml``
+has ``node/payload/i2c/``, a directory with as many files under it as it takes.
+``moc.yaml`` sits at the root of the tree because the ground station has no
+Rust of its own: it is the other end of the link rather than part of the
+vehicle, and the code that serves one is the network payload's.
+
+The correspondence is checked both ways by
 ``tcsgui::nodes::tests::every_description_has_its_rust``: a description with no
-Rust is a node the editor offers and the vehicle cannot run, and a computation
-implemented and not described is a node nobody can place. The second direction
-is asked only of the directories the descriptions already cover -- the code
-tree holds the payload kinds as well, and those are not vehicle nodes -- but
-once a family has one description in it, every file in that family needs one,
-which is what keeps a family from being half described.
+Rust is a node the editor offers and the vehicle cannot run, and a node type
+implemented and not described is one nobody can place. The second direction is
+asked of the directories the descriptions cover, so that once a family has one
+description in it, every file in that family needs one -- which is what keeps a
+family from being half described.
+
+Which terminals a type has is declared there, and so is what a node of it may
+be told. Both were written in Rust where nobody adding a node type could see
+them, and both are still *read* from Rust by the parts that cannot afford to
+read a file -- the checking and the flight software have
+``tcslibgs::graph::terminals``, and a window has
+``style::NodeType::attributes`` for a type the tree does not describe. So the
+tree is held against those: ``the_trees_terminals_are_the_schemas`` and
+``a_description_of_a_whole_type_says_what_the_type_says``. A description of one
+*variant* of a type is exempt from the second, since ``mean`` lists what a mean
+needs where the table lists what any compute node may say; for those the
+description is the authority, a node's window being built from it.
 
 Two trees rather than one was a decision, and the reason is what each tree is
 for. The descriptions are data read at run time, installed on a workstation,
@@ -1807,7 +1817,9 @@ where everything else is both.
 
 A description is YAML or XML as its extension says, file by file, and nothing
 cares which a given node used -- one of the shipped ones is XML for exactly
-that reason. What it says:
+that reason. One file per node, in one spelling, which
+``every_node_is_described_once_and_in_one_spelling`` says: a node described
+twice is two statements of what its terminals are. What it says:
 
 .. code-block:: yaml
 
@@ -1817,10 +1829,19 @@ that reason. What it says:
    about: The mean of the readings arriving at its named inputs.
    sets:                      # attributes the editor fills in and does not ask
      function: mean
+   payload-sink: true         # which of the four terminals a node of this
+   payload-source: true       # type has: the payload's own data in and out,
+   moc-sink: true             # and what the ground sends in and out
+   moc-source: true
    attributes:                # what a node of this kind says for itself
      - name: inputs
        required: true
        about: Which inputs it is over, comma separated.
+
+The shape of one of those files has two schemas of its own, ``node.xsd`` and
+``node.schema.json``, beside the configuration's pair and installed with them;
+they are held against each other and against the reader by
+``tcsgui/tests/schema.rs``.
 
 ``sets`` is what turns one node type into several things to place. ``compute``
 is one type, and the tree makes it four entries -- ``mean``, ``hysteresis``,

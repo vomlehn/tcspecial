@@ -1,0 +1,33 @@
+# Software reached over a socket: UDP, TCP or a Unix datagram.
+#
+# A payload: what the vehicle carries this flight. Its readings leave by
+# payload-out on their way to the ground, and what asks for them -- a
+# trigger, a command -- arrives at moc-in. Its Rust is tcspecial/src/node/payload/network/.
+node: network
+type: network
+about: >
+  Software reached over a socket: UDP, TCP or a Unix datagram.
+payload-sink: false
+payload-source: true
+moc-sink: true
+moc-source: false
+attributes:
+  - name: protocol
+    required: true
+    about: >
+      Which transport carries it: udp, tcp or unix_dgram.
+  - name: address
+    required: true
+    about: >
+      The host it is reached at, or bound at where the payload speaks first.
+  - name: port
+    required: true
+    about: The port that goes with the address.
+  - name: group
+    required: false
+    about: The payload group that reads it, where it is in one.
+  - name: trigger
+    required: false
+    about: >
+      What to send to make it answer, as hex bytes. A payload with none
+      is one the configuration describes as only read.

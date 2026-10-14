@@ -1,0 +1,36 @@
+# A node on a CAN bus, addressed by frame identifier.
+#
+# A payload: what the vehicle carries this flight. Its readings leave by
+# payload-out on their way to the ground, and what asks for them -- a
+# trigger, a command -- arrives at moc-in. Its Rust is tcspecial/src/node/payload/can/.
+node: can
+type: can
+about: A node on a CAN bus, addressed by frame identifier.
+payload-sink: false
+payload-source: true
+moc-sink: true
+moc-source: false
+attributes:
+  - name: interface
+    required: true
+    about: >
+      The CAN interface it is reached through: can0.
+  - name: can_id
+    required: true
+    about: The identifier its frames carry, as hex.
+  - name: can_fd
+    required: false
+    about: Whether the frames are CAN FD rather than classic.
+  - name: loopback
+    required: false
+    about: >
+      Whether the interface is put in loopback, for a bench test with
+      nothing on the far end.
+  - name: group
+    required: false
+    about: The payload group that reads it, where it is in one.
+  - name: trigger
+    required: false
+    about: >
+      What to send to make it answer, as hex bytes. A payload with none
+      is one the configuration describes as only read.

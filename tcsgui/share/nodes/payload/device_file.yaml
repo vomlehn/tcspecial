@@ -1,0 +1,24 @@
+# Anything reached as a device file, read and written as bytes.
+#
+# A payload: what the vehicle carries this flight. Its readings leave by
+# payload-out on their way to the ground, and what asks for them -- a
+# trigger, a command -- arrives at moc-in. Its Rust is tcspecial/src/node/payload/device_file/.
+node: device-file
+type: device-file
+about: Anything reached as a device file, read and written as bytes.
+payload-sink: false
+payload-source: true
+moc-sink: true
+moc-source: false
+attributes:
+  - name: path
+    required: true
+    about: The device file it is read from and written to.
+  - name: group
+    required: false
+    about: The payload group that reads it, where it is in one.
+  - name: trigger
+    required: false
+    about: >
+      What to send to make it answer, as hex bytes. A payload with none
+      is one the configuration describes as only read.

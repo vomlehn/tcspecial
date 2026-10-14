@@ -1414,14 +1414,21 @@ available is drawn anyway: a link with no line is a connection that does not
 appear in the drawing at all.
 
 A node is drawn with its terminals on it: a small rectangle in each corner it
-has one in, with an arrow in it. Two rows, which are the two streams -- along
-the top, left to right, what the ground sends, arriving at ``from_moc`` and
-leaving at ``to_payload``; along the bottom, right to left, what comes back,
-arriving at ``from_payload`` and leaving at ``to_moc``. The arrows therefore
-point the way the data travels across the canvas, because the canvas is laid
-out the same way: the ground is the leftmost working pane and the payloads the
-rightmost. A reader who has worked that out once need not read the names
+has one in. Two rows, which are the two streams -- along the top, left to
+right, what the ground sends, arriving at ``from_moc`` and leaving at
+``to_payload``; along the bottom, right to left, what comes back, arriving at
+``from_payload`` and leaving at ``to_moc``. Three of the four carry an arrow,
+pointing the way the data travels across the canvas, because the canvas is
+laid out the same way: the ground is the leftmost working pane and the payloads
+the rightmost. A reader who has worked that out once need not read the names
 again.
+
+The upper left is the exception and is drawn empty. It is ``from_moc``, where
+what the ground sends arrives, and an arrow there points into the node -- which
+is the mark a reader takes for "a line starts here", and the reading that had
+somebody dragging from the upper-left corner of a ``moc`` node, where there is
+no terminal at all. The box is still a box and still answers a press; what has
+gone is the arrow inside it.
 
 Only the terminals the type actually has. A payload carries its two on its
 left, a MOC link its two on its right, a ``null`` node all four, a log the one

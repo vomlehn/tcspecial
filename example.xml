@@ -42,6 +42,8 @@
         <name>mean</name>
         <type>compute</type>
         <function>mean</function>
+        <moc-out><target>payload</target></moc-out>
+        <payload-in>true</payload-in>
     </vehicle>
     <vehicle>
         <name>mean-2</name>
@@ -75,6 +77,8 @@
         <port>5100</port>
         <protocol>udp</protocol>
         <trigger>01</trigger>
+        <payload-out><target>mean</target><input>payload-in</input></payload-out>
+        <moc-in>true</moc-in>
     </payloads>
     <payloads>
         <name>i2c</name>

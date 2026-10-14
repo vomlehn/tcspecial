@@ -36,6 +36,9 @@ vehicle:
   - name: mean
     type: compute
     function: "mean"
+    moc-out:
+      - target: payload
+    payload-in: true
   - name: mean-2
     type: compute
     function: "mean"
@@ -67,6 +70,10 @@ payloads:
     port: "5100"
     protocol: "udp"
     trigger: "01"
+    payload-out:
+      - target: mean
+        input: payload-in
+    moc-in: true
   - name: i2c
     type: i2c
   - name: i2c-2

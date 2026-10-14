@@ -3524,7 +3524,7 @@ fn view_of(
             Outline::Rounded => "rounded",
             Outline::Circle => "circle",
             Outline::Keyed => "keyed",
-            Outline::Hexagon => "hexagon",
+            Outline::Pointed => "pointed",
         }
         .into(),
         // The outlines a corner radius cannot draw, as a path in the node's
@@ -4039,7 +4039,7 @@ mod tests {
             );
             assert_eq!(
                 view.shape.is_empty(),
-                outline != "hexagon",
+                outline != "pointed",
                 "{} is {outline:?} and its path is {:?}",
                 kind.spelling(),
                 view.shape

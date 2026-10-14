@@ -1666,14 +1666,30 @@ landed in. The headings keep the table's order, which is the one place that
 order says something -- devices, then the things that are driven, then the ends
 of the graph.
 
-The two ends of the graph are two shapes rather than one. A log is a pill and
-the ground station is a hexagon, which is what a systems diagram uses for
-something outside the thing it describes -- and the ground station is the one
-node on the canvas that is not part of the vehicle at all. They were both
+The two ends of the graph are two shapes rather than one. A log is a pill; the
+ground station is a rectangle with its left end drawn to a point, which is the
+one node on the canvas that is not part of the vehicle at all. They were both
 pills, under one heading, on the strength of both being "an end"; but a file
 written on board and everybody on the ground are not the same kind of end, and
 the two were never in the same pane for the shared heading to group anything.
-A hexagon is not a corner radius, so it arrives as path data from
+
+The point is on the left, and only on the left, for two reasons that agree. A
+node's ``payload-out`` is on its left side and its ``payload-in`` on its right,
+so the ground is leftward of everything in the diagram and the shape aims the
+way the telemetry goes. And a terminal is drawn in the corner of a node's box,
+so a shape that cuts a corner off cuts a terminal loose: the ground station's
+own two terminals are both on its right side, which is the side the shape keeps
+square. A test holds the shape to that -- every terminal of a type drawn from a
+path has to be inside that path -- because the reasoning is about where the
+terminals are, and a shape kept while a terminal moved would otherwise draw an
+arrow floating beside the node.
+
+It is also the same proportion as everything else: 152 by 72, where the rest of
+the canvas runs 40 to 96 tall at the same width. It was 128, which made it the
+one node whose shape *and* whose proportion were unlike every other, and that
+is two statements where one was meant.
+
+A point is not a corner radius, so it arrives as path data from
 ``style::shape_of`` and the markup draws it with a ``Path`` -- the same
 arrangement as the link routes, and for the same reason: geometry that can be
 read and tested belongs in Rust rather than in a layout language. A ``Path``

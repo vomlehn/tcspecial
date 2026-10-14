@@ -43,18 +43,25 @@ pub enum Outline {
     /// A rectangle with one pair of corners rounded and one square, which
     /// reads as a direction. Interfaces that are driven rather than read.
     Keyed,
-    /// Six sides, pointed left and right: the ground station.
+    /// Five sides, pointed groundward: the ground station.
     ///
     /// The one node on the canvas that is not part of the vehicle at all -- it
-    /// is the other end of the link -- and a hexagon is what a systems diagram
-    /// uses for something outside the thing it describes. It was a pill, which
-    /// it shared with a log: both were "an end of the graph", and the two ends
-    /// of a graph are not the same kind of thing.
+    /// is the other end of the link -- and a shape nothing aboard uses is what
+    /// says so. It was a pill, which it shared with a log: both were "an end
+    /// of the graph", and a file written on board and everybody on the ground
+    /// are not the same kind of end.
+    ///
+    /// Pointed on the left, which is the way the telemetry goes: a node's
+    /// `payload-out` is on its left and its `payload-in` on its right, so the
+    /// ground is leftward of everything, and the shape aims that way. The
+    /// right side stays square because that is where the ground station's own
+    /// two terminals are -- a shape has to give up a side to stop being a
+    /// rectangle, and the side to give up is the one with nothing on it.
     ///
     /// Drawn as a path rather than from a corner radius, because a radius
     /// cannot make a corner that is not round. The arithmetic is
-    /// [`hexagon`]'s, where it can be tested.
-    Hexagon,
+    /// [`pointed`]'s, where it can be tested.
+    Pointed,
 }
 
 /// How the inside is filled.
@@ -335,46 +342,46 @@ pub struct Corner {
 
 /// The outline of a node of this size, where its shape needs a path.
 ///
-/// Only the hexagon so far: a square, a rounded rectangle and a pill are a
-/// rectangle with a corner radius, and a keyed shape is one of those with a
-/// corner cut off, so the markup draws all four from one element. A hexagon is
-/// none of those, and a corner radius cannot make a corner that is not round.
+/// Only the pointed shape so far: a square, a rounded rectangle and a pill
+/// are a rectangle with a corner radius, and a keyed shape is one of those
+/// with a corner cut off, so the markup draws all four from one element. A
+/// point is none of those, and a corner radius cannot make a corner that is
+/// not round.
 ///
 /// Empty for every other outline, which is what says "draw this the ordinary
 /// way". The path is in the node's own coordinates, so the markup draws it
 /// one to one and the stroke keeps its width -- a viewbox stretched to fit
 /// would stretch the line with it.
-///
-/// Pointed left and right, which is the long way: the points are where the
-/// lines arrive and leave, and a hexagon pointed top and bottom would put its
-/// points where no terminal is. The slope is an eighth of the width, which
-/// reads as a hexagon at this size without taking so much off the corners that
-/// the name has nowhere to sit.
 pub fn shape_of(outline: Outline, (width, height): (u32, u32)) -> String {
     match outline {
-        Outline::Hexagon => hexagon((width, height)),
+        Outline::Pointed => pointed((width, height)),
         _ => String::new(),
     }
 }
 
-/// Six sides in a box this size, pointed left and right.
+/// Five sides in a box this size: a square right end and a point on the left.
+///
+/// A quarter of the width is given to the point, which is enough to be read as
+/// a shape rather than as a rectangle somebody mis-drew, and leaves the middle
+/// half of the box for a centred name. Only the left corners go: the two
+/// terminals of the one type drawn this way are both on the right, and a
+/// terminal outside its own outline is a terminal floating beside the node.
+/// The test below holds the shape to that rather than this comment.
 ///
 /// Inset half a pixel so the stroke sits inside the node: a path drawn on the
 /// boundary is drawn half outside it, and a node that overhangs its own box by
 /// a pixel is a node whose terminals and lines are all a pixel out.
-pub fn hexagon((width, height): (u32, u32)) -> String {
+pub fn pointed((width, height): (u32, u32)) -> String {
     let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
-    let slope = w / 8.0;
+    let point = w / 4.0;
     let middle = h / 2.0;
     format!(
-        "M {:.1} 0.5 L {:.1} 0.5 L {:.1} {:.1} L {:.1} {:.1}          L {:.1} {:.1} L 0.5 {:.1} Z",
-        slope + 0.5,
-        w - slope + 0.5,
+        "M {:.1} 0.5 L {:.1} 0.5 L {:.1} {:.1} L {:.1} {:.1} L 0.5 {:.1} Z",
+        point + 0.5,
         w + 0.5,
-        middle + 0.5,
-        w - slope + 0.5,
+        w + 0.5,
         h + 0.5,
-        slope + 0.5,
+        point + 0.5,
         h + 0.5,
         middle + 0.5
     )
@@ -894,7 +901,7 @@ impl NodeType {
     /// corners are hardware, rounded corners are software, a keyed rectangle
     /// is an interface that is driven, and the two ends of the graph are the
     /// two shapes nothing else uses -- a pill where it stops on board, a
-    /// hexagon where it leaves the vehicle. Within a shape the types differ by
+    /// point where it leaves the vehicle. Within a shape the types differ by
     /// shading, weight and size.
     pub fn appearance(self) -> Appearance {
         use Outline::*;
@@ -1074,19 +1081,26 @@ impl NodeType {
                 tint: Tint::Gold,
             },
             // The ground station: the one node on the canvas that is not part
-            // of the vehicle, which is what the hexagon says. It was a pill,
+            // of the vehicle, which is what the point says. It was a pill,
             // which it shared with the log, and the two ends of a graph are
             // not the same kind of thing -- one is a file on board, the other
             // is everybody on the ground.
+            //
+            // The same proportion as the rest of the canvas. It was 128 tall
+            // against everything else's 40 to 96, which made it the one node
+            // whose shape *and* whose proportion were unlike every other, and
+            // that is two statements where one was meant. Seventy-two is the
+            // tallest of the ordinary band, which is enough left over to say
+            // "this is the one that matters".
             NodeType::Moc => Appearance {
                 face: Face::Plain,
                 label_size: 16,
                 label_weight: 700,
                 label_italic: true,
-                outline: Hexagon,
+                outline: Pointed,
                 shading: Solid,
                 weight: Wide,
-                size: (WIDTH, 128),
+                size: (WIDTH, 72),
                 tint: Tint::Azure,
             },
         }
@@ -1110,7 +1124,7 @@ mod tests {
         for kind in NodeType::ALL {
             let drawn = kind.appearance();
             let shape = shape_of(drawn.outline, drawn.size);
-            let shaped = drawn.outline == Outline::Hexagon;
+            let shaped = drawn.outline == Outline::Pointed;
 
             assert_eq!(
                 shaped,
@@ -1129,13 +1143,6 @@ mod tests {
             // somewhere its outline is not.
             let (width, height) = drawn.size;
             let points: Vec<(f32, f32)> = points_of(&shape);
-            assert_eq!(
-                points.len(),
-                6,
-                "{} is a hexagon with {} corners: {shape}",
-                kind.spelling(),
-                points.len()
-            );
             for (x, y) in &points {
                 assert!(
                     (0.0..=width as f32).contains(x) && (0.0..=height as f32).contains(y),
@@ -1144,21 +1151,56 @@ mod tests {
                 );
             }
 
-            // Pointed the long way. The points are where the lines arrive and
-            // leave; a hexagon pointed top and bottom would put its points
-            // where no terminal is, and its flat sides where every one of them
-            // is.
-            let middle = (height as f32 - 1.0) / 2.0 + 0.5;
-            let sideways = points
+            // And it holds every terminal it is drawn with. This is the rule
+            // the shape is chosen by: a terminal is placed in the corner of
+            // the node's box, so a shape that cuts a corner off cuts a
+            // terminal loose, and a terminal drawn outside its own outline
+            // reads as something floating beside the node rather than part of
+            // it. It is why the point is on the left -- the ground station's
+            // own two terminals are both on the right -- and it is checked
+            // here so that a shape kept and a terminal moved cannot pass.
+            for terminal in kind
+                .terminals()
+                .sinks
                 .iter()
-                .filter(|(_, y)| (y - middle).abs() < 1.0)
-                .count();
-            assert_eq!(
-                sideways, 2,
-                "{} has {sideways} corners at half its height: {shape}",
-                kind.spelling()
-            );
+                .chain(kind.terminals().sources)
+            {
+                let corner = corner_of(terminal).expect("a terminal of a known type");
+                let (x, y) = terminal_at(corner, drawn.size);
+                let (wide, tall) = (TERMINAL.0 as i32, TERMINAL.1 as i32);
+                for spot in [
+                    (x, y),
+                    (x + wide, y),
+                    (x, y + tall),
+                    (x + wide, y + tall),
+                ] {
+                    assert!(
+                        within(&points, (spot.0 as f32, spot.1 as f32)),
+                        "{}'s {terminal} reaches ({}, {}), outside its own outline: {shape}",
+                        kind.spelling(),
+                        spot.0,
+                        spot.1
+                    );
+                }
+            }
         }
+    }
+
+    /// Whether a spot is inside a path's corners.
+    ///
+    /// The shapes here are convex, so this is "on the inside of every edge"
+    /// rather than a crossing count: with the corners wound one way round, the
+    /// cross product of an edge and the spot has one sign for every edge of a
+    /// shape that holds it. On an edge counts as inside -- a terminal flush
+    /// with the side of a square node is not outside it.
+    fn within(points: &[(f32, f32)], (x, y): (f32, f32)) -> bool {
+        points
+            .iter()
+            .zip(points.iter().cycle().skip(1))
+            .all(|((ax, ay), (bx, by))| {
+                let side = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+                side >= -0.5
+            })
     }
 
     /// The corners of a path, read back out of its commands.

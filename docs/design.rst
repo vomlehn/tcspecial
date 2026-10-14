@@ -1418,6 +1418,13 @@ nothing misses everything -- a target walled in on every side -- the best
 available is drawn anyway: a link with no line is a connection that does not
 appear in the drawing at all.
 
+What is wrong with a node is not drawn on it. The node is painted red -- its
+outline, its label and its terminals, and in the one shape no real type uses,
+so colour is never the only thing carrying it -- and the sentence is in that
+node's own window and in the alert that pops the first time it is wrong. On the
+canvas it was a sentence inside a box forty-eight pixels tall, which is a
+paragraph in the middle of a diagram; a diagram is read for its shape.
+
 A node is drawn with its terminals on it: a rectangle of 36 by 14 pixels in
 each corner it has one in, with an arrow in it pointing the way the data on it
 travels across the canvas. Two rows, which are the two streams. Along the top,
@@ -1546,9 +1553,17 @@ in one edit, so one undo puts it back -- the end being carried keeps its own
 name, a ``payload-in`` taken off one node going on another node's
 ``payload-in`` and nowhere else. On a node that has no such terminal, or one
 the same link already reaches: nothing changes, as a line that cannot be drawn
-is not drawn. And over no node at all: the link is deleted. Which is the only
-way to delete one, and it is the gesture a person reaches for -- pull the wire
-out and drop it on the floor.
+is not drawn.
+
+And over no node at all, it depends which end is in the hand. From the end a
+line *leaves* by, the line is deleted -- the gesture a person reaches for, pull
+the wire out of the thing that is sending and drop it on the floor, and the
+only way to delete one. From the end it *arrives* at, nothing happens: a sink
+takes one source, so dragging its end away and letting go over empty canvas is
+a slip far more often than a decision, and the line is written on the node it
+leaves whatever its arriving end was dragged across. Nothing becomes
+undeletable by that: a line into a sink that takes several -- the ground's --
+is deleted from its source end, which has the one line on it.
 
 A terminal with one link on it hands that link over; one with none starts a new
 one, and so does one with several, because nothing says which of several was
@@ -2226,6 +2241,14 @@ stating one is a fault the flight reader refuses -- so it is the group's own
 field and goes nowhere else. Renaming a group renames it on every node in it,
 as one edit, for the same reason: a rename that left the members behind would
 silently unschedule them.
+
+A configuration that exists in two spellings is written in both. ``vehicle.yaml``
+beside ``vehicle.xml`` is one configuration written twice, and two files meant
+to say the same thing drift the moment only one of them is written -- the
+shipped example is such a pair, and keeping it a pair by hand meant a command
+to remember after every session. Only where the sibling is already there:
+writing one that is not would be the editor deciding somebody wants their
+configuration in two languages, which is not a thing to decide for them.
 
 Every edit is written as it is made, so saving is not something to remember.
 There is a Save button all the same. It writes every file of the session now, which covers the three things the ordinary case does not: retrying a write

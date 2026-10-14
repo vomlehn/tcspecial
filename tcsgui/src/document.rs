@@ -1202,6 +1202,14 @@ impl Document {
                         ));
                     }
                 }
+                for (sink, sources) in self.arriving(node, home) {
+                    for from in sources {
+                        out.push_str(&format!(
+                            "        <{sink}>{}</{sink}>\n",
+                            escape(&from)
+                        ));
+                    }
+                }
                 out.push_str(&format!("    </{tag}>\n"));
             }
         }
@@ -1400,6 +1408,16 @@ impl Document {
                         )),
                     }
                 }
+                // And the same lines again at the other end: what arrives
+                // here, under the data sink it arrives at. See `arriving`.
+                for (sink, sources) in self.arriving(node, home) {
+                    match sources.as_slice() {
+                        [one] => out.push_str(&format!("    {sink}: {one}\n")),
+                        many => {
+                            out.push_str(&format!("    {sink}: [{}]\n", many.join(", ")))
+                        }
+                    }
+                }
             }
         }
 
@@ -1497,6 +1515,60 @@ impl Document {
             }
         }
         leaving
+    }
+
+    /// What arrives at a node, by the data sink it arrives at.
+    ///
+    /// The other end of what `leaving` writes, and a record of it rather than
+    /// the link itself: `from_payload: temp_fore` on the node the reading
+    /// reaches says the same thing as `to_moc: k_fore` on the node it left.
+    /// Written so that a node's entry says what it is connected to at both
+    /// ends, instead of only what leaves it -- which, for a node that is
+    /// mostly fed, was most of a node's entry saying nothing.
+    ///
+    /// The sink is the one the link names where it names one of the four, and
+    /// otherwise the one at the other end of the stream it left by: a `to_moc`
+    /// arrives at a `from_payload` and nowhere else. A computation's named
+    /// input -- `mean_temp.in0` -- is recorded under the stream's sink too:
+    /// which input it feeds is on the node it left, where there is one name
+    /// for it, and recording it twice would be two places to get it wrong.
+    ///
+    /// Sorted by name, because this is derived rather than written: two
+    /// readings of one document must write one file.
+    fn arriving(&self, node: &Node, home: &Home) -> Vec<(&'static str, Vec<String>)> {
+        let mut arriving: Vec<(&'static str, Vec<String>)> = Vec::new();
+        let ours = Qualified::of(&node.name, home).absolute();
+        for sink in ["from_payload", "from_moc"] {
+            let mut sources: Vec<String> = Vec::new();
+            for link in self.links.iter().filter(|l| l.to == ours) {
+                // Which sink of this node the line arrives at, which needs the
+                // terminal it left by: the two are one stream read from either
+                // end.
+                let Some(from) = self.nodes.iter().find(|n| n.name == link.from) else {
+                    continue;
+                };
+                let left_by =
+                    crate::style::terminal_for(&from.node_type, link.origin.as_deref(), false);
+                let at = match link.input.as_deref() {
+                    Some(named) if tcslibgs::graph::terminals::stream_of(named).is_some() => {
+                        Some(named)
+                    }
+                    _ => left_by.and_then(tcslibgs::graph::terminals::answers),
+                };
+                if at != Some(sink) {
+                    continue;
+                }
+                let name = Qualified::parse(&link.from).written_from(home);
+                if !sources.contains(&name) {
+                    sources.push(name);
+                }
+            }
+            if !sources.is_empty() {
+                sources.sort();
+                arriving.push((sink, sources));
+            }
+        }
+        arriving
     }
 
 }
@@ -3025,6 +3097,68 @@ mod tests {
         let xml = document.to_xml();
         assert!(xml.contains("&amp;"), "an ampersand went in raw: {xml}");
         assert!(xml.contains("&lt;always&gt;"), "{xml}");
+    }
+
+    /// A line is written at both of the nodes it joins.
+    ///
+    /// On the node it leaves, which is the link; and on the node it arrives
+    /// at, which is a record of it -- so that a node's entry says what it is
+    /// connected to without the whole file having to be read against it. Both
+    /// spellings, because a configuration saved under the other name must say
+    /// the same thing.
+    #[test]
+    fn a_link_is_written_at_both_of_its_ends() {
+        use crate::journal::Link;
+
+        let mut document = Document::new();
+        document.apply(&add("temp_fore", "i2c"));
+        document.apply(&add("moc", "moc"));
+        document.apply(&Edit::AddLink {
+            link: Link::joining("temp_fore", Some("to_moc"), "moc", None),
+        });
+
+        let yaml = document.to_yaml();
+        assert!(yaml.contains("to_moc: moc"), "{yaml}");
+        assert!(
+            yaml.contains("from_payload: temp_fore"),
+            "the arriving end is not recorded: {yaml}"
+        );
+
+        let xml = document.to_xml();
+        assert!(xml.contains("<to_moc>moc</to_moc>"), "{xml}");
+        assert!(
+            xml.contains("<from_payload>temp_fore</from_payload>"),
+            "the arriving end is not recorded: {xml}"
+        );
+
+        // And the record is of the stream, not of the terminal somebody drew
+        // from: what leaves by to_moc arrives at from_payload and nowhere
+        // else, so the payload's own sink says nothing about this link.
+        assert!(!yaml.contains("from_moc"), "{yaml}");
+    }
+
+    /// Several sources arriving at one sink are recorded as a list.
+    ///
+    /// The ground's case, which is every configuration: each payload aboard
+    /// reports to the one moc node, told apart by the socket its id names.
+    #[test]
+    fn a_sink_that_several_links_arrive_at_records_them_all() {
+        use crate::journal::Link;
+
+        let mut document = Document::new();
+        document.apply(&add("moc", "moc"));
+        for name in ["temp_aft", "temp_fore"] {
+            document.apply(&add(name, "i2c"));
+            document.apply(&Edit::AddLink {
+                link: Link::joining(name, Some("to_moc"), "moc", None),
+            });
+        }
+
+        let yaml = document.to_yaml();
+        assert!(
+            yaml.contains("from_payload: [temp_aft, temp_fore]"),
+            "both of them, in a settled order: {yaml}"
+        );
     }
 
     /// The shipped example is what this editor writes.

@@ -16,7 +16,10 @@
 //! it leaves by: `to_moc: k_fore` is a link from this node's `to_moc` terminal
 //! to `k_fore`, and `to_moc: [moc, mean_temp.in0]` is one to each of two. So
 //! there is no links section, and a node and the links out of it are read,
-//! written and deleted together. In memory they are still a list -- see
+//! written and deleted together. The node it arrives at records it as well --
+//! `from_payload: temp_fore`, under the sink it arrives at -- so that a node's
+//! entry says what it is connected to at both ends; that record is checked
+//! against these and otherwise never read. See [`mirror`]. In memory they are still a list -- see
 //! [`Link`] -- because every rule about a link is about both of its ends, and
 //! a list of them is what a rule can be written against.
 //!
@@ -38,6 +41,7 @@
 //! the same code that runs again aboard.
 
 pub mod check;
+pub mod mirror;
 pub mod parameters;
 pub mod reach;
 pub mod terminals;
@@ -219,6 +223,16 @@ pub struct NodeFile {
     pub to_moc: Vec<String>,
     /// And its vehicleward data: the sinks its `to_payload` reaches.
     pub to_payload: Vec<String>,
+    /// What the entry records as arriving at its `from_payload` sink: the
+    /// nodes whose groundward data reaches it, as `node` or `node.terminal`.
+    ///
+    /// A record of a link written at the other end rather than the link
+    /// itself, and the only thing in this structure that nothing downstream
+    /// reads: see [`mirror`]. Empty is a file that recorded nothing, which is
+    /// allowed.
+    pub from_payload: Vec<String>,
+    /// And what it records as arriving at its `from_moc` sink.
+    pub from_moc: Vec<String>,
 }
 
 impl NodeFile {
@@ -242,6 +256,18 @@ impl NodeFile {
             });
         }
         links
+    }
+
+    /// What this entry recorded as arriving at each of its sinks.
+    ///
+    /// The mirror of [`NodeFile::links`], and deliberately not links: these
+    /// are a record of links written elsewhere, and turning them into links
+    /// here would be the same connection in the graph twice.
+    pub fn arriving(&self) -> Vec<(&'static str, &Vec<String>)> {
+        vec![
+            ("from_payload", &self.from_payload),
+            ("from_moc", &self.from_moc),
+        ]
     }
 }
 
@@ -275,6 +301,8 @@ impl<'de> Deserialize<'de> for NodeFile {
                 let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
                 let mut to_moc: Vec<String> = Vec::new();
                 let mut to_payload: Vec<String> = Vec::new();
+                let mut from_payload: Vec<String> = Vec::new();
+                let mut from_moc: Vec<String> = Vec::new();
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -313,6 +341,24 @@ impl<'de> Deserialize<'de> for NodeFile {
                                 .into_iter()
                                 .map(str::to_string),
                         ),
+                        // A data sink, which records a link written on the
+                        // node it leaves rather than making one. Read the same
+                        // way, repeats included, because it is written the
+                        // same way -- and checked against the links it is a
+                        // record of as the configuration is read. See
+                        // `mirror`.
+                        "from_payload" => from_payload.extend(
+                            map.next_value::<Destinations>()?
+                                .each()
+                                .into_iter()
+                                .map(str::to_string),
+                        ),
+                        "from_moc" => from_moc.extend(
+                            map.next_value::<Destinations>()?
+                                .each()
+                                .into_iter()
+                                .map(str::to_string),
+                        ),
                         // Everything else is an attribute of the node, which
                         // is where a word nothing reads ends up -- and is
                         // refused by name against what the type takes. See
@@ -339,6 +385,8 @@ impl<'de> Deserialize<'de> for NodeFile {
                     },
                     to_moc,
                     to_payload,
+                    from_payload,
+                    from_moc,
                 })
             }
         }
@@ -636,10 +684,16 @@ impl Graph {
             placed: BTreeMap::new(),
         };
 
+        // What the files record at the arriving ends of their links, gathered
+        // as they are read and checked once they all have been: a link may
+        // cross from an included file into the top one, so the two halves of
+        // one record are not necessarily in the same file. See `mirror`.
+        let mut mirror = mirror::Mirror::default();
+
         let top: GraphFile = read_one(path)?;
         graph.description = top.description.clone();
         graph.tcspecial = top.tcspecial.clone();
-        graph.absorb(path, &top)?;
+        graph.absorb(path, &top, &mut mirror)?;
         graph.files.push(path.to_path_buf());
 
         for name in &top.include {
@@ -669,9 +723,11 @@ impl Graph {
                     included.display()
                 )));
             }
-            graph.absorb(&included, &file)?;
+            graph.absorb(&included, &file, &mut mirror)?;
             graph.files.push(included);
         }
+
+        mirror.check(&graph)?;
 
         Ok(graph)
     }
@@ -683,7 +739,12 @@ impl Graph {
     /// sections are for is that a reader of the file can see at a glance what
     /// the vehicle carries this flight -- so a node in the wrong one is
     /// refused here, where the complaint can name the file.
-    fn absorb(&mut self, from: &Path, file: &GraphFile) -> TcsResult<()> {
+    fn absorb(
+        &mut self,
+        from: &Path,
+        file: &GraphFile,
+        mirror: &mut mirror::Mirror,
+    ) -> TcsResult<()> {
         for (section, nodes) in [
             (Section::Moc, &file.moc),
             (Section::Vehicle, &file.vehicle),
@@ -706,6 +767,7 @@ impl Graph {
                     .insert(said.node.name.clone(), from.to_path_buf());
                 self.nodes.push(said.node.clone());
                 self.links.extend(said.links());
+                mirror.record(from, said);
             }
         }
 

@@ -205,6 +205,44 @@
               }
             ]
           },
+          "from_payload": {
+            "description": "What arrives at this node's `from_payload` sink: the node the data came from, or several. A record of links written on the nodes they leave rather than links -- a file may state none of these, and one that states any for a sink states all of them.",
+            "oneOf": [
+              {
+                "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "from_moc": {
+            "description": "What arrives at this node's `from_moc` sink: the node the data came from, or several. A record of links written on the nodes they leave rather than links -- a file may state none of these, and one that states any for a sink states all of them.",
+            "oneOf": [
+              {
+                "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
           "path": {
             "type": [
               "string",
@@ -709,6 +747,44 @@
               }
             ]
           },
+          "from_payload": {
+            "description": "What arrives at this node's `from_payload` sink: the node the data came from, or several. A record of links written on the nodes they leave rather than links -- a file may state none of these, and one that states any for a sink states all of them.",
+            "oneOf": [
+              {
+                "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "from_moc": {
+            "description": "What arrives at this node's `from_moc` sink: the node the data came from, or several. A record of links written on the nodes they leave rather than links -- a file may state none of these, and one that states any for a sink states all of them.",
+            "oneOf": [
+              {
+                "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
           "path": {
             "type": [
               "string",
@@ -1206,6 +1282,44 @@
                 "type": "array",
                 "items": {
                   "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "from_payload": {
+            "description": "What arrives at this node's `from_payload` sink: the node the data came from, or several. A record of links written on the nodes they leave rather than links -- a file may state none of these, and one that states any for a sink states all of them.",
+            "oneOf": [
+              {
+                "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                },
+                "minItems": 1
+              }
+            ]
+          },
+          "from_moc": {
+            "description": "What arrives at this node's `from_moc` sink: the node the data came from, or several. A record of links written on the nodes they leave rather than links -- a file may state none of these, and one that states any for a sink states all of them.",
+            "oneOf": [
+              {
+                "description": "A node whose data arrives here, as `node` or `node.terminal`.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "A node whose data arrives here, as `node` or `node.terminal`.",
                   "type": "string",
                   "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
                 },

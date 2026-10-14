@@ -27,6 +27,7 @@ moc:
     type: moc
     address: "10.0.0.1"
     port: "5000"
+    from_payload: [k_aft, k_bay, k_fore, mean_temp]
 
 vehicle:
   - name: k_fore
@@ -36,6 +37,7 @@ vehicle:
     offset: "273.15"
     scale: "0.0625"
     to_moc: [moc, mean_temp.in0, housekeeping]
+    from_payload: temp_fore
   - name: k_aft
     type: compute
     format: "i16_be"
@@ -43,6 +45,7 @@ vehicle:
     offset: "273.15"
     scale: "0.0625"
     to_moc: [moc, mean_temp.in1, housekeeping]
+    from_payload: temp_aft
   - name: k_bay
     type: compute
     format: "u24_be"
@@ -50,11 +53,13 @@ vehicle:
     offset: "255.37"
     scale: "0.0078"
     to_moc: [moc, mean_temp.in2, housekeeping]
+    from_payload: temp_bay
   - name: mean_temp
     type: compute
     function: "mean"
     inputs: "in0,in1,in2"
     to_moc: [moc, thermostat]
+    from_payload: [k_aft, k_bay, k_fore]
   # setpoint is set from the ground; above and below are the two degrees
   # either side that the heaters are switched at.
   - name: thermostat
@@ -66,10 +71,12 @@ vehicle:
     to_moc: housekeeping
     # asserted below the setpoint, unasserted above it
     to_payload: heaters
+    from_payload: mean_temp
   - name: housekeeping
     type: log
     directory: "/var/log/tcspecial"
     format: "variable_ts_rc"
+    from_payload: [k_aft, k_bay, k_fore, thermostat]
 
 payloads:
   # Forward bulkhead. Two bytes, signed, big endian.
@@ -104,6 +111,7 @@ payloads:
     direction: "output"
     lines: "3,4,5"
     path: "/dev/gpiochip0"
+    from_moc: thermostat
 
 commands:
   # the cabin temperature the heaters are held at, in kelvin

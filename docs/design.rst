@@ -236,6 +236,47 @@ link
     of a configuration a link belongs in. A link is in the file its source node
     is in, once, however far it reaches.
 
+    The node a link arrives at records it as well, under the data sink it
+    arrives at, with the value naming the node the data came from:
+
+    .. code-block:: yaml
+
+       - name: mean_temp
+         type: compute
+         function: "mean"
+         inputs: "in0,in1,in2"
+         to_moc: [moc, thermostat]
+         from_payload: [k_aft, k_bay, k_fore]
+
+    That is a record of the links above and not a link. The point of it is a
+    node whose entry said nothing about what fed it: a sensor's entry named
+    everywhere its reading went, and the computation at the other end named
+    nothing, so reading what arrives at a node meant reading the whole
+    configuration against it. Now a node's entry says what it is connected to
+    at both ends.
+
+    Which sink a link arrives at is the stream's own answer -- what leaves by
+    ``to_moc`` arrives at a ``from_payload`` and nowhere else -- so a
+    destination's named input, ``mean_temp.in0``, is recorded under the stream
+    and not under the input. Which input it feeds is written once, on the node
+    the link leaves.
+
+    Two statements of one fact can disagree, and the answer to that is not to
+    believe the second one. The record is checked against the links it is a
+    record of where the configuration is read, and three things are refused: a
+    source nothing links from, a source recorded as arriving by a terminal it
+    does not leave by, and a link left out of a sink that records its others.
+    Nothing downstream reads it -- ``tcslibgs::graph::mirror`` has it only long
+    enough to check it -- so the graph the vehicle flies comes from one place
+    however many places say so.
+
+    It is optional. A file written by hand may record nothing at the arriving
+    ends and be complete: there is nothing in a record the link itself does not
+    say, and every configuration written before these existed still reads. What
+    is not optional is recording all of a sink's sources once any of them are
+    recorded, because a list that is missing one reads as a list of everything.
+    The editor writes them on every node it writes.
+
     In memory they are still a list, because every rule about a link is about
     both of its ends and a list is what a rule can be written against.
 
@@ -1127,8 +1168,8 @@ come with it: a comment is written as a comment rather than as a field, so the
 editor reads the run of comment lines above an entry as that entry's.
 
 An *entry* is a node, a link, a group or a command binding, and that is the
-limit of it. Three kinds of comment in a hand-written file are not kept, and
-all three are lost the first time the editor writes the file -- which the Save
+limit of it. Four kinds of comment in a hand-written file are not kept, and all
+four are lost the first time the editor writes the file -- which the Save
 button does on demand, whether or not anything was edited:
 
 * prose attached to nothing: a heading at the top of a file, or a paragraph
@@ -1143,6 +1184,11 @@ the one attribute whose comment survives a save: the run of comment lines above
 a ``to_moc:`` or ``to_payload:`` is read as a note about the links that
 attribute makes. Where the attribute names several destinations the note is
 about all of them, one line carrying one comment.
+
+A comment above a ``from_payload:`` or ``from_moc:`` is not kept, those being
+the record of a link rather than the link: the note belongs above the link, at
+the end it is written at, and a comment the editor kept in a derived line would
+be a comment it moved. It is the fourth kind in the list above.
 
 The attribute order is not kept either: the editor writes a node's attributes
 and the section's parameters in the order a dictionary gives them, which is

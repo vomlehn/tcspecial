@@ -36,6 +36,20 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- Where data arrives at a node: the record of a link, written on the node
+       it arrives at, naming the node it left, as `node` or `node.terminal`.
+       The link itself is on the node it leaves and is what the software reads.
+       This is the same fact at the other end, so that a node's entry says what
+       it is connected to without the rest of the file being read against it.
+       A file may leave these out, and one that states any for a sink states
+       all of them: a disagreement between the two ends is refused where the
+       file is read. -->
+  <xs:simpleType name="source">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Za-z_][A-Za-z0-9_./-]*(\.[A-Za-z_][A-Za-z0-9_-]*)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- Where the editor drew one node, which the flight software ignores.
        In the tcsgui section at the end of the file rather than on the node:
        the node sections say what the vehicle carries, and this says where
@@ -63,6 +77,12 @@
       <!-- The two data sources, which are where links are written. -->
       <xs:element name="to_moc" type="destination"/>
       <xs:element name="to_payload" type="destination"/>
+      <!-- And the two data sinks, which record the same links at the end
+           they arrive at: the value names the node the data came from. A
+           record of a link rather than a link, and optional. See the `source`
+           type above. -->
+      <xs:element name="from_payload" type="source"/>
+      <xs:element name="from_moc" type="source"/>
       <!-- Where a node is. -->
       <xs:element name="path" type="xs:string"/>
       <xs:element name="address" type="xs:string"/>

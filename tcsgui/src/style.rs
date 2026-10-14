@@ -270,25 +270,30 @@ impl Terminals {
 /// own input: those are drawn where the link arrives and not as a terminal.
 pub fn corner_of(terminal: &str) -> Option<Corner> {
     match terminal {
+        // The upper left carries no arrow: see `Corner::arrow`.
         "from_moc" => Some(Corner {
             top: true,
             left: true,
             rightward: true,
+            arrow: false,
         }),
         "to_payload" => Some(Corner {
             top: true,
             left: false,
             rightward: true,
+            arrow: true,
         }),
         "from_payload" => Some(Corner {
             top: false,
             left: false,
             rightward: false,
+            arrow: true,
         }),
         "to_moc" => Some(Corner {
             top: false,
             left: true,
             rightward: false,
+            arrow: true,
         }),
         _ => None,
     }
@@ -302,6 +307,16 @@ pub struct Corner {
     pub left: bool,
     /// Whether the arrow points right, which is to say towards the payloads.
     pub rightward: bool,
+    /// Whether an arrow is drawn in the box at all.
+    ///
+    /// Every corner but the upper left. That one is `from_moc` -- where what
+    /// the ground sends arrives -- and its box is drawn empty: an arrow there
+    /// pointing into the node is the one a reader takes for "the line starts
+    /// here", which is exactly what it is not.
+    ///
+    /// The box is still a box, and it still answers a press: what a person
+    /// does with it has not changed, only what is drawn inside it.
+    pub arrow: bool,
 }
 
 /// How large a terminal is drawn, in pixels: wide enough for an arrow and no
@@ -1081,6 +1096,25 @@ mod tests {
         // And a computation's own input is not a terminal: it is drawn where
         // the link arrives, with its name on it.
         assert_eq!(corner_of("in0"), None);
+    }
+
+    /// The upper-left box is drawn empty, and the other three carry arrows.
+    ///
+    /// `from_moc` is where what the ground sends arrives, and an arrow there
+    /// pointing into the node is the one a reader takes for "a line starts
+    /// here" -- which is the mistake that had somebody dragging from the
+    /// corner of a moc node, where there is no terminal at all. The box is
+    /// still a box and still answers a press; what has gone is the arrow
+    /// inside it.
+    #[test]
+    fn the_upper_left_terminal_carries_no_arrow() {
+        assert!(!corner_of("from_moc").expect("a corner").arrow);
+        for terminal in ["to_payload", "from_payload", "to_moc"] {
+            assert!(
+                corner_of(terminal).expect("a corner").arrow,
+                "{terminal} should still say which way its data goes"
+            );
+        }
     }
 
     /// The editor draws the terminals the schema says a type has.

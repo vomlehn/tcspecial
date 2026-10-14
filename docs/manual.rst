@@ -173,10 +173,14 @@ terminal
     ``from_payload``, a ``from_payload`` to a ``to_moc``, a ``to_payload`` to a
     ``from_moc``, a ``from_moc`` to a ``to_payload``. Anything else would carry
     one stream into the other. In tcsgui the terminals are drawn as small
-    boxes in a node's corners, each with an arrow in it, and a link is made by
-    dragging from one of them onto the node the line is to reach: anywhere on
-    that node will do, and the line is drawn to whichever of its terminals the
-    stream arrives at. A node with no terminal of that stream takes nothing.
+    boxes in a node's corners -- three of them with an arrow saying which way
+    the data goes, and the upper-left one, where what the ground sends
+    arrives, drawn empty -- and a link is made by dragging from one of them
+    onto the node the line is to reach: anywhere on that node will do, and the
+    line is drawn to whichever of its terminals the stream arrives at. A node
+    with no terminal of that stream takes nothing, and a MOC link has none on
+    its left at all: what the ground sends *leaves* it, by the ``to_payload``
+    in its upper right.
 
 ``null`` node
     A vehicle node that carries both streams through and does nothing to what

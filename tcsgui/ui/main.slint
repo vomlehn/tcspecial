@@ -58,6 +58,10 @@ export struct TerminalView {
     y: length,
     // Whether the arrow points right, which is to say towards the payloads.
     rightward: bool,
+    // Whether an arrow is drawn in the box at all: every corner but the upper
+    // left, where an arrow pointing into the node reads as "the line starts
+    // here". See style::Corner::arrow.
+    arrow: bool,
 }
 
 export struct NodeView {
@@ -238,6 +242,8 @@ component Terminal inherits Rectangle {
     // from the sink that wants feeding. Which was pressed is what says which
     // end of the link the other one is.
     in property <bool> sink;
+    // Whether an arrow is drawn inside the box. See style::Corner::arrow.
+    in property <bool> arrow: true;
 
     // A link is being drawn from this terminal, and then let go of -- at this
     // point, measured from the terminal's own corner.
@@ -275,7 +281,7 @@ component Terminal inherits Rectangle {
         }
     }
 
-    Path {
+    if root.arrow: Path {
         width: 100%;
         height: 100%;
         viewbox-x: 0;
@@ -589,6 +595,7 @@ component NodeShape inherits Rectangle {
         x: node.from-moc.x + drag-x;
         y: node.from-moc.y + drag-y;
         rightward: node.from-moc.rightward;
+        arrow: node.from-moc.arrow;
         sink: true;
         ink: ink;
         grabbed => { link-from("from_moc"); }
@@ -600,6 +607,7 @@ component NodeShape inherits Rectangle {
         x: node.to-payload.x + drag-x;
         y: node.to-payload.y + drag-y;
         rightward: node.to-payload.rightward;
+        arrow: node.to-payload.arrow;
         sink: false;
         ink: ink;
         grabbed => { link-from("to_payload"); }
@@ -615,6 +623,7 @@ component NodeShape inherits Rectangle {
         x: node.from-payload.x + drag-x;
         y: node.from-payload.y + drag-y;
         rightward: node.from-payload.rightward;
+        arrow: node.from-payload.arrow;
         sink: true;
         ink: ink;
         grabbed => { link-from("from_payload"); }
@@ -629,6 +638,7 @@ component NodeShape inherits Rectangle {
         x: node.to-moc.x + drag-x;
         y: node.to-moc.y + drag-y;
         rightward: node.to-moc.rightward;
+        arrow: node.to-moc.arrow;
         sink: false;
         ink: ink;
         grabbed => { link-from("to_moc"); }

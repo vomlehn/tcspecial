@@ -2572,8 +2572,8 @@ fn joined(
 /// `from_payload` can only be put down on another `from_payload`: there is
 /// nothing else the gesture could have meant. The terminals are still drawn,
 /// because they are what says which streams a type carries and which way --
-/// but hitting a sixteen-pixel box in a corner is work the editor can do
-/// instead of the person.
+/// but hitting a box in a corner is work the editor can do instead of the
+/// person.
 ///
 /// `None` where the pointer is over no node, and where the node has no such
 /// terminal: the ground receives readings and is sent nothing, so a line
@@ -4074,7 +4074,7 @@ mod tests {
         // release over that node: the line lands on the terminal the stream
         // names -- the ground's from_payload -- as it would anywhere else on
         // the box. What may be joined to what has not changed; what has gone
-        // is having to hit a sixteen-pixel square to say it.
+        // is having to hit a small box to say it.
         assert_eq!(
             joined(
                 &document,

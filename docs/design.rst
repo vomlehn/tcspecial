@@ -1413,8 +1413,8 @@ nothing misses everything -- a target walled in on every side -- the best
 available is drawn anyway: a link with no line is a connection that does not
 appear in the drawing at all.
 
-A node is drawn with its terminals on it: a small rectangle in each corner it
-has one in. Two rows, which are the two streams -- along the top, left to
+A node is drawn with its terminals on it: a rectangle of 36 by 14 pixels in
+each corner it has one in. Two rows, which are the two streams -- along the top, left to
 right, what the ground sends, arriving at ``from_moc`` and leaving at
 ``to_payload``; along the bottom, right to left, what comes back, arriving at
 ``from_payload`` and leaving at ``to_moc``. Three of the four carry an arrow,
@@ -1422,6 +1422,16 @@ pointing the way the data travels across the canvas, because the canvas is
 laid out the same way: the ground is the leftmost working pane and the payloads
 the rightmost. A reader who has worked that out once need not read the names
 again.
+
+They were 24 by 10 -- wide enough for an arrow and no wider -- and that is a
+strip to aim at. A press has to land on a terminal exactly, the terminal being
+what says which stream the line carries, where the release only has to land on
+a node; so the box is now twice the area and bigger in both directions, the
+hand being short in whichever one it is short. What bounds them is the ``null``
+node, 40 pixels tall and the one type with all four: two rows and their insets
+have to fit inside that height with daylight between them, and two columns
+inside a node's 152. A name never collides with them however they grow, being
+padded away from whichever side carries terminals.
 
 The upper left is the exception and is drawn empty. It is ``from_moc``, where
 what the ground sends arrives, and an arrow there points into the node -- which
@@ -1442,7 +1452,7 @@ without the editor being touched.
 The label is padded away from whichever side carries terminals rather than a
 row being reserved at the top and the bottom: the name stays in the middle of
 the node and stops short of the corner boxes, where reserving rows would leave
-sixteen pixels for a name on the shortest node.
+a few pixels for a name on the shortest node.
 
 A link is drawn by dragging from a terminal onto the node it is to reach. The
 terminal is where a line is taken *from*, and it is the only handle there is:
@@ -1459,8 +1469,8 @@ there is nothing else the gesture could have meant: a stream has one name at
 each of its ends, so a line drawn from a ``to_moc`` can only arrive at a
 ``from_payload``, and the editor works out which terminal that is and draws the
 line to it. The terminals stay drawn, since they are what says which streams a
-type carries and which way; what has gone is having to hit a sixteen-pixel
-square in a corner to say something the stream already said.
+type carries and which way; what has gone is having to hit a small box in a
+corner to say something the stream already said.
 
 Which does not widen what may be joined to what. A node with no terminal of
 that stream takes nothing: the ground receives readings and is sent nothing, so

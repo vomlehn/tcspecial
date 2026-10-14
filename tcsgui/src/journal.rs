@@ -217,6 +217,19 @@ pub enum Edit {
         was: (i32, i32),
         now: (i32, i32),
     },
+    /// Every node brought to the top of its own pane, in one edit.
+    ///
+    /// What **Edit -> Arrange the nodes** does. One edit and not one per node,
+    /// so that one undo puts the whole layout back: somebody who tidies a
+    /// diagram they had arranged by hand must be able to get it back, and
+    /// eleven undos would be eleven presses and a chance to stop halfway.
+    ///
+    /// Both lists hold only the nodes that moved, by name, so the inverse is
+    /// the same edit with the pairs the other way about.
+    Arrange {
+        was: Vec<(String, (i32, i32))>,
+        now: Vec<(String, (i32, i32))>,
+    },
 }
 
 /// One connection, from a node to a named input of another.
@@ -359,6 +372,10 @@ impl Edit {
                 node: node.clone(),
                 was: *now,
                 now: *was,
+            },
+            Edit::Arrange { was, now } => Edit::Arrange {
+                was: now.clone(),
+                now: was.clone(),
             },
             Edit::SetNodeComment { node, was, now } => Edit::SetNodeComment {
                 node: node.clone(),
@@ -505,6 +522,10 @@ impl Edit {
                 was.to, now.to
             ),
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
+            Edit::Arrange { now, .. } => match now.len() {
+                1 => "arrange 1 node".to_string(),
+                many => format!("arrange {many} nodes"),
+            },
             Edit::SetTcspecial { attribute, .. } => {
                 format!("set tcspecial {attribute}")
             }

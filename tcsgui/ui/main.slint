@@ -1314,6 +1314,8 @@ export component MainWindow inherits Window {
     // Write this configuration as Rust, where the tcspecial section's
     // `rust-code` says: see tcsgui::codegen.
     callback generate-rust();
+    // Every node to the top of its own pane: see the menu item.
+    callback arrange();
     // And for the groups, the simulator's groups of settings, and the way
     // out.
     callback edit-groups();
@@ -1377,6 +1379,15 @@ export component MainWindow inherits Window {
             MenuItem {
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
+            }
+            MenuSeparator { }
+            // Every node to the top of its own pane, nothing covering
+            // anything. For a configuration read out of a file that is spread
+            // over more sheet than the window shows, and for a morning's
+            // dragging that has left one nobody can read.
+            MenuItem {
+                title: "Arrange the nodes";
+                activated => { root.arrange(); }
             }
             MenuSeparator { }
             // The configuration as Rust, compiled into tcspecial along with
@@ -1497,6 +1508,8 @@ export component SubWindow inherits Window {
     // Write this configuration as Rust, where the tcspecial section's
     // `rust-code` says: see tcsgui::codegen.
     callback generate-rust();
+    // Every node to the top of its own pane: see the menu item.
+    callback arrange();
     callback edit-groups();
     callback edit-simulator-groups();
     callback exit-requested();
@@ -1557,6 +1570,15 @@ export component SubWindow inherits Window {
             MenuItem {
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
+            }
+            MenuSeparator { }
+            // Every node to the top of its own pane, nothing covering
+            // anything. For a configuration read out of a file that is spread
+            // over more sheet than the window shows, and for a morning's
+            // dragging that has left one nobody can read.
+            MenuItem {
+                title: "Arrange the nodes";
+                activated => { root.arrange(); }
             }
             MenuSeparator { }
             // The configuration as Rust, compiled into tcspecial along with

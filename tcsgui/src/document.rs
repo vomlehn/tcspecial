@@ -465,6 +465,60 @@ impl Document {
         moved
     }
 
+    /// Where every node would go if the diagram were laid out afresh.
+    ///
+    /// What **Edit -> Arrange the nodes** is: each node at the top of its own
+    /// pane, in the order the document holds them, nothing covering anything,
+    /// and all of it where the top of the sheet is -- which is where the view
+    /// starts. It is what a person reaches for when a configuration read out
+    /// of a file is spread over more sheet than the window shows, or when a
+    /// morning's dragging has left it in a state nobody can read.
+    ///
+    /// Only the nodes that would move come back, each with where it would go:
+    /// that is what [`Edit::Arrange`] carries, and a node already in the right
+    /// place does not belong in an undo.
+    ///
+    /// The places come from [`crate::pane::place_in`], which is the same rule
+    /// that puts a newly added node somewhere: one statement of "as high as it
+    /// will go in its own pane without covering anything", so an arranged
+    /// diagram and a grown one look alike. The view it is placed into is the
+    /// whole sheet from the top, because arranging is what a person does to
+    /// bring everything into view rather than to fit it around what they are
+    /// looking at now.
+    pub fn arranged(
+        &self,
+        dividers: crate::pane::Dividers,
+    ) -> Vec<(String, (i32, i32))> {
+        let mut taken: Vec<(i32, i32, u32, u32)> = Vec::new();
+        let mut moved = Vec::new();
+
+        for node in &self.nodes {
+            let at = crate::pane::place_in(
+                &taken,
+                &node.node_type,
+                dividers,
+                (0, crate::pane::WORKING_HEIGHT),
+            );
+            let (width, height) = size_of(&node.node_type);
+            taken.push((at.0, at.1, width, height));
+            if at != node.at {
+                moved.push((node.name.clone(), at));
+            }
+        }
+
+        moved
+    }
+
+    /// Where each of these nodes is now, for the undo of an arrangement.
+    pub fn where_each_is(&self, named: &[(String, (i32, i32))]) -> Vec<(String, (i32, i32))> {
+        named
+            .iter()
+            .filter_map(|(name, _)| {
+                self.node(name).map(|node| (name.clone(), node.at))
+            })
+            .collect()
+    }
+
     /// The payloads that are in `group`.
     ///
     /// Payloads and not every node: a group is the schedule a set of payloads
@@ -678,6 +732,16 @@ impl Document {
             Edit::MoveNode { node, now, .. } => {
                 if let Some(node) = self.node_mut(node) {
                     node.at = *now;
+                }
+            }
+            // One edit for a whole layout: see `Edit::Arrange`. A name that is
+            // not here any more is passed over, as a move of a node that is
+            // gone would be.
+            Edit::Arrange { now, .. } => {
+                for (name, at) in now {
+                    if let Some(node) = self.node_mut(name) {
+                        node.at = *at;
+                    }
                 }
             }
             Edit::SetTcspecial {
@@ -2747,6 +2811,7 @@ mod tests {
                 Edit::SetNodeComment { .. } => (),
                 Edit::SetLinkComment { .. } => (),
                 Edit::MoveNode { .. } => (),
+                Edit::Arrange { .. } => (),
                 Edit::SetTcspecial { .. } => (),
                 Edit::SetSimPayload { .. } => (),
                 Edit::SetSimGroup { .. } => (),
@@ -2880,6 +2945,13 @@ mod tests {
                 node: "a".into(),
                 was: (0, 0),
                 now: (120, 80),
+            },
+            // A whole layout in one edit: where each node was, and where the
+            // arrangement put it. Both at (0, 0) to begin with, which is
+            // where the furnished document above leaves them.
+            Edit::Arrange {
+                was: vec![("a".into(), (0, 0)), ("b".into(), (0, 0))],
+                now: vec![("a".into(), (720, 0)), ("b".into(), (192, 0))],
             },
             Edit::SetTcspecial {
                 attribute: "port".into(),
@@ -3183,6 +3255,124 @@ mod tests {
             1,
             "once, for the sink and not for each line: {yaml}"
         );
+    }
+
+    /// Arranging puts every node at the top of its own pane, clear of the
+    /// others.
+    ///
+    /// The command for a configuration spread over more sheet than a window
+    /// shows -- which is how the shipped example reads after a session of
+    /// dragging: three payloads 650 pixels apart down a pane 240 wide, so one
+    /// of them is in view at a time.
+    #[test]
+    fn arranging_brings_every_node_to_the_top_of_its_pane() {
+        let dividers = crate::pane::default_dividers();
+        let mut document = Document::new();
+        for (name, node_type, at) in [
+            ("moc", "moc", (24, 1800)),
+            ("mean", "compute", (272, 288)),
+            ("payload", "network", (744, 160)),
+            ("sensor", "i2c", (720, 432)),
+            ("other", "i2c", (720, 1600)),
+        ] {
+            document.apply(&add(name, node_type));
+            document.apply(&Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+
+        let arranged = document.arranged(dividers);
+        assert!(!arranged.is_empty(), "there is plenty to tidy");
+        document.apply(&Edit::Arrange {
+            was: document.where_each_is(&arranged),
+            now: arranged,
+        });
+
+        // Each in its own pane, and none of them below the first screenful:
+        // the point of the command is that everything is in view.
+        for node in &document.nodes {
+            let (left, right) = crate::pane::pane_for(&node.node_type, dividers);
+            assert!(
+                node.at.0 >= left && node.at.0 <= right.max(left),
+                "{} is at {:?}, outside {left}..{right}",
+                node.name,
+                node.at
+            );
+            assert!(node.at.1 < 400, "{} is at {:?}", node.name, node.at);
+        }
+
+        // And nothing covering anything.
+        for (one, node) in document.nodes.iter().enumerate() {
+            let (width, height) = size_of(&node.node_type);
+            for (two, theirs) in document.nodes.iter().enumerate() {
+                if one == two {
+                    continue;
+                }
+                let (their_width, their_height) = size_of(&theirs.node_type);
+                let over = node.at.0 < theirs.at.0 + their_width as i32
+                    && theirs.at.0 < node.at.0 + width as i32
+                    && node.at.1 < theirs.at.1 + their_height as i32
+                    && theirs.at.1 < node.at.1 + height as i32;
+                assert!(!over, "{} covers {}", node.name, theirs.name);
+            }
+        }
+
+        // Asking again changes nothing: an arranged diagram is arranged.
+        assert!(
+            document.arranged(dividers).is_empty(),
+            "{:?}",
+            document.arranged(dividers)
+        );
+    }
+
+    /// One undo puts a hand-made layout back.
+    ///
+    /// The thing that makes the command safe to try: somebody who arranged a
+    /// diagram by hand and then tidied it by accident gets their arrangement
+    /// back with one press, not one press per node.
+    #[test]
+    fn one_undo_takes_back_a_whole_arrangement() {
+        let dividers = crate::pane::default_dividers();
+        let mut document = Document::new();
+        let before: Vec<(String, (i32, i32))> = [
+            ("moc", "moc", (24, 1800)),
+            ("sensor", "i2c", (720, 900)),
+            ("other", "i2c", (800, 1400)),
+        ]
+        .iter()
+        .map(|(name, node_type, at)| {
+            document.apply(&add(name, node_type));
+            document.apply(&Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: *at,
+            });
+            (name.to_string(), *at)
+        })
+        .collect();
+
+        let now = document.arranged(dividers);
+        let edit = Edit::Arrange {
+            was: document.where_each_is(&now),
+            now,
+        };
+        document.apply(&edit);
+        assert_ne!(
+            document.node("sensor").expect("it").at,
+            (720, 900),
+            "nothing was arranged"
+        );
+
+        document.apply(&edit.inverse());
+        for (name, at) in &before {
+            assert_eq!(
+                document.node(name).expect("it").at,
+                *at,
+                "{name} was not put back"
+            );
+        }
     }
 
     /// The shipped example is what this editor writes.

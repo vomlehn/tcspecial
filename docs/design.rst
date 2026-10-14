@@ -1524,10 +1524,34 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
+A new node goes as high as it will fit in its own pane without covering
+anything, and in view: the highest free place in the part of the sheet the
+window is showing, or failing that the lowest free place above it, or the
+highest below -- and then the sheet is scrolled so the new node's top is at the
+top of the view. A node placed where it cannot be seen is a press that did
+nothing as far as the person who made it can tell.
+
+**Edit -> Arrange the nodes** applies that rule to every node at once: each to
+the top of its own pane, in the order the file holds them, nothing covering
+anything, and the view back at the top of the sheet. The sheet is 960 by 2400
+and a window shows a few hundred pixels of it, so a configuration read out of a
+file -- or one left spread about by a morning's dragging -- can have most of
+itself outside the window with nothing to say so. This is the one press that
+brings it back.
+
+It is one edit, not one per node, so one undo puts a hand-made layout back:
+somebody who arranged a diagram carefully and then tidied it by accident must
+not have to press undo eleven times and get it half right. Nothing is recorded
+when there was nothing to move, because an undo that changes nothing is an undo
+that looks broken. And it is an edit, which `Document::settle` deliberately is
+not -- settling puts a node where the editor would never let one be dragged,
+and arranging puts it where anybody could have dragged it.
+
 The menu bar holds what belongs to the configuration as a whole rather than to
 anything on the canvas -- there is nothing to press on a diagram that would mean
 "the configuration", or "the groups", or "the way out". **File** holds Save,
-the two kinds of group, and Exit; **Edit** holds the tcspecial parameters.
+the two kinds of group, and Exit; **Edit** holds the tcspecial parameters,
+arranging the nodes, and generating the Rust.
 
 Exit offers to write anything the files do not have before it goes, which is
 normally nothing. Three answers rather than two: *Save and leave*, *Leave

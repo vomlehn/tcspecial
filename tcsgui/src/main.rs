@@ -780,6 +780,25 @@ macro_rules! wiring {
                 });
             }
             {
+                // Every node to the top of its own pane, and the view back at
+                // the top of the sheet: see `Editor::arrange`.
+                let editor = editor.clone();
+                let views = views.clone();
+                let window_for_scroll = window.as_weak();
+                window.on_arrange(move || {
+                    let dividers = views.borrow().divider.get();
+                    editor.borrow_mut().arrange(dividers);
+                    // And the view back at the top of the sheet, because that
+                    // is where the nodes have gone. A view left halfway down
+                    // one would make the command look as though it had emptied
+                    // the canvas.
+                    if let Some(window) = window_for_scroll.upgrade() {
+                        window.set_canvas_offset(0.0);
+                    }
+                    views.borrow().refresh(&editor.borrow());
+                });
+            }
+            {
                 // The configuration as Rust, written where the section says.
                 // Asked for rather than done on every save: see
                 // `Editor::write_rust_code`.
@@ -5191,6 +5210,96 @@ mod tests {
         a_link_is_deleted_by_dragging_its_end_onto_the_canvas();
         placing_a_described_node_answers_what_it_describes();
         an_error_is_put_where_it_cannot_be_missed();
+        the_menu_arranges_the_nodes_and_shows_them();
+    }
+
+    /// The Arrange item lays the diagram out and brings the view to it.
+    ///
+    /// Through the window, because the half worth testing is the half the unit
+    /// tests cannot reach: the menu item has to reach the editor, and the view
+    /// has to come back to the top of the sheet. A configuration spread down
+    /// 1800 pixels of a sheet is what this is for -- the shipped example reads
+    /// that way after a session of dragging, and a window shows a few hundred
+    /// pixels of it at a time.
+    fn the_menu_arranges_the_nodes_and_shows_them() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            dividers(),
+        )));
+        for (name, node_type, at) in [
+            ("ground", "moc", (16, 1600)),
+            ("sensor", "i2c", (dividers().vehicle + 24, 1200)),
+            ("other", "i2c", (dividers().vehicle + 24, 1800)),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+            editor.borrow_mut().edit(Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+
+        // Scrolled away from where the nodes are, which is the state this
+        // command is reached in.
+        ui.set_canvas_offset(-1400.0);
+        let depth = editor.borrow().undo_depth();
+
+        ui.invoke_arrange();
+
+        // Everything in the first screenful of its own pane.
+        for node in &editor.borrow().document().nodes {
+            let (left, right) = pane::pane_for(&node.node_type, dividers());
+            assert!(
+                node.at.0 >= left && node.at.0 <= right.max(left),
+                "{} is at {:?}",
+                node.name,
+                node.at
+            );
+            assert!(node.at.1 < 400, "{} is at {:?}", node.name, node.at);
+        }
+
+        // One edit, so one undo puts the layout back.
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+
+        // And the view is where the nodes are.
+        assert_eq!(ui.get_canvas_offset(), 0.0);
+
+        // Asked again with nothing to do, it does nothing -- including to the
+        // history, because an undo that changes nothing is an undo that looks
+        // broken.
+        ui.invoke_arrange();
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
     }
 
     /// A failed write puts a window in front of the person, once.

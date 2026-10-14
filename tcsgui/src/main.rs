@@ -8,7 +8,8 @@
 //! Three things about it were asked for and are not incidental:
 //!
 //! * **Nothing is told apart by colour alone.** Every node type differs from
-//!   every other in at least two of outline, border width, shading and size;
+//!   every other in at least two of outline, the line around it, border width
+//!   and size;
 //!   see `style.rs`, where a test fails if that stops being true. Red is
 //!   reserved for things that are wrong, and is the only colour with a meaning
 //!   of its own.
@@ -64,7 +65,7 @@ use pane::{
 };
 use journal::{Edit, Link};
 use subdiagram::{Home, Qualified};
-use style::{Face, NodeType, Outline, Shading, Tint, Weight, ERROR_TINT};
+use style::{Edge, Face, NodeType, Outline, Tint, Weight, ERROR_TINT};
 
 slint::include_modules!();
 
@@ -3486,11 +3487,11 @@ fn view_of(
     // is a shape no real type uses, and marked faulty. Showing it beats
     // refusing to open the file: a configuration written for a later build is
     // readable, and what cannot be placed is visibly what cannot be placed.
-    let (outline, shading, weight, size, tint, face, label_size, label_weight, label_italic) =
+    let (outline, edge, weight, size, tint, face, label_size, label_weight, label_italic) =
         match appearance {
             Some(a) => (
                 a.outline,
-                a.shading,
+                a.edge,
                 a.weight,
                 a.size,
                 tint_of(a.tint),
@@ -3501,7 +3502,7 @@ fn view_of(
             ),
             None => (
                 Outline::Square,
-                Shading::Open,
+                Edge::Single,
                 Weight::Narrow,
                 (104u32, 40u32),
                 ERROR_TINT.to_string(),
@@ -3528,17 +3529,14 @@ fn view_of(
             Outline::Barred => "barred",
         }
         .into(),
-        // The outlines a corner radius cannot draw, as a path in the node's
-        // own coordinates. Empty for the four it can, which is what tells the
-        // markup to draw the ordinary rectangle. See style::shape_of.
+        // The shape to fill, the line to stroke and the second line of a
+        // doubled edge, all as paths in the node's own coordinates. Empty for
+        // a rounded outline, which is the one the markup draws as a Rectangle
+        // with a corner radius -- and emptiness is what tells it to. See
+        // style::polygon_of, which all three come from.
         shape: style::shape_of(outline, size).into(),
-        shading: match shading {
-            Shading::Solid => "solid",
-            Shading::Hatched => "hatched",
-            Shading::Open => "open",
-            Shading::Double => "double",
-        }
-        .into(),
+        edge: style::edge_of(outline, edge, size).into(),
+        inner: style::inner_of(outline, edge, size).into(),
         border: match weight {
             Weight::Narrow => 1.0,
             Weight::Wide => 3.0,
@@ -4320,7 +4318,10 @@ mod tests {
         assert!(view.faulty);
         assert_eq!(view.tint, colour(ERROR_TINT));
         assert_eq!(view.outline, "square");
-        assert_eq!(view.shading, "open");
+        // A square polygon, one whole line, and no second line: the shape
+        // nothing real wears, drawn as plainly as it can be.
+        assert!(!view.shape.is_empty() && !view.edge.is_empty());
+        assert!(view.inner.is_empty());
     }
 
     /// The panel asks for what a type needs, filled in or not.

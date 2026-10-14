@@ -38,7 +38,8 @@ export global Type {
 // tests fail if either is broken:
 //
 //   * nothing is told apart by colour alone. Every node type differs from
-//     every other in at least two of outline, border width, shading and size,
+//     every other in at least two of outline, the line around it, border
+//     width and size,
 //     so a reader who sees no colour still sees distinguishable shapes.
 //   * red means something is wrong. No type, no selection and no link is red.
 //
@@ -79,14 +80,19 @@ export struct NodeView {
     height: length,
     // square | rounded | keyed | barred | store | parallelogram
     outline: string,
-    // The outline as path data, in this node's own coordinates, for the
-    // outlines a corner radius cannot draw: a side left out, or a side that
-    // leans. Empty for the square, rounded, keyed and barred ones, which is
-    // what says to draw the ordinary rectangle. Rust's arithmetic rather than
-    // markup's, for the same reason the link routes are: see style::shape_of.
+    // The shape to fill, as path data in this node's own coordinates. Empty
+    // for the rounded outline, which is a corner radius on a Rectangle, and
+    // emptiness is what says to draw it that way. Rust's arithmetic rather
+    // than markup's, for the same reason the link routes are: it comes from
+    // style::polygon_of, where it can be tested.
     shape: string,
-    // solid | hatched | open | double
-    shading: string,
+    // The line to stroke: the same outline, broken into dashes where this
+    // type's edge is a broken one. Empty for the rounded outline, which
+    // strokes itself with a Rectangle's border.
+    edge: string,
+    // The second line of a doubled edge, inset. Empty unless this type's edge
+    // is doubled.
+    inner: string,
     border: length,
     // How far in from the sides anything drawn inside the shape has to stay:
     // nothing, unless the outline leans. Rust's arithmetic, as the shape is:
@@ -229,32 +235,6 @@ export struct LinkView {
     label: string,
     // What somebody wrote about this connection.
     comment: string,
-}
-
-// Diagonal hatching, drawn with narrow lines inside whatever shape asks for
-// it.
-//
-// A Path rather than a row of rotated rectangles: a Rectangle has no rotation,
-// and a Path is what Slint draws lines with. The pattern is stated once in a
-// hundred-by-hundred viewbox and scaled to the element, so one string serves
-// every size of node, and the parent clips it so a circle's hatching stays
-// inside the circle.
-component Hatching inherits Rectangle {
-    in property <color> ink;
-    clip: true;
-    background: transparent;
-
-    Path {
-        width: 100%;
-        height: 100%;
-        viewbox-x: 0;
-        viewbox-y: 0;
-        viewbox-width: 100;
-        viewbox-height: 100;
-        stroke: ink;
-        stroke-width: 1px;
-        commands: "M 0 40 L 40 0 M 0 70 L 70 0 M 0 100 L 100 0 M 30 100 L 100 30 M 60 100 L 100 60";
-    }
 }
 
 // One terminal of a node: where a link may be attached.
@@ -427,7 +407,7 @@ component NodeShape inherits Rectangle {
         // rounded. A keyed shape is the square one with a corner squared off
         // by the triangle below it.
         //
-        // An outline a radius cannot draw arrives as path data instead, and
+        // Every outline but the rounded one arrives as path data instead, and
         // then this Rectangle keeps the geometry and the shadow and draws
         // neither border nor ground: the paths below it are the shape.
         body := Rectangle {
@@ -450,23 +430,13 @@ component NodeShape inherits Rectangle {
             drop-shadow-color: grip.pressed ? #00000033 : transparent;
             drop-shadow-offset-y: grip.pressed ? 3px : 0px;
             border-radius: node.outline == "rounded" ? self.height / 4 : 0px;
-            background: node.shape != ""
-                ? transparent
-                : (node.shading == "solid"
-                    ? ink.with-alpha(0.18)
-                    : node.shading == "double"
-                        ? ink.with-alpha(0.08)
-                        : transparent);
+            background: node.shape != "" ? transparent : ink.with-alpha(0.18);
 
-            // A shaped outline: the path, stroked and filled the way the
-            // Rectangle above would have been. One pixel to one coordinate --
-            // the viewbox is the node's own size -- so the line keeps its
-            // width instead of being stretched with the shape.
-            //
-            // Dropped three pixels under itself while dragging, which is the
-            // lift the Rectangle gets from its drop-shadow: a Path has none,
-            // and the one thing a person wants to know mid-gesture is whether
-            // the thing is moving. Drawn first, so it is under the shape.
+            // The lift a dragged node gets, for the shapes drawn as paths: a
+            // second copy of the shape three pixels lower, because a Path has
+            // no drop-shadow of its own and the one thing a person wants to
+            // know mid-gesture is whether the thing is moving. Drawn first, so
+            // it is under the shape.
             if node.shape != "" && grip.pressed: Path {
                 y: 3px;
                 width: 100%;
@@ -476,47 +446,49 @@ component NodeShape inherits Rectangle {
                 commands: node.shape;
                 fill: #00000033;
             }
+
+            // The body: the shape, filled and not stroked. One pixel to one
+            // coordinate -- the viewbox is the node's own size -- so nothing
+            // is stretched.
+            //
+            // Filled and stroked separately because the line may be broken: a
+            // dashed path is a row of short subpaths, and filling those would
+            // fill each dash rather than the shape.
             if node.shape != "": Path {
                 width: 100%;
                 height: 100%;
                 viewbox-width: self.width / 1px;
                 viewbox-height: self.height / 1px;
                 commands: node.shape;
+                fill: ink.with-alpha(0.18);
+            }
+
+            // The outline, whole or broken as this type's edge says. The
+            // dashes are Rust's arithmetic: see style::edge_of.
+            if node.edge != "": Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.edge;
                 stroke: ink;
                 stroke-width: grip.has-hover ? node.border + 1px : node.border;
-                fill: node.shading == "solid"
-                    ? ink.with-alpha(0.18)
-                    : node.shading == "double"
-                        ? ink.with-alpha(0.08)
-                        : transparent;
+                fill: transparent;
             }
 
-            // Hatched shading, inside whatever the outline turned out to be
-            // -- and inside the sides of it, which is what the inset is for: a
-            // leaning shape does not reach its own box at the top and the
-            // bottom, and hatching that filled the box would be hatching in
-            // the air beside the node.
-            if node.shading == "hatched": Hatching {
-                x: node.inset;
-                y: 0;
-                width: parent.width - 2 * node.inset;
+            // And the second line of a doubled edge, four pixels inside the
+            // first: the channel that used to be a pattern in the body, moved
+            // out to the line around it where it competes with neither the
+            // name nor the colour.
+            if node.inner != "": Path {
+                width: 100%;
                 height: 100%;
-                ink: ink.with-alpha(0.45);
-                border-radius: parent.border-radius;
-            }
-
-            // The second outline of a doubled shape, which is the third
-            // non-colour channel at work: a doubled square and a solid square
-            // differ without either of them being a different colour.
-            if node.shading == "double": Rectangle {
-                x: 4px + node.inset;
-                y: 4px;
-                width: parent.width - 8px - 2 * node.inset;
-                height: parent.height - 8px;
-                border-width: 1px;
-                border-color: ink;
-                border-radius: max(0px, parent.border-radius - 3px);
-                background: transparent;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.inner;
+                stroke: ink;
+                stroke-width: 1px;
+                fill: transparent;
             }
         }
 

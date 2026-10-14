@@ -96,19 +96,45 @@ pub enum Outline {
     Barred,
 }
 
-/// How the inside is filled.
+/// How a node's outline is drawn: one line, two, or a broken one.
 ///
-/// Shading rather than colour, so it survives a monochrome rendering.
+/// The channel that used to be the inside of the node. A body was filled flat,
+/// hatched, left empty or given a second outline, and three of those were
+/// about the inside; a pattern inside a node is now not drawn at all -- a body
+/// is its own colour and nothing else -- so what told two nodes apart has
+/// moved to the line around the outside, where it does not compete with the
+/// name or with the colour the body carries.
+///
+/// A line rather than a colour, so it survives a monochrome rendering, and
+/// four values from two independent facts: a line may be doubled, broken, both
+/// or neither.
+///
+/// A broken line is only available to a straight-sided outline. Dashes are
+/// walked along the polygon's own sides -- see [`polygon_of`] -- and a rounded
+/// outline has no polygon, so the two types drawn with a radius are held to a
+/// single line by the test below.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Shading {
-    /// Flat fill.
-    Solid,
-    /// Diagonal hatching, drawn as narrow lines.
-    Hatched,
-    /// No fill at all: the outline and the label only.
-    Open,
-    /// A second outline inside the first.
+pub enum Edge {
+    /// One line.
+    Single,
+    /// Two lines, the inner one inset.
     Double,
+    /// One broken line.
+    Dashed,
+    /// Two broken lines, which is the two facts at once.
+    DashedDouble,
+}
+
+impl Edge {
+    /// Whether a second line is drawn inside the first.
+    pub fn doubled(self) -> bool {
+        matches!(self, Edge::Double | Edge::DashedDouble)
+    }
+
+    /// Whether the line is broken.
+    pub fn broken(self) -> bool {
+        matches!(self, Edge::Dashed | Edge::DashedDouble)
+    }
 }
 
 /// How wide the outline is drawn, in pixels.
@@ -144,7 +170,7 @@ pub enum Face {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Appearance {
     pub outline: Outline,
-    pub shading: Shading,
+    pub edge: Edge,
     pub weight: Weight,
     /// The nominal width and height, in pixels, before a label widens it.
     ///
@@ -372,75 +398,204 @@ pub struct Corner {
     pub rightward: bool,
 }
 
-/// The outline of a node of this size, where its shape needs a path.
+/// The corners of a node's outline, where the outline is straight-sided.
 ///
-/// The store and the data symbol: a square rectangle and a rounded one are a
-/// corner radius, a keyed shape is one of those with a corner cut off, and a
-/// barred one is a square with two lines drawn inside it, so the markup draws
-/// all four from one element and two overlays. An end left open and a leaning
-/// side are neither, and a corner radius cannot make a corner that is not
-/// round.
+/// One list of points, and everything the markup draws from it -- the shape it
+/// fills, the line it strokes, the second line of a doubled edge, the dashes
+/// of a broken one -- is worked out here from these. The alternative was four
+/// strings each formatting its own arithmetic, which is four places to get a
+/// corner wrong.
 ///
-/// Empty for every other outline, which is what says "draw this the ordinary
-/// way". The path is in the node's own coordinates, so the markup draws it
-/// one to one and the stroke keeps its width -- a viewbox stretched to fit
-/// would stretch the line with it.
-pub fn shape_of(outline: Outline, (width, height): (u32, u32)) -> String {
+/// Empty for a rounded outline, which is a corner radius and not a polygon:
+/// an arc in a path is a different kind of arithmetic, and the two types drawn
+/// with one need neither a dash nor a second line. The test below is what says
+/// so, rather than this comment.
+///
+/// Wound clockwise, starting at the top left, and inset half a pixel so the
+/// stroke sits inside the node: a path drawn on the boundary is drawn half
+/// outside it, and a node that overhangs its own box by a pixel is a node
+/// whose terminals and lines are all a pixel out.
+pub fn polygon_of(outline: Outline, (width, height): (u32, u32)) -> Vec<(f32, f32)> {
+    let (w, h) = (width as f32 - 0.5, height as f32 - 0.5);
+    let (left, top) = (0.5, 0.5);
     match outline {
-        Outline::Store => store((width, height)),
-        Outline::Parallelogram => parallelogram((width, height)),
-        _ => String::new(),
+        // A radius, not a polygon.
+        Outline::Rounded => Vec::new(),
+        // The square one, and the two that are a square with something drawn
+        // on it: the keyed corner and the two bars are overlays, so the
+        // outline underneath them is the plain rectangle.
+        Outline::Square | Outline::Keyed | Outline::Barred | Outline::Store => {
+            vec![(left, top), (w, top), (w, h), (left, h)]
+        }
+        Outline::Parallelogram => {
+            let slant = (h - top) / 2.0;
+            vec![
+                (left + slant, top),
+                (w, top),
+                (w - slant, h),
+                (left, h),
+            ]
+        }
     }
 }
 
-/// Two long sides and a cap on the right, in a box this size.
+/// Whether the outline's own line comes back to where it started.
 ///
-/// Not closed: the path stops at the left edge rather than drawing it, which
-/// is what makes it a store rather than a rectangle. A stroke follows the
-/// commands and so leaves that side open; a fill closes the shape the way SVG
-/// does, which is what any shading inside it wants anyway.
-///
-/// Inset half a pixel so the stroke sits inside the node: a path drawn on the
-/// boundary is drawn half outside it, and a node that overhangs its own box by
-/// a pixel is a node whose terminals and lines are all a pixel out.
-pub fn store((width, height): (u32, u32)) -> String {
-    let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
-    format!(
-        "M 0.5 0.5 L {:.1} 0.5 L {:.1} {:.1} L 0.5 {:.1}",
-        w + 0.5,
-        w + 0.5,
-        h + 0.5,
-        h + 0.5
-    )
+/// Every shape's does but the data store's, which is a store because its left
+/// side is not drawn. The shape it *fills* is closed all the same -- a fill
+/// closes a path the way SVG does -- so this is a fact about the line and not
+/// about the shape.
+fn closes(outline: Outline) -> bool {
+    outline != Outline::Store
 }
 
-/// Four sides, leaning right, in a box this size.
+/// The shape to fill, as path data in the node's own coordinates.
 ///
-/// The slant is half the height, which is an edge at sixty-three degrees on
-/// every node whatever its height: a slant stated as a fraction of the width
-/// would lean differently on a 48-pixel node and a 64-pixel one, and nine
-/// kinds of payload drawn at four heights would read as four shapes.
+/// Closed, whatever the line does, and empty for a rounded outline -- which
+/// the markup fills with a Rectangle's own background. One pixel to one
+/// coordinate, so the markup draws it one to one and a stroke keeps its width:
+/// a viewbox stretched to fit would stretch the line with it.
+pub fn shape_of(outline: Outline, size: (u32, u32)) -> String {
+    let points = polygon_of(outline, size);
+    if points.is_empty() {
+        return String::new();
+    }
+    let mut out = run_of(&points);
+    out.push_str(" Z");
+    out
+}
+
+/// The line to stroke: the outline itself, broken into dashes where the edge
+/// is a broken one.
 ///
-/// Inset half a pixel, as [`store`] is and for the same reason.
-pub fn parallelogram((width, height): (u32, u32)) -> String {
-    let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
-    let slant = h / 2.0;
-    format!(
-        "M {:.1} 0.5 L {:.1} 0.5 L {:.1} {:.1} L 0.5 {:.1} Z",
-        slant + 0.5,
-        w + 0.5,
-        w - slant + 0.5,
-        h + 0.5,
-        h + 0.5
-    )
+/// Empty for a rounded outline, which the markup strokes with a Rectangle's
+/// own border.
+pub fn edge_of(outline: Outline, edge: Edge, size: (u32, u32)) -> String {
+    line_of(&polygon_of(outline, size), outline, edge)
+}
+
+/// The second line of a doubled edge, inset four pixels from the first.
+///
+/// Empty unless the edge is a doubled one. The inset is taken as a smaller box
+/// rather than by moving the points, so that each shape insets the way it is
+/// shaped: a parallelogram's inner line leans by its own slant, and a store's
+/// is open on the same side.
+pub fn inner_of(outline: Outline, edge: Edge, (width, height): (u32, u32)) -> String {
+    if !edge.doubled() || width <= 2 * DOUBLE || height <= 2 * DOUBLE {
+        return String::new();
+    }
+    let inset = DOUBLE as f32;
+    let points: Vec<(f32, f32)> = polygon_of(outline, (width - 2 * DOUBLE, height - 2 * DOUBLE))
+        .into_iter()
+        .map(|(x, y)| (x + inset, y + inset))
+        .collect();
+    line_of(&points, outline, edge)
+}
+
+/// How far the second line of a doubled edge is from the first, in pixels.
+///
+/// Four: at three the two lines read as one thick one at a glance, and at six
+/// the inner line starts to crowd a name on the shortest node.
+const DOUBLE: u32 = 4;
+
+/// How long a dash is, and the gap after it.
+///
+/// Eight and five, which at the sizes here gives a node's shortest side three
+/// or four dashes: fewer reads as a damaged line and more as a dotted one.
+const DASH: f32 = 8.0;
+const GAP: f32 = 5.0;
+
+/// One polygon as a line, dashed or whole.
+fn line_of(points: &[(f32, f32)], outline: Outline, edge: Edge) -> String {
+    if points.is_empty() {
+        return String::new();
+    }
+    if !edge.broken() {
+        let mut out = run_of(points);
+        if closes(outline) {
+            out.push_str(" Z");
+        }
+        return out;
+    }
+    dashes_of(points, closes(outline))
+}
+
+/// A polygon's points as one move and a line to each of the rest.
+fn run_of(points: &[(f32, f32)]) -> String {
+    let mut out = format!("M {:.1} {:.1}", points[0].0, points[0].1);
+    for (x, y) in &points[1..] {
+        out.push_str(&format!(" L {x:.1} {y:.1}"));
+    }
+    out
+}
+
+/// A polygon as a broken line: one subpath per dash.
+///
+/// Walked as one line rather than side by side, so the pattern carries on
+/// around a corner instead of restarting at each: a dash that began again at
+/// every corner would put a dash on all four of them and read as a shape with
+/// marked corners.
+///
+/// Subpaths because that is the only dash a path has here. Slint's Path takes
+/// no dash pattern, so a broken line is drawn as the pieces that are there --
+/// which is what `route.rs` does for the line being dragged, and for the same
+/// reason.
+fn dashes_of(points: &[(f32, f32)], closes: bool) -> String {
+    let mut sides: Vec<((f32, f32), (f32, f32))> = points
+        .windows(2)
+        .map(|pair| (pair[0], pair[1]))
+        .collect();
+    if closes {
+        sides.push((points[points.len() - 1], points[0]));
+    }
+
+    let mut out = String::new();
+    // Where along the dash-and-gap pattern the next side starts, so the
+    // pattern runs on round the shape.
+    let mut into = 0.0_f32;
+    for (from, to) in sides {
+        let (run_x, run_y) = (to.0 - from.0, to.1 - from.1);
+        let span = (run_x * run_x + run_y * run_y).sqrt();
+        if span <= f32::EPSILON {
+            continue;
+        }
+        let at = |along: f32| {
+            (
+                from.0 + run_x * along / span,
+                from.1 + run_y * along / span,
+            )
+        };
+
+        let mut along = -into;
+        while along < span {
+            let start = along.max(0.0);
+            let end = (along + DASH).min(span);
+            if end > start {
+                let (sx, sy) = at(start);
+                let (ex, ey) = at(end);
+                if !out.is_empty() {
+                    out.push(' ');
+                }
+                out.push_str(&format!("M {sx:.1} {sy:.1} L {ex:.1} {ey:.1}"));
+            }
+            along += DASH + GAP;
+        }
+        // Whatever of the pattern this side ended partway through.
+        into = (into + span) % (DASH + GAP);
+    }
+    out
 }
 
 /// How far in from a side a shape may be, anywhere on it.
 ///
-/// What anything drawn *inside* a node has to keep clear of the sides: the
-/// hatching, the second outline of a doubled shape, and the column the name
-/// is padded away from. Nothing for the shapes that reach their own sides all
-/// the way down, which is every outline but the slanted one.
+/// What the column a name is padded away from has to allow for, over and
+/// above the terminals themselves: a leaning shape moves its terminals in, so
+/// a name padded by the terminal column alone would be padded into them.
+/// Nothing for the shapes that reach their own sides all the way down, which
+/// is every outline but the slanted one.
+///
+/// The second line of a doubled edge needs none of this: it is inset as a
+/// smaller box and leans by its own slant. See [`inner_of`].
 pub fn room_of(outline: Outline, (_width, height): (u32, u32)) -> i32 {
     match outline {
         Outline::Parallelogram => (height as f32 / 2.0).ceil() as i32,
@@ -1020,21 +1175,21 @@ impl NodeType {
     /// store where it is kept, and the ground is the plain rectangle of
     /// something outside the system altogether. Within a shape the types
     /// differ by
-    /// shading, weight and size.
+    /// the edge, the weight and the size.
     pub fn appearance(self) -> Appearance {
         use Outline::*;
-        use Shading::*;
+        use Edge::*;
         use Weight::*;
         match self {
             // Buses and the rest of the payloads: the data symbol, and told
-            // apart from each other by shading and size.
+            // apart from each other by the line around them and by size.
             NodeType::I2c => Appearance {
                 face: Face::Mono,
                 label_size: 12,
                 label_weight: 700,
                 label_italic: false,
                 outline: Parallelogram,
-                shading: Solid,
+                edge: Single,
                 weight: Narrow,
                 size: (WIDTH, 48),
                 tint: Tint::Aubergine,
@@ -1045,7 +1200,7 @@ impl NodeType {
                 label_weight: 400,
                 label_italic: false,
                 outline: Parallelogram,
-                shading: Hatched,
+                edge: Double,
                 weight: Narrow,
                 size: (WIDTH, 56),
                 tint: Tint::Oxblood,
@@ -1056,7 +1211,7 @@ impl NodeType {
                 label_weight: 400,
                 label_italic: true,
                 outline: Parallelogram,
-                shading: Open,
+                edge: Dashed,
                 weight: Narrow,
                 size: (WIDTH, 48),
                 tint: Tint::Crimson,
@@ -1070,7 +1225,7 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: false,
                 outline: Parallelogram,
-                shading: Double,
+                edge: Double,
                 weight: Wide,
                 size: (WIDTH, 56),
                 tint: Tint::Magenta,
@@ -1081,7 +1236,7 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: false,
                 outline: Parallelogram,
-                shading: Double,
+                edge: Double,
                 weight: Narrow,
                 size: (WIDTH, 64),
                 tint: Tint::Mulberry,
@@ -1092,7 +1247,7 @@ impl NodeType {
                 label_weight: 400,
                 label_italic: true,
                 outline: Parallelogram,
-                shading: Hatched,
+                edge: DashedDouble,
                 weight: Wide,
                 size: (WIDTH, 56),
                 tint: Tint::Rose,
@@ -1103,7 +1258,7 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: true,
                 outline: Parallelogram,
-                shading: Solid,
+                edge: Single,
                 weight: Wide,
                 size: (WIDTH, 48),
                 tint: Tint::Plum,
@@ -1114,7 +1269,7 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: false,
                 outline: Parallelogram,
-                shading: Open,
+                edge: Dashed,
                 weight: Wide,
                 size: (WIDTH, 56),
                 tint: Tint::Orchid,
@@ -1125,7 +1280,7 @@ impl NodeType {
                 label_weight: 400,
                 label_italic: false,
                 outline: Parallelogram,
-                shading: Double,
+                edge: Double,
                 weight: Wide,
                 size: (WIDTH, 64),
                 tint: Tint::Heather,
@@ -1137,7 +1292,7 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: false,
                 outline: Keyed,
-                shading: Solid,
+                edge: Single,
                 weight: Wide,
                 size: (WIDTH, 72),
                 tint: Tint::Clay,
@@ -1154,7 +1309,7 @@ impl NodeType {
                 label_weight: 400,
                 label_italic: false,
                 outline: Rounded,
-                shading: Open,
+                edge: Single,
                 weight: Narrow,
                 size: (WIDTH, 40),
                 tint: Tint::Olive,
@@ -1165,7 +1320,7 @@ impl NodeType {
                 label_weight: 400,
                 label_italic: false,
                 outline: Rounded,
-                shading: Solid,
+                edge: Single,
                 weight: Wide,
                 size: (WIDTH, 64),
                 tint: Tint::Pine,
@@ -1186,22 +1341,22 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: false,
                 outline: Barred,
-                shading: Open,
+                edge: Single,
                 weight: Wide,
                 size: (WIDTH, 88),
                 tint: Tint::Moss,
             },
             // Where the data is kept, which is a store and not an end: a
             // flowchart's rounded end is a terminator, where control enters or
-            // leaves, and a log is neither. Hatched and narrow still, so the
-            // one thing that changed is the thing that was wrong.
+            // leaves, and a log is neither. Narrow still, so the one thing
+            // that changed is the thing that was wrong.
             NodeType::Log => Appearance {
                 face: Face::Plain,
                 label_size: 12,
                 label_weight: 400,
                 label_italic: false,
                 outline: Store,
-                shading: Hatched,
+                edge: Single,
                 weight: Narrow,
                 size: (WIDTH, 96),
                 tint: Tint::Gold,
@@ -1225,7 +1380,7 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: true,
                 outline: Square,
-                shading: Solid,
+                edge: Single,
                 weight: Wide,
                 size: (WIDTH, 72),
                 tint: Tint::Azure,
@@ -1238,41 +1393,56 @@ impl NodeType {
 mod tests {
     use super::*;
 
-    /// Every outline is drawn by one of the two means, and the shaped ones
-    /// stay inside the box they are given.
+    /// Every outline is drawn by one of the two means, stays inside its own
+    /// box, and holds the terminals it is drawn with.
     ///
-    /// Two means, because a corner radius draws four of the five outlines and
-    /// cannot draw the fifth. The markup picks between them on the path being
-    /// empty, so a sixth outline added later with a shape and no path -- or a
-    /// path and a radius both -- would be drawn as a plain rectangle or as two
-    /// shapes at once, and in neither case would anything say so.
+    /// Two means, because a corner radius draws the rounded outline and
+    /// nothing else: every other shape is a polygon, and a polygon is what a
+    /// dash and a second line are walked along. The markup picks between them
+    /// on the paths being empty, so an outline added later with a radius and a
+    /// polygon both -- or with neither -- would be drawn twice or not at all,
+    /// and in neither case would anything say so.
     #[test]
-    fn every_outline_is_either_a_radius_or_a_path() {
+    fn every_outline_is_either_a_radius_or_a_polygon() {
         for kind in NodeType::ALL {
             let drawn = kind.appearance();
+            let (width, height) = drawn.size;
+            let points = polygon_of(drawn.outline, drawn.size);
             let shape = shape_of(drawn.outline, drawn.size);
-            let shaped = matches!(
-                drawn.outline,
-                Outline::Store | Outline::Parallelogram
-            );
+            let edge = edge_of(drawn.outline, drawn.edge, drawn.size);
+            let rounded = drawn.outline == Outline::Rounded;
 
             assert_eq!(
-                shaped,
-                !shape.is_empty(),
-                "{} is {:?} and its path is {shape:?}",
+                rounded,
+                points.is_empty(),
+                "{} is {:?} and its polygon has {} corners",
                 kind.spelling(),
-                drawn.outline
+                drawn.outline,
+                points.len()
+            );
+            assert_eq!(
+                points.is_empty(),
+                shape.is_empty() && edge.is_empty(),
+                "{}'s polygon and its paths disagree: {shape:?}, {edge:?}",
+                kind.spelling()
             );
 
-            if !shaped {
+            if rounded {
+                // A radius has no polygon to walk, so it can carry neither a
+                // dash nor a second line, and the markup would silently draw
+                // a plain rounded rectangle instead of saying so.
+                assert!(
+                    !drawn.edge.broken() && !drawn.edge.doubled(),
+                    "{} is drawn with a radius and asks for a {:?} edge",
+                    kind.spelling(),
+                    drawn.edge
+                );
                 continue;
             }
 
             // Inside its own box, every coordinate of it. A shape that
             // overhangs is a shape whose terminals and lines are all drawn
             // somewhere its outline is not.
-            let (width, height) = drawn.size;
-            let points: Vec<(f32, f32)> = points_of(&shape);
             for (x, y) in &points {
                 assert!(
                     (0.0..=width as f32).contains(x) && (0.0..=height as f32).contains(y),
@@ -1281,37 +1451,44 @@ mod tests {
                 );
             }
 
-            // What is drawn inside it is inside it, where anything is. The
-            // hatching and the second outline of a doubled shape are
-            // rectangles in the markup, so a shape shaded either of those
-            // ways has to say how much room to leave at its sides -- and the
-            // answer has to be enough, or a payload's hatching is drawn in
-            // the air beside the node. A solid shape is filled by the path
-            // itself and has nothing rectangular inside it to escape.
-            if matches!(drawn.shading, Shading::Hatched | Shading::Double) {
-                let room = room_of(drawn.outline, drawn.size) as f32;
-                for spot in [
-                    (room, 0.0),
-                    (width as f32 - room, 0.0),
-                    (room, height as f32),
-                    (width as f32 - room, height as f32),
-                ] {
-                    assert!(
-                        within(&points, spot),
-                        "{} is shaded {:?}, leaves {room} at the sides, and \
-                         {spot:?} is still outside it: {shape}",
-                        kind.spelling(),
-                        drawn.shading
-                    );
-                }
+            // The second line of a doubled edge is inside the first. Inset as
+            // a smaller box, so each shape insets the way it is shaped -- and
+            // a parallelogram's inner line has to lean by its own slant or it
+            // crosses the outer one.
+            let inner = inner_of(drawn.outline, drawn.edge, drawn.size);
+            assert_eq!(
+                drawn.edge.doubled(),
+                !inner.is_empty(),
+                "{} has a {:?} edge and an inner line of {inner:?}",
+                kind.spelling(),
+                drawn.edge
+            );
+            for spot in points_of(&inner) {
+                assert!(
+                    within(&points, spot),
+                    "{}'s inner line reaches {spot:?}, outside its own outline",
+                    kind.spelling()
+                );
+            }
+
+            // A broken line is the shape's own line with pieces missing, so
+            // every piece of it lies on the outline. A dash walked off the
+            // shape would be a line beside the node.
+            for spot in points_of(&edge) {
+                assert!(
+                    on_edge(&points, spot, closes(drawn.outline)),
+                    "{}'s edge has a dash at {spot:?}, which is not on its \
+                     outline",
+                    kind.spelling()
+                );
             }
 
             // And it holds every terminal it is drawn with. This is the rule
-            // the shape is chosen by: a terminal is placed in the corner of
+            // the shapes are chosen by: a terminal is placed in the corner of
             // the node's box, so a shape that cuts a corner off cuts a
             // terminal loose, and a terminal drawn outside its own outline
             // reads as something floating beside the node rather than part of
-            // it. It is why the point is on the left -- the ground station's
+            // it. It is why the ground station's point was on the left -- its
             // own two terminals are both on the right -- and it is checked
             // here so that a shape kept and a terminal moved cannot pass.
             for terminal in kind
@@ -1339,6 +1516,29 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Whether a spot lies on one of a polygon's sides.
+    ///
+    /// Within half a pixel of it, as [`within`] is, and along it rather than
+    /// merely in line with it: a dash is a piece of a side, so both ends of it
+    /// have to be between the side's own ends.
+    fn on_edge(points: &[(f32, f32)], (x, y): (f32, f32), closes: bool) -> bool {
+        let mut sides: Vec<(&(f32, f32), &(f32, f32))> =
+            points.windows(2).map(|p| (&p[0], &p[1])).collect();
+        if closes {
+            sides.push((&points[points.len() - 1], &points[0]));
+        }
+        sides.iter().any(|((ax, ay), (bx, by))| {
+            let (run_x, run_y) = (bx - ax, by - ay);
+            let along = (run_x * run_x + run_y * run_y).sqrt();
+            if along <= f32::EPSILON {
+                return false;
+            }
+            let cross = (run_x * (y - ay) - run_y * (x - ax)) / along;
+            let into = (run_x * (x - ax) + run_y * (y - ay)) / along;
+            cross.abs() <= 0.5 && (-0.5..=along + 0.5).contains(&into)
+        })
     }
 
     /// Whether a spot is inside a path's corners.
@@ -1404,7 +1604,7 @@ mod tests {
             let two = b.appearance();
             let differences = [
                 one.outline != two.outline,
-                one.shading != two.shading,
+                one.edge != two.edge,
                 one.weight != two.weight,
                 one.size != two.size,
                 // How the label is set, which is one channel however many

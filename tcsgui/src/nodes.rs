@@ -108,22 +108,15 @@ pub struct Terminals {
 }
 
 impl Terminals {
-    /// Whether this declares the terminal of that name.
+    /// The four, by the terminal name each answers to.
     ///
     /// The one statement of which flag is which terminal, so that a test can
     /// hold the tree against the schema's own table without either side
-    /// repeating the other.
-    pub fn has(&self, terminal: &str) -> bool {
-        match terminal {
-            "payload-in" => self.payload_sink,
-            "payload-out" => self.payload_source,
-            "moc-in" => self.moc_sink,
-            "moc-out" => self.moc_source,
-            _ => false,
-        }
-    }
-
-    /// The four, by the terminal name each answers to.
+    /// repeating the other. Which is its only caller so far: the editor still
+    /// takes its terminals from `tcslibgs::graph::terminals`, and the tree is
+    /// held against that -- see
+    /// `tests::the_trees_terminals_are_the_schemas`.
+    #[cfg(test)]
     pub fn each(&self) -> [(&'static str, bool); 4] {
         [
             ("payload-in", self.payload_sink),

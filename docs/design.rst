@@ -1443,6 +1443,53 @@ may want to go and deal with it, and a program that insisted on writing first
 would be one they cannot get out of -- and *Stay*, because the menu is next to
 everything else and gets pressed by accident.
 
+The undo history
+----------------
+
+Every edit is written to the configuration as it is made, so the history is
+not protecting anybody's work: the work is on the disk already. What it buys is
+the ability to undo past a restart or a crash -- a convenience and not a safety
+net, which is what decides where it lives and how long for.
+
+It lives in the user's own state directory: ``$XDG_STATE_HOME/tcsgui``, or
+``~/.local/state/tcsgui`` where that is not set. The specification names this
+exact case -- state that should persist between restarts but is not important
+enough to be data, with history given as an example -- and it is deliberately
+not the cache directory, a cache being something a program can regenerate.
+
+It used to sit beside the configuration, as ``<name>.tcsgui-history``, on the
+argument that a configuration copied to another machine should take its history
+with it. That argument was worth less than it cost: a configuration lives in a
+directory under version control, so the file turned up in ``git status``, in
+review and in release tarballs -- and nobody has ever wanted to undo an edit on
+a machine they copied a file to.
+
+Each history is named for the configuration's own name and a digest of its
+absolute path -- ``graph-3f91c2d4e5f60718.yaml`` -- so that a person looking in
+the directory can tell what belongs to what and two configurations called
+``graph.yaml`` in two directories are two histories. The file says which
+configuration it is the history of, because a digest cannot be read backwards.
+The digest is FNV-1a written out in the source rather than the standard
+library's hasher, which does not promise the same answer across Rust releases:
+a hash that changed with the toolchain would orphan every history on the disk
+without saying so.
+
+It is deleted on a clean exit, which is what every other editor does: the
+history of a session that ended tidily is of no further use, and a directory
+that only ever grows is one somebody has to tidy. It is **kept** when the
+editor does not exit tidily -- a crash, a kill, a machine that went down --
+because that is the undo somebody will want when they come back; and kept, too,
+when the exit was asked for but the last save failed, which is the one case
+where the history is the only copy of a session's work.
+
+And it is pruned at startup, two ways: a history older than a week, and one
+whose configuration is no longer where it was. The first is the ordinary bound
+-- a crash a fortnight ago is not an undo anybody is waiting for -- and the
+second is tidiness nothing else would do, a configuration being free to be
+deleted or renamed by anything at all. A file in that directory that tcsgui
+does not understand is left alone: it is not the prune's place to decide that
+somebody else's file is rubbish.
+
 The section has one attribute that is not about running the software at all:
 ``rust-code-path``, a path to a Rust source file. See `The configuration as Rust`_.
 It is in this section because this is the section about the configuration as a

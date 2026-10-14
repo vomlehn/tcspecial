@@ -40,4 +40,7 @@ edit/
 # What tcsgui keeps beside a configuration it is editing: the history that
 # makes undo survive a crash. Of a moment rather than of a configuration, so
 # it is not something to commit.
+# The editor's undo history, which used to live beside the configuration and
+# is now in the user's own state directory: $XDG_STATE_HOME/tcsgui. Kept here
+# for a while so that a checkout with an old one in it stays clean.
 *.tcsgui-history

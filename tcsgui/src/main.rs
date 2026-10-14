@@ -210,6 +210,9 @@ struct Views {
     /// is about, and a second question about another node would leave a person
     /// answering whichever window happened to be on top.
     deleting: Option<DeleteWindow>,
+    /// The question about two nodes that share a name, while it is being
+    /// asked. See `settle_names`.
+    names: Option<NamesWindow>,
     /// The window that says what went wrong, and what it last said.
     ///
     /// One window, re-pointed: two of them side by side would be two copies of
@@ -569,6 +572,7 @@ fn main() -> Result<(), slint::PlatformError> {
         leaving: None,
         concerns: None,
         deleting: None,
+        names: None,
         alert: None,
         alerted: Rc::new(RefCell::new(String::new())),
         faulted: Rc::new(RefCell::new(Default::default())),
@@ -637,6 +641,12 @@ fn main() -> Result<(), slint::PlatformError> {
             views.borrow_mut().open.insert(name, window);
         });
     }
+
+    // And if the configuration names a node twice, the question about it --
+    // before the window runs, because the file cannot be checked or flown
+    // until it is answered and every link naming that name is ambiguous
+    // meanwhile. See `settle_names`.
+    settle_names(&editor, &views);
 
     let outcome = ui.run();
 
@@ -1750,6 +1760,242 @@ fn confirm_delete(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node
         if let Err(e) = window.show() {
             eprintln!("tcsgui: {node} cannot be asked about: {e}");
         }
+    }
+}
+
+/// Whether a set of proposed names settles the duplicate, and what is wrong
+/// with it if not.
+///
+/// `proposed` is what the fields hold, by the position of the node each is
+/// for, and `document` is what else is in the configuration. Three things are
+/// asked: that no name is blank, that no two of the proposed names are the
+/// same, and that none of them is a name some *other* node already has --
+/// renaming one duplicate into a third node's name is a duplicate again, and
+/// pressing a button that made the same question come back would be no answer
+/// at all.
+///
+/// Here rather than in the markup for the usual reason: the markup can compare
+/// two strings, this is a rule about a document, and a rule is worth a test.
+fn names_settle(
+    document: &Document,
+    proposed: &BTreeMap<usize, String>,
+) -> Result<(), String> {
+    let whole = |at: usize, name: &str| {
+        document
+            .nodes
+            .get(at)
+            .map(|node| Qualified::of(name, &node.home).absolute())
+            .unwrap_or_else(|| name.to_string())
+    };
+
+    let mut taken: BTreeMap<String, usize> = BTreeMap::new();
+    for (at, name) in proposed {
+        let said = name.trim();
+        if said.is_empty() {
+            return Err("A node has to have a name.".to_string());
+        }
+        if let Some(before) = taken.insert(whole(*at, said), *at) {
+            let _ = before;
+            return Err(format!("Two of these are called \"{said}\"."));
+        }
+    }
+
+    // And against the nodes that are not being renamed, which is every node
+    // whose position is not in the list.
+    for (at, node) in document.nodes.iter().enumerate() {
+        if proposed.contains_key(&at) {
+            continue;
+        }
+        let held = Qualified::of(&node.name, &node.home).absolute();
+        if let Some(asked) = taken.get(&held) {
+            let _ = asked;
+            return Err(format!(
+                "Another node is already called \"{}\".",
+                node.name
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Ask about two nodes that share a name, which a file nothing can fly has.
+///
+/// Opened when a configuration is read that names a node twice -- see
+/// `Document::sharing_a_name` -- and the renaming it does is not an edit: a
+/// duplicate is the file being unreadable rather than somebody's drawing, so
+/// it is written at once and left out of the history. `Editor::settle_name`
+/// says why at length.
+fn settle_names(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    let sharing = editor.borrow().document().sharing_a_name();
+    if sharing.is_empty() {
+        return;
+    }
+
+    // What the fields hold: each node's own name to begin with, so a window
+    // opened and closed again changes nothing.
+    let proposed: Rc<RefCell<BTreeMap<usize, String>>> = Rc::new(RefCell::new(
+        sharing
+            .iter()
+            .map(|at| {
+                (
+                    *at,
+                    editor
+                        .borrow()
+                        .document()
+                        .nodes
+                        .get(*at)
+                        .map(|node| node.name.clone())
+                        .unwrap_or_default(),
+                )
+            })
+            .collect(),
+    ));
+
+    let window = match NamesWindow::new() {
+        Ok(window) => window,
+        Err(e) => {
+            // The duplicate is still reported as a fault, so this failing is
+            // a quieter editor rather than a broken one.
+            eprintln!("tcsgui: the shared names cannot be asked about: {e}");
+            return;
+        }
+    };
+
+    {
+        let editor = editor.clone();
+        let proposed = proposed.clone();
+        let window = window.as_weak();
+        window
+            .upgrade()
+            .expect("the window exists")
+            .on_typed(move |row, said| {
+                let at = match order(&proposed.borrow()).get(row as usize) {
+                    Some(at) => *at,
+                    None => return,
+                };
+                proposed.borrow_mut().insert(at, said.to_string());
+                if let Some(window) = window.upgrade() {
+                    // The rows are not rebuilt: a model replaced under a
+                    // LineEdit takes the focus with it, and somebody typing a
+                    // name would have to press the field again for every
+                    // letter. Only the answer changes.
+                    say_names(&window, editor.borrow().document(), &proposed.borrow(), false);
+                }
+            });
+    }
+    {
+        let editor = editor.clone();
+        let proposed = proposed.clone();
+        let window = window.as_weak();
+        window
+            .upgrade()
+            .expect("the window exists")
+            .on_derive(move |row| {
+                let at = match order(&proposed.borrow()).get(row as usize) {
+                    Some(at) => *at,
+                    None => return,
+                };
+                let spare = editor.borrow().document().spare_name(at);
+                proposed.borrow_mut().insert(at, spare);
+                if let Some(window) = window.upgrade() {
+                    // Rebuilt here, because the field's own text is what
+                    // changed: a suggestion nobody can see is no suggestion.
+                    say_names(&window, editor.borrow().document(), &proposed.borrow(), true);
+                }
+            });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let proposed = proposed.clone();
+        window.on_confirmed(move || {
+            let asked = proposed.borrow().clone();
+            if names_settle(editor.borrow().document(), &asked).is_err() {
+                return;
+            }
+            {
+                let mut editor = editor.borrow_mut();
+                for (at, name) in &asked {
+                    editor.settle_name(*at, name.trim());
+                }
+            }
+            hide_names(&views);
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        let views = views.clone();
+        // Left as they are: the duplicate is reported as a fault like any
+        // other, which is where it was before this window existed. Somebody
+        // who would rather fix it in a text editor should not be held here.
+        window.on_left(move || hide_names(&views));
+    }
+
+    say_names(&window, editor.borrow().document(), &proposed.borrow(), true);
+    if let Err(e) = window.show() {
+        eprintln!("tcsgui: the shared names cannot be asked about: {e}");
+        return;
+    }
+    views.borrow_mut().names = Some(window);
+}
+
+/// The positions the window lists, in the order it lists them.
+fn order(proposed: &BTreeMap<usize, String>) -> Vec<usize> {
+    proposed.keys().copied().collect()
+}
+
+/// Put the names into the window, and say whether they settle it.
+///
+/// `rows` says whether the list itself is rebuilt. It is not, for a letter
+/// somebody typed: replacing the model under a LineEdit takes the focus with
+/// it, and a field that had to be pressed again for every letter is the bug
+/// this editor has already had once. See `refilled`.
+fn say_names(
+    window: &NamesWindow,
+    document: &Document,
+    proposed: &BTreeMap<usize, String>,
+    rows: bool,
+) {
+    if rows {
+        let rows: Vec<NameRow> = order(proposed)
+            .into_iter()
+            .map(|at| {
+                let node = document.nodes.get(at);
+                NameRow {
+                    at: at as i32,
+                    was: node.map(|node| node.name.clone()).unwrap_or_default().into(),
+                    now: proposed.get(&at).cloned().unwrap_or_default().into(),
+                    node_type: node
+                        .map(|node| node.node_type.clone())
+                        .unwrap_or_default()
+                        .into(),
+                    at_said: node
+                        .map(|node| format!("{}, {}", node.at.0, node.at.1))
+                        .unwrap_or_default()
+                        .into(),
+                }
+            })
+            .collect();
+        window.set_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
+    }
+
+    match names_settle(document, proposed) {
+        Ok(()) => {
+            window.set_ready(true);
+            window.set_trouble(Default::default());
+        }
+        Err(why) => {
+            window.set_ready(false);
+            window.set_trouble(why.into());
+        }
+    }
+}
+
+/// Take the question away, whichever way it was answered.
+fn hide_names(views: &Rc<RefCell<Views>>) {
+    let window = views.borrow_mut().names.take();
+    if let Some(window) = window {
+        let _ = window.hide();
     }
 }
 
@@ -4154,6 +4400,51 @@ mod tests {
         assert_eq!(list_shares_after(lists(), Pane::Moc, 2.0, 800.0), lists());
     }
 
+    /// A set of names settles a duplicate only if all of them are different,
+    /// none is empty, and none belongs to a node that is not being renamed.
+    #[test]
+    fn the_names_offered_have_to_settle_the_duplicate() {
+        let mut document = Document::new();
+        for (name, node_type) in [("i2c", "i2c"), ("i2c", "i2c"), ("moc", "moc")] {
+            document.apply(&Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+        }
+
+        let asked = |pairs: &[(usize, &str)]| -> BTreeMap<usize, String> {
+            pairs
+                .iter()
+                .map(|(at, name)| (*at, (*name).to_string()))
+                .collect()
+        };
+
+        // As the file has them: still the same name, which is what the window
+        // opens on and what the button has to wait for.
+        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c")])).is_err());
+
+        // One of them changed is enough.
+        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c-1")])).is_ok());
+        // Both, to something else again.
+        assert!(names_settle(&document, &asked(&[(0, "fore"), (1, "aft")])).is_ok());
+
+        // A blank is not a name.
+        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "  ")])).is_err());
+
+        // And a third node's name is a duplicate again: a button that made
+        // the same question come back would be no answer at all.
+        let said = names_settle(&document, &asked(&[(0, "i2c"), (1, "moc")]))
+            .expect_err("renaming one of them to the ground station's name");
+        assert!(said.contains("moc"), "{said}");
+
+        // What is said is about what is wrong, because it is said instead of
+        // the button being pressable.
+        let said = names_settle(&document, &asked(&[(0, "same"), (1, "same")]))
+            .expect_err("two the same");
+        assert!(said.contains("same"), "{said}");
+    }
+
     /// Each heading of each selection panel is in alphabetical order.
     ///
     /// A palette is a thing people look in rather than read, and the order it
@@ -6551,6 +6842,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -6670,6 +6962,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -6797,6 +7090,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -6877,6 +7171,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -7013,6 +7308,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -7128,6 +7424,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -7238,6 +7535,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -7361,6 +7659,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -7646,6 +7945,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -7784,6 +8084,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -7874,6 +8175,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -8026,6 +8328,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -8099,6 +8402,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -8245,6 +8549,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -8514,6 +8819,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -8587,6 +8893,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),
@@ -8704,6 +9011,7 @@ mod tests {
             leaving: None,
             concerns: None,
             deleting: None,
+            names: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             faulted: Rc::new(RefCell::new(Default::default())),

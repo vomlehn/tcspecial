@@ -61,6 +61,24 @@ export struct ConcernRow {
     node: string,
 }
 
+// One node whose name another node also has.
+export struct NameRow {
+    // Where in the file it is, which is how it is told from the other one: a
+    // name two nodes share cannot say which of them is meant. See
+    // tcsgui::Document::rename_at.
+    at: int,
+    // What it is called now, and what it would be called instead: `now` is
+    // what the field holds, which somebody may have typed into.
+    was: string,
+    now: string,
+    // Its type, because two nodes of one name are often two different things
+    // and the type is what says which is which.
+    node-type: string,
+    // And where it is drawn, for the same reason: two i2c nodes called the
+    // same thing are told apart by where they sit on the canvas.
+    at-said: string,
+}
+
 export struct TerminalView {
     shown: bool,
     x: length,
@@ -2821,6 +2839,116 @@ export component ConcernsWindow inherits Window {
 /// menu is a press somebody may have meant for Edit. Undo would put it back --
 /// a removal is one edit -- but an undo that has to be *discovered* is no
 /// answer to a node that has gone and taken four lines with it.
+/// What to do about two nodes that share a name.
+///
+/// Shown when a configuration is opened that names a node twice, which is a
+/// file nothing can fly: the links naming that name do not say which node they
+/// meant, and `tcsverify` refuses it. So this is not an edit somebody is being
+/// offered -- it is the file being made readable, and the window says so.
+///
+/// Every node of the shared name is offered, not the second of each pair,
+/// because the file does not say which of them was meant. A name can be typed,
+/// or taken from the button beside it, which derives one the way the editor
+/// names a node it places: `i2c-1`, `i2c-2`.
+///
+/// "Leave them" closes it and changes nothing. The duplicate is then reported
+/// as a fault like any other, which is what it was before this window existed:
+/// a person who wants to fix it in a text editor should not be held here.
+export component NamesWindow inherits Window {
+    title: "Two nodes share a name";
+    background: #fbfbfa;
+    min-width: 440px;
+    min-height: 240px;
+    preferred-width: 560px;
+    preferred-height: 320px;
+
+    in property <[NameRow]> rows;
+    // Whether the names as they stand are all different and none is empty,
+    // which is what the renaming button waits for. Worked out in Rust, where
+    // it can be tested: see tcsgui::names_settle.
+    in property <bool> ready: false;
+    // And why not, where they do not: said once, under the list, rather than
+    // beside whichever row is at fault -- a row is a field and a button, and a
+    // sentence between every pair of rows would shift the list as somebody
+    // types.
+    in property <string> trouble: "";
+
+    callback typed(int, string);
+    callback derive(int);
+    callback confirmed();
+    callback left();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: "Two nodes share a name";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+        }
+        Text {
+            text: "This configuration names a node twice. The links to it do "
+                + "not say which one they meant, so it cannot be flown or "
+                + "checked until the names are different. Type a name, or "
+                + "take the one offered.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for row[i] in root.rows: HorizontalLayout {
+                    spacing: Space.step;
+                    Text {
+                        text: row.node-type + " at " + row.at-said;
+                        font-size: Type.small;
+                        color: #6b7280;
+                        vertical-alignment: center;
+                        width: 150px;
+                        overflow: elide;
+                    }
+                    LineEdit {
+                        text: row.now;
+                        font-size: Type.body;
+                        horizontal-stretch: 1;
+                        edited(said) => { root.typed(i, said); }
+                    }
+                    Button {
+                        text: "Suggest";
+                        clicked => { root.derive(i); }
+                    }
+                }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            font-size: Type.small;
+            color: #c0392b;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Rectangle { }
+            Button {
+                text: "Leave them";
+                clicked => { root.left(); }
+            }
+            Button {
+                text: "Rename";
+                primary: true;
+                enabled: root.ready;
+                clicked => { root.confirmed(); }
+            }
+        }
+    }
+}
+
 export component DeleteWindow inherits Window {
     title: "Delete a node";
     background: #fbfbfa;

@@ -2827,9 +2827,19 @@ fn dropped(
     // The end being carried keeps its own terminal: a `payload-in` taken
     // off one node goes on another node's `payload-in` and nowhere else.
     let Some(over) = landed(document, home, (x, y), &pressed.terminal) else {
-        // Over nothing at all: the link goes.
+        // Over nothing at all. From the end a line *leaves* by, that is how a
+        // line is deleted: pull the wire out of the thing that is sending and
+        // drop it on the floor. From the end it arrives at, it is ignored --
+        // a sink takes one source, so dragging its end away and letting go
+        // over nothing is a slip far more often than it is a decision, and
+        // the line is still written on the node it leaves whatever the
+        // arriving end was dragged over.
+        //
+        // So nothing becomes undeletable: a line into a sink that takes
+        // several -- the ground's -- is deleted from its source end, which has
+        // the one link on it.
         if node_under(document, home, (x, y)).is_none() {
-            return Some(Edit::RemoveLink { link: held.clone() });
+            return (!sink_pressed).then(|| Edit::RemoveLink { link: held.clone() });
         }
         // Over a node that cannot be this end, but could be the other one:
         // then the gesture was drawing a new line and not moving this one.
@@ -3537,7 +3547,6 @@ fn view_of(
         label_italic,
         tint: colour(&tint),
         faulty: fault.is_some(),
-        fault: fault.unwrap_or_default().into(),
         selected,
         summary: summary.unwrap_or_default().into(),
         // A diagram of its own can be opened; nothing else can.
@@ -5064,10 +5073,13 @@ mod tests {
             "a second line into the ground should be drawn, not refused"
         );
 
-        // Over nothing at all: the link goes.
+        // Over nothing at all, from the end the line arrives at: ignored. A
+        // sink takes one source, so letting go of its end over nothing is a
+        // slip more often than a decision.
         assert_eq!(
             dropped(&document, &None, &held, &pressed, (40.0, 900.0)),
-            Some(Edit::RemoveLink { link: held.clone() })
+            None,
+            "an arriving end dropped on the canvas should change nothing"
         );
 
         // And the source end moves the same way: taken hold of at the
@@ -6652,9 +6664,13 @@ mod tests {
             )
         };
 
-        // Taken hold of at the ground link's own sink, which is where this
-        // link arrives.
-        let from = middle("ground", "moc", (16, 120), "payload-in");
+        // Taken hold of at the payload's own source, which is where this line
+        // leaves: a line is deleted from the end that sends it. The end it
+        // arrives at is ignored when it is dropped on nothing -- a sink takes
+        // one source, so letting go of its end over empty canvas is a slip
+        // more often than a decision -- which `the_end_of_a_link_can_be_moved
+        // _or_dropped` is where that half is checked.
+        let from = middle("sensor", "i2c", (dividers().vehicle + 24, 120), "payload-out");
         ui.window()
             .dispatch_event(WindowEvent::PointerMoved { position: from });
         ui.window().dispatch_event(WindowEvent::PointerPressed {

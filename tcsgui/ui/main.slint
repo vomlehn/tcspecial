@@ -89,9 +89,16 @@ export struct NodeView {
     label-weight: int,
     label-italic: bool,
     tint: color,
-    // Something is wrong with this node. The one thing drawn in red.
+    // Something is wrong with this node, which is what paints it red: the
+    // outline, the label and the terminals, so colour is never the only thing
+    // carrying it -- a faulty node is also drawn in the one shape no real type
+    // uses.
+    //
+    // What is wrong is not here. It was drawn under the name, which is a
+    // sentence inside a box forty-eight pixels tall and a paragraph in the
+    // middle of a diagram; it is said in the node's own window, and put in
+    // front of somebody once in the alert. See tcsgui::Views::alert_faults.
     faulty: bool,
-    fault: string,
     selected: bool,
     // What a closed subdiagram holds: how many nodes, and how many lines
     // cross its edge. Empty for every other type.
@@ -525,16 +532,6 @@ component NodeShape inherits Rectangle {
                 color: #555555;
                 horizontal-alignment: center;
                 overflow: elide;
-            }
-            // What is wrong, where something is. In red, beside the shape that is
-            // also in red, so the colour is never the only thing carrying it.
-            if node.faulty: Text {
-                text: node.fault;
-                color: error-ink;
-                font-size: Type.small;
-                font-italic: true;
-                horizontal-alignment: center;
-                wrap: word-wrap;
             }
         }
 

@@ -1329,6 +1329,21 @@ impl Document {
         // The top diagram, and the includes that say what else to read.
         written.push((path.to_path_buf(), self.text_for(&None, path)?));
 
+        // And the same configuration in the other spelling, where one is
+        // already there beside it. A configuration that exists as both
+        // `vehicle.yaml` and `vehicle.xml` is one configuration written twice,
+        // and two files that are meant to say the same thing drift the moment
+        // only one of them is written: the shipped example is a pair, and
+        // keeping it a pair by hand meant a command to remember after every
+        // session.
+        //
+        // Only where the sibling exists. Writing one that does not would be
+        // the editor deciding somebody wants their configuration in two
+        // languages, which is not a thing to decide for them.
+        if let Some(beside) = self.other_spelling(path) {
+            written.push((beside.clone(), self.text_for(&None, &beside)?));
+        }
+
         for name in self.subdiagrams() {
             let home = Some(name.clone());
             written.push((file_for(&name, path), self.text_for(&home, path)?));
@@ -1793,6 +1808,24 @@ impl Document {
         }
 
         out
+    }
+
+    /// The same configuration's other spelling, where there is one.
+    ///
+    /// `vehicle.yaml` beside `vehicle.xml`, in either direction, and `None`
+    /// where the sibling is not there -- which is every ordinary
+    /// configuration. See [`Document::files`], which writes it.
+    fn other_spelling(&self, path: &std::path::Path) -> Option<std::path::PathBuf> {
+        let said = path.extension().and_then(|e| e.to_str())?.to_lowercase();
+        let others: &[&str] = match said.as_str() {
+            "yaml" | "yml" => &["xml"],
+            "xml" => &["yaml", "yml"],
+            _ => &[],
+        };
+        others
+            .iter()
+            .map(|extension| path.with_extension(extension))
+            .find(|beside| beside.is_file())
     }
 
     /// What leaves a node, by the data source it leaves by.
@@ -3449,6 +3482,48 @@ mod tests {
         let xml = document.to_xml();
         assert!(xml.contains("&amp;"), "an ampersand went in raw: {xml}");
         assert!(xml.contains("&lt;always&gt;"), "{xml}");
+    }
+
+    /// A configuration that exists in two spellings is written in both.
+    ///
+    /// The shipped example is a pair, and two files meant to say the same
+    /// thing drift the moment only one of them is written: keeping them a pair
+    /// by hand meant a command to remember after every session. Only where the
+    /// sibling is already there, because writing one that is not would be the
+    /// editor deciding somebody wants their configuration in two languages.
+    #[test]
+    fn a_configuration_in_two_spellings_is_written_in_both() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let yaml = where_.path().join("vehicle.yaml");
+        let xml = where_.path().join("vehicle.xml");
+
+        let mut document = Document::new();
+        document.apply(&add("sensor", "i2c"));
+
+        // Only the file it was given, there being no sibling yet.
+        let files = document.files(&yaml).expect("the files");
+        assert_eq!(files.len(), 1, "{files:?}");
+        assert_eq!(files[0].0, yaml);
+
+        // With one beside it, both -- each in its own language.
+        std::fs::write(&xml, "<configuration/>\n").expect("a sibling");
+        let files = document.files(&yaml).expect("the files");
+        assert_eq!(files.len(), 2, "{files:?}");
+        let written: Vec<&std::path::PathBuf> = files.iter().map(|(path, _)| path).collect();
+        assert!(written.contains(&&yaml) && written.contains(&&xml), "{written:?}");
+        for (path, text) in &files {
+            if path == &xml {
+                assert!(text.starts_with("<?xml"), "{text}");
+            } else {
+                assert!(text.starts_with("version:"), "{text}");
+            }
+            assert!(text.contains("sensor"), "{text}");
+        }
+
+        // And the other way about, which is the same rule read backwards.
+        std::fs::write(&yaml, "version: \"2.0\"\n").expect("a sibling");
+        let files = document.files(&xml).expect("the files");
+        assert_eq!(files.len(), 2, "{files:?}");
     }
 
     /// A line is written at both of the nodes it joins.

@@ -465,6 +465,45 @@ impl Document {
         moved
     }
 
+    /// The edit that takes this node away, with everything that goes with it.
+    ///
+    /// A removal carries the node's own words and every line that touches it,
+    /// at either end, because that is what undo has to put back: the links go
+    /// when the node does -- a line to a node that is not there would dangle
+    /// -- and an undo that restored the node without them would be an undo
+    /// that did half of what was undone.
+    ///
+    /// `None` for a node that is not here, which is a window asking about one
+    /// somebody has already deleted.
+    pub fn removal_of(&self, name: &str) -> Option<Edit> {
+        let node = self.node(name)?;
+        Some(Edit::RemoveNode {
+            name: node.name.clone(),
+            node_type: node.node_type.clone(),
+            attributes: node
+                .attributes
+                .iter()
+                .map(|(attribute, value)| (attribute.clone(), value.clone()))
+                .collect(),
+            links: self
+                .links
+                .iter()
+                .filter(|link| link.from == name || link.to == name)
+                .cloned()
+                .collect(),
+            home: node.home.clone(),
+        })
+    }
+
+    /// How many lines touch this node, which is what a question about
+    /// deleting it has to say.
+    pub fn lines_touching(&self, name: &str) -> usize {
+        self.links
+            .iter()
+            .filter(|link| link.from == name || link.to == name)
+            .count()
+    }
+
     /// Where every node would go if the diagram were laid out afresh.
     ///
     /// What **Edit -> Arrange the nodes** is: each node at the top of its own

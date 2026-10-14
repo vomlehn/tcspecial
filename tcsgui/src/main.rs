@@ -186,6 +186,13 @@ struct Views {
     /// Held so that pressing Exit twice does not stack two of them, and so
     /// that answering it can take it away again.
     leaving: Option<LeaveWindow>,
+    /// The question a node's Delete asks, while it is being asked.
+    ///
+    /// Held so that pressing Delete twice does not stack two of them, and so
+    /// that answering one takes it away. One at a time: it names the node it
+    /// is about, and a second question about another node would leave a person
+    /// answering whichever window happened to be on top.
+    deleting: Option<DeleteWindow>,
     /// The window that says what went wrong, and what it last said.
     ///
     /// One window, re-pointed: two of them side by side would be two copies of
@@ -461,6 +468,7 @@ fn main() -> Result<(), slint::PlatformError> {
         parameters: None,
         attributes: BTreeMap::new(),
         leaving: None,
+        deleting: None,
         alert: None,
         alerted: Rc::new(RefCell::new(String::new())),
         sim_groups: None,
@@ -966,10 +974,33 @@ macro_rules! wiring {
                 });
             }
             {
+                let editor_for_menu = editor.clone();
+                let views_for_menu = views.clone();
+                let home_for_menu = home.clone();
+                // Edit, from the menu a click on a node opens: the window
+                // that shows what the node says, which is what a click used
+                // to open on its own.
+                window.on_node_edit(move |name| {
+                    let absolute = Qualified::of(&name, &home_for_menu).absolute();
+                    show_node(&editor_for_menu, &views_for_menu, &absolute);
+                });
+            }
+            {
+                let editor_for_delete = editor.clone();
+                let views_for_delete = views.clone();
+                let home_for_delete = home.clone();
+                // And Delete, which asks before it does anything: see
+                // `confirm_delete`.
+                window.on_node_delete(move |name| {
+                    let absolute = Qualified::of(&name, &home_for_delete).absolute();
+                    confirm_delete(&editor_for_delete, &views_for_delete, &absolute);
+                });
+            }
+            {
                 // Choosing a node: the outline follows, and nothing is
                 // recorded. What the node says about itself is a window of
-                // its own, opened by a click -- see on_node_moved -- so a
-                // press has only the outline to change.
+                // its own, reached through the node's menu, so a press has
+                // only the outline to change.
                 let views = views.clone();
                 let chosen = chosen.clone();
                 let home = home.clone();
@@ -1285,6 +1316,83 @@ fn drag_divider(
         vehicle_percent,
     });
     views.borrow().refresh(&editor.borrow());
+}
+
+/// Ask whether a node should go, and take it away if the answer is yes.
+///
+/// A node's Delete asks first. It is next to Edit in a menu a click opens, so
+/// a press meant for Edit is a press away from it -- and a node is not one
+/// word: it is its attributes and every line that touches it, which go with
+/// it. Undo would put all of that back, a removal being one edit, but an undo
+/// somebody has to discover is no answer to a node that has already gone.
+///
+/// One window at a time, re-pointed at whichever node was asked about: it
+/// names the node, and two of them would leave somebody answering whichever
+/// was on top. Deleting is what the window's Delete does and nothing else
+/// here does it, so a window that cannot be made is a node that cannot be
+/// deleted -- said on the error output, rather than deleting it unasked.
+fn confirm_delete(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node: &str) {
+    // Nothing to ask about: a node somebody deleted while the menu was open.
+    if editor.borrow().document().node(node).is_none() {
+        return;
+    }
+
+    if views.borrow().deleting.is_none() {
+        let window = match DeleteWindow::new() {
+            Ok(window) => window,
+            Err(e) => {
+                eprintln!("tcsgui: {node} cannot be asked about: {e}");
+                return;
+            }
+        };
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_confirmed(move || {
+                let asked = views
+                    .borrow()
+                    .deleting
+                    .as_ref()
+                    .map(|window| window.get_node().to_string())
+                    .unwrap_or_default();
+                let removal = editor.borrow().document().removal_of(&asked);
+                if let Some(removal) = removal {
+                    editor.borrow_mut().edit(removal);
+                }
+                hide_deleting(&views);
+                views.borrow().refresh(&editor.borrow());
+            });
+        }
+        {
+            let views = views.clone();
+            window.on_cancelled(move || hide_deleting(&views));
+        }
+        views.borrow_mut().deleting = Some(window);
+    }
+
+    let lines = editor.borrow().document().lines_touching(node);
+    let carries = match lines {
+        0 => String::new(),
+        1 => "One line is attached to it and goes with it.".to_string(),
+        many => format!("{many} lines are attached to it and go with it."),
+    };
+
+    let window = views.borrow().deleting.as_ref().map(|window| window.as_weak());
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        window.set_node(node.into());
+        window.set_carries(carries.into());
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: {node} cannot be asked about: {e}");
+        }
+    }
+}
+
+/// Take the question away, whichever way it was answered.
+fn hide_deleting(views: &Rc<RefCell<Views>>) {
+    let window = views.borrow_mut().deleting.take();
+    if let Some(window) = window {
+        let _ = window.hide();
+    }
 }
 
 /// The window that says what went wrong, made ready before anything does.
@@ -5353,6 +5461,110 @@ mod tests {
         an_error_is_put_where_it_cannot_be_missed();
         the_menu_arranges_the_nodes_and_shows_them();
         the_line_being_drawn_follows_the_pointer();
+        deleting_a_node_asks_first();
+    }
+
+    /// Delete asks, and only takes the node away if it is answered.
+    ///
+    /// The menu's second item, and the one a press meant for Edit is next to.
+    /// A node is not one word -- it is its attributes and every line that
+    /// touches it -- so the question names it and says what goes with it, and
+    /// Cancel leaves the document exactly as it was, history included.
+    fn deleting_a_node_asks_first() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            dividers(),
+        )));
+        for (name, node_type) in [("ground", "moc"), ("sensor", "i2c")] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+        }
+        editor.borrow_mut().edit(Edit::AddLink {
+            link: journal::Link::joining("sensor", Some("to_moc"), "ground", None),
+        });
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            deleting: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+
+        assert!(views.borrow().deleting.is_none(), "nothing asked yet");
+        let depth = editor.borrow().undo_depth();
+
+        // Asked about, and the question says which node and what goes with
+        // it: one line is attached to this one.
+        ui.invoke_node_delete("sensor".into());
+        let question = views
+            .borrow()
+            .deleting
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("the question should be asked")
+            .upgrade()
+            .expect("and left open");
+        assert_eq!(question.get_node(), "sensor");
+        assert!(question.get_carries().contains("One line"), "{}", question.get_carries());
+
+        // Cancelled: the node is still there, the line with it, and nothing
+        // is in the history.
+        question.invoke_cancelled();
+        assert!(views.borrow().deleting.is_none(), "the question should have gone");
+        assert!(editor.borrow().document().node("sensor").is_some());
+        assert_eq!(editor.borrow().document().links.len(), 1);
+        assert_eq!(editor.borrow().undo_depth(), depth, "cancelling is not an edit");
+
+        // Asked again and confirmed: the node goes, and the line that touched
+        // it goes with it -- a line to a node that is not there would dangle.
+        ui.invoke_node_delete("sensor".into());
+        let question = views
+            .borrow()
+            .deleting
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("asked again")
+            .upgrade()
+            .unwrap();
+        question.invoke_confirmed();
+        assert!(views.borrow().deleting.is_none());
+        assert!(editor.borrow().document().node("sensor").is_none(), "the node stayed");
+        assert!(editor.borrow().document().links.is_empty(), "a link was left dangling");
+
+        // One edit, so one undo puts the node and its line back.
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+        editor.borrow_mut().undo();
+        assert!(editor.borrow().document().node("sensor").is_some());
+        assert_eq!(editor.borrow().document().links.len(), 1);
+
+        // And a node that is not there is not asked about: a menu left open
+        // over a node somebody has already deleted.
+        ui.invoke_node_delete("nothing-here".into());
+        assert!(views.borrow().deleting.is_none());
     }
 
     /// While a line is being drawn it follows the pointer, and it goes when
@@ -5402,6 +5614,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -5522,6 +5735,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -5595,6 +5809,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -5735,6 +5950,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -5834,6 +6050,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -5946,6 +6163,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -6203,6 +6421,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -6334,6 +6553,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -6417,6 +6637,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -6529,6 +6750,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -6595,6 +6817,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -6675,10 +6898,16 @@ mod tests {
     /// window and they stay until they are closed. Closing takes a press of
     /// its own, or the windows would be the panel again.
     ///
-    /// Opened by a click and not by a press, because a press is how a drag
+    /// Reached by a click and not by a press, because a press is how a drag
     /// starts: a gesture that moved the node is a move, and one that moved
-    /// nothing is a request to see what the node says. Told apart by the
-    /// distance, not by the time.
+    /// nothing asks what there is to do with it. Told apart by the distance,
+    /// not by the time.
+    ///
+    /// The click opens the node's menu, whose Edit opens this window. The menu
+    /// itself is the toolkit's and is not on this canvas to be found by a
+    /// test, so what is checked here is the two halves either side of it: that
+    /// a click records no edit, and that Edit opens the window for the node
+    /// that was asked about.
     fn a_click_opens_a_window_per_node() {
         use i_slint_backend_testing as testing;
         use slint::platform::{PointerEventButton, WindowEvent};
@@ -6728,6 +6957,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -6770,8 +7000,14 @@ mod tests {
 
         click((dividers().moc + 120, 88), "compute");
         assert!(
+            views.borrow().attributes.is_empty(),
+            "a click opens the menu and nothing else: {:?}",
+            views.borrow().attributes.keys().collect::<Vec<_>>()
+        );
+        ui.invoke_node_edit("to_kelvin".into());
+        assert!(
             views.borrow().attributes.contains_key("to_kelvin"),
-            "a click should open what the node says: {:?}",
+            "Edit should open what the node says: {:?}",
             views.borrow().attributes.keys().collect::<Vec<_>>()
         );
         // And it moved nothing, so nothing is in the history.
@@ -6795,6 +7031,7 @@ mod tests {
         // A second node opens a second window, and the first stays: which is
         // the whole point of this not being a panel.
         click((dividers().moc + 120, 240), "compute");
+        ui.invoke_node_edit("mean_temp".into());
         assert_eq!(
             views.borrow().attributes.len(),
             2,
@@ -6806,6 +7043,7 @@ mod tests {
         // Clicking the same node again raises its window rather than making a
         // second one saying the same thing.
         click((dividers().moc + 120, 88), "compute");
+        ui.invoke_node_edit("to_kelvin".into());
         assert_eq!(views.borrow().attributes.len(), 2);
 
         // A node whose position is not on the grid opens on the first click
@@ -6833,9 +7071,10 @@ mod tests {
         let before = editor.borrow().undo_depth();
 
         click((dividers().vehicle + 27, 203), "i2c");
+        ui.invoke_node_edit("askew".into());
         assert!(
             views.borrow().attributes.contains_key("askew"),
-            "a node off the grid should open on the first click: {:?}",
+            "a node off the grid should answer the first click: {:?}",
             views.borrow().attributes.keys().collect::<Vec<_>>()
         );
         assert_eq!(
@@ -6852,6 +7091,7 @@ mod tests {
         // And a payload opens its own, which is the one a person reaches for
         // first: a sensor is where an address and a bus are typed.
         click((dividers().vehicle + 24, 88), "i2c");
+        ui.invoke_node_edit("sensor".into());
         assert!(
             views.borrow().attributes.contains_key("sensor"),
             "clicking a payload should open what it says: {:?}",
@@ -6980,6 +7220,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -7046,6 +7287,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
@@ -7156,6 +7398,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,

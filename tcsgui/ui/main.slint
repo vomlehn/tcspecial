@@ -335,6 +335,10 @@ component NodeShape inherits Rectangle {
     callback link-dragging(length, length);
     // This node was pressed, so it is the one the panel should show.
     callback chosen();
+    // What the menu a click opens asks for: the node's attributes, or the
+    // node's removal. See the menu itself, below the grip.
+    callback edit-requested();
+    callback delete-requested();
 
     // The error colour, and the only place in this file it appears.
     //
@@ -572,6 +576,31 @@ component NodeShape inherits Rectangle {
         }
     }
 
+    // What a click on a node offers. Shown by the grip below, at the point
+    // that was pressed, rather than by a right-click: a left click is what
+    // somebody does to a thing they want something from, and this window has
+    // nowhere else to put a node's own commands -- a node is not in the menu
+    // bar, which is for the configuration as a whole.
+    //
+    // First among the node's children, so the grip and the terminals are
+    // above it and a press reaches them: this one is here to be shown by
+    // name, not to answer the pointer itself.
+    menu := ContextMenuArea {
+        enabled: draggable;
+        Menu {
+            // Edit first, because it is what nearly every click wants, and it
+            // is what a click used to do on its own.
+            MenuItem {
+                title: "Edit";
+                activated => { root.edit-requested(); }
+            }
+            MenuItem {
+                title: "Delete";
+                activated => { root.delete-requested(); }
+            }
+        }
+    }
+
     grip := TouchArea {
         width: 100%;
         height: 100%;
@@ -586,7 +615,20 @@ component NodeShape inherits Rectangle {
                 chosen();
             }
             if (event.kind == PointerEventKind.up) {
-                dragged(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+                // A press that moved nothing is a click, and a click asks what
+                // there is to do with this node. One that moved is a drag, and
+                // the editor is told where the node went.
+                //
+                // Told apart here rather than in Rust because the menu has to
+                // be shown by the element that owns it, at the point that was
+                // pressed. Rust is told only about the drag, and still asks
+                // the same question of it -- a gesture that works out to no
+                // movement records no edit.
+                if (self.mouse-x == self.pressed-x && self.mouse-y == self.pressed-y) {
+                    menu.show({ x: self.mouse-x, y: self.mouse-y });
+                } else {
+                    dragged(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+                }
             }
         }
     }
@@ -983,6 +1025,9 @@ component Surface inherits Rectangle {
     // Where the pointer is while a line is being drawn. See drawing-route.
     callback link-moved(length, length);
     callback node-selected(string);
+    // What a node's own menu asks for: see NodeShape's menu.
+    callback node-edit(string);
+    callback node-delete(string);
 
     // Which node is drawn as chosen. What it says about itself is in a window
     // of its own -- see NodeWindow -- so this is all the canvas needs.
@@ -1264,6 +1309,8 @@ component Surface inherits Rectangle {
                     link-dropped(x, y) => { link-finished(x, y); }
                     link-dragging(x, y) => { link-moved(x, y); }
                     chosen => { node-selected(n.name); }
+                    edit-requested => { node-edit(n.name); }
+                    delete-requested => { node-delete(n.name); }
                 }
                 }
 
@@ -1372,6 +1419,9 @@ export component MainWindow inherits Window {
     // Where the pointer is while a line is being drawn. See drawing-route.
     callback link-moved(length, length);
     callback node-selected(string);
+    // What a node's own menu asks for: see NodeShape's menu.
+    callback node-edit(string);
+    callback node-delete(string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
     // Write this configuration as Rust, where the tcspecial section's
@@ -1500,6 +1550,8 @@ export component MainWindow inherits Window {
         link-moved(x, y) => { root.link-moved(x, y); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
+        node-edit(n) => { root.node-edit(n); }
+        node-delete(n) => { root.node-delete(n); }
     }
 }
 
@@ -1575,6 +1627,9 @@ export component SubWindow inherits Window {
     // Where the pointer is while a line is being drawn. See drawing-route.
     callback link-moved(length, length);
     callback node-selected(string);
+    // What a node's own menu asks for: see NodeShape's menu.
+    callback node-edit(string);
+    callback node-delete(string);
     callback edit-parameters();
     // Write this configuration as Rust, where the tcspecial section's
     // `rust-code` says: see tcsgui::codegen.
@@ -1699,6 +1754,8 @@ export component SubWindow inherits Window {
         link-moved(x, y) => { root.link-moved(x, y); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
+        node-edit(n) => { root.node-edit(n); }
+        node-delete(n) => { root.node-delete(n); }
     }
 }
 
@@ -2357,6 +2414,67 @@ export component AlertWindow inherits Window {
             Button {
                 text: "OK";
                 clicked => { root.acknowledged(); }
+            }
+        }
+    }
+}
+
+/// The question a node's Delete asks before anything goes.
+///
+/// Asked rather than done, because a node is not one word: it is its
+/// attributes and every line that touches it, and a press next to Edit in a
+/// menu is a press somebody may have meant for Edit. Undo would put it back --
+/// a removal is one edit -- but an undo that has to be *discovered* is no
+/// answer to a node that has gone and taken four lines with it.
+export component DeleteWindow inherits Window {
+    title: "Delete a node";
+    background: #fbfbfa;
+    min-width: 320px;
+    min-height: 150px;
+    preferred-width: 400px;
+
+    // The node this is about, and what goes with it: how many lines touch it,
+    // said in words by the editor.
+    in property <string> node: "";
+    in property <string> carries: "";
+
+    callback confirmed();
+    callback cancelled();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: "Delete \"" + root.node + "\"?";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        if root.carries != "": Text {
+            text: root.carries;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        Text {
+            text: "Undo takes it back, with its attributes and its lines.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Button {
+                text: "Cancel";
+                clicked => { root.cancelled(); }
+            }
+            Rectangle { }
+            Button {
+                text: "Delete";
+                clicked => { root.confirmed(); }
             }
         }
     }

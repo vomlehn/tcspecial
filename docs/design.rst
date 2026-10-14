@@ -1454,6 +1454,27 @@ row being reserved at the top and the bottom: the name stays in the middle of
 the node and stops short of the corner boxes, where reserving rows would leave
 a few pixels for a name on the shortest node.
 
+A click on a node opens a menu of what there is to do with it: **Edit**, which
+opens the window of what the node says, and **Delete**, which asks before
+anything goes. A node is not in the menu bar -- that is for the configuration
+as a whole -- and it has nowhere else to put its own commands, so the node
+itself is where they are asked for. Edit is first because it is what nearly
+every click wants, and because it is what a click used to do on its own.
+
+A click rather than a right-click, and a click rather than a press: a press is
+how a drag starts, so a gesture that moved the node is a move and one that
+moved nothing is this. Choosing a node is still the press -- a node somebody
+has started to move is the node they are interested in -- so the node the menu
+is about is the node drawn as chosen while it is open.
+
+Delete asks, with the node's name and what goes with it: "two lines are
+attached to it and go with it". Undo would put all of that back, a removal
+being one edit, but an undo somebody has to discover is no answer to a node
+that has already gone and taken four lines with it -- and the press that
+deleted it is one key away from the press that opens its attributes. Cancel
+leaves the document exactly as it was, the history included: a question
+answered no is not an edit.
+
 A link is drawn by dragging from a terminal onto the node it is to reach. The
 terminal is where a line is taken *from*, and it is the only handle there is:
 there were two round handles on every node -- one on each side, meaning "a link

@@ -2203,6 +2203,70 @@ export component NodeWindow inherits Window {
 // and a program that insisted on writing first would be a program they cannot
 // get out of. "Stay" is there because the menu is next to everything else and
 // gets pressed by accident.
+// What went wrong, said where it cannot be missed.
+//
+// A window and not only the red line in the bar, because the red line is the
+// *state* -- "saved", or what is wrong with the last save -- and somebody
+// typing into a node's own window is not looking at the bar of another. An
+// error that nobody sees is an error that gets worse: a full device stays full,
+// and every edit after it is one more edit the files do not have.
+//
+// One window, re-pointed, rather than one per error. Two of them side by side
+// would be two copies of the same sentence, and the sentence is always about
+// the same session.
+export component AlertWindow inherits Window {
+    title: "tcsgui";
+    background: #fbfbfa;
+    min-width: 360px;
+    min-height: 140px;
+    preferred-width: 460px;
+
+    // What went wrong, in the words the thing that failed used: a path, a
+    // reason from the operating system, the attribute a rule refused.
+    in property <string> trouble: "";
+
+    callback acknowledged();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: "Something did not work.";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        Text {
+            // The one thing worth saying beside the reason, because it is the
+            // thing a person wants to know first and the answer is usually
+            // yes: the editor is still holding the session, so whatever the
+            // message says, nothing has been thrown away.
+            text: "The session is still open. Put the cause right and press "
+                + "Save, or carry on editing -- nothing has been lost.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            Rectangle { }
+            Button {
+                text: "OK";
+                clicked => { root.acknowledged(); }
+            }
+        }
+    }
+}
+
 export component LeaveWindow inherits Window {
     title: "Leave tcsgui";
     background: #fbfbfa;

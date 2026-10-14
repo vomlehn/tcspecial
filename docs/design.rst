@@ -1417,14 +1417,18 @@ A node is drawn with its terminals on it: a rectangle of 36 by 14 pixels in
 each corner it has one in. Two rows, which are the two streams -- along the top, left to
 right, what the ground sends, arriving at ``from_moc`` and leaving at
 ``to_payload``; along the bottom, right to left, what comes back, arriving at
-``from_payload`` and leaving at ``to_moc``. Three of the four carry an arrow,
-pointing the way the data travels across the canvas, because the canvas is
-laid out the same way: the ground is the leftmost working pane and the payloads
-the rightmost. A reader who has worked that out once need not read the names
-again.
+``from_payload`` and leaving at ``to_moc``.
 
-They were 24 by 10 -- wide enough for an arrow and no wider -- and that is a
-strip to aim at. A press has to land on a terminal exactly, the terminal being
+Three of the four have a word in them: ``out`` where the data goes right,
+``in`` where it goes left. Words rather than arrows, which is what they were.
+An arrow says which way the data travels across the canvas, and a reader has
+to hold the canvas's own layout in mind -- ground leftmost, payloads rightmost
+-- before it says anything; the word says what the terminal is for the node it
+is drawn on, which is the question somebody about to draw a line is actually
+asking.
+
+They were 24 by 10 -- wide enough for the arrow they used to hold and no wider
+-- and that is a strip to aim at. A press has to land on a terminal exactly, the terminal being
 what says which stream the line carries, where the release only has to land on
 a node; so the box is now twice the area and bigger in both directions, the
 hand being short in whichever one it is short. What bounds them is the ``null``
@@ -1434,8 +1438,8 @@ inside a node's 152. A name never collides with them however they grow, being
 padded away from whichever side carries terminals.
 
 The upper left is the exception and is drawn empty. It is ``from_moc``, where
-what the ground sends arrives, and an arrow there points into the node -- which
-is the mark a reader takes for "a line starts here", and the reading that had
+what the ground sends arrives, and the arrow it used to carry pointed into the
+node -- the mark a reader takes for "a line starts here", and the reading that had
 somebody dragging from the upper-left corner of a ``moc`` node, where there is
 no terminal at all. The box is still a box and still answers a press; what has
 gone is the arrow inside it.
@@ -2136,9 +2140,11 @@ Undo and redo are a drawn arrow apiece beside the name of the edit they would
 take back or put again. The arrow is what the button does and the name is what
 it will do it to, which is the half worth keeping: "Undo" on a button is a word
 anybody could have guessed, where ``move "payload"`` is something only this
-session knows. The icons are drawn here as SVG rather than taken from an icon
-set, for the reason every other mark in the window is drawn from primitives:
-there is nothing to fail to load.
+session knows. Save is a floppy disk and no word at all -- the mark every
+program uses for it, where the other two need their names because what they
+would undo is a thing only this session knows. The icons are drawn here as SVG
+rather than taken from an icon set, for the reason every other mark in the
+window is drawn from primitives: there is nothing to fail to load.
 
 ``TCSGUI_FILE`` is the same variable the editor takes, so checking what was
 just edited is the same name in both commands: ``make runguiy`` and ``make

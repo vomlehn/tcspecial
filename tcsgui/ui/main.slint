@@ -58,10 +58,11 @@ export struct TerminalView {
     y: length,
     // Whether the arrow points right, which is to say towards the payloads.
     rightward: bool,
-    // Whether an arrow is drawn in the box at all: every corner but the upper
-    // left, where an arrow pointing into the node reads as "the line starts
-    // here". See style::Corner::arrow.
-    arrow: bool,
+    // What is written in the box: "in", "out", or nothing. Words rather than
+    // arrows -- an arrow has to be read against the canvas before it says
+    // anything -- and nothing at all in the upper left. See
+    // style::Corner::says.
+    says: string,
 }
 
 export struct NodeView {
@@ -242,8 +243,9 @@ component Terminal inherits Rectangle {
     // from the sink that wants feeding. Which was pressed is what says which
     // end of the link the other one is.
     in property <bool> sink;
-    // Whether an arrow is drawn inside the box. See style::Corner::arrow.
-    in property <bool> arrow: true;
+    // What is written inside the box: "in", "out", or nothing at all. See
+    // style::Corner::says.
+    in property <string> says;
 
     // A link is being drawn from this terminal, and then let go of -- at this
     // point, measured from the terminal's own corner.
@@ -290,17 +292,16 @@ component Terminal inherits Rectangle {
         }
     }
 
-    if root.arrow: Path {
+    // The word, centred in the box. In the same ink as the box's own outline,
+    // so a terminal reads as one thing.
+    if root.says != "": Text {
         width: 100%;
         height: 100%;
-        viewbox-x: 0;
-        viewbox-y: 0;
-        viewbox-width: 24;
-        viewbox-height: 10;
-        fill: ink;
-        commands: rightward
-            ? "M 4 3.5 L 13 3.5 L 13 1 L 20 5 L 13 9 L 13 6.5 L 4 6.5 Z"
-            : "M 20 3.5 L 11 3.5 L 11 1 L 4 5 L 11 9 L 11 6.5 L 20 6.5 Z";
+        text: root.says;
+        color: ink;
+        font-size: Type.small;
+        horizontal-alignment: center;
+        vertical-alignment: center;
     }
 }
 
@@ -649,7 +650,7 @@ component NodeShape inherits Rectangle {
         x: node.from-moc.x + drag-x;
         y: node.from-moc.y + drag-y;
         rightward: node.from-moc.rightward;
-        arrow: node.from-moc.arrow;
+        says: node.from-moc.says;
         dragged(x, y) => {
             link-dragging(node.x + node.from-moc.x + x, node.y + node.from-moc.y + y);
         }
@@ -664,7 +665,7 @@ component NodeShape inherits Rectangle {
         x: node.to-payload.x + drag-x;
         y: node.to-payload.y + drag-y;
         rightward: node.to-payload.rightward;
-        arrow: node.to-payload.arrow;
+        says: node.to-payload.says;
         dragged(x, y) => {
             link-dragging(node.x + node.to-payload.x + x, node.y + node.to-payload.y + y);
         }
@@ -683,7 +684,7 @@ component NodeShape inherits Rectangle {
         x: node.from-payload.x + drag-x;
         y: node.from-payload.y + drag-y;
         rightward: node.from-payload.rightward;
-        arrow: node.from-payload.arrow;
+        says: node.from-payload.says;
         dragged(x, y) => {
             link-dragging(node.x + node.from-payload.x + x, node.y + node.from-payload.y + y);
         }
@@ -701,7 +702,7 @@ component NodeShape inherits Rectangle {
         x: node.to-moc.x + drag-x;
         y: node.to-moc.y + drag-y;
         rightward: node.to-moc.rightward;
-        arrow: node.to-moc.arrow;
+        says: node.to-moc.says;
         dragged(x, y) => {
             link-dragging(node.x + node.to-moc.x + x, node.y + node.to-moc.y + y);
         }
@@ -1077,8 +1078,15 @@ component Surface inherits Rectangle {
             // failure between two of them. It is also an answer to somebody
             // who has been taught by every other program to save their work:
             // "it is already saved" is true and unconvincing.
+            //
+            // A floppy disk and no word, where undo and redo keep their words:
+            // theirs say what they would be undoing, which is a thing only
+            // this session knows, and this one would say "Save" beside a mark
+            // every program uses for it.
             Button {
-                text: "Save";
+                icon: @image-url("save.svg");
+                colorize-icon: true;
+                accessible-label: "Save";
                 clicked => { root.save-clicked(); }
             }
 

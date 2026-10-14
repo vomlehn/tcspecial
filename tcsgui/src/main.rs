@@ -3218,7 +3218,7 @@ fn terminal_view(
         x: x as f32,
         y: y as f32,
         rightward: corner.is_some_and(|corner| corner.rightward),
-        arrow: corner.is_some_and(|corner| corner.arrow),
+        says: corner.map(|corner| corner.says).unwrap_or_default().into(),
     }
 }
 

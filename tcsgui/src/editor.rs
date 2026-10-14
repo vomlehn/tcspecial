@@ -138,11 +138,10 @@ impl Editor {
         // A journal that cannot be read costs the undo and not the work, so it
         // is passed over in silence rather than reported: there is nothing the
         // person at the keyboard can do about it, and the thing they came to
-        // edit is open and correct.
-        if let Ok(text) = std::fs::read_to_string(journal_beside(path)) {
-            if let Ok(journal) = serde_yaml::from_str::<Journal>(&text) {
-                editor.journal = journal;
-            }
+        // edit is open and correct. See `crate::history`, which is where it
+        // lives and how long for.
+        if let Some(journal) = crate::history::read(path) {
+            editor.journal = journal;
         }
         editor
     }
@@ -242,8 +241,11 @@ impl Editor {
 
     /// Where the history is kept, for saying so when the configuration itself
     /// cannot be written.
-    pub fn journal_path(&self) -> PathBuf {
-        journal_beside(&self.path)
+    ///
+    /// In the user's state directory and not beside the configuration: see
+    /// `crate::history`. `None` where there is nowhere to keep one at all.
+    pub fn journal_path(&self) -> Option<PathBuf> {
+        crate::history::journal_for(&self.path)
     }
 
     /// Write every file of the configuration now.
@@ -351,43 +353,30 @@ impl Editor {
         // below, there is nothing left in the document that no file has.
         self.unsaved = false;
 
-        match serde_yaml::to_string(&self.journal) {
-            Ok(text) => {
-                if let Err(why) = write_atomically(&journal_beside(&self.path), text.as_bytes()) {
-                    // The configuration is safely written; what is lost is the
-                    // ability to undo past a crash. Worth saying and not worth
-                    // treating as a failed save.
-                    self.trouble = Some(format!(
-                        "the configuration is saved, but its history is not: {}",
-                        describe(&why)
-                    ));
-                }
-            }
-            Err(why) => {
-                self.trouble = Some(format!(
-                    "the configuration is saved, but its history could not be \
-                     written down: {why}"
-                ));
-            }
+        if let Err(why) = crate::history::write(&self.path, &self.journal) {
+            // The configuration is safely written; what is lost is the ability
+            // to undo past a crash. Worth saying and not worth treating as a
+            // failed save.
+            self.trouble = Some(format!(
+                "the configuration is saved, but its history is not: {why}"
+            ));
         }
+    }
+
+    /// Throw the history away, for an exit that was asked for.
+    ///
+    /// A session that ended tidily has no further use for its undo, and a
+    /// directory that only ever grows is a directory somebody has to tidy.
+    /// What is kept is the history of a session that ended *badly*, which is
+    /// the one somebody will want -- see `crate::history`.
+    pub fn forget_history(&self) {
+        crate::history::forget(&self.path);
     }
 }
 
 /// What the window says about a failed write.
 fn describe(why: &SaveError) -> String {
     format!("{why}")
-}
-
-/// The journal's name, which is the document's with a suffix.
-///
-/// Beside the document rather than in a state directory somewhere: a
-/// configuration copied to another machine should take its history with it,
-/// and a person who finds the pair in a directory can see that they belong
-/// together.
-fn journal_beside(path: &Path) -> PathBuf {
-    let mut name = path.as_os_str().to_os_string();
-    name.push(".tcsgui-history");
-    PathBuf::from(name)
 }
 
 #[cfg(test)]
@@ -1169,12 +1158,39 @@ tcsgui:
         assert_eq!(editor.document().nodes.len(), 1);
     }
 
-    /// The journal sits beside the document it belongs to.
+    /// The journal is named after the document and kept out of its directory.
+    ///
+    /// Where and how long for is `crate::history`, which has the tests for
+    /// both; this is the one thing this module still says about it. Asked
+    /// without setting `XDG_STATE_HOME`, which would set it for every other
+    /// test in the process: the editor writes a history on every edit.
     #[test]
     fn the_history_is_named_after_the_document() {
+        let editor = Editor::new(Path::new("/var/lib/tcs/graph.yaml"));
+        let named = match editor.journal_path() {
+            Some(named) => named,
+            // Neither XDG_STATE_HOME nor HOME on this machine, which is a
+            // session with nowhere to keep a history. The editor still edits.
+            None => return,
+        };
+
+        // Out of the configuration's own directory, and named after it: see
+        // crate::history.
+        assert_ne!(named.parent(), Some(Path::new("/var/lib/tcs")));
         assert_eq!(
-            journal_beside(Path::new("/var/lib/tcs/graph.yaml")),
-            PathBuf::from("/var/lib/tcs/graph.yaml.tcsgui-history")
+            named,
+            crate::history::journal_in(
+                &crate::history::state_dir().expect("somewhere"),
+                Path::new("/var/lib/tcs/graph.yaml")
+            )
+        );
+        assert!(
+            named
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("graph-"),
+            "{named:?}"
         );
     }
 }

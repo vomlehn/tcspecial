@@ -34,6 +34,7 @@
 mod document;
 mod editor;
 mod read;
+mod history;
 mod journal;
 mod pane;
 mod route;
@@ -387,6 +388,14 @@ fn main() -> Result<(), slint::PlatformError> {
         settings.vehicle_percent,
     )));
 
+    // The histories of sessions nobody is coming back to: a week old, or whose
+    // configuration is no longer there. Once, at startup, before anything is
+    // opened -- see `crate::history::prune`.
+    let gone = history::prune(std::time::SystemTime::now());
+    if gone > 0 {
+        eprintln!("tcsgui: {gone} old session histories were removed");
+    }
+
     // The configuration: see Editor::open.
     let editor = Rc::new(RefCell::new(Editor::open(
         std::path::Path::new(&path),
@@ -487,16 +496,40 @@ fn main() -> Result<(), slint::PlatformError> {
     // being made. Leaving a session's work in a process that is ending is the
     // one way this editor could lose anything, so it is worth one more try
     // and one plain sentence either way.
+    let mut kept = false;
     if editor.borrow().unsaved() {
         editor.borrow_mut().save();
         match editor.borrow().trouble() {
             None => eprintln!("tcsgui: saved {path} on the way out"),
-            Some(why) => eprintln!(
-                "tcsgui: {path} could not be saved: {why}\n\
-                 tcsgui: the work of this session is in {}",
-                editor.borrow().journal_path().display()
-            ),
+            Some(why) => {
+                // The one case where the history is the only copy of a
+                // session's work, so it is the one case where it is kept:
+                // this exit is tidy as a gesture and not as an outcome.
+                kept = true;
+                eprintln!(
+                    "tcsgui: {path} could not be saved: {why}\n\
+                     tcsgui: the work of this session is in {}",
+                    editor
+                        .borrow()
+                        .journal_path()
+                        .map(|path| path.display().to_string())
+                        .unwrap_or_else(|| "no history, there being nowhere to \
+                                             keep one"
+                            .to_string())
+                );
+            }
         }
+    }
+
+    // And the history goes, this being an exit that was asked for.
+    //
+    // What is kept is the history of a session that ended *badly* -- a crash,
+    // a kill, a machine that went down -- because that is the undo somebody
+    // will want when they come back. A session that ended tidily has no
+    // further use for its own, and a directory that only ever grows is a
+    // directory somebody has to tidy. See `crate::history`.
+    if !kept {
+        editor.borrow().forget_history();
     }
 
     outcome

@@ -155,6 +155,15 @@ struct Views {
     /// Not in the document: it is a working preference and not part of the
     /// diagram. See `settings.rs`.
     divider: Rc<std::cell::Cell<Dividers>>,
+    /// And how the selection column is divided, as the first two lists'
+    /// percentages of it: the moc list's and the vehicle list's, the payload
+    /// list taking what is left.
+    ///
+    /// Percentages rather than pixels, because the column is as tall as the
+    /// window and a share is what somebody chose -- the same distinction
+    /// `settings.rs` draws for the working panes, kept in the same file.
+    /// Shared between windows for the reason the dividers above are.
+    lists: Rc<std::cell::Cell<(i32, i32)>>,
     /// Which node each window's panel is showing, by the window's home.
     ///
     /// Per window, because two windows looking at two subdiagrams are looking
@@ -399,6 +408,7 @@ impl Views {
         self.alert(editor);
         let chosen = self.chosen.borrow();
         let divider = self.divider.get();
+        let lists = self.lists.get();
         // The link whose end is in somebody's hand, which is drawn nowhere:
         // a line that stayed put while its end was being dragged away would
         // be a line saying the gesture had not started.
@@ -429,6 +439,7 @@ impl Views {
                 &None,
                 chosen.get("").map(|s| s.as_str()),
                 divider,
+                lists,
                 held.as_ref(),
             );
         }
@@ -439,6 +450,7 @@ impl Views {
                 name,
                 chosen.get(name).map(|s| s.as_str()),
                 divider,
+                lists,
                 held.as_ref(),
             );
         }
@@ -514,6 +526,12 @@ fn main() -> Result<(), slint::PlatformError> {
         settings.moc_percent,
         settings.vehicle_percent,
     )));
+    // And how the selection column was divided, which is the same preference
+    // the other way: see `Views::lists`.
+    let lists = Rc::new(std::cell::Cell::new((
+        settings.list_moc_percent,
+        settings.list_vehicle_percent,
+    )));
 
     // The histories of sessions nobody is coming back to: a week old, or whose
     // configuration is no longer there. Once, at startup, before anything is
@@ -544,6 +562,7 @@ fn main() -> Result<(), slint::PlatformError> {
         chosen: Rc::new(RefCell::new(BTreeMap::new())),
         drawing: Rc::new(RefCell::new(None)),
         divider: divider.clone(),
+        lists: lists.clone(),
         group: None,
         parameters: None,
         attributes: BTreeMap::new(),
@@ -608,6 +627,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 &name,
                 None,
                 views.borrow().divider.get(),
+                views.borrow().lists.get(),
                 None,
             );
             if let Err(e) = window.show() {
@@ -952,6 +972,22 @@ macro_rules! wiring {
                         drag_divider(&editor, &views, Pane::Vehicle, dx);
                     });
                 }
+                // And either line between the three selection lists, which is
+                // the same gesture down the column: see drag_list_divider.
+                {
+                    let editor = editor.clone();
+                    let views = views.clone();
+                    window.on_moc_list_divider_moved(move |dy: f32, tall: f32| {
+                        drag_list_divider(&editor, &views, Pane::Moc, dy, tall);
+                    });
+                }
+                {
+                    let editor = editor.clone();
+                    let views = views.clone();
+                    window.on_vehicle_list_divider_moved(move |dy: f32, tall: f32| {
+                        drag_list_divider(&editor, &views, Pane::Vehicle, dy, tall);
+                    });
+                }
             }
             {
                 // Drawing a link: the terminal pressed is remembered, and the
@@ -1152,10 +1188,13 @@ fn put(
     home: &Home,
     chosen: Option<&str>,
     dividers: Dividers,
+    lists: (i32, i32),
     held: Option<&Link>,
 ) {
     ui.set_moc_divider(dividers.moc as f32);
     ui.set_vehicle_divider(dividers.vehicle as f32);
+    ui.set_moc_list_percent(lists.0);
+    ui.set_vehicle_list_percent(lists.1);
     ui.set_has_simulator(editor.document().simulator.is_some());
     let (nodes, links) = views_of(editor, home, held);
     ui.set_selected(chosen.unwrap_or_default().into());
@@ -1181,10 +1220,13 @@ fn put_sub(
     home: &str,
     chosen: Option<&str>,
     dividers: Dividers,
+    lists: (i32, i32),
     held: Option<&Link>,
 ) {
     window.set_moc_divider(dividers.moc as f32);
     window.set_vehicle_divider(dividers.vehicle as f32);
+    window.set_moc_list_percent(lists.0);
+    window.set_vehicle_list_percent(lists.1);
     window.set_has_simulator(editor.document().simulator.is_some());
     let home = Some(home.to_string());
     let (nodes, links) = views_of(editor, &home, held);
@@ -1416,11 +1458,92 @@ fn drag_divider(
     }
 
     let (moc_percent, vehicle_percent) = percents_for(dividers.get());
+    let (list_moc_percent, list_vehicle_percent) = views.borrow().lists.get();
     settings::save(settings::Settings {
         moc_percent,
         vehicle_percent,
+        list_moc_percent,
+        list_vehicle_percent,
     });
     views.borrow().refresh(&editor.borrow());
+}
+
+/// One of the two lines between the selection lists, dragged.
+///
+/// `dy` is how far it moved and `tall` how tall the whole column is, both in
+/// the window's own pixels: the share that changed is the one, over the other,
+/// and the arithmetic is here rather than in the markup for the reason the
+/// link routes are -- it can be read and tested here.
+///
+/// Each line moves the boundary between its own two neighbours and leaves the
+/// third alone, which is what a person dragging it expects: the list above
+/// grows by what the list below gives up. Nothing may be squeezed below
+/// [`settings::LEAST`] per cent of the column, so a line dragged to the top or
+/// the bottom stops a twentieth short of it -- a list with nothing showing is
+/// a list whose entries cannot be reached, and a line dragged to the edge is
+/// easy to do by accident and hard to understand afterwards.
+///
+/// The arithmetic is [`list_shares_after`], which is the part worth testing.
+fn drag_list_divider(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    which: Pane,
+    dy: f32,
+    tall: f32,
+) {
+    let lists = views.borrow().lists.clone();
+    let was = lists.get();
+    let now = list_shares_after(was, which, dy, tall);
+    if now == was {
+        // It did not move, or it was already against what stops it: nothing
+        // to redraw, and nothing to write.
+        return;
+    }
+    lists.set(now);
+
+    let (moc_percent, vehicle_percent) = percents_for(views.borrow().divider.get());
+    settings::save(settings::Settings {
+        moc_percent,
+        vehicle_percent,
+        list_moc_percent: now.0,
+        list_vehicle_percent: now.1,
+    });
+    views.borrow().refresh(&editor.borrow());
+}
+
+/// What the two shares become when a line is dragged this far.
+///
+/// `was` is the moc list's share and the vehicle list's, the payload list
+/// taking what is left; `which` says which line moved -- the upper one, above
+/// the vehicle list, or the lower one above the payload list; `dy` is how far
+/// it went and `tall` how tall the column is, both in pixels.
+///
+/// A share of the column, worked out here rather than in the markup: a
+/// percentage is what somebody chose and what the settings file keeps, where a
+/// pixel count is how this window happens to be sized today. And every share
+/// comes back inside [`settings::LEAST`] however far the line was dragged,
+/// which is the rule a test can hold this to and a markup cannot.
+fn list_shares_after(
+    (moc, vehicle): (i32, i32),
+    which: Pane,
+    dy: f32,
+    tall: f32,
+) -> (i32, i32) {
+    if tall < 1.0 {
+        return (moc, vehicle);
+    }
+    let step = (dy / tall * 100.0).round() as i32;
+    if step == 0 {
+        return (moc, vehicle);
+    }
+    // The upper line takes from the vehicle list and gives to the moc one; the
+    // lower line takes from the payload list, which is whatever is left, and
+    // gives to the vehicle's.
+    let asked = match which {
+        Pane::Moc => (moc + step, vehicle - step),
+        _ => (moc, vehicle + step),
+    };
+    settings::shares(asked.0, asked.1)
 }
 
 /// Show what might be wrong, with somewhere to go and something to decide.
@@ -3772,6 +3895,11 @@ mod tests {
         dividers_for(settings::DEFAULT_MOC, settings::DEFAULT_VEHICLE)
     }
 
+    /// And how the selection column is divided, until somebody drags a line.
+    fn lists() -> (i32, i32) {
+        (settings::DEFAULT_LIST_MOC, settings::DEFAULT_LIST_VEHICLE)
+    }
+
     /// Every row of one selection pane.
     /// A screenful at the top of the sheet, which is what a window shows when
     /// a configuration is opened: the top of the view and how much of it
@@ -3895,6 +4023,135 @@ mod tests {
                  the floor the palette is held to"
             );
         }
+    }
+
+    /// How much a selection list spends above its first node.
+    ///
+    /// Its own heading and the padding and spacing around it, and the family
+    /// heading the first entry sits under where there is one -- the numbers
+    /// the markup lays a `SelectionPane` out with: eight of padding, an
+    /// eighteen-pixel heading, eight of spacing, a twenty-two-pixel family
+    /// heading, and eight of row padding.
+    ///
+    /// Here so that the rule below can be a test rather than a hope. It is a
+    /// claim about the markup, and a markup changed without this is a list
+    /// whose first node is a pixel off the bottom of it -- which is why the
+    /// test reads the numbers out of `main.slint` and holds them against this.
+    const ABOVE_THE_FIRST: f32 = 8.0 + 18.0 + 8.0 + 22.0 + 8.0;
+
+    /// Every selection list shows a node when the window opens.
+    ///
+    /// Asked for, and the thing a share of a column cannot be trusted to do
+    /// by itself: a list given a twentieth of an 820-pixel window has
+    /// forty-one pixels, which is its own heading and nothing else -- a list
+    /// somebody has to discover is there by dragging a line they cannot see
+    /// the point of.
+    ///
+    /// So the three default shares are checked against what the three lists
+    /// actually have to draw, at the height the window opens at. The window's
+    /// own preferred height is read out of the markup rather than written
+    /// here twice, and so is the padding above the first row: a rule about
+    /// what fits is a rule about numbers in two files, and a test that
+    /// restated them would pass while the window showed nothing.
+    #[test]
+    fn every_selection_list_shows_a_node_when_the_window_opens() {
+        let markup = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+        )
+        .expect("the markup this binary was built from");
+
+        // The main window's preferred height, which is what it opens at.
+        let tall: f32 = markup
+            .split("export component MainWindow")
+            .nth(1)
+            .and_then(|from| from.split("preferred-height:").nth(1))
+            .and_then(|said| said.split(';').next())
+            .and_then(|said| said.trim().strip_suffix("px"))
+            .and_then(|said| said.trim().parse().ok())
+            .expect("the markup says what height the window opens at");
+
+        // And what it spends above the first row, which this test's own
+        // constant claims: the padding, the headings and the spacing.
+        for said in ["out property <length> step: 8px;", "height: 18px;"] {
+            assert!(
+                markup.contains(said),
+                "the markup no longer says {said:?}, so ABOVE_THE_FIRST is \
+                 out of date"
+            );
+        }
+
+        for (pane, share) in [
+            (Pane::Moc, settings::DEFAULT_LIST_MOC),
+            (Pane::Vehicle, settings::DEFAULT_LIST_VEHICLE),
+            (
+                Pane::Payloads,
+                100 - settings::DEFAULT_LIST_MOC - settings::DEFAULT_LIST_VEHICLE,
+            ),
+        ] {
+            let rows = rows_of(pane);
+            let first = rows
+                .iter()
+                .find(|row| !row.is_heading)
+                .expect("every list offers something");
+            let wanted = ABOVE_THE_FIRST + first.node.height;
+            let got = tall * share as f32 / 100.0;
+            assert!(
+                got >= wanted,
+                "the {} list opens {got:.0} pixels tall and its first node \
+                 wants {wanted:.0}",
+                pane.label()
+            );
+        }
+    }
+
+    /// A line between two lists cannot squeeze either of them away.
+    ///
+    /// The floor asked for: a twentieth of the column, whichever line is
+    /// dragged and however far. A list squeezed to nothing is a list whose
+    /// entries cannot be reached, and a line dragged to the end of its travel
+    /// is easy to do by accident and hard to understand afterwards -- so the
+    /// drag stops rather than the list disappearing.
+    #[test]
+    fn a_line_between_the_lists_cannot_squeeze_one_away() {
+        // A column 800 pixels tall, and each line dragged a long way past
+        // either end of its travel.
+        for (which, dy) in [
+            (Pane::Moc, -4000.0),
+            (Pane::Moc, 4000.0),
+            (Pane::Vehicle, -4000.0),
+            (Pane::Vehicle, 4000.0),
+        ] {
+            let (moc, vehicle) = list_shares_after(lists(), which, dy, 800.0);
+            let payload = 100 - moc - vehicle;
+            for (name, share) in [("moc", moc), ("vehicle", vehicle), ("payload", payload)] {
+                assert!(
+                    share >= settings::LEAST,
+                    "dragging the {which:?} line by {dy} would leave the \
+                     {name} list {share}% of the column"
+                );
+            }
+        }
+
+        // An ordinary drag moves the two it is between and leaves the third
+        // alone: the list above grows by what the list below gives up.
+        let (was_moc, was_vehicle) = lists();
+        let (moc, vehicle) = list_shares_after(lists(), Pane::Moc, 80.0, 800.0);
+        assert_eq!((moc, vehicle), (was_moc + 10, was_vehicle - 10));
+        assert_eq!(
+            100 - moc - vehicle,
+            100 - was_moc - was_vehicle,
+            "the third list is left alone"
+        );
+
+        // And the lower line takes from the payload list, which is the one
+        // that has no share of its own.
+        let (moc, vehicle) = list_shares_after(lists(), Pane::Vehicle, 80.0, 800.0);
+        assert_eq!((moc, vehicle), (was_moc, was_vehicle + 10));
+
+        // A gesture that worked out to nothing changes nothing, so nothing is
+        // redrawn and no settings file is written: a line nudged by a pixel on
+        // a tall column is not a preference.
+        assert_eq!(list_shares_after(lists(), Pane::Moc, 2.0, 800.0), lists());
     }
 
     /// Each heading of each selection panel is in alphabetical order.
@@ -6284,6 +6541,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -6399,6 +6660,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -6522,6 +6787,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -6598,6 +6867,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -6730,6 +7003,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -6841,6 +7118,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -6947,6 +7228,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -7066,6 +7351,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -7225,7 +7514,7 @@ mod tests {
 
             let ui = MainWindow::new().expect("a window");
             furnish!(&ui, descriptions());
-            put(&ui, &editor.borrow(), &None, None, dividers(), None);
+            put(&ui, &editor.borrow(), &None, None, dividers(), lists(), None);
 
             let names: Vec<String> = (0..ui.get_nodes().row_count())
                 .filter_map(|row| ui.get_nodes().row_data(row))
@@ -7269,7 +7558,7 @@ mod tests {
             );
             let ui = MainWindow::new().expect("a window");
             furnish!(&ui, descriptions());
-            put(&ui, &editor, &None, None, dividers(), None);
+            put(&ui, &editor, &None, None, dividers(), lists(), None);
 
             assert_eq!(
                 ui.get_links().row_count(),
@@ -7347,6 +7636,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -7481,6 +7774,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -7567,6 +7864,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -7715,6 +8016,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -7784,6 +8089,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -7926,6 +8235,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -8191,6 +8504,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -8260,6 +8577,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),
@@ -8373,6 +8694,10 @@ mod tests {
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
             group: None,
             parameters: None,
             attributes: BTreeMap::new(),

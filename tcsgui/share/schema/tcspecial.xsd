@@ -28,9 +28,25 @@
            elementFormDefault="qualified">
 
   <!-- Where data leaves a node: a link, written as an attribute of the node
-       it leaves. The value is the data sink it reaches, as `node` or
-       `node.terminal`. -->
-  <xs:simpleType name="destination">
+       it leaves. One element per line.
+
+       The spelling tcsgui writes is an entry: `target` names the node the line
+       goes to and `input` names which of that node's inputs it feeds, where it
+       feeds a named one. The short spelling is still read, the whole element
+       being the destination as `node` or `node.terminal`.
+
+       Which is why this is mixed content with optional children: XSD 1.0
+       cannot say "text, or these elements, but not both", so a file with both
+       in one element is accepted here and refused where it is read. -->
+  <xs:complexType name="destination" mixed="true">
+    <xs:sequence>
+      <xs:element name="target" type="nodename" minOccurs="0"/>
+      <xs:element name="input" type="nodename" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- A name, with the node and terminal spelling a link end may use. -->
+  <xs:simpleType name="nodename">
     <xs:restriction base="xs:string">
       <xs:pattern value="[A-Za-z_][A-Za-z0-9_./-]*(\.[A-Za-z_][A-Za-z0-9_-]*)?"/>
     </xs:restriction>
@@ -45,9 +61,7 @@
        all of them: a disagreement between the two ends is refused where the
        file is read. -->
   <xs:simpleType name="source">
-    <xs:restriction base="xs:string">
-      <xs:pattern value="[A-Za-z_][A-Za-z0-9_./-]*(\.[A-Za-z_][A-Za-z0-9_-]*)?"/>
-    </xs:restriction>
+    <xs:restriction base="nodename"/>
   </xs:simpleType>
 
   <!-- Where the editor drew one node, which the flight software ignores.

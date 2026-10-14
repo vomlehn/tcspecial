@@ -80,6 +80,23 @@ pub struct Command {
     pub comment: Option<String>,
 }
 
+/// Where one line goes, as a file writes it: its entry.
+///
+/// A link out of a node is written as an entry under the data source it leaves
+/// by -- `- target: mean_temp`, and `input: in0` where it feeds a named input
+/// -- so what the writers need is the two apart. Not a type the document holds:
+/// the document holds links, and this is one of them on its way into a file.
+///
+/// See `tcslibgs::graph::Destinations` for the spellings a reader accepts.
+struct Bound {
+    /// The node the line goes to, written as the file names it: a node on
+    /// another page is named from the page this one is written on.
+    target: String,
+    /// Which of that node's inputs it feeds, or which of its data sinks it
+    /// arrives at, where either had to be said.
+    input: Option<String>,
+}
+
 /// The whole of what is being edited.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Document {
@@ -1195,10 +1212,20 @@ impl Document {
                             ));
                         }
                     }
-                    for to in destinations {
+                    for Bound { target, input } in destinations {
+                        // One element per line, the entry's words inside it:
+                        // the same shape the tcsgui section's nodes are
+                        // written in, and short enough to read as one line.
+                        let said = match input {
+                            Some(input) => format!(
+                                "<target>{}</target><input>{}</input>",
+                                escape(&target),
+                                escape(&input)
+                            ),
+                            None => format!("<target>{}</target>", escape(&target)),
+                        };
                         out.push_str(&format!(
-                            "        <{terminal}>{}</{terminal}>\n",
-                            escape(&to)
+                            "        <{terminal}>{said}</{terminal}>\n"
                         ));
                     }
                 }
@@ -1400,12 +1427,12 @@ impl Document {
                             out.push_str(&format!("    # {line}\n"));
                         }
                     }
-                    match destinations.as_slice() {
-                        [one] => out.push_str(&format!("    {terminal}: {one}\n")),
-                        many => out.push_str(&format!(
-                            "    {terminal}: [{}]\n",
-                            many.join(", ")
-                        )),
+                    out.push_str(&format!("    {terminal}:\n"));
+                    for Bound { target, input } in destinations {
+                        out.push_str(&format!("      - target: {target}\n"));
+                        if let Some(input) = input {
+                            out.push_str(&format!("        input: {input}\n"));
+                        }
                     }
                 }
                 // And the same lines again at the other end: what arrives
@@ -1475,14 +1502,22 @@ impl Document {
     /// a node on another is an attribute of the first, so the file holding the
     /// second says nothing about it. A link written in both files it touched
     /// would be read as two.
+    ///
+    /// One entry per line, each naming the node it goes to as its `target` and
+    /// the input it feeds where it feeds a named one -- which is why this
+    /// hands back the two apart rather than the `node.input` the short
+    /// spelling joins with a dot. Several lines out of one terminal are
+    /// several entries, so nothing in a file pairs by position: two lists read
+    /// against each other, one of them a name short, would be a configuration
+    /// that reads as valid and delivers a reading to the wrong input.
     fn leaving(
         &self,
         node: &Node,
         home: &Home,
-    ) -> Vec<(&'static str, Vec<String>, Option<String>)> {
-        let mut leaving: Vec<(&'static str, Vec<String>, Option<String>)> = Vec::new();
+    ) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
+        let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> = Vec::new();
         for terminal in ["to_moc", "to_payload"] {
-            let mut destinations: Vec<String> = Vec::new();
+            let mut destinations: Vec<Bound> = Vec::new();
             // One line carries one comment, so the attribute's comment is the
             // first thing written about any of the links under it. Nothing in
             // the editor sets one -- a link's comment is read from a file
@@ -1501,10 +1536,9 @@ impl Document {
                 if by != Some(terminal) {
                     continue;
                 }
-                let to = Qualified::parse(&link.to).written_from(home);
-                destinations.push(match &link.input {
-                    Some(input) => format!("{to}.{input}"),
-                    None => to,
+                destinations.push(Bound {
+                    target: Qualified::parse(&link.to).written_from(home),
+                    input: link.input.clone(),
                 });
                 if comment.is_none() {
                     comment = link.comment.clone();
@@ -3118,14 +3152,17 @@ mod tests {
         });
 
         let yaml = document.to_yaml();
-        assert!(yaml.contains("to_moc: moc"), "{yaml}");
+        assert!(yaml.contains("    to_moc:\n      - target: moc\n"), "{yaml}");
         assert!(
             yaml.contains("from_payload: temp_fore"),
             "the arriving end is not recorded: {yaml}"
         );
 
         let xml = document.to_xml();
-        assert!(xml.contains("<to_moc>moc</to_moc>"), "{xml}");
+        assert!(
+            xml.contains("<to_moc><target>moc</target></to_moc>"),
+            "{xml}"
+        );
         assert!(
             xml.contains("<from_payload>temp_fore</from_payload>"),
             "the arriving end is not recorded: {xml}"
@@ -3252,25 +3289,21 @@ mod tests {
         // alone where the node has one, inside a list where it has several.
         // Both spellings say it, each in its own way.
         for link in &document.links {
-            let to = match &link.input {
-                Some(input) => format!("{}.{}", link.to, input),
-                None => link.to.clone(),
+            let (yaml_said, xml_said) = match &link.input {
+                Some(input) => (
+                    format!("- target: {}\n        input: {input}\n", link.to),
+                    format!(
+                        "<target>{}</target><input>{input}</input>",
+                        link.to
+                    ),
+                ),
+                None => (
+                    format!("- target: {}\n", link.to),
+                    format!("<target>{}</target>", link.to),
+                ),
             };
-            let terminal = link.origin.as_deref().expect("a link names its source");
-            assert!(
-                yaml.contains(&format!("{terminal}: {to}\n"))
-                    || yaml.contains(&format!("{terminal}: [{to},"))
-                    || yaml.contains(&format!("{terminal}: [{to}]"))
-                    || yaml.contains(&format!(", {to},"))
-                    || yaml.contains(&format!(", {to}]")),
-                "{} to {to} is missing from the YAML",
-                link.from
-            );
-            assert!(
-                xml.contains(&format!("<{terminal}>{to}</{terminal}>")),
-                "{} to {to} is missing from the XML",
-                link.from
-            );
+            assert!(yaml.contains(&yaml_said), "{} to {} is missing from the YAML", link.from, link.to);
+            assert!(xml.contains(&xml_said), "{} to {} is missing from the XML", link.from, link.to);
         }
     }
 
@@ -3420,7 +3453,7 @@ mod tests {
 
         let written: usize = files
             .iter()
-            .map(|(_, text)| text.matches("to_moc: moc").count())
+            .map(|(_, text)| text.matches("- target: moc").count())
             .sum();
         assert_eq!(written, 1, "the crossing link was written {written} times");
 
@@ -3433,7 +3466,7 @@ mod tests {
             .iter()
             .find(|(path, _)| path.ends_with("cabin.yaml"))
             .expect("the subdiagram's file");
-        assert!(inner.contains("to_moc: moc"), "{inner}");
+        assert!(inner.contains("to_moc:\n      - target: moc\n"), "{inner}");
 
         // And the top file says what it includes.
         let (_, top) = &files[0];
@@ -3516,8 +3549,8 @@ mod tests {
         assert!(yaml.contains("\npayloads:\n"), "{yaml}");
         assert!(yaml.contains("\nvehicle:\n"), "{yaml}");
         assert!(
-            yaml.contains("    to_moc: mean_temp.in0\n"),
-            "a link into a named input is written as one: {yaml}"
+            yaml.contains("    to_moc:\n      - target: mean_temp\n        input: in0\n"),
+            "a link into a named input is written as one entry: {yaml}"
         );
         assert!(!yaml.contains("\nlinks:"), "there is no links section: {yaml}");
     }

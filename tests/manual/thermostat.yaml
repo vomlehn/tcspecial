@@ -36,7 +36,11 @@ vehicle:
     function: "to_kelvin"
     offset: "273.15"
     scale: "0.0625"
-    to_moc: [moc, mean_temp.in0, housekeeping]
+    to_moc:
+      - target: moc
+      - target: mean_temp
+        input: in0
+      - target: housekeeping
     from_payload: temp_fore
   - name: k_aft
     type: compute
@@ -44,7 +48,11 @@ vehicle:
     function: "to_kelvin"
     offset: "273.15"
     scale: "0.0625"
-    to_moc: [moc, mean_temp.in1, housekeeping]
+    to_moc:
+      - target: moc
+      - target: mean_temp
+        input: in1
+      - target: housekeeping
     from_payload: temp_aft
   - name: k_bay
     type: compute
@@ -52,13 +60,19 @@ vehicle:
     function: "to_kelvin"
     offset: "255.37"
     scale: "0.0078"
-    to_moc: [moc, mean_temp.in2, housekeeping]
+    to_moc:
+      - target: moc
+      - target: mean_temp
+        input: in2
+      - target: housekeeping
     from_payload: temp_bay
   - name: mean_temp
     type: compute
     function: "mean"
     inputs: "in0,in1,in2"
-    to_moc: [moc, thermostat]
+    to_moc:
+      - target: moc
+      - target: thermostat
     from_payload: [k_aft, k_bay, k_fore]
   # setpoint is set from the ground; above and below are the two degrees
   # either side that the heaters are switched at.
@@ -68,9 +82,11 @@ vehicle:
     below: "2.0"
     function: "hysteresis"
     setpoint: "293.15"
-    to_moc: housekeeping
+    to_moc:
+      - target: housekeeping
     # asserted below the setpoint, unasserted above it
-    to_payload: heaters
+    to_payload:
+      - target: heaters
     from_payload: mean_temp
   - name: housekeeping
     type: log
@@ -86,7 +102,8 @@ payloads:
     group: "cabin_temps"
     path: "/dev/i2c-1"
     read_size: "2"
-    to_moc: k_fore
+    to_moc:
+      - target: k_fore
   # Aft bulkhead; same part as temp_fore.
   - name: temp_aft
     type: i2c
@@ -94,7 +111,8 @@ payloads:
     group: "cabin_temps"
     path: "/dev/i2c-1"
     read_size: "2"
-    to_moc: k_aft
+    to_moc:
+      - target: k_aft
   # Equipment bay. Three bytes, unsigned -- a different part, hence its
   # own conversion.
   - name: temp_bay
@@ -104,7 +122,8 @@ payloads:
     path: "/dev/spidev0.0"
     read_size: "3"
     spi_mode: "0"
-    to_moc: k_bay
+    to_moc:
+      - target: k_bay
   # Three circuits, driven together.
   - name: heaters
     type: gpio

@@ -3550,6 +3550,9 @@ fn view_of(
         label_weight: label_weight as i32,
         label_italic,
         tint: colour(&tint),
+        // What is drawn *on* the body, now that the body is painted in the
+        // tint: see NodeView::mark.
+        mark: colour(MARK),
         faulty: fault.is_some(),
         selected,
         summary: summary.unwrap_or_default().into(),
@@ -3607,14 +3610,17 @@ fn terminal_view(
 /// it: a line carrying the payload's own data is of the payload family, and
 /// one carrying what the ground sends is of the ground's.
 ///
-/// One shade lighter than the lightest node in that panel, which is what makes
-/// a line read as a line and not as a node's own outline: the payloads' panel
-/// is lightest at Clay and the ground's has Azure alone, and these are those
-/// two with ten more of CIE lightness. Written down rather than computed
-/// because the palette is written down -- the maths lives in `sight.rs`, which
-/// is test-only -- and
-/// `tests::a_line_is_one_shade_lighter_than_its_lightest_node` is what holds
-/// these against it.
+/// The middle of the three tiers the palette is built as: its own family's
+/// working pane is a paler shade of it, and every node body is darker. A
+/// drawing then reads as one picture -- a pale sheet, lines on the sheet,
+/// solid blocks on the lines -- and a line can never be mistaken for a node's
+/// own edge, whichever node it runs to.
+///
+/// Written down rather than computed, because the palette is written down --
+/// the maths lives in `sight.rs`, which is test-only. What holds these to the
+/// tiers is `the_palette_runs_from_the_pane_through_the_line_to_the_bodies`,
+/// and what holds them apart from everything else is
+/// `no_two_colours_of_the_scheme_look_alike`.
 ///
 /// Grey for a line whose stream cannot be told, which is a line this build
 /// does not understand: it is drawn, because a connection missing from a
@@ -3628,10 +3634,27 @@ fn line_ink(leaves_by: Option<&str>) -> String {
     .to_string()
 }
 
-/// The payload stream's line: Clay, one shade lighter.
+/// What is written on a node: its outline, its name, its terminals.
+///
+/// White. A body is painted in its own tint now, and the tints are the darkest
+/// of the three tiers the palette is built as -- a working pane is the
+/// lightest shade of its family, a link line is darker, and the bodies are
+/// darker still -- so what is written on a body has to be legible on the
+/// lightest body and the darkest alike. White clears four and a half to one
+/// against every one of them, which is the threshold for text, and a test says
+/// so.
+///
+/// Not the pane's own ground, which was the first thing tried: the payload
+/// pane is the darkest of the three at 84 of lightness, and its own shade on
+/// its own lightest body is 3.4 to one -- under the floor for a name somebody
+/// has to read.
+pub const MARK: &str = "#ffffff";
+
+/// The payload stream's line: the blush family, between its pane and its
+/// bodies at 58.8 of lightness.
 pub const PAYLOAD_LINE: &str = "#c47979";
 
-/// And what the ground sends: Azure, one shade lighter.
+/// And what the ground sends: the blue family, at 63.0.
 pub const MOC_LINE: &str = "#459aff";
 
 /// The palette's colours.
@@ -3650,25 +3673,33 @@ fn tint_of(tint: Tint) -> String {
     // taken in CIE L*a*b* under normal vision and under simulated protanopia,
     // deuteranopia and tritanopia at once.
     //
-    // It is 14 CIE units, where two or three is "the same colour in two
+    // It is 12 CIE units, where two or three is "the same colour in two
     // printings" and ten is "clearly two colours". So a pair anybody can tell
     // apart is a pair everybody can tell apart. The test below checks it
     // against these very values, which is the point of its existing: tuning
     // one of these means re-running the search.
     //
-    // Three units less than the fourteen-colour palette that came before, and
-    // the three are the price of the families: a palette free to put its
-    // colours anywhere spreads them further than one whose reds must stay red.
+    // Two units were given up to the three tiers: a body has to be darker
+    // than any line that reaches it, which took the top off the range the
+    // bodies had, and six of them moved down to make room -- which is why
+    // several are darker than their names suggest. A body is also painted in
+    // its tint now rather than washed with a fifth of it, and written on in
+    // white, so these are read as the colour of a node rather than as a tinge
+    // of it.
+    //
+    // Three units less again than the fourteen-colour palette that came
+    // before the families: a palette free to put its colours anywhere spreads
+    // them further than one whose reds must stay red.
     // What the families buy is that a node's colour says which pane it belongs
     // in, which no amount of separation would have told anybody.
     match tint {
         // The ground link, on its pale blue pane.
-        Tint::Azure => "#0080e8",
+        Tint::Azure => "#4260c3",
         // The vehicle's own graph, on pale green.
-        Tint::Pine => "#206038",
-        Tint::Olive => "#686808",
-        Tint::Gold => "#a08800",
-        Tint::Moss => "#609850",
+        Tint::Pine => "#005a30",
+        Tint::Olive => "#725400",
+        Tint::Gold => "#7e7812",
+        Tint::Moss => "#0f3f0c",
         // What the vehicle carries, on pale blush: ten of them, which is why
         // this is the family the search had the least room in.
         Tint::Aubergine => "#481040",
@@ -3680,7 +3711,7 @@ fn tint_of(tint: Tint) -> String {
         Tint::Plum => "#884078",
         Tint::Orchid => "#a848a0",
         Tint::Heather => "#906078",
-        Tint::Clay => "#a86060",
+        Tint::Clay => "#9f5a60",
     }
     .to_string()
 }
@@ -3745,82 +3776,104 @@ mod tests {
             .collect()
     }
 
-    /// A line is one shade lighter than the lightest node of its own panel.
+    /// The palette runs from the pane, through the line, to the bodies.
     ///
-    /// Which is what makes a line read as a line: lighter than everything in
-    /// the family, so it is not taken for a node's outline, and of that family
-    /// all the same, so the colour says which stream it carries. One shade
-    /// means about ten of CIE lightness here -- the steps between neighbouring
-    /// tints are two to eight, so ten is one step and a little more.
+    /// Three tiers of one hue family, lightest first: the working pane is the
+    /// palest shade of it, a link line carrying that family's data is darker,
+    /// and the node bodies are darker still. It is what makes a diagram read
+    /// as one picture -- a pale sheet with lines drawn on it and solid blocks
+    /// sitting on top -- rather than as three unrelated colour choices, and it
+    /// is why a body is painted in its own tint and written on in white.
     ///
-    /// The lightest node of the panel is the comparison the rule is written
-    /// against, so it is taken from the panel: every type the pane offers, by
-    /// the tint it is drawn in. A palette change that made a node lighter than
-    /// its lines fails here.
+    /// The step between tiers is at least eight CIE units, which is "clearly
+    /// lighter" rather than "possibly lighter"; what the whole scheme is held
+    /// to as a floor is a separate question, asked by
+    /// `no_two_colours_of_the_scheme_look_alike`.
     #[test]
-    fn a_line_is_one_shade_lighter_than_its_lightest_node() {
-        use sight::{difference, hue, hue_apart, lightness, seen, Sight};
+    fn the_palette_runs_from_the_pane_through_the_line_to_the_bodies() {
+        use sight::{contrast, lightness};
 
         let painted = |hex: &str| {
             let c = colour(hex);
             (c.red(), c.green(), c.blue())
         };
 
-        // The lightest tint the pane offers, which is what the panel shows.
-        let lightest = |pane: Pane| {
-            NodeType::ALL
-                .iter()
-                .filter(|t| pane_of(t.spelling()) == pane)
-                .map(|t| painted(&tint_of(t.appearance().tint)))
-                .max_by(|one, two| {
-                    lightness(*one)
-                        .partial_cmp(&lightness(*two))
-                        .expect("a lightness")
-                })
-                .expect("a pane offers something")
-        };
+        let panes = [Pane::Moc, Pane::Vehicle, Pane::Payloads];
+        let lines = [PAYLOAD_LINE, MOC_LINE];
+        let mark = painted(MARK);
 
-        for (pane, line) in [
-            (Pane::Payloads, PAYLOAD_LINE),
-            (Pane::Moc, MOC_LINE),
-        ] {
-            let line = painted(line);
-            let node = lightest(pane);
-            let step = lightness(line) - lightness(node);
-            assert!(
-                (6.0..=16.0).contains(&step),
-                "the {} line is {step:.1} lighter than the lightest node, \
-                 which is not one shade",
-                pane.label()
-            );
-
-            // Of the same family: a line that had wandered into another hue
-            // would say the wrong thing about which stream it carries.
-            assert!(
-                hue_apart(hue(line), hue(node)) < 25.0,
-                "the {} line is not of its own family's hue",
-                pane.label()
-            );
-
-            // And lighter than every node of the panel, not merely than the
-            // one it was derived from.
-            for t in NodeType::ALL.iter().filter(|t| pane_of(t.spelling()) == pane) {
-                let tint = painted(&tint_of(t.appearance().tint));
+        // Every pane is lighter than every line. Every line crosses every
+        // pane -- a payload's data is drawn from the payload pane to the
+        // ground one -- so this is asked of all six pairs rather than of each
+        // line against the pane it belongs to.
+        for pane in panes {
+            let ground = painted(&ground_of(style::ground_of(pane)));
+            for line in lines {
+                let step = lightness(ground) - lightness(painted(line));
                 assert!(
-                    lightness(line) > lightness(tint),
-                    "{} is lighter than the {} line",
-                    t.spelling(),
+                    step >= 8.0,
+                    "the {} pane is only {step:.1} lighter than a line on it",
                     pane.label()
                 );
             }
         }
 
+        // And every line is lighter than every body, for the same reason: a
+        // line arrives at nodes of both other panes.
+        for t in NodeType::ALL {
+            let body = painted(&tint_of(t.appearance().tint));
+            for line in lines {
+                let step = lightness(painted(line)) - lightness(body);
+                assert!(
+                    step >= 8.0,
+                    "{} is only {step:.1} darker than a line that reaches it",
+                    t.spelling()
+                );
+            }
+
+            // What is written on a body has to be readable on it: a name is
+            // text, and four and a half to one is the threshold for text.
+            let against = contrast(mark, body);
+            assert!(
+                against >= 4.5,
+                "{}'s name is {against:.2} against its own body",
+                t.spelling()
+            );
+        }
+
+        // And the bodies are a range of shades rather than one shade: the
+        // tier is "darker still", and a tier of fifteen colours all at one
+        // darkness would not read as the bottom of a scale.
+        //
+        // The span, and not a ladder of one body per rung. A rung per body
+        // was tried: ten payload bodies, each a step darker than the last and
+        // each far enough from the rest to be told apart by a reader with a
+        // dichromacy, does not exist. Under protanopia and deuteranopia a
+        // single hue family is very nearly a lightness scale, so ten bodies
+        // at the floor below would want ten steps of fourteen -- a hundred and
+        // forty units of lightness out of the eighty-seven there are. What a
+        // ladder costs is measured: forcing one drops the floor from 12 to
+        // about 10, and re-fitting the family to get it back leaves each
+        // colour's name describing a colour it no longer is.
+        let bodies: Vec<f64> = NodeType::ALL
+            .iter()
+            .map(|t| lightness(painted(&tint_of(t.appearance().tint))))
+            .collect();
+        let span = bodies.iter().cloned().fold(f64::MIN, f64::max)
+            - bodies.iter().cloned().fold(f64::MAX, f64::min);
+        assert!(
+            span >= 25.0,
+            "the bodies span {span:.1} of lightness, which is not a range of \
+             shades"
+        );
+
         // And the two lines are told apart by anybody: the whole point of
         // colouring them is that a reader can see which stream a line
         // carries without tracing it to its corner.
+        use sight::{difference, seen, Sight};
         let payload = painted(PAYLOAD_LINE);
         let moc = painted(MOC_LINE);
-        for sight in [Sight::Normal, Sight::Protanopia, Sight::Deuteranopia, Sight::Tritanopia] {
+        for sight in Sight::ALL {
             let apart = difference(seen(payload, sight), seen(moc, sight));
             assert!(
                 apart >= 14.0,
@@ -4171,43 +4224,64 @@ mod tests {
         }
     }
 
-    /// Every pair of tints is told apart by a colour blind reader.
+    /// No two colours of the whole scheme look alike to anybody.
     ///
-    /// The rule the palette was searched for, checked against the colours the
-    /// window is actually given rather than against the intention. Fifteen
-    /// colours in three hue families is well past what care at the keyboard
-    /// would keep true: a tint nudged by hand would be a near-copy of another
-    /// under one of the three dichromacies, and nobody with normal vision
-    /// would see it.
+    /// Every pair of it: the three working panes, the two link lines and the
+    /// fifteen node bodies, under normal vision and under each of the three
+    /// dichromacies. Twenty colours rather than the fifteen this used to ask
+    /// about, because a line is a colour a reader has to tell from the bodies
+    /// at either end of it and from the sheet it is drawn on -- and two of
+    /// them did not: the ground station's body was nine and a half from the
+    /// line arriving at it.
     ///
-    /// The floor is fourteen CIE units, where two or three is "the same colour
+    /// Checked against the colours the window is actually given rather than
+    /// against the intention. Twenty colours in three hue families is well
+    /// past what care at the keyboard would keep true: a tint nudged by hand
+    /// would be a near-copy of another under one of the three dichromacies,
+    /// and nobody with normal vision would see it.
+    ///
+    /// The floor is twelve CIE units, where two or three is "the same colour
     /// in two printings" and ten is "clearly two colours". So a pair anybody
-    /// can tell apart is a pair everybody can tell apart, which is what was
-    /// asked for.
+    /// can tell apart is a pair everybody can tell apart, with something in
+    /// hand.
     ///
-    /// Fourteen and not the seventeen the family-free palette managed, and the
-    /// three units are the price of the families: a palette free to put its
-    /// colours anywhere spreads them further than one whose reds must stay
-    /// red. What the families buy is a colour that says which pane a node
-    /// belongs in. A failure here means the search has to be run again rather
-    /// than a value nudged.
+    /// Twelve, where the bodies alone managed fourteen, and the two units are
+    /// what the three tiers cost. The bodies now have to be darker than the
+    /// lines as well as apart from each other -- see
+    /// `the_palette_runs_from_the_pane_through_the_line_to_the_bodies` -- which
+    /// takes the top off the range they had: six of them moved down to make
+    /// room, and the closest pair that is left is an olive and a gold at 12.2.
+    /// A failure here means the search has to be run again rather than a value
+    /// nudged.
     #[test]
-    fn no_two_tints_are_the_same_colour_to_a_colour_blind_reader() {
+    fn no_two_colours_of_the_scheme_look_alike() {
         use sight::{difference, seen, Sight};
 
-        let painted = |t: NodeType| {
-            let c = colour(&tint_of(t.appearance().tint));
+        let painted = |hex: &str| {
+            let c = colour(hex);
             (c.red(), c.green(), c.blue())
         };
 
-        let mut closest = (f64::MAX, Sight::Normal, "", "");
-        for (i, a) in NodeType::ALL.iter().enumerate() {
-            for b in &NodeType::ALL[i + 1..] {
+        let mut scheme: Vec<(String, (u8, u8, u8))> = Vec::new();
+        for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+            scheme.push((
+                format!("the {} pane", pane.label()),
+                painted(&ground_of(style::ground_of(pane))),
+            ));
+        }
+        scheme.push(("the payload line".to_string(), painted(PAYLOAD_LINE)));
+        scheme.push(("the moc line".to_string(), painted(MOC_LINE)));
+        for t in NodeType::ALL {
+            scheme.push((t.spelling().to_string(), painted(&tint_of(t.appearance().tint))));
+        }
+
+        let mut closest = (f64::MAX, Sight::Normal, String::new(), String::new());
+        for (i, (one, a)) in scheme.iter().enumerate() {
+            for (two, b) in &scheme[i + 1..] {
                 for sight in Sight::ALL {
-                    let apart =
-                        difference(seen(painted(*a), sight), seen(painted(*b), sight));
+                    let apart = difference(seen(*a, sight), seen(*b, sight));
                     if apart < closest.0 {
-                        closest = (apart, sight, a.spelling(), b.spelling());
+                        closest = (apart, sight, one.clone(), two.clone());
                     }
                 }
             }
@@ -4215,9 +4289,9 @@ mod tests {
 
         let (apart, sight, a, b) = closest;
         assert!(
-            apart >= 14.0,
+            apart >= 12.0,
             "{a} and {b} are only {apart:.1} apart to a reader with \
-             {sight:?}, and the floor is 14"
+             {sight:?}, and the floor is 12"
         );
     }
 

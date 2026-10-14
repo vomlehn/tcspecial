@@ -1790,6 +1790,41 @@ border width, the line around it, height and the way its label is set, and a
 test fails if
 that stops being true. Red is reserved for things that are wrong.
 
+The colours themselves are three tiers of one hue family, lightest first: a
+**working pane** is the palest shade of it, a **link line** carrying that
+family's data is darker, and the **node bodies** are darker still. A drawing
+then reads as one picture -- a pale sheet, lines drawn on the sheet, solid
+blocks sitting on the lines -- rather than as three unrelated colour choices,
+and a line can never be mistaken for a node's own edge. Each step is at least
+eight CIE units, which is "clearly lighter" rather than "possibly lighter".
+
+A body is painted in its own tint now rather than washed with a fifth of it,
+and what is written on it -- the outline, the name, the terminals, the marks
+in its corners -- is white. The pane's own shade was the first thing tried for
+that and is not light enough: the payload pane is the darkest of the three at
+84 of lightness, and its shade on its own lightest body is 3.4 to one, under
+the floor for text somebody has to read. White clears 4.5 to one against every
+body, and a test says so.
+
+Getting the tiers cost two units of separation. Every colour of the scheme is
+held apart from every other -- the twenty of them, panes and lines and bodies
+together, under normal vision and each of the three dichromacies -- and the
+floor is now 12 where the bodies alone managed 14. Six bodies moved down to
+get under the lines, which took the top off the range they had; the closest
+pair left is an olive and a gold at 12.2. Twelve is still above the ten that
+means "clearly two colours" and well above the two or three of "the same
+colour in two printings".
+
+What was asked for and is not there is a rung per body: each body a step
+darker than the last, down the panel. It does not exist. Under protanopia and
+deuteranopia a single hue family is very nearly a lightness scale, so ten
+payload bodies each far enough from the rest would want ten steps of fourteen
+-- a hundred and forty units of lightness out of the eighty-seven there are.
+Forcing a ladder drops the floor to about ten, and re-fitting the family to
+win it back leaves each colour's name describing a colour it no longer is. The
+bodies are a *range* of shades instead, spanning 33 units from the lightest to
+the darkest, and what separates any two of them is the floor above.
+
 A configuration that does not exist yet opens with the ground station already
 in it, at the upper left. Every graph has
 one -- a vehicle whose telemetry reaches nobody is a vehicle nobody is

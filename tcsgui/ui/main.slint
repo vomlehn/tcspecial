@@ -105,6 +105,16 @@ export struct NodeView {
     label-weight: int,
     label-italic: bool,
     tint: color,
+    // What is written on the body: its outline, its name, its terminals, the
+    // marks in its corners.
+    //
+    // The body is painted in the node's own tint now, and the tints are the
+    // darkest of three tiers -- the working pane is the lightest, a link line
+    // is darker, and the bodies are darker still -- so what is drawn on a
+    // body has to be legible on the lightest and the darkest of them alike.
+    // One colour does that, and it is the one at the end of the scale. See
+    // tcsgui::MARK, tcsgui::tint_of and tcsgui::line_ink.
+    mark: color,
     // Something is wrong with this node, which is what paints it red: the
     // outline, the label and the terminals, so colour is never the only thing
     // carrying it -- a faulty node is also drawn in the one shape no real type
@@ -246,6 +256,8 @@ export struct LinkView {
 // icon font, so nothing can fail to load.
 component Terminal inherits Rectangle {
     in property <color> ink;
+    // What is drawn on the node's body. See NodeView::mark.
+    in property <color> mark;
     // Whether the arrow points right, which is to say towards the payloads.
     in property <bool> rightward;
     // Whether this is where data arrives. Both kinds answer a press, because
@@ -274,12 +286,12 @@ component Terminal inherits Rectangle {
     width: 24px;
     height: 10px;
     border-width: 1px;
-    border-color: ink;
+    border-color: mark;
     border-radius: 1px;
     // Filled while the pointer is over it, as the old round handles were: a
     // target that answers the pointer is a target somebody can see they have
-    // hit before they let go.
-    background: touch.has-hover ? ink.with-alpha(0.45) : ink.with-alpha(0.10);
+    // hit before they let go. Pale, because it is drawn on the body.
+    background: touch.has-hover ? mark.with-alpha(0.85) : mark.with-alpha(0.25);
 
     touch := TouchArea {
         width: 100%;
@@ -311,7 +323,7 @@ component Terminal inherits Rectangle {
         viewbox-y: 0;
         viewbox-width: 24;
         viewbox-height: 10;
-        fill: ink;
+        fill: mark;
         commands: rightward
             ? "M 4 3.5 L 13 3.5 L 13 1 L 20 5 L 13 9 L 13 6.5 L 4 6.5 Z"
             : "M 20 3.5 L 11 3.5 L 11 1 L 4 5 L 11 9 L 11 6.5 L 20 6.5 Z";
@@ -362,6 +374,11 @@ component NodeShape inherits Rectangle {
     property <color> error-ink: #c0392b;
 
     property <color> ink: node.faulty ? error-ink : node.tint;
+    // What is drawn on the body, as against what the body is painted: see
+    // NodeView::mark. A faulty node keeps it -- the body goes red and the
+    // marks stay pale, so the one thing that changed is the thing that is
+    // wrong.
+    property <color> mark: node.mark;
 
     // How far a press may wander and still be a click rather than a drag.
     // Three pixels: enough for a hand on a mouse, far less than anything
@@ -420,7 +437,7 @@ component NodeShape inherits Rectangle {
             border-width: node.shape != ""
                 ? 0px
                 : (grip.has-hover ? node.border + 1px : node.border);
-            border-color: ink;
+            border-color: mark;
 
             // While it is being dragged, a node lifts off the canvas. Not
             // decoration: a drag that has started and a press that has not look
@@ -430,7 +447,7 @@ component NodeShape inherits Rectangle {
             drop-shadow-color: grip.pressed ? #00000033 : transparent;
             drop-shadow-offset-y: grip.pressed ? 3px : 0px;
             border-radius: node.outline == "rounded" ? self.height / 4 : 0px;
-            background: node.shape != "" ? transparent : ink.with-alpha(0.18);
+            background: node.shape != "" ? transparent : ink;
 
             // The lift a dragged node gets, for the shapes drawn as paths: a
             // second copy of the shape three pixels lower, because a Path has
@@ -460,7 +477,7 @@ component NodeShape inherits Rectangle {
                 viewbox-width: self.width / 1px;
                 viewbox-height: self.height / 1px;
                 commands: node.shape;
-                fill: ink.with-alpha(0.18);
+                fill: ink;
             }
 
             // The outline, whole or broken as this type's edge says. The
@@ -471,7 +488,7 @@ component NodeShape inherits Rectangle {
                 viewbox-width: self.width / 1px;
                 viewbox-height: self.height / 1px;
                 commands: node.edge;
-                stroke: ink;
+                stroke: mark;
                 stroke-width: grip.has-hover ? node.border + 1px : node.border;
                 fill: transparent;
             }
@@ -486,7 +503,7 @@ component NodeShape inherits Rectangle {
                 viewbox-width: self.width / 1px;
                 viewbox-height: self.height / 1px;
                 commands: node.inner;
-                stroke: ink;
+                stroke: mark;
                 stroke-width: 1px;
                 fill: transparent;
             }
@@ -503,14 +520,14 @@ component NodeShape inherits Rectangle {
             y: 0;
             width: node.border;
             height: 100%;
-            background: ink;
+            background: mark;
         }
         if node.outline == "barred": Rectangle {
             x: root.width - 8px - node.border;
             y: 0;
             width: node.border;
             height: 100%;
-            background: ink;
+            background: mark;
         }
 
         // The key: a square corner cut into an otherwise rounded shape, which is
@@ -520,14 +537,14 @@ component NodeShape inherits Rectangle {
             y: 0;
             width: root.width / 4;
             height: node.border;
-            background: ink;
+            background: mark;
         }
         if node.outline == "keyed": Rectangle {
             x: 0;
             y: 0;
             width: node.border;
             height: root.height / 4;
-            background: ink;
+            background: mark;
         }
 
         // The name, and under it the type. The type is shown always and not only
@@ -550,6 +567,7 @@ component NodeShape inherits Rectangle {
 
             Text {
                 text: node.name;
+                color: mark;
                 font-family: node.face == "mono" ? "monospace" : "";
                 font-size: node.label-size;
                 font-weight: node.label-weight;
@@ -559,6 +577,7 @@ component NodeShape inherits Rectangle {
             }
             Text {
                 text: node.node-type;
+                color: mark;
                 font-family: node.face == "mono" ? "monospace" : "";
                 font-size: Type.small;
                 horizontal-alignment: center;
@@ -577,7 +596,7 @@ component NodeShape inherits Rectangle {
                 text: node.summary;
                 font-size: Type.small;
                 font-italic: true;
-                color: #555555;
+                color: mark.with-alpha(0.75);
                 horizontal-alignment: center;
                 overflow: elide;
             }
@@ -598,8 +617,8 @@ component NodeShape inherits Rectangle {
             width: 14px;
             height: 14px;
             border-width: 1px;
-            border-color: ink;
-            background: open-touch.has-hover ? ink.with-alpha(0.25) : transparent;
+            border-color: mark;
+            background: open-touch.has-hover ? mark.with-alpha(0.35) : transparent;
 
             // Two narrow lines making a cross, which reads as "expand" without a
             // word or an icon file.
@@ -608,14 +627,14 @@ component NodeShape inherits Rectangle {
                 y: 6px;
                 width: 8px;
                 height: 1px;
-                background: ink;
+                background: mark;
             }
             Rectangle {
                 x: 6px;
                 y: 3px;
                 width: 1px;
                 height: 8px;
-                background: ink;
+                background: mark;
             }
 
             open-touch := TouchArea {
@@ -744,6 +763,7 @@ component NodeShape inherits Rectangle {
         }
         sink: true;
         ink: ink;
+        mark: mark;
         grabbed => { link-from("moc-in"); }
         released(x, y) => {
             link-dropped(node.x + node.moc-in.x + x, node.y + node.moc-in.y + y);
@@ -758,6 +778,7 @@ component NodeShape inherits Rectangle {
         }
         sink: false;
         ink: ink;
+        mark: mark;
         grabbed => { link-from("moc-out"); }
         // Where the pointer was let go of, in the canvas's own coordinates:
         // the node is placed at node.x and the terminal sits at its own offset
@@ -776,6 +797,7 @@ component NodeShape inherits Rectangle {
         }
         sink: true;
         ink: ink;
+        mark: mark;
         grabbed => { link-from("payload-in"); }
         released(x, y) => {
             link-dropped(
@@ -793,6 +815,7 @@ component NodeShape inherits Rectangle {
         }
         sink: false;
         ink: ink;
+        mark: mark;
         grabbed => { link-from("payload-out"); }
         released(x, y) => {
             link-dropped(node.x + node.payload-out.x + x, node.y + node.payload-out.y + y);

@@ -256,6 +256,10 @@ component Terminal inherits Rectangle {
     // is -- see `terminal_under`.
     callback grabbed();
     callback released(length, length);
+    // And where the pointer is while it is held, so the line being drawn can
+    // follow it: reported by the terminal the gesture started on, as the
+    // release is, because a press grabs the pointer.
+    callback dragged(length, length);
 
     width: 24px;
     height: 10px;
@@ -277,6 +281,11 @@ component Terminal inherits Rectangle {
             }
             if (event.kind == PointerEventKind.up) {
                 released(self.mouse-x, self.mouse-y);
+            }
+        }
+        moved => {
+            if (self.pressed) {
+                dragged(self.mouse-x, self.mouse-y);
             }
         }
     }
@@ -321,6 +330,9 @@ component NodeShape inherits Rectangle {
     // half is a point on the canvas.
     callback link-from(string);
     callback link-dropped(length, length);
+    // Where the pointer is while a line is being drawn from one of this
+    // node's terminals. See Terminal::dragged.
+    callback link-dragging(length, length);
     // This node was pressed, so it is the one the panel should show.
     callback chosen();
 
@@ -596,6 +608,9 @@ component NodeShape inherits Rectangle {
         y: node.from-moc.y + drag-y;
         rightward: node.from-moc.rightward;
         arrow: node.from-moc.arrow;
+        dragged(x, y) => {
+            link-dragging(node.x + node.from-moc.x + x, node.y + node.from-moc.y + y);
+        }
         sink: true;
         ink: ink;
         grabbed => { link-from("from_moc"); }
@@ -608,6 +623,9 @@ component NodeShape inherits Rectangle {
         y: node.to-payload.y + drag-y;
         rightward: node.to-payload.rightward;
         arrow: node.to-payload.arrow;
+        dragged(x, y) => {
+            link-dragging(node.x + node.to-payload.x + x, node.y + node.to-payload.y + y);
+        }
         sink: false;
         ink: ink;
         grabbed => { link-from("to_payload"); }
@@ -624,6 +642,9 @@ component NodeShape inherits Rectangle {
         y: node.from-payload.y + drag-y;
         rightward: node.from-payload.rightward;
         arrow: node.from-payload.arrow;
+        dragged(x, y) => {
+            link-dragging(node.x + node.from-payload.x + x, node.y + node.from-payload.y + y);
+        }
         sink: true;
         ink: ink;
         grabbed => { link-from("from_payload"); }
@@ -639,6 +660,9 @@ component NodeShape inherits Rectangle {
         y: node.to-moc.y + drag-y;
         rightward: node.to-moc.rightward;
         arrow: node.to-moc.arrow;
+        dragged(x, y) => {
+            link-dragging(node.x + node.to-moc.x + x, node.y + node.to-moc.y + y);
+        }
         sink: false;
         ink: ink;
         grabbed => { link-from("to_moc"); }
@@ -877,6 +901,10 @@ component PaneDivider inherits Rectangle {
 component Surface inherits Rectangle {
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
+    // The line a gesture is drawing, as SVG path data in canvas coordinates,
+    // and empty when no gesture is running. Dashed, and in pieces because a
+    // path here has no dash pattern: see tcsgui::route::drawing.
+    in property <string> drawing-route: "";
     // The two selection panes' contents, and the two working panes' geometry.
     //
     // All four come from Rust -- see style.rs and main.rs -- because which
@@ -952,6 +980,8 @@ component Surface inherits Rectangle {
     // Drawing a link: pressed on one node, released on another.
     callback link-started(string, string);
     callback link-finished(length, length);
+    // Where the pointer is while a line is being drawn. See drawing-route.
+    callback link-moved(length, length);
     callback node-selected(string);
 
     // Which node is drawn as chosen. What it says about itself is in a window
@@ -1208,6 +1238,22 @@ component Surface inherits Rectangle {
                 for l in links: LinkLine {
                     link: l;
                 }
+                // And the line being drawn, under them as well: it is a link
+                // that is not one yet, and it follows the pointer, so it is
+                // redrawn as the hand moves rather than when the document
+                // changes.
+                if root.drawing-route != "": Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: self.width / 1px;
+                    viewbox-height: self.height / 1px;
+                    commands: root.drawing-route;
+                    stroke: #6b7280;
+                    stroke-width: 1.25px;
+                    fill: transparent;
+                }
                 for n in nodes: NodeShape {
                     node: n;
                     draggable: true;
@@ -1216,6 +1262,7 @@ component Surface inherits Rectangle {
                     open-requested => { open-subdiagram(n.name); }
                     link-from(terminal) => { link-started(n.name, terminal); }
                     link-dropped(x, y) => { link-finished(x, y); }
+                    link-dragging(x, y) => { link-moved(x, y); }
                     chosen => { node-selected(n.name); }
                 }
                 }
@@ -1272,6 +1319,10 @@ export component MainWindow inherits Window {
 
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
+    // The line a gesture is drawing, as SVG path data in canvas coordinates,
+    // and empty when no gesture is running. Dashed, and in pieces because a
+    // path here has no dash pattern: see tcsgui::route::drawing.
+    in property <string> drawing-route: "";
     // The two selection panes' contents, and the two working panes' geometry.
     //
     // All four come from Rust -- see style.rs and main.rs -- because which
@@ -1318,6 +1369,8 @@ export component MainWindow inherits Window {
     callback save-clicked();
     callback link-started(string, string);
     callback link-finished(length, length);
+    // Where the pointer is while a line is being drawn. See drawing-route.
+    callback link-moved(length, length);
     callback node-selected(string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
@@ -1416,6 +1469,7 @@ export component MainWindow inherits Window {
         height: 100%;
         nodes: root.nodes;
         links: root.links;
+        drawing-route: root.drawing-route;
         moc-palette: root.moc-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
@@ -1443,6 +1497,7 @@ export component MainWindow inherits Window {
         open-subdiagram(n) => { root.open-subdiagram(n); }
         link-started(n, terminal) => { root.link-started(n, terminal); }
         link-finished(x, y) => { root.link-finished(x, y); }
+        link-moved(x, y) => { root.link-moved(x, y); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
     }
@@ -1468,6 +1523,10 @@ export component SubWindow inherits Window {
     in property <string> editing: "";
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
+    // The line a gesture is drawing, as SVG path data in canvas coordinates,
+    // and empty when no gesture is running. Dashed, and in pieces because a
+    // path here has no dash pattern: see tcsgui::route::drawing.
+    in property <string> drawing-route: "";
     // The two selection panes' contents, and the two working panes' geometry.
     //
     // All four come from Rust -- see style.rs and main.rs -- because which
@@ -1513,6 +1572,8 @@ export component SubWindow inherits Window {
     callback save-clicked();
     callback link-started(string, string);
     callback link-finished(length, length);
+    // Where the pointer is while a line is being drawn. See drawing-route.
+    callback link-moved(length, length);
     callback node-selected(string);
     callback edit-parameters();
     // Write this configuration as Rust, where the tcspecial section's
@@ -1608,6 +1669,7 @@ export component SubWindow inherits Window {
         editing: root.editing;
         nodes: root.nodes;
         links: root.links;
+        drawing-route: root.drawing-route;
         moc-palette: root.moc-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
@@ -1634,6 +1696,7 @@ export component SubWindow inherits Window {
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         link-started(n, terminal) => { root.link-started(n, terminal); }
         link-finished(x, y) => { root.link-finished(x, y); }
+        link-moved(x, y) => { root.link-moved(x, y); }
         selected: root.selected;
         node-selected(n) => { root.node-selected(n); }
     }

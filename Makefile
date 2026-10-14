@@ -347,17 +347,18 @@ verify:
 # history beside it, so starting on a name that is not there is how a new
 # configuration is begun.
 #
-# The default is under edit/, which is not in the repository, and deliberately
-# not the shipped example. tcsgui saves every edit as it is made -- that is
-# the point of it -- so an editor opened on tests/manual/thermostat.yaml to
-# see what the thing does rewrites the shipped example, and the first thing
-# anybody does with an editor is move something. The example is still
-# editable, by naming it:
+# The default is the shipped example, which is what somebody opening the
+# editor to see what it does wants to be looking at. It does get rewritten --
+# tcsgui saves every edit as it is made, that being the point of it -- and
+# that is a thing the example can survive where a scratch file could not: it
+# is in the repository, so a stray edit shows up in `git status` and comes
+# back with `git checkout example.yaml`, where an editor opened on a name
+# nobody keeps leaves its work somewhere nobody looks.
 #
 #   make runguiy
 #   make runguiy TCSGUI_FILE=tests/manual/thermostat
-#   make verify  TCSGUI_FILE=edit/graph.yaml
-TCSGUI_FILE = edit/graph.yaml
+#   make verify  TCSGUI_FILE=example.yaml
+TCSGUI_FILE = example.yaml
 
 # The simulator's own configuration, for the runsimgui targets.
 #
@@ -368,7 +369,7 @@ TCSGUI_FILE = edit/graph.yaml
 # entry that would edit the simulator's groups is greyed.
 #
 #   make runsimguiy
-#   make runsimguiy TCSGUI_FILE=edit/graph TCSGUI_SIM=edit/othersim
+#   make runsimguiy TCSGUI_FILE=vehicle TCSGUI_SIM=othersim
 TCSGUI_SIM = $(basename $(TCSGUI_FILE))sim
 
 # Running tcsgui on one spelling of a configuration.

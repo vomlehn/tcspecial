@@ -9,6 +9,7 @@ members = [
     "tcssim",
     "tcsverify",
     "tcsgui",
+    "tcsrustgen",
 ]
 
 [workspace.package]

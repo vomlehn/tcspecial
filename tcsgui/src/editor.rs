@@ -243,17 +243,13 @@ impl Editor {
             return;
         };
 
-        if let Some(parent) = path.parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
-                self.trouble = Some(format!("{} cannot be made: {e}", parent.display()));
-                return;
-            }
-        }
-
-        let rust = crate::codegen::rust_of(&self.document, &self.path);
-        match write_atomically(&path, rust.as_bytes()) {
-            Ok(()) => self.said = Some(format!("wrote {}", path.display())),
-            Err(why) => self.trouble = Some(describe(&why)),
+        // Written by `tcsrustgen`, which is the program that turns a
+        // configuration into Rust: the editor asks whether it is worth doing
+        // and then runs it, so that a Makefile and this menu item do the same
+        // thing in the same way. The directory is the generator's to make.
+        match crate::codegen::run(&self.path, &path) {
+            Ok(said) => self.said = Some(said),
+            Err(why) => self.trouble = Some(why),
         }
     }
 
@@ -815,6 +811,18 @@ tcsgui:
         let said = editor.trouble().expect("a sentence").to_string();
         assert!(said.contains("rust-code-path"), "{said}");
         assert_eq!(editor.said(), None);
+
+        // The rest is what the generator does, and the generator is a program
+        // of its own: a test that failed because it has not been built would
+        // be a test that says nothing about the editor. Skipped loudly, as
+        // the schema tests are when xmllint is absent.
+        if !crate::codegen::available() {
+            eprintln!(
+                "tcsrustgen is not built: what the editor does with the \
+                 generated code was not checked"
+            );
+            return;
+        }
 
         // And with the parameter set: a directory that is not there is made,
         // the file is written, and the window is told where.

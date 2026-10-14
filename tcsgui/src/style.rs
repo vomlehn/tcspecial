@@ -29,8 +29,29 @@
 /// a fully rounded end -- so none of this needs an image or a font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outline {
-    /// Square corners. Hardware: what is physically there.
+    /// Square corners. Something outside the system: the ground station.
+    ///
+    /// The external entity of a data-flow diagram, which is what the ground
+    /// is: the far end of the link, not part of the vehicle. It was the
+    /// payloads' shape, and they have the data symbol now, so the plain
+    /// rectangle is free for the one node it is the standard symbol for.
     Square,
+    /// A parallelogram. Data arriving or leaving: a payload.
+    ///
+    /// The flowchart symbol for input and output on an unspecified medium,
+    /// which is exactly what the nine device kinds are -- a bus, a socket, a
+    /// channel, a sample buffer, a file -- and the one symbol in the notation
+    /// that means *data crossing a boundary* rather than a thing or a step.
+    ///
+    /// It leans right, as the symbol is drawn, so its missing corners are the
+    /// top left and the bottom right. The top left is where a payload's
+    /// `payload-out` terminal is, which is why [`room_at`] exists: a terminal
+    /// in a corner the shape has given away is a terminal floating outside
+    /// its node, so the terminals of a slanted shape move in with the slant,
+    /// and so does the row its name is padded away from.
+    ///
+    /// Drawn from [`parallelogram`], for the reason [`Outline::Store`] gives.
+    Parallelogram,
     /// Rounded corners. Software aboard: a computation.
     Rounded,
     /// Two long sides and one end: the data store of a data-flow diagram.
@@ -383,6 +404,7 @@ pub fn shape_of(outline: Outline, (width, height): (u32, u32)) -> String {
     match outline {
         Outline::Pointed => pointed((width, height)),
         Outline::Store => store((width, height)),
+        Outline::Parallelogram => parallelogram((width, height)),
         _ => String::new(),
     }
 }
@@ -434,6 +456,77 @@ pub fn store((width, height): (u32, u32)) -> String {
     )
 }
 
+/// Four sides, leaning right, in a box this size.
+///
+/// The slant is half the height, which is an edge at sixty-three degrees on
+/// every node whatever its height: a slant stated as a fraction of the width
+/// would lean differently on a 48-pixel node and a 64-pixel one, and nine
+/// kinds of payload drawn at four heights would read as four shapes.
+///
+/// Inset half a pixel, as [`pointed`] is and for the same reason.
+pub fn parallelogram((width, height): (u32, u32)) -> String {
+    let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
+    let slant = h / 2.0;
+    format!(
+        "M {:.1} 0.5 L {:.1} 0.5 L {:.1} {:.1} L 0.5 {:.1} Z",
+        slant + 0.5,
+        w + 0.5,
+        w - slant + 0.5,
+        h + 0.5,
+        h + 0.5
+    )
+}
+
+/// How far in from a side a shape may be, anywhere on it.
+///
+/// What anything drawn *inside* a node has to keep clear of the sides: the
+/// hatching, the second outline of a doubled shape, and the column the name
+/// is padded away from. Nothing for the shapes that reach their own sides all
+/// the way down, which is every outline but the slanted one.
+pub fn room_of(outline: Outline, (_width, height): (u32, u32)) -> i32 {
+    match outline {
+        Outline::Parallelogram => (height as f32 / 2.0).ceil() as i32,
+        _ => 0,
+    }
+}
+
+/// How far in from its side the shape is, at the row this terminal sits in.
+///
+/// A terminal is drawn in a corner, and a slanted shape has given two of its
+/// corners away, so the terminals of one move in by however much the shape is
+/// missing at their own row -- and the line that arrives at a terminal moves
+/// with it, or it would end in the notch beside the node.
+///
+/// Measured at the edge of the terminal's box nearest the top or the bottom,
+/// which is where a leaning side is furthest in across the box's own height:
+/// the box has to clear the shape along all of it, not at its middle.
+pub fn room_at(outline: Outline, (width, height): (u32, u32), corner: Corner) -> i32 {
+    match outline {
+        Outline::Parallelogram => {
+            let (h, slant) = (height as f32 - 1.0, (height as f32 - 1.0) / 2.0);
+            let inset = TERMINAL_INSET as f32;
+            let tall = TERMINAL.1 as f32;
+            // The left side leans in as it goes down and the right side leans
+            // in as it goes up, so each is furthest in at a different edge of
+            // the box: the top of it on the left, the bottom of it on the
+            // right. Taking the row's own middle would leave half the box
+            // hanging out of the shape.
+            let room = if corner.left {
+                let y = if corner.top { inset } else { h - inset - tall };
+                slant * (1.0 - y / h)
+            } else {
+                let y = if corner.top { inset + tall } else { h - inset };
+                slant * (y / h)
+            };
+            room.max(0.0).ceil() as i32
+        }
+        _ => {
+            let _ = (width, corner);
+            0
+        }
+    }
+}
+
 /// How large a terminal is drawn, in pixels.
 ///
 /// It was 24 by 10 -- wide enough for an arrow and no wider -- and that is a
@@ -465,11 +558,17 @@ pub const TERMINAL_INSET: u32 = 3;
 /// geometry is arithmetic, and arithmetic in a layout language cannot be
 /// tested. The test below is what says the four of them land in four
 /// different corners and clear each other.
-pub fn terminal_at(corner: Corner, (width, height): (u32, u32)) -> (i32, i32) {
+pub fn terminal_at(outline: Outline, corner: Corner, (width, height): (u32, u32)) -> (i32, i32) {
     let inset = TERMINAL_INSET as i32;
     let far = |whole: u32, box_: u32| whole as i32 - box_ as i32 - inset;
+    // In by whatever the outline is missing at this row: see `room_at`.
+    let room = room_at(outline, (width, height), corner);
     (
-        if corner.left { inset } else { far(width, TERMINAL.0) },
+        if corner.left {
+            inset + room
+        } else {
+            far(width, TERMINAL.0) - room
+        },
         if corner.top { inset } else { far(height, TERMINAL.1) },
     )
 }
@@ -532,13 +631,19 @@ pub fn attachment(
 ) -> Option<((f32, f32), bool)> {
     let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type)?;
     let corner = corner_of(terminal)?;
-    let (width, height) = found.appearance().size;
-    let (_, y) = terminal_at(corner, (width, height));
+    let drawn = found.appearance();
+    let (width, height) = drawn.size;
+    let (_, y) = terminal_at(drawn.outline, corner, (width, height));
 
+    // In from the side by whatever the outline is missing at this row, so a
+    // line meets a slanted node where the node is rather than where its box
+    // is: the terminal moved in by the same amount, and a line that stopped
+    // at the box would stop in the notch beside the shape.
+    let room = room_at(drawn.outline, (width, height), corner) as f32;
     let edge = if corner.left {
-        at.0 as f32
+        at.0 as f32 + room
     } else {
-        (at.0 + width as i32) as f32
+        (at.0 + width as i32) as f32 - room
     };
     Some((
         (edge, at.1 as f32 + y as f32 + TERMINAL.1 as f32 / 2.0),
@@ -564,7 +669,8 @@ pub fn terminal_box(
 ) -> Option<(f32, f32, f32, f32)> {
     let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type)?;
     let corner = corner_of(terminal)?;
-    let (x, y) = terminal_at(corner, found.appearance().size);
+    let drawn = found.appearance();
+    let (x, y) = terminal_at(drawn.outline, corner, drawn.size);
     Some((
         (at.0 + x) as f32,
         (at.1 + y) as f32,
@@ -874,10 +980,13 @@ impl NodeType {
 
     /// Which family this type belongs to.    /// Which family this type belongs to.
     ///
-    /// The families are the shape grammar: square corners are hardware,
-    /// rounded are software aboard, a circle is an end of the graph, a keyed
-    /// rectangle is an interface that is driven, and a page is a diagram of
-    /// its own. The palette shows them under these headings, which is how the
+    /// The families are the shape grammar, and it is the standard notations'
+    /// grammar rather than one of our own: a parallelogram is data crossing a
+    /// boundary, a rounded box is a process, a plain rectangle is something
+    /// outside the system, a box with an end left open is somewhere data is
+    /// kept, a barred one is a step written down elsewhere, and a keyed
+    /// rectangle -- the one mark here that is nobody's standard -- is an
+    /// interface that is driven rather than read. The palette shows them under these headings, which is how the
     /// grammar gets taught -- a flat list of thirteen shapes hides the pattern
     /// that would make them learnable.
     pub fn family(self) -> &'static str {
@@ -945,9 +1054,10 @@ impl NodeType {
     /// How this type is drawn.
     ///
     /// The groupings are meant to be learnable rather than arbitrary: square
-    /// corners are hardware, rounded corners are software, a keyed rectangle
-    /// is an interface that is driven, a barred one is a page written down
-    /// somewhere else, and the two ends of the graph are the
+    /// a parallelogram is data crossing a boundary, rounded corners are a
+    /// process aboard, a keyed rectangle is an interface that is driven, a
+    /// barred one is a page written down somewhere else, and the two ends of
+    /// the graph are the
     /// two shapes nothing else uses -- a pill where it stops on board, a
     /// store where it is kept. Within a shape the types differ by
     /// shading, weight and size.
@@ -956,13 +1066,14 @@ impl NodeType {
         use Shading::*;
         use Weight::*;
         match self {
-            // Buses: square, and told apart by shading and size.
+            // Buses and the rest of the payloads: the data symbol, and told
+            // apart from each other by shading and size.
             NodeType::I2c => Appearance {
                 face: Face::Mono,
                 label_size: 12,
                 label_weight: 700,
                 label_italic: false,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Solid,
                 weight: Narrow,
                 size: (WIDTH, 48),
@@ -973,7 +1084,7 @@ impl NodeType {
                 label_size: 12,
                 label_weight: 400,
                 label_italic: false,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Hatched,
                 weight: Narrow,
                 size: (WIDTH, 56),
@@ -984,7 +1095,7 @@ impl NodeType {
                 label_size: 10,
                 label_weight: 400,
                 label_italic: true,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Open,
                 weight: Narrow,
                 size: (WIDTH, 48),
@@ -998,7 +1109,7 @@ impl NodeType {
                 label_size: 14,
                 label_weight: 700,
                 label_italic: false,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Double,
                 weight: Wide,
                 size: (WIDTH, 56),
@@ -1009,7 +1120,7 @@ impl NodeType {
                 label_size: 14,
                 label_weight: 700,
                 label_italic: false,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Double,
                 weight: Narrow,
                 size: (WIDTH, 64),
@@ -1020,7 +1131,7 @@ impl NodeType {
                 label_size: 12,
                 label_weight: 400,
                 label_italic: true,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Hatched,
                 weight: Wide,
                 size: (WIDTH, 56),
@@ -1031,7 +1142,7 @@ impl NodeType {
                 label_size: 10,
                 label_weight: 700,
                 label_italic: true,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Solid,
                 weight: Wide,
                 size: (WIDTH, 48),
@@ -1042,7 +1153,7 @@ impl NodeType {
                 label_size: 12,
                 label_weight: 700,
                 label_italic: false,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Open,
                 weight: Wide,
                 size: (WIDTH, 56),
@@ -1053,7 +1164,7 @@ impl NodeType {
                 label_size: 10,
                 label_weight: 400,
                 label_italic: false,
-                outline: Square,
+                outline: Parallelogram,
                 shading: Double,
                 weight: Wide,
                 size: (WIDTH, 64),
@@ -1179,7 +1290,10 @@ mod tests {
         for kind in NodeType::ALL {
             let drawn = kind.appearance();
             let shape = shape_of(drawn.outline, drawn.size);
-            let shaped = matches!(drawn.outline, Outline::Pointed | Outline::Store);
+            let shaped = matches!(
+                drawn.outline,
+                Outline::Pointed | Outline::Store | Outline::Parallelogram
+            );
 
             assert_eq!(
                 shaped,
@@ -1206,6 +1320,31 @@ mod tests {
                 );
             }
 
+            // What is drawn inside it is inside it, where anything is. The
+            // hatching and the second outline of a doubled shape are
+            // rectangles in the markup, so a shape shaded either of those
+            // ways has to say how much room to leave at its sides -- and the
+            // answer has to be enough, or a payload's hatching is drawn in
+            // the air beside the node. A solid shape is filled by the path
+            // itself and has nothing rectangular inside it to escape.
+            if matches!(drawn.shading, Shading::Hatched | Shading::Double) {
+                let room = room_of(drawn.outline, drawn.size) as f32;
+                for spot in [
+                    (room, 0.0),
+                    (width as f32 - room, 0.0),
+                    (room, height as f32),
+                    (width as f32 - room, height as f32),
+                ] {
+                    assert!(
+                        within(&points, spot),
+                        "{} is shaded {:?}, leaves {room} at the sides, and \
+                         {spot:?} is still outside it: {shape}",
+                        kind.spelling(),
+                        drawn.shading
+                    );
+                }
+            }
+
             // And it holds every terminal it is drawn with. This is the rule
             // the shape is chosen by: a terminal is placed in the corner of
             // the node's box, so a shape that cuts a corner off cuts a
@@ -1221,7 +1360,7 @@ mod tests {
                 .chain(kind.terminals().sources)
             {
                 let corner = corner_of(terminal).expect("a terminal of a known type");
-                let (x, y) = terminal_at(corner, drawn.size);
+                let (x, y) = terminal_at(drawn.outline, corner, drawn.size);
                 let (wide, tall) = (TERMINAL.0 as i32, TERMINAL.1 as i32);
                 for spot in [
                     (x, y),
@@ -1253,8 +1392,15 @@ mod tests {
             .iter()
             .zip(points.iter().cycle().skip(1))
             .all(|((ax, ay), (bx, by))| {
-                let side = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
-                side >= -0.5
+                let cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+                // Divided by the edge's own length, so the half pixel of
+                // slack is half a pixel of distance from the edge whatever
+                // the edge's length: a cross product is an area, and half a
+                // unit of area beside a 128-pixel side is no slack at all.
+                // Half a pixel, because every one of these shapes is inset
+                // half a pixel to keep its stroke inside the node.
+                let along = ((bx - ax).powi(2) + (by - ay).powi(2)).sqrt();
+                cross / along.max(f32::EPSILON) >= -0.5
             })
     }
 
@@ -1414,7 +1560,7 @@ mod tests {
             let mut boxes: Vec<(i32, i32)> = Vec::new();
             for terminal in t.terminals().each() {
                 let corner = corner_of(terminal).expect("a corner");
-                let at = terminal_at(corner, (width, height));
+                let at = terminal_at(t.appearance().outline, corner, (width, height));
                 // Inside the node, with its inset on every side.
                 assert!(at.0 >= inset && at.1 >= inset, "{terminal}: {at:?}");
                 assert!(
@@ -1638,16 +1784,28 @@ mod tests {
     }
 
     /// A line joins a node at the outer edge of the terminal's own box.
+    ///
+    /// Which is the side of the node where the shape reaches it, and in from
+    /// the side where it does not: a payload leans, so the line to the
+    /// terminal in its missing corner stops where the slant is rather than
+    /// out in the notch beside it.
     #[test]
     fn a_line_joins_a_node_at_its_terminals_edge() {
-        let (width, height) = NodeType::I2c.appearance().size;
+        let drawn = NodeType::I2c.appearance();
+        let (width, height) = drawn.size;
         let at = (400, 200);
 
         // A payload's pair, both on its left: its readings leave at the top
         // going left, and what asks for them arrives at the bottom going
         // right.
         let ((x, y), rightward) = attachment("i2c", at, "payload-out").expect("a payload");
-        assert_eq!(x, at.0 as f32, "a terminal on the left joins the left edge");
+        let room = room_at(drawn.outline, drawn.size, corner_of("payload-out").unwrap());
+        assert!(room > 0, "a payload leans, so its upper left is in from the side");
+        assert_eq!(
+            x,
+            at.0 as f32 + room as f32,
+            "a terminal on the left joins the shape's own left"
+        );
         assert!(!rightward, "the readings leave towards the ground");
         assert!(y < at.1 as f32 + height as f32 / 2.0, "the upper corner");
 

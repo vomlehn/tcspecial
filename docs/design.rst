@@ -1684,10 +1684,36 @@ terminal is drawn in a corner, and every other symbol in the vocabulary buys
 its distinctiveness with a corner. The bars are inside the shape, so they cost
 nothing a corner needs.
 
+A payload is a **parallelogram**, the flowchart symbol for input and output on
+an unspecified medium -- which is what the nine device kinds are: a bus, a
+socket, a channel, a sample buffer, a file. It is the one symbol in the
+notation that means *data crossing a boundary* rather than a thing or a step,
+and a payload is exactly that boundary. It leans right, as the symbol is
+drawn, so the corners it gives away are the top left and the bottom right.
+
+The top left is where a payload's ``payload-out`` terminal is, so this is the
+first shape whose slant had to be paid for rather than dodged. Three things
+move with it, all of them from ``style::room_at``, which says how far in the
+shape is at the row a given terminal sits in: the terminal box itself, so the
+arrow stays on the node; the point where a line joins the node, so the line
+stops where the shape is instead of out in the notch beside it; and the column
+the name is padded away from, so a name is not padded into a terminal that has
+moved. The room is measured at the edge of the terminal's box nearest the top
+or the bottom, not at the row's middle, because a leaning side is furthest in
+at one end of the box and taking the middle would leave half of it hanging
+out.
+
+Anything drawn *inside* a leaning shape has the same problem: the hatching and
+the second outline of a doubled shape are rectangles in the markup, and a
+rectangle filling the box would spill into the notches. They are inset by
+``style::room_of``, the widest the shape is missing anywhere, and a test holds
+every shape shaded either of those ways to it.
+
 The shapes are the ones the standard notations use, which is worth more than
 being inventive: a reader who has seen a data-flow diagram already knows that
-a rounded box is a process, a plain rectangle is something outside the system
-and a box with an end left open is somewhere data is kept. The pill a log used
+a parallelogram is data crossing a boundary, a rounded box is a process, a
+plain rectangle is something outside the system and a box with an end left
+open is somewhere data is kept. The pill a log used
 to be is the flowchart symbol for a *terminator*, where control enters or
 leaves a program, which is not what a log is. It also rounded away the one
 corner the log's own terminal is drawn in, and put that arrow about fifteen

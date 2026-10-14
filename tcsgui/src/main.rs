@@ -3523,6 +3523,7 @@ fn view_of(
             Outline::Square => "square",
             Outline::Rounded => "rounded",
             Outline::Store => "store",
+            Outline::Parallelogram => "parallelogram",
             Outline::Keyed => "keyed",
             Outline::Barred => "barred",
             Outline::Pointed => "pointed",
@@ -3561,11 +3562,18 @@ fn view_of(
         // this build does not know has none: the shape already says it cannot
         // be placed, and four arrows on it would be four claims about a type
         // nothing here can describe.
-        moc_in: terminal_view("moc-in", terminals, size),
-        moc_out: terminal_view("moc-out", terminals, size),
-        payload_in: terminal_view("payload-in", terminals, size),
-        payload_out: terminal_view("payload-out", terminals, size),
-        terminal_column: style::TERMINAL_COLUMN as f32,
+        moc_in: terminal_view("moc-in", terminals, outline, size),
+        moc_out: terminal_view("moc-out", terminals, outline, size),
+        payload_in: terminal_view("payload-in", terminals, outline, size),
+        payload_out: terminal_view("payload-out", terminals, outline, size),
+        // The column the name is padded away from, plus whatever the outline
+        // is missing at its widest: a slanted shape moves its terminals in,
+        // and a name padded by the column alone would be padded into them.
+        terminal_column: (style::TERMINAL_COLUMN as i32
+            + style::room_of(outline, size)) as f32,
+        // The room anything drawn inside the shape has to leave at the sides,
+        // which is nothing unless the shape leans: see style::room_of.
+        inset: style::room_of(outline, size) as f32,
     }
 }
 
@@ -3578,11 +3586,12 @@ fn view_of(
 fn terminal_view(
     terminal: &str,
     terminals: style::Terminals,
+    outline: Outline,
     size: (u32, u32),
 ) -> TerminalView {
     let corner = style::corner_of(terminal);
     let (x, y) = corner
-        .map(|corner| style::terminal_at(corner, size))
+        .map(|corner| style::terminal_at(outline, corner, size))
         .unwrap_or_default();
     TerminalView {
         shown: terminals.has(terminal),

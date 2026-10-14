@@ -77,7 +77,7 @@ export struct NodeView {
     y: length,
     width: length,
     height: length,
-    // square | rounded | keyed | barred | store | pointed
+    // square | rounded | keyed | barred | store | pointed | parallelogram
     outline: string,
     // The outline as path data, in this node's own coordinates, for the
     // outlines a corner radius cannot draw. Empty for the ones it can, which
@@ -87,6 +87,10 @@ export struct NodeView {
     // solid | hatched | open | double
     shading: string,
     border: length,
+    // How far in from the sides anything drawn inside the shape has to stay:
+    // nothing, unless the outline leans. Rust's arithmetic, as the shape is:
+    // see style::room_of.
+    inset: length,
     // How the label is set: the fifth channel that is not colour. A face, a
     // size, a weight and an italic, chosen per type in style.rs.
     face: string,
@@ -481,9 +485,15 @@ component NodeShape inherits Rectangle {
                         : transparent;
             }
 
-            // Hatched shading, inside whatever the outline turned out to be.
+            // Hatched shading, inside whatever the outline turned out to be
+            // -- and inside the sides of it, which is what the inset is for: a
+            // leaning shape does not reach its own box at the top and the
+            // bottom, and hatching that filled the box would be hatching in
+            // the air beside the node.
             if node.shading == "hatched": Hatching {
-                width: 100%;
+                x: node.inset;
+                y: 0;
+                width: parent.width - 2 * node.inset;
                 height: 100%;
                 ink: ink.with-alpha(0.45);
                 border-radius: parent.border-radius;
@@ -493,9 +503,9 @@ component NodeShape inherits Rectangle {
             // non-colour channel at work: a doubled square and a solid square
             // differ without either of them being a different colour.
             if node.shading == "double": Rectangle {
-                x: 4px;
+                x: 4px + node.inset;
                 y: 4px;
-                width: parent.width - 8px;
+                width: parent.width - 8px - 2 * node.inset;
                 height: parent.height - 8px;
                 border-width: 1px;
                 border-color: ink;

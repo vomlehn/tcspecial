@@ -338,11 +338,22 @@ pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
     out.trim_end().to_string()
 }
 
+/// How many nodes other than its own ends a link's line runs through.
+///
+/// The nodes it is joined to do not count, which is the same distinction
+/// [`blocking`] draws: a line leaves its source and arrives at its target, so
+/// crossing those two boxes is what it is for. It is not a distinction about
+/// edges either, now that a point where a line meets a node can be inside the
+/// node's box -- a slanted outline does not reach its own box at the row a
+/// terminal sits in, so the line stops where the shape is, which is in from
+/// the side. See `style::room_at`.
 #[cfg(test)]
 pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
+    let (from, to) = (ends.from, ends.to);
     let points = way(ends, around);
     around
         .iter()
+        .filter(|b| !holds(b, from) && !holds(b, to))
         .filter(|b| {
             let box_ = (b.x, b.y, b.x + b.width, b.y + b.height);
             points.windows(2).any(|s| crosses(s[0], s[1], box_))

@@ -52,16 +52,16 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- Where data arrives at a node: the record of a link, written on the node
-       it arrives at, naming the node it left, as `node` or `node.terminal`.
-       The link itself is on the node it leaves and is what the software reads.
-       This is the same fact at the other end, so that a node's entry says what
-       it is connected to without the rest of the file being read against it.
-       A file may leave these out, and one that states any for a sink states
-       all of them: a disagreement between the two ends is refused where the
-       file is read. -->
+  <!-- Whether a line arrives at one of a node's data sinks: true, or false
+       for a node saying none does. A record of the links written on the nodes
+       they leave, and not a link: which node a line comes from is written on
+       that node, and a copy of the name here would be the same connection
+       twice over. It would also read as "and nothing else" at a sink several
+       lines arrive at, which the ground's is in every configuration. A file
+       may leave these out, and one that disagrees with the links is refused
+       where it is read. -->
   <xs:simpleType name="source">
-    <xs:restriction base="nodename"/>
+    <xs:restriction base="xs:boolean"/>
   </xs:simpleType>
 
   <!-- Where the editor drew one node, which the flight software ignores.
@@ -91,10 +91,9 @@
       <!-- The two data sources, which are where links are written. -->
       <xs:element name="to_moc" type="destination"/>
       <xs:element name="to_payload" type="destination"/>
-      <!-- And the two data sinks, which record the same links at the end
-           they arrive at: the value names the node the data came from. A
-           record of a link rather than a link, and optional. See the `source`
-           type above. -->
+      <!-- And the two data sinks, which say whether a line arrives there.
+           A record of the links written at the other end rather than a link,
+           and optional. See the `source` type above. -->
       <xs:element name="from_payload" type="source"/>
       <xs:element name="from_moc" type="source"/>
       <!-- Where a node is. -->

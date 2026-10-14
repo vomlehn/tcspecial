@@ -1229,13 +1229,8 @@ impl Document {
                         ));
                     }
                 }
-                for (sink, sources) in self.arriving(node, home) {
-                    for from in sources {
-                        out.push_str(&format!(
-                            "        <{sink}>{}</{sink}>\n",
-                            escape(&from)
-                        ));
-                    }
+                for sink in self.arriving(node, home) {
+                    out.push_str(&format!("        <{sink}>true</{sink}>\n"));
                 }
                 out.push_str(&format!("    </{tag}>\n"));
             }
@@ -1435,15 +1430,10 @@ impl Document {
                         }
                     }
                 }
-                // And the same lines again at the other end: what arrives
-                // here, under the data sink it arrives at. See `arriving`.
-                for (sink, sources) in self.arriving(node, home) {
-                    match sources.as_slice() {
-                        [one] => out.push_str(&format!("    {sink}: {one}\n")),
-                        many => {
-                            out.push_str(&format!("    {sink}: [{}]\n", many.join(", ")))
-                        }
-                    }
+                // And which of its data sinks something arrives at, which is
+                // the same lines seen from the other end. See `arriving`.
+                for sink in self.arriving(node, home) {
+                    out.push_str(&format!("    {sink}: true\n"));
                 }
             }
         }
@@ -1551,35 +1541,36 @@ impl Document {
         leaving
     }
 
-    /// What arrives at a node, by the data sink it arrives at.
+    /// Which of a node's data sinks a line arrives at, where any does.
     ///
     /// The other end of what `leaving` writes, and a record of it rather than
-    /// the link itself: `from_payload: temp_fore` on the node the reading
-    /// reaches says the same thing as `to_moc: k_fore` on the node it left.
-    /// Written so that a node's entry says what it is connected to at both
-    /// ends, instead of only what leaves it -- which, for a node that is
-    /// mostly fed, was most of a node's entry saying nothing.
+    /// the link itself: `from_payload: true` on the node a reading reaches
+    /// says that something arrives there, where the `to_moc` on the node it
+    /// left says what and where. Written so that a node's entry says it is
+    /// connected at both ends, instead of only where it leaves -- which, for
+    /// a node that is mostly fed, was most of a node's entry saying nothing.
     ///
-    /// The sink is the one the link names where it names one of the four, and
-    /// otherwise the one at the other end of the stream it left by: a `to_moc`
-    /// arrives at a `from_payload` and nowhere else. A computation's named
-    /// input -- `mean_temp.in0` -- is recorded under the stream's sink too:
-    /// which input it feeds is on the node it left, where there is one name
-    /// for it, and recording it twice would be two places to get it wrong.
+    /// A flag and not the name of the node the line comes from. That name is
+    /// on the node the line leaves; a copy of it here would be the same
+    /// connection written twice, and at a sink several lines arrive at -- the
+    /// ground's, in every configuration -- one name reads as "and nothing
+    /// else".
     ///
-    /// Sorted by name, because this is derived rather than written: two
-    /// readings of one document must write one file.
-    fn arriving(&self, node: &Node, home: &Home) -> Vec<(&'static str, Vec<String>)> {
-        let mut arriving: Vec<(&'static str, Vec<String>)> = Vec::new();
+    /// Which sink a line arrives at is the stream's own answer: what leaves by
+    /// `to_moc` arrives at a `from_payload` and nowhere else, so a destination
+    /// that named an input -- `mean_temp.in0` -- counts at the stream's sink.
+    /// Only the sinks something arrives at are written, as a node with nothing
+    /// leaving it writes no `to_moc`.
+    fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
+        let mut arriving: Vec<&'static str> = Vec::new();
         let ours = Qualified::of(&node.name, home).absolute();
         for sink in ["from_payload", "from_moc"] {
-            let mut sources: Vec<String> = Vec::new();
-            for link in self.links.iter().filter(|l| l.to == ours) {
+            let any = self.links.iter().filter(|l| l.to == ours).any(|link| {
                 // Which sink of this node the line arrives at, which needs the
                 // terminal it left by: the two are one stream read from either
                 // end.
                 let Some(from) = self.nodes.iter().find(|n| n.name == link.from) else {
-                    continue;
+                    return false;
                 };
                 let left_by =
                     crate::style::terminal_for(&from.node_type, link.origin.as_deref(), false);
@@ -1589,17 +1580,10 @@ impl Document {
                     }
                     _ => left_by.and_then(tcslibgs::graph::terminals::answers),
                 };
-                if at != Some(sink) {
-                    continue;
-                }
-                let name = Qualified::parse(&link.from).written_from(home);
-                if !sources.contains(&name) {
-                    sources.push(name);
-                }
-            }
-            if !sources.is_empty() {
-                sources.sort();
-                arriving.push((sink, sources));
+                at == Some(sink)
+            });
+            if any {
+                arriving.push(sink);
             }
         }
         arriving
@@ -3154,8 +3138,8 @@ mod tests {
         let yaml = document.to_yaml();
         assert!(yaml.contains("    to_moc:\n      - target: moc\n"), "{yaml}");
         assert!(
-            yaml.contains("from_payload: temp_fore"),
-            "the arriving end is not recorded: {yaml}"
+            yaml.contains("    from_payload: true\n"),
+            "the arriving end does not say so: {yaml}"
         );
 
         let xml = document.to_xml();
@@ -3164,8 +3148,8 @@ mod tests {
             "{xml}"
         );
         assert!(
-            xml.contains("<from_payload>temp_fore</from_payload>"),
-            "the arriving end is not recorded: {xml}"
+            xml.contains("<from_payload>true</from_payload>"),
+            "the arriving end does not say so: {xml}"
         );
 
         // And the record is of the stream, not of the terminal somebody drew
@@ -3174,12 +3158,14 @@ mod tests {
         assert!(!yaml.contains("from_moc"), "{yaml}");
     }
 
-    /// Several sources arriving at one sink are recorded as a list.
+    /// A sink several lines arrive at says what one line says: that they do.
     ///
     /// The ground's case, which is every configuration: each payload aboard
     /// reports to the one moc node, told apart by the socket its id names.
+    /// Which is the reason this is a flag rather than a name -- one name there
+    /// would read as "and nothing else".
     #[test]
-    fn a_sink_that_several_links_arrive_at_records_them_all() {
+    fn a_sink_that_several_links_arrive_at_says_so_once() {
         use crate::journal::Link;
 
         let mut document = Document::new();
@@ -3192,9 +3178,10 @@ mod tests {
         }
 
         let yaml = document.to_yaml();
-        assert!(
-            yaml.contains("from_payload: [temp_aft, temp_fore]"),
-            "both of them, in a settled order: {yaml}"
+        assert_eq!(
+            yaml.matches("from_payload: true").count(),
+            1,
+            "once, for the sink and not for each line: {yaml}"
         );
     }
 

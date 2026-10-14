@@ -45,6 +45,7 @@ use std::fmt;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+use tcslibgs::graph::check::{Severity, AND_OTHERS, LISTED};
 use tcslibgs::{
     describes_payloads_text, ConfigFormat, DHConfig, PayloadConfig, SimConfigFile, TcsError,
 };
@@ -73,11 +74,25 @@ pub struct Finding {
     pub line: usize,
     /// What is wrong, in the words the library uses for it.
     pub message: String,
+    /// Whether the configuration says something wrong or has not finished
+    /// saying it. See [`Severity`], which is `tcslibgs`'s: the split belongs
+    /// with the rules and not with the program that prints them.
+    pub severity: Severity,
 }
 
 impl fmt::Display for Finding {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}: {}", self.file.display(), self.line, self.message)
+        // Labelled, both kinds. A report whose warnings said so and whose
+        // errors said nothing would leave a reader working out which an
+        // unlabelled line was.
+        write!(
+            f,
+            "{}:{}: {}: {}",
+            self.file.display(),
+            self.line,
+            self.severity.label(),
+            self.message
+        )
     }
 }
 
@@ -100,8 +115,20 @@ pub struct Report {
 }
 
 impl Report {
-    /// Whether anything is wrong.
+    /// Whether anything is wrong, as against unfinished.
+    ///
+    /// Warnings do not count. A configuration with a node whose attributes
+    /// are not all in yet is one somebody is in the middle of writing, and a
+    /// verifier that failed on it would fail on every save: what the status
+    /// is for is telling `make` that the files say something wrong.
     pub fn found_errors(&self) -> bool {
+        self.findings
+            .iter()
+            .any(|finding| finding.severity == Severity::Error)
+    }
+
+    /// Whether anything at all was found, wrong or unfinished.
+    pub fn found_anything(&self) -> bool {
         !self.findings.is_empty()
     }
 
@@ -117,18 +144,57 @@ impl Report {
         }
     }
 
-    /// Write the findings, and say so if there were too many.
+    /// Write the first few findings, then say how many more there were.
+    ///
+    /// Errors first and warnings after, so that the lines a person reads are
+    /// the ones saying the configuration is wrong rather than the ones saying
+    /// it is unfinished. [`LISTED`] of them, and then [`AND_OTHERS`] with the
+    /// count: a report twenty lines long is a report scrolled past, and in a
+    /// half-built graph most of those lines are one unfinished node said
+    /// twice.
     pub fn write(&self, out: &mut impl Write) -> io::Result<()> {
-        for finding in self.findings.iter().take(ERROR_LIMIT) {
+        let ordered = self.ordered();
+        for finding in ordered.iter().take(LISTED) {
             writeln!(out, "{finding}")?;
         }
+        let rest = ordered.len().saturating_sub(LISTED);
+        if rest > 0 {
+            writeln!(out, "{AND_OTHERS} ({rest} more)")?;
+        }
+        // And whether there were more than were even looked for, which is a
+        // different thing from more than were printed.
         if self.halted {
             writeln!(out, "{TOO_MANY}")?;
         }
         Ok(())
     }
 
+    /// The findings, errors first. See [`Report::write`].
+    pub fn ordered(&self) -> Vec<&Finding> {
+        let mut ordered: Vec<&Finding> = self
+            .findings
+            .iter()
+            .filter(|finding| finding.severity == Severity::Error)
+            .collect();
+        ordered.extend(
+            self.findings
+                .iter()
+                .filter(|finding| finding.severity == Severity::Warning),
+        );
+        ordered
+    }
+
     fn add(&mut self, file: &Path, line: usize, message: impl Into<String>) {
+        self.found(file, line, message, Severity::Error)
+    }
+
+    fn found(
+        &mut self,
+        file: &Path,
+        line: usize,
+        message: impl Into<String>,
+        severity: Severity,
+    ) {
         if self.halted {
             return;
         }
@@ -136,6 +202,7 @@ impl Report {
             file: file.to_path_buf(),
             line,
             message: message.into(),
+            severity,
         });
         // The one past the limit is kept so that the count is honest, and is
         // what says there were too many.
@@ -245,7 +312,7 @@ fn check_graph(path: &Path, report: &mut Report) {
             .map(|(_, where_)| where_.line_of(&about))
             .unwrap_or(crate::locate::THE_FILE_ITSELF);
 
-        report.add(&home, line, problem.describe());
+        report.found(&home, line, problem.describe(), problem.severity());
     }
 }
 
@@ -674,19 +741,33 @@ payloads:
         );
     }
 
-    /// A finding says the file, the line and what is wrong, in that order.
+    /// A finding says the file, the line, which kind it is and what is wrong.
     ///
-    /// The shape an editor and a build log both read: `file:line: message`.
+    /// The shape an editor and a build log both read: `file:line: error:
+    /// message`.
     #[test]
     fn a_finding_names_the_file_and_the_line() {
         let finding = Finding {
             file: PathBuf::from("tests/manual/tcspecial2.yaml"),
             line: 7,
             message: "payload \"DH0\" has no packet_size".to_string(),
+            severity: Severity::Error,
         };
         assert_eq!(
             finding.to_string(),
-            "tests/manual/tcspecial2.yaml:7: payload \"DH0\" has no packet_size"
+            "tests/manual/tcspecial2.yaml:7: error: payload \"DH0\" has no \
+             packet_size"
+        );
+
+        // And a warning says which it is in the same place, so that the two
+        // are read without counting colons.
+        let unfinished = Finding {
+            severity: Severity::Warning,
+            ..finding.clone()
+        };
+        assert!(
+            unfinished.to_string().contains(":7: warning: "),
+            "{unfinished}"
         );
 
         // And a real one is written the same way, by the same Display.
@@ -698,9 +779,12 @@ payloads:
         let report = verify(&set.payload, None);
         let first = report.findings.first().expect("something is wrong with it");
         assert!(
-            first
-                .to_string()
-                .starts_with(&format!("{}:{}: ", set.payload.display(), first.line)),
+            first.to_string().starts_with(&format!(
+                "{}:{}: {}: ",
+                set.payload.display(),
+                first.line,
+                first.severity.label()
+            )),
             "a finding must lead with its file and line: {first}"
         );
         assert!(
@@ -842,8 +926,8 @@ simulated_payloads:
         );
     }
 
-    /// A hundred and one problems stop the run, and the hundred and first is
-    /// not printed: it is the one that says there are more.
+    /// A hundred and one problems stop the run, and the printed report is the
+    /// first few of them and a count of the rest.
     #[test]
     fn too_many_problems_stop_the_run() {
         // Each payload states a port it cannot have, so each is one problem.
@@ -868,13 +952,21 @@ simulated_payloads:
         report.write(&mut printed).expect("written");
         let printed = String::from_utf8(printed).expect("text");
         let lines: Vec<&str> = printed.lines().collect();
-        assert_eq!(lines.len(), ERROR_LIMIT + 1, "a hundred and the message");
-        assert_eq!(lines[ERROR_LIMIT], TOO_MANY);
+        // The first few, then that there were others, then that the run gave
+        // up looking -- which is a different thing from there being more than
+        // were printed.
+        assert_eq!(lines.len(), LISTED + 2, "{printed}");
+        assert!(lines[LISTED].starts_with(AND_OTHERS), "{printed}");
+        assert!(
+            lines[LISTED].contains(&format!("{} more", report.findings.len() - LISTED)),
+            "{printed}"
+        );
+        assert_eq!(lines[LISTED + 1], TOO_MANY);
         assert_eq!(report.status(), 1);
     }
 
-    /// Exactly a hundred is not too many: the message says there are more
-    /// than were printed, so it must not appear when there are not.
+    /// Exactly a hundred is not too many: the run did not give up, so the
+    /// message that says it did must not appear.
     #[test]
     fn a_hundred_problems_are_all_printed_and_nothing_more_is_said() {
         let mut text = "version: \"1.0\"\ndescription: many\npayloads:\n".to_string();
@@ -893,7 +985,8 @@ simulated_payloads:
         let mut printed = Vec::new();
         report.write(&mut printed).expect("written");
         let printed = String::from_utf8(printed).expect("text");
-        assert_eq!(printed.lines().count(), ERROR_LIMIT);
+        assert_eq!(printed.lines().count(), LISTED + 1, "{printed}");
+        assert!(printed.contains(AND_OTHERS), "{printed}");
         assert!(!printed.contains(TOO_MANY), "{printed}");
     }
 
@@ -926,6 +1019,11 @@ simulated_payloads:
     /// beside it, so each is checked on its own -- and both spellings of each
     /// are checked, because a configuration may be written in either and the
     /// two are transcribed by hand.
+    ///
+    /// Errors, which is what "verifies" means: a shipped example may hold a
+    /// node somebody has not finished -- that is what a warning is -- and the
+    /// thermostat holds none. What must never be in one of these is something
+    /// the rules say is wrong.
     #[test]
     fn every_shipped_graph_verifies() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -936,9 +1034,65 @@ simulated_payloads:
                 assert!(
                     !report.found_errors(),
                     "{name}.{extension} was faulted: {:?}",
-                    report.findings
+                    report.ordered()
                 );
             }
         }
+
+        // And the worked example is finished, warnings and all: it is the one
+        // a reader is meant to learn the shape from.
+        for extension in ["yaml", "xml"] {
+            let graph = root.join(format!("tests/manual/thermostat.{extension}"));
+            let report = verify(&graph, None);
+            assert!(
+                !report.found_anything(),
+                "thermostat.{extension}: {:?}",
+                report.ordered()
+            );
+        }
+    }
+
+    /// A configuration whose only trouble is unfinished nodes warns and
+    /// passes.
+    ///
+    /// The state every configuration is in while it is being drawn: a node
+    /// placed and not yet filled in, a node not yet linked to anything. A
+    /// verifier that failed on that would fail on every save, so it says so
+    /// and exits nought -- and says `warning` on the line, so that a reader
+    /// can tell it from the kind that means the file is wrong.
+    #[test]
+    fn an_unfinished_graph_warns_and_passes() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("half_drawn.yaml");
+
+        // The shipped example with one more payload on it, placed and not yet
+        // told which device it is on or linked to anything -- which is what
+        // the editor writes the moment somebody drops a node on the canvas.
+        let said = std::fs::read_to_string(root.join("tests/manual/thermostat.yaml"))
+            .expect("the worked example");
+        std::fs::write(
+            &path,
+            said.replace(
+                "payloads:\n",
+                "payloads:\n  - name: temp_new\n    type: i2c\n",
+            ),
+        )
+        .unwrap();
+
+        let report = verify(&path, None);
+        assert!(report.found_anything(), "the unfinished node was not noticed");
+        assert!(
+            !report.found_errors(),
+            "an unfinished node is not an error: {:?}",
+            report.ordered()
+        );
+        assert_eq!(report.status(), 0, "and must not fail a build");
+
+        let mut printed = Vec::new();
+        report.write(&mut printed).expect("written");
+        let printed = String::from_utf8(printed).expect("text");
+        assert!(printed.contains(": warning: "), "{printed}");
+        assert!(printed.contains("temp_new"), "{printed}");
     }
 }

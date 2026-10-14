@@ -14,6 +14,61 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::{terminals, Destination, Graph};
 use crate::verify::About;
 
+/// How much a problem matters to somebody editing the configuration.
+///
+/// Two kinds, and the difference is whether the configuration says something
+/// wrong or has not finished saying it:
+///
+/// * an **error** is a configuration that contradicts itself or the rules. Two
+///   nodes of one name, a link to a node that is not there, a link carrying
+///   one stream into the other, two payloads claiming one socket. Reading it
+///   again will not make it true.
+/// * a **warning** is a configuration that is not finished. A node whose
+///   attributes are not all in yet -- no `path` on a sensor, no `inputs` on a
+///   mean -- and a node nothing is linked to. That is what a half-built graph
+///   looks like, and it is the state an editor leaves one in between one edit
+///   and the next.
+///
+/// This changes no rule. [`Graph::check`](super::Graph::check) hands back
+/// every problem either way and the flight software refuses a configuration
+/// with any of them: a sensor whose device nobody named cannot be opened, so
+/// it is not a question of degree aboard. What the split is for is the person:
+/// a graph halfway through being drawn should not bury the mistakes in it under
+/// the things they have not typed yet. `tcsverify` says which is which and
+/// exits nought where only warnings were found; tcsgui refuses to generate
+/// code while any remain, warnings included, because code generated from an
+/// unfinished configuration would not compile into anything that flies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Severity {
+    /// The configuration says something wrong.
+    Error,
+    /// The configuration has not finished saying it.
+    Warning,
+}
+
+impl Severity {
+    /// What this is called in a report.
+    pub fn label(self) -> &'static str {
+        match self {
+            Severity::Error => "error",
+            Severity::Warning => "warning",
+        }
+    }
+}
+
+/// How many problems are listed before the rest are summed up.
+///
+/// A person reading a report acts on the first few; the twentieth is scrolled
+/// past, and in a half-built graph most of them are the same unfinished node
+/// said a second way. So the first few are listed and the rest are counted.
+pub const LISTED: usize = 5;
+
+/// What follows the ones that were listed, where there were more.
+///
+/// One phrase, used by the verifier's output and by the editor's refusal to
+/// generate code, so that a person meets the same shape of report in both.
+pub const AND_OTHERS: &str = "and others";
+
 /// Something wrong with a configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Problem {
@@ -195,6 +250,27 @@ impl Problem {
             // about what it wants, and the source is the thing a reader will
             // have to change or unlink.
             Problem::LogSourceMismatch { source, .. } => About::Node(source.clone()),
+        }
+    }
+
+    /// Whether this is a configuration that is wrong or one that is
+    /// unfinished. See [`Severity`], which has the argument.
+    pub fn severity(&self) -> Severity {
+        match self {
+            // The attributes of a node: not all in yet is what an editor
+            // leaves between one edit and the next. A value that is there and
+            // wrong is counted with them rather than apart, because what says
+            // which is a sentence written by whichever node type knows -- and
+            // a reader of either has the same thing to do, which is open that
+            // node and look at its words.
+            Problem::BadNode { .. }
+            | Problem::BadCompute { .. }
+            | Problem::BadLog { .. }
+            // And a node with nothing joined to it, which is a line somebody
+            // has not drawn yet.
+            | Problem::NodeOnNoLink { .. }
+            | Problem::Unconnected { .. } => Severity::Warning,
+            _ => Severity::Error,
         }
     }
 

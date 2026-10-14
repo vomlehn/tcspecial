@@ -76,10 +76,18 @@ pub fn where_to(document: &Document, configuration: &Path) -> Option<PathBuf> {
 
 /// What is wrong with generating the code, where something is.
 ///
-/// Said as the editor says everything else that cannot be done: in words, on
-/// the window, with nothing written. A configuration with no `rust-code-path` is
+/// Said as the editor says everything else that cannot be done: in words, in a
+/// window, with nothing written. A configuration with no `rust-code-path` is
 /// not a fault -- it is a configuration nobody has asked this of -- but asking
 /// for the code without having said where it goes is worth a sentence.
+///
+/// And the configuration itself has to hold together. The editor is lazy on
+/// purpose while a diagram is being drawn -- a node placed and not yet filled
+/// in is how anybody works -- and generating code is the one command where
+/// that laziness has to end: what comes out of it is compiled into the
+/// program the vehicle runs, so a sensor whose device nobody named would be a
+/// payload the binary cannot open. Both kinds stop it, the unfinished as well
+/// as the wrong: see `tcslibgs::graph::check::Severity`.
 pub fn trouble(document: &Document, configuration: &Path) -> Option<String> {
     if where_to(document, configuration).is_none() {
         return Some(format!(
@@ -88,7 +96,69 @@ pub fn trouble(document: &Document, configuration: &Path) -> Option<String> {
             tcslibgs::graph::parameters::RUST_CODE
         ));
     }
-    None
+    unfinished(configuration)
+}
+
+/// What the configuration check says, as one sentence, where it says anything.
+///
+/// Asked of the files rather than of the document in hand, because the rules
+/// are `tcslibgs`'s and they are written against a `Graph`: every edit is
+/// written as it is made, so the files say what the document says -- and where
+/// a write failed, the editor is already saying so.
+///
+/// The first few and then a count of the rest, which is the shape `tcsverify`
+/// prints: `check::LISTED` and `check::AND_OTHERS` are shared so that somebody
+/// who has run the verifier meets a report they recognise. Errors before
+/// warnings, for the same reason the verifier puts them there.
+fn unfinished(configuration: &Path) -> Option<String> {
+    use tcslibgs::graph::check::{Severity, AND_OTHERS, LISTED};
+
+    let graph = match tcslibgs::graph::Graph::load(configuration) {
+        Ok(graph) => graph,
+        // The file the editor has been writing cannot be read back, which is
+        // a worse thing than this command: said plainly, with the name of the
+        // file to look at.
+        Err(e) => {
+            return Some(format!(
+                "{} cannot be read back, so there is nothing to generate from: {e}",
+                configuration.display()
+            ))
+        }
+    };
+
+    let problems = graph.check();
+    if problems.is_empty() {
+        return None;
+    }
+
+    let mut ordered: Vec<&tcslibgs::graph::check::Problem> = problems
+        .iter()
+        .filter(|problem| problem.severity() == Severity::Error)
+        .collect();
+    ordered.extend(
+        problems
+            .iter()
+            .filter(|problem| problem.severity() == Severity::Warning),
+    );
+
+    let listed: Vec<String> = ordered
+        .iter()
+        .take(LISTED)
+        .map(|problem| problem.describe())
+        .collect();
+    let rest = ordered.len().saturating_sub(LISTED);
+    let others = if rest > 0 {
+        format!("; {AND_OTHERS} ({rest} more)")
+    } else {
+        String::new()
+    };
+
+    Some(format!(
+        "the code cannot be generated from a configuration that is not \
+         finished. {}{others}. Put these right and ask again -- tcsverify \
+         lists all of them, with the line of the file each is on",
+        listed.join("; ")
+    ))
 }
 
 /// The configuration as Rust, ready to be compiled into tcspecial.
@@ -320,8 +390,6 @@ mod tests {
             where_to(&document, configuration),
             Some(PathBuf::from("/vehicles/aurora/generated/aurora.rs"))
         );
-        assert_eq!(trouble(&document, configuration), None);
-
         // An absolute path is where it says.
         document.apply(&Edit::SetTcspecial {
             attribute: "rust-code-path".to_string(),
@@ -331,6 +399,64 @@ mod tests {
         assert_eq!(
             where_to(&document, configuration),
             Some(PathBuf::from("/tmp/aurora.rs"))
+        );
+    }
+
+    /// A configuration that is not finished is refused, and told why.
+    ///
+    /// The command this guards is the one whose output is compiled into the
+    /// program the vehicle runs. Everywhere else the editor is lazy on
+    /// purpose; here a node nobody has finished is a payload the binary could
+    /// not open, so the answer is the list of what is missing and nothing
+    /// written.
+    #[test]
+    fn an_unfinished_configuration_cannot_be_generated_from() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+
+        // The worked example, which is finished, with the parameter set: the
+        // code is generated from it and this says nothing.
+        let mut document = crate::document::thermostat_example();
+        document.apply(&Edit::SetTcspecial {
+            attribute: "rust-code-path".to_string(),
+            was: None,
+            now: Some("generated/vehicle.rs".to_string()),
+        });
+        std::fs::write(&path, document.to_yaml()).expect("the configuration");
+        assert_eq!(trouble(&document, &path), None, "{:?}", trouble(&document, &path));
+
+        // One node more, placed and not yet told anything: refused, and the
+        // sentence names the node and what it is short of.
+        document.apply(&Edit::AddNode {
+            name: "temp_new".to_string(),
+            node_type: "i2c".to_string(),
+            home: None,
+        });
+        std::fs::write(&path, document.to_yaml()).expect("the configuration");
+        let said = trouble(&document, &path).expect("a sentence");
+        assert!(said.contains("not finished"), "{said}");
+        assert!(said.contains("temp_new"), "{said}");
+        assert!(said.contains("path"), "{said}");
+
+        // And where there are more than a few, the rest are counted rather
+        // than listed: the same shape tcsverify prints.
+        for id in 0..6 {
+            document.apply(&Edit::AddNode {
+                name: format!("temp_{id}"),
+                node_type: "i2c".to_string(),
+                home: None,
+            });
+        }
+        std::fs::write(&path, document.to_yaml()).expect("the configuration");
+        let said = trouble(&document, &path).expect("a sentence");
+        assert!(
+            said.contains(tcslibgs::graph::check::AND_OTHERS),
+            "the rest should be counted: {said}"
+        );
+        assert_eq!(
+            said.matches("; ").count(),
+            tcslibgs::graph::check::LISTED,
+            "the first few and then the count: {said}"
         );
     }
 

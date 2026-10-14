@@ -29,6 +29,48 @@
         <name>every_second</name>
         <interval>1s</interval>
     </payload_groups>
+    <!-- The ground. tcspecial waits at this address for a ground station to speak -->
+    <!-- to it, and sends telemetry back where the datagrams came from. -->
+    <moc>
+        <name>moc</name>
+        <type>moc</type>
+        <address>127.0.0.1</address>
+        <port>5000</port>
+        <!-- Down: what the ground sends reaches the payload. A link is an attribute -->
+        <!-- of the node it leaves, named after the data source it leaves by - and -->
+        <!-- what travels towards a payload leaves by to_payload. -->
+        <to_payload><target>payload</target></to_payload>
+        <from_payload>true</from_payload>
+    </moc>
+    <vehicle>
+        <name>mean</name>
+        <type>compute</type>
+        <function>mean</function>
+        <to_payload><target>i2c</target></to_payload>
+    </vehicle>
+    <vehicle>
+        <name>mean-2</name>
+        <type>compute</type>
+        <function>mean</function>
+    </vehicle>
+    <!-- The payload: software or a device that sends a datagram a second. -->
+    <!--  -->
+    <!-- tcspecial binds this address and the payload sends to it. That is the way -->
+    <!-- round a datagram link has to work: a UDP connect sends nothing, so a -->
+    <!-- payload waiting to be reached would hear nothing and - producing data -->
+    <!-- because it is running rather than because it was asked - would have -->
+    <!-- nowhere to send it. The payload speaks first, and tcspecial learns where -->
+    <!-- it is from the datagram that arrives. -->
+    <!--  -->
+    <!-- The second is the group&apos;s: the link is read once a second, and once a -->
+    <!-- second the trigger below is sent to ask for the next reading. -->
+    <!--  -->
+    <!-- The trigger is also what allows the downward link at all. A payload that -->
+    <!-- is read is asked for its readings, and the bytes that ask are its -->
+    <!-- trigger - so a payload that states none is one the configuration -->
+    <!-- describes as only read, and `tcsverify` refuses a link delivering into -->
+    <!-- it. One byte here; a real payload&apos;s would be whatever its own protocol -->
+    <!-- asks with. -->
     <payloads>
         <name>payload</name>
         <type>network</type>
@@ -37,29 +79,25 @@
         <port>5100</port>
         <protocol>udp</protocol>
         <trigger>01</trigger>
-        <!-- Up: every datagram the payload sends goes to the ground as it
-             arrives. A link is an attribute of the node it leaves, named
-             after the data source it leaves by. -->
-        <to_moc>moc</to_moc>
-        <!-- And the other end of the ground's link, recorded here: the same
-             line as the moc node's to_payload, written at the end it arrives
-             at so that this entry says what it is connected to both ways. -->
-        <from_moc>moc</from_moc>
+        <!-- Up: every datagram the payload sends goes to the ground as it arrives. -->
+        <to_moc><target>moc</target></to_moc>
+        <from_moc>true</from_moc>
     </payloads>
-    <moc>
-        <name>moc</name>
-        <type>moc</type>
-        <address>127.0.0.1</address>
-        <port>5000</port>
-        <!-- Down: what the ground sends reaches the payload, leaving by the
-             ground link's own to_payload. -->
-        <to_payload>payload</to_payload>
-        <!-- And the other end of the payload's link. -->
-        <from_payload>payload</from_payload>
-    </moc>
-    <!-- What the editor arranged: where each node was drawn. -->
+    <payloads>
+        <name>i2c</name>
+        <type>i2c</type>
+        <from_moc>true</from_moc>
+    </payloads>
+    <payloads>
+        <name>i2c-2</name>
+        <type>i2c</type>
+    </payloads>
     <tcsgui>
-        <nodes><name>payload</name><x>744</x><y>160</y></nodes>
         <nodes><name>moc</name><x>24</x><y>40</y></nodes>
+        <nodes><name>mean</name><x>272</x><y>288</y></nodes>
+        <nodes><name>mean-2</name><x>280</x><y>408</y></nodes>
+        <nodes><name>payload</name><x>744</x><y>160</y></nodes>
+        <nodes><name>i2c</name><x>608</x><y>432</y></nodes>
+        <nodes><name>i2c-2</name><x>608</x><y>600</y></nodes>
     </tcsgui>
 </configuration>

@@ -4,6 +4,10 @@ type: compute
 about: Reads a sensor's bytes as a number and scales it into kelvin.
 sets:
   function: to_kelvin
+payload-sink: true
+payload-source: true
+moc-sink: true
+moc-source: true
 attributes:
   - name: format
     required: true

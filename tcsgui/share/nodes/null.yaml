@@ -8,3 +8,7 @@
 node: "null"
 type: "null"
 about: Carries both streams through and does nothing to what passes.
+payload-sink: true
+payload-source: true
+moc-sink: true
+moc-source: true

@@ -4,6 +4,10 @@ type: compute
 about: The mean of the readings arriving at its named inputs.
 sets:
   function: mean
+payload-sink: true
+payload-source: true
+moc-sink: true
+moc-source: true
 attributes:
   - name: inputs
     required: true

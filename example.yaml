@@ -30,19 +30,11 @@ moc:
     type: moc
     address: "127.0.0.1"
     port: "5000"
-    # Down: what the ground sends reaches the payload. A link is an attribute
-    # of the node it leaves, named after the data source it leaves by -- and
-    # what travels towards a payload leaves by to_payload.
-    to_payload:
-      - target: payload
-    from_payload: true
 
 vehicle:
   - name: mean
     type: compute
     function: "mean"
-    to_payload:
-      - target: i2c
   - name: mean-2
     type: compute
     function: "mean"
@@ -73,21 +65,16 @@ payloads:
     port: "5100"
     protocol: "udp"
     trigger: "01"
-    # Up: every datagram the payload sends goes to the ground as it arrives.
-    to_moc:
-      - target: moc
-    from_moc: true
   - name: i2c
     type: i2c
-    from_moc: true
   - name: i2c-2
     type: i2c
 
 tcsgui:
   nodes:
-    - { name: moc, x: 24, y: 40 }
+    - { name: moc, x: 8, y: 24 }
     - { name: mean, x: 272, y: 288 }
     - { name: mean-2, x: 280, y: 408 }
     - { name: payload, x: 728, y: 40 }
-    - { name: i2c, x: 608, y: 432 }
+    - { name: i2c, x: 648, y: 456 }
     - { name: i2c-2, x: 608, y: 600 }

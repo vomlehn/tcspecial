@@ -487,7 +487,10 @@ mod tests {
     fn the_shipped_examples_open() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        for (name, nodes, links) in [("example", 6, 3), ("tests/manual/thermostat", 11, 16)] {
+        // The example ships with no lines: it is what the editor opens by
+        // default and what somebody draws their own graph in. The worked
+        // example is where the shipped lines are.
+        for (name, nodes, links) in [("example", 6, 0), ("tests/manual/thermostat", 11, 16)] {
             for extension in ["yaml", "xml"] {
                 let path = root.join(format!("{name}.{extension}"));
                 let document = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));

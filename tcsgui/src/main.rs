@@ -5402,19 +5402,29 @@ mod tests {
         assert!(FIRST_PLACE.0 > 0 && FIRST_PLACE.1 > 0);
     }
 
-    /// No line in the shipped example is drawn through a node.
+    /// No line in the worked example is drawn through a node.
     ///
     /// The rules are checked in `route.rs` against boxes and numbers; this
     /// asks the same question of a real configuration, which is where a
-    /// routing fault was actually found. The return link of this example used
+    /// routing fault was actually found. The return link of the example used
     /// to run its long leg straight through the box of the node it was
     /// arriving at.
+    ///
+    /// The thermostat, because `example.*` ships with no lines at all: it is
+    /// the file the editor opens by default and the one somebody draws their
+    /// own graph in, and the worked example is where the shipped lines live.
     #[test]
-    fn the_shipped_example_draws_no_line_through_a_node() {
+    fn no_line_of_the_worked_example_is_drawn_through_a_node() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
+        // The worked example, which is the shipped configuration with lines in
+        // it: `example.*` is the one somebody opens the editor on and draws
+        // their own, and it ships with none.
         for extension in ["yaml", "xml"] {
-            let editor = Editor::open(&root.join(format!("example.{extension}")), dividers());
+            let editor = Editor::open(
+                &root.join(format!("tests/manual/thermostat.{extension}")),
+                dividers(),
+            );
             let document = editor.document();
 
             // The same boxes and the same ends views_of works out, because
@@ -5432,7 +5442,7 @@ mod tests {
                     )
                 })
                 .collect();
-            assert!(!obstacles.is_empty(), "example.{extension} has no nodes");
+            assert!(!obstacles.is_empty(), "thermostat.{extension} has no nodes");
             assert!(!document.links.is_empty(), "and no links");
 
             for link in &document.links {
@@ -5441,8 +5451,8 @@ mod tests {
                 let through = route::runs_through(ends_of(document, link, &None), &obstacles);
                 assert_eq!(
                     through, 0,
-                    "example.{extension}: the line from {} to {} runs through \
-                     {through} node(s)",
+                    "thermostat.{extension}: the line from {} to {} runs \
+                     through {through} node(s)",
                     link.from, link.to
                 );
             }
@@ -6352,25 +6362,43 @@ mod tests {
                 ],
                 "example.{extension} should put its nodes on the canvas"
             );
+            // And no lines, the example shipping with none: it is what the
+            // editor opens by default and what somebody draws their own graph
+            // in.
             assert_eq!(
                 ui.get_links().row_count(),
-                3,
-                "example.{extension} should draw every link"
+                0,
+                "example.{extension} ships with no lines"
             );
+        }
 
-            // Each with a head and a marker: two of this example's links run
-            // between the same pair of nodes, one each way, so the direction
-            // is the only thing that tells them apart.
+        // The lines are the worked example's, and each is drawn with a head
+        // and a marker: two of its lines run between one pair of nodes, one
+        // each way, so the direction is the only thing that tells them apart.
+        for extension in ["yaml", "xml"] {
+            let editor = Editor::open(
+                &root.join(format!("tests/manual/thermostat.{extension}")),
+                dividers(),
+            );
+            let ui = MainWindow::new().expect("a window");
+            furnish!(&ui, descriptions());
+            put(&ui, &editor, &None, None, dividers(), None);
+
+            assert_eq!(
+                ui.get_links().row_count(),
+                16,
+                "thermostat.{extension} should draw every line"
+            );
             for row in 0..ui.get_links().row_count() {
                 let link = ui.get_links().row_data(row).expect("a link");
                 assert!(
                     link.head.ends_with('Z'),
-                    "example.{extension}: link {row} has no arrowhead: {:?}",
+                    "thermostat.{extension}: line {row} has no arrowhead: {:?}",
                     link.head
                 );
                 assert!(
                     link.marker.ends_with('Z'),
-                    "example.{extension}: link {row} has no flow marker: {:?}",
+                    "thermostat.{extension}: line {row} has no flow marker: {:?}",
                     link.marker
                 );
             }

@@ -138,13 +138,27 @@ terminal
     connects to a MOC link's ``from_payload``.
 
     A link is written as an attribute of the node it leaves, named after the
-    data source it leaves by -- ``to_moc: k_fore``, or ``to_moc: [moc,
-    mean_temp.in0]`` where it reaches several sinks. The destination names the
-    terminal it arrives at after a dot where it has to; ``node`` alone will do
-    wherever the type has one data sink, which is every type but ``null``. A data sink takes one data source; a data source may reach
-    several sinks; and a MOC link's sink takes as many as the configuration
-    gives it, every payload's telemetry arriving at the ground on its own
-    socket.
+    data source it leaves by, with one entry per line:
+
+    .. code-block:: yaml
+
+       - name: k_fore
+         type: compute
+         to_moc:
+           - target: moc
+           - target: mean_temp
+             input: in0
+
+    An entry's ``target`` is the node the line goes to; its ``input`` is which
+    of that node's inputs it feeds, or which of its data sinks it arrives at,
+    where either has to be said -- ``node`` alone will do wherever the type has
+    one data sink, which is every type but ``null``. The short spelling is read
+    as well, the destination written as ``node`` or ``node.terminal``, alone or
+    in a list: ``to_moc: k_fore``, or ``to_moc: [moc, mean_temp.in0]``.
+
+    A data sink takes one data source; a data source may reach several sinks;
+    and a MOC link's sink takes as many as the configuration gives it, every
+    payload's telemetry arriving at the ground on its own socket.
 
     The node at the arriving end records the same link under the data sink it
     arrives at, the value naming the node the data came from: ``from_payload:

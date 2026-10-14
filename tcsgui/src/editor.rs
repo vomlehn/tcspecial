@@ -1087,7 +1087,7 @@ tcsgui:
         // once, and with the far end plain, moc having no subdiagram to
         // qualify it with.
         assert!(
-            inner.contains("to_moc: moc"),
+            inner.contains("to_moc:\n      - target: moc\n"),
             "the crossing link should be written on the node it leaves: {inner}"
         );
         assert!(

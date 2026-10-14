@@ -3,6 +3,28 @@
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial.schema.json",
   "title": "tcspecial configuration, version 2",
   "description": "The shape of a version 2 configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a mean's inputs are the ones its links bind are rules about meaning, tested against real buses, and tcsverify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
+  "$defs": {
+    "linkEntry": {
+      "description": "One line out of a node: the node it goes to, and which of that node's inputs it feeds where it feeds a named one. One entry per line, so several lines are several entries and nothing pairs by position.",
+      "type": "object",
+      "properties": {
+        "target": {
+          "description": "The node this line goes to.",
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+        },
+        "input": {
+          "description": "Which of that node's inputs the line feeds, or which of its data sinks it arrives at, where either has to be said.",
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    }
+  },
   "type": "object",
   "properties": {
     "version": {
@@ -168,38 +190,56 @@
             "type": "string"
           },
           "to_moc": {
-            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "description": "The lines that leave this node by its `to_moc`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
-                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "description": "One line, written as an entry.",
+                "$ref": "#/$defs/linkEntry"
+              },
+              {
+                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
                 "type": "string",
                 "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
               },
               {
+                "description": "Several lines, each an entry or a destination.",
                 "type": "array",
                 "items": {
-                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
-                  "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  "oneOf": [
+                    { "$ref": "#/$defs/linkEntry" },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                    }
+                  ]
                 },
                 "minItems": 1
               }
             ]
           },
           "to_payload": {
-            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "description": "The lines that leave this node by its `to_payload`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
-                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "description": "One line, written as an entry.",
+                "$ref": "#/$defs/linkEntry"
+              },
+              {
+                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
                 "type": "string",
                 "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
               },
               {
+                "description": "Several lines, each an entry or a destination.",
                 "type": "array",
                 "items": {
-                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
-                  "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  "oneOf": [
+                    { "$ref": "#/$defs/linkEntry" },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                    }
+                  ]
                 },
                 "minItems": 1
               }
@@ -710,38 +750,56 @@
             "type": "string"
           },
           "to_moc": {
-            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "description": "The lines that leave this node by its `to_moc`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
-                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "description": "One line, written as an entry.",
+                "$ref": "#/$defs/linkEntry"
+              },
+              {
+                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
                 "type": "string",
                 "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
               },
               {
+                "description": "Several lines, each an entry or a destination.",
                 "type": "array",
                 "items": {
-                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
-                  "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  "oneOf": [
+                    { "$ref": "#/$defs/linkEntry" },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                    }
+                  ]
                 },
                 "minItems": 1
               }
             ]
           },
           "to_payload": {
-            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "description": "The lines that leave this node by its `to_payload`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
-                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "description": "One line, written as an entry.",
+                "$ref": "#/$defs/linkEntry"
+              },
+              {
+                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
                 "type": "string",
                 "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
               },
               {
+                "description": "Several lines, each an entry or a destination.",
                 "type": "array",
                 "items": {
-                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
-                  "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  "oneOf": [
+                    { "$ref": "#/$defs/linkEntry" },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                    }
+                  ]
                 },
                 "minItems": 1
               }
@@ -1252,38 +1310,56 @@
             "type": "string"
           },
           "to_moc": {
-            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "description": "The lines that leave this node by its `to_moc`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
-                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "description": "One line, written as an entry.",
+                "$ref": "#/$defs/linkEntry"
+              },
+              {
+                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
                 "type": "string",
                 "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
               },
               {
+                "description": "Several lines, each an entry or a destination.",
                 "type": "array",
                 "items": {
-                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
-                  "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  "oneOf": [
+                    { "$ref": "#/$defs/linkEntry" },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                    }
+                  ]
                 },
                 "minItems": 1
               }
             ]
           },
           "to_payload": {
-            "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
+            "description": "The lines that leave this node by its `to_payload`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
-                "description": "A data sink this link reaches, as `node` or `node.terminal`.",
+                "description": "One line, written as an entry.",
+                "$ref": "#/$defs/linkEntry"
+              },
+              {
+                "description": "One line, written as the node it reaches: `node` or `node.terminal`.",
                 "type": "string",
                 "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
               },
               {
+                "description": "Several lines, each an entry or a destination.",
                 "type": "array",
                 "items": {
-                  "description": "A data sink this link reaches, as `node` or `node.terminal`.",
-                  "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                  "oneOf": [
+                    { "$ref": "#/$defs/linkEntry" },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)?$"
+                    }
+                  ]
                 },
                 "minItems": 1
               }

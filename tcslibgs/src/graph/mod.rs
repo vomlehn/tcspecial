@@ -13,15 +13,21 @@
 //! disagree about what a node is are two statements of one fact.
 //!
 //! A link is an attribute of the node it leaves, named after the data source
-//! it leaves by: `to_moc: k_fore` is a link from this node's `to_moc` terminal
-//! to `k_fore`, and `to_moc: [moc, mean_temp.in0]` is one to each of two. So
-//! there is no links section, and a node and the links out of it are read,
+//! it leaves by, with one entry per line: `to_moc: [{ target: k_fore }]` is a
+//! link from this node's `to_moc` terminal to `k_fore`, and an entry naming an
+//! `input` as well feeds a named input of the node it reaches. The short
+//! spelling is read too -- `to_moc: k_fore`, `to_moc: [moc, mean_temp.in0]` --
+//! and means the same thing; see [`Destinations`].
+//!
+//! So there is no links section, and a node and the links out of it are read,
 //! written and deleted together. The node it arrives at records it as well --
 //! `from_payload: temp_fore`, under the sink it arrives at -- so that a node's
 //! entry says what it is connected to at both ends; that record is checked
-//! against these and otherwise never read. See [`mirror`]. In memory they are still a list -- see
-//! [`Link`] -- because every rule about a link is about both of its ends, and
-//! a list of them is what a rule can be written against.
+//! against these and otherwise never read. See [`mirror`].
+//!
+//! In memory they are still a list -- see [`Link`] -- because every rule about
+//! a link is about both of its ends, and a list of them is what a rule can be
+//! written against.
 //!
 //! One logical configuration, which may be written as several files. The top
 //! file may name others in an `include` list and their contents are merged
@@ -511,9 +517,29 @@ impl Link {
 
 /// One or several destinations, however the file wrote them.
 ///
-/// `to: moc` and `to: [moc, mean.in0]` are both legal, because a link with one
-/// destination is the ordinary case and making it write a list of one would be
-/// ceremony. In XML the same thing is repeated `<to>` elements.
+/// The spelling the editor writes is one entry per line, the node it reaches
+/// named by the entry's `target`:
+///
+/// ```yaml
+/// to_moc:
+///   - target: moc
+///   - target: mean_temp
+///     input: in0
+/// ```
+///
+/// A line is then one entry rather than one element of two lists, which is
+/// what makes several destinations safe to write: nothing pairs by position,
+/// so a list that slips by one cannot turn a reading into somebody else's
+/// input. In XML the same thing is a repeated `<to_moc>` with `<target>` in
+/// it.
+///
+/// The short spellings are still read: `to_moc: moc` and `to_moc: [moc,
+/// mean_temp.in0]`, the node and its input separated by a dot. Every
+/// configuration written before entries existed says what it said, and a link
+/// to one place is a line somebody can still write in a line. All of them read
+/// into the same thing -- a destination as `node` or `node.input` -- because
+/// every rule about a link is about where it goes and not about how the file
+/// said so.
 ///
 /// Read by hand rather than as an untagged enum, for the reason [`Scalar`]
 /// exists: a value written as an XML child element does not arrive as a
@@ -556,26 +582,122 @@ impl<'de> Deserialize<'de> for Destinations {
 
             fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Destinations, A::Error> {
                 let mut all = Vec::new();
-                // Each element may itself be a string or an XML element with
-                // text in it, so each is read as a Scalar.
-                while let Some(one) = seq.next_element::<Scalar>()? {
-                    all.push(one.as_str().to_string());
+                // Each element is an entry, a string, or an XML element with
+                // text in it: see Bound.
+                while let Some(one) = seq.next_element::<Bound>()? {
+                    all.push(one.0);
                 }
                 Ok(Destinations(all))
             }
 
-            /// One XML element with text in it: `<to>moc</to>`.
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Destinations, A::Error> {
-                let mut text: Option<String> = None;
-                while let Some((_, value)) = map.next_entry::<String, String>()? {
-                    text = Some(value);
-                }
-                text.map(|t| Destinations(vec![t]))
-                    .ok_or_else(|| de::Error::custom("a destination with nothing in it"))
+            /// One entry -- `{ target: moc }` -- or one XML element with text
+            /// in it: `<to_moc>moc</to_moc>`.
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Destinations, A::Error> {
+                Ok(Destinations(vec![written_as(map)?]))
             }
         }
 
         d.deserialize_any(V)
+    }
+}
+
+/// One destination, read from whichever spelling the file used.
+///
+/// The entry form's own type, so that a list can be a list of entries and a
+/// list of names at once: each element is read as one of these and comes out
+/// as a destination -- `node`, or `node.input` where the entry named an input.
+/// See [`Destinations`] for why there is more than one spelling.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Bound(String);
+
+impl<'de> Deserialize<'de> for Bound {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::{MapAccess, Visitor};
+        use std::fmt;
+
+        struct V;
+
+        impl<'de> Visitor<'de> for V {
+            type Value = Bound;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a destination, or an entry naming its target")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Bound, E> {
+                Ok(Bound(v.to_string()))
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Bound, A::Error> {
+                Ok(Bound(written_as(map)?))
+            }
+        }
+
+        d.deserialize_any(V)
+    }
+}
+
+/// The destination a mapping names, however the mapping got there.
+///
+/// Two shapes arrive here. An entry -- `{ target: mean_temp, input: in0 }` --
+/// which is what the editor writes and what a person writing a link by hand
+/// now has to write for a link to a named input. And an XML element with text
+/// in it, `<to_moc>moc</to_moc>`, which quick-xml hands over as a map of one
+/// entry whose value is the text: the short spelling, in the language where it
+/// does not arrive as a string.
+///
+/// Told apart by `target`, which the entry form always has. A mapping with
+/// neither `target` nor exactly one entry is refused rather than guessed at,
+/// and so is a word in an entry that is not `target` or `input`: a misspelled
+/// `targte` silently ignored is a link that quietly goes nowhere.
+fn written_as<'de, A: serde::de::MapAccess<'de>>(mut map: A) -> Result<String, A::Error> {
+    use serde::de::Error;
+
+    let mut target: Option<String> = None;
+    let mut input: Option<String> = None;
+    let mut text: Option<String> = None;
+    let mut unknown: Option<String> = None;
+
+    while let Some(key) = map.next_key::<String>()? {
+        match key.as_str() {
+            "target" => target = Some(map.next_value::<Scalar>()?.as_str().to_string()),
+            "input" => input = Some(map.next_value::<Scalar>()?.as_str().to_string()),
+            // What XML calls the text of an element, which is how the short
+            // spelling arrives in that language: `<to_moc>moc</to_moc>`.
+            "$text" => text = Some(map.next_value::<Scalar>()?.as_str().to_string()),
+            // And nothing else. A word nobody knows is a misspelling, and a
+            // misspelled `target` read as a name would be a link that quietly
+            // goes nowhere.
+            other => {
+                unknown = Some(other.to_string());
+                map.next_value::<serde::de::IgnoredAny>()?;
+            }
+        }
+    }
+
+    if let Some(unknown) = unknown {
+        return Err(A::Error::custom(format!(
+            "\"{unknown}\" is not a word a link entry knows: an entry says \
+             `target`, the node the line goes to, and may say `input`, which \
+             of that node's inputs it feeds"
+        )));
+    }
+
+    match (target, input, text) {
+        // An entry, which may name the input it feeds.
+        (Some(target), input, _) => Ok(match input {
+            Some(input) => format!("{target}.{input}"),
+            None => target,
+        }),
+        (None, Some(input), _) => Err(A::Error::custom(format!(
+            "a link entry that says `input: {input}` has to say which node \
+             that input belongs to, as `target`"
+        ))),
+        // The short spelling, in XML.
+        (None, None, Some(text)) => Ok(text),
+        (None, None, None) => Err(A::Error::custom(
+            "a destination is a node, or an entry naming its target",
+        )),
     }
 }
 
@@ -1227,6 +1349,61 @@ moc:
         let many: Link =
             serde_norway::from_str("from: a\nto: [b, c.in0]\n").expect("several destinations");
         assert_eq!(many.to.each(), vec!["b", "c.in0"]);
+    }
+
+    /// The entry spelling, which is the one the editor writes.
+    ///
+    /// One entry per line, each naming its target, so that several
+    /// destinations are several entries rather than two lists read against
+    /// each other. It means the same thing as the short spelling above, which
+    /// is what the assertions say: both come out as a destination.
+    #[test]
+    fn a_link_may_be_written_as_an_entry_naming_its_target() {
+        let said: NodeFile = serde_norway::from_str(
+            "name: k_fore
+type: compute
+to_moc:
+  - target: moc
+  - target: mean_temp
+    input: in0
+",
+        )
+        .expect("entries");
+        assert_eq!(said.to_moc, vec!["moc", "mean_temp.in0"]);
+
+        // One entry on its own needs no list, as one destination needs no
+        // list.
+        let one: NodeFile =
+            serde_norway::from_str("name: a\ntype: compute\nto_moc: { target: moc }\n")
+                .expect("one entry");
+        assert_eq!(one.to_moc, vec!["moc"]);
+    }
+
+    /// A misspelled word in an entry is refused, not ignored.
+    ///
+    /// `targte: moc` read as an entry naming nothing is a link that quietly
+    /// goes nowhere, which is the kind of fault a configuration file exists to
+    /// make impossible.
+    #[test]
+    fn a_word_an_entry_does_not_know_is_refused() {
+        let said = format!(
+            "{}",
+            serde_norway::from_str::<NodeFile>(
+                "name: a\ntype: compute\nto_moc:\n  - targte: moc\n"
+            )
+            .expect_err("a misspelling is refused")
+        );
+        assert!(said.contains("target"), "{said}");
+
+        // And an input with no node to belong to.
+        let said = format!(
+            "{}",
+            serde_norway::from_str::<NodeFile>(
+                "name: a\ntype: compute\nto_moc:\n  - input: in0\n"
+            )
+            .expect_err("an input names no node")
+        );
+        assert!(said.contains("which node"), "{said}");
     }
 }
 

@@ -220,14 +220,33 @@ link
     numbers and a zero.
 
     A link is written as an **attribute of the node it leaves**, named after
-    the data source it leaves by:
+    the data source it leaves by, with one entry per line:
 
     .. code-block:: yaml
 
        - name: k_fore
          type: compute
          function: "to_kelvin"
-         to_moc: [moc, mean_temp.in0, housekeeping]
+         to_moc:
+           - target: moc
+           - target: mean_temp
+             input: in0
+           - target: housekeeping
+
+    An entry's ``target`` is the node the line goes to and its ``input`` is
+    which of that node's inputs it feeds, where it feeds a named one. One entry
+    per line is what makes several of them safe: the alternative was two lists
+    read against each other, and a list one name short is a configuration that
+    reads as valid and delivers a reading to somebody else's input. A word an
+    entry does not know is refused rather than ignored, because ``targte: moc``
+    quietly ignored is a line that goes nowhere.
+
+    The short spelling is still read -- ``to_moc: moc``, or ``to_moc: [moc,
+    mean_temp.in0]``, the node and its input separated by a dot. Every
+    configuration written before entries existed says what it said, and a link
+    to one place is still a line somebody can write in a line. All of them read
+    into the same thing, because every rule about a link is about where it goes
+    and not about how the file said so.
 
     So there is no links section. A node and the links out of it are read,
     written and deleted together, which is where a reader of the file wants
@@ -245,7 +264,9 @@ link
          type: compute
          function: "mean"
          inputs: "in0,in1,in2"
-         to_moc: [moc, thermostat]
+         to_moc:
+           - target: moc
+           - target: thermostat
          from_payload: [k_aft, k_bay, k_fore]
 
     That is a record of the links above and not a link. The point of it is a

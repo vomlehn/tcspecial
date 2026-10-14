@@ -45,9 +45,9 @@
         <function>to_kelvin</function>
         <offset>273.15</offset>
         <scale>0.0625</scale>
-        <to_moc>moc</to_moc>
-        <to_moc>mean_temp.in0</to_moc>
-        <to_moc>housekeeping</to_moc>
+        <to_moc><target>moc</target></to_moc>
+        <to_moc><target>mean_temp</target><input>in0</input></to_moc>
+        <to_moc><target>housekeeping</target></to_moc>
         <from_payload>temp_fore</from_payload>
     </vehicle>
     <vehicle>
@@ -57,9 +57,9 @@
         <function>to_kelvin</function>
         <offset>273.15</offset>
         <scale>0.0625</scale>
-        <to_moc>moc</to_moc>
-        <to_moc>mean_temp.in1</to_moc>
-        <to_moc>housekeeping</to_moc>
+        <to_moc><target>moc</target></to_moc>
+        <to_moc><target>mean_temp</target><input>in1</input></to_moc>
+        <to_moc><target>housekeeping</target></to_moc>
         <from_payload>temp_aft</from_payload>
     </vehicle>
     <vehicle>
@@ -69,9 +69,9 @@
         <function>to_kelvin</function>
         <offset>255.37</offset>
         <scale>0.0078</scale>
-        <to_moc>moc</to_moc>
-        <to_moc>mean_temp.in2</to_moc>
-        <to_moc>housekeeping</to_moc>
+        <to_moc><target>moc</target></to_moc>
+        <to_moc><target>mean_temp</target><input>in2</input></to_moc>
+        <to_moc><target>housekeeping</target></to_moc>
         <from_payload>temp_bay</from_payload>
     </vehicle>
     <vehicle>
@@ -79,8 +79,8 @@
         <type>compute</type>
         <function>mean</function>
         <inputs>in0,in1,in2</inputs>
-        <to_moc>moc</to_moc>
-        <to_moc>thermostat</to_moc>
+        <to_moc><target>moc</target></to_moc>
+        <to_moc><target>thermostat</target></to_moc>
         <from_payload>k_aft</from_payload>
         <from_payload>k_bay</from_payload>
         <from_payload>k_fore</from_payload>
@@ -94,9 +94,9 @@
         <below>2.0</below>
         <function>hysteresis</function>
         <setpoint>293.15</setpoint>
-        <to_moc>housekeeping</to_moc>
+        <to_moc><target>housekeeping</target></to_moc>
         <!-- asserted below the setpoint, unasserted above it -->
-        <to_payload>heaters</to_payload>
+        <to_payload><target>heaters</target></to_payload>
         <from_payload>mean_temp</from_payload>
     </vehicle>
     <vehicle>
@@ -117,7 +117,7 @@
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
-        <to_moc>k_fore</to_moc>
+        <to_moc><target>k_fore</target></to_moc>
     </payloads>
     <!-- Aft bulkhead; same part as temp_fore. -->
     <payloads>
@@ -127,7 +127,7 @@
         <group>cabin_temps</group>
         <path>/dev/i2c-1</path>
         <read_size>2</read_size>
-        <to_moc>k_aft</to_moc>
+        <to_moc><target>k_aft</target></to_moc>
     </payloads>
     <!-- Equipment bay. Three bytes, unsigned - a different part, hence its -->
     <!-- own conversion. -->
@@ -139,7 +139,7 @@
         <path>/dev/spidev0.0</path>
         <read_size>3</read_size>
         <spi_mode>0</spi_mode>
-        <to_moc>k_bay</to_moc>
+        <to_moc><target>k_bay</target></to_moc>
     </payloads>
     <!-- Three circuits, driven together. -->
     <payloads>

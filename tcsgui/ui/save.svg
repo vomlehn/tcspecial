@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Save: a floppy disk, which is the mark every program uses for it and
+     nobody has used the thing itself in twenty years.
+
+     Drawn here rather than taken from an icon set, as the undo and redo
+     arrows are: Slint ships none, and a font of them is a thing that can fail
+     to load. Strokes and one filled shape, no gradients, so the button can
+     colourise it to whatever the platform's foreground is.
+
+     Three parts, which is what makes it read as a floppy and not as a
+     rectangle: the body with its corner cut off, the shutter across the top,
+     and the label across the bottom. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path d="M4 3.5 H16.5 L20.5 7.5 V20.5 H4 Z"
+        fill="none" stroke="#1f2937" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 3.5 H15 V9 H8 Z" fill="#1f2937"/>
+  <path d="M7 14 H17 V20.5 H7 Z"
+        fill="none" stroke="#1f2937" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

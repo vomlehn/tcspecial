@@ -270,30 +270,30 @@ impl Terminals {
 /// own input: those are drawn where the link arrives and not as a terminal.
 pub fn corner_of(terminal: &str) -> Option<Corner> {
     match terminal {
-        // The upper left carries no arrow: see `Corner::arrow`.
+        // The upper left says nothing: see `Corner::says`.
         "from_moc" => Some(Corner {
             top: true,
             left: true,
             rightward: true,
-            arrow: false,
+            says: "",
         }),
         "to_payload" => Some(Corner {
             top: true,
             left: false,
             rightward: true,
-            arrow: true,
+            says: "out",
         }),
         "from_payload" => Some(Corner {
             top: false,
             left: false,
             rightward: false,
-            arrow: true,
+            says: "in",
         }),
         "to_moc" => Some(Corner {
             top: false,
             left: true,
             rightward: false,
-            arrow: true,
+            says: "in",
         }),
         _ => None,
     }
@@ -305,18 +305,24 @@ pub fn corner_of(terminal: &str) -> Option<Corner> {
 pub struct Corner {
     pub top: bool,
     pub left: bool,
-    /// Whether the arrow points right, which is to say towards the payloads.
+    /// Whether the data goes right here, which is to say towards the payloads.
+    ///
+    /// Not a glyph any more -- see [`Corner::says`] -- but still the direction
+    /// a line leaves or arrives by, which is what [`attachment`] needs.
     pub rightward: bool,
-    /// Whether an arrow is drawn in the box at all.
+    /// What is written in the box: `in`, `out`, or nothing.
     ///
-    /// Every corner but the upper left. That one is `from_moc` -- where what
-    /// the ground sends arrives -- and its box is drawn empty: an arrow there
-    /// pointing into the node is the one a reader takes for "the line starts
-    /// here", which is exactly what it is not.
+    /// Words rather than arrows. An arrow says which way the data goes, which
+    /// a reader has to read against the canvas to make anything of; the word
+    /// says what the terminal *is* for the node it is on, which is the
+    /// question somebody drawing a line is asking. `out` where the data goes
+    /// right, `in` where it goes left.
     ///
-    /// The box is still a box, and it still answers a press: what a person
-    /// does with it has not changed, only what is drawn inside it.
-    pub arrow: bool,
+    /// Nothing at all in the upper left. That one is `from_moc` -- where what
+    /// the ground sends arrives -- and it was the arrow a reader took for "a
+    /// line starts here"; the box is still a box and still answers a press,
+    /// and what has gone is only what is drawn inside it.
+    pub says: &'static str,
 }
 
 /// How large a terminal is drawn, in pixels.
@@ -1162,21 +1168,27 @@ mod tests {
         }
     }
 
-    /// The upper-left box is drawn empty, and the other three carry arrows.
+    /// A box says `in` or `out`, and the upper-left one says nothing.
     ///
-    /// `from_moc` is where what the ground sends arrives, and an arrow there
-    /// pointing into the node is the one a reader takes for "a line starts
-    /// here" -- which is the mistake that had somebody dragging from the
-    /// corner of a moc node, where there is no terminal at all. The box is
-    /// still a box and still answers a press; what has gone is the arrow
-    /// inside it.
+    /// Words rather than arrows, because an arrow has to be read against the
+    /// canvas before it says anything, where the word says what the terminal
+    /// is for the node it is on. `out` where the data goes right, `in` where
+    /// it goes left -- so the two always agree with `rightward`, which is what
+    /// this asserts rather than repeating the table.
+    ///
+    /// Nothing in the upper left. That one is `from_moc`, and its arrow was
+    /// the one a reader took for "a line starts here" -- the mistake that had
+    /// somebody dragging from the corner of a moc node, where there is no
+    /// terminal at all.
     #[test]
-    fn the_upper_left_terminal_carries_no_arrow() {
-        assert!(!corner_of("from_moc").expect("a corner").arrow);
+    fn a_terminal_says_in_or_out_and_the_upper_left_says_nothing() {
+        assert_eq!(corner_of("from_moc").expect("a corner").says, "");
         for terminal in ["to_payload", "from_payload", "to_moc"] {
-            assert!(
-                corner_of(terminal).expect("a corner").arrow,
-                "{terminal} should still say which way its data goes"
+            let corner = corner_of(terminal).expect("a corner");
+            assert_eq!(
+                corner.says,
+                if corner.rightward { "out" } else { "in" },
+                "{terminal}"
             );
         }
     }

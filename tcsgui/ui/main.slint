@@ -383,6 +383,11 @@ component NodeShape inherits Rectangle {
 
     property <color> ink: node.faulty ? error-ink : node.tint;
 
+    // How far a press may wander and still be a click rather than a drag.
+    // Three pixels: enough for a hand on a mouse, far less than anything
+    // somebody means as a move.
+    property <length> slop: 3px;
+
     // While a drag is running the node follows the pointer by this much, and
     // the document still says where it was: nothing is recorded until the
     // gesture ends.
@@ -666,15 +671,18 @@ component NodeShape inherits Rectangle {
         }
     }
 
-    // What a click on a node offers. Shown by the grip below, at the point
-    // that was pressed, rather than by a right-click: a left click is what
-    // somebody does to a thing they want something from, and this window has
-    // nowhere else to put a node's own commands -- a node is not in the menu
-    // bar, which is for the configuration as a whole.
+    // What a click on a node offers: a node's own commands, which have
+    // nowhere else to live -- a node is not in the menu bar, and the menu bar
+    // is for the configuration as a whole.
+    //
+    // Shown by the grip below, at the point that was pressed, and not by this
+    // area answering the pointer itself: the grip covers the whole node and
+    // takes every press, so a ContextMenuArea's own right-click handling
+    // never sees one. That is why a right click did nothing at all until the
+    // grip was taught to show this by name.
     //
     // First among the node's children, so the grip and the terminals are
-    // above it and a press reaches them: this one is here to be shown by
-    // name, not to answer the pointer itself.
+    // above it and a press reaches them.
     menu := ContextMenuArea {
         enabled: draggable;
         Menu {
@@ -697,24 +705,44 @@ component NodeShape inherits Rectangle {
         enabled: draggable;
         mouse-cursor: draggable ? MouseCursor.grab : MouseCursor.default;
         pointer-event(event) => {
-            if (event.kind == PointerEventKind.down) {
+            if (event.kind == PointerEventKind.down
+                && event.button == PointerEventButton.right) {
+                // A right click asks what there is to do with this node,
+                // which is what a right click means everywhere else. On the
+                // press rather than the release, as a context menu is: by the
+                // time a button somebody is holding down comes up they are
+                // looking at the menu, not at the node.
+                menu.show({ x: self.mouse-x, y: self.mouse-y });
+            }
+            if (event.kind == PointerEventKind.down
+                && event.button == PointerEventButton.left) {
                 // Choosing and dragging are the same press: a node you have
                 // started to move is the node you are interested in, and
                 // making them separate gestures would mean pressing twice to
                 // do the obvious thing.
                 chosen();
             }
-            if (event.kind == PointerEventKind.up) {
-                // A press that moved nothing is a click, and a click asks what
-                // there is to do with this node. One that moved is a drag, and
-                // the editor is told where the node went.
+            if (event.kind == PointerEventKind.up
+                && event.button == PointerEventButton.left) {
+                // A left press that stayed put is a click, and it offers the
+                // same menu; one that moved is a drag, and the editor is told
+                // where the node went.
+                //
+                // "Stayed put" is within a few pixels, not exactly nowhere.
+                // The test here was that the release was at the very pixel of
+                // the press, which a hand on a mouse does not manage: every
+                // click carried a fraction of a pixel, every click was read as
+                // a drag, and the menu was unreachable by the gesture that was
+                // supposed to be its own. The same slack keeps a trembling
+                // click from recording a one-pixel move as an edit.
                 //
                 // Told apart here rather than in Rust because the menu has to
                 // be shown by the element that owns it, at the point that was
                 // pressed. Rust is told only about the drag, and still asks
                 // the same question of it -- a gesture that works out to no
                 // movement records no edit.
-                if (self.mouse-x == self.pressed-x && self.mouse-y == self.pressed-y) {
+                if (abs(self.mouse-x - self.pressed-x) <= root.slop
+                    && abs(self.mouse-y - self.pressed-y) <= root.slop) {
                     menu.show({ x: self.mouse-x, y: self.mouse-y });
                 } else {
                     dragged(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);

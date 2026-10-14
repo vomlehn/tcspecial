@@ -1506,11 +1506,23 @@ as a whole -- and it has nowhere else to put its own commands, so the node
 itself is where they are asked for. Edit is first because it is what nearly
 every click wants, and because it is what a click used to do on its own.
 
-A click rather than a right-click, and a click rather than a press: a press is
-how a drag starts, so a gesture that moved the node is a move and one that
-moved nothing is this. Choosing a node is still the press -- a node somebody
-has started to move is the node they are interested in -- so the node the menu
-is about is the node drawn as chosen while it is open.
+A right click opens it, as a right click opens a menu anywhere else, and so
+does a left click that moved nothing: a press is how a drag starts, so a
+gesture that moved the node is a move and one that stayed put is this.
+Choosing a node is still the left press -- a node somebody has started to move
+is the node they are interested in -- so the node the menu is about is the node
+drawn as chosen while it is open.
+
+The right click had to be handled by hand rather than left to Slint's
+``ContextMenuArea``. The grip that takes a drag covers the whole node and is
+above everything, so it takes every press on it and the menu area underneath
+never sees one; the grip shows the menu by name instead.
+
+"Stayed put" is within three pixels, not exactly nowhere. The test was that
+the release landed on the very pixel of the press, which a hand on a mouse does
+not manage: every click carried a fraction of a pixel, every click was read as
+a drag, and the menu was unreachable by the gesture meant to open it. The same
+slack keeps a trembling click from recording a one-pixel move as an edit.
 
 Delete asks, with the node's name and what goes with it: "two lines are
 attached to it and go with it". Undo would put all of that back, a removal

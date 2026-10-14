@@ -1666,6 +1666,21 @@ landed in. The headings keep the table's order, which is the one place that
 order says something -- devices, then the things that are driven, then the ends
 of the graph.
 
+The two ends of the graph are two shapes rather than one. A log is a pill and
+the ground station is a hexagon, which is what a systems diagram uses for
+something outside the thing it describes -- and the ground station is the one
+node on the canvas that is not part of the vehicle at all. They were both
+pills, under one heading, on the strength of both being "an end"; but a file
+written on board and everybody on the ground are not the same kind of end, and
+the two were never in the same pane for the shared heading to group anything.
+A hexagon is not a corner radius, so it arrives as path data from
+``style::shape_of`` and the markup draws it with a ``Path`` -- the same
+arrangement as the link routes, and for the same reason: geometry that can be
+read and tested belongs in Rust rather than in a layout language. A ``Path``
+has no drop shadow, so the lift a node gets while it is being dragged is a
+second copy of the shape, three pixels lower and barely visible, drawn under
+the first.
+
 Colour remains the redundant channel for all that. Nothing is told apart by
 colour alone: every type differs from every other in at least two of outline,
 border width, shading, height and the way its label is set, and a test fails if

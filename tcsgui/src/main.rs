@@ -3524,8 +3524,13 @@ fn view_of(
             Outline::Rounded => "rounded",
             Outline::Circle => "circle",
             Outline::Keyed => "keyed",
+            Outline::Hexagon => "hexagon",
         }
         .into(),
+        // The outlines a corner radius cannot draw, as a path in the node's
+        // own coordinates. Empty for the four it can, which is what tells the
+        // markup to draw the ordinary rectangle. See style::shape_of.
+        shape: style::shape_of(outline, size).into(),
         shading: match shading {
             Shading::Solid => "solid",
             Shading::Hatched => "hatched",
@@ -3996,6 +4001,50 @@ mod tests {
         assert!(bare.contains(&"compute".to_string()), "{bare:?}");
         assert!(bare.contains(&"null".to_string()), "{bare:?}");
         assert!(!bare.contains(&"mean".to_string()), "{bare:?}");
+    }
+
+    /// Every outline the views carry is one the markup draws.
+    ///
+    /// The word is the whole of the agreement between `style` and the markup:
+    /// an outline spelled one way here and another way there is drawn as a
+    /// plain square, silently, because the markup's last branch is the one
+    /// with no test on it. A path for the shapes a corner radius cannot draw
+    /// is the same seam twice over -- the word and the data have to arrive
+    /// together -- so both are checked here, against the markup itself.
+    #[test]
+    fn every_outline_is_one_the_markup_knows() {
+        let markup = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+        )
+        .expect("the markup this binary was built from");
+
+        for kind in style::NodeType::ALL {
+            let view = view_of("n", kind.spelling(), (0, 0), None, false, None);
+            let outline = view.outline.to_string();
+            // One of three means, and exactly one. A path is how the markup
+            // asks about a shape a corner radius cannot draw, so a type
+            // carrying one is drawn whatever its word says. Square is the
+            // branch with nothing to test: the markup asks about every other
+            // radius outline and draws a square when none of them answers, so
+            // it is the one word agreed to by being absent. Everything else
+            // has to be asked about by name.
+            let drawn = !view.shape.is_empty()
+                || outline == "square"
+                || markup.contains(&format!("node.outline == \"{outline}\""));
+            assert!(
+                drawn,
+                "{} is drawn as {outline:?} with no path, and the markup never \
+                 asks about that word",
+                kind.spelling()
+            );
+            assert_eq!(
+                view.shape.is_empty(),
+                outline != "hexagon",
+                "{} is {outline:?} and its path is {:?}",
+                kind.spelling(),
+                view.shape
+            );
+        }
     }
 
     /// Nothing in the palette is red.

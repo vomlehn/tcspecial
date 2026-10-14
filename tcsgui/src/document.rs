@@ -641,6 +641,122 @@ impl Document {
     /// -- and an undo that restored the node without them would be an undo
     /// that did half of what was undone.
     ///
+    /// Which nodes share a name with another node, in the order the file holds
+    /// them.
+    ///
+    /// Every one of them, not the second of each pair: a file whose two nodes
+    /// are both called `i2c` does not say which of them was meant, so there is
+    /// nothing to prefer, and whoever is putting it right should be offered
+    /// both names to change.
+    ///
+    /// By the whole name, which includes the subdiagram a node lives in: two
+    /// pages of one configuration may each have a `temp_fore`, and that is not
+    /// a duplicate -- see [`Node::home`].
+    pub fn sharing_a_name(&self) -> Vec<usize> {
+        let mut count: BTreeMap<&str, usize> = BTreeMap::new();
+        let whole: Vec<String> = self
+            .nodes
+            .iter()
+            .map(|node| Qualified::of(&node.name, &node.home).absolute())
+            .collect();
+        for name in &whole {
+            *count.entry(name.as_str()).or_default() += 1;
+        }
+        whole
+            .iter()
+            .enumerate()
+            .filter(|(_, name)| count.get(name.as_str()).copied().unwrap_or(0) > 1)
+            .map(|(at, _)| at)
+            .collect()
+    }
+
+    /// Rename the node in this position.
+    ///
+    /// By position and not by name, which is the whole point: a name two nodes
+    /// share cannot say which of them to rename, and
+    /// [`Edit::RenameNode`] -- which renames the first node it finds -- would
+    /// rename whichever happened to be read first.
+    ///
+    /// The links follow only if the old name is left with nobody holding it.
+    /// A link names a name: while two nodes shared one, every link naming it
+    /// was ambiguous, and renaming one of the two does not make the link mean
+    /// the other -- it leaves it meaning the node that kept the name. When the
+    /// last holder is renamed there is no ambiguity left, and the links go
+    /// with it as they do for any other rename.
+    ///
+    /// Nothing happens for a position that is not there or a name that is
+    /// already this node's.
+    pub fn rename_at(&mut self, at: usize, now: &str) {
+        let Some(node) = self.nodes.get(at) else {
+            return;
+        };
+        let was = Qualified::of(&node.name, &node.home).absolute();
+        let home = node.home.clone();
+        let whole = Qualified::of(now, &home).absolute();
+        if whole == was {
+            return;
+        }
+        self.nodes[at].name = now.to_string();
+
+        let shared = self
+            .nodes
+            .iter()
+            .any(|node| Qualified::of(&node.name, &node.home).absolute() == was);
+        if shared {
+            return;
+        }
+        for link in &mut self.links {
+            if link.from == was {
+                link.from = whole.clone();
+            }
+            if link.to == was {
+                link.to = whole.clone();
+            }
+        }
+        // And the simulator's entry for it, where there is one: the two files
+        // are joined by name, so a name changed in one of them has to change
+        // in the other or the pair stops being a pair. See `crate::sim`.
+        if let Some(simulator) = &mut self.simulator {
+            if let Some(settings) = simulator.payloads.remove(&was) {
+                simulator.payloads.insert(whole.clone(), settings);
+            }
+        }
+    }
+
+    /// A name no node has, derived from one that is taken.
+    ///
+    /// The name with a hyphen and the first free number, or the next free
+    /// number where it already ends in one: `i2c` becomes `i2c-1`, and `i2c-1`
+    /// becomes `i2c-2` rather than `i2c-1-1`. The same shape of name the editor
+    /// gives a node it places -- see `tcsgui::fresh_name` -- so a derived name
+    /// looks like a name and not like a repair.
+    ///
+    /// Within the home of the node at `at`, since that is where it has to be
+    /// free.
+    pub fn spare_name(&self, at: usize) -> String {
+        let Some(node) = self.nodes.get(at) else {
+            return String::new();
+        };
+        let home = node.home.clone();
+        // Whatever it is called, without a number on the end: a file with
+        // `i2c-1` twice should offer `i2c-2`, not `i2c-1-1`.
+        let stem = match node.name.rsplit_once('-') {
+            Some((stem, number)) if !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()) => stem,
+            _ => node.name.as_str(),
+        };
+        let stem = if stem.is_empty() { node.node_type.as_str() } else { stem };
+        let taken = |name: &str| {
+            let whole = Qualified::of(name, &home).absolute();
+            self.nodes
+                .iter()
+                .any(|node| Qualified::of(&node.name, &node.home).absolute() == whole)
+        };
+        (1..)
+            .map(|n| format!("{stem}-{n}"))
+            .find(|name| !taken(name))
+            .expect("a free name exists")
+    }
+
     /// `None` for a node that is not here, which is a window asking about one
     /// somebody has already deleted.
     pub fn removal_of(&self, name: &str) -> Option<Edit> {
@@ -904,6 +1020,16 @@ impl Document {
                     }
                     if &link.to == was {
                         link.to = now.clone();
+                    }
+                }
+                // And so does the simulator's own file, which is joined to
+                // the configuration by the payload's name and by nothing
+                // else: a rename that left its entry behind would leave a set
+                // of settings naming a payload that is not there, which the
+                // next session refuses the file for. See `crate::sim`.
+                if let Some(simulator) = &mut self.simulator {
+                    if let Some(settings) = simulator.payloads.remove(was) {
+                        simulator.payloads.insert(now.clone(), settings);
                     }
                 }
             }
@@ -3596,6 +3722,80 @@ mod tests {
 
     /// What might be wrong is raised; what is meant can be set aside.
     ///
+    /// A duplicate name is put right by position, and the links stay with
+    /// whoever keeps the name.
+    #[test]
+    fn one_of_two_nodes_sharing_a_name_can_be_renamed() {
+        let mut document = Document::new();
+        for name in ["i2c", "i2c", "moc"] {
+            document.apply(&Edit::AddNode {
+                name: name.to_string(),
+                node_type: if name == "moc" { "moc" } else { "i2c" }.to_string(),
+                home: None,
+            });
+        }
+        document.apply(&Edit::AddLink {
+            link: Link::new("i2c", "moc", None),
+        });
+
+        // Both of them are offered, because the file does not say which was
+        // meant. The ground station is not.
+        assert_eq!(document.sharing_a_name(), vec![0, 1]);
+
+        // A name derived from the one that is taken, and free.
+        assert_eq!(document.spare_name(1), "i2c-1");
+
+        // The second one renamed: the first keeps the name, so the link --
+        // which named that name -- stays where it was.
+        document.rename_at(1, "i2c-1");
+        assert_eq!(document.nodes[0].name, "i2c");
+        assert_eq!(document.nodes[1].name, "i2c-1");
+        assert_eq!(document.links[0].from, "i2c");
+        assert!(document.sharing_a_name().is_empty());
+
+        // And now that nobody shares it, renaming the holder takes the link
+        // with it, as any other rename does.
+        document.rename_at(0, "i2c-2");
+        assert_eq!(document.links[0].from, "i2c-2");
+
+        // A derived name steps the number rather than adding another: a file
+        // with two `i2c-2` nodes should offer another number, not `i2c-2-1`.
+        document.apply(&Edit::AddNode {
+            name: "i2c-2".to_string(),
+            node_type: "i2c".to_string(),
+            home: None,
+        });
+        assert_eq!(document.sharing_a_name(), vec![0, 3]);
+        assert_eq!(document.spare_name(3), "i2c-3");
+    }
+
+    /// Two pages may each hold a node of the same name, which is not a
+    /// duplicate.
+    #[test]
+    fn a_name_is_only_shared_within_one_home() {
+        let mut document = Document::new();
+        for home in [None, Some("cabin".to_string()), Some("bay".to_string())] {
+            document.apply(&Edit::AddNode {
+                name: "temp_fore".to_string(),
+                node_type: "i2c".to_string(),
+                home,
+            });
+        }
+        assert!(
+            document.sharing_a_name().is_empty(),
+            "three pages, three nodes, one name apiece"
+        );
+
+        // And inside one page it is a duplicate like any other.
+        document.apply(&Edit::AddNode {
+            name: "temp_fore".to_string(),
+            node_type: "i2c".to_string(),
+            home: Some("cabin".to_string()),
+        });
+        assert_eq!(document.sharing_a_name(), vec![1, 3]);
+        assert_eq!(document.spare_name(3), "temp_fore-1");
+    }
+
     /// Three shapes, and which rules apply depends on the pane: a payload is
     /// where the payload's own data begins and a MOC link where it ends, so
     /// those two are asked whether what they send reaches anything, and a

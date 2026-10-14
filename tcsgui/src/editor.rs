@@ -168,13 +168,58 @@ impl Editor {
         }
 
         match crate::sim::read(path) {
-            Ok(simulator) => self.document.simulator = Some(simulator),
-            Err(why) => {
-                self.trouble = Some(format!("{} cannot be read: {why}", path.display()));
-                // An empty one all the same, so that the windows have
-                // somewhere to put what somebody types rather than being
-                // unreachable for the rest of the session.
-                self.document.simulator = Some(crate::sim::Simulator::new(path));
+            Ok(simulator) => {
+                // Every simulated payload has to name a payload of the
+                // configuration: that name is the whole of how the two files
+                // are joined, so one that names nothing is a set of settings
+                // that drives nothing -- which is what a misspelling looks
+                // like. Refused rather than adopted, because adopting it
+                // means writing the file back on the next edit with the
+                // stray entry still in it and nothing said.
+                let payloads: Vec<String> = self
+                    .document
+                    .nodes
+                    .iter()
+                    .filter(|node| crate::pane::is_payload(&node.node_type))
+                    .map(|node| {
+                        crate::Qualified::of(&node.name, &node.home).absolute()
+                    })
+                    .collect();
+                let stray: Vec<&String> = simulator
+                    .payloads
+                    .keys()
+                    .filter(|name| !payloads.contains(name))
+                    .collect();
+                if stray.is_empty() {
+                    self.document.simulator = Some(simulator);
+                } else {
+                    self.trouble = Some(format!(
+                        "{}: {} names no payload of {}; a simulated payload \
+                         names the payload it stands in for, so the two files \
+                         are joined by the name and this one joins nothing",
+                        path.display(),
+                        said_list(&stray),
+                        self.path.display()
+                    ));
+                    self.document.simulator = None;
+                }
+            }
+            Err(trouble) => {
+                self.trouble = Some(format!(
+                    "{} cannot be read: {}",
+                    path.display(),
+                    trouble.why()
+                ));
+                // An empty one in its place where the file cannot be read at
+                // all, so that the windows have somewhere to put what
+                // somebody types rather than being unreachable for the rest
+                // of the session -- and nothing at all where the file parses
+                // but says something the two files cannot both mean: that one
+                // would be written back with half of itself missing. See
+                // `crate::sim::Trouble`.
+                self.document.simulator = trouble
+                    .leaves_somewhere_to_type()
+                    .then(|| crate::sim::Simulator::new(path));
             }
         }
     }
@@ -302,6 +347,29 @@ impl Editor {
         self.persist();
     }
 
+    /// Rename the node in this position, as a repair rather than an edit.
+    ///
+    /// For the one thing that cannot be done by [`Edit::RenameNode`]: telling
+    /// two nodes that share a name apart. A name is how an edit says which
+    /// node it means, so an edit cannot mean "the second of the two" -- see
+    /// [`Document::rename_at`], which is the arithmetic.
+    ///
+    /// Not recorded in the history, which is the decision worth stating. A
+    /// file with two nodes of one name is a file nothing can fly: the editor
+    /// cannot save a graph that names a node twice without the next session
+    /// facing the same question, and tcsverify refuses it. So putting it right
+    /// is not an edit somebody made to a drawing -- it is the file being made
+    /// readable -- and an undo that put the duplicate back would write a
+    /// broken configuration to the disk, every edit being saved as it is made.
+    /// Undo takes back what was drawn; this was not drawn.
+    ///
+    /// Written at once, for the same reason: the document and the file must
+    /// not disagree about a name while the session carries on.
+    pub fn settle_name(&mut self, at: usize, now: &str) {
+        self.document.rename_at(at, now);
+        self.persist();
+    }
+
     /// Lay every node out afresh: each at the top of its own pane, nothing
     /// covering anything.
     ///
@@ -415,6 +483,25 @@ impl Editor {
 /// What the window says about a failed write.
 fn describe(why: &SaveError) -> String {
     format!("{why}")
+}
+
+/// A list of names as a sentence says them.
+///
+/// One name is quoted; two are joined by "and"; more are a comma list with an
+/// "and" before the last. A message that said `["a", "b"]` would be a message
+/// written for a programmer.
+fn said_list(names: &[&String]) -> String {
+    let quoted: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
+    match quoted.len() {
+        0 => String::new(),
+        1 => quoted[0].clone(),
+        2 => format!("{} and {}", quoted[0], quoted[1]),
+        _ => format!(
+            "{} and {}",
+            quoted[..quoted.len() - 1].join(", "),
+            quoted[quoted.len() - 1]
+        ),
+    }
 }
 
 #[cfg(test)]
@@ -679,6 +766,115 @@ tcsgui:
         // And there is somewhere to type, so the windows are not unreachable
         // for the rest of the session.
         assert!(editor.document().simulator.is_some());
+    }
+
+    /// A simulator file with two entries of one name is refused, and so is
+    /// one naming a payload that is not there.
+    ///
+    /// Both are files the editor could half-read and write back damaged: a
+    /// duplicate collapses to whichever entry was read last, and a stray name
+    /// is a set of settings that drives nothing. Neither is adopted, so
+    /// neither is overwritten, and the session carries on with the
+    /// configuration alone.
+    #[test]
+    fn a_simulator_file_that_does_not_join_up_is_refused() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayloads:\n  - name: payload\n    type: network\n",
+        )
+        .expect("a configuration");
+
+        // Two entries of one name.
+        let twice = where_.path().join("twicesim.yaml");
+        std::fs::write(
+            &twice,
+            "simulated_payloads:\n  - name: payload\n    packet_interval_ms: 500\n  \
+             - name: payload\n    packet_interval_ms: 900\n",
+        )
+        .expect("a simulator file");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&twice);
+        let said = editor.trouble().expect("this should be reported");
+        assert!(said.contains("payload"), "{said}");
+        assert!(
+            editor.document().simulator.is_none(),
+            "a file that cannot be read back is a file nothing should be \
+             written over"
+        );
+        // And on the disk, untouched: nothing was adopted, so nothing of it
+        // can be lost by the next edit.
+        assert!(std::fs::read_to_string(&twice).unwrap().contains("900"));
+
+        // A name no payload has.
+        let stray = where_.path().join("straysim.yaml");
+        std::fs::write(
+            &stray,
+            "simulated_payloads:\n  - name: payload\n  - name: paylod\n",
+        )
+        .expect("a simulator file");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&stray);
+        let said = editor.trouble().expect("this should be reported");
+        assert!(said.contains("paylod"), "{said}");
+        assert!(editor.document().simulator.is_none());
+
+        // And the one that does join up is opened.
+        let good = where_.path().join("goodsim.yaml");
+        std::fs::write(
+            &good,
+            "simulated_payloads:\n  - name: payload\n    packet_interval_ms: 500\n",
+        )
+        .expect("a simulator file");
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.open_simulator(&good);
+        assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
+        assert!(editor.document().simulator.is_some());
+
+        // Renaming the payload takes its settings with it, so the pair still
+        // joins up: a rename that left them behind would make the next
+        // session refuse the file the editor itself had written.
+        editor.edit(Edit::RenameNode {
+            was: "payload".to_string(),
+            now: "payload-1".to_string(),
+        });
+        let written = std::fs::read_to_string(&good).expect("the simulator file");
+        assert!(written.contains("payload-1"), "{written}");
+        let mut again = Editor::open(&path, crate::pane::default_dividers());
+        again.open_simulator(&good);
+        assert!(again.trouble().is_none(), "{:?}", again.trouble());
+    }
+
+    /// Two nodes of one name are told apart by position, written at once, and
+    /// not put back by an undo.
+    #[test]
+    fn a_duplicate_name_is_settled_outside_the_history() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayloads:\n  - name: i2c\n    type: i2c\n  \
+             - name: i2c\n    type: i2c\n",
+        )
+        .expect("a configuration naming a node twice");
+
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        assert_eq!(editor.document().sharing_a_name(), vec![0, 1]);
+        let depth = editor.undo_depth();
+
+        let spare = editor.document().spare_name(1);
+        editor.settle_name(1, &spare);
+        assert!(editor.document().sharing_a_name().is_empty());
+
+        // On the disk at once, because the document and the file must not
+        // disagree about a name while the session carries on.
+        let written = std::fs::read_to_string(&path).expect("the configuration");
+        assert!(written.contains(&spare), "{written}");
+
+        // And not in the history: an undo would put back a configuration that
+        // nothing can fly, and every edit is written as it is made.
+        assert_eq!(editor.undo_depth(), depth, "a repair is not an edit");
     }
 
     /// A setting typed into a simulated payload reaches the simulator's file.

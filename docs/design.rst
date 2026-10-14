@@ -1871,6 +1871,50 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
+A configuration that names a node twice is a configuration nothing can fly:
+the links naming that name do not say which of the two they meant, and
+``tcsverify`` refuses it. The editor asks about it when the file is opened, in
+a window of its own, before anything else can be done with the drawing. Every
+node of the shared name is offered -- not the second of each pair, because the
+file does not say which was meant -- and each can be typed over or given the
+name the **Suggest** button derives, which is the name the editor would have
+placed it with. **Rename** waits until the names all differ, none is blank and
+none belongs to a third node, since a repair that left the same question
+standing would be no answer; what is wrong is said under the list rather than
+beside a row, so the list does not shift as somebody types. **Leave them**
+closes it and changes nothing: the duplicate is then reported as a fault like
+any other, and somebody who would rather fix it in a text editor is not held
+there.
+
+Renaming one of two nodes that share a name is done **by position**, which is
+the one thing ``Edit::RenameNode`` cannot express: a name is how an edit says
+which node it means, so an edit cannot mean "the second of the two". It is also
+not recorded in the history, which is the decision worth stating. A duplicate
+is the file being unreadable rather than somebody's drawing, and an undo would
+put it back -- which, every edit being written as it is made, would write a
+broken configuration to the disk. Undo takes back what was drawn; this was not
+drawn. The repair is written at once instead, so the document and the file
+never disagree about a name.
+
+The links stay with whoever keeps the name. A link names a name: while two
+nodes shared one, every link naming it was ambiguous, and renaming one of them
+does not make the link mean the other. When the last holder of a name is
+renamed there is no ambiguity left and the links follow, as they do for any
+other rename.
+
+The simulator's file is held to the same rule from both ends. Two entries of
+one name are refused outright -- a name is the whole of how the two files are
+joined, so two of them are two sets of settings for one payload and the file
+does not say which applies -- and so is an entry naming a payload the
+configuration does not have. Both are refused rather than half-read: the file
+parses, so adopting part of it would mean writing the rest of it away at the
+next edit. A file that cannot be parsed at all is different and keeps its old
+treatment -- reported, and an empty one put in its place, because an editor
+that will not start on a damaged file cannot be used to fix one. That is the
+distinction ``sim::Trouble`` draws. And renaming a payload node carries its
+simulated entry with it, so the editor cannot be the thing that breaks the
+join.
+
 A node placed from a palette is named after its type, a hyphen, and the first
 number that is free: ``i2c-1``, then ``i2c-2``, and ``i2c-1`` again if the
 first one is deleted -- the number says which of them this is, not how many

@@ -143,6 +143,38 @@ pub fn must_be_yaml(path: &Path) -> Result<(), String> {
     ))
 }
 
+/// Why a simulator file was not opened, and what to do about it.
+///
+/// Two kinds, because they want opposite answers. A file the editor cannot
+/// *read* is one it cannot write back faithfully either, so the session goes
+/// on with an empty one and somewhere to type -- an editor that would not
+/// start on a damaged file is an editor that cannot be used to fix one. A file
+/// the editor can read but must not *use* is a different matter: it parses, so
+/// adopting half of it would mean writing the other half away at the next
+/// edit. That one is refused, and the file is left on the disk exactly as it
+/// is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Trouble {
+    /// It cannot be parsed, or its name is not a YAML one.
+    Unreadable(String),
+    /// It parses, and says something the two files cannot both mean.
+    Unusable(String),
+}
+
+impl Trouble {
+    /// What to say about it.
+    pub fn why(&self) -> &str {
+        match self {
+            Trouble::Unreadable(why) | Trouble::Unusable(why) => why,
+        }
+    }
+
+    /// Whether the session should carry on with an empty one in its place.
+    pub fn leaves_somewhere_to_type(&self) -> bool {
+        matches!(self, Trouble::Unreadable(_))
+    }
+}
+
 /// Read the simulator configuration at `path`.
 ///
 /// A file that is not there is not an error: a name that does not exist yet is
@@ -150,19 +182,45 @@ pub fn must_be_yaml(path: &Path) -> Result<(), String> {
 /// is. A name that is not YAML is an error whether or not the file exists --
 /// see [`must_be_yaml`] -- because it is the name this would be written back
 /// to.
-pub fn read(path: &Path) -> Result<Simulator, String> {
-    must_be_yaml(path)?;
+pub fn read(path: &Path) -> Result<Simulator, Trouble> {
+    must_be_yaml(path).map_err(Trouble::Unreadable)?;
 
     let mut simulator = Simulator::new(path);
     if !path.exists() {
         return Ok(simulator);
     }
 
-    let format = ConfigFormat::of_file(path).map_err(|e| format!("{e}"))?;
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{e}"))?;
-    let file: File = format.parse(&text).map_err(|e| format!("{e}"))?;
+    let unreadable = |e: &dyn std::fmt::Display| Trouble::Unreadable(format!("{e}"));
+    let format = ConfigFormat::of_file(path).map_err(|e| unreadable(&e))?;
+    let text = std::fs::read_to_string(path).map_err(|e| unreadable(&e))?;
+    let file: File = format.parse(&text).map_err(|e| unreadable(&e))?;
 
     simulator.description = file.description;
+
+    // Two entries of one name are refused rather than read. A name is how
+    // this file is joined to the configuration, so two of them are two sets
+    // of settings for one payload and the file does not say which applies --
+    // and reading it as a map would quietly keep the second and throw the
+    // first away. Refusing leaves the file on the disk for somebody to fix,
+    // which is what it would not do if the editor adopted half of it and
+    // wrote it back on the next edit.
+    for (what, entries) in [
+        ("simulated payload group", &file.simulated_payload_groups),
+        ("simulated payload", &file.simulated_payloads),
+    ] {
+        let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        for entry in entries {
+            if !seen.insert(entry.name.as_str()) {
+                return Err(Trouble::Unusable(format!(
+                    "two {what}s are called \"{}\"; a name is how this file \
+                     and the configuration are joined, so it has to name one \
+                     entry",
+                    entry.name
+                )));
+            }
+        }
+    }
+
     let settled = |entries: Vec<Entry>| -> BTreeMap<String, Settings> {
         entries
             .into_iter()

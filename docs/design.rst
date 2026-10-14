@@ -1616,6 +1616,41 @@ a press on a corner draws a link and a press anywhere else moves the node. That
 is the one thing the arrangement costs: a node can no longer be dragged by its
 corners.
 
+A line's colour says which stream it carries, and a line is drawn twice as
+wide as it was. Both halves of that are the same point: a line is the thing a
+reader of a diagram follows, and a grey one two pixels wide left the two
+streams to be told apart by which corner each line left -- which is reading a
+diagram by its arithmetic.
+
+So a line carrying the payload's own data is of the payload family and one
+carrying what the ground sends is of the ground's, each **one shade lighter
+than the lightest node in that panel**: ten of CIE lightness above it, where
+the steps between neighbouring tints are two to eight. Lighter so that a line
+is not taken for a node's outline, and of the family so that the colour says
+the stream.
+``tcsgui::tests::a_line_is_one_shade_lighter_than_its_lightest_node`` holds
+both to the panels themselves, so a palette change that made a node lighter
+than its lines fails there -- and holds the two lines fourteen CIE units apart
+under normal vision and the three dichromacies, which is the floor the palette
+itself is held to.
+
+What it costs is contrast against the panes: a line at that lightness is
+between two and three to one against the three grounds, where a node is held
+to three. The width is what pays for it -- the rule a node is held to is for a
+shape, and a five-pixel line is read far more easily than its contrast ratio
+suggests -- but it is a trade and it is written down here rather than left to
+be noticed.
+
+Each selection panel is in alphabetical order under each of its headings. A
+palette is a thing people look in rather than read, and the order it had was
+the order the type table happens to declare things in, which is no order at
+all to somebody hunting for ``rpmsg``. Within a heading and not across the
+panel: a heading is a statement about the entries under it, so a list sorted
+past its headings would file a device under whichever heading its first letter
+landed in. The headings keep the table's order, which is the one place that
+order says something -- devices, then the things that are driven, then the ends
+of the graph.
+
 Colour remains the redundant channel for all that. Nothing is told apart by
 colour alone: every type differs from every other in at least two of outline,
 border width, shading, height and the way its label is set, and a test fails if

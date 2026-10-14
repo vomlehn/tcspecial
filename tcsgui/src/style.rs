@@ -319,9 +319,24 @@ pub struct Corner {
     pub arrow: bool,
 }
 
-/// How large a terminal is drawn, in pixels: wide enough for an arrow and no
-/// wider, because four of them share the edges of a node with its name.
-pub const TERMINAL: (u32, u32) = (24, 10);
+/// How large a terminal is drawn, in pixels.
+///
+/// It was 24 by 10 -- wide enough for an arrow and no wider -- and that is a
+/// strip a person has to aim at, which is the complaint this answers: a press
+/// has to land on a terminal exactly, since the terminal is what says which
+/// stream the line carries, where the release only has to land on a node.
+/// Twice the area, and both ways about, so the hand has room in whichever
+/// direction it is short.
+///
+/// What bounds it is the smallest node, which is the `null` one at 40 tall and
+/// the one with all four: two rows of terminals and their insets have to fit
+/// inside that height and leave the rows apart, and the two columns have to
+/// fit inside [`WIDTH`] -- see
+/// `tests::the_terminals_of_every_type_fit_inside_it`, which is what says so
+/// rather than this comment. The name is clear of them either way: a label is
+/// padded away from whichever side carries terminals, so the boxes and the
+/// name cannot collide however tall they grow.
+pub const TERMINAL: (u32, u32) = (36, 14);
 
 /// How far a terminal sits from the corner it is in.
 ///
@@ -448,7 +463,7 @@ pub fn terminal_box(
 /// What the label is padded by on whichever side carries terminals: the name
 /// stays in the middle of the node and stops short of the corner boxes, rather
 /// than a row being reserved at the top and the bottom -- which would leave
-/// sixteen pixels for a name on the shortest node.
+/// a few pixels for a name on the shortest node.
 pub const TERMINAL_COLUMN: u32 = TERMINAL.0 + 2 * TERMINAL_INSET;
 
 /// Every node type the editor can place.
@@ -1096,6 +1111,55 @@ mod tests {
         // And a computation's own input is not a terminal: it is drawn where
         // the link arrives, with its name on it.
         assert_eq!(corner_of("in0"), None);
+    }
+
+    /// Every terminal a type has fits inside it, clear of the others.
+    ///
+    /// What bounds [`TERMINAL`]. The `null` node is 40 pixels tall and carries
+    /// all four, so growing a terminal is growing it against that: two rows
+    /// have to fit inside the height with daylight between them, and two
+    /// columns inside the width. A box that overran would be a box hanging
+    /// outside its node -- pressable where nothing is drawn -- or two boxes
+    /// lying on top of each other, where a press means whichever happens to be
+    /// on top.
+    #[test]
+    fn the_terminals_of_every_type_fit_inside_it() {
+        let inset = TERMINAL_INSET as i32;
+        let (box_width, box_height) = (TERMINAL.0 as i32, TERMINAL.1 as i32);
+
+        for t in NodeType::ALL {
+            let (width, height) = t.appearance().size;
+            let mut boxes: Vec<(i32, i32)> = Vec::new();
+            for terminal in t.terminals().each() {
+                let corner = corner_of(terminal).expect("a corner");
+                let at = terminal_at(corner, (width, height));
+                // Inside the node, with its inset on every side.
+                assert!(at.0 >= inset && at.1 >= inset, "{terminal}: {at:?}");
+                assert!(
+                    at.0 + box_width <= width as i32 - inset
+                        && at.1 + box_height <= height as i32 - inset,
+                    "{}: {terminal} at {at:?} overruns {width}x{height}",
+                    t.spelling()
+                );
+                boxes.push(at);
+            }
+
+            // And clear of each other, which is the rule the smallest node is
+            // measured against.
+            for (one, at) in boxes.iter().enumerate() {
+                for theirs in boxes.iter().skip(one + 1) {
+                    let over = at.0 < theirs.0 + box_width
+                        && theirs.0 < at.0 + box_width
+                        && at.1 < theirs.1 + box_height
+                        && theirs.1 < at.1 + box_height;
+                    assert!(
+                        !over,
+                        "{}: terminals at {at:?} and {theirs:?} overlap",
+                        t.spelling()
+                    );
+                }
+            }
+        }
     }
 
     /// The upper-left box is drawn empty, and the other three carry arrows.

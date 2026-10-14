@@ -285,6 +285,59 @@ pub fn label_at(ends: Ends, around: &[Obstacle]) -> (f32, f32) {
 /// checked against four numbers and a box or two, which is how a rule should
 /// be checked; this is how a test of a real configuration asks the same
 /// question of every link in it at once.
+/// The line a gesture is drawing, from where it started to where the pointer
+/// is, as a dashed path.
+///
+/// Straight, where a link's own route is orthogonal: this one is in a person's
+/// hand and follows it, and a route that turned corners as the hand moved
+/// would be a line that jumps about while being aimed. Dashed, so that a line
+/// which is not a connection yet does not read as one -- and dashed by
+/// construction, a run of short subpaths, because a path in this toolkit has
+/// no dash pattern of its own.
+///
+/// The anchor is the end that is staying put: the terminal the gesture started
+/// at when a line is being drawn, and the far end of the line when one is
+/// being carried by its end.
+pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
+    /// How long a dash is, and the gap after it.
+    const DASH: f32 = 6.0;
+    const GAP: f32 = 5.0;
+
+    let (dx, dy) = (at.0 - anchor.0, at.1 - anchor.1);
+    let span = (dx * dx + dy * dy).sqrt();
+    // Nowhere to draw to, which is the first moment of every gesture.
+    if span < 1.0 {
+        return String::new();
+    }
+    let (ux, uy) = (dx / span, dy / span);
+
+    let mut out = String::new();
+    let dash = |from: f32, to: f32, out: &mut String| {
+        out.push_str(&format!(
+            "M {:.1} {:.1} L {:.1} {:.1} ",
+            anchor.0 + ux * from,
+            anchor.1 + uy * from,
+            anchor.0 + ux * to,
+            anchor.1 + uy * to
+        ));
+    };
+
+    let mut along = 0.0;
+    while along < span {
+        let mut end = (along + DASH).min(span);
+        // The last dash ends under the pointer rather than wherever the
+        // pattern happened to stop: the tip is what a person is aiming with,
+        // and a line that stopped a gap short of their hand would miss by a
+        // gap. So a dash with less than a gap left after it runs to the end.
+        if span - end < GAP {
+            end = span;
+        }
+        dash(along, end, &mut out);
+        along = end + GAP;
+    }
+    out.trim_end().to_string()
+}
+
 #[cfg(test)]
 pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
     let points = way(ends, around);
@@ -1101,6 +1154,42 @@ mod tests {
             visited[0].0 > visited[1].0,
             "and it points the way the data goes: {said}"
         );
+    }
+
+    /// The line in somebody's hand is dashed, straight, and reaches the
+    /// pointer.
+    ///
+    /// Straight because it is being aimed: a route that turned corners as the
+    /// hand moved would jump about under it. Dashed because it is not a
+    /// connection yet, and in pieces because a path here has no dash pattern
+    /// of its own -- so the test is that there are several subpaths and that
+    /// the last of them ends where the pointer is.
+    #[test]
+    fn the_line_being_drawn_is_a_dashed_run_to_the_pointer() {
+        let said = drawing((0.0, 0.0), (100.0, 0.0));
+        assert!(said.matches('M').count() > 5, "{said}");
+        assert!(said.starts_with("M 0.0 0.0 L 6.0 0.0"), "{said}");
+        assert!(said.ends_with("L 100.0 0.0"), "{said}");
+
+        // Diagonal, and still ending under the pointer.
+        let said = drawing((10.0, 10.0), (60.0, 60.0));
+        assert!(said.ends_with("L 60.0 60.0"), "{said}");
+
+        // Whatever the length, the tip is under the pointer: that is what a
+        // person is aiming with, and a dash pattern that stopped where it
+        // stopped would miss by a gap.
+        for span in 2..400 {
+            let at = (span as f32 / 3.0, span as f32);
+            let said = drawing((0.0, 0.0), at);
+            assert!(
+                said.ends_with(&format!("L {:.1} {:.1}", at.0, at.1)),
+                "{span}: {said}"
+            );
+        }
+
+        // And nothing at all where the pointer has not moved, which is the
+        // first moment of every gesture.
+        assert_eq!(drawing((20.0, 20.0), (20.0, 20.5)), "");
     }
 }
 

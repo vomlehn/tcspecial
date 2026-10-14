@@ -1509,10 +1509,26 @@ That case used to do nothing at all, and it is the first thing somebody tried.
 A second line out of a data source could only be drawn from the sink end -- a
 rule nobody guessed, and one the drawing gives no hint of.
 
-While the hand is moving, only the lines are redrawn. Rebuilding the nodes
-would destroy the element holding the pointer and take the rest of the gesture
-with it -- which is a fault this window has made once already, when the same
-press that chose a node rebuilt the canvas under it.
+While the hand is moving, the line being drawn follows it: a dashed line from
+the end that is staying put to wherever the pointer is, erased and drawn again
+on every movement. Without it a person aims at nothing -- the line appeared
+when the gesture was already over, which is to say when it was too late to aim
+-- and the line in hand is what says the gesture started at all.
+
+Dashed because it is not a connection yet, and straight where a link's own
+route is orthogonal: this one is being aimed, and a route that turned corners
+as the hand moved would jump about under it. The dashes are a run of short
+subpaths, a path in this toolkit having no dash pattern of its own, and the
+last of them ends under the pointer rather than wherever the pattern stopped:
+the tip is what somebody is aiming with. Which end stays put is the terminal
+the gesture started at when a line is being drawn, and the *far* end when a
+line is being carried by one of its ends -- that end is in the hand, and the
+other one is what it still hangs from.
+
+Only the lines are redrawn, never the nodes. Rebuilding the nodes would
+destroy the element holding the pointer and take the rest of the gesture with
+it -- which is a fault this window has made once already, when the same press
+that chose a node rebuilt the canvas under it.
 
 A link may be drawn either way about: from the data source that feeds it or
 from the data sink that wants feeding. It is the same link, and the file says

@@ -96,7 +96,7 @@
         <nodes><name>moc</name><x>24</x><y>40</y></nodes>
         <nodes><name>mean</name><x>272</x><y>288</y></nodes>
         <nodes><name>mean-2</name><x>280</x><y>408</y></nodes>
-        <nodes><name>payload</name><x>744</x><y>160</y></nodes>
+        <nodes><name>payload</name><x>728</x><y>40</y></nodes>
         <nodes><name>i2c</name><x>608</x><y>432</y></nodes>
         <nodes><name>i2c-2</name><x>608</x><y>600</y></nodes>
     </tcsgui>

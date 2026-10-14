@@ -902,11 +902,43 @@ macro_rules! wiring {
                 });
             }
             {
+                let window_for_drawing = window.as_weak();
+                let drawing_for_motion = drawing.clone();
+                let editor_for_motion = editor.clone();
+                let home_for_motion = home.clone();
+                // Where the pointer is, while a line is being drawn from a
+                // terminal. The line follows it: a gesture whose line stayed
+                // at the terminal until it was let go of is a gesture with
+                // nothing to aim.
+                window.on_link_moved(move |x, y| {
+                    let Some(window) = window_for_drawing.upgrade() else {
+                        return;
+                    };
+                    let said = drawing_for_motion
+                        .borrow()
+                        .as_ref()
+                        .and_then(|from| {
+                            let editor = editor_for_motion.borrow();
+                            let anchor = anchored(editor.document(), &home_for_motion, from)?;
+                            Some(route::drawing(anchor, (x, y)))
+                        })
+                        .unwrap_or_default();
+                    window.set_drawing_route(said.into());
+                });
+            }
+            {
                 let editor = editor.clone();
                 let views = views.clone();
                 let drawing = drawing.clone();
                 let home = home.clone();
+                let window_for_finish = window.as_weak();
                 window.on_link_finished(move |x, y| {
+                    // The line in hand goes first, whatever the gesture turns
+                    // out to have done: it was never a link, and leaving it
+                    // drawn would be a second line nobody made.
+                    if let Some(window) = window_for_finish.upgrade() {
+                        window.set_drawing_route(Default::default());
+                    }
                     let from = match drawing.borrow_mut().take() {
                         Some(from) => from,
                         None => return,
@@ -2560,6 +2592,30 @@ fn joined(
         return None;
     }
     Some(link)
+}
+
+/// Where the line a gesture is drawing is anchored: the end that stays put.
+///
+/// The terminal the gesture started at, where a line is being drawn from
+/// nothing. The *far* end of the line, where one is being carried by its end:
+/// that end is in somebody's hand and the other one is what it still hangs
+/// from, so a line anchored at the pressed terminal would be drawn from the
+/// end that is moving.
+///
+/// `None` for a node or a terminal this page does not draw, which is what a
+/// gesture on another page looks like from here: no line, rather than a line
+/// from a guess.
+fn anchored(document: &Document, home: &Home, from: &Drawing) -> Option<(f32, f32)> {
+    if let Some(held) = &from.holding {
+        let ends = ends_of(document, held, home);
+        let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&from.terminal)?;
+        // The end that is not the one in hand.
+        return Some(if sink_pressed { ends.from } else { ends.to });
+    }
+
+    let node = document.node(&from.node)?;
+    let (at, _) = style::attachment(&node.node_type, node.at, &from.terminal)?;
+    Some(at)
 }
 
 /// Where a line being dragged has landed: the node under the pointer, and the
@@ -5296,6 +5352,129 @@ mod tests {
         placing_a_described_node_answers_what_it_describes();
         an_error_is_put_where_it_cannot_be_missed();
         the_menu_arranges_the_nodes_and_shows_them();
+        the_line_being_drawn_follows_the_pointer();
+    }
+
+    /// While a line is being drawn it follows the pointer, and it goes when
+    /// the gesture ends.
+    ///
+    /// Through the window, because every part of this is the window's: the
+    /// terminal reports where the pointer is while it holds it, the canvas
+    /// draws a dashed line there, and the line is erased and drawn again on
+    /// every movement. Without it a person aims at nothing -- the line
+    /// appeared only once the gesture was over, which is to say once it was
+    /// too late to aim.
+    fn the_line_being_drawn_follows_the_pointer() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("drawn.yaml"),
+            dividers(),
+        )));
+        for (name, node_type, at) in [
+            ("sensor", "i2c", (dividers().vehicle + 24, 120)),
+            ("ground", "moc", (16, 120)),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+            editor.borrow_mut().edit(Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
+        views.borrow_mut().chosen = chosen.clone();
+        views.borrow_mut().drawing = drawing.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+        ui.show().expect("the window shows");
+
+        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+            .next()
+            .expect("the window has a canvas");
+        let origin = canvas.absolute_position();
+        let at = |x: f32, y: f32| slint::LogicalPosition::new(origin.x + x, origin.y + y);
+
+        // Pressed on the payload's to_moc, which is where its readings leave.
+        let node = editor.borrow().document().node("sensor").expect("it").at;
+        let (x, y, width, height) =
+            style::terminal_box("i2c", node, "to_moc").expect("a terminal");
+        let from = at(x + width / 2.0, y + height / 2.0);
+
+        // Nothing drawn before the gesture.
+        assert_eq!(ui.get_drawing_route(), "");
+
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: from });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+
+        // Moved partway: a line from the terminal to the pointer, in pieces
+        // because it is dashed.
+        let halfway = at(400.0, 200.0);
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: halfway });
+        let said = ui.get_drawing_route().to_string();
+        assert!(said.contains('M'), "no line is being drawn: {said:?}");
+        assert!(
+            said.matches('M').count() > 1,
+            "the line should be dashed: {said}"
+        );
+        assert!(said.ends_with("L 400.0 200.0"), "{said}");
+
+        // Moved again: erased and drawn again, which is the point of it.
+        let further = at(300.0, 320.0);
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: further });
+        let moved = ui.get_drawing_route().to_string();
+        assert_ne!(moved, said, "the line did not follow the pointer");
+        assert!(moved.ends_with("L 300.0 320.0"), "{moved}");
+
+        // And let go of over the ground, which makes the link and takes the
+        // line being drawn away: what is on the canvas now is a link.
+        let over = at(16.0 + 40.0, 120.0 + 40.0);
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: over });
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: over,
+            button: PointerEventButton::Left,
+        });
+        assert_eq!(
+            ui.get_drawing_route(),
+            "",
+            "the line in hand should have gone"
+        );
+        assert_eq!(editor.borrow().document().links.len(), 1);
     }
 
     /// The Arrange item lays the diagram out and brings the view to it.

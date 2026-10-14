@@ -11,10 +11,12 @@ moc-source: true
 attributes:
   - name: format
     required: true
-    about: "How the bytes are laid out: i16_be, u16_le and the rest."
+    about: >
+      "How the bytes are laid out: i16_be, u16_le and the rest."
   - name: scale
     required: true
-    about: What one count is worth. Nought would make every reading the same.
+    about: >
+      What one count is worth. Nought would make every reading the same.
   - name: offset
     required: true
     about: What is added after scaling.

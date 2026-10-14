@@ -1,7 +1,9 @@
 # A comparison against a setpoint with a band either side of it.
 node: hysteresis
 type: compute
-about: Switches at a setpoint, with a band either side so it does not chatter.
+about: >
+  Switches at a setpoint, with a band either side so it does not
+  chatter.
 sets:
   function: hysteresis
 payload-sink: true

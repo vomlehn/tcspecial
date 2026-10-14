@@ -3642,18 +3642,41 @@ mod tests {
         }
     }
 
-    /// The description tree is what the vehicle pane offers.
+    /// The description tree is what each pane offers.
     ///
     /// A type the tree describes is offered as its descriptions and not as
     /// itself: `compute` is one node type, and the tree turns it into `mean`,
     /// `hysteresis`, `to_kelvin` and `process`. Each entry is named after the
     /// description and carries what the description answers for it, so placing
     /// one puts down a compute node that is already a mean.
+    ///
+    /// Every pane, now that every type is described: a payload kind and the
+    /// ground link have a description apiece, which is where their terminals
+    /// are declared, and each is offered in its own pane under its own name.
     #[test]
     fn the_vehicle_pane_offers_what_the_tree_describes() {
         let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes");
         let (described, trouble) = nodes::read_tree(&tree);
         assert_eq!(trouble, Vec::<String>::new());
+
+        // Every description is offered, in whichever pane its type belongs to.
+        let everywhere: Vec<String> = [Pane::Moc, Pane::Vehicle, Pane::Payloads]
+            .into_iter()
+            .flat_map(|pane| {
+                rows_from(pane, &described)
+                    .into_iter()
+                    .filter(|row| !row.is_heading)
+                    .map(|row| row.node.name.to_string())
+                    .collect::<Vec<String>>()
+            })
+            .collect();
+        for one in &described {
+            assert!(
+                everywhere.contains(&one.node),
+                "{} is not offered: {everywhere:?}",
+                one.node
+            );
+        }
 
         let rows = rows_from(Pane::Vehicle, &described);
         let named: Vec<String> = rows
@@ -3661,9 +3684,6 @@ mod tests {
             .filter(|row| !row.is_heading)
             .map(|row| row.node.name.to_string())
             .collect();
-        for one in &described {
-            assert!(named.contains(&one.node), "{} is not offered: {named:?}", one.node);
-        }
         // And the bare type is not offered beside them: a compute node with no
         // function is refused until somebody types one in.
         assert!(!named.contains(&"compute".to_string()), "{named:?}");

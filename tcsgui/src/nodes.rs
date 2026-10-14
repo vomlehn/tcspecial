@@ -9,10 +9,13 @@
 //! `serial/keypad.yaml` would have `node/vehicle/serial/keypad.rs` or a
 //! directory `node/vehicle/serial/keypad/` with files under it.
 //!
-//! The vehicle family of that tree, which is the one this describes: what the
-//! vehicle itself runs. A payload's code is `node/payload` and what a file may
-//! say about one is the payload type's own rule -- see
-//! `tcslibgs::graph::reach` -- so there is nothing here for one.
+//! Every node type has one, and the tree's families are the code's: a
+//! description at `vehicle/compute/mean.yaml` is about the Rust at
+//! `tcspecial/src/node/vehicle/compute/mean.rs`, and one at
+//! `payload/i2c.yaml` about `node/payload/i2c/`. `moc.yaml` is at the root
+//! because the ground station has no Rust of its own -- it is the other end of
+//! the link rather than part of the vehicle, and the code that serves one is
+//! the network payload's.
 //!
 //! Two trees rather than one, which was a decision and is worth the reason.
 //! The descriptions are data the editor reads at run time and will be able to
@@ -490,8 +493,29 @@ mod tests {
         let names: Vec<&str> = described.iter().map(|one| one.node.as_str()).collect();
         assert_eq!(
             names,
-            vec!["hysteresis", "mean", "process", "to_kelvin", "log", "null"],
-            "sorted by path, which puts a directory's descriptions together"
+            vec![
+                // The ground link, which is at the root because it has no
+                // Rust of its own, then the two families in the order the
+                // code tree holds them.
+                "moc",
+                "can",
+                "device-file",
+                "gpio",
+                "hdlc",
+                "i2c",
+                "iio",
+                "network",
+                "rpmsg",
+                "serial",
+                "spi",
+                "hysteresis",
+                "mean",
+                "process",
+                "to_kelvin",
+                "log",
+                "null",
+            ],
+            "sorted by path, which puts a family's descriptions together"
         );
 
         // A computation is a compute node with its function already answered,
@@ -571,6 +595,69 @@ mod tests {
         }
     }
 
+    /// A description that is about a whole type says what that type says.
+    ///
+    /// Two statements of one fact, and the same answer as for the terminals:
+    /// the file is what a person reads and edits, `style::NodeType::attributes`
+    /// is what a node's window falls back to for a type the tree does not
+    /// describe, and a test holds one against the other. An attribute in one
+    /// and not the other is a field somebody looks for and cannot find, or a
+    /// field with nothing said about it.
+    ///
+    /// Asked only of the descriptions that are about a type as a whole -- a
+    /// payload kind, the ground link, a log -- which is what `node ==
+    /// node_type` means. A description that is one *variant* of a type is a
+    /// different thing: `mean` lists what a mean needs and `hysteresis` what a
+    /// hysteresis needs, where the table lists what any compute node may say,
+    /// so the two are not the same list and are not asked to be. For those the
+    /// description is the authority, the window being built from it.
+    ///
+    /// And every attribute anywhere in the tree has something said about it: a
+    /// field with an empty line beside it is a field somebody has to guess at.
+    #[test]
+    fn a_description_of_a_whole_type_says_what_the_type_says() {
+        let (described, trouble) = read_tree(&shipped());
+        assert!(trouble.is_empty(), "{trouble:?}");
+
+        for one in &described {
+            for attribute in &one.attributes {
+                assert!(
+                    !attribute.about.trim().is_empty(),
+                    "{}: \"{}\" has nothing said about it",
+                    one.path.display(),
+                    attribute.name
+                );
+            }
+
+            if one.node != one.node_type {
+                continue;
+            }
+            let Some(found) = crate::style::NodeType::ALL
+                .iter()
+                .find(|t| t.spelling() == one.node_type)
+            else {
+                continue;
+            };
+
+            let described: Vec<(&str, bool)> = one
+                .attributes
+                .iter()
+                .map(|a| (a.name.as_str(), a.required))
+                .collect();
+            let offered: Vec<(&str, bool)> = found
+                .attributes()
+                .iter()
+                .map(|(name, required)| (*name, *required))
+                .collect();
+            assert_eq!(
+                described,
+                offered,
+                "{}: the description and the editor offer different attributes",
+                one.path.display()
+            );
+        }
+    }
+
     /// Every description has its Rust, and every vehicle node its description.
     ///
     /// The correspondence the two trees exist for. One way round, a description
@@ -578,21 +665,34 @@ mod tests {
     /// other, a computation implemented and not described is a node nobody can
     /// place -- which is how a feature gets built and never used.
     ///
+    /// The tree mirrors the code tree, family by family: a description at
+    /// `vehicle/compute/mean.yaml` is about the Rust at
+    /// `tcspecial/src/node/vehicle/compute/mean.rs`, and one at
+    /// `payload/i2c.yaml` about `node/payload/i2c/`.
+    ///
+    /// `moc.yaml` is the exception, and sits at the root because of it: the
+    /// ground station has no Rust of its own. It is not part of the vehicle at
+    /// all -- it is the other end of the link -- and the code that serves one
+    /// is the network payload's.
+    ///
     /// The second direction is asked only of the directories the descriptions
-    /// cover. The code tree holds the payload kinds as well, and those are not
-    /// vehicle nodes; but once a family has one description in it, all of its
-    /// files need one, which is what keeps a family from being half described.
+    /// cover: once a family has one description in it, all of its files need
+    /// one, which is what keeps a family from being half described.
     #[test]
     fn every_description_has_its_rust() {
-        let code = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../tcspecial/src/node/vehicle");
+        let code = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcspecial/src/node");
         let (described, _) = read_tree(&shipped());
         assert!(!described.is_empty());
 
         let mut families: Vec<PathBuf> = Vec::new();
         for one in &described {
-            // The same path, with the extension taken off: `compute/mean.yaml`
-            // is `compute/mean.rs`, or the directory `compute/mean/`.
+            // The ground link, which has none: see above.
+            if one.path == Path::new("moc.yaml") {
+                continue;
+            }
+            // The same path, with the extension taken off:
+            // `vehicle/compute/mean.yaml` is `vehicle/compute/mean.rs`, or
+            // the directory `vehicle/compute/mean/`.
             let stem = one.path.with_extension("");
             let file = code.join(&stem).with_extension("rs");
             let directory = code.join(&stem);
@@ -721,8 +821,13 @@ mod tests {
         assert_eq!(null.node, "null");
         assert!(null.asked().is_empty(), "a null node says nothing");
 
-        // And a payload is described by nothing, so the editor asks its type.
-        assert_eq!(matching(&described, "i2c", &said(&[("address", "0x48")])), None);
+        // And a payload is described as itself: one kind, one description, no
+        // `sets`, so whatever a node of that type says it matches.
+        let sensor = matching(&described, "i2c", &said(&[("address", "0x48")]))
+            .expect("an i2c node is described");
+        assert_eq!(sensor.node, "i2c");
+        assert!(sensor.terminals.payload_source && sensor.terminals.moc_sink);
+        assert!(!sensor.terminals.payload_sink && !sensor.terminals.moc_source);
     }
 
     /// A description that is not one is refused by name, and the rest are read.

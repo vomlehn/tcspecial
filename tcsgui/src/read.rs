@@ -163,7 +163,7 @@ struct Said {
     /// By the node a link leaves and the data source it leaves by.
     ///
     /// Which is where a link is written now: an attribute of its own node,
-    /// named after the terminal. So a comment above `to_moc:` is about the
+    /// named after the terminal. So a comment above `payload-out:` is about the
     /// links that attribute makes -- all of them, where it names several
     /// destinations, because one line carries one comment.
     links: BTreeMap<(String, String), String>,
@@ -264,11 +264,11 @@ fn line_opens_an_entry(line: &str) -> bool {
 
 /// Which data source this line writes, if it writes one.
 ///
-/// `to_moc: k_fore` in YAML and `<to_moc>k_fore</to_moc>` in XML -- and the
-/// list form too, a comment above `to_moc: [a, b]` being about both of them.
+/// `payload-out: k_fore` in YAML and `<payload-out>k_fore</payload-out>` in XML -- and the
+/// list form too, a comment above `payload-out: [a, b]` being about both of them.
 /// The two names are the schema's: see `tcslibgs::graph::terminals`.
 fn source_named(line: &str, xml: bool) -> Option<String> {
-    for terminal in ["to_moc", "to_payload"] {
+    for terminal in ["payload-out", "moc-out"] {
         let is = if xml {
             line.starts_with(&format!("<{terminal}>"))
         } else {
@@ -456,10 +456,10 @@ mod tests {
         // attribute it is written under -- and the sink it arrives at where
         // the type has more than one, which is what the null node is for.
         for link in [
-            Link::joining("sensor", Some("to_moc"), "through", Some("from_payload")),
-            Link::joining("through", Some("to_moc"), "ground", None),
-            Link::joining("ground", Some("to_payload"), "through", Some("from_moc")),
-            Link::joining("through", Some("to_payload"), "sensor", None),
+            Link::joining("sensor", Some("payload-out"), "through", Some("payload-in")),
+            Link::joining("through", Some("payload-out"), "ground", None),
+            Link::joining("ground", Some("moc-out"), "through", Some("moc-in")),
+            Link::joining("through", Some("moc-out"), "sensor", None),
         ] {
             document.apply(&Edit::AddLink { link });
         }

@@ -1582,7 +1582,7 @@ impl Document {
 
     /// What leaves a node, by the data source it leaves by.
     ///
-    /// A link is an attribute of the node it leaves -- `to_moc: k_fore` -- so
+    /// A link is an attribute of the node it leaves -- `payload-out: k_fore` -- so
     /// writing a node means writing the links out of it, named after their
     /// terminal. Which terminal is the editor's own table where the link does
     /// not say: a payload has one data source and the line was drawn from it.
@@ -1609,7 +1609,7 @@ impl Document {
         home: &Home,
     ) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
         let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> = Vec::new();
-        for terminal in ["to_moc", "to_payload"] {
+        for terminal in ["payload-out", "moc-out"] {
             let mut destinations: Vec<Bound> = Vec::new();
             // One line carries one comment, so the attribute's comment is the
             // first thing written about any of the links under it. Nothing in
@@ -1647,8 +1647,8 @@ impl Document {
     /// Which of a node's data sinks a line arrives at, where any does.
     ///
     /// The other end of what `leaving` writes, and a record of it rather than
-    /// the link itself: `from_payload: true` on the node a reading reaches
-    /// says that something arrives there, where the `to_moc` on the node it
+    /// the link itself: `payload-in: true` on the node a reading reaches
+    /// says that something arrives there, where the `payload-out` on the node it
     /// left says what and where. Written so that a node's entry says it is
     /// connected at both ends, instead of only where it leaves -- which, for
     /// a node that is mostly fed, was most of a node's entry saying nothing.
@@ -1660,14 +1660,14 @@ impl Document {
     /// else".
     ///
     /// Which sink a line arrives at is the stream's own answer: what leaves by
-    /// `to_moc` arrives at a `from_payload` and nowhere else, so a destination
+    /// `payload-out` arrives at a `payload-in` and nowhere else, so a destination
     /// that named an input -- `mean_temp.in0` -- counts at the stream's sink.
     /// Only the sinks something arrives at are written, as a node with nothing
-    /// leaving it writes no `to_moc`.
+    /// leaving it writes no `payload-out`.
     fn arriving(&self, node: &Node, home: &Home) -> Vec<&'static str> {
         let mut arriving: Vec<&'static str> = Vec::new();
         let ours = Qualified::of(&node.name, home).absolute();
-        for sink in ["from_payload", "from_moc"] {
+        for sink in ["payload-in", "moc-in"] {
             let any = self.links.iter().filter(|l| l.to == ours).any(|link| {
                 // Which sink of this node the line arrives at, which needs the
                 // terminal it left by: the two are one stream read from either
@@ -1969,26 +1969,26 @@ pub fn thermostat_example() -> Document {
         });
     };
 
-    link(&mut document, "temp_fore", "to_moc", "k_fore", None);
-    link(&mut document, "temp_aft", "to_moc", "k_aft", None);
-    link(&mut document, "temp_bay", "to_moc", "k_bay", None);
+    link(&mut document, "temp_fore", "payload-out", "k_fore", None);
+    link(&mut document, "temp_aft", "payload-out", "k_aft", None);
+    link(&mut document, "temp_bay", "payload-out", "k_bay", None);
 
     // The "T": each converted reading goes to the ground, into the mean, and
     // into the log.
     for (from, input) in [("k_fore", "in0"), ("k_aft", "in1"), ("k_bay", "in2")] {
-        link(&mut document, from, "to_moc", "moc", None);
-        link(&mut document, from, "to_moc", "mean_temp", Some(input));
-        link(&mut document, from, "to_moc", "housekeeping", None);
+        link(&mut document, from, "payload-out", "moc", None);
+        link(&mut document, from, "payload-out", "mean_temp", Some(input));
+        link(&mut document, from, "payload-out", "housekeeping", None);
     }
 
-    link(&mut document, "mean_temp", "to_moc", "moc", None);
-    link(&mut document, "mean_temp", "to_moc", "thermostat", None);
+    link(&mut document, "mean_temp", "payload-out", "moc", None);
+    link(&mut document, "mean_temp", "payload-out", "thermostat", None);
     // The heaters are a payload, so what drives them leaves the thermostat by
-    // its to_payload: the vehicleward stream, which is what reaches a payload.
-    link(&mut document, "thermostat", "to_payload", "heaters", None);
-    link(&mut document, "thermostat", "to_moc", "housekeeping", None);
+    // its moc-out: the vehicleward stream, which is what reaches a payload.
+    link(&mut document, "thermostat", "moc-out", "heaters", None);
+    link(&mut document, "thermostat", "payload-out", "housekeeping", None);
     document.apply(&Edit::SetLinkComment {
-        link: Link::joining("thermostat", Some("to_payload"), "heaters", None),
+        link: Link::joining("thermostat", Some("moc-out"), "heaters", None),
         was: None,
         now: Some("asserted below the setpoint, unasserted above it".to_string()),
     });
@@ -3243,30 +3243,30 @@ mod tests {
         document.apply(&add("temp_fore", "i2c"));
         document.apply(&add("moc", "moc"));
         document.apply(&Edit::AddLink {
-            link: Link::joining("temp_fore", Some("to_moc"), "moc", None),
+            link: Link::joining("temp_fore", Some("payload-out"), "moc", None),
         });
 
         let yaml = document.to_yaml();
-        assert!(yaml.contains("    to_moc:\n      - target: moc\n"), "{yaml}");
+        assert!(yaml.contains("    payload-out:\n      - target: moc\n"), "{yaml}");
         assert!(
-            yaml.contains("    from_payload: true\n"),
+            yaml.contains("    payload-in: true\n"),
             "the arriving end does not say so: {yaml}"
         );
 
         let xml = document.to_xml();
         assert!(
-            xml.contains("<to_moc><target>moc</target></to_moc>"),
+            xml.contains("<payload-out><target>moc</target></payload-out>"),
             "{xml}"
         );
         assert!(
-            xml.contains("<from_payload>true</from_payload>"),
+            xml.contains("<payload-in>true</payload-in>"),
             "the arriving end does not say so: {xml}"
         );
 
         // And the record is of the stream, not of the terminal somebody drew
-        // from: what leaves by to_moc arrives at from_payload and nowhere
+        // from: what leaves by payload-out arrives at payload-in and nowhere
         // else, so the payload's own sink says nothing about this link.
-        assert!(!yaml.contains("from_moc"), "{yaml}");
+        assert!(!yaml.contains("moc-in"), "{yaml}");
     }
 
     /// A sink several lines arrive at says what one line says: that they do.
@@ -3284,13 +3284,13 @@ mod tests {
         for name in ["temp_aft", "temp_fore"] {
             document.apply(&add(name, "i2c"));
             document.apply(&Edit::AddLink {
-                link: Link::joining(name, Some("to_moc"), "moc", None),
+                link: Link::joining(name, Some("payload-out"), "moc", None),
             });
         }
 
         let yaml = document.to_yaml();
         assert_eq!(
-            yaml.matches("from_payload: true").count(),
+            yaml.matches("payload-in: true").count(),
             1,
             "once, for the sink and not for each line: {yaml}"
         );
@@ -3682,7 +3682,7 @@ mod tests {
             .iter()
             .find(|(path, _)| path.ends_with("cabin.yaml"))
             .expect("the subdiagram's file");
-        assert!(inner.contains("to_moc:\n      - target: moc\n"), "{inner}");
+        assert!(inner.contains("payload-out:\n      - target: moc\n"), "{inner}");
 
         // And the top file says what it includes.
         let (_, top) = &files[0];
@@ -3760,12 +3760,12 @@ mod tests {
         // `quoted`.
         assert!(yaml.contains("address: \"0x48\""), "{yaml}");
         // The three sections, and the link as an attribute of the node it
-        // leaves: a payload's readings leave by its to_moc, and the input
+        // leaves: a payload's readings leave by its payload-out, and the input
         // they arrive at is named after the dot.
         assert!(yaml.contains("\npayloads:\n"), "{yaml}");
         assert!(yaml.contains("\nvehicle:\n"), "{yaml}");
         assert!(
-            yaml.contains("    to_moc:\n      - target: mean_temp\n        input: in0\n"),
+            yaml.contains("    payload-out:\n      - target: mean_temp\n        input: in0\n"),
             "a link into a named input is written as one entry: {yaml}"
         );
         assert!(!yaml.contains("\nlinks:"), "there is no links section: {yaml}");

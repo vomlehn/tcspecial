@@ -476,7 +476,7 @@ moc:
     type: moc
     address: \"10.0.0.1\"
     port: \"5000\"
-    to_payload: temp_fore
+    moc-out: temp_fore
 
 payloads:
   - name: temp_fore
@@ -484,7 +484,7 @@ payloads:
     path: \"/dev/i2c-1\"
     address: \"0x48\"
     trigger: \"01\"
-    to_moc: moc
+    payload-out: moc
 
 tcsgui:
   nodes:
@@ -1146,11 +1146,11 @@ tcsgui:
         // once, and with the far end plain, moc having no subdiagram to
         // qualify it with.
         assert!(
-            inner.contains("to_moc:\n      - target: moc\n"),
+            inner.contains("payload-out:\n      - target: moc\n"),
             "the crossing link should be written on the node it leaves: {inner}"
         );
         assert!(
-            !top.contains("to_moc:"),
+            !top.contains("payload-out:"),
             "the crossing link is written twice: {top}"
         );
     }

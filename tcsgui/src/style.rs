@@ -257,9 +257,9 @@ impl Terminals {
 ///
 /// Two rows and two columns, and the arrangement is the two streams: the
 /// vehicleward one along the top, left to right, arriving from the ground at
-/// `from_moc` and leaving for the payload at `to_payload`; the groundward one
+/// `moc-in` and leaving for the payload at `moc-out`; the groundward one
 /// along the bottom, right to left, arriving from the payload at
-/// `from_payload` and leaving for the ground at `to_moc`.
+/// `payload-in` and leaving for the ground at `payload-out`.
 ///
 /// Which means the arrows all point the way the data actually travels across
 /// the canvas, because the canvas is laid out the same way: the ground is the
@@ -270,30 +270,31 @@ impl Terminals {
 /// own input: those are drawn where the link arrives and not as a terminal.
 pub fn corner_of(terminal: &str) -> Option<Corner> {
     match terminal {
-        // The upper left says nothing: see `Corner::says`.
-        "from_moc" => Some(Corner {
+        // The payload's own data along the top, travelling leftwards: it
+        // arrives from a payload on the right and leaves for the ground on
+        // the left.
+        "payload-out" => Some(Corner {
             top: true,
             left: true,
-            rightward: true,
-            says: "",
+            rightward: false,
         }),
-        "to_payload" => Some(Corner {
+        "payload-in" => Some(Corner {
             top: true,
             left: false,
-            rightward: true,
-            says: "out",
-        }),
-        "from_payload" => Some(Corner {
-            top: false,
-            left: false,
             rightward: false,
-            says: "in",
         }),
-        "to_moc" => Some(Corner {
+        // And what the ground sends along the bottom, travelling rightwards:
+        // it arrives from the ground on the left and leaves for a payload on
+        // the right.
+        "moc-in" => Some(Corner {
             top: false,
             left: true,
-            rightward: false,
-            says: "in",
+            rightward: true,
+        }),
+        "moc-out" => Some(Corner {
+            top: false,
+            left: false,
+            rightward: true,
         }),
         _ => None,
     }
@@ -305,24 +306,19 @@ pub fn corner_of(terminal: &str) -> Option<Corner> {
 pub struct Corner {
     pub top: bool,
     pub left: bool,
-    /// Whether the data goes right here, which is to say towards the payloads.
+    /// Whether the arrow points right, which is to say towards the payloads.
     ///
-    /// Not a glyph any more -- see [`Corner::says`] -- but still the direction
-    /// a line leaves or arrives by, which is what [`attachment`] needs.
+    /// The way the data on this terminal travels across the canvas, which is
+    /// the way the canvas is laid out: the ground is the leftmost working pane
+    /// and the payloads the rightmost. So the payload's own data -- telemetry,
+    /// on its way to the ground -- points left, and what the ground sends
+    /// points right.
+    ///
+    /// All four carry one. A terminal's name says whose data it is and whether
+    /// it arrives or leaves -- `payload-in`, `moc-out` -- and the arrow says
+    /// which way that is on the screen, which is the half a reader can take in
+    /// without reading.
     pub rightward: bool,
-    /// What is written in the box: `in`, `out`, or nothing.
-    ///
-    /// Words rather than arrows. An arrow says which way the data goes, which
-    /// a reader has to read against the canvas to make anything of; the word
-    /// says what the terminal *is* for the node it is on, which is the
-    /// question somebody drawing a line is asking. `out` where the data goes
-    /// right, `in` where it goes left.
-    ///
-    /// Nothing at all in the upper left. That one is `from_moc` -- where what
-    /// the ground sends arrives -- and it was the arrow a reader took for "a
-    /// line starts here"; the box is still a box and still answers a press,
-    /// and what has gone is only what is drawn inside it.
-    pub says: &'static str,
 }
 
 /// How large a terminal is drawn, in pixels.
@@ -370,8 +366,8 @@ pub fn terminal_at(corner: Corner, (width, height): (u32, u32)) -> (i32, i32) {
 /// `named` is what the link wrote, where it wrote one, and `sink` says which
 /// end of the link this is. Three answers in order of authority: the terminal
 /// the link named, where the type has it; the only terminal of that kind,
-/// where there is one; and otherwise the groundward one -- `from_payload`
-/// where data arrives and `to_moc` where it leaves -- because telemetry on its
+/// where there is one; and otherwise the groundward one -- `payload-in`
+/// where data arrives and `payload-out` where it leaves -- because telemetry on its
 /// way to the ground is what a node does unless the file says otherwise.
 ///
 /// `None` only for a type this build does not know, which is drawn as a node
@@ -400,7 +396,7 @@ pub fn terminal_for(node_type: &str, named: Option<&str>, sink: bool) -> Option<
     match ours {
         [only] => Some(only),
         _ => {
-            let groundward = if sink { "from_payload" } else { "to_moc" };
+            let groundward = if sink { "payload-in" } else { "payload-out" };
             ours.iter().find(|terminal| **terminal == groundward).copied()
         }
     }
@@ -708,13 +704,13 @@ impl NodeType {
         }
         match self {
             NodeType::Log => Terminals {
-                sinks: &["from_payload"],
+                sinks: &["payload-in"],
                 sources: &[],
             },
             // A computation and a page: both ends of both streams.
             _ => Terminals {
-                sinks: &["from_payload", "from_moc"],
-                sources: &["to_moc", "to_payload"],
+                sinks: &["payload-in", "moc-in"],
+                sources: &["payload-out", "moc-out"],
             },
         }
     }
@@ -731,7 +727,7 @@ impl NodeType {
     /// is one of the boxes on the screen. Asking the schema's table instead
     /// threw away what a person had just said -- a computation has two data
     /// sinks drawn on it and the schema calls its sinks its own business, so a
-    /// line dragged to the `from_moc` in its upper left was recorded as a link
+    /// line dragged to the `moc-in` in its upper left was recorded as a link
     /// naming no terminal, and then drawn arriving at the other corner.
     pub fn must_name(self, sink: bool) -> bool {
         let terminals = self.terminals();
@@ -1091,8 +1087,8 @@ mod tests {
 
     /// Every terminal a type has is drawn somewhere, and in the right corner.
     ///
-    /// The arrangement is the argument: the vehicleward stream along the top
-    /// going right, the groundward stream along the bottom going left, so
+    /// The arrangement is the argument: the payload's own data along the top
+    /// going left, what the ground sends along the bottom going right, so
     /// every arrow points the way the data travels across a canvas whose
     /// leftmost pane is the ground and whose rightmost is the payloads. A
     /// terminal in the wrong corner would make the drawing say the opposite of
@@ -1103,14 +1099,16 @@ mod tests {
             for terminal in t.terminals().each() {
                 let corner = corner_of(terminal)
                     .unwrap_or_else(|| panic!("{}: {terminal} has no corner", t.spelling()));
-                // The top row is what the ground sends and the bottom row is
-                // what comes back, and each row runs one way.
-                let vehicleward = *terminal == "from_moc" || *terminal == "to_payload";
-                assert_eq!(corner.top, vehicleward, "{terminal}");
-                assert_eq!(corner.rightward, vehicleward, "{terminal}");
-                // Arriving on the side the data comes from: the ground is to
-                // the left of the vehicle and the payloads to its right.
-                let from_the_left = *terminal == "from_moc" || *terminal == "to_moc";
+                // The top row is the payload's own data, on its way to the
+                // ground, and the bottom row is what the ground sends back.
+                // Each row runs one way.
+                let payloads = terminal.starts_with("payload-");
+                assert_eq!(corner.top, payloads, "{terminal}");
+                assert_eq!(corner.rightward, !payloads, "{terminal}");
+                // Leaving on the side the data is going to, arriving on the
+                // side it comes from: the ground is to the left of the vehicle
+                // and the payloads to its right.
+                let from_the_left = *terminal == "moc-in" || *terminal == "payload-out";
                 assert_eq!(corner.left, from_the_left, "{terminal}");
             }
         }
@@ -1168,27 +1166,26 @@ mod tests {
         }
     }
 
-    /// A box says `in` or `out`, and the upper-left one says nothing.
+    /// Every box carries an arrow, pointing the way its data travels.
     ///
-    /// Words rather than arrows, because an arrow has to be read against the
-    /// canvas before it says anything, where the word says what the terminal
-    /// is for the node it is on. `out` where the data goes right, `in` where
-    /// it goes left -- so the two always agree with `rightward`, which is what
-    /// this asserts rather than repeating the table.
-    ///
-    /// Nothing in the upper left. That one is `from_moc`, and its arrow was
-    /// the one a reader took for "a line starts here" -- the mistake that had
-    /// somebody dragging from the corner of a moc node, where there is no
-    /// terminal at all.
+    /// The name says whose data a terminal carries and whether it arrives or
+    /// leaves -- `payload-in`, `moc-out` -- and the arrow says which way that
+    /// is on the screen. One statement of it, derived from the stream rather
+    /// than written out per corner: the payload's own data is on its way to
+    /// the ground, which is leftwards, and what the ground sends is on its way
+    /// to a payload, which is rightwards.
     #[test]
-    fn a_terminal_says_in_or_out_and_the_upper_left_says_nothing() {
-        assert_eq!(corner_of("from_moc").expect("a corner").says, "");
-        for terminal in ["to_payload", "from_payload", "to_moc"] {
-            let corner = corner_of(terminal).expect("a corner");
-            assert_eq!(
-                corner.says,
-                if corner.rightward { "out" } else { "in" },
-                "{terminal}"
+    fn every_terminal_carries_an_arrow_the_way_its_data_goes() {
+        for terminal in ["payload-in", "payload-out"] {
+            assert!(
+                !corner_of(terminal).expect("a corner").rightward,
+                "{terminal}: the payload's own data is on its way to the ground"
+            );
+        }
+        for terminal in ["moc-in", "moc-out"] {
+            assert!(
+                corner_of(terminal).expect("a corner").rightward,
+                "{terminal}: what the ground sends is on its way to a payload"
             );
         }
     }
@@ -1240,7 +1237,7 @@ mod tests {
             );
         }
 
-        assert!(NodeType::Log.terminals().has("from_payload"));
+        assert!(NodeType::Log.terminals().has("payload-in"));
         assert!(
             NodeType::Log.terminals().sources.is_empty(),
             "nothing is read from a log"
@@ -1285,23 +1282,23 @@ mod tests {
     fn a_line_is_drawn_to_the_terminal_the_link_means() {
         // Named, and the type has it.
         assert_eq!(
-            terminal_for("null", Some("from_moc"), true),
-            Some("from_moc")
+            terminal_for("null", Some("moc-in"), true),
+            Some("moc-in")
         );
         // Named, and the type has not: a computation's own input, which is
         // not a terminal. The groundward sink is where readings arrive.
         assert_eq!(
             terminal_for("compute", Some("in0"), true),
-            Some("from_payload")
+            Some("payload-in")
         );
         // Nothing named, and one of that kind: the one.
-        assert_eq!(terminal_for("i2c", None, false), Some("to_moc"));
-        assert_eq!(terminal_for("moc", None, true), Some("from_payload"));
+        assert_eq!(terminal_for("i2c", None, false), Some("payload-out"));
+        assert_eq!(terminal_for("moc", None, true), Some("payload-in"));
         // Nothing named and two of that kind: the groundward one, which is
         // what a node does unless the file says otherwise. The checking
         // refuses such a file; the canvas still has to draw it.
-        assert_eq!(terminal_for("null", None, false), Some("to_moc"));
-        assert_eq!(terminal_for("null", None, true), Some("from_payload"));
+        assert_eq!(terminal_for("null", None, false), Some("payload-out"));
+        assert_eq!(terminal_for("null", None, true), Some("payload-in"));
         // Nothing to read from a log, and nothing known about a type this
         // build does not have.
         assert_eq!(terminal_for("log", None, false), None);
@@ -1314,26 +1311,26 @@ mod tests {
         let (width, height) = NodeType::I2c.appearance().size;
         let at = (400, 200);
 
-        // The groundward pair of a payload, both on its left: the readings
-        // leave at the bottom going left, what asks for them arrives at the
-        // top going right.
-        let ((x, y), rightward) = attachment("i2c", at, "to_moc").expect("a payload");
+        // A payload's pair, both on its left: its readings leave at the top
+        // going left, and what asks for them arrives at the bottom going
+        // right.
+        let ((x, y), rightward) = attachment("i2c", at, "payload-out").expect("a payload");
         assert_eq!(x, at.0 as f32, "a terminal on the left joins the left edge");
         assert!(!rightward, "the readings leave towards the ground");
-        assert!(y > at.1 as f32 + height as f32 / 2.0, "the lower corner");
+        assert!(y < at.1 as f32 + height as f32 / 2.0, "the upper corner");
 
-        let ((_, top), rightward) = attachment("i2c", at, "from_moc").expect("a payload");
-        assert!(rightward && top < y, "what asks arrives at the upper corner");
+        let ((_, lower), rightward) = attachment("i2c", at, "moc-in").expect("a payload");
+        assert!(rightward && lower > y, "what asks arrives at the lower corner");
 
         // And the ground link's pair, both on its right.
-        let ((x, _), _) = attachment("moc", at, "from_payload").expect("the ground");
+        let ((x, _), _) = attachment("moc", at, "payload-in").expect("the ground");
         let (moc_width, _) = NodeType::Moc.appearance().size;
         assert_eq!(x, (at.0 + moc_width as i32) as f32);
 
         // A terminal a node does not have is not a place to join it, and
         // neither is a name that is not a terminal at all.
         assert_eq!(attachment("i2c", at, "in0"), None);
-        assert_eq!(attachment("contraption", at, "to_moc"), None);
+        assert_eq!(attachment("contraption", at, "payload-out"), None);
         let _ = width;
     }
 

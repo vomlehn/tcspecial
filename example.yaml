@@ -72,8 +72,8 @@ payloads:
 
 tcsgui:
   nodes:
-    - { name: moc, x: 8, y: 24 }
-    - { name: mean, x: 272, y: 288 }
+    - { name: moc, x: 24, y: 128 }
+    - { name: mean, x: 368, y: 176 }
     - { name: mean-2, x: 280, y: 408 }
     - { name: payload, x: 728, y: 40 }
     - { name: i2c, x: 648, y: 456 }

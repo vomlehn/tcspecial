@@ -189,8 +189,8 @@
             "description": "The payload group that reads it, where it is in one.",
             "type": "string"
           },
-          "to_moc": {
-            "description": "The lines that leave this node by its `to_moc`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "payload-out": {
+            "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -217,8 +217,8 @@
               }
             ]
           },
-          "to_payload": {
-            "description": "The lines that leave this node by its `to_payload`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "moc-out": {
+            "description": "The lines that leave this node by its `moc-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -245,12 +245,12 @@
               }
             ]
           },
-          "from_payload": {
-            "description": "Whether a line arrives at this node's `from_payload` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "payload-in": {
+            "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
-          "from_moc": {
-            "description": "Whether a line arrives at this node's `from_moc` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "moc-in": {
+            "description": "Whether a line arrives at this node's `moc-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
           "path": {
@@ -719,8 +719,8 @@
             "description": "The payload group that reads it, where it is in one.",
             "type": "string"
           },
-          "to_moc": {
-            "description": "The lines that leave this node by its `to_moc`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "payload-out": {
+            "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -747,8 +747,8 @@
               }
             ]
           },
-          "to_payload": {
-            "description": "The lines that leave this node by its `to_payload`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "moc-out": {
+            "description": "The lines that leave this node by its `moc-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -775,12 +775,12 @@
               }
             ]
           },
-          "from_payload": {
-            "description": "Whether a line arrives at this node's `from_payload` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "payload-in": {
+            "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
-          "from_moc": {
-            "description": "Whether a line arrives at this node's `from_moc` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "moc-in": {
+            "description": "Whether a line arrives at this node's `moc-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
           "path": {
@@ -1249,8 +1249,8 @@
             "description": "The payload group that reads it, where it is in one.",
             "type": "string"
           },
-          "to_moc": {
-            "description": "The lines that leave this node by its `to_moc`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "payload-out": {
+            "description": "The lines that leave this node by its `payload-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -1277,8 +1277,8 @@
               }
             ]
           },
-          "to_payload": {
-            "description": "The lines that leave this node by its `to_payload`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
+          "moc-out": {
+            "description": "The lines that leave this node by its `moc-out`, one entry each. An entry names the node the line goes to as its `target`, and `input` where it feeds a named input of that node. The short spellings are read too: the destination as a string, `node` or `node.terminal`, alone or in a list.",
             "oneOf": [
               {
                 "description": "One line, written as an entry.",
@@ -1305,12 +1305,12 @@
               }
             ]
           },
-          "from_payload": {
-            "description": "Whether a line arrives at this node's `from_payload` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "payload-in": {
+            "description": "Whether a line arrives at this node's `payload-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
-          "from_moc": {
-            "description": "Whether a line arrives at this node's `from_moc` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
+          "moc-in": {
+            "description": "Whether a line arrives at this node's `moc-in` sink. A record of the links written on the nodes they leave, and not a link: which node a line comes from is written on that node. A file may leave it out; one that disagrees with the links is refused where it is read.",
             "type": "boolean"
           },
           "path": {

@@ -227,7 +227,7 @@ link
        - name: k_fore
          type: compute
          function: "to_kelvin"
-         to_moc:
+         payload-out:
            - target: moc
            - target: mean_temp
              input: in0
@@ -241,7 +241,7 @@ link
     entry does not know is refused rather than ignored, because ``targte: moc``
     quietly ignored is a line that goes nowhere.
 
-    The short spelling is still read -- ``to_moc: moc``, or ``to_moc: [moc,
+    The short spelling is still read -- ``payload-out: moc``, or ``payload-out: [moc,
     mean_temp.in0]``, the node and its input separated by a dot. Every
     configuration written before entries existed says what it said, and a link
     to one place is still a line somebody can write in a line. All of them read
@@ -264,10 +264,10 @@ link
          type: compute
          function: "mean"
          inputs: "in0,in1,in2"
-         to_moc:
+         payload-out:
            - target: moc
            - target: thermostat
-         from_payload: true
+         payload-in: true
 
     That is a record of the links above and not a link. The point of it is a
     node whose entry said nothing about what fed it: a sensor's entry named
@@ -286,7 +286,7 @@ link
     ``false`` is a node saying none does.
 
     Which sink a line arrives at is the stream's own answer -- what leaves by
-    ``to_moc`` arrives at a ``from_payload`` and nowhere else -- so a
+    ``payload-out`` arrives at a ``payload-in`` and nowhere else -- so a
     destination's named input, ``mean_temp.in0``, counts at the stream's sink.
     Which input it feeds is written once, on the node the link leaves.
 
@@ -358,8 +358,13 @@ Terminals: where a link is attached
 -----------------------------------
 
 A link joins one node's **data source** to another's **data sink**. Each end
-has a name, and the name says which way the data is travelling rather than
-what is at the other end of it. There are four:
+has a name, and the name says two things about the data and nothing about what
+is at the other end: whose it is, and whether it arrives here or leaves.
+``payload-`` is a payload's own data, on its way to the ground; ``moc-`` is
+what the ground sends, on its way to a payload. ``-in`` is where it arrives and
+``-out`` is where it leaves -- so **every ``-out`` is a data source and every
+``-in`` a data sink**, which is the whole of the rule a reader has to remember.
+There are four:
 
 .. list-table::
    :header-rows: 1
@@ -370,21 +375,21 @@ what is at the other end of it. There are four:
      - arrives at
      - what it carries
    * - groundward
-     - ``to_moc``
-     - ``from_payload``
+     - ``payload-out``
+     - ``payload-in``
      - a payload's readings, on their way to the ground
    * - vehicleward
-     - ``to_payload``
-     - ``from_moc``
+     - ``moc-out``
+     - ``moc-in``
      - what the ground sends back: a command, a trigger, a setpoint
 
-So one stream is named twice -- ``to_moc`` where it leaves and
-``from_payload`` where it arrives -- and the two words are a sentence about the
-same bytes read from either end. The names describe the direction of flow and
-not the type at the far end: with no vehicle node in the way, a payload's
-``to_moc`` connects to a MOC link's ``from_payload``, and with one it connects
-to that node's ``from_payload`` instead and the node's own ``to_moc`` carries
-it the rest of the way.
+So one stream is named twice -- ``payload-out`` where it leaves a node and
+``payload-in`` where it arrives at the next -- and the two words are a sentence
+about the same bytes read from either end. The names say nothing about the type
+at the far end: with no vehicle node in the way, a payload's ``payload-out``
+connects to a MOC link's ``payload-in``, and with one it connects to that
+node's ``payload-in`` instead and the node's own ``payload-out`` carries it the
+rest of the way.
 
 A link end is written ``node.terminal``, and may be written as ``node`` alone
 wherever the type has one terminal of the kind the end needs: ``{ from:
@@ -395,12 +400,12 @@ which, which is why the ``null`` node's links name their terminals.
 Which types have which:
 
 payloads
-    ``from_moc`` and ``to_moc``. A payload receives what asks it for a reading
+    ``moc-in`` and ``payload-out``. A payload receives what asks it for a reading
     -- a trigger, a command, a byte written to a line -- and sends what it
     read.
 
 MOC links
-    ``from_payload`` and ``to_payload``. The ground is the other end of both.
+    ``payload-in`` and ``moc-out``. The ground is the other end of both.
 
 ``null``
     all four.
@@ -437,9 +442,9 @@ Requirement
 
 Requirement
     Each terminal may be linked to one other terminal, and the pairing is four
-    sentences: a ``to_moc`` only to a ``from_payload``, a ``from_payload`` only
-    to a ``to_moc``, a ``to_payload`` only to a ``from_moc``, a ``from_moc``
-    only to a ``to_payload``. Which is one sentence twice over -- a stream
+    sentences: a ``payload-out`` only to a ``payload-in``, a ``payload-in`` only
+    to a ``payload-out``, a ``moc-out`` only to a ``moc-in``, a ``moc-in``
+    only to a ``moc-out``. Which is one sentence twice over -- a stream
     leaves at one terminal and arrives at the other -- so the pairing is
     derived from the table above rather than written out again.
 
@@ -1131,7 +1136,7 @@ Requirement
     does not name it. Delivering it would make a file that says something it
     does not mean work by accident. A *terminal* is not one of those -- see
     `Terminals: where a link is attached`_ -- and never reaches a port: a
-    device's ``from_moc`` is its one way in, spelled, and is resolved where the
+    device's ``moc-in`` is its one way in, spelled, and is resolved where the
     routing table is built.
 
 Requirement
@@ -1210,11 +1215,11 @@ button does on demand, whether or not anything was edited:
 
 A comment above a link is kept, and a link is now an attribute -- so this is
 the one attribute whose comment survives a save: the run of comment lines above
-a ``to_moc:`` or ``to_payload:`` is read as a note about the links that
+a ``payload-out:`` or ``moc-out:`` is read as a note about the links that
 attribute makes. Where the attribute names several destinations the note is
 about all of them, one line carrying one comment.
 
-A comment above a ``from_payload:`` or ``from_moc:`` is not kept, those being
+A comment above a ``payload-in:`` or ``moc-in:`` is not kept, those being
 a record of links rather than links: the note belongs above the link, at the
 end it is written at, and a comment the editor kept in a derived line would be
 a comment it moved. It is the fourth kind in the list above.
@@ -1414,21 +1419,22 @@ available is drawn anyway: a link with no line is a connection that does not
 appear in the drawing at all.
 
 A node is drawn with its terminals on it: a rectangle of 36 by 14 pixels in
-each corner it has one in. Two rows, which are the two streams -- along the top, left to
-right, what the ground sends, arriving at ``from_moc`` and leaving at
-``to_payload``; along the bottom, right to left, what comes back, arriving at
-``from_payload`` and leaving at ``to_moc``.
+each corner it has one in, with an arrow in it pointing the way the data on it
+travels across the canvas. Two rows, which are the two streams. Along the top,
+right to left, the payload's own data on its way to the ground: it arrives at
+``payload-in`` and leaves at ``payload-out``. Along the bottom, left to right,
+what the ground sends on its way to a payload: it arrives at ``moc-in`` and
+leaves at ``moc-out``.
 
-Three of the four have a word in them: ``out`` where the data goes right,
-``in`` where it goes left. Words rather than arrows, which is what they were.
-An arrow says which way the data travels across the canvas, and a reader has
-to hold the canvas's own layout in mind -- ground leftmost, payloads rightmost
--- before it says anything; the word says what the terminal is for the node it
-is drawn on, which is the question somebody about to draw a line is actually
-asking.
+So the arrows along the top point left and the arrows along the bottom point
+right, because that is the way the canvas itself is laid out -- the ground is
+the leftmost working pane and the payloads the rightmost. A reader who has
+worked that out once need not read the names again; and a reader who reads them
+is told whose data it is and whether it arrives or leaves, which is the
+question somebody about to draw a line is asking.
 
-They were 24 by 10 -- wide enough for the arrow they used to hold and no wider
--- and that is a strip to aim at. A press has to land on a terminal exactly, the terminal being
+The boxes were 24 by 10 -- wide enough for an arrow and no wider -- and that is
+a strip to aim at. A press has to land on a terminal exactly, the terminal being
 what says which stream the line carries, where the release only has to land on
 a node; so the box is now twice the area and bigger in both directions, the
 hand being short in whichever one it is short. What bounds them is the ``null``
@@ -1436,13 +1442,6 @@ node, 40 pixels tall and the one type with all four: two rows and their insets
 have to fit inside that height with daylight between them, and two columns
 inside a node's 152. A name never collides with them however they grow, being
 padded away from whichever side carries terminals.
-
-The upper left is the exception and is drawn empty. It is ``from_moc``, where
-what the ground sends arrives, and the arrow it used to carry pointed into the
-node -- the mark a reader takes for "a line starts here", and the reading that had
-somebody dragging from the upper-left corner of a ``moc`` node, where there is
-no terminal at all. The box is still a box and still answers a press; what has
-gone is the arrow inside it.
 
 Only the terminals the type actually has. A payload carries its two on its
 left, a MOC link its two on its right, a ``null`` node all four, a log the one
@@ -1491,8 +1490,8 @@ link them, which is one thing to learn instead of two.
 Where it is let go of is a node and not a terminal. Anywhere on the node will
 do -- its name, its middle, a corner box, the wrong corner box -- because
 there is nothing else the gesture could have meant: a stream has one name at
-each of its ends, so a line drawn from a ``to_moc`` can only arrive at a
-``from_payload``, and the editor works out which terminal that is and draws the
+each of its ends, so a line drawn from a ``payload-out`` can only arrive at a
+``payload-in``, and the editor works out which terminal that is and draws the
 line to it. The terminals stay drawn, since they are what says which streams a
 type carries and which way; what has gone is having to hit a small box in a
 corner to say something the stream already said.
@@ -1509,8 +1508,8 @@ let go of decides what happens to it. Anywhere on the node it is already
 attached to: nothing changes, a gesture that has thought better of itself
 leaving no trace. On another node that has that terminal: the link moves there,
 in one edit, so one undo puts it back -- the end being carried keeps its own
-name, a ``from_payload`` taken off one node going on another node's
-``from_payload`` and nowhere else. On a node that has no such terminal, or one
+name, a ``payload-in`` taken off one node going on another node's
+``payload-in`` and nowhere else. On a node that has no such terminal, or one
 the same link already reaches: nothing changes, as a line that cannot be drawn
 is not drawn. And over no node at all: the link is deleted. Which is the only
 way to delete one, and it is the gesture a person reaches for -- pull the wire
@@ -1526,7 +1525,7 @@ Where it lands settles that. A node that could be *this* end -- one with the
 same terminal -- takes the end, which is the re-routing gesture. A node that
 could only be the *other* end gets a new line instead, and the line that was
 picked up stays where it was. So the moc node already feeding one payload,
-pressed on its ``to_payload`` and let go of over a second payload, feeds the
+pressed on its ``moc-out`` and let go of over a second payload, feeds the
 second one as well: a payload cannot be a data source, so there is nothing else
 the gesture could have meant.
 
@@ -1839,7 +1838,7 @@ Two things follow from that division. A node's attributes are the union over
 every node type -- a bus address, a baud rate and a setpoint are all allowed on
 any node -- because a schema that knew which type takes which would be a second
 copy of rules that already exist. And the XSD cannot say that a node's ``name``
-appears exactly once: ``to_moc`` may appear many times, several destinations
+appears exactly once: ``payload-out`` may appear many times, several destinations
 being several elements, and XSD 1.0 allows neither repeats nor a mixture inside
 ``xs:all``. A node with two names is refused where the file is read instead.
 

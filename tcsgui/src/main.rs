@@ -2314,7 +2314,7 @@ fn views_of(
             // A terminal is not one of those, and is not labelled: it is drawn
             // as the corner the line is attached to and as the arrow in it,
             // which says the same thing in the place a reader is already
-            // looking. A label reading "from_payload" beside every line would
+            // looking. A label reading "payload-in" beside every line would
             // be the name of the thing the picture is showing.
             let named_input = link
                 .input
@@ -2375,8 +2375,8 @@ fn ends_of(document: &Document, link: &Link, home: &Home) -> route::Ends {
         style::attachment(&node.node_type, node.at, terminal)
     };
     // Which data sink the line arrives at, where the link does not say. The
-    // one that pairs with the source it left: a link leaving `to_payload`
-    // arrives at a `from_moc`, that being the same stream named at its other
+    // one that pairs with the source it left: a link leaving `moc-out`
+    // arrives at a `moc-in`, that being the same stream named at its other
     // end -- see tcslibgs::graph::terminals::answers. Without this the drawing
     // fell back to the groundward sink whatever the link carried, so a command
     // from the ground was drawn arriving at the corner the readings leave by.
@@ -2502,8 +2502,8 @@ fn dropped(
 ) -> Option<Edit> {
     let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
 
-    // The end being carried keeps its own terminal: a `from_payload` taken
-    // off one node goes on another node's `from_payload` and nowhere else.
+    // The end being carried keeps its own terminal: a `payload-in` taken
+    // off one node goes on another node's `payload-in` and nowhere else.
     let Some(over) = landed(document, home, (x, y), &pressed.terminal) else {
         // Over nothing at all: the link goes.
         if node_under(document, home, (x, y)).is_none() {
@@ -2653,8 +2653,8 @@ fn attached(document: &Document, at: &Drawing, sink: bool) -> Vec<Link> {
 /// mind;
 ///
 /// let go of over a terminal that does not pair with the one it started at. A
-/// `to_moc` may only be linked to a `from_payload` and a `to_payload` only to
-/// a `from_moc`: that is one stream, named at each of its ends, and anything
+/// `payload-out` may only be linked to a `payload-in` and a `moc-out` only to
+/// a `moc-in`: that is one stream, named at each of its ends, and anything
 /// else would carry one stream into the other. The rule is
 /// `tcslibgs::graph::terminals::pairs_with`, which is also what the checking
 /// refuses a written-out configuration for;
@@ -2731,9 +2731,9 @@ fn anchored(document: &Document, home: &Home, from: &Drawing) -> Option<(f32, f3
 ///
 /// Anywhere on the node will do -- its name, its middle, a corner box -- and
 /// `wanted` is the terminal it attaches to, which the gesture already knows.
-/// A stream has one name at each of its ends, so a line drawn from a `to_moc`
-/// can only arrive at a `from_payload`, and an end carried off a
-/// `from_payload` can only be put down on another `from_payload`: there is
+/// A stream has one name at each of its ends, so a line drawn from a `payload-out`
+/// can only arrive at a `payload-in`, and an end carried off a
+/// `payload-in` can only be put down on another `payload-in`: there is
 /// nothing else the gesture could have meant. The terminals are still drawn,
 /// because they are what says which streams a type carries and which way --
 /// but hitting a box in a corner is work the editor can do instead of the
@@ -2797,7 +2797,7 @@ fn arriving_at(document: &Document, node: &str, terminal: &str) -> Option<String
 /// And about the end it leaves by, which is always the terminal pressed.
 ///
 /// Always, because a link *is* an attribute of the node it leaves, named after
-/// that terminal: `to_moc: k_fore` is where the link is written, so there is no
+/// that terminal: `payload-out: k_fore` is where the link is written, so there is no
 /// such thing as a link whose source terminal the file does not say.
 fn leaving_by(from: &Drawing) -> Option<String> {
     Some(from.terminal.clone())
@@ -3190,10 +3190,10 @@ fn view_of(
         // this build does not know has none: the shape already says it cannot
         // be placed, and four arrows on it would be four claims about a type
         // nothing here can describe.
-        from_moc: terminal_view("from_moc", terminals, size),
-        to_payload: terminal_view("to_payload", terminals, size),
-        from_payload: terminal_view("from_payload", terminals, size),
-        to_moc: terminal_view("to_moc", terminals, size),
+        moc_in: terminal_view("moc-in", terminals, size),
+        moc_out: terminal_view("moc-out", terminals, size),
+        payload_in: terminal_view("payload-in", terminals, size),
+        payload_out: terminal_view("payload-out", terminals, size),
         terminal_column: style::TERMINAL_COLUMN as f32,
     }
 }
@@ -3218,7 +3218,7 @@ fn terminal_view(
         x: x as f32,
         y: y as f32,
         rightward: corner.is_some_and(|corner| corner.rightward),
-        says: corner.map(|corner| corner.says).unwrap_or_default().into(),
+
     }
 }
 
@@ -3514,32 +3514,33 @@ mod tests {
 
         // A payload: what the ground sends arrives, and its readings leave.
         let sensor = view("i2c");
-        assert!(sensor.from_moc.shown && sensor.to_moc.shown);
-        assert!(!sensor.to_payload.shown && !sensor.from_payload.shown);
+        assert!(sensor.moc_in.shown && sensor.payload_out.shown);
+        assert!(!sensor.moc_out.shown && !sensor.payload_in.shown);
         // Both on its left, and the arrows point the way the data travels:
-        // in from the ground along the top, back out along the bottom.
-        assert!(sensor.from_moc.x < sensor.width / 2.0);
-        assert!(sensor.to_moc.x < sensor.width / 2.0);
-        assert!(sensor.from_moc.y < sensor.to_moc.y);
-        assert!(sensor.from_moc.rightward && !sensor.to_moc.rightward);
+        // its own readings leave along the top going left, and what asks for
+        // them arrives along the bottom going right.
+        assert!(sensor.moc_in.x < sensor.width / 2.0);
+        assert!(sensor.payload_out.x < sensor.width / 2.0);
+        assert!(sensor.payload_out.y < sensor.moc_in.y);
+        assert!(sensor.moc_in.rightward && !sensor.payload_out.rightward);
 
         // The ground: the other end of both, and both on its right.
         let moc = view("moc");
-        assert!(moc.to_payload.shown && moc.from_payload.shown);
-        assert!(!moc.from_moc.shown && !moc.to_moc.shown);
-        assert!(moc.to_payload.x > moc.width / 2.0);
-        assert!(moc.from_payload.x > moc.width / 2.0);
-        assert!(moc.to_payload.y < moc.from_payload.y);
+        assert!(moc.moc_out.shown && moc.payload_in.shown);
+        assert!(!moc.moc_in.shown && !moc.payload_out.shown);
+        assert!(moc.moc_out.x > moc.width / 2.0);
+        assert!(moc.payload_in.x > moc.width / 2.0);
+        assert!(moc.payload_in.y < moc.moc_out.y);
 
         // A page has all four: what is inside it may have any of them, and
         // nothing out here knows which -- so a line can be drawn to a page
         // either way on either stream.
         let page = view("subdiagram");
         for terminal in [
-            &page.from_moc,
-            &page.to_payload,
-            &page.from_payload,
-            &page.to_moc,
+            &page.moc_in,
+            &page.moc_out,
+            &page.payload_in,
+            &page.payload_out,
         ] {
             assert!(terminal.shown);
         }
@@ -3549,15 +3550,15 @@ mod tests {
         // type nothing here can describe -- and there is nothing to be gained
         // by letting a line be drawn to one.
         let unknown = view("contraption");
-        assert!(!unknown.from_moc.shown && !unknown.to_moc.shown);
+        assert!(!unknown.moc_in.shown && !unknown.payload_out.shown);
 
         // Every terminal is drawn inside its node, which is what makes the box
         // a person presses and the box a link arrives at the same box.
         for (node, terminal) in [
-            (&sensor, &sensor.from_moc),
-            (&sensor, &sensor.to_moc),
-            (&moc, &moc.to_payload),
-            (&moc, &moc.from_payload),
+            (&sensor, &sensor.moc_in),
+            (&sensor, &sensor.payload_out),
+            (&moc, &moc.moc_out),
+            (&moc, &moc.payload_in),
         ] {
             assert!(terminal.x >= 0.0 && terminal.y >= 0.0);
             assert!(terminal.x + style::TERMINAL.0 as f32 <= node.width);
@@ -4015,8 +4016,8 @@ mod tests {
     /// A link's ends are placed on the terminals it is attached to.
     ///
     /// Which is the drawing the canvas is for: the readings leave a payload by
-    /// its `to_moc`, in its lower left corner, and arrive at the computation
-    /// by its `from_payload`, in that node's lower right -- so the line runs
+    /// its `payload-out`, in its lower left corner, and arrive at the computation
+    /// by its `payload-in`, in that node's lower right -- so the line runs
     /// leftward along the bottom of both, the way the data goes and the way
     /// the panes are arranged. It used to leave the middle of the source's
     /// right edge and arrive at the middle of the target's left edge, which
@@ -4087,13 +4088,13 @@ mod tests {
         assert_eq!(links.len(), 1);
         let view = &links[0];
 
-        // It starts on the payload's own `to_moc` terminal, which is the
+        // It starts on the payload's own `payload-out` terminal, which is the
         // left edge of its lower left corner, and finishes on the
-        // computation's `from_payload`, the right edge of its lower right
+        // computation's `payload-in`, the right edge of its lower right
         // corner -- so the line touches both boxes it joins and crosses
         // neither shape.
         let ((start_x, start_y), leaves_right) =
-            style::attachment("i2c", (504, 24), "to_moc").expect("a payload's source");
+            style::attachment("i2c", (504, 24), "payload-out").expect("a payload's source");
         assert!(!leaves_right, "the readings leave towards the ground");
         assert!(
             view.route
@@ -4103,7 +4104,7 @@ mod tests {
         );
 
         let ((end_x, end_y), _) =
-            style::attachment("compute", (200, 40), "from_payload").expect("a sink");
+            style::attachment("compute", (200, 40), "payload-in").expect("a sink");
         assert!(
             view.route.ends_with(&format!("{end_x:.1} {end_y:.1}")),
             "{}",
@@ -4190,33 +4191,33 @@ mod tests {
             )
         };
 
-        // The readings, from the payload to the ground: a to_moc let go of
-        // over a from_payload. Neither end names its terminal, both types
+        // The readings, from the payload to the ground: a payload-out let go of
+        // over a payload-in. Neither end names its terminal, both types
         // having one of each -- which is what keeps a saved file saying
         // `{ from: sensor, to: ground }`.
         let link = joined(
             &document,
             &None,
-            &drawn("sensor", "to_moc"),
-            over("ground", "from_payload"),
+            &drawn("sensor", "payload-out"),
+            over("ground", "payload-in"),
         )
         .expect("a payload's readings reach the ground");
         assert_eq!(link.from, "sensor");
         // The terminal it leaves by, always: a link is written as an
         // attribute of its own node, named after that terminal.
-        assert_eq!(link.origin.as_deref(), Some("to_moc"));
+        assert_eq!(link.origin.as_deref(), Some("payload-out"));
         assert_eq!(link.to, "ground");
         // And nothing at the arriving end, the ground link having one data
         // sink: the schema reads an unnamed end as that one.
         assert_eq!(link.input, None);
 
-        // And back the other way, which is the other stream: a to_payload let
-        // go of over a from_moc.
+        // And back the other way, which is the other stream: a moc-out let
+        // go of over a moc-in.
         let back = joined(
             &document,
             &None,
-            &drawn("ground", "to_payload"),
-            over("sensor", "from_moc"),
+            &drawn("ground", "moc-out"),
+            over("sensor", "moc-in"),
         )
         .expect("what the ground sends reaches the payload");
         assert_eq!((back.from.as_str(), back.to.as_str()), ("ground", "sensor"));
@@ -4226,25 +4227,25 @@ mod tests {
         let through = joined(
             &document,
             &None,
-            &drawn("through", "to_moc"),
-            over("ground", "from_payload"),
+            &drawn("through", "payload-out"),
+            over("ground", "payload-in"),
         )
         .expect("a null node reaches the ground");
-        assert_eq!(through.origin.as_deref(), Some("to_moc"));
+        assert_eq!(through.origin.as_deref(), Some("payload-out"));
 
         // Now the gestures that are not links.
 
         // Let go of over the far node's own data source, which is still a
         // release over that node: the line lands on the terminal the stream
-        // names -- the ground's from_payload -- as it would anywhere else on
+        // names -- the ground's payload-in -- as it would anywhere else on
         // the box. What may be joined to what has not changed; what has gone
         // is having to hit a small box to say it.
         assert_eq!(
             joined(
                 &document,
                 &None,
-                &drawn("sensor", "to_moc"),
-                over("ground", "to_payload"),
+                &drawn("sensor", "payload-out"),
+                over("ground", "moc-out"),
             ),
             Some(link.clone()),
             "a release anywhere on the node makes the link the stream allows"
@@ -4252,7 +4253,7 @@ mod tests {
 
         // And the middle of it, which is where a person actually aims.
         assert_eq!(
-            joined(&document, &None, &drawn("sensor", "to_moc"), middle("ground")),
+            joined(&document, &None, &drawn("sensor", "payload-out"), middle("ground")),
             Some(link.clone())
         );
 
@@ -4263,16 +4264,16 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("through", "to_payload"),
+                &drawn("through", "moc-out"),
                 middle("ground"),
             ),
             None,
-            "a moc node has no from_moc to arrive at"
+            "a moc node has no moc-in to arrive at"
         );
 
         // Let go of over nothing.
         assert_eq!(
-            joined(&document, &None, &drawn("sensor", "to_moc"), (900.0, 400.0)),
+            joined(&document, &None, &drawn("sensor", "payload-out"), (900.0, 400.0)),
             None
         );
 
@@ -4282,8 +4283,8 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("through", "to_moc"),
-                over("through", "from_moc"),
+                &drawn("through", "payload-out"),
+                over("through", "moc-in"),
             ),
             None
         );
@@ -4295,35 +4296,35 @@ mod tests {
         let backwards = joined(
             &document,
             &None,
-            &drawn("ground", "from_payload"),
-            over("sensor", "to_moc"),
+            &drawn("ground", "payload-in"),
+            over("sensor", "payload-out"),
         )
         .expect("a link drawn from the sink end");
         assert_eq!(backwards, link, "the same link, whichever end it was drawn from");
 
         // And from a data sink onto the *node*, which is the same gesture with
         // nothing to aim at: a sink is fed by one stream, so the terminal the
-        // line leaves by is the payload's to_moc whether or not the hand
+        // line leaves by is the payload's payload-out whether or not the hand
         // found the box.
         assert_eq!(
             joined(
                 &document,
                 &None,
-                &drawn("ground", "from_payload"),
+                &drawn("ground", "payload-in"),
                 middle("sensor"),
             ),
             Some(link.clone()),
             "a line from a data sink should reach a node dropped anywhere on it"
         );
 
-        // Released over the null node's own to_moc box, which is a release
-        // over the null node: the readings land on its from_payload, that
+        // Released over the null node's own payload-out box, which is a release
+        // over the null node: the readings land on its payload-in, that
         // being where a groundward stream arrives.
         let through_sink = joined(
             &document,
             &None,
-            &drawn("sensor", "to_moc"),
-            over("through", "to_moc"),
+            &drawn("sensor", "payload-out"),
+            over("through", "payload-out"),
         )
         .expect("the readings reach the node in the way");
         assert_eq!(
@@ -4331,7 +4332,7 @@ mod tests {
                 through_sink.to.as_str(),
                 through_sink.input.as_deref(),
             ),
-            ("through", Some("from_payload")),
+            ("through", Some("payload-in")),
             "a null node has two data sinks, so the file says which"
         );
 
@@ -4342,8 +4343,8 @@ mod tests {
             joined(
                 &document,
                 &None,
-                &drawn("sensor", "to_moc"),
-                over("ground", "from_payload"),
+                &drawn("sensor", "payload-out"),
+                over("ground", "payload-in"),
             ),
             None,
             "the same link twice"
@@ -4417,7 +4418,7 @@ mod tests {
             });
         }
         // The readings of one sensor, reaching the ground.
-        let held = Link::joining("sensor", Some("to_moc"), "ground", None);
+        let held = Link::joining("sensor", Some("payload-out"), "ground", None);
         document.apply(&Edit::AddLink { link: held.clone() });
 
         // Where each node is and what it is, copied out so that a link can be
@@ -4452,14 +4453,14 @@ mod tests {
         // arrives.
         let pressed = Drawing {
             node: "ground".to_string(),
-            terminal: "from_payload".to_string(),
+            terminal: "payload-in".to_string(),
             holding: Some(held.clone()),
         };
 
         // Put back where it came from: nothing happens. A gesture that has
         // thought better of itself leaves no trace.
         assert_eq!(
-            dropped(&document, &None, &held, &pressed, over("ground", "from_payload")),
+            dropped(&document, &None, &held, &pressed, over("ground", "payload-in")),
             None
         );
 
@@ -4474,16 +4475,16 @@ mod tests {
             &None,
             &held,
             &pressed,
-            over("through", "from_payload"),
+            over("through", "payload-in"),
         )
         .expect("a sink that pairs with the source");
         match moved {
             Edit::MoveLink { was, now } => {
                 assert_eq!(was, held);
                 assert_eq!(now.from, "sensor", "the far end stays put");
-                assert_eq!(now.origin.as_deref(), Some("to_moc"));
+                assert_eq!(now.origin.as_deref(), Some("payload-out"));
                 assert_eq!(now.to, "through");
-                assert_eq!(now.input.as_deref(), Some("from_payload"));
+                assert_eq!(now.input.as_deref(), Some("payload-in"));
             }
             other => panic!("{other:?}"),
         }
@@ -4491,39 +4492,39 @@ mod tests {
         // Anywhere on that node is the same answer, which is what makes this
         // worth aiming loosely: the corner box of its other stream, the box
         // of one of its data sources, and the middle of it all put the end on
-        // its from_payload, that being where a groundward stream arrives.
+        // its payload-in, that being where a groundward stream arrives.
         for landing in [
-            over("through", "from_moc"),
-            over("through", "to_moc"),
+            over("through", "moc-in"),
+            over("through", "payload-out"),
             middle("through"),
         ] {
             assert_eq!(
                 dropped(&document, &None, &held, &pressed, landing),
                 Some(Edit::MoveLink {
                     was: held.clone(),
-                    now: Link::joining("sensor", Some("to_moc"), "through", Some("from_payload")),
+                    now: Link::joining("sensor", Some("payload-out"), "through", Some("payload-in")),
                 }),
-                "a release anywhere on the node moves the end to its from_payload"
+                "a release anywhere on the node moves the end to its payload-in"
             );
         }
 
         // Not onto the far node itself, which would be a link from a node to
         // itself.
         assert_eq!(
-            dropped(&document, &None, &held, &pressed, over("sensor", "from_moc")),
+            dropped(&document, &None, &held, &pressed, over("sensor", "moc-in")),
             None
         );
 
         // And onto a node that cannot be this end but could be the other one,
         // the gesture is read as drawing a line rather than moving one: a
-        // payload has no from_payload, so dropping the ground's arriving end
+        // payload has no payload-in, so dropping the ground's arriving end
         // on one means "this payload reports here too". The ground's sink
         // takes as many as the configuration gives it, which is what makes
         // that a sentence and not a contradiction.
         assert_eq!(
             dropped(&document, &None, &held, &pressed, middle("other")),
             Some(Edit::AddLink {
-                link: Link::joining("other", Some("to_moc"), "ground", None)
+                link: Link::joining("other", Some("payload-out"), "ground", None)
             }),
             "a second line into the ground should be drawn, not refused"
         );
@@ -4535,18 +4536,18 @@ mod tests {
         );
 
         // And the source end moves the same way: taken hold of at the
-        // sensor's `to_moc` and put on another sensor's.
+        // sensor's `payload-out` and put on another sensor's.
         let pressed = Drawing {
             node: "sensor".to_string(),
-            terminal: "to_moc".to_string(),
+            terminal: "payload-out".to_string(),
             holding: Some(held.clone()),
         };
-        let moved = dropped(&document, &None, &held, &pressed, over("other", "to_moc"))
+        let moved = dropped(&document, &None, &held, &pressed, over("other", "payload-out"))
             .expect("another sensor's readings may reach the same ground");
         match moved {
             Edit::MoveLink { now, .. } => {
                 assert_eq!(now.from, "other");
-                assert_eq!(now.origin.as_deref(), Some("to_moc"));
+                assert_eq!(now.origin.as_deref(), Some("payload-out"));
                 assert_eq!(now.to, "ground", "the far end stays put");
             }
             other => panic!("{other:?}"),
@@ -4556,10 +4557,10 @@ mod tests {
         // nothing: two lines between one pair of terminals lie on top of each
         // other and deliver twice.
         document.apply(&Edit::AddLink {
-            link: Link::joining("other", Some("to_moc"), "ground", None),
+            link: Link::joining("other", Some("payload-out"), "ground", None),
         });
         assert_eq!(
-            dropped(&document, &None, &held, &pressed, over("other", "to_moc")),
+            dropped(&document, &None, &held, &pressed, over("other", "payload-out")),
             None
         );
     }
@@ -4567,7 +4568,7 @@ mod tests {
     /// A second line out of a data source is drawn from that source.
     ///
     /// The gesture somebody tried first and found dead: a moc node already
-    /// feeding one payload, pressed on its `to_payload` and let go of over a
+    /// feeding one payload, pressed on its `moc-out` and let go of over a
     /// second payload. That terminal has one line on it, so the press means
     /// "pick this line up" -- and a payload cannot be a data source, so there
     /// was nowhere for the end to land and nothing happened at all. What they
@@ -4600,14 +4601,14 @@ mod tests {
         }
         // The line that is already there, which is what made the gesture
         // ambiguous: the ground feeds one payload.
-        let held = Link::joining("ground", Some("to_payload"), "i2c", None);
+        let held = Link::joining("ground", Some("moc-out"), "i2c", None);
         document.apply(&Edit::AddLink { link: held.clone() });
 
-        // Pressed on the ground's to_payload, which hands over the line it
+        // Pressed on the ground's moc-out, which hands over the line it
         // has, and let go of in the middle of the other payload.
         let pressed = Drawing {
             node: "ground".to_string(),
-            terminal: "to_payload".to_string(),
+            terminal: "moc-out".to_string(),
             holding: Some(held.clone()),
         };
         let (width, height) = size_of("spi");
@@ -4620,7 +4621,7 @@ mod tests {
         assert_eq!(
             dropped(&document, &None, &held, &pressed, over),
             Some(Edit::AddLink {
-                link: Link::joining("ground", Some("to_payload"), "spi", None)
+                link: Link::joining("ground", Some("moc-out"), "spi", None)
             }),
             "the second line was not drawn"
         );
@@ -4663,32 +4664,32 @@ mod tests {
         };
 
         // Nothing linked yet: nothing to hand over.
-        assert!(attached(&document, &at("sensor", "to_moc"), false).is_empty());
+        assert!(attached(&document, &at("sensor", "payload-out"), false).is_empty());
 
         document.apply(&Edit::AddLink {
-            link: Link::joining("sensor", Some("to_moc"), "ground", None),
+            link: Link::joining("sensor", Some("payload-out"), "ground", None),
         });
-        assert_eq!(attached(&document, &at("sensor", "to_moc"), false).len(), 1);
+        assert_eq!(attached(&document, &at("sensor", "payload-out"), false).len(), 1);
         // And the sink end of the same link, from the other side.
         assert_eq!(
-            attached(&document, &at("ground", "from_payload"), true).len(),
+            attached(&document, &at("ground", "payload-in"), true).len(),
             1
         );
 
         // A second destination from the same source: now the source has two,
         // and nothing says which a drag meant.
         document.apply(&Edit::AddLink {
-            link: Link::joining("sensor", Some("to_moc"), "housekeeping", None),
+            link: Link::joining("sensor", Some("payload-out"), "housekeeping", None),
         });
-        assert_eq!(attached(&document, &at("sensor", "to_moc"), false).len(), 2);
+        assert_eq!(attached(&document, &at("sensor", "payload-out"), false).len(), 2);
 
         // The ground's sink takes many, and the same is true of it: every
         // payload aboard reports to the one ground link.
         document.apply(&Edit::AddLink {
-            link: Link::joining("other", Some("to_moc"), "ground", None),
+            link: Link::joining("other", Some("payload-out"), "ground", None),
         });
         assert_eq!(
-            attached(&document, &at("ground", "from_payload"), true).len(),
+            attached(&document, &at("ground", "payload-in"), true).len(),
             2
         );
     }
@@ -4696,7 +4697,7 @@ mod tests {
     /// A link to a terminal is recorded as the terminal that was pressed.
     ///
     /// The fault this is here for: a line dragged from the ground link's
-    /// `to_payload` to the upper left corner of a computation -- its `from_moc`
+    /// `moc-out` to the upper left corner of a computation -- its `moc-in`
     /// -- was recorded as a link naming no terminal at all, and then drawn
     /// arriving at the computation's lower right. Twice wrong: what somebody
     /// had just said was thrown away, and the drawing then guessed the other
@@ -4739,27 +4740,27 @@ mod tests {
             &None,
             &Drawing {
                 node: "ground".to_string(),
-                terminal: "to_payload".to_string(),
+                terminal: "moc-out".to_string(),
                 holding: None,
             },
-            over("to_kelvin", "compute", (300, 120), "from_moc"),
+            over("to_kelvin", "compute", (300, 120), "moc-in"),
         )
         .expect("the ground reaches a computation");
 
         assert_eq!(link.from, "ground");
-        assert_eq!(link.origin.as_deref(), Some("to_payload"));
+        assert_eq!(link.origin.as_deref(), Some("moc-out"));
         assert_eq!(link.to, "to_kelvin");
         // The terminal that was pressed, which is the whole of what the
         // gesture said: a computation has two data sinks, so the file has to
         // say which.
-        assert_eq!(link.input.as_deref(), Some("from_moc"));
+        assert_eq!(link.input.as_deref(), Some("moc-in"));
 
         // And the line is drawn to that corner: the upper left, where what
         // the ground sends arrives.
         document.apply(&Edit::AddLink { link });
         let ends = ends_of(&document, &document.links[0], &None);
         let ((x, y), _) =
-            style::attachment("compute", (300, 120), "from_moc").expect("a terminal");
+            style::attachment("compute", (300, 120), "moc-in").expect("a terminal");
         assert_eq!(ends.to, (x, y), "the line arrives at the terminal it was drawn to");
 
         // A mean is the one destination whose arriving end is named by
@@ -4777,7 +4778,7 @@ mod tests {
         });
         assert!(declares_inputs(&document, "mean_temp"));
         assert_eq!(
-            arriving_at(&document, "mean_temp", "from_payload").as_deref(),
+            arriving_at(&document, "mean_temp", "payload-in").as_deref(),
             Some("in0"),
             "a mean is filled by name, not by terminal"
         );
@@ -4785,8 +4786,8 @@ mod tests {
 
     /// A link the file does not name a sink for is drawn at the pairing one.
     ///
-    /// A link leaving `to_payload` carries what the ground sends, so it
-    /// arrives at a `from_moc`: the same stream, named at its other end. The
+    /// A link leaving `moc-out` carries what the ground sends, so it
+    /// arrives at a `moc-in`: the same stream, named at its other end. The
     /// drawing used to fall back to the groundward sink whatever the link
     /// carried, which drew a command from the ground arriving at the corner
     /// the readings leave by.
@@ -4812,12 +4813,12 @@ mod tests {
         }
         // Written by hand, naming the source and not the sink.
         document.apply(&Edit::AddLink {
-            link: Link::joining("ground", Some("to_payload"), "through", None),
+            link: Link::joining("ground", Some("moc-out"), "through", None),
         });
 
         let ends = ends_of(&document, &document.links[0], &None);
         let ((x, y), _) =
-            style::attachment("null", (300, 120), "from_moc").expect("the sink");
+            style::attachment("null", (300, 120), "moc-in").expect("the sink");
         assert_eq!(
             ends.to,
             (x, y),
@@ -5511,7 +5512,7 @@ mod tests {
             });
         }
         editor.borrow_mut().edit(Edit::AddLink {
-            link: journal::Link::joining("sensor", Some("to_moc"), "ground", None),
+            link: journal::Link::joining("sensor", Some("payload-out"), "ground", None),
         });
 
         let ui = MainWindow::new().expect("a window");
@@ -5661,10 +5662,10 @@ mod tests {
         let origin = canvas.absolute_position();
         let at = |x: f32, y: f32| slint::LogicalPosition::new(origin.x + x, origin.y + y);
 
-        // Pressed on the payload's to_moc, which is where its readings leave.
+        // Pressed on the payload's payload-out, which is where its readings leave.
         let node = editor.borrow().document().node("sensor").expect("it").at;
         let (x, y, width, height) =
-            style::terminal_box("i2c", node, "to_moc").expect("a terminal");
+            style::terminal_box("i2c", node, "payload-out").expect("a terminal");
         let from = at(x + width / 2.0, y + height / 2.0);
 
         // Nothing drawn before the gesture.
@@ -5960,7 +5961,7 @@ mod tests {
             });
         }
         editor.borrow_mut().edit(Edit::AddLink {
-            link: journal::Link::joining("sensor", Some("to_moc"), "ground", None),
+            link: journal::Link::joining("sensor", Some("payload-out"), "ground", None),
         });
 
         let ui = MainWindow::new().expect("a window");
@@ -6007,7 +6008,7 @@ mod tests {
 
         // Taken hold of at the ground link's own sink, which is where this
         // link arrives.
-        let from = middle("ground", "moc", (16, 120), "from_payload");
+        let from = middle("ground", "moc", (16, 120), "payload-in");
         ui.window()
             .dispatch_event(WindowEvent::PointerMoved { position: from });
         ui.window().dispatch_event(WindowEvent::PointerPressed {
@@ -6238,8 +6239,8 @@ mod tests {
             )
         };
 
-        let from = middle("sensor", "to_moc");
-        let to = middle("ground", "from_payload");
+        let from = middle("sensor", "payload-out");
+        let to = middle("ground", "payload-in");
 
         ui.window()
             .dispatch_event(WindowEvent::PointerMoved { position: from });
@@ -6265,7 +6266,7 @@ mod tests {
         // The end it leaves by is named, that being the attribute the link is
         // written under; the end it arrives at is not, the ground link having
         // one data sink.
-        assert_eq!(links[0].origin.as_deref(), Some("to_moc"));
+        assert_eq!(links[0].origin.as_deref(), Some("payload-out"));
         assert_eq!(links[0].input, None);
 
         // And the node did not move: a press on a terminal draws a link, and
@@ -6279,7 +6280,7 @@ mod tests {
         // The same gesture let go of anywhere on the node, which is the way
         // a person actually draws one: the other sensor's readings dropped in
         // the middle of the ground link's box. The terminal is the stream's
-        // own answer -- a to_moc arrives at a from_payload -- so there is
+        // own answer -- a payload-out arrives at a payload-in -- so there is
         // nothing to aim at.
         let gesture = |from: slint::LogicalPosition, to: slint::LogicalPosition| {
             ui.window()
@@ -6296,7 +6297,7 @@ mod tests {
             });
         };
 
-        gesture(middle("other", "to_moc"), centre("ground"));
+        gesture(middle("other", "payload-out"), centre("ground"));
         let links = editor.borrow().document().links.clone();
         assert_eq!(
             links.len(),
@@ -6305,16 +6306,16 @@ mod tests {
         );
         let made = links.iter().find(|link| link.from == "other").expect("the second line");
         assert_eq!(made.to, "ground");
-        assert_eq!(made.origin.as_deref(), Some("to_moc"));
+        assert_eq!(made.origin.as_deref(), Some("payload-out"));
 
         // And a node with no terminal of that stream takes nothing: a payload
         // receives what asks it for a reading, so what arrives at its
-        // from_moc leaves a to_payload -- and a payload has none to offer.
-        gesture(middle("other", "from_moc"), centre("sensor"));
+        // moc-in leaves a moc-out -- and a payload has none to offer.
+        gesture(middle("other", "moc-in"), centre("sensor"));
         assert_eq!(
             editor.borrow().document().links.len(),
             2,
-            "a payload has no to_payload for a line to leave by"
+            "a payload has no moc-out for a line to leave by"
         );
     }
 

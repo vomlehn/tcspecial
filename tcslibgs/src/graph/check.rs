@@ -874,7 +874,7 @@ impl Graph {
                 continue;
             }
             // Whatever terminal it leaves by: a payload read through its
-            // `to_moc` is a payload that is read.
+            // `payload-out` is a payload that is read.
             let read = self.links.iter().any(|link| {
                 link.from.split('.').next().unwrap_or(&link.from) == node.name
             });
@@ -895,7 +895,7 @@ impl Graph {
     /// Every named input of this node that a link binds.
     ///
     /// A terminal is not one of them. `in0` is which *of several* ways into a
-    /// computation and a mean is built on knowing; `from_moc` is which *way*
+    /// computation and a mean is built on knowing; `moc-in` is which *way*
     /// the data is going, and a link may name it on a computation as it does on
     /// any other type. Counting one as an input would make a mean over `in0`
     /// and `in1` look like a mean over three things the moment somebody drew a
@@ -923,7 +923,7 @@ impl Graph {
     /// source of it, and naming it twice would read as two.
     ///
     /// Named as the node, whatever terminal the link left by: a complaint that
-    /// said `"n.to_moc" produces records of three bytes` would be naming a
+    /// said `"n.payload-out" produces records of three bytes` would be naming a
     /// thing the file has no entry for.
     fn sources_of(&self, node: &str) -> Vec<&str> {
         let mut sources: Vec<&str> = Vec::new();
@@ -1733,7 +1733,7 @@ mod tests {
                 link("average", &["moc"]),
                 // And the ground reaching it, drawn to the corner where what
                 // the ground sends arrives.
-                link("moc.to_payload", &["average.from_moc"]),
+                link("moc.moc-out", &["average.moc-in"]),
             ],
         );
         let problems = g.check();
@@ -1916,7 +1916,7 @@ mod tests {
             })
             .unwrap_or_else(|| panic!("{problems:?}"));
         // Saying what it does have, which is the one thing a reader needs.
-        assert!(why.contains("telemetry") && why.contains("from_payload"), "{why}");
+        assert!(why.contains("telemetry") && why.contains("payload-in"), "{why}");
         // Reported on the node the link leaves, which is where the link is
         // written: a link is an attribute of that node.
         let said = problems
@@ -1930,7 +1930,7 @@ mod tests {
         // knows.
         let g = graph(
             vec![node("a", "i2c"), node("c", "moc")],
-            vec![link("a", &["c.to_payload"])],
+            vec![link("a", &["c.moc-out"])],
         );
         let problems = g.check();
         assert!(
@@ -1946,14 +1946,14 @@ mod tests {
         // either, and guessing one would be guessing which stream it carries.
         let g = graph(
             vec![node("a", "i2c"), node("n", "null"), node("c", "moc")],
-            vec![link("a", &["n"]), link("n.to_moc", &["c"])],
+            vec![link("a", &["n"]), link("n.payload-out", &["c"])],
         );
         let problems = g.check();
         assert!(
             problems.iter().any(|p| matches!(
                 p,
                 Problem::BadTerminal { why, .. }
-                    if why.contains("from_payload") && why.contains("from_moc")
+                    if why.contains("payload-in") && why.contains("moc-in")
             )),
             "{problems:?}"
         );
@@ -1972,7 +1972,7 @@ mod tests {
             // A data source at one end and a data sink at the other, so the
             // ends themselves are right -- and the stream is vehicleward
             // where it leaves and groundward where it arrives.
-            vec![link("n.to_payload", &["c.from_payload"])],
+            vec![link("n.moc-out", &["c.payload-in"])],
         );
         let problems = g.check();
         let said = problems
@@ -2001,10 +2001,10 @@ mod tests {
         let g = graph(
             vec![sensor, node("n", "null"), node("c", "moc")],
             vec![
-                link("a.to_moc", &["n.from_payload"]),
-                link("n.to_moc", &["c.from_payload"]),
-                link("c.to_payload", &["n.from_moc"]),
-                link("n.to_payload", &["a.from_moc"]),
+                link("a.payload-out", &["n.payload-in"]),
+                link("n.payload-out", &["c.payload-in"]),
+                link("c.moc-out", &["n.moc-in"]),
+                link("n.moc-out", &["a.moc-in"]),
             ],
         );
         assert_eq!(g.check(), Vec::new());
@@ -2017,7 +2017,7 @@ mod tests {
             .insert("address".to_string(), Scalar::of("0x48"));
         let g = graph(
             vec![node("a", "i2c"), said_something, node("c", "moc")],
-            vec![link("a", &["n.from_payload"]), link("n.to_moc", &["c"])],
+            vec![link("a", &["n.payload-in"]), link("n.payload-out", &["c"])],
         );
         let problems = g.check();
         assert!(
@@ -2058,8 +2058,8 @@ mod tests {
         let g = graph(
             vec![node("a", "i2c"), node("b", "i2c"), node("n", "null")],
             vec![
-                link("a", &["n.from_payload"]),
-                link("b", &["n.from_payload"]),
+                link("a", &["n.payload-in"]),
+                link("b", &["n.payload-in"]),
             ],
         );
         let problems = g.check();
@@ -2067,7 +2067,7 @@ mod tests {
             problems.iter().any(|p| matches!(
                 p,
                 Problem::InputBoundTwice { node, input }
-                    if node == "n" && input == "from_payload"
+                    if node == "n" && input == "payload-in"
             )),
             "{problems:?}"
         );
@@ -2155,8 +2155,8 @@ mod tests {
             Problem::CrossedStreams {
                 from: "n".into(),
                 link: "\"n\" to \"c\"".into(),
-                leaves: "to_moc".into(),
-                arrives: "to_payload".into(),
+                leaves: "payload-out".into(),
+                arrives: "moc-out".into(),
             },
             Problem::DuplicateLink {
                 from: "a".into(),

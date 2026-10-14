@@ -127,15 +127,19 @@ link
 terminal
     Where a link is attached: a node's **data source** is where data leaves it
     and a **data sink** is where data arrives. A terminal has a name, and the
-    name says which way the data is travelling and not what is at the other
-    end of it. There are four of them, two per stream:
+    name says whose data it is and whether it arrives or leaves, not what is
+    at the other end of it: ``payload-`` is the payload's own data on its way
+    to the ground, ``moc-`` is what the ground sends on its way to a payload,
+    and ``-in`` arrives where ``-out`` leaves. So every ``-out`` is a data
+    source and every ``-in`` a data sink. There are four of them, two per
+    stream:
 
-    ``to_moc`` is where a payload's readings leave and ``from_payload`` is
-    where they arrive; ``to_payload`` is where what the ground sends leaves and
-    ``from_moc`` is where it arrives. A payload has ``from_moc`` and
-    ``to_moc``; a MOC link has ``from_payload`` and ``to_payload``; a ``null``
-    node has all four. With no vehicle node in the way, a payload's ``to_moc``
-    connects to a MOC link's ``from_payload``.
+    ``payload-out`` is where a payload's readings leave and ``payload-in`` is
+    where they arrive; ``moc-out`` is where what the ground sends leaves and
+    ``moc-in`` is where it arrives. A payload has ``moc-in`` and
+    ``payload-out``; a MOC link has ``payload-in`` and ``moc-out``; a ``null``
+    node has all four. With no vehicle node in the way, a payload's ``payload-out``
+    connects to a MOC link's ``payload-in``.
 
     A link is written as an attribute of the node it leaves, named after the
     data source it leaves by, with one entry per line:
@@ -144,7 +148,7 @@ terminal
 
        - name: k_fore
          type: compute
-         to_moc:
+         payload-out:
            - target: moc
            - target: mean_temp
              input: in0
@@ -154,14 +158,14 @@ terminal
     where either has to be said -- ``node`` alone will do wherever the type has
     one data sink, which is every type but ``null``. The short spelling is read
     as well, the destination written as ``node`` or ``node.terminal``, alone or
-    in a list: ``to_moc: k_fore``, or ``to_moc: [moc, mean_temp.in0]``.
+    in a list: ``payload-out: k_fore``, or ``payload-out: [moc, mean_temp.in0]``.
 
     A data sink takes one data source; a data source may reach several sinks;
     and a MOC link's sink takes as many as the configuration gives it, every
     payload's telemetry arriving at the ground on its own socket.
 
     The node at the arriving end says so under the data sink the line arrives
-    at: ``from_payload: true``, and ``false`` for a sink nothing arrives at.
+    at: ``payload-in: true``, and ``false`` for a sink nothing arrives at.
     It is a record and not the link -- the link is the attribute on the node it
     leaves, and that is the one the software reads -- so a file may leave these
     out and still be complete. Which node a line comes from is not repeated
@@ -169,18 +173,19 @@ terminal
     arrive at, one name would read as the only one. A flag that disagrees with
     the links is refused where the file is read. tcsgui writes them.
 
-    Each terminal may be linked to one other: a ``to_moc`` to a
-    ``from_payload``, a ``from_payload`` to a ``to_moc``, a ``to_payload`` to a
-    ``from_moc``, a ``from_moc`` to a ``to_payload``. Anything else would carry
-    one stream into the other. In tcsgui the terminals are drawn as small
-    boxes in a node's corners -- three of them with an arrow saying which way
-    the data goes, and the upper-left one, where what the ground sends
-    arrives, drawn empty -- and a link is made by dragging from one of them
-    onto the node the line is to reach: anywhere on that node will do, and the
-    line is drawn to whichever of its terminals the stream arrives at. A node
-    with no terminal of that stream takes nothing, and a MOC link has none on
-    its left at all: what the ground sends *leaves* it, by the ``to_payload``
-    in its upper right.
+    Each terminal may be linked to one other: a ``payload-out`` to a
+    ``payload-in``, a ``payload-in`` to a ``payload-out``, a ``moc-out`` to a
+    ``moc-in``, a ``moc-in`` to a ``moc-out``. Anything else would carry
+    one stream into the other. In tcsgui the terminals are drawn as small boxes
+    in a node's corners, each with an arrow saying which way its data goes: the
+    payload's own data along the top pointing left, towards the ground, and
+    what the ground sends along the bottom pointing right, towards the
+    payloads. A link is made by dragging from one of them onto the node the
+    line is to reach: anywhere on that node will do, and the line is drawn to
+    whichever of its terminals the stream arrives at. A node with no terminal
+    of that stream takes nothing, and a MOC link has none on its left at all:
+    the payload data it receives arrives at the ``payload-in`` in its upper
+    right, and what it sends leaves by the ``moc-out`` in its lower right.
 
 ``null`` node
     A vehicle node that carries both streams through and does nothing to what

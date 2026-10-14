@@ -446,7 +446,6 @@ moc:
     address: \"10.0.0.1\"
     port: \"5000\"
     to_payload: temp_fore
-    editor: { x: 240, y: 40 }
 
 payloads:
   - name: temp_fore
@@ -455,7 +454,11 @@ payloads:
     address: \"0x48\"
     trigger: \"01\"
     to_moc: moc
-    editor: { x: 40, y: 240 }
+
+tcsgui:
+  nodes:
+    - { name: moc, x: 240, y: 40 }
+    - { name: temp_fore, x: 40, y: 240 }
 ";
         std::fs::write(&path, by_hand).expect("a file");
 

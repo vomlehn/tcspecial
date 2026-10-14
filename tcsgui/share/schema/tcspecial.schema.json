@@ -167,23 +167,6 @@
             "description": "The payload group that reads it, where it is in one.",
             "type": "string"
           },
-          "editor": {
-            "description": "Where the editor drew it, which the flight software ignores.",
-            "type": "object",
-            "properties": {
-              "x": {
-                "type": "integer"
-              },
-              "y": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "x",
-              "y"
-            ],
-            "additionalProperties": false
-          },
           "to_moc": {
             "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
             "oneOf": [
@@ -688,23 +671,6 @@
             "description": "The payload group that reads it, where it is in one.",
             "type": "string"
           },
-          "editor": {
-            "description": "Where the editor drew it, which the flight software ignores.",
-            "type": "object",
-            "properties": {
-              "x": {
-                "type": "integer"
-              },
-              "y": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "x",
-              "y"
-            ],
-            "additionalProperties": false
-          },
           "to_moc": {
             "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
             "oneOf": [
@@ -1208,23 +1174,6 @@
           "group": {
             "description": "The payload group that reads it, where it is in one.",
             "type": "string"
-          },
-          "editor": {
-            "description": "Where the editor drew it, which the flight software ignores.",
-            "type": "object",
-            "properties": {
-              "x": {
-                "type": "integer"
-              },
-              "y": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "x",
-              "y"
-            ],
-            "additionalProperties": false
           },
           "to_moc": {
             "description": "One data sink or several: several is how one reading reaches the ground and an on-board computation at once.",
@@ -1733,6 +1682,37 @@
         ],
         "additionalProperties": false
       }
+    },
+    "tcsgui": {
+      "description": "What the editor arranged: where each node was drawn. Last in the file and in a section of its own, because the sections above say what the vehicle carries and this says where somebody put the boxes on a screen. The flight software ignores it.",
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "The node this is about.",
+                "type": "string"
+              },
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "x",
+              "y"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

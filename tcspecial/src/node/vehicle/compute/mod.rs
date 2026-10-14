@@ -330,7 +330,6 @@ mod tests {
             node_type: "compute".to_string(),
             group: None,
             attributes: BTreeMap::new(),
-            editor: None,
         };
         let said = match make(&node, &[]) {
             Err(said) => said,
@@ -350,7 +349,6 @@ mod tests {
             node_type: "compute".to_string(),
             group: None,
             attributes,
-            editor: None,
         };
         let said = match make(&node, &[]) {
             Err(said) => said,
@@ -376,7 +374,6 @@ mod tests {
             node_type: "compute".to_string(),
             group: None,
             attributes,
-            editor: None,
         };
 
         let said = match make(&node, &[]) {

@@ -36,12 +36,22 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- Where the editor drew a node, which the flight software ignores. -->
-  <xs:complexType name="editor">
+  <!-- Where the editor drew one node, which the flight software ignores.
+       In the tcsgui section at the end of the file rather than on the node:
+       the node sections say what the vehicle carries, and this says where
+       somebody put the boxes on a screen. -->
+  <xs:complexType name="placed">
     <xs:all>
+      <xs:element name="name" type="xs:string"/>
       <xs:element name="x" type="xs:integer"/>
       <xs:element name="y" type="xs:integer"/>
     </xs:all>
+  </xs:complexType>
+
+  <xs:complexType name="tcsgui">
+    <xs:sequence>
+      <xs:element name="nodes" type="placed" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
   </xs:complexType>
 
   <xs:complexType name="node">
@@ -50,7 +60,6 @@
       <xs:element name="name" type="xs:string"/>
       <xs:element name="type" type="xs:string"/>
       <xs:element name="group" type="xs:string"/>
-      <xs:element name="editor" type="editor"/>
       <!-- The two data sources, which are where links are written. -->
       <xs:element name="to_moc" type="destination"/>
       <xs:element name="to_payload" type="destination"/>
@@ -224,6 +233,7 @@
         <xs:element name="vehicle" type="node"/>
         <xs:element name="payloads" type="node"/>
         <xs:element name="commands" type="command"/>
+        <xs:element name="tcsgui" type="tcsgui"/>
       </xs:choice>
     </xs:complexType>
   </xs:element>

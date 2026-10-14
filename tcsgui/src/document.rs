@@ -171,7 +171,6 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
             })
             .map(|(attribute, value)| (attribute.clone(), Scalar::of(value.as_str())))
             .collect(),
-        editor: None,
     };
 
     // Only the nodes that are opened. A computation and a log have rules of
@@ -1203,10 +1202,6 @@ impl Document {
                         ));
                     }
                 }
-                out.push_str(&format!(
-                    "        <editor><x>{}</x><y>{}</y></editor>\n",
-                    node.at.0, node.at.1
-                ));
                 out.push_str(&format!("    </{tag}>\n"));
             }
         }
@@ -1237,15 +1232,31 @@ impl Document {
             }
         }
 
+        // And last, what the editor arranged: see the YAML writer.
+        let placed = self.nodes_in(home);
+        if !placed.is_empty() {
+            out.push_str("    <tcsgui>\n");
+            for node in placed {
+                out.push_str(&format!(
+                    "        <nodes><name>{}</name><x>{}</x><y>{}</y></nodes>\n",
+                    escape(&node.name),
+                    node.at.0,
+                    node.at.1
+                ));
+            }
+            out.push_str("    </tcsgui>\n");
+        }
+
         out.push_str("</configuration>\n");
         out
     }
 
     /// The document as a configuration file.
     ///
-    /// Written in the shape `design.rst` specifies: a `nodes` list where each
-    /// entry carries its `type` and its attributes, and a `links` list. The
-    /// canvas positions are written as well, under a key the flight software
+    /// Written in the shape `design.rst` specifies: three sections of nodes,
+    /// each entry carrying its `type`, its attributes and the links that leave
+    /// it. The canvas positions are written as well, in a `tcsgui` section at
+    /// the end, under a key the flight software
     /// ignores, so that reopening the file finds the diagram as it was left.
     #[cfg(test)]
     pub fn to_yaml(&self) -> String {
@@ -1389,13 +1400,6 @@ impl Document {
                         )),
                     }
                 }
-                // Two named numbers rather than a list, and the same shape in
-                // XML: a reader of either format wants one struct, and `at:
-                // [x, y]` in YAML against `<at>x,y</at>` in XML would be two.
-                out.push_str(&format!(
-                    "    editor: {{ x: {}, y: {} }}\n",
-                    node.at.0, node.at.1
-                ));
             }
         }
 
@@ -1411,6 +1415,26 @@ impl Document {
                 out.push_str(&format!(
                     "  - {{ from: {}, sets: {} }}\n",
                     command.from, command.sets
+                ));
+            }
+        }
+
+        // And last, what the editor arranged: where each node was drawn.
+        //
+        // Last and in a section of its own because it is a different kind of
+        // thing. The sections above say what the vehicle carries and what it
+        // is told; this says where somebody put the boxes on a screen, which
+        // the flight software ignores -- so a reader meets the vehicle first
+        // and can stop reading when the vehicle stops.
+        let placed = self.nodes_in(home);
+        if !placed.is_empty() {
+            out.push_str("\ntcsgui:\n  nodes:\n");
+            for node in placed {
+                out.push_str(&format!(
+                    "    - {{ name: {}, x: {}, y: {} }}\n",
+                    plain(&node.name),
+                    node.at.0,
+                    node.at.1
                 ));
             }
         }
@@ -1905,7 +1929,6 @@ mod tests {
                 node_type: t.spelling().to_string(),
                 group: None,
                 attributes: Default::default(),
-                editor: None,
             };
             assert_eq!(
                 t.is_payload(),

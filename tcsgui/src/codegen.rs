@@ -127,7 +127,7 @@ pub fn rust_of(document: &Document, from: &Path) -> String {
          \n\
          use tcslibgs::graph::parameters::nest;\n\
          use tcslibgs::graph::{\n    \
-             CommandBinding, Destinations, Editor, Graph, Group, Link, Node,\n\
+             CommandBinding, Destinations, Graph, Group, Link, Node,\n\
          };\n\
          use tcslibgs::Scalar;\n\
          \n",
@@ -223,10 +223,6 @@ pub fn rust_of(document: &Document, from: &Path) -> String {
                      .collect(),\n",
                 );
             }
-            out.push_str(&format!(
-                "                editor: Some(Editor {{ x: {}, y: {} }}),\n",
-                node.at.0, node.at.1
-            ));
             out.push_str("            },\n");
         }
     }
@@ -267,14 +263,16 @@ pub fn rust_of(document: &Document, from: &Path) -> String {
     }
     out.push_str("        ],\n");
 
-    // Which files it was read from, and which file each node came from. Empty
-    // here, and that is the honest answer: a configuration compiled in was
-    // read from no file at all. They exist so that a complaint about a node can
-    // name the page it is on, and a complaint about this configuration names
-    // the source it was generated into.
+    // Which files it was read from, which file each node came from, and where
+    // each was drawn. All empty, and that is the honest answer: a
+    // configuration compiled in was read from no file at all, and nothing
+    // aboard draws it. The first two exist so that a complaint about a node
+    // can name the page it is on, and a complaint about this configuration
+    // names the source it was generated into.
     out.push_str(
         "        files: Vec::new(),\n        \
-         homes: BTreeMap::new(),\n    }\n}\n",
+         homes: BTreeMap::new(),\n        \
+         placed: BTreeMap::new(),\n    }\n}\n",
     );
 
     out

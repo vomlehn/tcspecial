@@ -779,7 +779,6 @@ mod tests {
             node_type: node_type.to_string(),
             group: None,
             attributes: Default::default(),
-            editor: None,
         };
 
         let graph = Graph {
@@ -806,6 +805,7 @@ mod tests {
             }],
             files: Vec::new(),
             homes: Default::default(),
+            placed: Default::default(),
         };
         let routes = Routes::of(&graph);
 
@@ -1250,7 +1250,6 @@ mod tests {
             ]
             .into_iter()
             .collect(),
-            editor: None,
         })
         .expect("a log");
 
@@ -1292,7 +1291,6 @@ mod tests {
             ]
             .into_iter()
             .collect(),
-            editor: None,
         })
         .expect("a log");
 

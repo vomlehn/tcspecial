@@ -108,6 +108,21 @@ pub struct GraphFile {
     pub payloads: Vec<NodeFile>,
     #[serde(default)]
     pub commands: Vec<CommandBinding>,
+    /// What the editor arranged: where each node was drawn.
+    ///
+    /// Last in the file, and apart from the nodes, because it is a different
+    /// kind of thing. A node entry says what the vehicle carries and what it
+    /// is told; this says where somebody put the box on a screen, which the
+    /// flight software ignores entirely -- so a reader of a configuration
+    /// meets the vehicle first and the drawing at the end, and can stop
+    /// reading when the vehicle stops.
+    ///
+    /// In the configuration all the same, and not in a file beside it: a
+    /// person who arranges a diagram expects the arrangement to survive being
+    /// closed, two people reading one configuration should see one drawing,
+    /// and a second file to keep in step is a second file to lose.
+    #[serde(default)]
+    pub tcsgui: Option<Tcsgui>,
     /// The sections a version 2 file used to have, kept to be refused.
     ///
     /// Declared so that a file written against the earlier shape is refused by
@@ -121,6 +136,30 @@ pub struct GraphFile {
     pub links: Option<Vec<Link>>,
     #[serde(default)]
     pub groups: Option<Vec<Group>>,
+}
+
+/// What the editor keeps about a configuration that a vehicle does not need.
+///
+/// Only the positions so far, which is what `tcsgui` means: the editor's own
+/// section of the file. Anything else it comes to keep about a drawing belongs
+/// here too, so that the question "does the flight software read this" has one
+/// answer for the whole section.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct Tcsgui {
+    /// Where each node was drawn, by name.
+    #[serde(default)]
+    pub nodes: Vec<Placed>,
+}
+
+/// One node's place on the canvas.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Placed {
+    /// The node this is about, as the nodes section named it.
+    pub name: String,
+    pub x: i32,
+    pub y: i32,
 }
 
 /// Which section of a file a node belongs in.
@@ -232,7 +271,7 @@ impl<'de> Deserialize<'de> for NodeFile {
                 let mut name: Option<String> = None;
                 let mut node_type: Option<String> = None;
                 let mut group: Option<String> = None;
-                let mut editor: Option<Editor> = None;
+
                 let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
                 let mut to_moc: Vec<String> = Vec::new();
                 let mut to_payload: Vec<String> = Vec::new();
@@ -246,7 +285,18 @@ impl<'de> Deserialize<'de> for NodeFile {
                         "group" => {
                             group = Some(map.next_value::<Scalar>()?.as_str().to_string())
                         }
-                        "editor" => editor = Some(map.next_value::<Editor>()?),
+                        // Where this used to be, and said so rather than
+                        // read as an attribute nothing knows: a position is
+                        // the editor's own and lives in the `tcsgui` section
+                        // at the end of the file now.
+                        "editor" => {
+                            return Err(de::Error::custom(
+                                "a node's position is not written on the node \
+                                 any more: it is in the tcsgui section at the \
+                                 end of the file, as `- { name: <node>, x: \
+                                 <x>, y: <y> }`",
+                            ))
+                        }
                         // A data source, and the one place a file says what is
                         // linked to what. Repeats add to it rather than
                         // replacing it: that is what several XML elements of
@@ -286,7 +336,6 @@ impl<'de> Deserialize<'de> for NodeFile {
                             .ok_or_else(|| de::Error::missing_field("type"))?,
                         group,
                         attributes,
-                        editor,
                     },
                     to_moc,
                     to_payload,
@@ -348,15 +397,6 @@ pub struct Node {
     /// goes.
     #[serde(flatten)]
     pub attributes: BTreeMap<String, Scalar>,
-    /// Where the editor drew this node, which the flight software ignores.
-    ///
-    /// Declared rather than swept up with the attributes, for two reasons. A
-    /// position is two numbers and the attributes are text, so flattening it
-    /// in would make the attribute map hold a thing that is not an attribute;
-    /// and a node's attributes are checked against what its type requires, so
-    /// an undeclared `editor` would be reported as one the type does not know.
-    #[serde(default)]
-    pub editor: Option<Editor>,
 }
 
 impl Node {
@@ -393,19 +433,6 @@ impl Node {
                 | "gpio"
         )
     }
-}
-
-/// What an editor keeps about a node that a vehicle does not need.
-///
-/// Only a position so far. It is in the configuration rather than in a file
-/// beside it because a person who arranges a diagram expects the arrangement
-/// to survive being closed, and because a second file to keep in step is a
-/// second file to lose.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct Editor {
-    pub x: i32,
-    pub y: i32,
 }
 
 /// A connection from one node to one or more destinations.
@@ -579,6 +606,14 @@ pub struct Graph {
     pub files: Vec<PathBuf>,
     /// Which file each node was read from, by node name.
     pub homes: BTreeMap<String, PathBuf>,
+    /// Where each node was drawn, by node name: the `tcsgui` sections of the
+    /// files, merged.
+    ///
+    /// Apart from the nodes here as it is in the file, and for the same
+    /// reason: a node is what the vehicle carries and this is what somebody
+    /// arranged. The flight software never looks at it; the editor is the only
+    /// reader there is.
+    pub placed: BTreeMap<String, Placed>,
 }
 
 impl Graph {
@@ -598,6 +633,7 @@ impl Graph {
             commands: Vec::new(),
             files: Vec::new(),
             homes: BTreeMap::new(),
+            placed: BTreeMap::new(),
         };
 
         let top: GraphFile = read_one(path)?;
@@ -675,6 +711,16 @@ impl Graph {
 
         self.groups.extend(file.payload_groups.iter().cloned());
         self.commands.extend(file.commands.iter().cloned());
+
+        // What the editor arranged, by node name. A node named here and
+        // nowhere else is a position left behind by a node somebody deleted:
+        // kept rather than refused, because it says nothing about the vehicle
+        // and the editor writes the section out again from the nodes it has.
+        if let Some(said) = &file.tcsgui {
+            for placed in &said.nodes {
+                self.placed.insert(placed.name.clone(), placed.clone());
+            }
+        }
         Ok(())
     }
 
@@ -953,7 +999,13 @@ mod tests {
             sensor.attributes.get("address").map(Scalar::as_str),
             Some("0x48")
         );
-        assert_eq!(sensor.editor.as_ref().map(|e| (e.x, e.y)), Some((40, 40)));
+        // And where it was drawn, which is the editor's section at the end
+        // of the file rather than a field on the node: a node says what the
+        // vehicle carries, and this says where somebody put the box.
+        assert_eq!(
+            yaml.placed.get("temp_fore").map(|at| (at.x, at.y)),
+            Some((40, 40))
+        );
     }
 
     /// The example is a configuration that could be flown.

@@ -254,6 +254,7 @@ mod tests {
             commands: Vec::new(),
             files: Vec::new(),
             homes: BTreeMap::new(),
+            placed: BTreeMap::new(),
         };
         let schedule = Schedule::of(&graph, Instant::now());
 

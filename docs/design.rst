@@ -1352,6 +1352,29 @@ and a handle in the middle of an edge could not say which of them was meant. So
 the boxes a reader looks at to see what may be linked to what are the boxes a
 person presses to link them, which is one thing to learn instead of two.
 
+A link that is already there can be taken hold of by either of its ends. Press
+the terminal it is attached to and the line comes off the drawing; where it is
+let go of decides what happens to it. Back where it started, or anywhere on a
+node that is not a terminal: nothing changes, a gesture that has thought better
+of itself leaving no trace. On another terminal that suits that end: the link
+moves, in one edit, so one undo puts it back. On a terminal that does not suit
+it -- the wrong kind, the wrong stream, its own far node, or one the same link
+already reaches: nothing changes, as a line that cannot be drawn is not drawn.
+And over no node at all: the link is deleted. Which is the only way to delete
+one, and it is the gesture a person reaches for -- pull the wire out and drop
+it on the floor.
+
+A terminal with one link on it hands that link over; one with none starts a new
+one, and so does one with several, because nothing says which of several was
+meant. A data sink takes one source, so dragging from a sink is always "move
+this line"; a data source may reach several sinks, so a second line out of one
+is drawn from the sink end.
+
+While the hand is moving, only the lines are redrawn. Rebuilding the nodes
+would destroy the element holding the pointer and take the rest of the gesture
+with it -- which is a fault this window has made once already, when the same
+press that chose a node rebuilt the canvas under it.
+
 A link may be drawn either way about: from the data source that feeds it or
 from the data sink that wants feeding. It is the same link, and the file says
 the same thing -- a person drawing a diagram works in whichever direction they

@@ -243,6 +243,31 @@ impl Views {
     }
 
     /// Draw every window from the document as it now is.
+    /// The lines, redrawn, and nothing else.
+    ///
+    /// For the moment a link's end is taken hold of: the line comes off the
+    /// drawing while the hand is moving, and the nodes must not be touched.
+    /// Rebuilding them would destroy the element holding the pointer, which
+    /// takes the rest of the gesture with it -- the fault this window has made
+    /// once already, when the same press that chose a node rebuilt the canvas
+    /// under it.
+    fn relink(&self, editor: &Editor) {
+        let held = self
+            .drawing
+            .borrow()
+            .as_ref()
+            .and_then(|drawing| drawing.holding.clone());
+        if let Some(top) = self.top.upgrade() {
+            let (_, links) = views_of(editor, &None, held.as_ref());
+            top.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
+        }
+        for (name, window) in &self.open {
+            let home = Some(name.clone());
+            let (_, links) = views_of(editor, &home, held.as_ref());
+            window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
+        }
+    }
+
     fn refresh(&self, editor: &Editor) {
         let chosen = self.chosen.borrow();
         let divider = self.divider.get();
@@ -773,9 +798,12 @@ macro_rules! wiring {
                     *drawing.borrow_mut() = Some(Drawing { holding: held, ..at });
                     // Taken off the drawing while the gesture runs, so the
                     // line follows the hand rather than staying where it was.
+                    // The lines only: rebuilding the nodes would destroy the
+                    // element holding the pointer and the rest of the gesture
+                    // with it. See Views::relink.
                     views_for_press
                         .borrow()
-                        .refresh(&editor_for_press.borrow());
+                        .relink(&editor_for_press.borrow());
                 });
             }
             {
@@ -4004,6 +4032,232 @@ mod tests {
         );
     }
 
+    /// The end of a line can be taken hold of, moved, or dropped on the floor.
+    ///
+    /// The four things a person can do with it, which is the whole of the
+    /// gesture: put it back, move it to another terminal that suits, try one
+    /// that does not, or let go of it over nothing. The last is also the only
+    /// way to delete a link, and it is the one somebody reaches for -- pull
+    /// the wire out and drop it.
+    #[test]
+    fn the_end_of_a_link_can_be_moved_or_dropped() {
+        use journal::{Edit, Link};
+
+        let mut document = Document::new();
+        for (name, node_type, at) in [
+            ("ground", "moc", (16, 120)),
+            ("through", "null", (300, 120)),
+            ("sensor", "i2c", (600, 120)),
+            ("other", "i2c", (600, 400)),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+            document.apply(&Edit::MoveNode {
+                node: name.into(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+        // The readings of one sensor, reaching the ground.
+        let held = Link::joining("sensor", Some("to_moc"), "ground", None);
+        document.apply(&Edit::AddLink { link: held.clone() });
+
+        // Where each node is and what it is, copied out so that a link can be
+        // added to the document afterwards without the borrow outliving it.
+        let placed: Vec<(String, String, (i32, i32))> = document
+            .nodes_in(&None)
+            .iter()
+            .map(|node| (node.name.clone(), node.node_type.clone(), node.at))
+            .collect();
+        let found = |node: &str| {
+            placed
+                .iter()
+                .find(|(name, _, _)| name == node)
+                .expect("the node")
+                .clone()
+        };
+        let at = |node: &str| found(node).2;
+        let kind = |node: &str| found(node).1;
+        let over = |node: &str, terminal: &str| {
+            let (x, y, width, height) =
+                style::terminal_box(&kind(node), at(node), terminal).expect("a terminal");
+            (x + width / 2.0, y + height / 2.0)
+        };
+        let middle = |node: &str| {
+            let (width, height) = size_of(&kind(node));
+            (
+                at(node).0 as f32 + width as f32 / 2.0,
+                at(node).1 as f32 + height as f32 / 2.0,
+            )
+        };
+        // The end that was taken hold of: the sink, which is where this link
+        // arrives.
+        let pressed = Drawing {
+            node: "ground".to_string(),
+            terminal: "from_payload".to_string(),
+            holding: Some(held.clone()),
+        };
+
+        // Put back where it came from: nothing happens. A gesture that has
+        // thought better of itself leaves no trace.
+        assert_eq!(
+            dropped(&document, &None, &held, &pressed, over("ground", "from_payload")),
+            None
+        );
+
+        // Let go of over a node but not over a terminal: also nothing. That
+        // is a gesture that missed.
+        assert_eq!(dropped(&document, &None, &held, &pressed, middle("ground")), None);
+
+        // Moved to a terminal that suits the end: one edit, so one undo puts
+        // it back. The far end -- the sensor -- stays where it is.
+        let moved = dropped(
+            &document,
+            &None,
+            &held,
+            &pressed,
+            over("through", "from_payload"),
+        )
+        .expect("a sink that pairs with the source");
+        match moved {
+            Edit::MoveLink { was, now } => {
+                assert_eq!(was, held);
+                assert_eq!(now.from, "sensor", "the far end stays put");
+                assert_eq!(now.origin.as_deref(), Some("to_moc"));
+                assert_eq!(now.to, "through");
+                assert_eq!(now.input.as_deref(), Some("from_payload"));
+            }
+            other => panic!("{other:?}"),
+        }
+
+        // A terminal that does not suit it: nothing. A `from_moc` takes what
+        // the ground sends, and this link carries readings.
+        assert_eq!(
+            dropped(
+                &document,
+                &None,
+                &held,
+                &pressed,
+                over("through", "from_moc")
+            ),
+            None
+        );
+
+        // Nor onto a data source, which is the other end's kind.
+        assert_eq!(
+            dropped(&document, &None, &held, &pressed, over("through", "to_moc")),
+            None
+        );
+
+        // Nor onto the far node itself, which would be a link from a node to
+        // itself.
+        assert_eq!(
+            dropped(&document, &None, &held, &pressed, over("sensor", "from_moc")),
+            None
+        );
+
+        // Over nothing at all: the link goes.
+        assert_eq!(
+            dropped(&document, &None, &held, &pressed, (40.0, 900.0)),
+            Some(Edit::RemoveLink { link: held.clone() })
+        );
+
+        // And the source end moves the same way: taken hold of at the
+        // sensor's `to_moc` and put on another sensor's.
+        let pressed = Drawing {
+            node: "sensor".to_string(),
+            terminal: "to_moc".to_string(),
+            holding: Some(held.clone()),
+        };
+        let moved = dropped(&document, &None, &held, &pressed, over("other", "to_moc"))
+            .expect("another sensor's readings may reach the same ground");
+        match moved {
+            Edit::MoveLink { now, .. } => {
+                assert_eq!(now.from, "other");
+                assert_eq!(now.origin.as_deref(), Some("to_moc"));
+                assert_eq!(now.to, "ground", "the far end stays put");
+            }
+            other => panic!("{other:?}"),
+        }
+
+        // And a move that would make a link the document already has does
+        // nothing: two lines between one pair of terminals lie on top of each
+        // other and deliver twice.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("other", Some("to_moc"), "ground", None),
+        });
+        assert_eq!(
+            dropped(&document, &None, &held, &pressed, over("other", "to_moc")),
+            None
+        );
+    }
+
+    /// A terminal with one link on it hands it over; one with several does not.
+    ///
+    /// Which is the rule that lets one gesture mean two things. A data sink
+    /// takes one source, so dragging from a sink is always "move this line".
+    /// A data source may reach several sinks, and when it already has more
+    /// than one nothing says which of them was meant -- so that gesture draws
+    /// a new line instead, and a second line out of a source is drawn from the
+    /// sink end.
+    #[test]
+    fn a_terminal_with_one_link_hands_it_over() {
+        use journal::{Edit, Link};
+
+        let mut document = Document::new();
+        for (name, node_type) in [
+            ("ground", "moc"),
+            ("sensor", "i2c"),
+            ("other", "i2c"),
+            ("housekeeping", "log"),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.into(),
+                node_type: node_type.into(),
+                home: None,
+            });
+        }
+
+        let at = |node: &str, terminal: &str| Drawing {
+            node: node.to_string(),
+            terminal: terminal.to_string(),
+            holding: None,
+        };
+
+        // Nothing linked yet: nothing to hand over.
+        assert!(attached(&document, &at("sensor", "to_moc"), false).is_empty());
+
+        document.apply(&Edit::AddLink {
+            link: Link::joining("sensor", Some("to_moc"), "ground", None),
+        });
+        assert_eq!(attached(&document, &at("sensor", "to_moc"), false).len(), 1);
+        // And the sink end of the same link, from the other side.
+        assert_eq!(
+            attached(&document, &at("ground", "from_payload"), true).len(),
+            1
+        );
+
+        // A second destination from the same source: now the source has two,
+        // and nothing says which a drag meant.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("sensor", Some("to_moc"), "housekeeping", None),
+        });
+        assert_eq!(attached(&document, &at("sensor", "to_moc"), false).len(), 2);
+
+        // The ground's sink takes many, and the same is true of it: every
+        // payload aboard reports to the one ground link.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("other", Some("to_moc"), "ground", None),
+        });
+        assert_eq!(
+            attached(&document, &at("ground", "from_payload"), true).len(),
+            2
+        );
+    }
+
     /// A link to a terminal is recorded as the terminal that was pressed.
     ///
     /// The fault this is here for: a line dragged from the ground link's
@@ -4782,7 +5036,125 @@ mod tests {
         a_node_follows_the_pointer_and_reports_where_it_went();
         an_existing_configuration_is_on_the_canvas();
         a_link_is_drawn_by_dragging_from_a_terminal();
+        a_link_is_deleted_by_dragging_its_end_onto_the_canvas();
         placing_a_described_node_answers_what_it_describes();
+    }
+
+    /// Dragging a link's end onto empty canvas deletes it.
+    ///
+    /// Through the window, because that is the half the unit tests cannot
+    /// reach: a data sink has to answer a press at all -- it did not, links
+    /// being drawn only from sources -- and the line has to come off the
+    /// drawing while the hand is moving. It is also the only way to delete a
+    /// link, which is why it is worth a test of its own.
+    fn a_link_is_deleted_by_dragging_its_end_onto_the_canvas() {
+        use i_slint_backend_testing as testing;
+        use slint::platform::{PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("pulled.yaml"),
+            dividers(),
+        )));
+        for (name, node_type, at) in [
+            ("ground", "moc", (16, 120)),
+            ("sensor", "i2c", (dividers().vehicle + 24, 120)),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+            editor.borrow_mut().edit(Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+        editor.borrow_mut().edit(Edit::AddLink {
+            link: journal::Link::joining("sensor", Some("to_moc"), "ground", None),
+        });
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+        let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
+        views.borrow_mut().chosen = chosen.clone();
+        views.borrow_mut().drawing = drawing.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+        ui.show().expect("the window shows");
+
+        let canvas = testing::ElementHandle::find_by_element_id(&ui, "Surface::canvas")
+            .next()
+            .expect("the window has a canvas");
+        let origin = canvas.absolute_position();
+        let middle = |node: &str, node_type: &str, at: (i32, i32), terminal: &str| {
+            let (x, y, width, height) =
+                style::terminal_box(node_type, at, terminal).expect("a terminal");
+            let _ = node;
+            slint::LogicalPosition::new(
+                origin.x + x + width / 2.0,
+                origin.y + y + height / 2.0,
+            )
+        };
+
+        // Taken hold of at the ground link's own sink, which is where this
+        // link arrives.
+        let from = middle("ground", "moc", (16, 120), "from_payload");
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: from });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: from,
+            button: PointerEventButton::Left,
+        });
+
+        // While the hand is moving, the line is off the drawing: a line that
+        // stayed put would say the gesture had not started.
+        assert_eq!(ui.get_links().row_count(), 0, "the held line is not drawn");
+
+        // And let go of over empty canvas: in the middle of the vehicle pane,
+        // where neither node is, and inside the window so the toolkit
+        // delivers the event.
+        let onto = slint::LogicalPosition::new(
+            origin.x + dividers().moc as f32 + 100.0,
+            origin.y + 380.0,
+        );
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: onto });
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: onto,
+            button: PointerEventButton::Left,
+        });
+
+        assert!(
+            drawing.borrow().is_none(),
+            "the release should have reached the handler"
+        );
+        assert!(
+            editor.borrow().document().links.is_empty(),
+            "dragging a link's end onto the canvas should delete it: {:?}",
+            editor.borrow().document().links
+        );
+        // Undoable, like every other edit.
+        editor.borrow_mut().undo();
+        assert_eq!(editor.borrow().document().links.len(), 1);
     }
 
     /// Placing a described node puts down a node that already is one.

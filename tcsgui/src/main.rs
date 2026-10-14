@@ -3522,7 +3522,7 @@ fn view_of(
         outline: match outline {
             Outline::Square => "square",
             Outline::Rounded => "rounded",
-            Outline::Circle => "circle",
+            Outline::Store => "store",
             Outline::Keyed => "keyed",
             Outline::Pointed => "pointed",
         }
@@ -4028,21 +4028,26 @@ mod tests {
             // radius outline and draws a square when none of them answers, so
             // it is the one word agreed to by being absent. Everything else
             // has to be asked about by name.
-            let drawn = !view.shape.is_empty()
+            let shaped = !view.shape.is_empty()
                 || outline == "square"
                 || markup.contains(&format!("node.outline == \"{outline}\""));
             assert!(
-                drawn,
+                shaped,
                 "{} is drawn as {outline:?} with no path, and the markup never \
                  asks about that word",
                 kind.spelling()
             );
+            // And the path the view carries is the one the table drew. Which
+            // outlines need a path is style's own question, asked by its own
+            // test; this is the handover, which is the part that can go wrong
+            // here -- a shape left out of the view is an outline drawn as a
+            // plain square with nothing to say so.
+            let drawn = kind.appearance();
             assert_eq!(
-                view.shape.is_empty(),
-                outline != "pointed",
-                "{} is {outline:?} and its path is {:?}",
-                kind.spelling(),
-                view.shape
+                view.shape.to_string(),
+                style::shape_of(drawn.outline, drawn.size),
+                "{}'s path did not reach its view",
+                kind.spelling()
             );
         }
     }

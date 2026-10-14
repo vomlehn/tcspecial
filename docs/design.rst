@@ -1666,12 +1666,24 @@ landed in. The headings keep the table's order, which is the one place that
 order says something -- devices, then the things that are driven, then the ends
 of the graph.
 
-The two ends of the graph are two shapes rather than one. A log is a pill; the
-ground station is a rectangle with its left end drawn to a point, which is the
-one node on the canvas that is not part of the vehicle at all. They were both
-pills, under one heading, on the strength of both being "an end"; but a file
-written on board and everybody on the ground are not the same kind of end, and
-the two were never in the same pane for the shared heading to group anything.
+The two ends of the graph are two shapes rather than one. A log is a data
+store -- two long sides and a cap on the right, the left end left open -- and
+the ground station is a rectangle with its left end drawn to a point, which is
+the one node on the canvas that is not part of the vehicle at all. They were
+both pills, under one heading, on the strength of both being "an end"; but a
+file written on board and everybody on the ground are not the same kind of
+end, and the two were never in the same pane for the shared heading to group
+anything.
+
+The shapes are the ones the standard notations use, which is worth more than
+being inventive: a reader who has seen a data-flow diagram already knows that
+a rounded box is a process, a plain rectangle is something outside the system
+and a box with an end left open is somewhere data is kept. The pill a log used
+to be is the flowchart symbol for a *terminator*, where control enters or
+leaves a program, which is not what a log is. It also rounded away the one
+corner the log's own terminal is drawn in, and put that arrow about fifteen
+pixels outside the outline; leaving an end open is the one way to stop being a
+rectangle without touching a corner at all.
 
 The point is on the left, and only on the left, for two reasons that agree. A
 node's ``payload-out`` is on its left side and its ``payload-in`` on its right,

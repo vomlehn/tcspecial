@@ -33,13 +33,23 @@ pub enum Outline {
     Square,
     /// Rounded corners. Software aboard: a computation.
     Rounded,
-    /// Fully rounded ends. An end of the graph: the ground, or a log.
+    /// Two long sides and one end: the data store of a data-flow diagram.
     ///
-    /// Drawn as a radius of half the shorter side, so it is a circle where the
-    /// sides are equal and a rounded-off pill where they are not. Every node
-    /// being one width now means these are pills, which reads as the same
-    /// shape family and still shares nothing with the other three outlines.
-    Circle,
+    /// What a log is. It was a pill, which is the flowchart symbol for a
+    /// *terminator* -- where control enters or leaves a program -- and a log
+    /// is not that: it is somewhere data is kept. Both notations in common use
+    /// draw a store as a rectangle with at least one end left open, and
+    /// leaving an end open is also the one way to stop being a rectangle
+    /// without touching a corner.
+    ///
+    /// Open on the left, because a log's one terminal is `payload-in`, in its
+    /// top right. The pill it replaced put that arrow about fifteen pixels
+    /// outside its own outline, which is the defect this fixes as much as the
+    /// meaning: a radius of half the shorter side rounds away the very corner
+    /// the terminal is drawn in.
+    ///
+    /// Drawn from [`store`], for the reason [`Outline::Pointed`] gives.
+    Store,
     /// A rectangle with one pair of corners rounded and one square, which
     /// reads as a direction. Interfaces that are driven rather than read.
     Keyed,
@@ -355,6 +365,7 @@ pub struct Corner {
 pub fn shape_of(outline: Outline, (width, height): (u32, u32)) -> String {
     match outline {
         Outline::Pointed => pointed((width, height)),
+        Outline::Store => store((width, height)),
         _ => String::new(),
     }
 }
@@ -384,6 +395,25 @@ pub fn pointed((width, height): (u32, u32)) -> String {
         point + 0.5,
         h + 0.5,
         middle + 0.5
+    )
+}
+
+/// Two long sides and a cap on the right, in a box this size.
+///
+/// Not closed: the path stops at the left edge rather than drawing it, which
+/// is what makes it a store rather than a rectangle. A stroke follows the
+/// commands and so leaves that side open; a fill closes the shape the way SVG
+/// does, which is what any shading inside it wants anyway.
+///
+/// Inset half a pixel, as [`pointed`] is and for the same reason.
+pub fn store((width, height): (u32, u32)) -> String {
+    let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
+    format!(
+        "M 0.5 0.5 L {:.1} 0.5 L {:.1} {:.1} L 0.5 {:.1}",
+        w + 0.5,
+        w + 0.5,
+        h + 0.5,
+        h + 0.5
     )
 }
 
@@ -901,7 +931,7 @@ impl NodeType {
     /// corners are hardware, rounded corners are software, a keyed rectangle
     /// is an interface that is driven, and the two ends of the graph are the
     /// two shapes nothing else uses -- a pill where it stops on board, a
-    /// point where it leaves the vehicle. Within a shape the types differ by
+    /// store where it is kept. Within a shape the types differ by
     /// shading, weight and size.
     pub fn appearance(self) -> Appearance {
         use Outline::*;
@@ -1066,15 +1096,16 @@ impl NodeType {
                 size: (WIDTH, 88),
                 tint: Tint::Moss,
             },
-            // Ends of the graph, and the only two shapes used once each: an
-            // end is where a reader stops, and a shape they have seen nowhere
-            // else is what says to stop.
+            // Where the data is kept, which is a store and not an end: a
+            // flowchart's rounded end is a terminator, where control enters or
+            // leaves, and a log is neither. Hatched and narrow still, so the
+            // one thing that changed is the thing that was wrong.
             NodeType::Log => Appearance {
                 face: Face::Plain,
                 label_size: 12,
                 label_weight: 400,
                 label_italic: false,
-                outline: Circle,
+                outline: Store,
                 shading: Hatched,
                 weight: Narrow,
                 size: (WIDTH, 96),
@@ -1124,7 +1155,7 @@ mod tests {
         for kind in NodeType::ALL {
             let drawn = kind.appearance();
             let shape = shape_of(drawn.outline, drawn.size);
-            let shaped = drawn.outline == Outline::Pointed;
+            let shaped = matches!(drawn.outline, Outline::Pointed | Outline::Store);
 
             assert_eq!(
                 shaped,

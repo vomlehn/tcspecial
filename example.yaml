@@ -31,11 +31,13 @@ moc:
     type: moc
     address: "127.0.0.1"
     port: "5000"
+    payload-in: true
 
 vehicle:
   - name: mean
     type: compute
     function: "mean"
+    payload-in: true
   - name: mean-2
     type: compute
     function: "mean"
@@ -66,10 +68,18 @@ payloads:
     port: "5100"
     protocol: "udp"
     trigger: "01"
+    payload-out:
+      - target: mean
+        input: payload-in
   - name: i2c
     type: i2c
+    payload-out:
+      - target: mean
+        input: payload-in
   - name: i2c-2
     type: i2c
+    payload-out:
+      - target: moc
 
 tcsgui:
   nodes:

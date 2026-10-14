@@ -2212,11 +2212,24 @@ and says that the session is still open and nothing has been lost, because the
 useful response is to put the cause right and press Save rather than to start
 again.
 
+Something wrong with the *configuration* goes there too, the first time it is
+wrong. A fault -- two nodes of one name, two lines into one input, a value a
+rule refuses -- is an error: ``tcsverify`` fails on it and the flight software
+would refuse the file. The editor said so in red inside the node it is about
+and nowhere else, which is a sentence in a box forty-eight pixels tall, and on
+a canvas somebody is not looking at. So it is said in the window as well, with
+a heading of its own: "Something is wrong with the configuration" rather than
+"Something did not work", because the second is about a command that failed and
+there is nothing to press Save about. The red on the node stays, and so does
+the sentence in that node's own window; the window is the moment it appeared.
+
 It appears once per thing that goes wrong, not once per edit. With a directory
 that cannot be written every edit fails with the same sentence, and a window
 that came back on each of them would be a window nobody could type past; the
 red line goes on saying it for as long as it is true. A failure that was put
-right and then happened again is a new thing, and is shown again. The window is
+right and then happened again is a new thing, and is shown again. A fault is
+remembered by its own sentence and forgotten when it stops being true, which is
+what makes "put right and made again" the same as "new". The window is
 made at startup and hidden rather than made when it is needed: the moment it is
 needed is the moment something has already failed, and a window that could not
 be made then would leave nothing to say it with.

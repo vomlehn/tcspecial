@@ -3524,6 +3524,7 @@ fn view_of(
             Outline::Rounded => "rounded",
             Outline::Store => "store",
             Outline::Keyed => "keyed",
+            Outline::Barred => "barred",
             Outline::Pointed => "pointed",
         }
         .into(),

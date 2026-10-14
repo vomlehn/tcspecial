@@ -3,7 +3,7 @@
 //! A line between two nodes is written on the node it leaves, under the data
 //! source it leaves by, with the node it reaches named by the entry's
 //! `target`. The node it arrives at says so too, under the sink it arrives
-//! at: `from_payload: true`. The first is what the configuration means --
+//! at: `payload-in: true`. The first is what the configuration means --
 //! [`NodeFile::links`](super::NodeFile::links) derives the graph from it and
 //! the flight software reads nothing else. The second is a record of the same
 //! fact at the other end, so that a node's own entry says it is connected
@@ -88,7 +88,7 @@ impl Mirror {
             let at = recorded.from.display();
             // A sink the type does not have, said as what it is before
             // anything is compared: "a payload has no data sink called
-            // from_payload" is the useful complaint, not "nothing arrives
+            // payload-in" is the useful complaint, not "nothing arrives
             // there".
             if let Some(said) = graph.node(node) {
                 if let Err(why) = terminal_at(&said.node_type, Some(sink), true) {
@@ -132,7 +132,7 @@ impl Mirror {
 /// Derived from the links, which are the configuration. The sink a link
 /// arrives at is the one the destination named, where it named one of the
 /// four; otherwise it is the one at the other end of the stream it leaves by
-/// -- a `to_moc` arrives at a `from_payload` and nowhere else, so a file that
+/// -- a `payload-out` arrives at a `payload-in` and nowhere else, so a file that
 /// did not say it still said it.
 ///
 /// The names are here for the complaint rather than for the comparison: what
@@ -175,9 +175,9 @@ mod tests {
     /// A configuration of one payload and the ground, with whatever the two
     /// entries are given to say about their own data sinks.
     ///
-    /// The groundward link is the payload's `to_moc: moc` and the vehicleward
-    /// one is the ground's `to_payload: payload`, so the flags that agree with
-    /// them are `from_payload: true` on the ground and `from_moc: true` on the
+    /// The groundward link is the payload's `payload-out: moc` and the vehicleward
+    /// one is the ground's `moc-out: payload`, so the flags that agree with
+    /// them are `payload-in: true` on the ground and `moc-in: true` on the
     /// payload.
     fn pair(moc_says: &str, payload_says: &str) -> TcsResult<Graph> {
         let where_ = tempfile::tempdir().expect("a directory");
@@ -205,7 +205,7 @@ moc:
     type: moc
     address: \"10.0.0.1\"
     port: \"5000\"
-    to_payload:
+    moc-out:
       - target: payload
 {moc_says}
 payloads:
@@ -214,7 +214,7 @@ payloads:
     path: \"/dev/i2c-1\"
     address: \"0x48\"
     read_size: \"2\"
-    to_moc:
+    payload-out:
       - target: moc
 {payload_says}
 "
@@ -228,7 +228,7 @@ payloads:
     /// that reads.
     #[test]
     fn a_flag_that_agrees_with_the_links_is_read() {
-        let graph = pair("    from_payload: true", "    from_moc: true")
+        let graph = pair("    payload-in: true", "    moc-in: true")
             .expect("both ends saying the same thing");
         assert_eq!(graph.links.len(), 2, "the flags are not links");
     }
@@ -249,19 +249,19 @@ payloads:
     fn a_sink_that_claims_a_line_nothing_sends_is_refused() {
         let said = format!(
             "{}",
-            pair("    from_payload: true", "    from_moc: true\n    from_payload: true")
-                .expect_err("a payload has no from_payload")
+            pair("    payload-in: true", "    moc-in: true\n    payload-in: true")
+                .expect_err("a payload has no payload-in")
         );
-        assert!(said.contains("no data sink called \"from_payload\""), "{said}");
+        assert!(said.contains("no data sink called \"payload-in\""), "{said}");
 
         // And on a node that does have the sink, with nothing arriving at it:
         // a null node carries both streams, and this one is sent neither.
         let said = format!(
             "{}",
             pair(
-                "    from_payload: true",
-                "    from_moc: true\nvehicle:\n  - name: through\n    type: null\n    \
-                 from_moc: true",
+                "    payload-in: true",
+                "    moc-in: true\nvehicle:\n  - name: through\n    type: null\n    \
+                 moc-in: true",
             )
             .expect_err("nothing sends the null node anything")
         );
@@ -277,7 +277,7 @@ payloads:
     fn a_sink_that_denies_a_line_it_is_sent_is_refused() {
         let said = format!(
             "{}",
-            pair("    from_payload: false", "    from_moc: true")
+            pair("    payload-in: false", "    moc-in: true")
                 .expect_err("the payload sends its readings there")
         );
         assert!(said.contains("\"payload\" sends one there"), "{said}");
@@ -286,9 +286,9 @@ payloads:
     /// `false` where nothing arrives is true, and reads.
     #[test]
     fn a_sink_that_denies_a_line_nobody_sends_is_read() {
-        pair("    from_payload: true", "    from_moc: false")
+        pair("    payload-in: true", "    moc-in: false")
             .expect_err("the ground sends the payload what it asks with");
-        pair("    from_payload: true", "    from_moc: true")
+        pair("    payload-in: true", "    moc-in: true")
             .expect("and says so when it says so");
     }
 
@@ -302,7 +302,7 @@ payloads:
     fn a_sink_given_a_name_instead_of_a_flag_is_refused() {
         let said = format!(
             "{}",
-            pair("    from_payload: payload", "    from_moc: true")
+            pair("    payload-in: payload", "    moc-in: true")
                 .expect_err("a name is not a flag")
         );
         assert!(said.contains("is not true or false"), "{said}");

@@ -543,14 +543,14 @@ mod tests {
         assert!(moved.all_delivered(), "{:?}", moved.refused);
 
         // What the ground saw: three temperatures and the average.
-        let to_moc: Vec<String> = moc
+        let payload_out: Vec<String> = moc
             .borrow()
             .given
             .iter()
             .map(|(_, datum)| String::from_utf8_lossy(datum).to_string())
             .collect();
         assert_eq!(
-            to_moc,
+            payload_out,
             vec!["289.15", "289.15", "287.3188", "288.5396"],
             "the ground should have the three readings and their mean"
         );

@@ -488,7 +488,7 @@ payload_groups:
   - name: temps
     interval: \"3s\"
 payloads:
-  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\", to_moc: moc }
+  - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\", payload-out: moc }
 moc:
   - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
 ";
@@ -534,7 +534,7 @@ payload_groups:
   - name: temps
     interval: soon
 payloads:
-  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\", to_moc: nowhere }
+  - { name: a, type: i2c, group: temps, path: \"/dev/i2c-1\", payload-out: nowhere }
   - { name: a, type: spi, path: \"/dev/spidev0.0\" }
 vehicle:
   - { name: m, type: compute, function: mean, inputs: \"in0\" }
@@ -570,7 +570,7 @@ vehicle:
         std::fs::write(
             &top,
             "version: \"2.0\"\ninclude:\n  - cabin\nmoc:\n  \
-             - { name: moc, type: moc, to_payload: moc }\n",
+             - { name: moc, type: moc, moc-out: moc }\n",
         )
         .unwrap();
         // The included file holds a node nothing links to.
@@ -624,7 +624,7 @@ vehicle:
         <name>a</name>
         <type>i2c</type>
         <path>/dev/i2c-1</path>
-        <to_moc>nowhere</to_moc>
+        <payload-out>nowhere</payload-out>
     </payloads>
 </configuration>
 ",

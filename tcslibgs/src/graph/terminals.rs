@@ -1,22 +1,27 @@
 //! What a link may be attached to: a node's data sinks and data sources.
 //!
 //! A link joins one node's data source to another's data sink. Each end has a
-//! name, and the name says which way the data is travelling rather than what
-//! is at the other end of it: `to_moc` is data leaving for the ground,
-//! `from_payload` is data arriving from the payload side. So one stream is
-//! named twice -- `to_moc` where it leaves and `from_payload` where it arrives
-//! -- and the two words are a sentence about the same bytes read from either
-//! end.
+//! name, and the name says two things about the data and nothing about what is
+//! at the other end: whose it is, and whether it arrives here or leaves.
+//! `payload-` is a payload's own data, on its way to the ground; `moc-` is
+//! what the ground sends, on its way to a payload. `-in` is where it arrives
+//! and `-out` is where it leaves -- so every `-out` is a data source and every
+//! `-in` a data sink, which is the whole of the rule a reader has to remember.
+//!
+//! So one stream is named twice -- `payload-out` where it leaves a node and
+//! `payload-in` where it arrives at the next -- and the two words are a
+//! sentence about the same bytes read from either end.
 //!
 //! Two streams, and every terminal belongs to one of them:
 //!
-//! | stream       | leaves at     | arrives at      |
-//! |--------------|---------------|-----------------|
-//! | groundward   | `to_moc`      | `from_payload`  |
-//! | vehicleward  | `to_payload`  | `from_moc`      |
+//! | stream      | leaves at     | arrives at   |
+//! |-------------|---------------|--------------|
+//! | groundward  | `payload-out` | `payload-in` |
+//! | vehicleward | `moc-out`     | `moc-in`     |
 //!
-//! Groundward is a payload's readings on their way to the ground; vehicleward
-//! is what the ground sends back -- a command, a trigger, a setpoint.
+//! Groundward is a payload's readings on their way to the ground, which is why
+//! those two are the `payload-` pair; vehicleward is what the ground sends
+//! back -- a command, a trigger, a setpoint -- which is the `moc-` pair.
 //!
 //! # Which types this knows
 //!
@@ -49,13 +54,13 @@ impl Stream {
 ///
 /// One table, because the name, the end it belongs at and the stream it
 /// carries are one fact about it: three tables would be three places for the
-/// `to_moc` row to be got wrong in.
+/// `payload-out` row to be got wrong in.
 const KNOWN: &[(&str, bool, Stream)] = &[
     // name, whether it is a sink, which stream.
-    ("to_moc", false, Stream::Groundward),
-    ("from_payload", true, Stream::Groundward),
-    ("to_payload", false, Stream::Vehicleward),
-    ("from_moc", true, Stream::Vehicleward),
+    ("payload-out", false, Stream::Groundward),
+    ("payload-in", true, Stream::Groundward),
+    ("moc-out", false, Stream::Vehicleward),
+    ("moc-in", true, Stream::Vehicleward),
 ];
 
 /// Which stream a terminal carries, and whether it is a sink.
@@ -71,9 +76,9 @@ pub fn stream_of(terminal: &str) -> Option<(bool, Stream)> {
 
 /// The terminal at the other end of this one's stream.
 ///
-/// The pairing, as four sentences: a `to_moc` may only be linked to a
-/// `from_payload`, a `from_payload` only to a `to_moc`, a `to_payload` only to
-/// a `from_moc`, and a `from_moc` only to a `to_payload`. Which is one
+/// The pairing, as four sentences: a `payload-out` may only be linked to a
+/// `payload-in`, a `payload-in` only to a `payload-out`, a `moc-out` only to
+/// a `moc-in`, and a `moc-in` only to a `moc-out`. Which is one
 /// sentence twice over -- a stream leaves at one terminal and arrives at the
 /// other -- and that is why it is derived from [`KNOWN`] rather than written
 /// out again: the two halves of the table cannot drift apart.
@@ -149,15 +154,15 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
     const PAYLOAD: Terminals = Terminals {
         // A payload receives what asks it for a reading -- a trigger, a
         // command, a byte written to a line -- and sends what it read.
-        sinks: &["from_moc"],
-        sources: &["to_moc"],
+        sinks: &["moc-in"],
+        sources: &["payload-out"],
         merges: false,
     };
     const MOC: Terminals = Terminals {
         // And the ground is the other end of both: it receives the readings
         // and sends what asks for them.
-        sinks: &["from_payload"],
-        sources: &["to_payload"],
+        sinks: &["payload-in"],
+        sources: &["moc-out"],
         // Every payload's telemetry arrives here, told apart by the payload
         // id its socket carries: see the field.
         merges: true,
@@ -166,8 +171,8 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         // The simplest vehicle node: one terminal at each end of each stream,
         // and nothing done to what passes through. It is what says what a
         // vehicle node *is*, which is why it is the one with all four.
-        sinks: &["from_payload", "from_moc"],
-        sources: &["to_moc", "to_payload"],
+        sinks: &["payload-in", "moc-in"],
+        sources: &["payload-out", "moc-out"],
         merges: false,
     };
 
@@ -269,15 +274,15 @@ mod tests {
     /// rule say something that is not true.
     #[test]
     fn each_terminal_is_one_end_of_one_stream() {
-        assert_eq!(stream_of("to_moc"), Some((false, Stream::Groundward)));
-        assert_eq!(stream_of("from_payload"), Some((true, Stream::Groundward)));
-        assert_eq!(stream_of("to_payload"), Some((false, Stream::Vehicleward)));
-        assert_eq!(stream_of("from_moc"), Some((true, Stream::Vehicleward)));
+        assert_eq!(stream_of("payload-out"), Some((false, Stream::Groundward)));
+        assert_eq!(stream_of("payload-in"), Some((true, Stream::Groundward)));
+        assert_eq!(stream_of("moc-out"), Some((false, Stream::Vehicleward)));
+        assert_eq!(stream_of("moc-in"), Some((true, Stream::Vehicleward)));
         // A computation's own input is not one of them.
         assert_eq!(stream_of("in0"), None);
 
         // One source and one sink per stream, which is what makes "the
-        // groundward stream leaves at to_moc and arrives at from_payload" a
+        // groundward stream leaves at payload-out and arrives at payload-in" a
         // sentence rather than a guess.
         for stream in [Stream::Groundward, Stream::Vehicleward] {
             let ends: Vec<bool> = KNOWN
@@ -292,28 +297,28 @@ mod tests {
 
     /// Each terminal may be linked to exactly one other, and which.
     ///
-    /// The four sentences the editor is held to: a `to_moc` to a
-    /// `from_payload`, a `from_payload` to a `to_moc`, a `to_payload` to a
-    /// `from_moc`, a `from_moc` to a `to_payload`. Anything else is a link
+    /// The four sentences the editor is held to: a `payload-out` to a
+    /// `payload-in`, a `payload-in` to a `payload-out`, a `moc-out` to a
+    /// `moc-in`, a `moc-in` to a `moc-out`. Anything else is a link
     /// that would carry one stream into the other.
     #[test]
     fn a_terminal_may_be_linked_to_one_other_terminal() {
-        assert_eq!(answers("to_moc"), Some("from_payload"));
-        assert_eq!(answers("from_payload"), Some("to_moc"));
-        assert_eq!(answers("to_payload"), Some("from_moc"));
-        assert_eq!(answers("from_moc"), Some("to_payload"));
+        assert_eq!(answers("payload-out"), Some("payload-in"));
+        assert_eq!(answers("payload-in"), Some("payload-out"));
+        assert_eq!(answers("moc-out"), Some("moc-in"));
+        assert_eq!(answers("moc-in"), Some("moc-out"));
         assert_eq!(answers("in0"), None);
 
         // And the pairing is from the source end to the sink end: a link
         // leaves one and arrives at the other, so the same two names the
         // other way about is a link drawn backwards.
-        assert!(pairs_with("to_moc", "from_payload"));
-        assert!(!pairs_with("from_payload", "to_moc"));
-        assert!(pairs_with("to_payload", "from_moc"));
-        assert!(!pairs_with("from_moc", "to_payload"));
+        assert!(pairs_with("payload-out", "payload-in"));
+        assert!(!pairs_with("payload-in", "payload-out"));
+        assert!(pairs_with("moc-out", "moc-in"));
+        assert!(!pairs_with("moc-in", "moc-out"));
 
         // Nothing else pairs with anything: the two streams never meet.
-        let every = ["to_moc", "from_payload", "to_payload", "from_moc"];
+        let every = ["payload-out", "payload-in", "moc-out", "moc-in"];
         for leaves in every {
             for arrives in every {
                 assert_eq!(
@@ -335,10 +340,10 @@ mod tests {
         // What the payload sends arrives at the ground, and what the ground
         // sends arrives at the payload: the same two streams, named from each
         // end.
-        assert_eq!(payload.sources, &["to_moc"]);
-        assert_eq!(moc.sinks, &["from_payload"]);
-        assert_eq!(moc.sources, &["to_payload"]);
-        assert_eq!(payload.sinks, &["from_moc"]);
+        assert_eq!(payload.sources, &["payload-out"]);
+        assert_eq!(moc.sinks, &["payload-in"]);
+        assert_eq!(moc.sources, &["moc-out"]);
+        assert_eq!(payload.sinks, &["moc-in"]);
     }
 
     /// The null vehicle node has all four, which is what makes it the one
@@ -346,10 +351,10 @@ mod tests {
     #[test]
     fn the_null_node_has_both_ends_of_both_streams() {
         let null = terminals_of("null").expect("the null node");
-        for name in ["from_payload", "from_moc"] {
+        for name in ["payload-in", "moc-in"] {
             assert!(null.sinks.contains(&name), "{name} is not a sink of null");
         }
-        for name in ["to_moc", "to_payload"] {
+        for name in ["payload-out", "moc-out"] {
             assert!(null.sources.contains(&name), "{name} is not a source of null");
         }
     }
@@ -392,19 +397,19 @@ mod tests {
     fn an_unnamed_end_is_the_only_terminal() {
         assert_eq!(
             terminal_at("i2c", None, false),
-            Ok(Some("to_moc".to_string())),
+            Ok(Some("payload-out".to_string())),
             "a payload sends on its only source"
         );
         assert_eq!(
             terminal_at("moc", None, true),
-            Ok(Some("from_payload".to_string())),
+            Ok(Some("payload-in".to_string())),
             "the ground receives on its only sink"
         );
 
         // And a node with two of them has to be told which: the null node is
         // both ends of both streams, so an unnamed link to it could be either.
         let said = terminal_at("null", None, true).expect_err("ambiguous");
-        assert!(said.contains("from_payload") && said.contains("from_moc"), "{said}");
+        assert!(said.contains("payload-in") && said.contains("moc-in"), "{said}");
     }
 
     /// A name the type does not have, and a name at the wrong end.
@@ -415,14 +420,14 @@ mod tests {
     #[test]
     fn a_terminal_is_refused_by_name_and_by_end() {
         let said = terminal_at("i2c", Some("to_ground"), false).expect_err("no such");
-        assert!(said.contains("to_ground") && said.contains("to_moc"), "{said}");
+        assert!(said.contains("to_ground") && said.contains("payload-out"), "{said}");
 
-        let said = terminal_at("moc", Some("to_payload"), true).expect_err("wrong end");
+        let said = terminal_at("moc", Some("moc-out"), true).expect_err("wrong end");
         assert!(
-            said.contains("to_payload") && said.contains("leaves"),
+            said.contains("moc-out") && said.contains("leaves"),
             "{said}"
         );
-        let said = terminal_at("null", Some("from_moc"), false).expect_err("wrong end");
-        assert!(said.contains("from_moc") && said.contains("arrives"), "{said}");
+        let said = terminal_at("null", Some("moc-in"), false).expect_err("wrong end");
+        assert!(said.contains("moc-in") && said.contains("arrives"), "{said}");
     }
 }

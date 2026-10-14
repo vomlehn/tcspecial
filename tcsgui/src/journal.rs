@@ -240,7 +240,7 @@ pub struct Link {
     /// more than one. `None` is a node with one, which needs no naming -- see
     /// `tcslibgs::graph::terminals`.
     ///
-    /// Written into the file as part of the `from`: `from: through.to_moc`.
+    /// Written into the file as part of the `from`: `from: through.payload-out`.
     /// Kept apart from the name here because everything in the editor that
     /// looks a link's source up looks up a node, and a field that sometimes
     /// held `node.terminal` would be a name that sometimes is not one.

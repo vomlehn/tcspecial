@@ -56,13 +56,9 @@ export struct TerminalView {
     shown: bool,
     x: length,
     y: length,
-    // Whether the arrow points right, which is to say towards the payloads.
+    // Whether the arrow points right, which is to say towards the payloads,
+    // and so which arrow is drawn. See style::Corner::rightward.
     rightward: bool,
-    // What is written in the box: "in", "out", or nothing. Words rather than
-    // arrows -- an arrow has to be read against the canvas before it says
-    // anything -- and nothing at all in the upper left. See
-    // style::Corner::says.
-    says: string,
 }
 
 export struct NodeView {
@@ -100,17 +96,17 @@ export struct NodeView {
     // drawing that says nothing about what may be linked to what.
     //
     // Two rows, which are the two streams. Along the top, left to right, what
-    // the ground sends: it arrives at `from-moc` and leaves at `to-payload`.
+    // the ground sends: it arrives at `moc-in` and leaves at `moc-out`.
     // Along the bottom, right to left, what comes back: it arrives at
-    // `from-payload` and leaves at `to-moc`. The arrows therefore point the
+    // `payload-in` and leaves at `payload-out`. The arrows therefore point the
     // way the canvas itself is laid out -- the ground is the leftmost working
     // pane and the payloads the rightmost -- so a reader who has worked that
     // out once need not read the names again. The table is in style.rs, taken
     // from tcslibgs::graph::terminals.
-    from-moc: TerminalView,
-    to-payload: TerminalView,
-    from-payload: TerminalView,
-    to-moc: TerminalView,
+    moc-in: TerminalView,
+    moc-out: TerminalView,
+    payload-in: TerminalView,
+    payload-out: TerminalView,
     // How much room a terminal takes along an edge, which is what the label
     // is padded by on whichever side carries one. From style.rs, like the
     // sizes above, so that the one statement of how large a terminal is
@@ -243,9 +239,7 @@ component Terminal inherits Rectangle {
     // from the sink that wants feeding. Which was pressed is what says which
     // end of the link the other one is.
     in property <bool> sink;
-    // What is written inside the box: "in", "out", or nothing at all. See
-    // style::Corner::says.
-    in property <string> says;
+
 
     // A link is being drawn from this terminal, and then let go of -- at this
     // point, measured from the terminal's own corner.
@@ -292,16 +286,21 @@ component Terminal inherits Rectangle {
         }
     }
 
-    // The word, centred in the box. In the same ink as the box's own outline,
-    // so a terminal reads as one thing.
-    if root.says != "": Text {
+    // The arrow, which says which way the data on this terminal travels
+    // across the canvas: the ground is the leftmost working pane and the
+    // payloads the rightmost, so the payload's own data points left and what
+    // the ground sends points right.
+    Path {
         width: 100%;
         height: 100%;
-        text: root.says;
-        color: ink;
-        font-size: Type.small;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 24;
+        viewbox-height: 10;
+        fill: ink;
+        commands: rightward
+            ? "M 4 3.5 L 13 3.5 L 13 1 L 20 5 L 13 9 L 13 6.5 L 4 6.5 Z"
+            : "M 20 3.5 L 11 3.5 L 11 1 L 4 5 L 11 9 L 11 6.5 L 20 6.5 Z";
     }
 }
 
@@ -470,9 +469,9 @@ component NodeShape inherits Rectangle {
         // for a name on the shortest node.
         VerticalLayout {
             padding: Space.tight;
-            padding-left: (node.from-moc.shown || node.to-moc.shown)
+            padding-left: (node.moc-in.shown || node.payload-out.shown)
                 ? node.terminal-column : Space.tight;
-            padding-right: (node.to-payload.shown || node.from-payload.shown)
+            padding-right: (node.moc-out.shown || node.payload-in.shown)
                 ? node.terminal-column : Space.tight;
             spacing: 1px;
             alignment: center;
@@ -646,71 +645,67 @@ component NodeShape inherits Rectangle {
     // here by hand for the same reason -- these are outside the group that
     // carries it, and a terminal that stayed put while its node moved would be
     // a line attached to where the node used to be.
-    if node.from-moc.shown: Terminal {
-        x: node.from-moc.x + drag-x;
-        y: node.from-moc.y + drag-y;
-        rightward: node.from-moc.rightward;
-        says: node.from-moc.says;
+    if node.moc-in.shown: Terminal {
+        x: node.moc-in.x + drag-x;
+        y: node.moc-in.y + drag-y;
+        rightward: node.moc-in.rightward;
         dragged(x, y) => {
-            link-dragging(node.x + node.from-moc.x + x, node.y + node.from-moc.y + y);
+            link-dragging(node.x + node.moc-in.x + x, node.y + node.moc-in.y + y);
         }
         sink: true;
         ink: ink;
-        grabbed => { link-from("from_moc"); }
+        grabbed => { link-from("moc-in"); }
         released(x, y) => {
-            link-dropped(node.x + node.from-moc.x + x, node.y + node.from-moc.y + y);
+            link-dropped(node.x + node.moc-in.x + x, node.y + node.moc-in.y + y);
         }
     }
-    if node.to-payload.shown: Terminal {
-        x: node.to-payload.x + drag-x;
-        y: node.to-payload.y + drag-y;
-        rightward: node.to-payload.rightward;
-        says: node.to-payload.says;
+    if node.moc-out.shown: Terminal {
+        x: node.moc-out.x + drag-x;
+        y: node.moc-out.y + drag-y;
+        rightward: node.moc-out.rightward;
         dragged(x, y) => {
-            link-dragging(node.x + node.to-payload.x + x, node.y + node.to-payload.y + y);
+            link-dragging(node.x + node.moc-out.x + x, node.y + node.moc-out.y + y);
         }
         sink: false;
         ink: ink;
-        grabbed => { link-from("to_payload"); }
+        grabbed => { link-from("moc-out"); }
         // Where the pointer was let go of, in the canvas's own coordinates:
         // the node is placed at node.x and the terminal sits at its own offset
         // inside it, so the two and the pointer's offset from the terminal's
         // corner are the whole of it.
         released(x, y) => {
-            link-dropped(node.x + node.to-payload.x + x, node.y + node.to-payload.y + y);
+            link-dropped(node.x + node.moc-out.x + x, node.y + node.moc-out.y + y);
         }
     }
-    if node.from-payload.shown: Terminal {
-        x: node.from-payload.x + drag-x;
-        y: node.from-payload.y + drag-y;
-        rightward: node.from-payload.rightward;
-        says: node.from-payload.says;
+    if node.payload-in.shown: Terminal {
+        x: node.payload-in.x + drag-x;
+        y: node.payload-in.y + drag-y;
+        rightward: node.payload-in.rightward;
         dragged(x, y) => {
-            link-dragging(node.x + node.from-payload.x + x, node.y + node.from-payload.y + y);
+            link-dragging(node.x + node.payload-in.x + x, node.y + node.payload-in.y + y);
         }
         sink: true;
         ink: ink;
-        grabbed => { link-from("from_payload"); }
+        grabbed => { link-from("payload-in"); }
         released(x, y) => {
             link-dropped(
-                node.x + node.from-payload.x + x,
-                node.y + node.from-payload.y + y
+                node.x + node.payload-in.x + x,
+                node.y + node.payload-in.y + y
             );
         }
     }
-    if node.to-moc.shown: Terminal {
-        x: node.to-moc.x + drag-x;
-        y: node.to-moc.y + drag-y;
-        rightward: node.to-moc.rightward;
-        says: node.to-moc.says;
+    if node.payload-out.shown: Terminal {
+        x: node.payload-out.x + drag-x;
+        y: node.payload-out.y + drag-y;
+        rightward: node.payload-out.rightward;
         dragged(x, y) => {
-            link-dragging(node.x + node.to-moc.x + x, node.y + node.to-moc.y + y);
+            link-dragging(node.x + node.payload-out.x + x, node.y + node.payload-out.y + y);
         }
         sink: false;
         ink: ink;
-        grabbed => { link-from("to_moc"); }
+        grabbed => { link-from("payload-out"); }
         released(x, y) => {
-            link-dropped(node.x + node.to-moc.x + x, node.y + node.to-moc.y + y);
+            link-dropped(node.x + node.payload-out.x + x, node.y + node.payload-out.y + y);
         }
     }
 

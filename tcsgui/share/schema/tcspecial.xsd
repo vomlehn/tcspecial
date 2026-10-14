@@ -14,7 +14,7 @@
 
   A node's content is a choice of known element names repeated in any order,
   which is as close as XSD 1.0 comes to "these words and no others". It cannot
-  say that `name` appears exactly once, because `to_moc` may appear many times
+  say that `name` appears exactly once, because `payload-out` may appear many times
   (several destinations are several elements) and XSD 1.0's xs:all allows
   neither repeats nor a mixture. A node with two names is refused where the
   file is read instead.
@@ -89,13 +89,13 @@
       <xs:element name="type" type="xs:string"/>
       <xs:element name="group" type="xs:string"/>
       <!-- The two data sources, which are where links are written. -->
-      <xs:element name="to_moc" type="destination"/>
-      <xs:element name="to_payload" type="destination"/>
+      <xs:element name="payload-out" type="destination"/>
+      <xs:element name="moc-out" type="destination"/>
       <!-- And the two data sinks, which say whether a line arrives there.
            A record of the links written at the other end rather than a link,
            and optional. See the `source` type above. -->
-      <xs:element name="from_payload" type="source"/>
-      <xs:element name="from_moc" type="source"/>
+      <xs:element name="payload-in" type="source"/>
+      <xs:element name="moc-in" type="source"/>
       <!-- Where a node is. -->
       <xs:element name="path" type="xs:string"/>
       <xs:element name="address" type="xs:string"/>

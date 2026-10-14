@@ -174,7 +174,7 @@ mod tests {
             "version: \"2.0\"\n\
              payloads:\n\
              \x20 - { name: a, type: i2c, path: /dev/i2c-1, address: \"0x48\", \
-             to_moc: nobody }\n\
+             payload-out: nobody }\n\
              vehicle:\n\
              \x20 - { name: a, type: compute, function: mean }\n",
         )

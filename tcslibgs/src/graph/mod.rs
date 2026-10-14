@@ -13,15 +13,15 @@
 //! disagree about what a node is are two statements of one fact.
 //!
 //! A link is an attribute of the node it leaves, named after the data source
-//! it leaves by, with one entry per line: `to_moc: [{ target: k_fore }]` is a
-//! link from this node's `to_moc` terminal to `k_fore`, and an entry naming an
+//! it leaves by, with one entry per line: `payload-out: [{ target: k_fore }]` is a
+//! link from this node's `payload-out` terminal to `k_fore`, and an entry naming an
 //! `input` as well feeds a named input of the node it reaches. The short
-//! spelling is read too -- `to_moc: k_fore`, `to_moc: [moc, mean_temp.in0]` --
+//! spelling is read too -- `payload-out: k_fore`, `payload-out: [moc, mean_temp.in0]` --
 //! and means the same thing; see [`Destinations`].
 //!
 //! So there is no links section, and a node and the links out of it are read,
 //! written and deleted together. The node it arrives at says so as well --
-//! `from_payload: true`, under the sink it arrives at -- so that a node's
+//! `payload-in: true`, under the sink it arrives at -- so that a node's
 //! entry says it is connected at both ends; that flag is checked against these
 //! links and otherwise never read. See [`mirror`].
 //!
@@ -225,11 +225,11 @@ pub fn section_of(node_type: &str) -> Section {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeFile {
     pub node: Node,
-    /// Where this node's groundward data goes: the sinks its `to_moc` reaches.
-    pub to_moc: Vec<String>,
-    /// And its vehicleward data: the sinks its `to_payload` reaches.
-    pub to_payload: Vec<String>,
-    /// Whether a line arrives at this node's `from_payload` sink, as the entry
+    /// Where this node's groundward data goes: the sinks its `payload-out` reaches.
+    pub payload_out: Vec<String>,
+    /// And its vehicleward data: the sinks its `moc-out` reaches.
+    pub moc_out: Vec<String>,
+    /// Whether a line arrives at this node's `payload-in` sink, as the entry
     /// says so.
     ///
     /// A record of the links written at the other end rather than a link, and
@@ -238,21 +238,21 @@ pub struct NodeFile {
     /// allowed; `Some(true)` is a node saying a groundward line arrives here
     /// and `Some(false)` one saying none does, and either is refused where the
     /// links say otherwise.
-    pub from_payload: Option<bool>,
-    /// And whether one arrives at its `from_moc` sink.
-    pub from_moc: Option<bool>,
+    pub payload_in: Option<bool>,
+    /// And whether one arrives at its `moc-in` sink.
+    pub moc_in: Option<bool>,
 }
 
 impl NodeFile {
     /// The links this node's sources make.
     ///
     /// One per destination, each `from` naming the node and the data source it
-    /// leaves by -- `k_fore.to_moc` -- which is what every rule about a link
+    /// leaves by -- `k_fore.payload-out` -- which is what every rule about a link
     /// already reads: see [`Link::origin`].
     pub fn links(&self) -> Vec<Link> {
         let mut links = Vec::new();
         for (terminal, destinations) in
-            [("to_moc", &self.to_moc), ("to_payload", &self.to_payload)]
+            [("payload-out", &self.payload_out), ("moc-out", &self.moc_out)]
         {
             if destinations.is_empty() {
                 continue;
@@ -273,8 +273,8 @@ impl NodeFile {
     /// be the same connection in the graph twice.
     pub fn arriving(&self) -> Vec<(&'static str, Option<bool>)> {
         vec![
-            ("from_payload", self.from_payload),
-            ("from_moc", self.from_moc),
+            ("payload-in", self.payload_in),
+            ("moc-in", self.moc_in),
         ]
     }
 }
@@ -284,8 +284,8 @@ impl<'de> Deserialize<'de> for NodeFile {
     ///
     /// A node's attributes are whatever its type takes, so they are collected
     /// rather than declared -- and `serde(flatten)` cannot be used to collect
-    /// them beside a declared `to_moc`, because an XML file writes several
-    /// destinations as several `<to_moc>` elements and a flattened map refuses
+    /// them beside a declared `payload-out`, because an XML file writes several
+    /// destinations as several `<payload-out>` elements and a flattened map refuses
     /// the second as a duplicate key. Read as a map here, the repeats are what
     /// they look like: more destinations.
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -307,10 +307,10 @@ impl<'de> Deserialize<'de> for NodeFile {
                 let mut group: Option<String> = None;
 
                 let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
-                let mut to_moc: Vec<String> = Vec::new();
-                let mut to_payload: Vec<String> = Vec::new();
-                let mut from_payload: Option<bool> = None;
-                let mut from_moc: Option<bool> = None;
+                let mut payload_out: Vec<String> = Vec::new();
+                let mut moc_out: Vec<String> = Vec::new();
+                let mut payload_in: Option<bool> = None;
+                let mut moc_in: Option<bool> = None;
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -337,13 +337,13 @@ impl<'de> Deserialize<'de> for NodeFile {
                         // linked to what. Repeats add to it rather than
                         // replacing it: that is what several XML elements of
                         // one name mean.
-                        "to_moc" => to_moc.extend(
+                        "payload-out" => payload_out.extend(
                             map.next_value::<Destinations>()?
                                 .each()
                                 .into_iter()
                                 .map(str::to_string),
                         ),
-                        "to_payload" => to_payload.extend(
+                        "moc-out" => moc_out.extend(
                             map.next_value::<Destinations>()?
                                 .each()
                                 .into_iter()
@@ -353,10 +353,10 @@ impl<'de> Deserialize<'de> for NodeFile {
                         // there -- a record of links written on the nodes they
                         // leave, and not a link. Checked against those links
                         // as the configuration is read: see `mirror`.
-                        "from_payload" => {
-                            from_payload = Some(said_so("from_payload", &mut map)?)
+                        "payload-in" => {
+                            payload_in = Some(said_so("payload-in", &mut map)?)
                         }
-                        "from_moc" => from_moc = Some(said_so("from_moc", &mut map)?),
+                        "moc-in" => moc_in = Some(said_so("moc-in", &mut map)?),
                         // Everything else is an attribute of the node, which
                         // is where a word nothing reads ends up -- and is
                         // refused by name against what the type takes. See
@@ -381,10 +381,10 @@ impl<'de> Deserialize<'de> for NodeFile {
                         group,
                         attributes,
                     },
-                    to_moc,
-                    to_payload,
-                    from_payload,
-                    from_moc,
+                    payload_out,
+                    moc_out,
+                    payload_in,
+                    moc_in,
                 })
             }
         }
@@ -498,7 +498,7 @@ pub struct Link {
 impl Link {
     /// Which node this link leaves, and by which of its data sources.
     ///
-    /// Written the way a destination is -- `temp_fore.to_moc` -- because the
+    /// Written the way a destination is -- `temp_fore.payload-out` -- because the
     /// two ends of a link are the same kind of thing: a node and one of its
     /// terminals. A node with one source needs no name after the dot, so every
     /// file written before there were names for these still says what it said.
@@ -513,7 +513,7 @@ impl Link {
 /// named by the entry's `target`:
 ///
 /// ```yaml
-/// to_moc:
+/// payload-out:
 ///   - target: moc
 ///   - target: mean_temp
 ///     input: in0
@@ -522,10 +522,10 @@ impl Link {
 /// A line is then one entry rather than one element of two lists, which is
 /// what makes several destinations safe to write: nothing pairs by position,
 /// so a list that slips by one cannot turn a reading into somebody else's
-/// input. In XML the same thing is a repeated `<to_moc>` with `<target>` in
+/// input. In XML the same thing is a repeated `<payload-out>` with `<target>` in
 /// it.
 ///
-/// The short spellings are still read: `to_moc: moc` and `to_moc: [moc,
+/// The short spellings are still read: `payload-out: moc` and `payload-out: [moc,
 /// mean_temp.in0]`, the node and its input separated by a dot. Every
 /// configuration written before entries existed says what it said, and a link
 /// to one place is a line somebody can still write in a line. All of them read
@@ -583,7 +583,7 @@ impl<'de> Deserialize<'de> for Destinations {
             }
 
             /// One entry -- `{ target: moc }` -- or one XML element with text
-            /// in it: `<to_moc>moc</to_moc>`.
+            /// in it: `<payload-out>moc</payload-out>`.
             fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Destinations, A::Error> {
                 Ok(Destinations(vec![written_as(map)?]))
             }
@@ -631,9 +631,9 @@ impl<'de> Deserialize<'de> for Bound {
 
 /// Whether a node's entry says a line arrives at one of its sinks.
 ///
-/// `from_payload: true`, and `false` for a node saying none does. Read through
+/// `payload-in: true`, and `false` for a node saying none does. Read through
 /// [`Scalar`] rather than as a `bool` because XML has no booleans: the text of
-/// `<from_payload>true</from_payload>` is the word, and the word is what both
+/// `<payload-in>true</payload-in>` is the word, and the word is what both
 /// languages have in common.
 ///
 /// Anything else is refused saying what the field means. It named the node the
@@ -663,7 +663,7 @@ fn said_so<'de, A: serde::de::MapAccess<'de>>(
 /// Two shapes arrive here. An entry -- `{ target: mean_temp, input: in0 }` --
 /// which is what the editor writes and what a person writing a link by hand
 /// now has to write for a link to a named input. And an XML element with text
-/// in it, `<to_moc>moc</to_moc>`, which quick-xml hands over as a map of one
+/// in it, `<payload-out>moc</payload-out>`, which quick-xml hands over as a map of one
 /// entry whose value is the text: the short spelling, in the language where it
 /// does not arrive as a string.
 ///
@@ -684,7 +684,7 @@ fn written_as<'de, A: serde::de::MapAccess<'de>>(mut map: A) -> Result<String, A
             "target" => target = Some(map.next_value::<Scalar>()?.as_str().to_string()),
             "input" => input = Some(map.next_value::<Scalar>()?.as_str().to_string()),
             // What XML calls the text of an element, which is how the short
-            // spelling arrives in that language: `<to_moc>moc</to_moc>`.
+            // spelling arrives in that language: `<payload-out>moc</payload-out>`.
             "$text" => text = Some(map.next_value::<Scalar>()?.as_str().to_string()),
             // And nothing else. A word nobody knows is a misspelling, and a
             // misspelled `target` read as a name would be a link that quietly
@@ -1026,7 +1026,7 @@ fn read_one(path: &Path) -> TcsResult<GraphFile> {
             "links",
             file.links.is_some(),
             "a link is an attribute of the node it leaves, named after the data \
-             source it leaves by: `to_moc: k_fore`",
+             source it leaves by: `payload_out: k_fore`",
         ),
         ("groups", file.groups.is_some(), "groups are now payload_groups"),
     ];
@@ -1275,7 +1275,7 @@ moc:
             where_.path().join("cabin.yaml"),
             "version: \"2.0\"\npayloads:\n  \
              - { name: cabin_sensor, type: i2c, path: \"/dev/i2c-1\", \
-             address: \"0x48\", to_moc: moc }\n",
+             address: \"0x48\", payload-out: moc }\n",
         )
         .unwrap();
 
@@ -1383,21 +1383,21 @@ moc:
         let said: NodeFile = serde_norway::from_str(
             "name: k_fore
 type: compute
-to_moc:
+payload-out:
   - target: moc
   - target: mean_temp
     input: in0
 ",
         )
         .expect("entries");
-        assert_eq!(said.to_moc, vec!["moc", "mean_temp.in0"]);
+        assert_eq!(said.payload_out, vec!["moc", "mean_temp.in0"]);
 
         // One entry on its own needs no list, as one destination needs no
         // list.
         let one: NodeFile =
-            serde_norway::from_str("name: a\ntype: compute\nto_moc: { target: moc }\n")
+            serde_norway::from_str("name: a\ntype: compute\npayload-out: { target: moc }\n")
                 .expect("one entry");
-        assert_eq!(one.to_moc, vec!["moc"]);
+        assert_eq!(one.payload_out, vec!["moc"]);
     }
 
     /// A misspelled word in an entry is refused, not ignored.
@@ -1410,7 +1410,7 @@ to_moc:
         let said = format!(
             "{}",
             serde_norway::from_str::<NodeFile>(
-                "name: a\ntype: compute\nto_moc:\n  - targte: moc\n"
+                "name: a\ntype: compute\npayload-out:\n  - targte: moc\n"
             )
             .expect_err("a misspelling is refused")
         );
@@ -1420,7 +1420,7 @@ to_moc:
         let said = format!(
             "{}",
             serde_norway::from_str::<NodeFile>(
-                "name: a\ntype: compute\nto_moc:\n  - input: in0\n"
+                "name: a\ntype: compute\npayload-out:\n  - input: in0\n"
             )
             .expect_err("an input names no node")
         );

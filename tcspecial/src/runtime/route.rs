@@ -81,7 +81,7 @@ impl Routes {
             // The node it leaves, whatever terminal it leaves by. A terminal
             // says which way the data is going -- see
             // `tcslibgs::graph::terminals` -- and the routing question is
-            // which node, so `n.to_moc` and `n` are one source here.
+            // which node, so `n.payload-out` and `n` are one source here.
             let from = link.origin().node;
 
             for destination in link.to.each() {
@@ -243,15 +243,15 @@ mod tests {
             .find(|d| d.to == "mean_temp")
             .expect("a delivery into the mean");
         assert_eq!(into_mean.input.as_deref(), Some("in0"));
-        let to_moc = from_k_fore.iter().find(|d| d.to == "moc").unwrap();
-        assert_eq!(to_moc.input, None);
+        let payload_out = from_k_fore.iter().find(|d| d.to == "moc").unwrap();
+        assert_eq!(payload_out.input, None);
     }
 
     /// A link that names its terminals routes as one that does not.
     ///
     /// A terminal says which way the data is going and not which of several
-    /// ways in -- see `tcslibgs::graph::terminals` -- so `a.to_moc` to
-    /// `c.from_payload` is the same delivery as `a` to `c`. It matters here
+    /// ways in -- see `tcslibgs::graph::terminals` -- so `a.payload-out` to
+    /// `c.payload-in` is the same delivery as `a` to `c`. It matters here
     /// and not only in the checking: a terminal carried through as a named
     /// input would reach a device's port, which refuses an input a device does
     /// not have, and a configuration that passed the ground check would stop
@@ -279,7 +279,7 @@ mod tests {
         };
 
         let plain = Routes::of(&one_link("a", "c"));
-        let named = Routes::of(&one_link("a.to_moc", "c.from_payload"));
+        let named = Routes::of(&one_link("a.payload-out", "c.payload-in"));
 
         for routes in [&plain, &named] {
             let deliveries = routes.from("a");
@@ -295,7 +295,7 @@ mod tests {
         // And a computation's named input is still carried, which is the
         // distinction: `in0` is which of several ways in, and the mean is
         // built on knowing.
-        let into_mean = Routes::of(&one_link("a.to_moc", "m.in0"));
+        let into_mean = Routes::of(&one_link("a.payload-out", "m.in0"));
         assert_eq!(into_mean.from("a")[0].input.as_deref(), Some("in0"));
         assert_eq!(into_mean.source_of("m", "in0"), Some("a"));
     }

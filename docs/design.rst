@@ -1716,11 +1716,9 @@ or the bottom, not at the row's middle, because a leaning side is furthest in
 at one end of the box and taking the middle would leave half of it hanging
 out.
 
-Anything drawn *inside* a leaning shape has the same problem: the hatching and
-the second outline of a doubled shape are rectangles in the markup, and a
-rectangle filling the box would spill into the notches. They are inset by
-``style::room_of``, the widest the shape is missing anywhere, and a test holds
-every shape shaded either of those ways to it.
+Nothing is drawn inside a leaning shape that could spill out of it. The second
+line of a doubled edge is inset as a *smaller box* and so leans by its own
+slant, and a test holds it inside the outer line.
 
 The shapes are the ones the standard notations use, which is worth more than
 being inventive: a reader who has seen a data-flow diagram already knows that
@@ -1758,9 +1756,38 @@ too. It is checked as the rule rather than as the shape, because the reasoning
 is about where the terminals are, and a shape kept while a terminal moved
 would otherwise draw an arrow floating beside the node.
 
+Nothing is drawn as a pattern inside a node. A body is its own colour and
+nothing else: a pattern there competes with the name written over it and with
+the colour the body carries, and it was the one channel that looked like noise
+rather than like a statement. What it used to tell apart is now told apart by
+the line around the outside, which may be **doubled**, **broken**, both or
+neither -- two independent facts, so four values out of one channel.
+
+Only four pairs of types ever leaned on the old pattern channel, all of them
+payload kinds drawn at the same shape, width and height, and the new one
+carries all four: a dashed serial against a plain I2C, and HDLC doubled,
+Network dashed and IIO both, which separates the three of them from each
+other.
+
+A broken line is only available to a straight-sided outline. Dashes are walked
+along the shape's own polygon -- ``style::polygon_of``, which is also where the
+filled shape and the inner line come from -- and the rounded outline is a
+corner radius with no polygon to walk. A test holds the two types drawn with a
+radius to a single whole line, because the markup would otherwise draw a plain
+rounded rectangle and say nothing about the dash it could not manage.
+
+The dashes themselves are subpaths, one per dash: Slint's ``Path`` takes no
+dash pattern, so a broken line is drawn as the pieces that are there, which is
+what ``route.rs`` already does for the line being dragged. The pattern is
+walked round the whole shape rather than restarted at each side, so it carries
+on around a corner instead of putting a dash on all four of them. And the
+shape is filled by one path and stroked by another, because filling a row of
+short subpaths would fill each dash rather than the node.
+
 Colour remains the redundant channel for all that. Nothing is told apart by
 colour alone: every type differs from every other in at least two of outline,
-border width, shading, height and the way its label is set, and a test fails if
+border width, the line around it, height and the way its label is set, and a
+test fails if
 that stops being true. Red is reserved for things that are wrong.
 
 A configuration that does not exist yet opens with the ground station already

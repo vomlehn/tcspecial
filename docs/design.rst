@@ -1832,6 +1832,19 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
+A node placed from a palette is named after its type, a hyphen, and the first
+number that is free: ``i2c-1``, then ``i2c-2``, and ``i2c-1`` again if the
+first one is deleted -- the number says which of them this is, not how many
+have ever been placed. Numbered from the first rather than from the second,
+which is what it used to be: a bare ``i2c`` and then an ``i2c-2`` is two kinds
+of name for one kind of thing, the first one's name becomes the odd one out the
+moment a second is placed, and a diagram of type names reads as a diagram of
+types rather than of nodes. A number on every one of them also says plainly
+that the name is the editor's suggestion rather than a description. The ground
+station a new configuration is given is named the same way, by the same
+function, because a name the editor chose should look the same whichever of its
+hands chose it.
+
 A new node goes as high as it will fit in its own pane without covering
 anything, and in view: the highest free place in the part of the sheet the
 window is showing, or failing that the lowest free place above it, or the

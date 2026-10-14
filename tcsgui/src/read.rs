@@ -491,11 +491,12 @@ mod tests {
     fn the_shipped_examples_open() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        // The example ships with no lines: it is what the editor opens by
-        // default and what somebody draws their own graph in, so what it
-        // holds is whatever they last drew. What is asked of it is what is
-        // true however it is drawn: that both spellings read, that they say
-        // the same thing, and that neither is faulty. The worked example is
+        // The example is what the editor opens by default and what somebody
+        // draws their own graph in, so what it holds is whatever they last
+        // drew -- including nothing at all, which is a configuration somebody
+        // emptied and a state the editor starts new ones in. What is asked of
+        // it is what is true however it is drawn: that both spellings read,
+        // that they say the same thing, and that neither is faulty. The worked example is
         // the one with contents worth asserting, and
         // `the_worked_example_is_the_configuration_it_describes` asserts them.
         for name in ["example", "tests/manual/thermostat"] {
@@ -503,10 +504,6 @@ mod tests {
             for extension in ["yaml", "xml"] {
                 let path = root.join(format!("{name}.{extension}"));
                 let document = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
-                assert!(
-                    !document.nodes.is_empty(),
-                    "{name}.{extension} describes nothing"
-                );
                 read_as.push((document.nodes.len(), document.links.len()));
             }
             assert_eq!(

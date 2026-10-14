@@ -3227,14 +3227,17 @@ fn seed(editor: &mut Editor) {
     }
 
     // Two edits, as placing one by hand is: a node exists, and then it is
-    // somewhere.
+    // somewhere. And named as one placed by hand is -- `moc-1`, from
+    // `fresh_name` -- because a name the editor chose should look the same
+    // whichever of its hands chose it.
+    let name = fresh_name(editor.document(), "moc", &None);
     editor.edit(Edit::AddNode {
-        name: "moc".to_string(),
+        name: name.clone(),
         node_type: "moc".to_string(),
         home: None,
     });
     editor.edit(Edit::MoveNode {
-        node: "moc".to_string(),
+        node: name,
         was: (0, 0),
         now: MOC_PLACE,
     });
@@ -3242,19 +3245,23 @@ fn seed(editor: &mut Editor) {
 
 /// A name no node in the document has yet.
 ///
-/// The type's own spelling, numbered if that is taken: a person who places
-/// three i2c nodes gets i2c, i2c-2 and i2c-3 and renames them, rather than
-/// being made to name each one before it can exist.
+/// The type's own spelling, a hyphen, and the first number that is free: a
+/// person who places three i2c nodes gets i2c-1, i2c-2 and i2c-3 and renames
+/// them, rather than being made to name each one before it can exist.
+///
+/// Numbered from the first one rather than from the second. The first used to
+/// be the bare type -- i2c, then i2c-2 -- which reads as two kinds of name for
+/// one kind of thing: a person with one of each ends up with a diagram of
+/// types rather than of nodes, and the moment a second one is placed the first
+/// one's name is the odd one out. A number on every one of them also says
+/// plainly that the name is the editor's suggestion and not a description.
 fn fresh_name(document: &Document, node_type: &str, home: &Home) -> String {
     let taken = |name: &str| {
         document
             .node(&Qualified::of(name, home).absolute())
             .is_some()
     };
-    if !taken(node_type) {
-        return node_type.to_string();
-    }
-    (2..)
+    (1..)
         .map(|n| format!("{node_type}-{n}"))
         .find(|name| !taken(name))
         .expect("a free name exists")
@@ -4674,25 +4681,43 @@ mod tests {
         assert_eq!(top[0].label, "cabin/temp_fore");
     }
 
-    /// A name is fresh within its own home.
+    /// A name is the type, a hyphen and the first free number, and it is
+    /// fresh within its own home.
     ///
     /// Two subdiagrams may each hold an i2c, so placing one in each gives
-    /// both the plain name rather than numbering the second.
+    /// both the first number rather than numbering the second one twice.
     #[test]
-    fn a_fresh_name_is_fresh_where_it_is_placed() {
+    fn a_fresh_name_is_numbered_from_one_and_fresh_where_it_is_placed() {
         let mut document = Document::new();
-        assert_eq!(fresh_name(&document, "i2c", &None), "i2c");
+        assert_eq!(fresh_name(&document, "i2c", &None), "i2c-1");
 
         document.apply(&Edit::AddNode {
-            name: "i2c".into(),
+            name: "i2c-1".into(),
             node_type: "i2c".into(),
             home: None,
         });
         assert_eq!(fresh_name(&document, "i2c", &None), "i2c-2");
 
-        // In a subdiagram, the plain name is free again.
+        // A gap is filled rather than stepped over: the number says which one
+        // this is among the ones there are, not how many have ever been
+        // placed.
+        document.apply(&Edit::AddNode {
+            name: "i2c-2".into(),
+            node_type: "i2c".into(),
+            home: None,
+        });
+        document.apply(&Edit::RemoveNode {
+            name: "i2c-1".into(),
+            node_type: "i2c".into(),
+            home: None,
+            attributes: Vec::new(),
+            links: Vec::new(),
+        });
+        assert_eq!(fresh_name(&document, "i2c", &None), "i2c-1");
+
+        // In a subdiagram, the first number is free again.
         let cabin = Some("cabin".to_string());
-        assert_eq!(fresh_name(&document, "i2c", &cabin), "i2c");
+        assert_eq!(fresh_name(&document, "i2c", &cabin), "i2c-1");
     }
 
     /// A link's ends are placed on the terminals it is attached to.
@@ -6011,7 +6036,7 @@ mod tests {
             );
         }
 
-        let moc = editor.document().node("moc").expect("a ground station");
+        let moc = editor.document().node("moc-1").expect("a ground station");
         assert_eq!(moc.node_type, "moc");
         assert_eq!(moc.at, MOC_PLACE);
         // The upper left of the moc working pane, which is where the ground
@@ -6025,7 +6050,7 @@ mod tests {
         editor.undo();
         editor.undo();
         assert!(
-            editor.document().node("moc").is_none(),
+            editor.document().node("moc-1").is_none(),
             "the ground station cannot be taken back"
         );
 
@@ -6050,7 +6075,7 @@ mod tests {
             home: None,
         });
         seed(&mut editor);
-        assert!(editor.document().node("moc").is_none());
+        assert!(editor.document().node("moc-1").is_none());
 
         // One somebody has emptied, which has a history behind it.
         let mut editor = Editor::open(&where_.path().join("b.yaml"), dividers());
@@ -6063,7 +6088,7 @@ mod tests {
         assert!(editor.document().nodes.is_empty());
         seed(&mut editor);
         assert!(
-            editor.document().node("moc").is_none(),
+            editor.document().node("moc-1").is_none(),
             "a configuration somebody emptied was refilled"
         );
 
@@ -6074,7 +6099,7 @@ mod tests {
         let mut editor = Editor::open(&damaged, dividers());
         assert!(editor.trouble().is_some(), "a damaged file should be reported");
         seed(&mut editor);
-        assert!(editor.document().node("moc").is_none());
+        assert!(editor.document().node("moc-1").is_none());
         assert_eq!(
             std::fs::read_to_string(&damaged).unwrap(),
             "version: \"2.0\"\nnodes: [[[\n",
@@ -6900,12 +6925,16 @@ mod tests {
             .expect("the palette offers a mean");
         ui.invoke_place_node(mean.node.name.clone(), mean.node.node_type.clone(), mean.sets);
 
+        // Named after the type, numbered from one: see `fresh_name`. The
+        // palette entry is called "mean" and the node it places is "mean-1",
+        // which is the editor saying "this is the first of them" rather than
+        // "this is the mean".
         let placed = editor
             .borrow()
             .document()
-            .node("mean")
+            .node("mean-1")
             .cloned()
-            .expect("a node called mean");
+            .expect("a node called mean-1");
         assert_eq!(placed.node_type, "compute");
         assert_eq!(
             placed.attributes.get("function").map(String::as_str),
@@ -6915,8 +6944,8 @@ mod tests {
 
         // And the panel asks it for a mean's attributes rather than for every
         // attribute any computation has.
-        chosen.borrow_mut().insert(String::new(), "mean".to_string());
-        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("mean"));
+        chosen.borrow_mut().insert(String::new(), "mean-1".to_string());
+        let (_, _, _, fields) = panel_of(&editor.borrow(), &None, Some("mean-1"));
         let asked: Vec<String> = fields
             .iter()
             .filter(|field| !field.is_heading)
@@ -6932,7 +6961,7 @@ mod tests {
             editor
                 .borrow()
                 .document()
-                .node("mean")
+                .node("mean-1")
                 .expect("still there")
                 .attributes
                 .get("function"),
@@ -7166,7 +7195,9 @@ mod tests {
                 .iter()
                 .map(|node| node.name.clone())
                 .collect();
-            assert!(!held.is_empty(), "example.{extension} describes nothing");
+            // Whatever it holds, including nothing: an emptied configuration
+            // is somebody's work in progress and a canvas with nothing on it
+            // is the right drawing of it.
             assert_eq!(
                 names, held,
                 "example.{extension} should put its nodes on the canvas"

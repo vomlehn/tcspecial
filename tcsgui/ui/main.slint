@@ -77,7 +77,7 @@ export struct NodeView {
     y: length,
     width: length,
     height: length,
-    // square | rounded | circle | keyed | pointed
+    // square | rounded | keyed | store | pointed
     outline: string,
     // The outline as path data, in this node's own coordinates, for the
     // outlines a corner radius cannot draw. Empty for the ones it can, which
@@ -413,9 +413,9 @@ component NodeShape inherits Rectangle {
         height: 100%;
         background: transparent;
         // The shape itself. One Rectangle, with the corner radius saying
-        // which outline this is: 0 for square, a quarter of the height for
-        // rounded, half the width for a circle. A keyed shape is this with a
-        // corner squared off by the triangle below it.
+        // which outline this is: 0 for square and a quarter of the height for
+        // rounded. A keyed shape is the square one with a corner squared off
+        // by the triangle below it.
         //
         // An outline a radius cannot draw arrives as path data instead, and
         // then this Rectangle keeps the geometry and the shadow and draws
@@ -439,14 +439,7 @@ component NodeShape inherits Rectangle {
             drop-shadow-blur: grip.pressed ? 12px : 0px;
             drop-shadow-color: grip.pressed ? #00000033 : transparent;
             drop-shadow-offset-y: grip.pressed ? 3px : 0px;
-            // Half the shorter side, not half the width: every node is one
-            // width now, so an end of the graph is wider than it is tall and
-            // half its width would be a radius larger than the shape.
-            border-radius: node.outline == "circle"
-                ? min(self.width, self.height) / 2
-                : node.outline == "rounded"
-                    ? self.height / 4
-                    : 0px;
+            border-radius: node.outline == "rounded" ? self.height / 4 : 0px;
             background: node.shape != ""
                 ? transparent
                 : (node.shading == "solid"

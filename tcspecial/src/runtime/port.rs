@@ -806,6 +806,7 @@ mod tests {
             files: Vec::new(),
             homes: Default::default(),
             placed: Default::default(),
+            set_aside: Default::default(),
         };
         let routes = Routes::of(&graph);
 

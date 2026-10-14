@@ -144,6 +144,10 @@ pub fn read(path: &Path) -> Result<Document, String> {
         }
     }
 
+    // What the editor was told not to raise: the other half of its own
+    // section, read back so that a decision survives being closed.
+    document.aside = graph.set_aside.clone();
+
     for binding in &graph.commands {
         document.commands.push(Command {
             from: binding.from.clone(),

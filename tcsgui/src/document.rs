@@ -80,6 +80,73 @@ pub struct Command {
     pub comment: Option<String>,
 }
 
+/// Something that might be wrong with the drawing, and might not be.
+///
+/// Apart from [`Fault`], which is what *is* wrong: a fault is a document the
+/// editor will not pretend is sound -- two nodes of one name, a link to a node
+/// that is not there -- and a concern is a shape somebody may have meant. A
+/// payload nothing reads yet is the ordinary state of a diagram halfway
+/// through being drawn, and an editor that called it an error would be an
+/// editor crying wolf at its own user.
+///
+/// See [`Document::concerns`] for which rules apply where, and
+/// [`Document::aside`] for how one is set aside.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Concern {
+    /// A node at the start of a stream whose data reaches nothing: a payload
+    /// whose readings go nowhere, a MOC link nothing is listening to.
+    GoesNowhere { node: String, terminal: String },
+    /// A vehicle node something arrives at and nothing leaves. The stream
+    /// stops there, and a log is the one type that is allowed to stop one.
+    NothingLeaves { node: String },
+    /// A vehicle node something leaves and nothing arrives at: it is sending
+    /// what it has not been given.
+    NothingArrives { node: String },
+}
+
+impl Concern {
+    /// Which node this is about.
+    pub fn node(&self) -> &str {
+        match self {
+            Concern::GoesNowhere { node, .. }
+            | Concern::NothingLeaves { node }
+            | Concern::NothingArrives { node } => node,
+        }
+    }
+
+    /// The word for this kind, as the file writes it.
+    ///
+    /// Part of what a set-aside is remembered by, so it has to be stable: a
+    /// word changed here is a decision somebody made and lost.
+    pub fn kind(&self) -> String {
+        match self {
+            Concern::GoesNowhere { terminal, .. } => format!("{terminal}-goes-nowhere"),
+            Concern::NothingLeaves { .. } => "nothing-leaves".to_string(),
+            Concern::NothingArrives { .. } => "nothing-arrives".to_string(),
+        }
+    }
+
+    /// What identifies this concern: the node, and the kind.
+    pub fn key(&self) -> (String, String) {
+        (self.node().to_string(), self.kind())
+    }
+
+    /// What the button's menu says about it, in one line.
+    pub fn describe(&self) -> String {
+        match self {
+            Concern::GoesNowhere { node, terminal } => {
+                format!("\"{node}\": nothing is linked to its {terminal}")
+            }
+            Concern::NothingLeaves { node } => {
+                format!("\"{node}\": something arrives and nothing leaves")
+            }
+            Concern::NothingArrives { node } => {
+                format!("\"{node}\": something leaves and nothing arrives")
+            }
+        }
+    }
+}
+
 /// Where one line goes, as a file writes it: its entry.
 ///
 /// A link out of a node is written as an entry under the data source it leaves
@@ -100,6 +167,15 @@ struct Bound {
 /// The whole of what is being edited.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Document {
+    /// The concerns somebody has decided not to act on, by node and kind.
+    ///
+    /// A decision about this configuration rather than about this session, so
+    /// it is written in the file's own `tcsgui` section beside where the nodes
+    /// were drawn: two people editing one configuration should not each have
+    /// to decide again that a payload nobody reads yet is on purpose. See
+    /// [`Concern::key`].
+    #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+    pub aside: std::collections::BTreeSet<(String, String)>,
     /// What the configuration says it is, as the file's `description`.
     ///
     /// Held so that saving does not drop it. It is a line of the schema rather
@@ -465,6 +541,98 @@ impl Document {
         moved
     }
 
+    /// What might be wrong, which is not the same as what is wrong.
+    ///
+    /// A payload whose readings reach nothing, a vehicle node something
+    /// arrives at and nothing leaves, one something leaves and nothing arrives
+    /// at: none of these is a file that cannot be read, and every one of them
+    /// is a diagram somebody has not finished -- or has finished, and meant.
+    /// So they are raised rather than refused, counted on a button, and set
+    /// aside one at a time by whoever decides they are not problems: see
+    /// [`Document::aside`].
+    ///
+    /// Which rules apply to a node depends on which pane it is in, because the
+    /// data flows one way through the panes: a payload is where the payload's
+    /// own data begins and a MOC link is where it ends, and the other stream
+    /// runs the other way. So a payload's `payload-out` with nothing on it is
+    /// a concern -- those readings reach nobody -- where a computation's is
+    /// not, a computation being free to send its result the other way or to be
+    /// read by nothing yet. What is asked of a vehicle node is that a stream
+    /// passing through it comes out somewhere, which is the shape of the whole
+    /// graph: payload, vehicle nodes, MOC link.
+    ///
+    /// In the document's own order, so the list a person reads is the list in
+    /// the file.
+    pub fn concerns(&self) -> Vec<Concern> {
+        let mut concerns = Vec::new();
+
+        for node in &self.nodes {
+            let name = Qualified::of(&node.name, &node.home).absolute();
+            let Some(found) = NodeType::ALL
+                .iter()
+                .find(|t| t.spelling() == node.node_type)
+            else {
+                // A type this build does not know: that is a fault, and
+                // `faults` is where it is said.
+                continue;
+            };
+            let terminals = found.terminals();
+            let leaves = |terminal: &str| {
+                self.links.iter().any(|link| {
+                    link.from == name
+                        && crate::style::terminal_for(
+                            &node.node_type,
+                            link.origin.as_deref(),
+                            false,
+                        ) == Some(terminal)
+                })
+            };
+            let anything_leaves = self.links.iter().any(|link| link.from == name);
+            let anything_arrives = self.links.iter().any(|link| link.to == name);
+
+            match crate::pane::pane_of(&node.node_type) {
+                // Where a stream begins: what it sends has to reach
+                // something, or the node is a sensor nobody reads.
+                crate::pane::Pane::Payloads | crate::pane::Pane::Moc => {
+                    for terminal in terminals.sources {
+                        if !leaves(terminal) {
+                            concerns.push(Concern::GoesNowhere {
+                                node: name.clone(),
+                                terminal: (*terminal).to_string(),
+                            });
+                        }
+                    }
+                }
+                // And in between, a stream has to come out somewhere. A log
+                // is the exception by having no data source at all: it is
+                // where data stops on purpose.
+                crate::pane::Pane::Vehicle => {
+                    if anything_arrives && !anything_leaves && !terminals.sources.is_empty() {
+                        concerns.push(Concern::NothingLeaves { node: name.clone() });
+                    }
+                    if anything_leaves && !anything_arrives && !terminals.sinks.is_empty() {
+                        concerns.push(Concern::NothingArrives { node: name.clone() });
+                    }
+                }
+            }
+        }
+
+        concerns
+    }
+
+    /// The concerns somebody has decided not to act on, and the rest.
+    ///
+    /// Two lists, because the window shows them on two buttons: what might be
+    /// wrong, and what somebody has looked at and left. A concern that stops
+    /// applying leaves both lists by itself -- the set-aside is remembered by
+    /// node and kind, and a kind that no longer holds is not raised -- so
+    /// nothing has to be tidied up after a link is drawn.
+    pub fn concerns_apart(&self) -> (Vec<Concern>, Vec<Concern>) {
+        self.concerns()
+            .into_iter()
+            .partition(|concern| !self.aside.contains(&concern.key()))
+    }
+
     /// The edit that takes this node away, with everything that goes with it.
     ///
     /// A removal carries the node's own words and every line that touches it,
@@ -771,6 +939,16 @@ impl Document {
             Edit::MoveNode { node, now, .. } => {
                 if let Some(node) = self.node_mut(node) {
                     node.at = *now;
+                }
+            }
+            // A decision about a concern, remembered by node and kind: see
+            // `Document::aside`.
+            Edit::SetAside { node, kind, aside } => {
+                let key = (node.clone(), kind.clone());
+                if *aside {
+                    self.aside.insert(key);
+                } else {
+                    self.aside.remove(&key);
                 }
             }
             // One edit for a whole layout: see `Edit::Arrange`. A name that is
@@ -1377,6 +1555,18 @@ impl Document {
                     node.at.1
                 ));
             }
+            // And what was set aside about the nodes in this file.
+            for (node, concern) in self.aside.iter().filter(|(node, _)| {
+                self.nodes_in(home)
+                    .iter()
+                    .any(|drawn| Qualified::of(&drawn.name, home).absolute() == *node)
+            }) {
+                out.push_str(&format!(
+                    "        <set-aside><node>{}</node><concern>{}</concern></set-aside>\n",
+                    escape(&Qualified::parse(node).written_from(home)),
+                    escape(concern)
+                ));
+            }
             out.push_str("    </tcsgui>\n");
         }
 
@@ -1565,14 +1755,39 @@ impl Document {
         // the flight software ignores -- so a reader meets the vehicle first
         // and can stop reading when the vehicle stops.
         let placed = self.nodes_in(home);
+        // What was set aside, and only for the nodes this file holds: a
+        // decision about a node in a subdiagram belongs in that subdiagram's
+        // file, where the node is.
+        let here: Vec<&(String, String)> = self
+            .aside
+            .iter()
+            .filter(|(node, _)| {
+                placed
+                    .iter()
+                    .any(|drawn| Qualified::of(&drawn.name, home).absolute() == *node)
+            })
+            .collect();
+        if !placed.is_empty() || !here.is_empty() {
+            out.push_str("\ntcsgui:\n");
+        }
         if !placed.is_empty() {
-            out.push_str("\ntcsgui:\n  nodes:\n");
+            out.push_str("  nodes:\n");
             for node in placed {
                 out.push_str(&format!(
                     "    - {{ name: {}, x: {}, y: {} }}\n",
                     plain(&node.name),
                     node.at.0,
                     node.at.1
+                ));
+            }
+        }
+        if !here.is_empty() {
+            out.push_str("  set-aside:\n");
+            for (node, concern) in here {
+                out.push_str(&format!(
+                    "    - {{ node: {}, concern: {} }}\n",
+                    plain(&Qualified::parse(node).written_from(home)),
+                    plain(concern)
                 ));
             }
         }
@@ -2851,6 +3066,7 @@ mod tests {
                 Edit::SetLinkComment { .. } => (),
                 Edit::MoveNode { .. } => (),
                 Edit::Arrange { .. } => (),
+                Edit::SetAside { .. } => (),
                 Edit::SetTcspecial { .. } => (),
                 Edit::SetSimPayload { .. } => (),
                 Edit::SetSimGroup { .. } => (),
@@ -2984,6 +3200,13 @@ mod tests {
                 node: "a".into(),
                 was: (0, 0),
                 now: (120, 80),
+            },
+            // A concern set aside, which is a decision about the drawing and
+            // is undone like any other.
+            Edit::SetAside {
+                node: "a".into(),
+                kind: "payload-out-goes-nowhere".into(),
+                aside: true,
             },
             // A whole layout in one edit: where each node was, and where the
             // arrangement put it. Both at (0, 0) to begin with, which is
@@ -3293,6 +3516,164 @@ mod tests {
             yaml.matches("payload-in: true").count(),
             1,
             "once, for the sink and not for each line: {yaml}"
+        );
+    }
+
+    /// What might be wrong is raised; what is meant can be set aside.
+    ///
+    /// Three shapes, and which rules apply depends on the pane: a payload is
+    /// where the payload's own data begins and a MOC link where it ends, so
+    /// those two are asked whether what they send reaches anything, and a
+    /// vehicle node is asked whether a stream passing through it comes out
+    /// somewhere.
+    #[test]
+    fn what_might_be_wrong_is_raised_and_can_be_set_aside() {
+        use crate::journal::Link;
+
+        let mut document = Document::new();
+        for (name, node_type) in [
+            ("sensor", "i2c"),
+            ("ground", "moc"),
+            ("mean_temp", "compute"),
+            ("housekeeping", "log"),
+        ] {
+            document.apply(&add(name, node_type));
+        }
+
+        // Nothing drawn: the payload's readings reach nothing and so does
+        // what the ground sends. The two vehicle nodes are not accused of
+        // anything -- a node nothing is linked to either way is a node
+        // somebody has just placed.
+        let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
+        assert_eq!(
+            said,
+            vec![
+                "payload-out-goes-nowhere".to_string(),
+                "moc-out-goes-nowhere".to_string()
+            ],
+            "{:?}",
+            document.concerns()
+        );
+
+        // The readings reach a computation: the payload is answered, and the
+        // computation is now one a stream stops at.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("sensor", Some("payload-out"), "mean_temp", Some("in0")),
+        });
+        let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
+        assert!(!said.contains(&"payload-out-goes-nowhere".to_string()), "{said:?}");
+        assert!(said.contains(&"nothing-leaves".to_string()), "{said:?}");
+
+        // And on to the ground, which is the shape the whole graph is: a
+        // payload, vehicle nodes, a MOC link.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("mean_temp", Some("payload-out"), "ground", None),
+        });
+        let said: Vec<String> = document.concerns().iter().map(|c| c.kind()).collect();
+        assert_eq!(
+            said,
+            vec!["moc-out-goes-nowhere".to_string()],
+            "{:?}",
+            document.concerns()
+        );
+
+        // A log is where a stream stops on purpose: something arrives and
+        // nothing leaves, and that is what a log is for.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("mean_temp", Some("payload-out"), "housekeeping", None),
+        });
+        assert!(
+            !document
+                .concerns()
+                .iter()
+                .any(|c| c.node() == "housekeeping"),
+            "{:?}",
+            document.concerns()
+        );
+
+        // What is left is the ground's own: nothing is listening to what it
+        // sends. Set aside, it leaves the first list for the second.
+        let concern = document.concerns().first().cloned().expect("one left");
+        document.apply(&Edit::SetAside {
+            node: concern.node().to_string(),
+            kind: concern.kind(),
+            aside: true,
+        });
+        let (raised, aside) = document.concerns_apart();
+        assert!(raised.is_empty(), "{raised:?}");
+        assert_eq!(aside.len(), 1);
+        assert_eq!(aside[0].node(), "ground");
+
+        // Taken up again, it comes back.
+        document.apply(&Edit::SetAside {
+            node: concern.node().to_string(),
+            kind: concern.kind(),
+            aside: false,
+        });
+        assert_eq!(document.concerns_apart().0.len(), 1);
+    }
+
+    /// A concern that stops applying leaves both lists by itself.
+    ///
+    /// What keeps the set-aside list from filling up with decisions about
+    /// shapes that are no longer there: it is remembered by node and kind, and
+    /// a kind that no longer holds is not raised, so nothing has to be tidied
+    /// up after a line is drawn.
+    #[test]
+    fn a_concern_that_stops_applying_is_not_raised_or_remembered() {
+        use crate::journal::Link;
+
+        let mut document = Document::new();
+        document.apply(&add("sensor", "i2c"));
+        document.apply(&add("ground", "moc"));
+        let concern = document
+            .concerns()
+            .into_iter()
+            .find(|c| c.node() == "sensor")
+            .expect("the payload's readings reach nothing");
+        document.apply(&Edit::SetAside {
+            node: concern.node().to_string(),
+            kind: concern.kind(),
+            aside: true,
+        });
+        assert_eq!(document.concerns_apart().1.len(), 1);
+
+        // Drawn, and it is gone from both lists -- while the decision is
+        // still in the document, which is what makes it come back if the line
+        // is deleted.
+        document.apply(&Edit::AddLink {
+            link: Link::joining("sensor", Some("payload-out"), "ground", None),
+        });
+        let (raised, aside) = document.concerns_apart();
+        assert!(
+            !raised.iter().chain(aside.iter()).any(|c| c.node() == "sensor"),
+            "{raised:?} {aside:?}"
+        );
+        // The decision is still in the document, which is what makes it come
+        // back if the line is deleted.
+        assert!(document.aside.contains(&concern.key()));
+    }
+
+    /// A set-aside is written in the editor's own section and read back.
+    #[test]
+    fn a_set_aside_survives_being_written() {
+        let mut document = Document::new();
+        document.apply(&add("sensor", "i2c"));
+        document.apply(&Edit::SetAside {
+            node: "sensor".into(),
+            kind: "payload-out-goes-nowhere".into(),
+            aside: true,
+        });
+
+        let yaml = document.to_yaml();
+        assert!(
+            yaml.contains("  set-aside:\n    - { node: sensor, concern: payload-out-goes-nowhere }"),
+            "{yaml}"
+        );
+        let xml = document.to_xml();
+        assert!(
+            xml.contains("<set-aside><node>sensor</node><concern>payload-out-goes-nowhere</concern></set-aside>"),
+            "{xml}"
         );
     }
 

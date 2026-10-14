@@ -1007,6 +1007,7 @@ mod tests {
             files: Vec::new(),
             homes: BTreeMap::new(),
             placed: BTreeMap::new(),
+            set_aside: Default::default(),
         }
     }
 

@@ -186,6 +186,13 @@ struct Views {
     /// Held so that pressing Exit twice does not stack two of them, and so
     /// that answering it can take it away again.
     leaving: Option<LeaveWindow>,
+    /// The list of what might be wrong, while it is open.
+    ///
+    /// One window for both lists -- what has not been looked at and what was
+    /// set aside -- pointed at either by its own `aside` flag. Held so that
+    /// pressing the button twice does not stack two of them, and so that the
+    /// list can be refreshed under somebody's eyes as they act on it.
+    concerns: Option<ConcernsWindow>,
     /// The question a node's Delete asks, while it is being asked.
     ///
     /// Held so that pressing Delete twice does not stack two of them, and so
@@ -468,6 +475,7 @@ fn main() -> Result<(), slint::PlatformError> {
         parameters: None,
         attributes: BTreeMap::new(),
         leaving: None,
+        concerns: None,
         deleting: None,
         alert: None,
         alerted: Rc::new(RefCell::new(String::new())),
@@ -986,6 +994,22 @@ macro_rules! wiring {
                 });
             }
             {
+                let editor_for_concerns = editor.clone();
+                let views_for_concerns = views.clone();
+                // What might be wrong, and what was set aside: one window,
+                // pointed at either list. See `show_concerns`.
+                window.on_show_concerns(move || {
+                    show_concerns(&editor_for_concerns, &views_for_concerns, false);
+                });
+            }
+            {
+                let editor_for_aside = editor.clone();
+                let views_for_aside = views.clone();
+                window.on_show_aside(move || {
+                    show_concerns(&editor_for_aside, &views_for_aside, true);
+                });
+            }
+            {
                 let editor_for_delete = editor.clone();
                 let views_for_delete = views.clone();
                 let home_for_delete = home.clone();
@@ -1069,6 +1093,11 @@ fn put(
     ui.set_redo_label(label(editor.journal().next_redo()));
     ui.set_trouble(editor.trouble().unwrap_or_default().into());
     ui.set_said(editor.said().unwrap_or_default().into());
+    // What might be wrong, counted on the two buttons: the list itself is a
+    // window. See `Document::concerns`.
+    let (raised, aside) = editor.document().concerns_apart();
+    ui.set_concern_count(raised.len() as i32);
+    ui.set_aside_count(aside.len() as i32);
 }
 
 /// The same, for one open subdiagram.
@@ -1316,6 +1345,144 @@ fn drag_divider(
         vehicle_percent,
     });
     views.borrow().refresh(&editor.borrow());
+}
+
+/// Show what might be wrong, with somewhere to go and something to decide.
+///
+/// `aside` says which of the two lists: what has not been looked at, or what
+/// somebody looked at and left. One window, pointed at either -- two windows
+/// saying almost the same thing would be two windows to keep in step -- so
+/// pressing the other button points this one at the other list.
+///
+/// Rows are held by their place in the list, which is why the window is
+/// refreshed after every decision: a row acted on changes the list under it,
+/// and an index into a list that has moved is a decision about the wrong node.
+fn show_concerns(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, aside: bool) {
+    if views.borrow().concerns.is_none() {
+        let window = match ConcernsWindow::new() {
+            Ok(window) => window,
+            Err(e) => {
+                eprintln!("tcsgui: the list cannot be shown: {e}");
+                return;
+            }
+        };
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_go_to(move |which| {
+                let node = {
+                    let shown = views.borrow();
+                    let Some(window) = shown.concerns.as_ref() else {
+                        return;
+                    };
+                    let (raised, set_aside) = editor.borrow().document().concerns_apart();
+                    let list = if window.get_aside() { set_aside } else { raised };
+                    match list.get(which as usize) {
+                        Some(concern) => concern.node().to_string(),
+                        None => return,
+                    }
+                };
+                go_to(editor.clone(), views.clone(), &node);
+            });
+        }
+        {
+            let editor = editor.clone();
+            let views = views.clone();
+            window.on_decided(move |which| {
+                let decision = {
+                    let shown = views.borrow();
+                    let Some(window) = shown.concerns.as_ref() else {
+                        return;
+                    };
+                    let was_aside = window.get_aside();
+                    let (raised, set_aside) = editor.borrow().document().concerns_apart();
+                    let list = if was_aside { set_aside } else { raised };
+                    list.get(which as usize).map(|concern| Edit::SetAside {
+                        node: concern.node().to_string(),
+                        kind: concern.kind(),
+                        aside: !was_aside,
+                    })
+                };
+                if let Some(edit) = decision {
+                    editor.borrow_mut().edit(edit);
+                    // The list has changed under the row that was pressed, so
+                    // it is written again before anybody presses another.
+                    let aside = views
+                        .borrow()
+                        .concerns
+                        .as_ref()
+                        .is_some_and(|window| window.get_aside());
+                    list_concerns(&editor.borrow(), &views, aside);
+                    views.borrow().refresh(&editor.borrow());
+                }
+            });
+        }
+        {
+            let views = views.clone();
+            window.on_closed(move || {
+                let window = views.borrow_mut().concerns.take();
+                if let Some(window) = window {
+                    let _ = window.hide();
+                }
+            });
+        }
+        views.borrow_mut().concerns = Some(window);
+    }
+
+    list_concerns(&editor.borrow(), views, aside);
+    let window = views.borrow().concerns.as_ref().map(|window| window.as_weak());
+    if let Some(window) = window.and_then(|window| window.upgrade()) {
+        if let Err(e) = window.show() {
+            eprintln!("tcsgui: the list cannot be shown: {e}");
+        }
+    }
+}
+
+/// Write one of the two lists into the window.
+fn list_concerns(editor: &Editor, views: &Rc<RefCell<Views>>, aside: bool) {
+    let (raised, set_aside) = editor.document().concerns_apart();
+    let shown = if aside { set_aside } else { raised };
+    let rows: Vec<ConcernRow> = shown
+        .iter()
+        .map(|concern| ConcernRow {
+            said: concern.describe().into(),
+            node: concern.node().into(),
+        })
+        .collect();
+
+    if let Some(window) = views.borrow().concerns.as_ref() {
+        window.set_aside(aside);
+        window.set_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
+    }
+}
+
+/// Show a node: chosen, in view, and with its window open.
+///
+/// What "go to it" means. The outline says which node the list was talking
+/// about, the scroll puts it where it can be seen -- a node named in a list
+/// and drawn eight hundred pixels below the fold is a list that points at
+/// nothing -- and the window is what somebody went there to look at.
+fn go_to(editor: Rc<RefCell<Editor>>, views: Rc<RefCell<Views>>, node: &str) {
+    let at = editor
+        .borrow()
+        .document()
+        .node(node)
+        .map(|node| node.at)
+        .unwrap_or((0, 0));
+    let home = Qualified::parse(node).in_;
+
+    views
+        .borrow()
+        .chosen
+        .borrow_mut()
+        .insert(home.clone().unwrap_or_default(), node.to_string());
+    if home.is_none() {
+        if let Some(top) = views.borrow().top.upgrade() {
+            top.set_canvas_offset(-(at.1 as f32));
+        }
+    }
+    views.borrow().refresh(&editor.borrow());
+    show_node(&editor, &views, node);
 }
 
 /// Ask whether a node should go, and take it away if the answer is yes.
@@ -2272,7 +2439,7 @@ fn views_of(
                 node.at,
                 fault,
                 false,
-                summary.as_deref().or(node.comment.as_deref()),
+                summary.as_deref(),
             )
         })
         .collect();
@@ -3107,7 +3274,9 @@ fn view_of(
     at: (i32, i32),
     fault: Option<String>,
     selected: bool,
-    comment: Option<&str>,
+    // What a closed subdiagram holds, and nothing for any other type: see
+    // `NodeView::summary`. A node's own comment is in its window.
+    summary: Option<&str>,
 ) -> NodeView {
     let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type);
     let appearance = found.map(|t| t.appearance());
@@ -3183,7 +3352,7 @@ fn view_of(
         faulty: fault.is_some(),
         fault: fault.unwrap_or_default().into(),
         selected,
-        comment: comment.unwrap_or_default().into(),
+        summary: summary.unwrap_or_default().into(),
         // A diagram of its own can be opened; nothing else can.
         openable: node_type == "subdiagram",
         // The terminals this type has, each drawn in its own corner. A type
@@ -3947,9 +4116,9 @@ mod tests {
         let box_ = top.iter().find(|n| n.name == "cabin").unwrap();
         assert!(box_.openable, "a subdiagram should be openable");
         assert!(
-            box_.comment.contains("1 node"),
+            box_.summary.contains("1 node"),
             "the closed box should say what is inside: {}",
-            box_.comment
+            box_.summary
         );
     }
 
@@ -5527,6 +5696,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -5640,6 +5810,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -5761,6 +5932,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -5835,6 +6007,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -5976,6 +6149,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -6076,6 +6250,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -6189,6 +6364,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -6465,6 +6641,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -6597,6 +6774,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -6681,6 +6859,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -6794,6 +6973,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -6861,6 +7041,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -7001,6 +7182,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -7264,6 +7446,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -7331,6 +7514,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
@@ -7442,6 +7626,7 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            concerns: None,
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),

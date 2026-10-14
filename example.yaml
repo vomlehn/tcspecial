@@ -15,6 +15,7 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:6100"
     source_base: "0.0.0.0:6000"
+  rust-code-path: "t.rs"
   tcs_cmd:
     recv: "0.0.0.0:4000"
     send: "127.0.0.1:4100"

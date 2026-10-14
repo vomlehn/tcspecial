@@ -1457,6 +1457,41 @@ row being reserved at the top and the bottom: the name stays in the middle of
 the node and stops short of the corner boxes, where reserving rows would leave
 a few pixels for a name on the shortest node.
 
+Things that might be wrong are counted on a button rather than refused.
+
+A **concern** is a shape that might be a mistake and might be meant: a payload
+whose readings reach nothing, a vehicle node a stream arrives at and nothing
+leaves, one something leaves and nothing arrives at. None of those stops a
+configuration being read, and every one of them is the ordinary state of a
+diagram halfway through being drawn -- so an editor that called them errors
+would be an editor crying wolf at its own user, and one that said nothing would
+leave a sensor nobody reads to be found in flight.
+
+So the bar carries two buttons, and only when there is something to count:
+*"3 concerns"* and *"1 set aside"*. Each opens a list with a line per concern,
+a **Go to it** that chooses the node, scrolls the sheet to it and opens its
+window, and a button that moves it between the two lists. Two buttons because
+they are two questions: "is there anything I have not looked at", and "what did
+I decide to leave" -- a decision nobody can find again is a decision nobody can
+change.
+
+Which rules apply to a node depends on which pane it is in, because that is
+what the data flow is: a payload is where the payload's own data begins and a
+MOC link is where it ends, and the other stream runs the other way. A payload's
+``payload-out`` with nothing on it is a concern -- those readings reach nobody
+-- where a computation's is not, a computation being free to send its result
+the other way or to be read by nothing yet. What is asked of a vehicle node is
+that a stream passing through it comes out somewhere, which is the shape of the
+whole graph. A log is the exception by having no data source at all: it is
+where a stream stops on purpose.
+
+Setting one aside is an edit, so undo takes it back, and it is written in the
+file's own ``tcsgui`` section beside where the nodes were drawn: two people
+editing one configuration should not each have to decide again that a payload
+nobody reads yet is on purpose. It is remembered by node and kind, so a concern
+that stops applying leaves both lists by itself and comes back if the line it
+was about is deleted -- nothing has to be tidied up after drawing.
+
 A click on a node opens a menu of what there is to do with it: **Edit**, which
 opens the window of what the node says, and **Delete**, which asks before
 anything goes. A node is not in the menu bar -- that is for the configuration

@@ -1675,6 +1675,15 @@ file written on board and everybody on the ground are not the same kind of
 end, and the two were never in the same pane for the shared heading to group
 anything.
 
+A page of its own is a *predefined process* -- a rectangle with a bar inset at
+each end, the flowchart symbol for a step whose insides are written down
+somewhere else. It was a rounded box with a second outline inside it, which
+was this symbol by accident and at one remove. It is also the one standard
+symbol available to that node at all: a page carries all four terminals, a
+terminal is drawn in a corner, and every other symbol in the vocabulary buys
+its distinctiveness with a corner. The bars are inside the shape, so they cost
+nothing a corner needs.
+
 The shapes are the ones the standard notations use, which is worth more than
 being inventive: a reader who has seen a data-flow diagram already knows that
 a rounded box is a process, a plain rectangle is something outside the system

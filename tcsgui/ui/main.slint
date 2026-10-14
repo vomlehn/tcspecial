@@ -77,7 +77,7 @@ export struct NodeView {
     y: length,
     width: length,
     height: length,
-    // square | rounded | keyed | store | pointed
+    // square | rounded | keyed | barred | store | pointed
     outline: string,
     // The outline as path data, in this node's own coordinates, for the
     // outlines a corner radius cannot draw. Empty for the ones it can, which
@@ -502,6 +502,27 @@ component NodeShape inherits Rectangle {
                 border-radius: max(0px, parent.border-radius - 3px);
                 background: transparent;
             }
+        }
+
+        // The two bars of a predefined process: a step whose insides are
+        // written down somewhere else. Inset eight pixels, which is about a
+        // twentieth of the width and where a flowchart puts them, and the full
+        // height, so they read as bars rather than as ticks. The terminals are
+        // drawn after these and are nearly opaque, so a bar passes behind the
+        // two it meets.
+        if node.outline == "barred": Rectangle {
+            x: 8px;
+            y: 0;
+            width: node.border;
+            height: 100%;
+            background: ink;
+        }
+        if node.outline == "barred": Rectangle {
+            x: root.width - 8px - node.border;
+            y: 0;
+            width: node.border;
+            height: 100%;
+            background: ink;
         }
 
         // The key: a square corner cut into an otherwise rounded shape, which is

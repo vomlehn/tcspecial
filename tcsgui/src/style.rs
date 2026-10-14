@@ -53,6 +53,23 @@ pub enum Outline {
     /// A rectangle with one pair of corners rounded and one square, which
     /// reads as a direction. Interfaces that are driven rather than read.
     Keyed,
+    /// A square rectangle with a bar inset at each end: a predefined process.
+    ///
+    /// The flowchart symbol for a step whose insides are written down
+    /// somewhere else -- a subroutine -- which is what a page of its own is.
+    /// It was a rounded rectangle with a second outline inside it, which was
+    /// this symbol by accident and at one remove; the bars say the same thing
+    /// the way every reader of a flowchart has already been taught it.
+    ///
+    /// Square corners, because a page of its own carries all four terminals
+    /// and a terminal is drawn in a corner. The bars are inside the shape, so
+    /// they cost nothing a corner needs: that is why this is the one standard
+    /// symbol available to a node with every terminal.
+    ///
+    /// Drawn from a radius of nothing and two bars in the markup, not from a
+    /// path: the bars are not one closed shape, and the markup already draws
+    /// the keyed corner the same way.
+    Barred,
     /// Five sides, pointed groundward: the ground station.
     ///
     /// The one node on the canvas that is not part of the vehicle at all -- it
@@ -929,7 +946,8 @@ impl NodeType {
     ///
     /// The groupings are meant to be learnable rather than arbitrary: square
     /// corners are hardware, rounded corners are software, a keyed rectangle
-    /// is an interface that is driven, and the two ends of the graph are the
+    /// is an interface that is driven, a barred one is a page written down
+    /// somewhere else, and the two ends of the graph are the
     /// two shapes nothing else uses -- a pill where it stops on board, a
     /// store where it is kept. Within a shape the types differ by
     /// shading, weight and size.
@@ -1081,17 +1099,23 @@ impl NodeType {
                 size: (WIDTH, 64),
                 tint: Tint::Pine,
             },
-            // A diagram of its own. Doubly outlined and the tallest thing on
-            // the canvas bar the two ends of the graph, because it stands for
-            // a page rather than a device: the two outlines read as a box
-            // holding a box, which is what it is.
+            // A diagram of its own: a step whose insides are written down
+            // somewhere else, which is a predefined process -- a rectangle
+            // with a bar inset at each end. It was a rounded box with a second
+            // outline inside it, which was this symbol by accident and at one
+            // remove.
+            //
+            // Open now rather than doubled, because the bars are the second
+            // thing inside the shape and two of those is a busy node. Still
+            // the tallest thing on the canvas bar the log, because it stands
+            // for a page rather than a device.
             NodeType::Subdiagram => Appearance {
                 face: Face::Plain,
                 label_size: 14,
                 label_weight: 700,
                 label_italic: false,
-                outline: Rounded,
-                shading: Double,
+                outline: Barred,
+                shading: Open,
                 weight: Wide,
                 size: (WIDTH, 88),
                 tint: Tint::Moss,

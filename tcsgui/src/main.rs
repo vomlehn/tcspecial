@@ -2362,18 +2362,29 @@ fn dropped(
 ) -> Option<Edit> {
     let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
 
-    // Over nothing: the link goes. Over a node the end cannot attach to --
-    // one with no terminal of this stream -- nothing happens: a line that
-    // cannot be drawn is not drawn, and a gesture that landed on a node is
-    // not a gesture that put the line down.
     // The end being carried keeps its own terminal: a `from_payload` taken
     // off one node goes on another node's `from_payload` and nowhere else.
     let Some(over) = landed(document, home, (x, y), &pressed.terminal) else {
-        return if node_under(document, home, (x, y)).is_none() {
-            Some(Edit::RemoveLink { link: held.clone() })
-        } else {
-            None
-        };
+        // Over nothing at all: the link goes.
+        if node_under(document, home, (x, y)).is_none() {
+            return Some(Edit::RemoveLink { link: held.clone() });
+        }
+        // Over a node that cannot be this end, but could be the other one:
+        // then the gesture was drawing a new line and not moving this one.
+        //
+        // Which is the only way to draw a second line out of a data source. A
+        // source may feed several sinks; a terminal with one line on it hands
+        // that line over, so pressing a source that already has one and
+        // dropping it on a payload used to do nothing at all -- the payload
+        // cannot be a source, so there was nowhere for the end to go. It is
+        // what somebody tried first, and what they meant was obvious: this
+        // node, fed from here.
+        //
+        // Tried second, so nothing that worked before changes. A node that
+        // *can* take this end still takes it -- that is the re-routing
+        // gesture, and it is the reading a person has when they drag an end
+        // off one vehicle node onto another.
+        return joined(document, home, pressed, (x, y)).map(|link| Edit::AddLink { link });
     };
 
     // Back where it started.
@@ -4318,17 +4329,24 @@ mod tests {
         }
 
         // Not onto the far node itself, which would be a link from a node to
-        // itself -- and not onto a node with no terminal of this stream. A
-        // payload receives what asks it for a reading and does not receive
-        // readings, so an arriving end has nowhere to go on one.
+        // itself.
         assert_eq!(
             dropped(&document, &None, &held, &pressed, over("sensor", "from_moc")),
             None
         );
+
+        // And onto a node that cannot be this end but could be the other one,
+        // the gesture is read as drawing a line rather than moving one: a
+        // payload has no from_payload, so dropping the ground's arriving end
+        // on one means "this payload reports here too". The ground's sink
+        // takes as many as the configuration gives it, which is what makes
+        // that a sentence and not a contradiction.
         assert_eq!(
             dropped(&document, &None, &held, &pressed, middle("other")),
-            None,
-            "a payload has no from_payload for this end to land on"
+            Some(Edit::AddLink {
+                link: Link::joining("other", Some("to_moc"), "ground", None)
+            }),
+            "a second line into the ground should be drawn, not refused"
         );
 
         // Over nothing at all: the link goes.
@@ -4365,6 +4383,72 @@ mod tests {
             dropped(&document, &None, &held, &pressed, over("other", "to_moc")),
             None
         );
+    }
+
+    /// A second line out of a data source is drawn from that source.
+    ///
+    /// The gesture somebody tried first and found dead: a moc node already
+    /// feeding one payload, pressed on its `to_payload` and let go of over a
+    /// second payload. That terminal has one line on it, so the press means
+    /// "pick this line up" -- and a payload cannot be a data source, so there
+    /// was nowhere for the end to land and nothing happened at all. What they
+    /// meant was plain: that node, fed from here.
+    ///
+    /// So a landing that cannot be this end and could be the other one is read
+    /// as a new line. Which is the only gesture there is for a second line out
+    /// of a source: a source may feed several sinks, and the one it already
+    /// feeds is what makes the press ambiguous in the first place.
+    #[test]
+    fn a_source_that_already_feeds_one_node_can_feed_another() {
+        use journal::{Edit, Link};
+
+        let mut document = Document::new();
+        for (name, node_type, at) in [
+            ("ground", "moc", (0, 0)),
+            ("i2c", "i2c", (dividers().vehicle + 8, 0)),
+            ("spi", "spi", (dividers().vehicle + 8, 152)),
+        ] {
+            document.apply(&Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+            document.apply(&Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+        // The line that is already there, which is what made the gesture
+        // ambiguous: the ground feeds one payload.
+        let held = Link::joining("ground", Some("to_payload"), "i2c", None);
+        document.apply(&Edit::AddLink { link: held.clone() });
+
+        // Pressed on the ground's to_payload, which hands over the line it
+        // has, and let go of in the middle of the other payload.
+        let pressed = Drawing {
+            node: "ground".to_string(),
+            terminal: "to_payload".to_string(),
+            holding: Some(held.clone()),
+        };
+        let (width, height) = size_of("spi");
+        let at = document.node("spi").expect("the node").at;
+        let over = (
+            at.0 as f32 + width as f32 / 2.0,
+            at.1 as f32 + height as f32 / 2.0,
+        );
+
+        assert_eq!(
+            dropped(&document, &None, &held, &pressed, over),
+            Some(Edit::AddLink {
+                link: Link::joining("ground", Some("to_payload"), "spi", None)
+            }),
+            "the second line was not drawn"
+        );
+
+        // And the line that was picked up is still there: a gesture that drew
+        // a line did not move one.
+        assert!(document.links.contains(&held));
     }
 
     /// A terminal with one link on it hands it over; one with several does not.

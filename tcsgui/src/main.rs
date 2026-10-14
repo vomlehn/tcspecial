@@ -4301,6 +4301,21 @@ mod tests {
         .expect("a link drawn from the sink end");
         assert_eq!(backwards, link, "the same link, whichever end it was drawn from");
 
+        // And from a data sink onto the *node*, which is the same gesture with
+        // nothing to aim at: a sink is fed by one stream, so the terminal the
+        // line leaves by is the payload's to_moc whether or not the hand
+        // found the box.
+        assert_eq!(
+            joined(
+                &document,
+                &None,
+                &drawn("ground", "from_payload"),
+                middle("sensor"),
+            ),
+            Some(link.clone()),
+            "a line from a data sink should reach a node dropped anywhere on it"
+        );
+
         // Released over the null node's own to_moc box, which is a release
         // over the null node: the readings land on its from_payload, that
         // being where a groundward stream arrives.

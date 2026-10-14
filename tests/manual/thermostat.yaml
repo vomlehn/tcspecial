@@ -27,7 +27,6 @@ moc:
     type: moc
     address: "10.0.0.1"
     port: "5000"
-    editor: { x: 660, y: 40 }
 
 vehicle:
   - name: k_fore
@@ -37,7 +36,6 @@ vehicle:
     offset: "273.15"
     scale: "0.0625"
     to_moc: [moc, mean_temp.in0, housekeeping]
-    editor: { x: 240, y: 40 }
   - name: k_aft
     type: compute
     format: "i16_be"
@@ -45,7 +43,6 @@ vehicle:
     offset: "273.15"
     scale: "0.0625"
     to_moc: [moc, mean_temp.in1, housekeeping]
-    editor: { x: 240, y: 160 }
   - name: k_bay
     type: compute
     format: "u24_be"
@@ -53,13 +50,11 @@ vehicle:
     offset: "255.37"
     scale: "0.0078"
     to_moc: [moc, mean_temp.in2, housekeeping]
-    editor: { x: 240, y: 280 }
   - name: mean_temp
     type: compute
     function: "mean"
     inputs: "in0,in1,in2"
     to_moc: [moc, thermostat]
-    editor: { x: 460, y: 160 }
   # setpoint is set from the ground; above and below are the two degrees
   # either side that the heaters are switched at.
   - name: thermostat
@@ -71,12 +66,10 @@ vehicle:
     to_moc: housekeeping
     # asserted below the setpoint, unasserted above it
     to_payload: heaters
-    editor: { x: 660, y: 240 }
   - name: housekeeping
     type: log
     directory: "/var/log/tcspecial"
     format: "variable_ts_rc"
-    editor: { x: 460, y: 380 }
 
 payloads:
   # Forward bulkhead. Two bytes, signed, big endian.
@@ -87,7 +80,6 @@ payloads:
     path: "/dev/i2c-1"
     read_size: "2"
     to_moc: k_fore
-    editor: { x: 40, y: 40 }
   # Aft bulkhead; same part as temp_fore.
   - name: temp_aft
     type: i2c
@@ -96,7 +88,6 @@ payloads:
     path: "/dev/i2c-1"
     read_size: "2"
     to_moc: k_aft
-    editor: { x: 40, y: 160 }
   # Equipment bay. Three bytes, unsigned -- a different part, hence its
   # own conversion.
   - name: temp_bay
@@ -107,15 +98,27 @@ payloads:
     read_size: "3"
     spi_mode: "0"
     to_moc: k_bay
-    editor: { x: 40, y: 280 }
   # Three circuits, driven together.
   - name: heaters
     type: gpio
     direction: "output"
     lines: "3,4,5"
     path: "/dev/gpiochip0"
-    editor: { x: 860, y: 240 }
 
 commands:
   # the cabin temperature the heaters are held at, in kelvin
   - { from: moc, sets: thermostat.setpoint }
+
+tcsgui:
+  nodes:
+    - { name: temp_fore, x: 40, y: 40 }
+    - { name: temp_aft, x: 40, y: 160 }
+    - { name: temp_bay, x: 40, y: 280 }
+    - { name: k_fore, x: 240, y: 40 }
+    - { name: k_aft, x: 240, y: 160 }
+    - { name: k_bay, x: 240, y: 280 }
+    - { name: mean_temp, x: 460, y: 160 }
+    - { name: thermostat, x: 660, y: 240 }
+    - { name: moc, x: 660, y: 40 }
+    - { name: heaters, x: 860, y: 240 }
+    - { name: housekeeping, x: 460, y: 380 }

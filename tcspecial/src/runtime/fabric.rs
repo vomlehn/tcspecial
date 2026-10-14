@@ -795,7 +795,6 @@ mod tests {
             node_type: "compute".to_string(),
             group: None,
             attributes: Default::default(),
-            editor: None,
         };
         let link = |from: &str, to: &str| Link {
             from: from.to_string(),
@@ -816,6 +815,7 @@ mod tests {
             commands: Vec::new(),
             files: Vec::new(),
             homes: Default::default(),
+            placed: Default::default(),
         };
 
         let mut fabric = Fabric::new(Routes::of(&graph), 64);

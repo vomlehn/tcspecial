@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 
 use tcslibgs::graph::parameters::nest;
 use tcslibgs::graph::{
-    CommandBinding, Destinations, Editor, Graph, Group, Link, Node,
+    CommandBinding, Destinations, Graph, Group, Link, Node,
 };
 use tcslibgs::Scalar;
 
@@ -50,7 +50,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 660, y: 40 }),
             },
             Node {
                 name: "k_fore".to_string(),
@@ -64,7 +63,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 240, y: 40 }),
             },
             Node {
                 name: "k_aft".to_string(),
@@ -78,7 +76,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 240, y: 160 }),
             },
             Node {
                 name: "k_bay".to_string(),
@@ -92,7 +89,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 240, y: 280 }),
             },
             Node {
                 name: "mean_temp".to_string(),
@@ -104,7 +100,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 460, y: 160 }),
             },
             Node {
                 name: "thermostat".to_string(),
@@ -118,7 +113,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 660, y: 240 }),
             },
             Node {
                 name: "housekeeping".to_string(),
@@ -130,7 +124,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 460, y: 380 }),
             },
             Node {
                 name: "temp_fore".to_string(),
@@ -144,7 +137,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 40, y: 40 }),
             },
             Node {
                 name: "temp_aft".to_string(),
@@ -158,7 +150,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 40, y: 160 }),
             },
             Node {
                 name: "temp_bay".to_string(),
@@ -173,7 +164,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 40, y: 280 }),
             },
             Node {
                 name: "heaters".to_string(),
@@ -186,7 +176,6 @@ pub fn configuration() -> Graph {
                 ]
                 .into_iter()
                 .collect(),
-                editor: Some(Editor { x: 860, y: 240 }),
             },
         ],
         links: vec![
@@ -276,5 +265,6 @@ pub fn configuration() -> Graph {
         ],
         files: Vec::new(),
         homes: BTreeMap::new(),
+        placed: BTreeMap::new(),
     }
 }

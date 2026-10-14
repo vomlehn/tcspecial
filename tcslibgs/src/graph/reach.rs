@@ -496,7 +496,6 @@ mod tests {
                 .iter()
                 .map(|(a, v)| (a.to_string(), Scalar::of(*v)))
                 .collect::<BTreeMap<_, _>>(),
-            editor: None,
         }
     }
 

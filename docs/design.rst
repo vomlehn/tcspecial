@@ -1211,8 +1211,26 @@ rename forgets nothing; the old file is left for its owner to delete.
 
 That file and not the configuration, which is the distinction worth stating. A
 node's position is in the configuration because it is part of the diagram --
-two people reading one configuration should see one drawing. How the canvas is
-divided is not part of the diagram: it is a working preference of the person at
+two people reading one configuration should see one drawing -- in a ``tcsgui``
+section at the end of the file rather than on the node it is about:
+
+.. code-block:: yaml
+
+   tcsgui:
+     nodes:
+       - { name: moc, x: 24, y: 40 }
+       - { name: payload, x: 744, y: 160 }
+
+Last, and in a section of its own, because it is a different kind of thing.
+The sections above say what the vehicle carries and what it is told; this says
+where somebody put the boxes on a screen, which the flight software ignores
+entirely. So a reader meets the vehicle first and can stop reading when the
+vehicle stops, and a node entry is about the vehicle and nothing else. A node's
+position written on the node is refused where the file is read, saying where it
+has gone.
+
+How the canvas is divided is a different question again, and the answer is the
+other way about: it is not part of the diagram at all: it is a working preference of the person at
 the keyboard, and writing it into the configuration would make resizing a pane
 a change to a file that flies. A percentage rather than pixels for the same
 reason: a percentage is the thing the person chose, where a pixel count is how

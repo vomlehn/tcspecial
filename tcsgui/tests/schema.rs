@@ -76,12 +76,14 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
         "vehicle",
         "payloads",
         "commands",
+        // The editor's own, last in the file: where each node was drawn.
+        "tcsgui",
     ] {
         assert!(sections.contains(section), "the schema has no {section}");
     }
     // And nothing else: a section the schema offers and the reader refuses
     // would be a schema telling somebody to write a file that cannot be read.
-    assert_eq!(sections.len(), 9, "{sections:?}");
+    assert_eq!(sections.len(), 10, "{sections:?}");
 
     // The sections that are gone are gone from the schema too. A file written
     // to the earlier shape is refused where it is read, and an editor offering

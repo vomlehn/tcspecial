@@ -41,7 +41,6 @@
              arrives. A link is an attribute of the node it leaves, named
              after the data source it leaves by. -->
         <to_moc>moc</to_moc>
-        <editor><x>744</x><y>160</y></editor>
     </payloads>
     <moc>
         <name>moc</name>
@@ -51,6 +50,10 @@
         <!-- Down: what the ground sends reaches the payload, leaving by the
              ground link's own to_payload. -->
         <to_payload>payload</to_payload>
-        <editor><x>24</x><y>40</y></editor>
     </moc>
+    <!-- What the editor arranged: where each node was drawn. -->
+    <tcsgui>
+        <nodes><name>payload</name><x>744</x><y>160</y></nodes>
+        <nodes><name>moc</name><x>24</x><y>40</y></nodes>
+    </tcsgui>
 </configuration>

@@ -103,7 +103,13 @@ pub fn read(path: &Path) -> Result<Document, String> {
             name: Qualified::of(&node.name, &home).absolute(),
             node_type: node.node_type.clone(),
             attributes,
-            at: node.editor.as_ref().map_or((0, 0), |at| (at.x, at.y)),
+            // Where it was drawn, from the editor's own section at the end of
+            // the file: a node entry says what the vehicle carries, and this
+            // says where somebody put the box.
+            at: graph
+                .placed
+                .get(&node.name)
+                .map_or((0, 0), |at| (at.x, at.y)),
             home,
             comment: said.nodes.get(&node.name).cloned(),
         });

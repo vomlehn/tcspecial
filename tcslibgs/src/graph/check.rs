@@ -930,6 +930,7 @@ mod tests {
             commands: Vec::new(),
             files: Vec::new(),
             homes: BTreeMap::new(),
+            placed: BTreeMap::new(),
         }
     }
 
@@ -985,7 +986,6 @@ mod tests {
             node_type: node_type.to_string(),
             group: None,
             attributes,
-            editor: None,
         }
     }
 
@@ -1022,7 +1022,6 @@ mod tests {
             node_type: node_type.to_string(),
             group: None,
             attributes: BTreeMap::new(),
-            editor: None,
         };
 
         let g = graph(

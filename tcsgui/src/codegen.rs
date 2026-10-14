@@ -219,12 +219,13 @@ fn program() -> PathBuf {
         return PathBuf::from(said);
     }
     if let Ok(ours) = std::env::current_exe() {
-        for directory in [ours.parent(), ours.parent().and_then(|at| at.parent())] {
-            if let Some(at) = directory {
-                let beside = at.join(GENERATOR);
-                if beside.is_file() {
-                    return beside;
-                }
+        for at in [ours.parent(), ours.parent().and_then(|at| at.parent())]
+            .into_iter()
+            .flatten()
+        {
+            let beside = at.join(GENERATOR);
+            if beside.is_file() {
+                return beside;
             }
         }
     }
@@ -236,22 +237,12 @@ fn program() -> PathBuf {
 /// For the tests, which check what the editor does with what it says: a test
 /// that failed because the generator has not been built would be a test that
 /// says nothing about the editor. See [`program`] for where it is looked for.
+#[cfg(test)]
 pub fn available() -> bool {
     std::process::Command::new(program()).output().is_ok()
 }
 
-/// A string as Rust spells it.
-fn quoted(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
-}
 
-/// An `Option<String>` as Rust spells it.
-fn option_of(value: Option<&str>) -> String {
-    match value.map(str::trim).filter(|value| !value.is_empty()) {
-        Some(value) => format!("Some({}.to_string())", quoted(value)),
-        None => "None".to_string(),
-    }
-}
 
 #[cfg(test)]
 mod tests {

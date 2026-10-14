@@ -2442,6 +2442,15 @@ export component AlertWindow inherits Window {
     // What went wrong, in the words the thing that failed used: a path, a
     // reason from the operating system, the attribute a rule refused.
     in property <string> trouble: "";
+    // What kind of thing it is, in one line, and what to do about it.
+    //
+    // Two kinds reach this window and they want different sentences: a command
+    // that failed -- a write, a generation -- and something wrong with the
+    // configuration itself. Both are errors and neither has thrown anything
+    // away, but "press Save" is advice about the first and nonsense about the
+    // second.
+    in property <string> heading: "Something did not work.";
+    in property <string> advice: "";
 
     callback acknowledged();
 
@@ -2450,7 +2459,7 @@ export component AlertWindow inherits Window {
         spacing: Space.step;
 
         Text {
-            text: "Something did not work.";
+            text: root.heading;
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
@@ -2461,13 +2470,12 @@ export component AlertWindow inherits Window {
             font-size: Type.body;
             wrap: word-wrap;
         }
-        Text {
+        if root.advice != "": Text {
             // The one thing worth saying beside the reason, because it is the
             // thing a person wants to know first and the answer is usually
             // yes: the editor is still holding the session, so whatever the
             // message says, nothing has been thrown away.
-            text: "The session is still open. Put the cause right and press "
-                + "Save, or carry on editing -- nothing has been lost.";
+            text: root.advice;
             font-size: Type.small;
             color: #6b7280;
             wrap: word-wrap;

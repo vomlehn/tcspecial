@@ -208,6 +208,12 @@ struct Views {
     /// on each of them would be a window nobody could type past.
     alert: Option<AlertWindow>,
     alerted: Rc<RefCell<String>>,
+    /// Which faults have been put in front of somebody already.
+    ///
+    /// By the sentence, because that is what was shown. A fault that is no
+    /// longer there is forgotten, so one put right and made again is said
+    /// again -- see `alert_faults`.
+    faulted: Rc<RefCell<std::collections::BTreeSet<String>>>,
     /// The simulator's groups window, if it is open, and which group it is
     /// showing.
     ///
@@ -280,16 +286,82 @@ impl Views {
     /// after it is one more the files do not have.
     fn alert(&self, editor: &Editor) {
         let said = editor.trouble().unwrap_or_default().to_string();
-        if said == *self.alerted.borrow() {
-            return;
+        if said != *self.alerted.borrow() {
+            *self.alerted.borrow_mut() = said.clone();
+            if !said.is_empty() {
+                self.say(
+                    "Something did not work.",
+                    &said,
+                    "The session is still open. Put the cause right and press \
+                     Save, or carry on editing -- nothing has been lost.",
+                );
+            }
         }
-        *self.alerted.borrow_mut() = said.clone();
-        if said.is_empty() {
-            return;
-        }
+        self.alert_faults(editor);
+    }
 
+    /// And what is wrong with the configuration, the first time it is wrong.
+    ///
+    /// A fault is an error: two nodes of one name, two lines into one input, a
+    /// value a rule refuses. The configuration will not fly with one in it, so
+    /// `tcsverify` fails and the flight software would refuse the file -- and
+    /// until now the editor said it in red on the node and nowhere else, which
+    /// is a sentence inside a box forty-eight pixels tall.
+    ///
+    /// Once per fault, and the set of what has been said is kept so that a
+    /// fault put right and made again is said again: every edit refreshes
+    /// every window, and a window that came back on each of them would be one
+    /// nobody could type past. The red on the node stays, and so does the
+    /// sentence in the node's own window; this is the moment it appeared.
+    fn alert_faults(&self, editor: &Editor) {
+        use tcslibgs::graph::check::{AND_OTHERS, LISTED};
+
+        let faults: Vec<String> = editor
+            .faults()
+            .iter()
+            .map(|fault| fault.describe())
+            .collect();
+
+        // What is new, and what has gone: a fault that is no longer there is
+        // forgotten, which is what lets it be said again if it comes back.
+        let mut alerted = self.faulted.borrow_mut();
+        alerted.retain(|said| faults.contains(said));
+        let fresh: Vec<String> = faults
+            .iter()
+            .filter(|said| !alerted.contains(*said))
+            .cloned()
+            .collect();
+        if fresh.is_empty() {
+            return;
+        }
+        for said in &fresh {
+            alerted.insert(said.clone());
+        }
+        drop(alerted);
+
+        let listed: Vec<String> = fresh.iter().take(LISTED).cloned().collect();
+        let rest = fresh.len().saturating_sub(LISTED);
+        let said = if rest > 0 {
+            format!("{}; {AND_OTHERS} ({rest} more)", listed.join("; "))
+        } else {
+            listed.join("; ")
+        };
+
+        self.say(
+            "Something is wrong with the configuration.",
+            &said,
+            "It is drawn in red on the node it is about, and said again in \
+             that node's own window. Nothing has been lost, and the \
+             configuration will not fly until it is put right.",
+        );
+    }
+
+    /// Put one of those in front of somebody.
+    fn say(&self, heading: &str, said: &str, advice: &str) {
         let Some(window) = &self.alert else { return };
+        window.set_heading(heading.into());
         window.set_trouble(said.into());
+        window.set_advice(advice.into());
         if let Err(e) = window.show() {
             // Nowhere to say it but the terminal, the thing that says things
             // having failed.
@@ -479,6 +551,7 @@ fn main() -> Result<(), slint::PlatformError> {
         deleting: None,
         alert: None,
         alerted: Rc::new(RefCell::new(String::new())),
+        faulted: Rc::new(RefCell::new(Default::default())),
         sim_groups: None,
         showing_sim_group: Rc::new(RefCell::new(String::new())),
         showing: Rc::new(RefCell::new(String::new())),
@@ -5744,6 +5817,7 @@ mod tests {
         a_link_is_deleted_by_dragging_its_end_onto_the_canvas();
         placing_a_described_node_answers_what_it_describes();
         an_error_is_put_where_it_cannot_be_missed();
+        a_fault_is_put_where_it_cannot_be_missed();
         the_menu_arranges_the_nodes_and_shows_them();
         the_line_being_drawn_follows_the_pointer();
         deleting_a_node_asks_first();
@@ -5790,6 +5864,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5904,6 +5979,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6026,6 +6102,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6101,6 +6178,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6190,6 +6268,106 @@ mod tests {
         shut(0o700);
     }
 
+    /// Something wrong with the configuration is put in front of them too.
+    ///
+    /// A fault is an error: two lines into one input, two nodes of one name, a
+    /// value a rule refuses. The configuration will not fly with one in it, and
+    /// until this the editor said so in red inside a node forty-eight pixels
+    /// tall and nowhere else. Said once, and said again if it is put right and
+    /// made again.
+    fn a_fault_is_put_where_it_cannot_be_missed() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(Editor::open(
+            &where_.path().join("vehicle.yaml"),
+            dividers(),
+        )));
+        for (name, node_type) in [
+            ("temp_fore", "i2c"),
+            ("temp_aft", "i2c"),
+            ("mean_temp", "compute"),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+        }
+
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            concerns: None,
+            deleting: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        alerting(&views);
+
+        let shown = || {
+            let views = views.borrow();
+            let window = views.alert.as_ref().expect("a window to say it with");
+            (
+                window.window().is_visible(),
+                window.get_heading().to_string(),
+                window.get_trouble().to_string(),
+            )
+        };
+
+        // Nothing wrong yet: three nodes and no lines is a diagram somebody
+        // has started, which is a concern at most.
+        views.borrow().refresh(&editor.borrow());
+        assert!(!shown().0, "{:?}", editor.borrow().faults());
+
+        // Two lines into one input, which is the fault: a mean over one
+        // reading and itself.
+        let twice = |to: &str| journal::Link::joining(to, Some("payload-out"), "mean_temp", Some("in0"));
+        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_fore") });
+        views.borrow().refresh(&editor.borrow());
+        assert!(!shown().0, "one line into an input is no fault");
+
+        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_aft") });
+        views.borrow().refresh(&editor.borrow());
+        let (visible, heading, said) = shown();
+        assert!(visible, "the fault was not shown");
+        assert!(heading.contains("configuration"), "{heading}");
+        assert!(said.contains("two links arrive"), "{said}");
+        assert!(said.contains("mean_temp.in0"), "{said}");
+
+        // Acknowledged, and the next edit does not bring it back: the red on
+        // the node and the sentence in its window are still saying it.
+        views.borrow().alert.as_ref().unwrap().invoke_acknowledged();
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "temp_bay".to_string(),
+            node_type: "i2c".to_string(),
+            home: None,
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(!shown().0, "the same fault should not come back");
+
+        // Put right and made again, and it is said again: a fault that is no
+        // longer there is forgotten, which is what lets it be said twice.
+        editor.borrow_mut().edit(Edit::RemoveLink { link: twice("temp_aft") });
+        views.borrow().refresh(&editor.borrow());
+        assert!(editor.borrow().faults().is_empty(), "{:?}", editor.borrow().faults());
+        editor.borrow_mut().edit(Edit::AddLink { link: twice("temp_aft") });
+        views.borrow().refresh(&editor.borrow());
+        assert!(shown().0, "a fault made again should be said again");
+    }
+
 
     /// Dragging a link's end onto empty canvas deletes it.
     ///
@@ -6243,6 +6421,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6344,6 +6523,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6458,6 +6638,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6614,28 +6795,29 @@ mod tests {
                 .filter_map(|row| ui.get_nodes().row_data(row))
                 .map(|node| node.name.to_string())
                 .collect();
-            // In the order the file's sections are read: the ground link,
-            // then the vehicle's own graph, then what it carries -- which is
-            // the three working panes left to right.
+            // Every node the file holds, in the order its sections are read:
+            // the ground link, then the vehicle's own graph, then what it
+            // carries -- which is the three working panes left to right.
+            //
+            // What the file holds rather than a list written out here: this is
+            // the file the editor opens by default, so what is in it is
+            // whatever was last drawn.
+            let held: Vec<String> = editor
+                .borrow()
+                .document()
+                .nodes
+                .iter()
+                .map(|node| node.name.clone())
+                .collect();
+            assert!(!held.is_empty(), "example.{extension} describes nothing");
             assert_eq!(
-                names,
-                vec![
-                    "moc".to_string(),
-                    "mean".to_string(),
-                    "mean-2".to_string(),
-                    "payload".to_string(),
-                    "i2c".to_string(),
-                    "i2c-2".to_string(),
-                ],
+                names, held,
                 "example.{extension} should put its nodes on the canvas"
             );
-            // And no lines, the example shipping with none: it is what the
-            // editor opens by default and what somebody draws their own graph
-            // in.
             assert_eq!(
                 ui.get_links().row_count(),
-                0,
-                "example.{extension} ships with no lines"
+                editor.borrow().document().links.len(),
+                "example.{extension}: the canvas and the file disagree about its lines"
             );
         }
 
@@ -6735,6 +6917,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6868,6 +7051,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6953,6 +7137,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -7100,6 +7285,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -7168,6 +7354,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -7309,6 +7496,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -7573,6 +7761,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -7641,6 +7830,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -7753,6 +7943,7 @@ mod tests {
             deleting: None,
             alert: None,
             alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),

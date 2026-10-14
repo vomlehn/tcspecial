@@ -37,11 +37,13 @@
         <type>moc</type>
         <address>127.0.0.1</address>
         <port>5000</port>
+        <payload-in>true</payload-in>
     </moc>
     <vehicle>
         <name>mean</name>
         <type>compute</type>
         <function>mean</function>
+        <payload-in>true</payload-in>
     </vehicle>
     <vehicle>
         <name>mean-2</name>
@@ -74,14 +76,17 @@
         <port>5100</port>
         <protocol>udp</protocol>
         <trigger>01</trigger>
+        <payload-out><target>mean</target><input>payload-in</input></payload-out>
     </payloads>
     <payloads>
         <name>i2c</name>
         <type>i2c</type>
+        <payload-out><target>mean</target><input>payload-in</input></payload-out>
     </payloads>
     <payloads>
         <name>i2c-2</name>
         <type>i2c</type>
+        <payload-out><target>moc</target></payload-out>
     </payloads>
     <tcsgui>
         <nodes><name>moc</name><x>24</x><y>128</y></nodes>

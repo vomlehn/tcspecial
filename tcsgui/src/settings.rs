@@ -1,11 +1,12 @@
 //! What tcsgui remembers between sessions, in
 //! `$HOME/.tcsgui/preferences.xml`.
 //!
-//! Two settings: how much of the working pane the moc working pane takes and
-//! how much the vehicle's takes, as percentages. The panes are always in the
-//! same order -- moc, vehicle, payloads -- so two percentages and that
-//! sentence are the whole of where the two dividers are, the payload pane
-//! taking what is left.
+//! Four settings, in two pairs. How much of the working pane the moc working
+//! pane takes and how much the vehicle's takes, across; and how much of the
+//! selection column the moc list takes and how much the vehicle's takes,
+//! down. Each set of panes is always in the same order -- moc, vehicle,
+//! payloads -- so two percentages and that sentence are the whole of where a
+//! pair of dividers is, the payload one taking what is left.
 //!
 //! Here rather than in the configuration, which is the distinction worth
 //! stating. A node's position is in the configuration because it is part of
@@ -51,6 +52,22 @@ pub const MOST: i32 = 100 - 2 * LEAST;
 pub const DEFAULT_MOC: i32 = 20;
 pub const DEFAULT_VEHICLE: i32 = 55;
 
+/// How the selection column is divided until somebody divides it
+/// differently.
+///
+/// Down rather than across, and the shares are not the working panes': what a
+/// selection list has to show is its *entries*, and there are one, four and
+/// ten of them. Each share is enough for the list's heading and the first node
+/// under it at the window's own height, which is the rule
+/// `tests::every_selection_list_shows_a_node_when_the_window_opens` holds
+/// these to -- a list opened with nothing in it is a list somebody has to
+/// discover is there.
+///
+/// The payload list takes what is left, which is the largest share for the
+/// longest list.
+pub const DEFAULT_LIST_MOC: i32 = 20;
+pub const DEFAULT_LIST_VEHICLE: i32 = 35;
+
 /// What the editor remembers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Settings {
@@ -59,6 +76,11 @@ pub struct Settings {
     /// And how much the vehicle working pane takes. The payload working pane
     /// takes what is left.
     pub vehicle_percent: i32,
+    /// How much of the selection column the moc list takes.
+    pub list_moc_percent: i32,
+    /// And how much the vehicle list takes. The payload list takes what is
+    /// left.
+    pub list_vehicle_percent: i32,
 }
 
 impl Default for Settings {
@@ -66,6 +88,8 @@ impl Default for Settings {
         Settings {
             moc_percent: DEFAULT_MOC,
             vehicle_percent: DEFAULT_VEHICLE,
+            list_moc_percent: DEFAULT_LIST_MOC,
+            list_vehicle_percent: DEFAULT_LIST_VEHICLE,
         }
     }
 }
@@ -77,6 +101,10 @@ impl Default for Settings {
 /// somebody edited by hand, or by a divider dragged to the edge. The payload
 /// pane's share is what is left, so it is the one that gives way when the
 /// first two ask for too much between them.
+///
+/// Three shares and a floor, which is the same arithmetic whichever way the
+/// panes are divided: the working panes across and the selection lists down
+/// both come through here.
 pub fn shares(moc_percent: i32, vehicle_percent: i32) -> (i32, i32) {
     let moc = moc_percent.clamp(LEAST, MOST);
     let vehicle = vehicle_percent.clamp(LEAST, MOST - moc + LEAST);
@@ -195,9 +223,21 @@ fn settings_in(text: &str, whose: &str) -> Settings {
     };
 
     let (moc_percent, vehicle_percent) = shares(moc, vehicle);
+
+    // And the selection column, which is the same arithmetic down. A file
+    // written before the lists could be resized says nothing about them,
+    // which is the defaults -- not a share taken out of anything, because
+    // nobody arranged these yet.
+    let (list_moc_percent, list_vehicle_percent) = shares(
+        percent_in(text, whose, "moc_list_percent", DEFAULT_LIST_MOC),
+        percent_in(text, whose, "vehicle_list_percent", DEFAULT_LIST_VEHICLE),
+    );
+
     Settings {
         moc_percent,
         vehicle_percent,
+        list_moc_percent,
+        list_vehicle_percent,
     }
 }
 
@@ -236,9 +276,12 @@ pub fn save(settings: Settings) {
         None => return,
     };
     let (moc, vehicle) = shares(settings.moc_percent, settings.vehicle_percent);
-    if let Err(why) =
-        crate::save::write_atomically(&path, written(moc, vehicle).as_bytes())
-    {
+    let (list_moc, list_vehicle) =
+        shares(settings.list_moc_percent, settings.list_vehicle_percent);
+    if let Err(why) = crate::save::write_atomically(
+        &path,
+        written(moc, vehicle, list_moc, list_vehicle).as_bytes(),
+    ) {
         eprintln!("tcsgui: {} cannot be written: {why}", path.display());
     }
 }
@@ -249,7 +292,7 @@ pub fn save(settings: Settings) {
 /// element, never an attribute -- so that a person who has read one file has
 /// read both. With a comment saying what the number means, because a bare 75
 /// in a file is a number somebody will guess at.
-fn written(moc: i32, vehicle: i32) -> String {
+fn written(moc: i32, vehicle: i32, list_moc: i32, list_vehicle: i32) -> String {
     format!(
         "\
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -271,9 +314,17 @@ fn written(moc: i32, vehicle: i32) -> String {
          cannot be reached. -->
     <moc_pane_percent>{moc}</moc_pane_percent>
     <vehicle_pane_percent>{vehicle}</vehicle_pane_percent>
+
+    <!-- And how much of the selection column down the left each of the first
+         two lists takes, in the same order and under the same rule: the moc
+         list, the vehicle list, and the payload list taking what is left,
+         so {list_rest}% here. -->
+    <moc_list_percent>{list_moc}</moc_list_percent>
+    <vehicle_list_percent>{list_vehicle}</vehicle_list_percent>
 </settings>
 ",
-        rest = 100 - moc - vehicle
+        rest = 100 - moc - vehicle,
+        list_rest = 100 - list_moc - list_vehicle
     )
 }
 
@@ -310,25 +361,49 @@ mod tests {
             (LEAST, MOST),
             (MOST, LEAST),
         ] {
-            let text = written(moc, vehicle);
+            // Both pairs, and crossed over: the lists' shares are written
+            // beside the panes' and read back from the same file, so a reader
+            // that took one for the other would be a session that remembered
+            // the wrong thing.
+            let (list_moc, list_vehicle) = (vehicle, moc);
+            let text = written(moc, vehicle, list_moc, list_vehicle);
             let said = |name| {
                 element(&text, name).and_then(|said| said.parse::<i32>().ok())
             };
             assert_eq!(said("moc_pane_percent"), Some(moc));
             assert_eq!(said("vehicle_pane_percent"), Some(vehicle));
+            assert_eq!(said("moc_list_percent"), Some(list_moc));
+            assert_eq!(said("vehicle_list_percent"), Some(list_vehicle));
             // And through the reader, which is what the editor would use.
             let settings = settings_in(&text, "a test");
             assert_eq!((settings.moc_percent, settings.vehicle_percent), (moc, vehicle));
+            assert_eq!(
+                (settings.list_moc_percent, settings.list_vehicle_percent),
+                (list_moc, list_vehicle)
+            );
         }
+
+        // A file written before the lists could be resized says nothing about
+        // them, and that is the defaults rather than nothing: a session that
+        // read a nought would open with a list of no height.
+        let older = written(DEFAULT_MOC, DEFAULT_VEHICLE, DEFAULT_LIST_MOC, DEFAULT_LIST_VEHICLE)
+            .replace("<moc_list_percent>", "<was_moc_list_percent>")
+            .replace("<vehicle_list_percent>", "<was_vehicle_list_percent>");
+        let settings = settings_in(&older, "a file from before");
+        assert_eq!(
+            (settings.list_moc_percent, settings.list_vehicle_percent),
+            (DEFAULT_LIST_MOC, DEFAULT_LIST_VEHICLE)
+        );
     }
 
     /// The file says what the third pane gets, too.
     #[test]
     fn the_file_says_what_every_pane_takes() {
-        let text = written(15, 60);
+        let text = written(15, 60, 20, 30);
         assert!(text.contains("15"), "{text}");
         assert!(text.contains("60"), "{text}");
         assert!(text.contains("25%"), "the payload pane's share: {text}");
+        assert!(text.contains("50%"), "the payload list's share: {text}");
     }
 
     /// Two shares that leave the third pane nothing are brought inside the
@@ -442,6 +517,8 @@ mod tests {
         save(Settings {
             moc_percent: 20,
             vehicle_percent: 40,
+            list_moc_percent: 15,
+            list_vehicle_percent: 45,
         });
         assert_eq!(load().moc_percent, 20);
         assert_eq!(load().vehicle_percent, 40);
@@ -475,6 +552,7 @@ mod tests {
         save(Settings {
             moc_percent: DEFAULT_MOC,
             vehicle_percent: 60,
+            ..Settings::default()
         });
         assert_eq!(load().vehicle_percent, 60);
 

@@ -1251,6 +1251,32 @@ working panes are in, and which one a shape was pressed in is what decides
 where it lands. A node stays in its pane: a drag that would carry a payload
 leftwards across a divider stops at it.
 
+Each of the three lists is as tall as its own share of the column, with a line
+between each pair that can be dragged to change the two it is between -- the
+same arrangement as the working panes, turned on its side, and kept in the same
+settings file as percentages. A line moves the boundary between its own two
+neighbours and leaves the third alone, which is what a person dragging it
+expects: the list above grows by what the list below gives up. The arithmetic
+is ``tcsgui::list_shares_after``, in Rust where it can be tested, and the
+markup reports a drag as how far it went and how tall the column is -- what a
+share is depends on what it is a share of.
+
+No list may be squeezed below a twentieth of the column, so a line dragged to
+the top or the bottom stops a twentieth short of it. It is the rule the working
+panes already have and the same constant: a list with nothing showing is a list
+whose entries cannot be reached, and a line dragged to the edge is easy to do
+by accident and hard to understand afterwards.
+
+And every list shows a node when the window opens, which a share of a column
+cannot be trusted to do by itself: a twentieth of an 820-pixel window is
+forty-one pixels, enough for the list's own heading and nothing under it. So
+the three default shares -- 20, 35 and 45 -- are checked against what the three
+lists actually have to draw at the height the window opens at, and the test
+reads both the window's preferred height and the list's own padding out of
+``main.slint`` rather than restating them: a rule about what fits is a rule
+about numbers in two files, and a test that copied them would pass while the
+window showed nothing.
+
 What that buys is a drawing that can be compared with last mission's. The three
 parts change on different schedules -- the ground is the other end of the link
 and not the vehicle at all, the vehicle's own graph persists, and what it

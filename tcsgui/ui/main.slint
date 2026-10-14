@@ -981,6 +981,68 @@ component SelectionPane inherits Rectangle {
 // A component because there are two of them and they are the same control. The
 // line follows the pointer while the handle is held and the divider settles
 // when the gesture ends: one change for one gesture, as a node's drag is.
+// One line between two selection lists: a handle that reports how far it was
+// dragged, downwards.
+//
+// The horizontal twin of PaneDivider, and the same arrangement for the same
+// reason: the grip is a sibling of the line, so its coordinates stay where the
+// line was for as long as the gesture lasts.
+//
+// It reports the whole column's height along with the distance, because what a
+// share is depends on what it is a share of, and the arithmetic that turns the
+// two into a percentage belongs in Rust where it can be tested: see
+// tcsgui::drag_list_divider.
+component ListDivider inherits Rectangle {
+    callback moved(length, length);
+
+    height: 7px;
+    background: transparent;
+
+    Rectangle {
+        y: parent.height / 2 + (grip.pressed ? grip.mouse-y - grip.pressed-y : 0px);
+        x: 0;
+        width: 100%;
+        height: grip.has-hover || grip.pressed ? 2px : 1px;
+        background: grip.has-hover || grip.pressed ? #6b7280 : #cbcdd1;
+
+        // The handle: a grooved pill in the middle of the line, so that a line
+        // which can be dragged does not look like one which cannot.
+        Rectangle {
+            x: parent.width / 2 - 20px;
+            y: -6px;
+            width: 40px;
+            height: 13px;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: grip.has-hover || grip.pressed ? #6b7280 : #b4b7bd;
+            background: grip.pressed ? #e8e9eb : white;
+
+            for groove in 3: Rectangle {
+                x: 14px + groove * 6px;
+                y: 4px;
+                width: 1px;
+                height: 5px;
+                background: #9ca3af;
+            }
+        }
+    }
+
+    grip := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: MouseCursor.row-resize;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.up) {
+                root.moved(self.mouse-y - self.pressed-y, root.parent-height);
+            }
+        }
+    }
+
+    // How tall the column is, which the parent passes in: an element cannot
+    // ask its parent's height without the parent saying so.
+    in property <length> parent-height: 0px;
+}
+
 component PaneDivider inherits Rectangle {
     // Where the divider is, in the window's own coordinates.
     in property <length> at: 0px;
@@ -1132,6 +1194,15 @@ component Surface inherits Rectangle {
     // this much. Two callbacks and not one with a name in it: which divider
     // moved is known where the gesture happened, and a string crossing the
     // boundary would be a name to keep in step in two files.
+    // How the selection column is divided, as the first two lists' shares of
+    // it. From Rust, where the settings file keeps them: see
+    // tcsgui::Views::lists.
+    in property <int> moc-list-percent: 20;
+    in property <int> vehicle-list-percent: 35;
+    // And the two lines between the lists, dragged: how far it went and how
+    // tall the whole column is. See tcsgui::drag_list_divider.
+    callback moc-list-divider-moved(length, length);
+    callback vehicle-list-divider-moved(length, length);
     callback moc-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
@@ -1260,34 +1331,67 @@ component Surface inherits Rectangle {
             //
             // Top to bottom in the order the panes are left to right, so the
             // two readings of the same rule agree.
-            VerticalLayout {
+            // Each list as tall as its own share of the column, with a line
+            // between each pair that can be dragged to change the two it is
+            // between. A Rectangle and placed children rather than a
+            // VerticalLayout: a layout hands out what is left over, where a
+            // share is a share of the whole -- and a share of the whole is
+            // what somebody chose and what the settings file keeps.
+            //
+            // Top to bottom in the order the working panes are left to right,
+            // so the two readings of the same rule agree. The payload list
+            // takes what is left, being the longest: ten of the fifteen types
+            // are payloads.
+            lists := Rectangle {
                 width: 180px;
-                spacing: Space.step;
+                // What the shares are of. Named so the dividers can report it:
+                // see ListDivider.
+                property <length> whole: self.height;
+                property <length> moc-tall: whole * root.moc-list-percent / 100;
+                property <length> vehicle-tall: whole * root.vehicle-list-percent / 100;
 
                 SelectionPane {
+                    x: 0;
+                    y: 0;
+                    width: 100%;
+                    height: lists.moc-tall - 4px;
                     heading: "MOC node types";
                     ground: root.moc-ground;
                     palette: root.moc-palette;
-                    // One type, so one row: the ground link is the only thing
-                    // that goes in its pane.
-                    vertical-stretch: 0;
                     place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
+                ListDivider {
+                    x: 0;
+                    y: lists.moc-tall - 7px;
+                    width: 100%;
+                    parent-height: lists.whole;
+                    moved(dy, tall) => { root.moc-list-divider-moved(dy, tall); }
+                }
                 SelectionPane {
+                    x: 0;
+                    y: lists.moc-tall;
+                    width: 100%;
+                    height: lists.vehicle-tall - 4px;
                     heading: "Vehicle node types";
                     ground: root.vehicle-ground;
                     palette: root.vehicle-palette;
-                    vertical-stretch: 1;
                     place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
+                ListDivider {
+                    x: 0;
+                    y: lists.moc-tall + lists.vehicle-tall - 7px;
+                    width: 100%;
+                    parent-height: lists.whole;
+                    moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
+                }
                 SelectionPane {
+                    x: 0;
+                    y: lists.moc-tall + lists.vehicle-tall;
+                    width: 100%;
+                    height: lists.whole - lists.moc-tall - lists.vehicle-tall;
                     heading: "Payload node types";
                     ground: root.payload-ground;
                     palette: root.payload-palette;
-                    // The taller share: ten of the fourteen types are
-                    // payloads, and a pane that scrolls through ten rows four
-                    // at a time is a pane nobody finds the tenth in.
-                    vertical-stretch: 2;
                     place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
             }
@@ -1559,6 +1663,15 @@ export component MainWindow inherits Window {
     // this much. Two callbacks and not one with a name in it: which divider
     // moved is known where the gesture happened, and a string crossing the
     // boundary would be a name to keep in step in two files.
+    // How the selection column is divided, as the first two lists' shares of
+    // it. From Rust, where the settings file keeps them: see
+    // tcsgui::Views::lists.
+    in property <int> moc-list-percent: 20;
+    in property <int> vehicle-list-percent: 35;
+    // And the two lines between the lists, dragged: how far it went and how
+    // tall the whole column is. See tcsgui::drag_list_divider.
+    callback moc-list-divider-moved(length, length);
+    callback vehicle-list-divider-moved(length, length);
     callback moc-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
@@ -1674,6 +1787,10 @@ export component MainWindow inherits Window {
         payload-palette: root.payload-palette;
         moc-divider: root.moc-divider;
         vehicle-divider: root.vehicle-divider;
+        moc-list-percent: root.moc-list-percent;
+        vehicle-list-percent: root.vehicle-list-percent;
+        moc-list-divider-moved(dy, tall) => { root.moc-list-divider-moved(dy, tall); }
+        vehicle-list-divider-moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
         working-width: root.working-width;
         working-height: root.working-height;
         moc-ground: root.moc-ground;
@@ -1779,6 +1896,13 @@ export component SubWindow inherits Window {
     // this much. Two callbacks and not one with a name in it: which divider
     // moved is known where the gesture happened, and a string crossing the
     // boundary would be a name to keep in step in two files.
+    // How the selection column is divided, and its two lines: a subdiagram is
+    // a page of the same configuration, so its lists are arranged the same
+    // way and dragging one of its lines arranges every window's.
+    in property <int> moc-list-percent: 20;
+    in property <int> vehicle-list-percent: 35;
+    callback moc-list-divider-moved(length, length);
+    callback vehicle-list-divider-moved(length, length);
     callback moc-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback save-clicked();
@@ -1890,6 +2014,10 @@ export component SubWindow inherits Window {
         payload-palette: root.payload-palette;
         moc-divider: root.moc-divider;
         vehicle-divider: root.vehicle-divider;
+        moc-list-percent: root.moc-list-percent;
+        vehicle-list-percent: root.vehicle-list-percent;
+        moc-list-divider-moved(dy, tall) => { root.moc-list-divider-moved(dy, tall); }
+        vehicle-list-divider-moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
         working-width: root.working-width;
         working-height: root.working-height;
         moc-ground: root.moc-ground;

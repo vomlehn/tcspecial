@@ -186,6 +186,14 @@ struct Views {
     /// Held so that pressing Exit twice does not stack two of them, and so
     /// that answering it can take it away again.
     leaving: Option<LeaveWindow>,
+    /// The window that says what went wrong, and what it last said.
+    ///
+    /// One window, re-pointed: two of them side by side would be two copies of
+    /// one sentence. What it last said is kept so that an error is shown once
+    /// -- every edit redraws every window, and a window that popped up again
+    /// on each of them would be a window nobody could type past.
+    alert: Option<AlertWindow>,
+    alerted: Rc<RefCell<String>>,
     /// The simulator's groups window, if it is open, and which group it is
     /// showing.
     ///
@@ -244,6 +252,37 @@ impl Views {
     }
 
     /// Draw every window from the document as it now is.
+    /// What went wrong, said where it cannot be missed.
+    ///
+    /// Once per thing that goes wrong, and that is what `alerted` is for:
+    /// every edit redraws every window, so a window shown on each of them
+    /// would be one nobody could type past. A trouble that is still the same
+    /// trouble has already been said.
+    ///
+    /// The red line in the bar stays as well, and the two are not the same
+    /// thing: the line is the state -- "saved", or what is wrong with the last
+    /// save -- and this is the moment it went wrong. An error nobody sees is
+    /// an error that gets worse: a full device stays full while every edit
+    /// after it is one more the files do not have.
+    fn alert(&self, editor: &Editor) {
+        let said = editor.trouble().unwrap_or_default().to_string();
+        if said == *self.alerted.borrow() {
+            return;
+        }
+        *self.alerted.borrow_mut() = said.clone();
+        if said.is_empty() {
+            return;
+        }
+
+        let Some(window) = &self.alert else { return };
+        window.set_trouble(said.into());
+        if let Err(e) = window.show() {
+            // Nowhere to say it but the terminal, the thing that says things
+            // having failed.
+            eprintln!("tcsgui: {e}");
+        }
+    }
+
     /// The lines, redrawn, and nothing else.
     ///
     /// For the moment a link's end is taken hold of: the line comes off the
@@ -270,6 +309,7 @@ impl Views {
     }
 
     fn refresh(&self, editor: &Editor) {
+        self.alert(editor);
         let chosen = self.chosen.borrow();
         let divider = self.divider.get();
         // The link whose end is in somebody's hand, which is drawn nowhere:
@@ -421,10 +461,13 @@ fn main() -> Result<(), slint::PlatformError> {
         parameters: None,
         attributes: BTreeMap::new(),
         leaving: None,
+        alert: None,
+        alerted: Rc::new(RefCell::new(String::new())),
         sim_groups: None,
         showing_sim_group: Rc::new(RefCell::new(String::new())),
         showing: Rc::new(RefCell::new(String::new())),
     }));
+    alerting(&views);
     // Which node the panel is showing, per window.
     //
     // Deliberately not in the document: what somebody is looking at is not
@@ -1191,6 +1234,37 @@ fn drag_divider(
         vehicle_percent,
     });
     views.borrow().refresh(&editor.borrow());
+}
+
+/// The window that says what went wrong, made ready before anything does.
+///
+/// Made once and kept hidden, rather than made when it is needed: the moment
+/// it is needed is the moment something has already failed, and a window that
+/// could not be made then would leave nothing to say it with. Hidden and shown
+/// again, so acknowledging one thing does not throw away the means of saying
+/// the next.
+///
+/// Without a window there is still the red line in the bar and the error
+/// output, so this failing is a quieter editor and not a broken one.
+fn alerting(views: &Rc<RefCell<Views>>) {
+    let window = match AlertWindow::new() {
+        Ok(window) => window,
+        Err(e) => {
+            eprintln!("tcsgui: errors cannot be shown in a window: {e}");
+            return;
+        }
+    };
+    {
+        let views = views.clone();
+        window.on_acknowledged(move || {
+            // Hidden and kept, not dropped: see above.
+            let window = views.borrow().alert.as_ref().map(|window| window.as_weak());
+            if let Some(window) = window.and_then(|window| window.upgrade()) {
+                let _ = window.hide();
+            }
+        });
+    }
+    views.borrow_mut().alert = Some(window);
 }
 
 /// The offer and not the saving: somebody who has been told the device is full
@@ -5071,7 +5145,129 @@ mod tests {
         a_link_is_drawn_by_dragging_from_a_terminal();
         a_link_is_deleted_by_dragging_its_end_onto_the_canvas();
         placing_a_described_node_answers_what_it_describes();
+        an_error_is_put_where_it_cannot_be_missed();
     }
+
+    /// A failed write puts a window in front of the person, once.
+    ///
+    /// The red line in the bar is easy to work past without reading, and the
+    /// thing it says -- the file does not have your last edit -- is the one
+    /// thing in this editor that silence makes worse. So it is also said in a
+    /// window. Once per thing, though: with a directory that cannot be written
+    /// every edit fails, and a window that came back on each of them would be
+    /// a window nobody could type past.
+    fn an_error_is_put_where_it_cannot_be_missed() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let locked = where_.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        let path = locked.join("vehicle.yaml");
+
+        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let ui = MainWindow::new().expect("a window");
+        let views = Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }));
+        alerting(&views);
+
+        let shown = || {
+            let views = views.borrow();
+            let window = views.alert.as_ref().expect("a window to say it with");
+            (
+                window.window().is_visible(),
+                window.get_trouble().to_string(),
+            )
+        };
+
+        // A write that worked says nothing.
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "to_kelvin".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(!editor.borrow().unsaved());
+        assert!(
+            !shown().0,
+            "a session with nothing wrong should be left alone"
+        );
+
+        // One that failed is put in front of them, and says why.
+        let shut = |mode: u32| {
+            let mut permissions = std::fs::metadata(&locked).unwrap().permissions();
+            permissions.set_mode(mode);
+            std::fs::set_permissions(&locked, permissions).unwrap();
+        };
+        shut(0o500);
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "mean_temp".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(editor.borrow().unsaved(), "the write should have failed");
+        let (visible, said) = shown();
+        assert!(visible, "a failed write should be said in a window");
+        assert!(!said.is_empty(), "and should say what failed");
+
+        // Acknowledged, it goes; and the same trouble on the next edit does
+        // not bring it back.
+        views.borrow().alert.as_ref().unwrap().invoke_acknowledged();
+        assert!(!shown().0);
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "to_fahrenheit".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(
+            !shown().0,
+            "the same trouble, already read, should not come back"
+        );
+        // The bar still says it, which is the state and not the moment.
+        assert!(editor.borrow().trouble().is_some());
+
+        // Put right and then wrong again: that is a new thing to say.
+        shut(0o700);
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "to_rankine".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(
+            !editor.borrow().unsaved(),
+            "{:?}",
+            editor.borrow().trouble()
+        );
+        shut(0o500);
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "to_celsius".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(shown().0, "a fresh failure should be said again");
+
+        // Left writable, or the directory cannot be removed.
+        shut(0o700);
+    }
+
 
     /// Dragging a link's end onto empty canvas deletes it.
     ///
@@ -5121,6 +5317,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5218,6 +5416,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5327,6 +5527,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5545,6 +5747,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5674,6 +5878,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5755,6 +5961,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5865,6 +6073,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -5929,6 +6139,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6060,6 +6272,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6310,6 +6524,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6374,6 +6590,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),
@@ -6482,6 +6700,8 @@ mod tests {
             parameters: None,
             attributes: BTreeMap::new(),
             leaving: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
             showing: Rc::new(RefCell::new(String::new())),

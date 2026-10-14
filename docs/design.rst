@@ -1911,6 +1911,26 @@ the program does the same for anything the files do not have, and says on the
 error output whether it got there -- leaving a session's work in a process that
 is ending is the one way this editor could lose anything.
 
+Anything that goes wrong is said twice: in the red line along the bottom of the
+window, and in a small window of its own that has to be acknowledged. The line
+is the state -- ``saved``, or what stopped the last write -- and the window is
+the moment it happened. Both, because either alone is wrong: a line is easy to
+carry on typing past without reading, and the thing it says is the one thing in
+this editor that silence makes worse -- a full device stays full while every
+edit after it is one more the files do not have. The window says what failed,
+and says that the session is still open and nothing has been lost, because the
+useful response is to put the cause right and press Save rather than to start
+again.
+
+It appears once per thing that goes wrong, not once per edit. With a directory
+that cannot be written every edit fails with the same sentence, and a window
+that came back on each of them would be a window nobody could type past; the
+red line goes on saying it for as long as it is true. A failure that was put
+right and then happened again is a new thing, and is shown again. The window is
+made at startup and hidden rather than made when it is needed: the moment it is
+needed is the moment something has already failed, and a window that could not
+be made then would leave nothing to say it with.
+
 Undo and redo are a drawn arrow apiece beside the name of the edit they would
 take back or put again. The arrow is what the button does and the name is what
 it will do it to, which is the half worth keeping: "Undo" on a button is a word

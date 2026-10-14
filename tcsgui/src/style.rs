@@ -51,6 +51,7 @@ pub enum Outline {
     /// and so does the row its name is padded away from.
     ///
     /// Drawn from [`parallelogram`], for the reason [`Outline::Store`] gives.
+    ///
     Parallelogram,
     /// Rounded corners. Software aboard: a computation.
     Rounded,
@@ -69,7 +70,9 @@ pub enum Outline {
     /// meaning: a radius of half the shorter side rounds away the very corner
     /// the terminal is drawn in.
     ///
-    /// Drawn from [`store`], for the reason [`Outline::Pointed`] gives.
+    /// Drawn from [`store`] rather than from a corner radius, because a
+    /// radius cannot leave a side out. The arithmetic is there, where it can
+    /// be tested, as the link routes' is.
     Store,
     /// A rectangle with one pair of corners rounded and one square, which
     /// reads as a direction. Interfaces that are driven rather than read.
@@ -91,25 +94,6 @@ pub enum Outline {
     /// path: the bars are not one closed shape, and the markup already draws
     /// the keyed corner the same way.
     Barred,
-    /// Five sides, pointed groundward: the ground station.
-    ///
-    /// The one node on the canvas that is not part of the vehicle at all -- it
-    /// is the other end of the link -- and a shape nothing aboard uses is what
-    /// says so. It was a pill, which it shared with a log: both were "an end
-    /// of the graph", and a file written on board and everybody on the ground
-    /// are not the same kind of end.
-    ///
-    /// Pointed on the left, which is the way the telemetry goes: a node's
-    /// `payload-out` is on its left and its `payload-in` on its right, so the
-    /// ground is leftward of everything, and the shape aims that way. The
-    /// right side stays square because that is where the ground station's own
-    /// two terminals are -- a shape has to give up a side to stop being a
-    /// rectangle, and the side to give up is the one with nothing on it.
-    ///
-    /// Drawn as a path rather than from a corner radius, because a radius
-    /// cannot make a corner that is not round. The arithmetic is
-    /// [`pointed`]'s, where it can be tested.
-    Pointed,
 }
 
 /// How the inside is filled.
@@ -390,11 +374,12 @@ pub struct Corner {
 
 /// The outline of a node of this size, where its shape needs a path.
 ///
-/// Only the pointed shape so far: a square, a rounded rectangle and a pill
-/// are a rectangle with a corner radius, and a keyed shape is one of those
-/// with a corner cut off, so the markup draws all four from one element. A
-/// point is none of those, and a corner radius cannot make a corner that is
-/// not round.
+/// The store and the data symbol: a square rectangle and a rounded one are a
+/// corner radius, a keyed shape is one of those with a corner cut off, and a
+/// barred one is a square with two lines drawn inside it, so the markup draws
+/// all four from one element and two overlays. An end left open and a leaning
+/// side are neither, and a corner radius cannot make a corner that is not
+/// round.
 ///
 /// Empty for every other outline, which is what says "draw this the ordinary
 /// way". The path is in the node's own coordinates, so the markup draws it
@@ -402,39 +387,10 @@ pub struct Corner {
 /// would stretch the line with it.
 pub fn shape_of(outline: Outline, (width, height): (u32, u32)) -> String {
     match outline {
-        Outline::Pointed => pointed((width, height)),
         Outline::Store => store((width, height)),
         Outline::Parallelogram => parallelogram((width, height)),
         _ => String::new(),
     }
-}
-
-/// Five sides in a box this size: a square right end and a point on the left.
-///
-/// A quarter of the width is given to the point, which is enough to be read as
-/// a shape rather than as a rectangle somebody mis-drew, and leaves the middle
-/// half of the box for a centred name. Only the left corners go: the two
-/// terminals of the one type drawn this way are both on the right, and a
-/// terminal outside its own outline is a terminal floating beside the node.
-/// The test below holds the shape to that rather than this comment.
-///
-/// Inset half a pixel so the stroke sits inside the node: a path drawn on the
-/// boundary is drawn half outside it, and a node that overhangs its own box by
-/// a pixel is a node whose terminals and lines are all a pixel out.
-pub fn pointed((width, height): (u32, u32)) -> String {
-    let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
-    let point = w / 4.0;
-    let middle = h / 2.0;
-    format!(
-        "M {:.1} 0.5 L {:.1} 0.5 L {:.1} {:.1} L {:.1} {:.1} L 0.5 {:.1} Z",
-        point + 0.5,
-        w + 0.5,
-        w + 0.5,
-        h + 0.5,
-        point + 0.5,
-        h + 0.5,
-        middle + 0.5
-    )
 }
 
 /// Two long sides and a cap on the right, in a box this size.
@@ -444,7 +400,9 @@ pub fn pointed((width, height): (u32, u32)) -> String {
 /// commands and so leaves that side open; a fill closes the shape the way SVG
 /// does, which is what any shading inside it wants anyway.
 ///
-/// Inset half a pixel, as [`pointed`] is and for the same reason.
+/// Inset half a pixel so the stroke sits inside the node: a path drawn on the
+/// boundary is drawn half outside it, and a node that overhangs its own box by
+/// a pixel is a node whose terminals and lines are all a pixel out.
 pub fn store((width, height): (u32, u32)) -> String {
     let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
     format!(
@@ -463,7 +421,7 @@ pub fn store((width, height): (u32, u32)) -> String {
 /// would lean differently on a 48-pixel node and a 64-pixel one, and nine
 /// kinds of payload drawn at four heights would read as four shapes.
 ///
-/// Inset half a pixel, as [`pointed`] is and for the same reason.
+/// Inset half a pixel, as [`store`] is and for the same reason.
 pub fn parallelogram((width, height): (u32, u32)) -> String {
     let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
     let slant = h / 2.0;
@@ -1059,7 +1017,9 @@ impl NodeType {
     /// barred one is a page written down somewhere else, and the two ends of
     /// the graph are the
     /// two shapes nothing else uses -- a pill where it stops on board, a
-    /// store where it is kept. Within a shape the types differ by
+    /// store where it is kept, and the ground is the plain rectangle of
+    /// something outside the system altogether. Within a shape the types
+    /// differ by
     /// shading, weight and size.
     pub fn appearance(self) -> Appearance {
         use Outline::*;
@@ -1246,24 +1206,25 @@ impl NodeType {
                 size: (WIDTH, 96),
                 tint: Tint::Gold,
             },
-            // The ground station: the one node on the canvas that is not part
-            // of the vehicle, which is what the point says. It was a pill,
-            // which it shared with the log, and the two ends of a graph are
-            // not the same kind of thing -- one is a file on board, the other
-            // is everybody on the ground.
+            // The ground station: a plain rectangle with square corners,
+            // which is the external entity of a data-flow diagram -- the thing
+            // outside the system that data comes from and goes to. That is
+            // what the ground is, and now that the payloads wear the data
+            // symbol the rectangle belongs to the one node it is the standard
+            // mark for.
             //
-            // The same proportion as the rest of the canvas. It was 128 tall
-            // against everything else's 40 to 96, which made it the one node
-            // whose shape *and* whose proportion were unlike every other, and
-            // that is two statements where one was meant. Seventy-two is the
-            // tallest of the ordinary band, which is enough left over to say
-            // "this is the one that matters".
+            // It has had a pill and a five-sided point before this. Both said
+            // "not like the others" by being unlike anything, where the
+            // rectangle says it by being the one shape a reader of these
+            // notations already knows the meaning of. Wide, solid, azure and
+            // the tallest of the ordinary band still, so it is the one that
+            // catches the eye without being the one shaped oddly.
             NodeType::Moc => Appearance {
                 face: Face::Plain,
                 label_size: 16,
                 label_weight: 700,
                 label_italic: true,
-                outline: Pointed,
+                outline: Square,
                 shading: Solid,
                 weight: Wide,
                 size: (WIDTH, 72),
@@ -1292,7 +1253,7 @@ mod tests {
             let shape = shape_of(drawn.outline, drawn.size);
             let shaped = matches!(
                 drawn.outline,
-                Outline::Pointed | Outline::Store | Outline::Parallelogram
+                Outline::Store | Outline::Parallelogram
             );
 
             assert_eq!(

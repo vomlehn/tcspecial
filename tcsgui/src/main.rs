@@ -2343,10 +2343,13 @@ fn dropped(
 ) -> Option<Edit> {
     let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
 
-    // Over nothing: the link goes. A node's own box and not its terminals,
-    // because letting go over a node is a gesture that missed and letting go
-    // over the canvas is one that meant it.
-    let Some(over) = terminal_under(document, home, (x, y), sink_pressed) else {
+    // Over nothing: the link goes. Over a node the end cannot attach to --
+    // one with no terminal of this stream -- nothing happens: a line that
+    // cannot be drawn is not drawn, and a gesture that landed on a node is
+    // not a gesture that put the line down.
+    // The end being carried keeps its own terminal: a `from_payload` taken
+    // off one node goes on another node's `from_payload` and nowhere else.
+    let Some(over) = landed(document, home, (x, y), &pressed.terminal) else {
         return if node_under(document, home, (x, y)).is_none() {
             Some(Edit::RemoveLink { link: held.clone() })
         } else {
@@ -2501,7 +2504,9 @@ fn joined(
     // pointer, and the link is put back in its own order afterwards: a link
     // leaves a source and arrives at a sink however it was drawn.
     let (sink_pressed, _) = tcslibgs::graph::terminals::stream_of(&pressed.terminal)?;
-    let dropped = terminal_under(document, home, (x, y), !sink_pressed)?;
+    // The far end of the line, which the stream names: see `landed`.
+    let wanted = tcslibgs::graph::terminals::answers(&pressed.terminal)?;
+    let dropped = landed(document, home, (x, y), wanted)?;
     let (source, sink) = if sink_pressed {
         (&dropped, pressed)
     } else {
@@ -2527,47 +2532,50 @@ fn joined(
     Some(link)
 }
 
-/// Which terminal of which node is at this point, where one is.
+/// Where a line being dragged has landed: the node under the pointer, and the
+/// terminal the line attaches to there.
 ///
-/// What the release of a link gesture lands on. `sink` says which kind is
-/// being looked for: a link is let go of over a data sink, a data source being
-/// where it was drawn from.
+/// Anywhere on the node will do -- its name, its middle, a corner box -- and
+/// `wanted` is the terminal it attaches to, which the gesture already knows.
+/// A stream has one name at each of its ends, so a line drawn from a `to_moc`
+/// can only arrive at a `from_payload`, and an end carried off a
+/// `from_payload` can only be put down on another `from_payload`: there is
+/// nothing else the gesture could have meant. The terminals are still drawn,
+/// because they are what says which streams a type carries and which way --
+/// but hitting a sixteen-pixel box in a corner is work the editor can do
+/// instead of the person.
 ///
-/// Only the nodes of this page, because only they are drawn on it: a point on
-/// this canvas is not a point on another one, and a link to a node on another
-/// page is drawn as a stub rather than as a box to aim at.
-fn terminal_under(
+/// `None` where the pointer is over no node, and where the node has no such
+/// terminal: the ground receives readings and is sent nothing, so a line
+/// carrying what the ground sends has nowhere to land on it. A gesture that
+/// cannot make a link still makes nothing; what has changed is how hard it is
+/// to aim, not what may be joined to what.
+fn landed(
     document: &Document,
     home: &Home,
     (x, y): (f32, f32),
-    sink: bool,
+    wanted: &str,
 ) -> Option<Drawing> {
-    for node in document.nodes_in(home) {
-        let terminals = NodeType::ALL
-            .iter()
-            .find(|t| t.spelling() == node.node_type)?
-            .terminals();
-        let named = if sink {
-            terminals.sinks
-        } else {
-            terminals.sources
-        };
-        for terminal in named {
-            let Some((bx, by, width, height)) =
-                style::terminal_box(&node.node_type, node.at, terminal)
-            else {
-                continue;
-            };
-            if x >= bx && x <= bx + width && y >= by && y <= by + height {
-                return Some(Drawing {
-                    node: node.name.clone(),
-                    terminal: (*terminal).to_string(),
-                    holding: None,
-                });
-            }
-        }
+    let (sink, _) = tcslibgs::graph::terminals::stream_of(wanted)?;
+    let node = node_under(document, home, (x, y))?;
+    let found = document.node(&node)?;
+    let terminals = NodeType::ALL
+        .iter()
+        .find(|t| t.spelling() == found.node_type)?
+        .terminals();
+    let theirs = if sink {
+        terminals.sinks
+    } else {
+        terminals.sources
+    };
+    if !theirs.contains(&wanted) {
+        return None;
     }
-    None
+    Some(Drawing {
+        node,
+        terminal: wanted.to_string(),
+        holding: None,
+    })
 }
 
 /// What to record about the end a line arrives at.
@@ -3973,6 +3981,19 @@ mod tests {
             terminal: terminal.to_string(),
             holding: None,
         };
+        // And the middle of a node, which is the other place a person lets go:
+        // a line may be dropped anywhere on the node it is being joined to.
+        let middle = |node: &str| {
+            let (_, node_type, at) = placed
+                .iter()
+                .find(|(name, _, _)| name == node)
+                .expect("the node");
+            let (width, height) = size_of(node_type);
+            (
+                at.0 as f32 + width as f32 / 2.0,
+                at.1 as f32 + height as f32 / 2.0,
+            )
+        };
 
         // The readings, from the payload to the ground: a to_moc let go of
         // over a from_payload. Neither end names its terminal, both types
@@ -4016,24 +4037,13 @@ mod tests {
         .expect("a null node reaches the ground");
         assert_eq!(through.origin.as_deref(), Some("to_moc"));
 
-        // Now the four gestures that are not links.
-        //
-        // Let go of over a terminal that does not pair: a to_payload carries
-        // what the ground sends, and a from_payload is where readings arrive
-        // -- a line between them would carry one stream into the other.
-        assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("through", "to_payload"),
-                over("ground", "from_payload"),
-            ),
-            None,
-            "a to_payload may only be linked to a from_moc"
-        );
+        // Now the gestures that are not links.
 
-        // Let go of over a data source, which is where a link is drawn from
-        // and not a place to let go of one.
+        // Let go of over the far node's own data source, which is still a
+        // release over that node: the line lands on the terminal the stream
+        // names -- the ground's from_payload -- as it would anywhere else on
+        // the box. What may be joined to what has not changed; what has gone
+        // is having to hit a sixteen-pixel square to say it.
         assert_eq!(
             joined(
                 &document,
@@ -4041,7 +4051,28 @@ mod tests {
                 &drawn("sensor", "to_moc"),
                 over("ground", "to_payload"),
             ),
-            None
+            Some(link.clone()),
+            "a release anywhere on the node makes the link the stream allows"
+        );
+
+        // And the middle of it, which is where a person actually aims.
+        assert_eq!(
+            joined(&document, &None, &drawn("sensor", "to_moc"), middle("ground")),
+            Some(link.clone())
+        );
+
+        // A node with no terminal of that stream takes nothing: the ground
+        // receives readings and is sent nothing, so what the ground sends has
+        // nowhere to land on the ground.
+        assert_eq!(
+            joined(
+                &document,
+                &None,
+                &drawn("through", "to_payload"),
+                middle("ground"),
+            ),
+            None,
+            "a moc node has no from_moc to arrive at"
         );
 
         // Let go of over nothing.
@@ -4075,16 +4106,23 @@ mod tests {
         .expect("a link drawn from the sink end");
         assert_eq!(backwards, link, "the same link, whichever end it was drawn from");
 
-        // But not between two ends of the same kind: a source feeds a sink,
-        // and two sources have nothing to say to each other.
+        // Released over the null node's own to_moc box, which is a release
+        // over the null node: the readings land on its from_payload, that
+        // being where a groundward stream arrives.
+        let through_sink = joined(
+            &document,
+            &None,
+            &drawn("sensor", "to_moc"),
+            over("through", "to_moc"),
+        )
+        .expect("the readings reach the node in the way");
         assert_eq!(
-            joined(
-                &document,
-                &None,
-                &drawn("sensor", "to_moc"),
-                over("through", "to_moc"),
+            (
+                through_sink.to.as_str(),
+                through_sink.input.as_deref(),
             ),
-            None
+            ("through", Some("from_payload")),
+            "a null node has two data sinks, so the file says which"
         );
 
         // And a link that is already there: a second line on top of the first
@@ -4215,8 +4253,8 @@ mod tests {
             None
         );
 
-        // Let go of over a node but not over a terminal: also nothing. That
-        // is a gesture that missed.
+        // Or anywhere else on the node it is already attached to, which is
+        // the same answer for the same reason: that is where it is.
         assert_eq!(dropped(&document, &None, &held, &pressed, middle("ground")), None);
 
         // Moved to a terminal that suits the end: one edit, so one undo puts
@@ -4240,30 +4278,37 @@ mod tests {
             other => panic!("{other:?}"),
         }
 
-        // A terminal that does not suit it: nothing. A `from_moc` takes what
-        // the ground sends, and this link carries readings.
-        assert_eq!(
-            dropped(
-                &document,
-                &None,
-                &held,
-                &pressed,
-                over("through", "from_moc")
-            ),
-            None
-        );
+        // Anywhere on that node is the same answer, which is what makes this
+        // worth aiming loosely: the corner box of its other stream, the box
+        // of one of its data sources, and the middle of it all put the end on
+        // its from_payload, that being where a groundward stream arrives.
+        for landing in [
+            over("through", "from_moc"),
+            over("through", "to_moc"),
+            middle("through"),
+        ] {
+            assert_eq!(
+                dropped(&document, &None, &held, &pressed, landing),
+                Some(Edit::MoveLink {
+                    was: held.clone(),
+                    now: Link::joining("sensor", Some("to_moc"), "through", Some("from_payload")),
+                }),
+                "a release anywhere on the node moves the end to its from_payload"
+            );
+        }
 
-        // Nor onto a data source, which is the other end's kind.
-        assert_eq!(
-            dropped(&document, &None, &held, &pressed, over("through", "to_moc")),
-            None
-        );
-
-        // Nor onto the far node itself, which would be a link from a node to
-        // itself.
+        // Not onto the far node itself, which would be a link from a node to
+        // itself -- and not onto a node with no terminal of this stream. A
+        // payload receives what asks it for a reading and does not receive
+        // readings, so an arriving end has nowhere to go on one.
         assert_eq!(
             dropped(&document, &None, &held, &pressed, over("sensor", "from_moc")),
             None
+        );
+        assert_eq!(
+            dropped(&document, &None, &held, &pressed, middle("other")),
+            None,
+            "a payload has no from_payload for this end to land on"
         );
 
         // Over nothing at all: the link goes.
@@ -5501,6 +5546,7 @@ mod tests {
         // left corner and arrive at the ground link's lower right.
         for (name, node_type, at) in [
             ("sensor", "i2c", (dividers().vehicle + 24, 120)),
+            ("other", "i2c", (dividers().vehicle + 24, 320)),
             ("ground", "moc", (16, 120)),
         ] {
             editor.borrow_mut().edit(Edit::AddNode {
@@ -5565,6 +5611,17 @@ mod tests {
             )
         };
 
+        // And the middle of a node, which is the other place a line may be
+        // let go of: anywhere on the node it is being joined to will do.
+        let centre = |node: &str| {
+            let found = editor.borrow().document().node(node).expect("the node").clone();
+            let (width, height) = size_of(&found.node_type);
+            slint::LogicalPosition::new(
+                origin.x + found.at.0 as f32 + width as f32 / 2.0,
+                origin.y + found.at.1 as f32 + height as f32 / 2.0,
+            )
+        };
+
         let from = middle("sensor", "to_moc");
         let to = middle("ground", "from_payload");
 
@@ -5603,26 +5660,45 @@ mod tests {
             (dividers().vehicle + 24, 120)
         );
 
-        // A pairing that is not allowed makes nothing: a to_moc let go of
-        // over a to_payload, which is a data source and not a place for a
-        // link to arrive.
-        let to = middle("ground", "to_payload");
-        ui.window()
-            .dispatch_event(WindowEvent::PointerMoved { position: from });
-        ui.window().dispatch_event(WindowEvent::PointerPressed {
-            position: from,
-            button: PointerEventButton::Left,
-        });
-        ui.window()
-            .dispatch_event(WindowEvent::PointerMoved { position: to });
-        ui.window().dispatch_event(WindowEvent::PointerReleased {
-            position: to,
-            button: PointerEventButton::Left,
-        });
+        // The same gesture let go of anywhere on the node, which is the way
+        // a person actually draws one: the other sensor's readings dropped in
+        // the middle of the ground link's box. The terminal is the stream's
+        // own answer -- a to_moc arrives at a from_payload -- so there is
+        // nothing to aim at.
+        let gesture = |from: slint::LogicalPosition, to: slint::LogicalPosition| {
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: from });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position: from,
+                button: PointerEventButton::Left,
+            });
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: to });
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position: to,
+                button: PointerEventButton::Left,
+            });
+        };
+
+        gesture(middle("other", "to_moc"), centre("ground"));
+        let links = editor.borrow().document().links.clone();
+        assert_eq!(
+            links.len(),
+            2,
+            "a line let go of on a node should be joined to it: {links:?}"
+        );
+        let made = links.iter().find(|link| link.from == "other").expect("the second line");
+        assert_eq!(made.to, "ground");
+        assert_eq!(made.origin.as_deref(), Some("to_moc"));
+
+        // And a node with no terminal of that stream takes nothing: a payload
+        // receives what asks it for a reading, so what arrives at its
+        // from_moc leaves a to_payload -- and a payload has none to offer.
+        gesture(middle("other", "from_moc"), centre("sensor"));
         assert_eq!(
             editor.borrow().document().links.len(),
-            1,
-            "a gesture between terminals that do not pair should draw nothing"
+            2,
+            "a payload has no to_payload for a line to leave by"
         );
     }
 

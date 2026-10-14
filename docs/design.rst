@@ -1728,6 +1728,17 @@ must be stated first and marked as such, and the list it is built from is the
 checker's own: two lists would drift, and what that would look like is a
 configuration the editor called complete and ``tcsverify`` refused.
 
+A field is updated in place rather than rebuilt. Every character typed is an
+edit, every edit a refresh, and a refresh used to replace the model a window's
+fields are built from -- which destroys the elements the repeater made from it,
+the text box among them, and takes the cursor with it. The symptom was a value
+that had to be typed one character and one click at a time, with the focus
+underline flickering under each. So a list of the same shape has its rows
+updated where they differ and is otherwise left alone, and a list that is a
+different list is replaced, the elements not being the same elements anyway.
+It is the same rule the canvas already followed for a drag -- rebuild nothing
+the pointer is holding -- and `refilled` is where it is written.
+
 The section is read as the words a file holds rather than as the struct the
 command interpreter wants, and the strictness applied afterwards. That is what
 lets the editor write a section somebody is halfway through filling in: a port

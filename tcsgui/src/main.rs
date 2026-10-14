@@ -1146,7 +1146,9 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
     window.set_node(name.into());
     window.set_node_type(node_type.into());
     window.set_comment(comment.into());
-    window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    if !refilled(&window.get_fields(), &fields) {
+        window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    }
     window.set_fault(fault.into());
     window.set_trouble(editor.trouble().unwrap_or_default().into());
 }
@@ -1710,7 +1712,9 @@ fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
     );
     window.set_members_text(said.join(", ").into());
     window.set_members(ModelRc::from(Rc::new(VecModel::from(members))));
-    window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    if !refilled(&window.get_fields(), &fields) {
+        window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    }
     // The same red the main window shows, because somebody typing in here
     // should not have to look at the other one to find out that nothing is
     // reaching the disk.
@@ -1724,6 +1728,70 @@ fn put_group(window: &GroupWindow, editor: &Editor, group: &str) {
 /// Built from that list rather than from what the document happens to hold, so
 /// that a section somebody has never filled in shows nine fields to fill
 /// rather than nothing at all.
+/// What tells one row of a window's fields from another.
+///
+/// The name and whether it is a heading, which is what says two lists are the
+/// same list: a list with the same names in the same order is the one a
+/// repeater has already built elements for, and those elements are what the
+/// cursor lives in. See [`refilled`].
+trait Named {
+    fn named(&self) -> (String, bool);
+}
+
+impl Named for FieldView {
+    fn named(&self) -> (String, bool) {
+        (self.name.to_string(), self.is_heading)
+    }
+}
+
+impl Named for GroupFieldView {
+    fn named(&self) -> (String, bool) {
+        (self.name.to_string(), false)
+    }
+}
+
+/// Put these rows into a window's fields without replacing the model.
+///
+/// Replacing it destroys every element the repeater built from it -- which
+/// includes the field somebody is typing in, and the cursor goes with it. That
+/// was the bug: every character was an edit, every edit a refresh, and every
+/// refresh a new text box, so a value had to be typed one character and one
+/// click at a time.
+///
+/// So a model of the same shape is updated row by row, and only where a row
+/// has actually changed: setting a row that already says what it says would
+/// still move the cursor to the end of it. A list that is a different list --
+/// a different length, or different names in a different order -- is replaced,
+/// because then the elements are not the same elements anyway.
+///
+/// Answers whether it managed it; the caller replaces the model if not.
+fn refilled<Row>(model: &ModelRc<Row>, rows: &[Row]) -> bool
+where
+    Row: Clone + PartialEq + Named + 'static,
+{
+    use slint::Model;
+    let Some(held) = model.as_any().downcast_ref::<VecModel<Row>>() else {
+        return false;
+    };
+    if held.row_count() != rows.len() {
+        return false;
+    }
+    for (at, row) in rows.iter().enumerate() {
+        let Some(had) = held.row_data(at) else {
+            return false;
+        };
+        if had.named() != row.named() {
+            return false;
+        }
+    }
+    for (at, row) in rows.iter().enumerate() {
+        if held.row_data(at).as_ref() != Some(row) {
+            held.set_row_data(at, row.clone());
+        }
+    }
+    true
+}
+
 fn put_parameters(window: &ParametersWindow, editor: &Editor) {
     let said = &editor.document().tcspecial;
     let fields: Vec<FieldView> = tcslibgs::graph::parameters::ATTRIBUTES
@@ -1740,7 +1808,9 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
         })
         .collect();
 
-    window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    if !refilled(&window.get_fields(), &fields) {
+        window.set_fields(ModelRc::from(Rc::new(VecModel::from(fields))));
+    }
     window.set_trouble(editor.trouble().unwrap_or_default().into());
     // What is wrong with what has been entered, which belongs to no node and
     // so has nowhere else to be shown.
@@ -6937,6 +7007,39 @@ mod tests {
             .document()
             .tcspecial
             .contains_key("tcs_cmd.recv"));
+
+        // And the fields are the same fields afterwards, which is what lets
+        // somebody type into one.
+        //
+        // Every character typed is an edit, every edit a refresh, and a
+        // refresh used to replace this model -- which destroys the elements a
+        // repeater built from it, the text box among them, and takes the
+        // cursor with it. The symptom was a value that had to be typed one
+        // character and one click at a time. So the rows are updated in place
+        // and the model is the model it was: see `refilled`.
+        let before = window.get_fields();
+        let before = before
+            .as_any()
+            .downcast_ref::<VecModel<FieldView>>()
+            .expect("a list of fields") as *const VecModel<FieldView>;
+        window.invoke_parameter_set("tcs_cmd.send".into(), "127.0.0.1:4100".into());
+        views.borrow().refresh(&editor.borrow());
+        let after = window.get_fields();
+        let after = after
+            .as_any()
+            .downcast_ref::<VecModel<FieldView>>()
+            .expect("a list of fields") as *const VecModel<FieldView>;
+        assert!(
+            std::ptr::eq(before, after),
+            "the fields were replaced, which takes the cursor with them"
+        );
+        // And the row says what was typed, so updating in place is not the
+        // same as not updating.
+        let sent = (0..window.get_fields().row_count())
+            .filter_map(|row| window.get_fields().row_data(row))
+            .find(|f| f.name == "tcs_cmd.send")
+            .expect("the field");
+        assert_eq!(sent.value, "127.0.0.1:4100");
     }
 
     /// The group window offers every group there is.

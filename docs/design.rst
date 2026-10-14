@@ -1483,9 +1483,21 @@ out and drop it on the floor.
 
 A terminal with one link on it hands that link over; one with none starts a new
 one, and so does one with several, because nothing says which of several was
-meant. A data sink takes one source, so dragging from a sink is always "move
-this line"; a data source may reach several sinks, so a second line out of one
-is drawn from the sink end.
+meant. A data sink takes one source, so dragging from a sink is usually "move
+this line"; a data source may reach several sinks, and the one it already feeds
+is what makes a press on it ambiguous.
+
+Where it lands settles that. A node that could be *this* end -- one with the
+same terminal -- takes the end, which is the re-routing gesture. A node that
+could only be the *other* end gets a new line instead, and the line that was
+picked up stays where it was. So the moc node already feeding one payload,
+pressed on its ``to_payload`` and let go of over a second payload, feeds the
+second one as well: a payload cannot be a data source, so there is nothing else
+the gesture could have meant.
+
+That case used to do nothing at all, and it is the first thing somebody tried.
+A second line out of a data source could only be drawn from the sink end -- a
+rule nobody guessed, and one the drawing gives no hint of.
 
 While the hand is moving, only the lines are redrawn. Rebuilding the nodes
 would destroy the element holding the pointer and take the rest of the gesture

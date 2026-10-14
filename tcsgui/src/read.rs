@@ -487,7 +487,7 @@ mod tests {
     fn the_shipped_examples_open() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        for (name, nodes, links) in [("example", 2, 2), ("tests/manual/thermostat", 11, 16)] {
+        for (name, nodes, links) in [("example", 6, 3), ("tests/manual/thermostat", 11, 16)] {
             for extension in ["yaml", "xml"] {
                 let path = root.join(format!("{name}.{extension}"));
                 let document = read(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -510,6 +510,39 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The shipped example is one configuration in two spellings.
+    ///
+    /// `example.xml` is written from `example.yaml` rather than kept beside it
+    /// by hand: the YAML is the one a person edits -- it is the one carrying
+    /// the prose -- and the XML is the same configuration in the other
+    /// language, which is what the XSD is validated against and what
+    /// `tcslibgs` reads to prove its two readers agree. Two files kept in step
+    /// by hand are two files that drift.
+    ///
+    /// Set TCSGUI_WRITE_EXAMPLE to write it out after a deliberate change to
+    /// the YAML, as `tests/manual/thermostat.*` is written.
+    #[test]
+    fn the_shipped_example_is_the_same_in_both_spellings() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let document = read(&root.join("example.yaml")).expect("the example opens");
+        let written = document.to_xml();
+        let path = root.join("example.xml");
+
+        if std::env::var("TCSGUI_WRITE_EXAMPLE").is_ok() {
+            std::fs::write(&path, &written).expect("the example is writable");
+            return;
+        }
+
+        let shipped = std::fs::read_to_string(&path).expect("the shipped XML");
+        assert_eq!(
+            shipped,
+            written,
+            "{} is not example.yaml in the other language any more. Run the \
+             tests with TCSGUI_WRITE_EXAMPLE=1 to write it out",
+            path.display()
+        );
     }
 
     /// A comment belongs to the entry under it, in either language.

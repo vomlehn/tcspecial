@@ -215,7 +215,30 @@ impl Editor {
         self.trouble = None;
         self.said = None;
 
+        // The configuration as the files hold it is what the code is
+        // generated from, so a session whose last write failed has nothing to
+        // generate from: said as itself rather than as a complaint about the
+        // configuration, which may be perfectly good.
+        if self.unsaved() {
+            self.trouble = Some(format!(
+                "{} does not have this session's last edit, so there is \
+                 nothing to generate from yet: press Save, or put right \
+                 whatever stopped the last write",
+                self.path.display()
+            ));
+            return;
+        }
+
+        // Where it goes, and whether the configuration is finished enough to
+        // be worth generating: see `codegen::trouble`.
+        if let Some(why) = crate::codegen::trouble(&self.document, &self.path) {
+            self.trouble = Some(why);
+            return;
+        }
+
         let Some(path) = crate::codegen::where_to(&self.document, &self.path) else {
+            // Unreachable: `trouble` has just said so. Kept because the path
+            // is an Option and a panic here would be a crash in a command.
             self.trouble = crate::codegen::trouble(&self.document, &self.path);
             return;
         };
@@ -757,12 +780,15 @@ tcsgui:
     fn the_rust_is_written_where_the_section_says() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.yaml");
+
+        // The worked example, which is a finished configuration: code is
+        // generated from what the files hold and only from a configuration
+        // that holds together, so a document with one bare node in it would
+        // be refused for that instead -- which is
+        // `codegen::an_unfinished_configuration_cannot_be_generated_from`.
+        std::fs::write(&path, crate::document::thermostat_example().to_yaml())
+            .expect("the configuration");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
-        editor.edit(Edit::AddNode {
-            name: "sensor".to_string(),
-            node_type: "i2c".to_string(),
-            home: None,
-        });
 
         // Asked for before anything says where it goes: told what to do about
         // it, and nothing written.
@@ -784,7 +810,7 @@ tcsgui:
         let written = where_.path().join("generated/vehicle.rs");
         let rust = std::fs::read_to_string(&written).expect("the generated code");
         assert!(rust.contains("pub fn configuration() -> Graph"), "{rust}");
-        assert!(rust.contains("\"sensor\""), "{rust}");
+        assert!(rust.contains("\"temp_fore\""), "{rust}");
         // The path it was written to is not in the code: that is where the
         // code goes, not something the vehicle is told.
         assert!(!rust.contains("rust-code-path"), "{rust}");
@@ -795,11 +821,25 @@ tcsgui:
         // And the next edit stops saying it: what the last command did is
         // about that command.
         editor.edit(Edit::AddNode {
-            name: "moc".to_string(),
-            node_type: "moc".to_string(),
+            name: "temp_new".to_string(),
+            node_type: "i2c".to_string(),
             home: None,
         });
         assert_eq!(editor.said(), None);
+
+        // That node is one nobody has finished, so the command now refuses
+        // and says which node and what it is short of -- and writes nothing,
+        // the file from before still being the file from before.
+        let before = std::fs::read_to_string(&written).expect("the generated code");
+        editor.write_rust_code();
+        let said = editor.trouble().expect("a sentence").to_string();
+        assert!(said.contains("temp_new"), "{said}");
+        assert_eq!(editor.said(), None, "nothing was written");
+        assert_eq!(
+            std::fs::read_to_string(&written).expect("the generated code"),
+            before,
+            "the code from before should be untouched"
+        );
     }
 
     /// A simulator configuration has to be named `.yaml`, and a name that is

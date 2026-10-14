@@ -5736,18 +5736,25 @@ mod tests {
             // the three working panes left to right.
             assert_eq!(
                 names,
-                vec!["moc".to_string(), "payload".to_string()],
+                vec![
+                    "moc".to_string(),
+                    "mean".to_string(),
+                    "mean-2".to_string(),
+                    "payload".to_string(),
+                    "i2c".to_string(),
+                    "i2c-2".to_string(),
+                ],
                 "example.{extension} should put its nodes on the canvas"
             );
             assert_eq!(
                 ui.get_links().row_count(),
-                2,
-                "example.{extension} should draw both links"
+                3,
+                "example.{extension} should draw every link"
             );
 
-            // Each with a head and a marker: the two links of this example
-            // run between the same pair of nodes, one each way, so the
-            // direction is the only thing that tells them apart.
+            // Each with a head and a marker: two of this example's links run
+            // between the same pair of nodes, one each way, so the direction
+            // is the only thing that tells them apart.
             for row in 0..ui.get_links().row_count() {
                 let link = ui.get_links().row_data(row).expect("a link");
                 assert!(

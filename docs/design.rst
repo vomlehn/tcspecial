@@ -255,8 +255,8 @@ link
     of a configuration a link belongs in. A link is in the file its source node
     is in, once, however far it reaches.
 
-    The node a link arrives at records it as well, under the data sink it
-    arrives at, with the value naming the node the data came from:
+    The node a link arrives at says so as well, under the data sink it arrives
+    at:
 
     .. code-block:: yaml
 
@@ -267,36 +267,44 @@ link
          to_moc:
            - target: moc
            - target: thermostat
-         from_payload: [k_aft, k_bay, k_fore]
+         from_payload: true
 
     That is a record of the links above and not a link. The point of it is a
     node whose entry said nothing about what fed it: a sensor's entry named
     everywhere its reading went, and the computation at the other end named
-    nothing, so reading what arrives at a node meant reading the whole
-    configuration against it. Now a node's entry says what it is connected to
-    at both ends.
+    nothing, so a reader had to read the whole configuration against a node to
+    see whether anything reached it. Now a node's entry says it is connected at
+    both ends.
 
-    Which sink a link arrives at is the stream's own answer -- what leaves by
+    A flag and not the name of the node the line comes from. That name is
+    written on the node the line leaves, which is where the link is; a copy of
+    it here would be the same connection written twice, and at a sink that
+    several lines arrive at one name would read as "and nothing else" -- the
+    ground's sink is such a sink in every configuration, every payload aboard
+    reporting to it. What a node can say about its own sink without repeating
+    the graph is whether anything arrives there, and that is what it says.
+    ``false`` is a node saying none does.
+
+    Which sink a line arrives at is the stream's own answer -- what leaves by
     ``to_moc`` arrives at a ``from_payload`` and nowhere else -- so a
-    destination's named input, ``mean_temp.in0``, is recorded under the stream
-    and not under the input. Which input it feeds is written once, on the node
-    the link leaves.
+    destination's named input, ``mean_temp.in0``, counts at the stream's sink.
+    Which input it feeds is written once, on the node the link leaves.
 
     Two statements of one fact can disagree, and the answer to that is not to
-    believe the second one. The record is checked against the links it is a
-    record of where the configuration is read, and three things are refused: a
-    source nothing links from, a source recorded as arriving by a terminal it
-    does not leave by, and a link left out of a sink that records its others.
-    Nothing downstream reads it -- ``tcslibgs::graph::mirror`` has it only long
-    enough to check it -- so the graph the vehicle flies comes from one place
-    however many places say so.
+    believe the second one. The flag is checked against the links it is a
+    record of where the configuration is read, and both directions are refused:
+    a sink that says a line arrives where none does, and one that says none
+    does where a link is written. Nothing downstream reads it --
+    ``tcslibgs::graph::mirror`` has it only long enough to check it -- so the
+    graph the vehicle flies comes from one place however many places say so.
 
-    It is optional. A file written by hand may record nothing at the arriving
-    ends and be complete: there is nothing in a record the link itself does not
-    say, and every configuration written before these existed still reads. What
-    is not optional is recording all of a sink's sources once any of them are
-    recorded, because a list that is missing one reads as a list of everything.
-    The editor writes them on every node it writes.
+    It is optional. A file written by hand may say nothing about its sinks and
+    be complete: there is nothing in a flag the links do not already say, and
+    every configuration written before these existed still reads. A word that
+    is neither ``true`` nor ``false`` is refused saying what the field means,
+    rather than read as a name -- a name there was legal for a while, and a
+    file written against that is better refused than half understood. The
+    editor writes the flags on every node it writes.
 
     In memory they are still a list, because every rule about a link is about
     both of its ends and a list is what a rule can be written against.
@@ -1207,9 +1215,9 @@ attribute makes. Where the attribute names several destinations the note is
 about all of them, one line carrying one comment.
 
 A comment above a ``from_payload:`` or ``from_moc:`` is not kept, those being
-the record of a link rather than the link: the note belongs above the link, at
-the end it is written at, and a comment the editor kept in a derived line would
-be a comment it moved. It is the fourth kind in the list above.
+a record of links rather than links: the note belongs above the link, at the
+end it is written at, and a comment the editor kept in a derived line would be
+a comment it moved. It is the fourth kind in the list above.
 
 The attribute order is not kept either: the editor writes a node's attributes
 and the section's parameters in the order a dictionary gives them, which is
@@ -1792,6 +1800,24 @@ Asked for rather than done on every save. Generating the code is a second
 output of the editor and not part of what editing means, and a half-finished
 configuration in a file somebody's build is reading would be a build of
 something nobody meant.
+
+Which is also why it is the one command that insists on a finished
+configuration. Everywhere else the editor is lazy on purpose -- see `The editor
+is lazy`_ -- and here the laziness has to end: what comes out of this is
+compiled into the program the vehicle runs, so a sensor whose device nobody
+named would be a payload the binary cannot open. So the command asks
+``Graph::check`` of the configuration as the files hold it and refuses while
+anything is outstanding, warnings as well as errors, listing the first few of
+them and counting the rest -- the same five-and-``and others`` shape
+``tcsverify`` prints, so that a person who has run the verifier meets a report
+they recognise. Nothing is written when it refuses: the generated file from
+before is still the generated file from before.
+
+It asks the files rather than the document in hand, for the same reason it
+generates from them: every edit is written as it is made, so the two say the
+same thing, and a session whose last write failed has nothing to generate from
+-- which the command says in those words rather than as a complaint about a
+configuration that may be perfectly good.
 
 What is generated is the part that varies between configurations: the nodes,
 what each says about itself, the links, the payload groups, the command
@@ -6554,19 +6580,50 @@ Requirement
     names, a set being free to name its files as it likes.
 
 Requirement
-    Every problem is printed as the file it is in, the line of that file, and
-    what is wrong: ``file:line: message``. The shape an editor jumps to and a
-    build log is read with.
+    Every problem is printed as the file it is in, the line of that file,
+    which kind it is, and what is wrong: ``file:line: error: message`` or
+    ``file:line: warning: message``. The shape an editor jumps to and a build
+    log is read with. Both kinds say which they are, rather than only the
+    warnings: a report where an unlabelled line had to be worked out would be
+    a report read wrongly.
 
 Requirement
-    A hundred problems are printed at most. The hundred and first stops the
-    run and ``Too many errors, halting`` is printed in its place.
+    A problem is an **error** where the configuration says something wrong --
+    two nodes of one name, a link to a node that is not there, a link carrying
+    one stream into the other -- and a **warning** where it has not finished
+    saying it: a node whose attributes are not all in yet, a node nothing is
+    linked to. One statement of which is which,
+    ``tcslibgs::graph::check::Problem::severity``, so that the verifier, the
+    editor and the flight software agree about what a half-built graph is.
+
+    The split changes no rule. The flight software refuses a configuration
+    with any problem in it, warnings included: a sensor whose device nobody
+    named cannot be opened, and that is not a matter of degree aboard. What it
+    is for is the person editing. A configuration is unfinished for as long as
+    somebody is drawing it, and a verifier that failed on that would fail on
+    every save -- burying the mistakes that matter under the fields nobody has
+    typed yet.
 
 Requirement
-    Tcsverify exits with a status of nought when it found nothing wrong and
-    non-nought when it found something, so that a recipe or a shell ``&&`` can
-    be told by it. A command line that is neither of the two shapes above is
-    a third status, which is not a statement about any file.
+    The first few problems are printed and the rest are counted: five of them,
+    and then ``and others (n more)``. Errors are printed before warnings, so
+    that the lines a person reads are the ones saying the configuration is
+    wrong. A twenty-line report is a report scrolled past, and in a half-built
+    graph most of those lines are one unfinished node said a second way.
+
+Requirement
+    A hundred problems are looked for at most. The hundred and first stops the
+    run and ``Too many errors, halting`` is printed, which is a different
+    statement from ``and others``: one says more were found than were printed,
+    the other that the looking stopped.
+
+Requirement
+    Tcsverify exits with a status of nought when it found no errors and
+    non-nought when it found one, so that a recipe or a shell ``&&`` can be
+    told by it. Warnings do not change the status: a configuration somebody is
+    in the middle of writing must not fail a build it is not part of yet. A
+    command line that is neither of the two shapes above is a third status,
+    which is not a statement about any file.
 
 Requirement
     Tcsverify states no rule of its own. Every problem it reports comes from

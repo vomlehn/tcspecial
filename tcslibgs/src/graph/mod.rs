@@ -20,10 +20,10 @@
 //! and means the same thing; see [`Destinations`].
 //!
 //! So there is no links section, and a node and the links out of it are read,
-//! written and deleted together. The node it arrives at records it as well --
-//! `from_payload: temp_fore`, under the sink it arrives at -- so that a node's
-//! entry says what it is connected to at both ends; that record is checked
-//! against these and otherwise never read. See [`mirror`].
+//! written and deleted together. The node it arrives at says so as well --
+//! `from_payload: true`, under the sink it arrives at -- so that a node's
+//! entry says it is connected at both ends; that flag is checked against these
+//! links and otherwise never read. See [`mirror`].
 //!
 //! In memory they are still a list -- see [`Link`] -- because every rule about
 //! a link is about both of its ends, and a list of them is what a rule can be
@@ -229,16 +229,18 @@ pub struct NodeFile {
     pub to_moc: Vec<String>,
     /// And its vehicleward data: the sinks its `to_payload` reaches.
     pub to_payload: Vec<String>,
-    /// What the entry records as arriving at its `from_payload` sink: the
-    /// nodes whose groundward data reaches it, as `node` or `node.terminal`.
+    /// Whether a line arrives at this node's `from_payload` sink, as the entry
+    /// says so.
     ///
-    /// A record of a link written at the other end rather than the link
-    /// itself, and the only thing in this structure that nothing downstream
-    /// reads: see [`mirror`]. Empty is a file that recorded nothing, which is
-    /// allowed.
-    pub from_payload: Vec<String>,
-    /// And what it records as arriving at its `from_moc` sink.
-    pub from_moc: Vec<String>,
+    /// A record of the links written at the other end rather than a link, and
+    /// the only thing in this structure that nothing downstream reads: see
+    /// [`mirror`]. `None` is a file that said nothing about it, which is
+    /// allowed; `Some(true)` is a node saying a groundward line arrives here
+    /// and `Some(false)` one saying none does, and either is refused where the
+    /// links say otherwise.
+    pub from_payload: Option<bool>,
+    /// And whether one arrives at its `from_moc` sink.
+    pub from_moc: Option<bool>,
 }
 
 impl NodeFile {
@@ -264,15 +266,15 @@ impl NodeFile {
         links
     }
 
-    /// What this entry recorded as arriving at each of its sinks.
+    /// What this entry said about each of its sinks.
     ///
-    /// The mirror of [`NodeFile::links`], and deliberately not links: these
-    /// are a record of links written elsewhere, and turning them into links
-    /// here would be the same connection in the graph twice.
-    pub fn arriving(&self) -> Vec<(&'static str, &Vec<String>)> {
+    /// The mirror of [`NodeFile::links`], and deliberately not links: this is
+    /// a record of links written elsewhere, and a record read as a link would
+    /// be the same connection in the graph twice.
+    pub fn arriving(&self) -> Vec<(&'static str, Option<bool>)> {
         vec![
-            ("from_payload", &self.from_payload),
-            ("from_moc", &self.from_moc),
+            ("from_payload", self.from_payload),
+            ("from_moc", self.from_moc),
         ]
     }
 }
@@ -307,8 +309,8 @@ impl<'de> Deserialize<'de> for NodeFile {
                 let mut attributes: BTreeMap<String, Scalar> = BTreeMap::new();
                 let mut to_moc: Vec<String> = Vec::new();
                 let mut to_payload: Vec<String> = Vec::new();
-                let mut from_payload: Vec<String> = Vec::new();
-                let mut from_moc: Vec<String> = Vec::new();
+                let mut from_payload: Option<bool> = None;
+                let mut from_moc: Option<bool> = None;
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -347,24 +349,14 @@ impl<'de> Deserialize<'de> for NodeFile {
                                 .into_iter()
                                 .map(str::to_string),
                         ),
-                        // A data sink, which records a link written on the
-                        // node it leaves rather than making one. Read the same
-                        // way, repeats included, because it is written the
-                        // same way -- and checked against the links it is a
-                        // record of as the configuration is read. See
-                        // `mirror`.
-                        "from_payload" => from_payload.extend(
-                            map.next_value::<Destinations>()?
-                                .each()
-                                .into_iter()
-                                .map(str::to_string),
-                        ),
-                        "from_moc" => from_moc.extend(
-                            map.next_value::<Destinations>()?
-                                .each()
-                                .into_iter()
-                                .map(str::to_string),
-                        ),
+                        // A data sink, which says whether a line arrives
+                        // there -- a record of links written on the nodes they
+                        // leave, and not a link. Checked against those links
+                        // as the configuration is read: see `mirror`.
+                        "from_payload" => {
+                            from_payload = Some(said_so("from_payload", &mut map)?)
+                        }
+                        "from_moc" => from_moc = Some(said_so("from_moc", &mut map)?),
                         // Everything else is an attribute of the node, which
                         // is where a word nothing reads ends up -- and is
                         // refused by name against what the type takes. See
@@ -634,6 +626,35 @@ impl<'de> Deserialize<'de> for Bound {
         }
 
         d.deserialize_any(V)
+    }
+}
+
+/// Whether a node's entry says a line arrives at one of its sinks.
+///
+/// `from_payload: true`, and `false` for a node saying none does. Read through
+/// [`Scalar`] rather than as a `bool` because XML has no booleans: the text of
+/// `<from_payload>true</from_payload>` is the word, and the word is what both
+/// languages have in common.
+///
+/// Anything else is refused saying what the field means. It named the node the
+/// data came from for a while, which read as "and nothing else" the moment a
+/// second line arrived -- so a file written against that is refused rather
+/// than half understood.
+fn said_so<'de, A: serde::de::MapAccess<'de>>(
+    sink: &str,
+    map: &mut A,
+) -> Result<bool, A::Error> {
+    use serde::de::Error;
+
+    let said = map.next_value::<Scalar>()?;
+    match said.as_str().trim() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        other => Err(A::Error::custom(format!(
+            "{sink}: \"{other}\" is not true or false. A data sink says \
+             whether a line arrives there and nothing more -- which node it \
+             comes from is written on that node, as the link itself"
+        ))),
     }
 }
 

@@ -121,8 +121,8 @@ link
     on-board computation; it is the "T" such an arrangement is usually drawn
     as. It is written as an attribute of the node it leaves rather than in a
     section of its own, so a node and what leaves it are read and written
-    together, and recorded again on the node it arrives at so that a node's
-    entry says what it is connected to both ways.
+    together, and noted on the node it arrives at as well, so that a node's
+    entry says it is connected both ways.
 
 terminal
     Where a link is attached: a node's **data source** is where data leaves it
@@ -160,14 +160,14 @@ terminal
     and a MOC link's sink takes as many as the configuration gives it, every
     payload's telemetry arriving at the ground on its own socket.
 
-    The node at the arriving end records the same link under the data sink it
-    arrives at, the value naming the node the data came from: ``from_payload:
-    k_fore``, or ``from_payload: [k_aft, k_bay, k_fore]`` where several arrive
-    there. It is a record and not the link -- the link is the attribute on the
-    node it leaves, and that is the one the software reads -- so a file may
-    leave these out and still be complete. A file that states any of them for a
-    sink states all of them, and a record that disagrees with the link it
-    records is refused where the file is read. tcsgui writes them.
+    The node at the arriving end says so under the data sink the line arrives
+    at: ``from_payload: true``, and ``false`` for a sink nothing arrives at.
+    It is a record and not the link -- the link is the attribute on the node it
+    leaves, and that is the one the software reads -- so a file may leave these
+    out and still be complete. Which node a line comes from is not repeated
+    here: that is written on the node it leaves, and at a sink several lines
+    arrive at, one name would read as the only one. A flag that disagrees with
+    the links is refused where the file is read. tcsgui writes them.
 
     Each terminal may be linked to one other: a ``to_moc`` to a
     ``from_payload``, a ``from_payload`` to a ``to_moc``, a ``to_payload`` to a
@@ -1502,12 +1502,20 @@ the file, the line and what is wrong there:
 .. code-block:: console
 
    $ cargo run --bin tcsverify -- /tmp/draft.yaml
-   /tmp/draft.yaml:61: payload "udp-steady": packet_size must be greater than zero
-   /tmp/draft.yaml:68: payload "random-device" is a device-file payload, so port does not apply to it
+   /tmp/draft.yaml:61: error: payload "udp-steady": packet_size must be greater than zero
+   /tmp/draft.yaml:68: error: payload "random-device" is a device-file payload, so port does not apply to it
 
-It exits 0 when nothing is wrong, 1 when something is, and 2 when the command
+Each line says which kind it is. An **error** is a configuration that says
+something wrong -- two nodes of one name, a link to a node that is not there.
+A **warning** is one that has not finished saying it: a node whose attributes
+are not all in yet, a node nothing is linked to. That is the state every
+configuration is in while it is being drawn, so warnings do not fail the run.
+
+It exits 0 when it found no errors, 1 when it found one, and 2 when the command
 line is neither of those two shapes -- which a script can tell apart from a
-bad file.
+bad file. A configuration with warnings and no errors exits 0, and the vehicle
+will still refuse it: the flight software requires every attribute a node
+needs, and so does tcsgui before it will generate code from one.
 
 Every program that runs a set refuses the first thing wrong with it and stops,
 which is what a program that cannot run without it should do and is not what a
@@ -1515,9 +1523,12 @@ person fixing the file wants: a set with three mistakes in it is three runs of
 tcsmoc, each reporting one of them. This asks the same rules -- the library's,
 the ones those programs use -- for all of their answers at once.
 
-It reports a hundred problems at most, and then says ``Too many errors,
-halting``. The hundred and first is what says there are more; beyond that a
-page of them would mostly be consequences of the first few.
+It prints the first five problems, errors before warnings, and then ``and
+others (n more)``: a twenty-line report is a report scrolled past, and in a
+half-built configuration most of those lines are one unfinished node said a
+second way. It looks for a hundred at most, and then says ``Too many errors,
+halting`` -- which says the looking stopped, where ``and others`` says more
+were found than were printed.
 
 Both files of the set are checked, and the second against the first: every
 payload simulated, every simulated payload a payload, and every setting one

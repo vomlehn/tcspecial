@@ -43,6 +43,18 @@ pub enum Outline {
     /// A rectangle with one pair of corners rounded and one square, which
     /// reads as a direction. Interfaces that are driven rather than read.
     Keyed,
+    /// Six sides, pointed left and right: the ground station.
+    ///
+    /// The one node on the canvas that is not part of the vehicle at all -- it
+    /// is the other end of the link -- and a hexagon is what a systems diagram
+    /// uses for something outside the thing it describes. It was a pill, which
+    /// it shared with a log: both were "an end of the graph", and the two ends
+    /// of a graph are not the same kind of thing.
+    ///
+    /// Drawn as a path rather than from a corner radius, because a radius
+    /// cannot make a corner that is not round. The arithmetic is
+    /// [`hexagon`]'s, where it can be tested.
+    Hexagon,
 }
 
 /// How the inside is filled.
@@ -319,6 +331,53 @@ pub struct Corner {
     /// which way that is on the screen, which is the half a reader can take in
     /// without reading.
     pub rightward: bool,
+}
+
+/// The outline of a node of this size, where its shape needs a path.
+///
+/// Only the hexagon so far: a square, a rounded rectangle and a pill are a
+/// rectangle with a corner radius, and a keyed shape is one of those with a
+/// corner cut off, so the markup draws all four from one element. A hexagon is
+/// none of those, and a corner radius cannot make a corner that is not round.
+///
+/// Empty for every other outline, which is what says "draw this the ordinary
+/// way". The path is in the node's own coordinates, so the markup draws it
+/// one to one and the stroke keeps its width -- a viewbox stretched to fit
+/// would stretch the line with it.
+///
+/// Pointed left and right, which is the long way: the points are where the
+/// lines arrive and leave, and a hexagon pointed top and bottom would put its
+/// points where no terminal is. The slope is an eighth of the width, which
+/// reads as a hexagon at this size without taking so much off the corners that
+/// the name has nowhere to sit.
+pub fn shape_of(outline: Outline, (width, height): (u32, u32)) -> String {
+    match outline {
+        Outline::Hexagon => hexagon((width, height)),
+        _ => String::new(),
+    }
+}
+
+/// Six sides in a box this size, pointed left and right.
+///
+/// Inset half a pixel so the stroke sits inside the node: a path drawn on the
+/// boundary is drawn half outside it, and a node that overhangs its own box by
+/// a pixel is a node whose terminals and lines are all a pixel out.
+pub fn hexagon((width, height): (u32, u32)) -> String {
+    let (w, h) = (width as f32 - 1.0, height as f32 - 1.0);
+    let slope = w / 8.0;
+    let middle = h / 2.0;
+    format!(
+        "M {:.1} 0.5 L {:.1} 0.5 L {:.1} {:.1} L {:.1} {:.1}          L {:.1} {:.1} L 0.5 {:.1} Z",
+        slope + 0.5,
+        w - slope + 0.5,
+        w + 0.5,
+        middle + 0.5,
+        w - slope + 0.5,
+        h + 0.5,
+        slope + 0.5,
+        h + 0.5,
+        middle + 0.5
+    )
 }
 
 /// How large a terminal is drawn, in pixels.
@@ -781,7 +840,13 @@ impl NodeType {
             NodeType::Gpio => "Driven",
             NodeType::Compute => "Computation",
             NodeType::Null => "Pass-through",
-            NodeType::Log | NodeType::Moc => "Ends of the graph",
+            // Two families of one, because they are two kinds of end and now
+            // two shapes: the log is where the data stops on board and the
+            // ground station is where it leaves the vehicle. They are also in
+            // two different panes, so one heading over both was never read as
+            // a group by anybody.
+            NodeType::Log => "Ends of the graph",
+            NodeType::Moc => "The ground station",
             NodeType::Subdiagram => "Pages",
         }
     }
@@ -826,9 +891,11 @@ impl NodeType {
     /// How this type is drawn.
     ///
     /// The groupings are meant to be learnable rather than arbitrary: square
-    /// corners are hardware, rounded corners are software, circles are ends of
-    /// the graph, and a keyed rectangle is an interface that is driven. Within
-    /// a shape the types differ by shading, weight and size.
+    /// corners are hardware, rounded corners are software, a keyed rectangle
+    /// is an interface that is driven, and the two ends of the graph are the
+    /// two shapes nothing else uses -- a pill where it stops on board, a
+    /// hexagon where it leaves the vehicle. Within a shape the types differ by
+    /// shading, weight and size.
     pub fn appearance(self) -> Appearance {
         use Outline::*;
         use Shading::*;
@@ -992,7 +1059,9 @@ impl NodeType {
                 size: (WIDTH, 88),
                 tint: Tint::Moss,
             },
-            // Ends of the graph.
+            // Ends of the graph, and the only two shapes used once each: an
+            // end is where a reader stops, and a shape they have seen nowhere
+            // else is what says to stop.
             NodeType::Log => Appearance {
                 face: Face::Plain,
                 label_size: 12,
@@ -1004,12 +1073,17 @@ impl NodeType {
                 size: (WIDTH, 96),
                 tint: Tint::Gold,
             },
+            // The ground station: the one node on the canvas that is not part
+            // of the vehicle, which is what the hexagon says. It was a pill,
+            // which it shared with the log, and the two ends of a graph are
+            // not the same kind of thing -- one is a file on board, the other
+            // is everybody on the ground.
             NodeType::Moc => Appearance {
                 face: Face::Plain,
                 label_size: 16,
                 label_weight: 700,
                 label_italic: true,
-                outline: Circle,
+                outline: Hexagon,
                 shading: Solid,
                 weight: Wide,
                 size: (WIDTH, 128),
@@ -1022,6 +1096,93 @@ impl NodeType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every outline is drawn by one of the two means, and the shaped ones
+    /// stay inside the box they are given.
+    ///
+    /// Two means, because a corner radius draws four of the five outlines and
+    /// cannot draw the fifth. The markup picks between them on the path being
+    /// empty, so a sixth outline added later with a shape and no path -- or a
+    /// path and a radius both -- would be drawn as a plain rectangle or as two
+    /// shapes at once, and in neither case would anything say so.
+    #[test]
+    fn every_outline_is_either_a_radius_or_a_path() {
+        for kind in NodeType::ALL {
+            let drawn = kind.appearance();
+            let shape = shape_of(drawn.outline, drawn.size);
+            let shaped = drawn.outline == Outline::Hexagon;
+
+            assert_eq!(
+                shaped,
+                !shape.is_empty(),
+                "{} is {:?} and its path is {shape:?}",
+                kind.spelling(),
+                drawn.outline
+            );
+
+            if !shaped {
+                continue;
+            }
+
+            // Inside its own box, every coordinate of it. A shape that
+            // overhangs is a shape whose terminals and lines are all drawn
+            // somewhere its outline is not.
+            let (width, height) = drawn.size;
+            let points: Vec<(f32, f32)> = points_of(&shape);
+            assert_eq!(
+                points.len(),
+                6,
+                "{} is a hexagon with {} corners: {shape}",
+                kind.spelling(),
+                points.len()
+            );
+            for (x, y) in &points {
+                assert!(
+                    (0.0..=width as f32).contains(x) && (0.0..=height as f32).contains(y),
+                    "{} has a corner at ({x}, {y}), outside {width} by {height}",
+                    kind.spelling()
+                );
+            }
+
+            // Pointed the long way. The points are where the lines arrive and
+            // leave; a hexagon pointed top and bottom would put its points
+            // where no terminal is, and its flat sides where every one of them
+            // is.
+            let middle = (height as f32 - 1.0) / 2.0 + 0.5;
+            let sideways = points
+                .iter()
+                .filter(|(_, y)| (y - middle).abs() < 1.0)
+                .count();
+            assert_eq!(
+                sideways, 2,
+                "{} has {sideways} corners at half its height: {shape}",
+                kind.spelling()
+            );
+        }
+    }
+
+    /// The corners of a path, read back out of its commands.
+    ///
+    /// Only the shapes above are read, which are moves and lines and nothing
+    /// else, so this is two words at a time and not a parser.
+    fn points_of(shape: &str) -> Vec<(f32, f32)> {
+        let words: Vec<&str> = shape.split_whitespace().collect();
+        let mut points = Vec::new();
+        let mut word = 0;
+        while word < words.len() {
+            match words[word] {
+                "M" | "L" => {
+                    let x = words[word + 1].parse().expect("a coordinate");
+                    let y = words[word + 2].parse().expect("a coordinate");
+                    points.push((x, y));
+                    word += 3;
+                }
+                "Z" => word += 1,
+                other => panic!("{other} is not a move, a line or a close: {shape}"),
+            }
+        }
+        points
+    }
 
     /// No two node types are told apart by colour alone.
     ///

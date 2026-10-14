@@ -77,8 +77,13 @@ export struct NodeView {
     y: length,
     width: length,
     height: length,
-    // square | rounded | circle | keyed
+    // square | rounded | circle | keyed | hexagon
     outline: string,
+    // The outline as path data, in this node's own coordinates, for the
+    // outlines a corner radius cannot draw. Empty for the ones it can, which
+    // is every outline but the hexagon. Rust's arithmetic rather than the
+    // markup's, for the same reason the link routes are: see style::shape_of.
+    shape: string,
     // solid | hatched | open | double
     shading: string,
     border: length,
@@ -411,6 +416,10 @@ component NodeShape inherits Rectangle {
         // which outline this is: 0 for square, a quarter of the height for
         // rounded, half the width for a circle. A keyed shape is this with a
         // corner squared off by the triangle below it.
+        //
+        // An outline a radius cannot draw arrives as path data instead, and
+        // then this Rectangle keeps the geometry and the shadow and draws
+        // neither border nor ground: the paths below it are the shape.
         body := Rectangle {
             width: 100%;
             height: 100%;
@@ -418,7 +427,9 @@ component NodeShape inherits Rectangle {
             // mark had one and the node itself did not, which reads as half
             // finished -- and a surface that answers the pointer is a surface
             // whose parts look pressable before they are pressed.
-            border-width: grip.has-hover ? node.border + 1px : node.border;
+            border-width: node.shape != ""
+                ? 0px
+                : (grip.has-hover ? node.border + 1px : node.border);
             border-color: ink;
 
             // While it is being dragged, a node lifts off the canvas. Not
@@ -436,11 +447,46 @@ component NodeShape inherits Rectangle {
                 : node.outline == "rounded"
                     ? self.height / 4
                     : 0px;
-            background: node.shading == "solid"
-                ? ink.with-alpha(0.18)
-                : node.shading == "double"
-                    ? ink.with-alpha(0.08)
-                    : transparent;
+            background: node.shape != ""
+                ? transparent
+                : (node.shading == "solid"
+                    ? ink.with-alpha(0.18)
+                    : node.shading == "double"
+                        ? ink.with-alpha(0.08)
+                        : transparent);
+
+            // A shaped outline: the path, stroked and filled the way the
+            // Rectangle above would have been. One pixel to one coordinate --
+            // the viewbox is the node's own size -- so the line keeps its
+            // width instead of being stretched with the shape.
+            //
+            // Dropped three pixels under itself while dragging, which is the
+            // lift the Rectangle gets from its drop-shadow: a Path has none,
+            // and the one thing a person wants to know mid-gesture is whether
+            // the thing is moving. Drawn first, so it is under the shape.
+            if node.shape != "" && grip.pressed: Path {
+                y: 3px;
+                width: 100%;
+                height: 100%;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.shape;
+                fill: #00000033;
+            }
+            if node.shape != "": Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: self.width / 1px;
+                viewbox-height: self.height / 1px;
+                commands: node.shape;
+                stroke: ink;
+                stroke-width: grip.has-hover ? node.border + 1px : node.border;
+                fill: node.shading == "solid"
+                    ? ink.with-alpha(0.18)
+                    : node.shading == "double"
+                        ? ink.with-alpha(0.08)
+                        : transparent;
+            }
 
             // Hatched shading, inside whatever the outline turned out to be.
             if node.shading == "hatched": Hatching {

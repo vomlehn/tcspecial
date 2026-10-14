@@ -9,7 +9,7 @@
 //! flown and `runtime::start` opens it, so a configuration compiled in arrives
 //! at the same two functions a configuration read from a file does.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use tcslibgs::graph::parameters::nest;
 use tcslibgs::graph::{
@@ -266,5 +266,6 @@ pub fn configuration() -> Graph {
         files: Vec::new(),
         homes: BTreeMap::new(),
         placed: BTreeMap::new(),
+         set_aside: BTreeSet::new(),
     }
 }

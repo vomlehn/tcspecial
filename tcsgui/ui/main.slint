@@ -52,6 +52,14 @@ export global Type {
 // The geometry is computed in Rust -- see style::terminal_at -- for the reason
 // the link routes are: arithmetic in a layout language is hard to read and
 // impossible to test.
+// One thing that might be wrong, as the concerns window shows it.
+export struct ConcernRow {
+    // The sentence: which node, and what about it.
+    said: string,
+    // The node it is about, which is what "go to it" goes to.
+    node: string,
+}
+
 export struct TerminalView {
     shown: bool,
     x: length,
@@ -85,9 +93,13 @@ export struct NodeView {
     faulty: bool,
     fault: string,
     selected: bool,
-    // What somebody wrote about this node, shown under it -- or, for a
-    // subdiagram that is closed, what is inside it.
-    comment: string,
+    // What a closed subdiagram holds: how many nodes, and how many lines
+    // cross its edge. Empty for every other type.
+    //
+    // A node's own comment is not here any more: a note somebody wrote about a
+    // sensor belongs in that node's window, beside the attributes it is about,
+    // and on the canvas it was a paragraph in the middle of a diagram.
+    summary: string,
     // Whether this node is a diagram of its own and can be opened.
     openable: bool,
     // Which terminals this type has, drawn as a small rectangle in a corner
@@ -492,12 +504,17 @@ component NodeShape inherits Rectangle {
                 horizontal-alignment: center;
                 overflow: elide;
             }
-            // What somebody wrote about this node. Shown rather than hidden behind
-            // a hover: a note explaining why a sensor is at an odd address is
-            // worth reading before the address is changed, and a note nobody
-            // finds is a note nobody wrote.
-            if node.comment != "": Text {
-                text: node.comment;
+            // What a closed subdiagram holds: how many nodes, and how many
+            // lines cross its edge. The two things worth knowing about a
+            // diagram you are not looking at.
+            //
+            // Not a node's comment, which this used to show as well. A note
+            // somebody wrote about a sensor belongs in that node's own window,
+            // beside the attributes it is about: on the canvas it was a
+            // paragraph in the middle of a diagram, and a diagram is read for
+            // its shape.
+            if node.summary != "": Text {
+                text: node.summary;
                 font-size: Type.small;
                 font-italic: true;
                 color: #555555;
@@ -990,6 +1007,13 @@ component Surface inherits Rectangle {
     // whether a place is in view.
     out property <length> canvas-view-height: sheet.visible-height;
 
+    // How many concerns there are, and how many were set aside: see the two
+    // buttons in the bar.
+    in property <int> concern-count: 0;
+    in property <int> aside-count: 0;
+    callback show-concerns();
+    callback show-aside();
+
     in property <string> trouble: "";
     // And what the last command did, where it did something worth saying:
     // generating the Rust writes a file somebody named and changes nothing
@@ -1083,6 +1107,23 @@ component Surface inherits Rectangle {
                 colorize-icon: true;
                 accessible-label: "Save";
                 clicked => { root.save-clicked(); }
+            }
+
+            // What might be wrong, and what somebody has decided not to act
+            // on. Counted rather than listed here: the list is a window, and
+            // a bar that held it would be a bar with a paragraph in it.
+            //
+            // Two buttons because they are two questions. The first is "is
+            // there anything I have not looked at"; the second is "what did I
+            // decide to leave", which is worth being able to ask again -- a
+            // decision somebody cannot find is a decision they cannot change.
+            if concern-count > 0: Button {
+                text: concern-count + (concern-count == 1 ? " concern" : " concerns");
+                clicked => { root.show-concerns(); }
+            }
+            if aside-count > 0: Button {
+                text: aside-count + " set aside";
+                clicked => { root.show-aside(); }
             }
 
             Text {
@@ -1401,6 +1442,13 @@ export component MainWindow inherits Window {
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
     in property <string> redo-label: "";
+    // How many concerns there are, and how many were set aside: see the two
+    // buttons in the bar.
+    in property <int> concern-count: 0;
+    in property <int> aside-count: 0;
+    callback show-concerns();
+    callback show-aside();
+
     in property <string> trouble: "";
     in property <string> said: "";
     in property <string> selected: "";
@@ -1539,6 +1587,10 @@ export component MainWindow inherits Window {
         undo-label: root.undo-label;
         redo-label: root.redo-label;
         trouble: root.trouble;
+        concern-count: root.concern-count;
+        aside-count: root.aside-count;
+        show-concerns => { root.show-concerns(); }
+        show-aside => { root.show-aside(); }
         said: root.said;
         canvas-offset <=> root.canvas-offset;
         undo-clicked => { root.undo-clicked(); }
@@ -1610,6 +1662,13 @@ export component SubWindow inherits Window {
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
     in property <string> redo-label: "";
+    // How many concerns there are, and how many were set aside: see the two
+    // buttons in the bar.
+    in property <int> concern-count: 0;
+    in property <int> aside-count: 0;
+    callback show-concerns();
+    callback show-aside();
+
     in property <string> trouble: "";
     in property <string> said: "";
     in property <string> selected: "";
@@ -1744,6 +1803,10 @@ export component SubWindow inherits Window {
         undo-label: root.undo-label;
         redo-label: root.redo-label;
         trouble: root.trouble;
+        concern-count: root.concern-count;
+        aside-count: root.aside-count;
+        show-concerns => { root.show-concerns(); }
+        show-aside => { root.show-aside(); }
         said: root.said;
         canvas-offset <=> root.canvas-offset;
         undo-clicked => { root.undo-clicked(); }
@@ -2417,6 +2480,101 @@ export component AlertWindow inherits Window {
             Button {
                 text: "OK";
                 clicked => { root.acknowledged(); }
+            }
+        }
+    }
+}
+
+/// What might be wrong with the drawing, listed, with somewhere to go.
+///
+/// A concern is a shape that might be a mistake and might be meant: a payload
+/// whose readings reach nothing, a vehicle node a stream stops at. The editor
+/// will not refuse a configuration for one -- that is what a fault is for --
+/// so what it owes instead is a way to find them: a count on a button, a list
+/// behind it, and a press that takes you to the node.
+///
+/// One window for both lists, pointed at either by `aside`: what has not been
+/// looked at, and what somebody looked at and left. Two windows saying almost
+/// the same thing would be two windows to keep in step.
+export component ConcernsWindow inherits Window {
+    title: "tcsgui";
+    background: #fbfbfa;
+    min-width: 420px;
+    min-height: 200px;
+    preferred-width: 560px;
+    preferred-height: 320px;
+
+    in property <[ConcernRow]> rows: [];
+    // Whether this is the list of what was set aside, which decides what the
+    // second button on a row offers.
+    in property <bool> aside: false;
+
+    // Which row: the index into `rows`, which is what the editor holds them
+    // by. A name would be a second thing to keep in step with the list.
+    callback go-to(int);
+    callback decided(int);
+    callback closed();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: root.aside
+                ? "Set aside"
+                : "Things that might be wrong";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+        }
+        Text {
+            text: root.aside
+                ? "You decided to leave these. Take one up again to have it "
+                    + "counted with the rest."
+                : "None of these stops a configuration being read or flown. "
+                    + "Set one aside if it is what you meant.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for row[i] in root.rows: HorizontalLayout {
+                    spacing: Space.step;
+                    Text {
+                        text: row.said;
+                        font-size: Type.body;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        wrap: word-wrap;
+                    }
+                    Button {
+                        text: "Go to it";
+                        clicked => { root.go-to(i); }
+                    }
+                    Button {
+                        text: root.aside ? "Take up again" : "Set aside";
+                        clicked => { root.decided(i); }
+                    }
+                }
+                if root.rows.length == 0: Text {
+                    text: root.aside
+                        ? "Nothing has been set aside."
+                        : "Nothing to look at.";
+                    font-size: Type.body;
+                    font-italic: true;
+                    color: #6b7280;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            Rectangle { }
+            Button {
+                text: "Close";
+                clicked => { root.closed(); }
             }
         }
     }

@@ -193,7 +193,7 @@ pub fn rust_of(document: &Document, from: &Path) -> String {
     ));
 
     out.push_str(
-        "use std::collections::BTreeMap;\n\
+        "use std::collections::{BTreeMap, BTreeSet};\n\
          \n\
          use tcslibgs::graph::parameters::nest;\n\
          use tcslibgs::graph::{\n    \
@@ -342,7 +342,8 @@ pub fn rust_of(document: &Document, from: &Path) -> String {
     out.push_str(
         "        files: Vec::new(),\n        \
          homes: BTreeMap::new(),\n        \
-         placed: BTreeMap::new(),\n    }\n}\n",
+         placed: BTreeMap::new(),
+         set_aside: BTreeSet::new(),\n    }\n}\n",
     );
 
     out

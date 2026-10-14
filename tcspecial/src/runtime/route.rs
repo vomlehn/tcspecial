@@ -276,6 +276,7 @@ mod tests {
             files: Vec::new(),
             homes: std::collections::BTreeMap::new(),
             placed: std::collections::BTreeMap::new(),
+            set_aside: Default::default(),
         };
 
         let plain = Routes::of(&one_link("a", "c"));

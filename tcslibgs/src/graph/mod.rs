@@ -160,6 +160,31 @@ pub struct Tcsgui {
     /// Where each node was drawn, by name.
     #[serde(default)]
     pub nodes: Vec<Placed>,
+    /// What the editor was told not to go on raising: a node, and the kind of
+    /// concern somebody looked at and left.
+    ///
+    /// A concern is a shape that might be a mistake and might be meant -- a
+    /// payload nothing reads yet, a vehicle node a stream stops at -- and the
+    /// editor counts them on a button rather than refusing the file. This is
+    /// the answer "that one is on purpose", written down so that two people
+    /// editing one configuration do not each have to give it again.
+    ///
+    /// Here rather than in a file of somebody's own for the reason the
+    /// positions are: it is a statement about this configuration, and a second
+    /// file to keep in step is a second file to lose.
+    #[serde(default, rename = "set-aside")]
+    pub set_aside: Vec<Aside>,
+}
+
+/// One concern somebody has set aside.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Aside {
+    /// The node it is about, as the nodes section named it.
+    pub node: String,
+    /// Which kind of concern: the editor's own word for it, so that a concern
+    /// of another kind about the same node is still raised.
+    pub concern: String,
 }
 
 /// One node's place on the canvas.
@@ -805,6 +830,12 @@ pub struct Graph {
     /// arranged. The flight software never looks at it; the editor is the only
     /// reader there is.
     pub placed: BTreeMap<String, Placed>,
+    /// What the editor was told not to raise, by node and kind of concern.
+    ///
+    /// The editor's own, as `placed` is: the flight software never looks at it
+    /// -- a concern is a question about a drawing and not about a vehicle --
+    /// and the one reader is tcsgui. See [`Tcsgui::set_aside`].
+    pub set_aside: std::collections::BTreeSet<(String, String)>,
 }
 
 impl Graph {
@@ -825,6 +856,7 @@ impl Graph {
             files: Vec::new(),
             homes: BTreeMap::new(),
             placed: BTreeMap::new(),
+            set_aside: std::collections::BTreeSet::new(),
         };
 
         // What the files record at the arriving ends of their links, gathered
@@ -924,6 +956,10 @@ impl Graph {
         if let Some(said) = &file.tcsgui {
             for placed in &said.nodes {
                 self.placed.insert(placed.name.clone(), placed.clone());
+            }
+            for aside in &said.set_aside {
+                self.set_aside
+                    .insert((aside.node.clone(), aside.concern.clone()));
             }
         }
         Ok(())

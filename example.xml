@@ -20,6 +20,7 @@
             <dest_base>127.0.0.1:6100</dest_base>
             <source_base>0.0.0.0:6000</source_base>
         </payload_telemetry>
+        <rust-code-path>t.rs</rust-code-path>
         <tcs_cmd>
             <recv>0.0.0.0:4000</recv>
             <send>127.0.0.1:4100</send>

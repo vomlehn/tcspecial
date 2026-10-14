@@ -217,6 +217,17 @@ pub enum Edit {
         was: (i32, i32),
         now: (i32, i32),
     },
+    /// A concern set aside, or taken up again.
+    ///
+    /// An edit because it is a decision about the configuration and it is
+    /// written in the file: somebody who sets one aside by accident expects
+    /// undo to bring it back, as they would for any other press.
+    SetAside {
+        node: String,
+        kind: String,
+        /// Whether it is being set aside, as against taken up again.
+        aside: bool,
+    },
     /// Every node brought to the top of its own pane, in one edit.
     ///
     /// What **Edit -> Arrange the nodes** does. One edit and not one per node,
@@ -373,6 +384,11 @@ impl Edit {
                 was: *now,
                 now: *was,
             },
+            Edit::SetAside { node, kind, aside } => Edit::SetAside {
+                node: node.clone(),
+                kind: kind.clone(),
+                aside: !aside,
+            },
             Edit::Arrange { was, now } => Edit::Arrange {
                 was: now.clone(),
                 now: was.clone(),
@@ -522,6 +538,13 @@ impl Edit {
                 was.to, now.to
             ),
             Edit::MoveNode { node, .. } => format!("move \"{node}\""),
+            Edit::SetAside { node, aside, .. } => {
+                if *aside {
+                    format!("set aside what \"{node}\" says")
+                } else {
+                    format!("take up what \"{node}\" says again")
+                }
+            }
             Edit::Arrange { now, .. } => match now.len() {
                 1 => "arrange 1 node".to_string(),
                 many => format!("arrange {many} nodes"),

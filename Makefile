@@ -491,6 +491,8 @@ distclean: clean
 install: install-data
 	@echo "Installing $(PROJECT_NAME)..."
 	cargo install --path $(PROJECT_NAME)
+	@echo "Installing tcsrustgen..."
+	cargo install --path tcsrustgen
 
 # Install tcsgui's data: the description tree and the schemas.
 #

@@ -1925,8 +1925,20 @@ file, compiled into the executable along with the node types it uses and the
 infrastructure around them. A vehicle built that way carries no configuration
 file at all and nothing aboard has to parse one.
 
-The editor's half of that is **Edit → Generate Rust code**. It writes the file
-where the configuration's own ``tcspecial`` section says, under ``rust-code-path``:
+The generator is a program of its own, **tcsrustgen**, taking two paths: the
+configuration to read and the ``.rs`` file to write. It is not a corner of the
+editor because generating the flight software's configuration should not
+require a window -- a Makefile, a build script and the Edit menu all run the
+same thing the same way, and the one that is tested is the one that runs.
+
+It reads the configuration with ``Graph::load``, which is the reader every
+other program uses, and writes what that graph is as Rust. So the generator
+never sees the editor's own idea of a document: it sees the configuration, as
+the vehicle will.
+
+The editor's half of that is **Edit → Generate Rust code**. It runs the
+generator, passing the configuration it is editing and the file the
+configuration's own ``tcspecial`` section names under ``rust-code-path``:
 a path, relative to the configuration's own directory or absolute. Relative to
 the configuration and not to wherever the editor was started from, because a
 configuration and the code generated from it belong together and a path that
@@ -1951,6 +1963,13 @@ them and counting the rest -- the same five-and-``and others`` shape
 ``tcsverify`` prints, so that a person who has run the verifier meets a report
 they recognise. Nothing is written when it refuses: the generated file from
 before is still the generated file from before.
+
+Where the generator is looked for: ``$TCSRUSTGEN``, then beside the editor's
+own executable, then one directory above that -- which is where the pair sits
+when the thing running is a test binary under ``target/debug/deps`` -- and
+failing those, the ``PATH``. A program that cannot be found is said so by
+name, because "no such file or directory" about a program nobody asked for
+by name is a sentence that explains nothing.
 
 It asks the files rather than the document in hand, for the same reason it
 generates from them: every edit is written as it is made, so the two say the

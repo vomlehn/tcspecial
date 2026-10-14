@@ -34,6 +34,12 @@ moc:
     # of the node it leaves, named after the data source it leaves by -- and
     # what travels towards a payload leaves by to_payload.
     to_payload: payload
+    # And the other end of the payload's link, recorded where it arrives: the
+    # same line as the payload's to_moc, written here as well so that a node's
+    # entry says what it is connected to both ways. It is a record and not the
+    # link -- the link is the attribute on the node it leaves -- and the two
+    # must agree, which is checked where the file is read.
+    from_payload: payload
 
 payloads:
   # The payload: software or a device that sends a datagram a second.
@@ -63,6 +69,8 @@ payloads:
     trigger: "01"
     # Up: every datagram the payload sends goes to the ground as it arrives.
     to_moc: moc
+    # And the other end of the ground's link.
+    from_moc: moc
 
 # What the editor arranged: where each node was drawn. Last and in a section of
 # its own, because the sections above say what the vehicle carries and this

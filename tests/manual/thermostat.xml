@@ -33,6 +33,10 @@
         <type>moc</type>
         <address>10.0.0.1</address>
         <port>5000</port>
+        <from_payload>k_aft</from_payload>
+        <from_payload>k_bay</from_payload>
+        <from_payload>k_fore</from_payload>
+        <from_payload>mean_temp</from_payload>
     </moc>
     <vehicle>
         <name>k_fore</name>
@@ -44,6 +48,7 @@
         <to_moc>moc</to_moc>
         <to_moc>mean_temp.in0</to_moc>
         <to_moc>housekeeping</to_moc>
+        <from_payload>temp_fore</from_payload>
     </vehicle>
     <vehicle>
         <name>k_aft</name>
@@ -55,6 +60,7 @@
         <to_moc>moc</to_moc>
         <to_moc>mean_temp.in1</to_moc>
         <to_moc>housekeeping</to_moc>
+        <from_payload>temp_aft</from_payload>
     </vehicle>
     <vehicle>
         <name>k_bay</name>
@@ -66,6 +72,7 @@
         <to_moc>moc</to_moc>
         <to_moc>mean_temp.in2</to_moc>
         <to_moc>housekeeping</to_moc>
+        <from_payload>temp_bay</from_payload>
     </vehicle>
     <vehicle>
         <name>mean_temp</name>
@@ -74,6 +81,9 @@
         <inputs>in0,in1,in2</inputs>
         <to_moc>moc</to_moc>
         <to_moc>thermostat</to_moc>
+        <from_payload>k_aft</from_payload>
+        <from_payload>k_bay</from_payload>
+        <from_payload>k_fore</from_payload>
     </vehicle>
     <!-- setpoint is set from the ground; above and below are the two degrees -->
     <!-- either side that the heaters are switched at. -->
@@ -87,12 +97,17 @@
         <to_moc>housekeeping</to_moc>
         <!-- asserted below the setpoint, unasserted above it -->
         <to_payload>heaters</to_payload>
+        <from_payload>mean_temp</from_payload>
     </vehicle>
     <vehicle>
         <name>housekeeping</name>
         <type>log</type>
         <directory>/var/log/tcspecial</directory>
         <format>variable_ts_rc</format>
+        <from_payload>k_aft</from_payload>
+        <from_payload>k_bay</from_payload>
+        <from_payload>k_fore</from_payload>
+        <from_payload>thermostat</from_payload>
     </vehicle>
     <!-- Forward bulkhead. Two bytes, signed, big endian. -->
     <payloads>
@@ -133,6 +148,7 @@
         <direction>output</direction>
         <lines>3,4,5</lines>
         <path>/dev/gpiochip0</path>
+        <from_moc>thermostat</from_moc>
     </payloads>
     <!-- the cabin temperature the heaters are held at, in kelvin -->
     <commands>

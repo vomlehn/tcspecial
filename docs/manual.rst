@@ -121,7 +121,8 @@ link
     on-board computation; it is the "T" such an arrangement is usually drawn
     as. It is written as an attribute of the node it leaves rather than in a
     section of its own, so a node and what leaves it are read and written
-    together.
+    together, and recorded again on the node it arrives at so that a node's
+    entry says what it is connected to both ways.
 
 terminal
     Where a link is attached: a node's **data source** is where data leaves it
@@ -144,6 +145,15 @@ terminal
     several sinks; and a MOC link's sink takes as many as the configuration
     gives it, every payload's telemetry arriving at the ground on its own
     socket.
+
+    The node at the arriving end records the same link under the data sink it
+    arrives at, the value naming the node the data came from: ``from_payload:
+    k_fore``, or ``from_payload: [k_aft, k_bay, k_fore]`` where several arrive
+    there. It is a record and not the link -- the link is the attribute on the
+    node it leaves, and that is the one the software reads -- so a file may
+    leave these out and still be complete. A file that states any of them for a
+    sink states all of them, and a record that disagrees with the link it
+    records is refused where the file is read. tcsgui writes them.
 
     Each terminal may be linked to one other: a ``to_moc`` to a
     ``from_payload``, a ``from_payload`` to a ``to_moc``, a ``to_payload`` to a

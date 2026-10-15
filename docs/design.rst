@@ -1824,6 +1824,37 @@ blocks sitting on the lines -- rather than as three unrelated colour choices,
 and a line can never be mistaken for a node's own edge. Each step is at least
 eight CIE units, which is "clearly lighter" rather than "possibly lighter".
 
+The payload pane is a **lilac-grey**, not the blush it was: the blush read as
+red, and red means something on this canvas. It is barely a colour at all -- a
+chroma of 1.8 where it was 5.7, and 1.7 of redness where it was 5.7 -- and
+what it cost is two points of lightness, 83.1 against the 84 a pane was held
+to.
+
+That trade is the whole of the problem. The three panes have to stay 15 apart
+under four ways of seeing, and in the thin slice of near-white, low-chroma
+space the only direction still 15 away from both the blue pane and the green
+one is the red one: violet reads as blue to a protanope and teal sits between
+the two. Exactly seven colours in the gamut qualified at 84 of lightness, and
+all seven were pale pinks -- so a pale payload pane *is* a pink payload pane.
+Two points lower, lightness carries the separation instead and the chroma can
+fall to nothing. It is also not the nodes' doing: recomputing the payload
+bodies and the line from the pane was tried first, and changed nothing, since
+the nodes were never the constraint.
+
+Nothing else moved. The payload line and all fifteen bodies still satisfy
+every rule against the new pane -- the contrasts run 3.3 to 9.5 to one, each
+body is 37 to 67 points below it, and the scheme floor is where it was at 12.2
+-- so the diagram is the diagram it was, on a quieter sheet.
+
+One rule had to change to say what it always meant. A node's colour says which
+pane it belongs in, and that was checked against the *pane's* hue; a pane with
+a chroma of 1.8 has no hue worth measuring against, its number being
+arithmetic on a rounding error. Each family's hue is declared instead --
+``family_hue``: the blue of the ground link at 265 degrees, the green of the
+vehicle's own graph at 118, the blush of what it carries at 2 -- and the three
+are held 60 degrees apart, because a family spans 40 either side of its centre
+and two families that overlap say nothing about where a node belongs.
+
 A body is painted in its own tint now rather than washed with a fifth of it,
 and what is written on it -- the outline, the name, the terminals, the marks
 in its corners -- is white. The pane's own shade was the first thing tried for

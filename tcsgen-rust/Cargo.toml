@@ -1,5 +1,5 @@
 [package]
-name = "tcsrustgen"
+name = "tcsgen-rust"
 version = "0.1.0"
 edition = "2021"
 description = "Turns a tcspecial configuration into the Rust that builds it"

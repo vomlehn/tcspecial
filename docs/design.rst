@@ -2594,35 +2594,49 @@ same thing, and a session whose last write failed has nothing to generate from
 -- which the command says in those words rather than as a complaint about a
 configuration that may be perfectly good.
 
-What is generated is the part that varies between configurations: the nodes,
-what each says about itself, the links, the payload groups, the command
-bindings, and what tcspecial itself is configured with. What does not vary --
-what an i2c node does, what a mean computes, what the command interpreter
-answers -- is the code that is already there, and the generated file names
-those types rather than repeating them.
+What is generated is a section of the configuration at a time, each as a struct
+of its own and a function that builds one. So far the ``tcspecial`` section:
+``TcSpecial``, with a field for every parameter the section holds and a struct
+for every subsection of it, built by ``tcspecial()``. The nodes, the links, the
+payload groups and the command bindings are each their own section and are to
+come. What does not vary -- what an i2c node does, what a mean computes, what
+the command interpreter answers -- is the code that is already there, and the
+generated file names those types rather than repeating them.
 
-It builds a ``Graph``, which is what the flight software already works in:
-``Graph::check`` says whether a configuration can be flown and
-``runtime::start`` opens it, so a configuration compiled in arrives at the same
-two functions a configuration read from a file does. That is the point of
-generating this rather than something cleverer -- a second representation of a
-configuration would be a second thing to keep correct, and the one that is
-checked is this one.
+The fields are typed as what the attributes mean rather than as the text a file
+holds them in: a socket is a ``HostPort``, which is an address and a port, the
+beacon's interval is a ``Duration``, and the log's directory is a ``PathBuf``.
+That is most of the point of generating this at all -- the splitting of
+``0.0.0.0:4000`` and the reading of ``5000`` happen once, while the file is
+being written and there is still somebody reading the error, and what is
+compiled into the vehicle is the answer.
+
+Which is also why the generator refuses a ``tcspecial`` section that is not
+finished: a typed field cannot be written from an attribute nobody stated. The
+section is read with ``parameters::ci_config_of`` and ``to_ci_config``, the two
+calls tcsverify and the flight software read it with, so a section the
+generator refuses is one they would have refused and in the same words --
+naming the attribute, because a section of nine attributes is read by somebody
+who needs to know which one to change. Nothing is written when it refuses.
+``rust-code-path`` is not generated at all: it says where the file goes, which
+is not something the vehicle is told, and a field carried into the flight
+software and never acted on is a field somebody will one day believe in.
 
 A generated file that nothing compiles is a generator that can emit something
 that does not build, and nobody would find out until a build of the flight
 software failed. So the generated form of the shipped thermostat is committed
-as ``tcsgui/tests/generated/thermostat.rs`` and compiled by
-``tcsgui/tests/generated.rs``, which then hands what it builds to
-``Graph::check`` and compares it against the same configuration read from its
-file. The compiler is the test: a change to ``Graph``, ``Node`` or ``Link``
-that the generator has not kept up with fails there.
+as ``tcsgen-rust/tests/generated/thermostat.rs`` and compiled by
+``tcsgen-rust/tests/generated.rs``, which then holds what it says against the
+same configuration read from its file and put through those same two calls. The
+compiler is the test: a change to ``HostPort`` that the generator has not kept
+up with fails there.
 
-What is still to come is the build that uses it: a tcspecial whose ``main``
-calls ``configuration()`` instead of reading a path, and a build that compiles
-in only the node types a configuration names. **Needs examination.** That is a
-change to how the flight software is built rather than to what the editor
-writes, which is why the editor's half landed first.
+What is still to come is the rest of the sections, and then the build that uses
+them: a tcspecial whose ``main`` reads the generated ``tcspecial()`` instead of
+a path, and a build that compiles in only the node types a configuration names.
+**Needs examination.** That is a change to how the flight software is built
+rather than to what the editor writes, which is why the editor's half landed
+first.
 
 The editor is lazy
 ------------------

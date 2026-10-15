@@ -14,26 +14,28 @@
 //!
 //! # What is generated, and what is not
 //!
-//! This generates the part that varies between configurations: the nodes, what
-//! each of them says about itself, the links between them, the payload groups,
-//! the command bindings, and what tcspecial itself is configured with. The part
-//! that does not vary -- what an i2c node does, what a mean computes, what the
-//! command interpreter answers -- is the code that is already in `tcspecial`
-//! and `tcslibgs`, and the generated file names those types rather than
-//! repeating them.
+//! This generates a section of the configuration at a time, each as a struct
+//! of its own: so far the `tcspecial` section, as a `TcSpecial` with a field
+//! for every parameter the section holds, and the nodes, the links, the payload
+//! groups and the command bindings are to come. The part that does not vary --
+//! what an i2c node does, what a mean computes, what the command interpreter
+//! answers -- is the code that is already in `tcspecial` and `tcslibgs`, and
+//! the generated file names those types rather than repeating them.
 //!
-//! It builds a [`tcslibgs::graph::Graph`], which is what the flight software
-//! already works in: `Graph::check` is what says a configuration can be flown
-//! and `runtime::start` is what opens it, so a graph that was built in Rust
-//! rather than read from a file arrives at the same two functions. That is the
-//! whole point of generating this rather than something cleverer -- a second
-//! representation of a configuration would be a second thing to keep correct,
-//! and the one that is checked is this one.
+//! The fields are typed as what the attributes mean rather than as the text a
+//! file holds them in: a socket is a [`tcslibgs::HostPort`], which is an
+//! address and a port, and the beacon's interval is a `Duration`. The
+//! splitting and the reading happen once, while the file is being generated
+//! and there is still somebody reading the error, so what is compiled into the
+//! vehicle is the answer. A configuration whose section is not finished is
+//! refused there, with the attribute named -- which is one more reason this
+//! asks `trouble` first: somebody at a window should hear about a half-filled
+//! section from the editor, not from a generator's exit status.
 //!
-//! What is still to come is the build that uses it: a tcspecial whose
-//! `main` calls `configuration()` instead of reading a path. **Needs
-//! examination**, and it is a change to how the flight software is built
-//! rather than to what the editor writes, which is why it is not here.
+//! What is still to come is the build that uses it: a tcspecial whose `main`
+//! reads the generated `tcspecial()` instead of a path. **Needs examination**,
+//! and it is a change to how the flight software is built rather than to what
+//! the editor writes, which is why it is not here.
 //!
 //! # Why it is generated rather than hand-written
 //!
@@ -162,7 +164,7 @@ fn unfinished(configuration: &Path) -> Option<String> {
 
 /// Run the generator on this configuration, writing where the section says.
 ///
-/// A program of its own -- `tcsrustgen` -- rather than a corner of the editor:
+/// A program of its own -- `tcsgen-rust` -- rather than a corner of the editor:
 /// generating the flight software's configuration should not require a window,
 /// so a Makefile and this menu item run the same thing the same way. What the
 /// editor adds is the question of whether it is worth running, which is
@@ -205,17 +207,17 @@ pub fn run(configuration: &Path, output: &Path) -> Result<String, String> {
 }
 
 /// The name of the program that does the generating.
-const GENERATOR: &str = "tcsrustgen";
+const GENERATOR: &str = "tcsgen-rust";
 
 /// Which program to run, in the order the places are tried.
 ///
-/// `TCSRUSTGEN` first, for somebody who keeps it somewhere of their own.
+/// `TCSGEN_RUST` first, for somebody who keeps it somewhere of their own.
 /// Then beside this executable, which is what a workspace built with cargo and
 /// an installed pair both look like. Then one directory above that, which is
 /// where the pair sits when this is a test binary under `target/debug/deps`.
 /// And failing all of those, the bare name, which leaves the `PATH` to answer.
 fn program() -> PathBuf {
-    if let Some(said) = std::env::var_os("TCSRUSTGEN") {
+    if let Some(said) = std::env::var_os("TCSGEN_RUST") {
         return PathBuf::from(said);
     }
     if let Ok(ours) = std::env::current_exe() {

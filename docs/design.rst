@@ -715,14 +715,33 @@ A payload group's ``interval`` is one of those numbers followed by a unit:
 
 .. code-block:: text
 
-   us   microseconds        d   days
-   ms   milliseconds        w   weeks
+   us   microseconds        m   minutes        d   days
+   ms   milliseconds        h   hours          w   weeks
    s    seconds
 
+Every unit from a microsecond to a week, because a reading taken once a week
+is written ``1w`` and not ``604800s``, and a number nobody can read at a glance
+is a number nobody can check. The same argument covers the middle of the
+range: ``15m`` and ``6h`` are how a schedule is discussed, and making somebody
+write ``900s`` and ``21600s`` is making them do the arithmetic the mistake
+hides in.
+
 The suffix is matched longest first, so the ``s`` of ``ms`` is not taken for
-seconds, and ``1w`` and ``7d`` are the same interval. An interval of nought is
-refused in every unit: it is no interval at all, and a schedule asking for one
-is a schedule asking to be run again before it has finished.
+seconds and the ``m`` of ``ms`` is not taken for minutes, and ``1w``, ``7d``
+and ``168h`` are one interval. An interval of nought is refused in every unit:
+it is no interval at all, and a schedule asking for one is a schedule asking
+to be run again before it has finished.
+
+One slip this grammar cannot catch, recorded because it is the price of the
+convenience: ``m`` and ``ms`` are one letter and a thousand-fold apart, so a
+typed ``m`` where ``ms`` was meant is a reading taken sixty thousand times
+less often, and nothing in the file could tell. Written down in
+``parse_interval`` and in its test, so that the next reader finds it stated
+rather than discovers it.
+
+A timeout, which is version 1's and has the same shape, takes only ``us``,
+``ms`` and ``s``. There is no read anybody waits an hour for, and a timeout
+stated in hours is a configuration that will look like a hang.
 
 The logging node
 ----------------
@@ -2523,7 +2542,7 @@ file, compiled into the executable along with the node types it uses and the
 infrastructure around them. A vehicle built that way carries no configuration
 file at all and nothing aboard has to parse one.
 
-The generator is a program of its own, **tcsrustgen**, taking two paths: the
+The generator is a program of its own, **tcsgen-rust**, taking two paths: the
 configuration to read and the ``.rs`` file to write. It is not a corner of the
 editor because generating the flight software's configuration should not
 require a window -- a Makefile, a build script and the Edit menu all run the
@@ -2562,7 +2581,7 @@ them and counting the rest -- the same five-and-``and others`` shape
 they recognise. Nothing is written when it refuses: the generated file from
 before is still the generated file from before.
 
-Where the generator is looked for: ``$TCSRUSTGEN``, then beside the editor's
+Where the generator is looked for: ``$TCSGEN_RUST``, then beside the editor's
 own executable, then one directory above that -- which is where the pair sits
 when the thing running is a test binary under ``target/debug/deps`` -- and
 failing those, the ``PATH``. A program that cannot be found is said so by

@@ -4004,11 +4004,13 @@ fn terminal_view(
 /// it: a line carrying the payload's own data is of the payload family, and
 /// one carrying what the ground sends is of the ground's.
 ///
-/// The middle of the three tiers the palette is built as: its own family's
-/// working pane is a paler shade of it, and every node body is darker. A
-/// drawing then reads as one picture -- a pale sheet, lines on the sheet,
-/// solid blocks on the lines -- and a line can never be mistaken for a node's
-/// own edge, whichever node it runs to.
+/// The middle of the three tiers the palette is built as, and a shade of the
+/// pane its data comes from: the payload stream leaves the payload pane and
+/// is drawn in a darker teal, the ground's stream leaves the moc pane and is
+/// drawn in a darker blue. A drawing then reads as one picture -- a pale
+/// sheet, lines on the sheet, solid blocks on the lines -- a line can never be
+/// mistaken for a node's own edge, and the colour of a line says which end of
+/// the canvas its data started at.
 ///
 /// Written down rather than computed, because the palette is written down --
 /// the maths lives in `sight.rs`, which is test-only. What holds these to the
@@ -4044,19 +4046,32 @@ fn line_ink(leaves_by: Option<&str>) -> String {
 /// has to read.
 pub const MARK: &str = "#ffffff";
 
-/// The payload stream's line: the blush family, between its pane and its
-/// bodies at 58.8 of lightness.
+/// The payload stream's line: a darker shade of the payload pane, at 58.2 of
+/// lightness.
 ///
-/// The mauve end of the family rather than the red end. It was a dusty red at
-/// hue 23, which is the fault red's own side of the family -- 27 CIE units
-/// from it, which is "another colour" to measure and "something is wrong with
-/// that line" to look at. This is hue 333, 53 units away, and it reads as a
-/// violet while still being of the blush family its pane and its nodes are
-/// drawn in. See `tests::no_line_is_mistakable_for_a_fault`.
-pub const PAYLOAD_LINE: &str = "#ba78ac";
+/// A line is drawn in the colour of the pane its data comes *from*, darker.
+/// The payload's own readings start in the payload pane and generally end at
+/// the ground, so the line is a teal taken from the teal pane they leave --
+/// which means a reader can see where a line's data came from without
+/// following it back. What it is darker *than* is also what it crosses, so the
+/// shade is where it is for the reason below.
+///
+/// Twenty-four points darker, not "a bit". That is what the two other rules
+/// leave: a line has to stay eight points above the lightest node body, which
+/// puts the floor at 57.4, and it has to be seen on a pane at 90 of lightness,
+/// which puts the lightest usable shade at 58.2 -- the two meet, and there is
+/// nothing in between. Anything lighter reaches 1.3 to 1 against its own pane
+/// and disappears; nothing in the gamut reaches 2.5 to one at all while
+/// staying clear of the bodies. See
+/// `tests::the_palette_runs_from_the_pane_through_the_line_to_the_bodies`.
+pub const PAYLOAD_LINE: &str = "#289aa2";
 
-/// And what the ground sends: the blue family, at 63.0.
-pub const MOC_LINE: &str = "#459aff";
+/// And what the ground sends: a darker shade of the moc pane, at 58.2.
+///
+/// Thirty-two points darker, for the same reasons, and still a blue -- the
+/// ground's own hue, which is the one thing about the lines that did not have
+/// to change.
+pub const MOC_LINE: &str = "#0292e4";
 
 /// The palette's colours.
 ///
@@ -4241,7 +4256,7 @@ mod tests {
     /// `no_two_colours_of_the_scheme_look_alike`.
     #[test]
     fn the_palette_runs_from_the_pane_through_the_line_to_the_bodies() {
-        use sight::{contrast, lightness};
+        use sight::{contrast, hue, hue_apart, lightness};
 
         let painted = |hex: &str| {
             let c = colour(hex);
@@ -4266,6 +4281,38 @@ mod tests {
                     pane.label()
                 );
             }
+        }
+
+        // And each line is a shade of the pane its data comes from. A
+        // payload's readings start in the payload pane and generally end at
+        // the ground; what the ground sends starts in the moc pane and ends
+        // at a payload. So the line's colour says which end of the canvas its
+        // data started at, without a reader following it back.
+        //
+        // Twenty degrees, which is "the same colour, darker" rather than "a
+        // related colour": a pane and its line have to be recognisably one
+        // family, and the hue of a wash is a little unsteady -- at a chroma of
+        // 9 a step of one in a channel moves it several degrees.
+        for (what, line, pane) in [
+            ("payload", PAYLOAD_LINE, Pane::Payloads),
+            ("moc", MOC_LINE, Pane::Moc),
+        ] {
+            let ground = painted(&ground_of(style::ground_of(pane)));
+            let apart = hue_apart(hue(painted(line)), hue(ground));
+            assert!(
+                apart <= 20.0,
+                "the {what} line is {apart:.0} degrees from the {} pane it is \
+                 a shade of",
+                pane.label()
+            );
+            // Darker than it, and by more than the tier asks: these two are
+            // as light as a line can be and still be seen on a pane, which is
+            // further down than "a bit" -- see PAYLOAD_LINE.
+            let step = lightness(ground) - lightness(painted(line));
+            assert!(
+                step >= 8.0,
+                "the {what} line is only {step:.1} darker than its own pane"
+            );
         }
 
         // And every line is lighter than every body, for the same reason: a

@@ -1864,6 +1864,14 @@ win it back leaves each colour's name describing a colour it no longer is. The
 bodies are a *range* of shades instead, spanning 33 units from the lightest to
 the darkest, and what separates any two of them is the floor above.
 
+Nothing is raised about a configuration that is one node or none. A new
+configuration opens with the ground station already in it, and the moment that
+node exists every rule above has something to say about it: nothing is linked
+to it, because there is nothing to link it to. A count on the button before
+anybody has drawn anything is a complaint about the editor's own first act,
+and it cannot be acted on until there is a second node. The rules come back as
+soon as there is a graph to apply them to.
+
 A configuration that does not exist yet opens with the ground station already
 in it, at the upper left. Every graph has
 one -- a vehicle whose telemetry reaches nobody is a vehicle nobody is

@@ -892,25 +892,20 @@ pub(crate) fn reject_stream(
     reject_unused(group, kind, "a stream section", present)
 }
 
-/// Parse an unsigned value written in decimal, or in hex with an `0x` prefix.
+/// Parse an unsigned value, in whatever way a configuration may write one.
+///
+/// The grammar is [`crate::whole`]'s and is the same for every integer in
+/// every one of these files: decimal, or hexadecimal with an `0x` prefix,
+/// underscores allowed among the digits.
 pub(crate) fn parse_u32(group: &str, field: &str, s: &Scalar) -> EndpointConfigResult<u32> {
-    let text = s.as_str();
-    let parsed = match text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-        Some(hex) => u32::from_str_radix(hex, 16),
-        None => text.parse::<u32>(),
-    };
-    parsed.map_err(|_| bad(group, &format!("{field}: \"{text}\" is not a whole number")))
+    crate::whole::whole_u32(s.as_str()).map_err(|why| bad(group, &format!("{field}: {why}")))
 }
 
-/// Parse a byte value: decimal, or hex with an `0x` prefix.
+/// Parse a byte value, by the one grammar: see [`crate::whole`].
 fn parse_byte(group: &str, text: &str) -> EndpointConfigResult<u8> {
     let text = text.trim();
-    let parsed = match text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-        Some(hex) => u16::from_str_radix(hex, 16),
-        None => text.parse::<u16>(),
-    };
-    match parsed {
-        Ok(v) if v <= u8::MAX as u16 => Ok(v as u8),
+    match crate::whole::whole(text) {
+        Ok(v) if v <= u8::MAX as u64 => Ok(v as u8),
         Ok(v) => Err(bad(
             group,
             &format!("terminator {v} is not a byte value: expected 0 to 255"),

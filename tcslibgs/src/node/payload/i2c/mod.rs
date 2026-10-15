@@ -70,12 +70,12 @@ const I2C_RESERVED_HIGH: std::ops::RangeInclusive<u32> = 0x78..=0x7F;
 /// two it got wrong.
 pub(crate) fn parse_i2c_address(group: &str, text: &str, ten_bit: bool) -> EndpointConfigResult<u16> {
     let text = text.trim();
-    let parsed = match text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-        Some(hex) => u32::from_str_radix(hex, 16),
-        None => text.parse::<u32>(),
-    };
-    let value =
-        parsed.map_err(|_| bad(group, &format!("address: \"{text}\" is not a whole number")))?;
+    // The one grammar every integer in these files is written in: decimal, or
+    // hexadecimal with an `0x` prefix, underscores allowed among the digits.
+    // An address is the field that wants the hexadecimal most -- a datasheet
+    // says 0x48 and never 72 -- and the same spelling works everywhere else.
+    let value = crate::whole::whole_u32(text)
+        .map_err(|why| bad(group, &format!("address: {why}")))?;
 
     let (limit, width) = if ten_bit { (0x3FF, 10) } else { (0x7F, 7) };
     if value > limit {

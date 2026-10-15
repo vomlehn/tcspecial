@@ -33,6 +33,7 @@ pub mod telemetry;
 pub mod trigger;
 pub mod types;
 pub mod verify;
+pub mod whole;
 
 pub use commands::*;
 // The value types a runtime endpoint configuration carries. They are defined

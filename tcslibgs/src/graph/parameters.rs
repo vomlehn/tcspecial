@@ -259,10 +259,13 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
             )),
         }
     };
+    // Every integer in these files is written the same way: decimal, or
+    // hexadecimal with an `0x` prefix, underscores allowed among the digits.
+    // See `crate::whole` -- the beacon's interval is an integer like any
+    // other, so `0x3e8` and `1_000` are the thousand milliseconds `1000` is.
     let number = |name: &str| -> Result<u32, String> {
         let said = text(name)?;
-        said.parse::<u32>()
-            .map_err(|_| format!("{name} is \"{said}\", which is not a whole number"))
+        crate::whole::whole_u32(&said).map_err(|why| format!("{name} is {why}"))
     };
 
     Ok(CIConfigJson {

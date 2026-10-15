@@ -310,7 +310,7 @@ pub fn params_of(
 
             let restart = match attributes.get("restart").map(Scalar::as_str) {
                 None | Some("never") => Restart::Never,
-                Some(other) => other.parse::<u32>().map(Restart::UpTo).map_err(|_| {
+                Some(other) => crate::whole::whole_u32(other).map(Restart::UpTo).map_err(|_| {
                     named(format!(
                         "restart: \"{other}\" is neither \"never\" nor a number of \
                          times"

@@ -195,6 +195,94 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
     }
 }
 
+/// Every XML file this repository ships is well formed XML.
+///
+/// Weaker than the validation above and over a wider set: a file of the
+/// version 1 payload language has no schema to be held against, but it is
+/// still XML, and XML it is not is a file no editor and no other tool can
+/// open whatever this program's own reader tolerates. Four of these said
+/// `--` inside a comment, which XML forbids, and nothing noticed because
+/// `quick-xml` reads them anyway.
+///
+/// Skipped, loudly, where xmllint is not installed.
+#[test]
+fn every_shipped_xml_file_is_well_formed() {
+    if Command::new("xmllint").arg("--version").output().is_err() {
+        eprintln!("xmllint is not installed: the XML files were not checked");
+        return;
+    }
+
+    let files = [
+        "example.xml",
+        "tests/manual/thermostat.xml",
+        "tests/manual/tcspecial1.xml",
+        "tests/manual/tcspecial2.xml",
+        "tests/manual/tcspecial3.xml",
+        "tests/manual/tcspecial4.xml",
+        "tcslibgs/tests/actual/tcspecial.xml",
+    ];
+    for file in files {
+        let path = root().join(file);
+        assert!(path.is_file(), "{file} is not there any more");
+        let output = Command::new("xmllint")
+            .arg("--noout")
+            .arg(&path)
+            .output()
+            .expect("xmllint runs");
+        assert!(
+            output.status.success(),
+            "{file} is not well formed XML:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+/// Every shipped version 2 configuration says which schema describes it.
+///
+/// The reference is what makes shipping the schemas worth anything: an editor
+/// opening one of these validates it without being set up to, and a file that
+/// has to be pointed at its schema by hand is a file nobody points at it. The
+/// XML spelling says so in the two attributes every XML tool reads; the YAML
+/// spelling says so in the comment every YAML language server reads, there
+/// being no other way to say it in YAML.
+///
+/// The path is relative, which is how it stays true in a checkout: see
+/// `tcsgui::nodes::schema_reference` for what is written where the schemas are
+/// not above the file.
+///
+/// The worked example and not `example.*`: this pair is written by the editor
+/// and compared byte for byte against what it writes, so a reference that
+/// stopped being written would fail here. `example.*` is written by the same
+/// writer from the same function and says the same thing.
+#[test]
+fn every_shipped_configuration_says_which_schema_describes_it() {
+    for (file, said) in [
+        (
+            "tests/manual/thermostat.xml",
+            "../../tcsgui/share/schema/tcspecial.xsd",
+        ),
+        (
+            "tests/manual/thermostat.yaml",
+            "../../tcsgui/share/schema/tcspecial.schema.json",
+        ),
+    ] {
+        let path = root().join(file);
+        let text = std::fs::read_to_string(&path).expect("a shipped configuration");
+        assert!(
+            text.contains(said),
+            "{file} does not say that {said} describes it"
+        );
+
+        // And the schema it names is where it says it is, which is the half
+        // of a reference that rots.
+        let named = path.parent().expect("a directory").join(said);
+        assert!(
+            named.is_file(),
+            "{file} names {said}, which is not there"
+        );
+    }
+}
+
 /// Every key of every shipped configuration is one the schema allows.
 ///
 /// The other half of the XML test, for the spelling that has no validator to

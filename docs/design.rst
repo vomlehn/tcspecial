@@ -2443,6 +2443,36 @@ appears exactly once: ``payload-out`` may appear many times, several destination
 being several elements, and XSD 1.0 allows neither repeats nor a mixture inside
 ``xs:all``. A node with two names is refused where the file is read instead.
 
+A schema an editor has to be pointed at by hand is a schema nobody points it
+at, so every version 2 configuration this project writes names its own. In XML
+that is the two attributes every XML tool reads::
+
+    <configuration
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="tcsgui/share/schema/tcspecial.xsd">
+
+and in YAML it is a comment, there being no other way to say it in YAML::
+
+    # yaml-language-server: $schema=tcsgui/share/schema/tcspecial.schema.json
+
+Both are written by ``nodes::schema_reference``, which gives the path relative
+to the file where the schemas are above it -- which is a checkout, where these
+examples live and where the relative path is the one that is true -- and the
+installed path where they are not. A file saved anywhere else therefore points
+at ``$(PREFIX)/share/tcsgui/schema``, which is where the schemas are on a
+machine the program is installed on.
+
+Two consequences. The YAML comment is followed by a blank line, which is what
+keeps it a note about the file rather than about the first entry: a comment's
+claim on what comes after it ends at a blank line, and that rule is
+``read::comments_of``'s. And ``GraphFile`` names those two XML attributes as
+fields it reads and ignores, because ``deny_unknown_fields`` is worth keeping:
+a misspelled section is one the software silently does nothing about, so every
+word a configuration may contain is a word named in that struct.
+
+Nothing aboard reads either reference. They are for the person editing the
+file, in the same way the ``tcsgui`` section is.
+
 A schema nothing is checked against is worse than no schema: it refuses files
 the software accepts, or accepts what the software refuses, and either way the
 person believes the schema. So ``tcsgui/tests/schema.rs`` holds each against
@@ -2451,7 +2481,20 @@ the lists the software itself reads from -- the section's parameters from
 ``sim_config::SETTINGS`` -- rather than against a copy written out there, which
 would be the same problem one step further away. Every shipped XML file is
 validated with ``xmllint``, and every key of every shipped YAML file is looked
-for in the JSON Schema.
+for in the JSON Schema, every shipped version 2 configuration is checked for
+the reference to its own schema and for that schema being where it says, and
+every shipped XML file -- the version 1 payload sets included, which have no
+schema to be validated against -- is checked for being well formed XML at all.
+That last check found four files that were not: they said ``--`` inside a
+comment, which XML forbids, and nothing had noticed because ``quick-xml``
+reads them anyway and no other tool had been asked to.
+
+The reference is only on the version 2 configurations. The version 1 payload
+language has no schema -- ``stale_interval_ms``, ``payload_interface`` and
+``packet_size`` are words ``tcspecial.xsd`` has never heard of, and its root
+element is ``payload`` rather than ``configuration`` -- so a file of that
+language pointed at that schema would be a file reported as invalid rather
+than a file validated.
 
 That last test found a real fault the moment it was written: an XML comment may
 not contain two hyphens in a row, and this project writes ``--`` as an em dash

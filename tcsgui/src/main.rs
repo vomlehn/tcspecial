@@ -65,7 +65,7 @@ use pane::{
 };
 use journal::{Edit, Link};
 use subdiagram::{Home, Qualified};
-use style::{Edge, Face, NodeType, Outline, Tint, Weight, ERROR_TINT};
+use style::{Edge, Face, NodeType, Outline, Weight, ERROR_TINT};
 
 slint::include_modules!();
 
@@ -3888,7 +3888,7 @@ fn view_of(
                 a.edge,
                 a.weight,
                 a.size,
-                tint_of(a.tint),
+                tint_of(node_type),
                 a.face,
                 a.label_size,
                 a.label_weight,
@@ -4073,93 +4073,86 @@ pub const PAYLOAD_LINE: &str = "#289aa2";
 /// to change.
 pub const MOC_LINE: &str = "#0292e4";
 
-/// The palette's colours.
+/// What a node of this type is painted.
 ///
-/// Held here rather than in `style.rs` on purpose: that module holds what a
-/// type *means* and the rules the looks obey, and this holds what the meanings
-/// are painted. Keeping them apart is what lets the accessibility tests check
-/// the rules without knowing a single hex value.
-fn tint_of(tint: Tint) -> String {
-    // Searched for rather than chosen by eye, and three things were asked of
-    // the search at once: that every tint stay in the hue family of the pane
-    // its nodes are drawn on, that it be dark enough against that pane to read
-    // as a shape -- three to one, which is the threshold for something that is
-    // not text -- and that, subject to those, the smallest perceived
-    // difference between any two of the fifteen be as large as it can be,
-    // taken in CIE L*a*b* under normal vision and under simulated protanopia,
-    // deuteranopia and tritanopia at once.
-    //
-    // It is 12 CIE units, where two or three is "the same colour in two
-    // printings" and ten is "clearly two colours". So a pair anybody can tell
-    // apart is a pair everybody can tell apart. The test below checks it
-    // against these very values, which is the point of its existing: tuning
-    // one of these means re-running the search.
-    //
-    // Two units were given up to the three tiers: a body has to be darker
-    // than any line that reaches it, which took the top off the range the
-    // bodies had, and six of them moved down to make room -- which is why
-    // several are darker than their names suggest. A body is also painted in
-    // its tint now rather than washed with a fifth of it, and written on in
-    // white, so these are read as the colour of a node rather than as a tinge
-    // of it.
-    //
-    // Three units less again than the fourteen-colour palette that came
-    // before the families: a palette free to put its colours anywhere spreads
-    // them further than one whose reds must stay red.
-    // What the families buy is that a node's colour says which pane it belongs
-    // in, which no amount of separation would have told anybody.
-    match tint {
-        // The ground link, on its pale blue pane.
-        Tint::Azure => "#4260c3",
-        // The vehicle's own graph, on pale green.
-        Tint::Pine => "#005a30",
-        Tint::Olive => "#725400",
-        Tint::Gold => "#7e7812",
-        Tint::Moss => "#0f3f0c",
-        // What the vehicle carries, on pale blush: ten of them, which is why
-        // this is the family the search had the least room in.
-        Tint::Aubergine => "#481040",
-        Tint::Oxblood => "#481820",
-        Tint::Crimson => "#780008",
-        Tint::Magenta => "#780870",
-        Tint::Mulberry => "#683850",
-        Tint::Rose => "#a82038",
-        Tint::Plum => "#884078",
-        Tint::Orchid => "#a848a0",
-        Tint::Heather => "#906078",
-        Tint::Clay => "#9f5a60",
-    }
-    .to_string()
+/// A rung of its own panel's ramp. Each panel starts twelve CIE units below
+/// the line that carries its data -- the moc panel below the moc line, the
+/// payload panel below the payload line, and the vehicle panel below both,
+/// having no line of its own -- and steps three and a half units darker for
+/// each node, taking the panel's nodes in alphabetical order. A reader can
+/// then find a node in a panel by how dark it is, and the panel reads as one
+/// family rather than as a set of unrelated colours.
+///
+/// Twelve for the first step and not the eight the tiers ask, because the moc
+/// family's line and its bodies are the same hue: at the same hue a step in
+/// lightness *is* the difference, and twelve is the floor two colours of this
+/// scheme are held apart by.
+///
+/// The ramp stops at thirteen of lightness, which is where the three families
+/// stop being told apart: below it a dark blue, a dark green and a dark blush
+/// converge, and at twelve they are 11.6 apart under deuteranopia. A panel
+/// with more nodes than its ramp has rungs starts again at the top, so two
+/// nodes of one panel may share a colour -- which is allowed here because
+/// colour is the redundant channel: every pair of types differs in two of
+/// outline, edge, border width, size and label, and
+/// `style::NodeType::appearance` is held to that by its own test.
+///
+/// What this gave up is the twelve units between *neighbours* in one panel.
+/// A ramp of ten in one hue family cannot keep it -- see `design.rst` -- so
+/// within a panel the steps are three to five units, which is "a shade
+/// darker", and across panels the closest pair is 30.9. The ramp is the
+/// information: a node's place in its panel is its colour's place in the
+/// ramp.
+///
+/// Searched offline and written down, as the palette before it was: the
+/// maths lives in `sight.rs`, which is test-only, and
+/// `tests::every_panel_is_a_ramp_from_its_own_line` holds these to the rule.
+fn tint_of(node_type: &str) -> String {
+    let pane = pane_of(node_type);
+    let rungs = match pane {
+        Pane::Moc => MOC_RUNGS,
+        Pane::Vehicle => VEHICLE_RUNGS,
+        Pane::Payloads => PAYLOAD_RUNGS,
+    };
+    let order = ramp_order(pane);
+    // Where this type comes in its own panel, alphabetically. A type this
+    // build does not know is not in any panel and is drawn as a fault, so the
+    // first rung is as good an answer as any.
+    let at = order.iter().position(|name| *name == node_type).unwrap_or(0);
+    rungs[at % rungs.len()].to_string()
 }
 
-/// What each working pane is painted.
+/// The ground link's panel: one node, so one rung.
+const MOC_RUNGS: &[&str] = &["#0073b5"];
+
+/// The vehicle's own graph, in the order the panel lists it: compute, log,
+/// null, subdiagram.
+const VEHICLE_RUNGS: &[&str] = &["#547800", "#4b7000", "#446600", "#3d5d00"];
+
+/// And what it carries, which is the longest ramp: ten rungs from 46.2 of
+/// lightness down to 14.9, three and a half units apart, which is as far as
+/// the floor allows.
+const PAYLOAD_RUNGS: &[&str] = &[
+    "#c7316c", "#bc2564", "#b2165b", "#a70053", "#99004b", "#8a0043", "#7b003b",
+    "#6d0033", "#5f002c", "#510025",
+];
+
+/// Each panel's own node types, alphabetically: the order the ramp is walked
+/// in, and the order the panel lists them in under its headings.
 ///
-/// Three washes chosen as a set: a blue, a green and a teal, 14 CIE units
-/// apart from each other under every one of the four ways of seeing, none
-/// above a chroma of 14, so a pane reads as a tinted sheet of paper rather
-/// than as a coloured panel.
-///
-/// As a set, which is the thing that changed. The panes used to be chosen one
-/// at a time and came out at 84, 91 and 95 of lightness with chromas of 6, 14
-/// and 14 -- a pale blue, a near-white green and a grey -- and that spread
-/// *was* their separation: three pale colours are told apart mostly by
-/// lightness, so colours of unequal weight are easy to hold 15 apart and look
-/// like three unrelated choices. These are 90, 90 and 82 at chromas of 13.5,
-/// 13.5 and 8.6: two at one weight and the third below them, which reads as
-/// one palette.
-///
-/// What it cost is half a unit. The closest pair is 14.5 where the old three
-/// managed 15.2, and that is the trade measured rather than guessed: holding
-/// the three within four points of lightness and three of chroma -- the most
-/// coherent the gamut allows -- the best any trio reaches is 13.2, and the
-/// 17.1 at the other end of the curve is the shape the canvas used to have.
-/// Fourteen is the floor here, so the trio has a little room.
-///
-/// A pane no longer carries its family's hue, which is what lets the third one
-/// be a teal while what it holds is drawn in blush. What a node's colour says
-/// about where it belongs is measured against the family's own hue instead --
-/// see [`family_hue`] -- and the pane's job is to be a quiet ground that the
-/// other two are not.
+/// Worked out from the type table rather than written here, so that a type
+/// added to one panel takes its place in that panel's ramp and shifts the
+/// ones below it -- which is what a ramp down a list means.
+fn ramp_order(pane: Pane) -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = NodeType::ALL
+        .iter()
+        .filter(|t| pane_of(t.spelling()) == pane)
+        .map(|t| t.spelling())
+        .collect();
+    names.sort();
+    names
+}
+
 /// The hue each family of colours is built around, in degrees of the CIE
 /// wheel.
 ///
@@ -4318,7 +4311,7 @@ mod tests {
         // And every line is lighter than every body, for the same reason: a
         // line arrives at nodes of both other panes.
         for t in NodeType::ALL {
-            let body = painted(&tint_of(t.appearance().tint));
+            let body = painted(&tint_of(t.spelling()));
             for line in lines {
                 let step = lightness(painted(line)) - lightness(body);
                 assert!(
@@ -4354,7 +4347,7 @@ mod tests {
         // colour's name describing a colour it no longer is.
         let bodies: Vec<f64> = NodeType::ALL
             .iter()
-            .map(|t| lightness(painted(&tint_of(t.appearance().tint))))
+            .map(|t| lightness(painted(&tint_of(t.spelling()))))
             .collect();
         let span = bodies.iter().cloned().fold(f64::MIN, f64::max)
             - bodies.iter().cloned().fold(f64::MAX, f64::min);
@@ -4818,7 +4811,7 @@ mod tests {
     #[test]
     fn every_tint_is_a_visible_colour() {
         for t in NodeType::ALL {
-            let hex = tint_of(t.appearance().tint);
+            let hex = tint_of(t.spelling());
             assert!(hex.starts_with('#') && hex.len() == 7, "{hex}");
             let c = colour(&hex);
             assert_ne!(
@@ -4938,6 +4931,135 @@ mod tests {
         }
     }
 
+    /// Each panel's nodes are a ramp from its own line, darkening down the
+    /// panel in alphabetical order.
+    ///
+    /// The rule the body colours are derived by rather than chosen: a panel
+    /// starts twelve CIE units below the line that carries its data -- the
+    /// vehicle panel below both lines, having none of its own -- and steps
+    /// darker for each node in turn. A reader finds a node in a panel by how
+    /// dark it is, and a panel reads as one family.
+    ///
+    /// Twelve for the first step and not the eight the tiers ask, because the
+    /// ground station's line and its bodies are the same hue: at one hue a
+    /// step in lightness *is* the difference between two colours, and twelve
+    /// is the floor this scheme holds.
+    ///
+    /// A panel with more nodes than rungs starts again at its first colour,
+    /// so two nodes of one panel may share one -- which is allowed because
+    /// colour is the redundant channel here. Nothing wraps today: the longest
+    /// panel has ten nodes and ten rungs, and the test says so, so that the
+    /// day an eleventh payload kind is added somebody sees the wrap happen
+    /// rather than discovering two identical swatches.
+    #[test]
+    fn every_panel_is_a_ramp_from_its_own_line() {
+        use sight::{contrast, difference, lightness, seen, Sight};
+
+        let painted = |hex: &str| {
+            let c = colour(hex);
+            (c.red(), c.green(), c.blue())
+        };
+        let mark = painted(MARK);
+
+        for (pane, rungs, from) in [
+            (Pane::Moc, MOC_RUNGS, MOC_LINE),
+            (Pane::Payloads, PAYLOAD_RUNGS, PAYLOAD_LINE),
+            // The vehicle panel has no line of its own, so it starts below
+            // the darker of the two that cross it.
+            (Pane::Vehicle, VEHICLE_RUNGS, PAYLOAD_LINE),
+        ] {
+            let order = ramp_order(pane);
+            assert!(
+                !order.is_empty(),
+                "the {} panel offers nothing",
+                pane.label()
+            );
+
+            // Alphabetical, which is the order the ramp is walked in and the
+            // order the panel lists its entries under each heading.
+            let mut sorted = order.clone();
+            sorted.sort();
+            assert_eq!(order, sorted, "the {} panel is out of order", pane.label());
+
+            // The first rung is darker than the line, by the eight the tiers
+            // ask -- and twelve *apart* from it, which is the rule that
+            // actually binds and the reason the first step is bigger than the
+            // ones after it. Lightness carries the whole of that difference
+            // for the ground station, whose line and body are one hue; for
+            // the others the hue helps, so their first rung needs less
+            // lightness to make the twelve.
+            let line = lightness(painted(from));
+            let first = lightness(painted(rungs[0]));
+            assert!(
+                line - first >= 8.0,
+                "the {} panel starts {:.1} below its line, and the tier is 8",
+                pane.label(),
+                line - first
+            );
+            for sight in Sight::ALL {
+                let apart = difference(seen(painted(rungs[0]), sight), seen(painted(from), sight));
+                assert!(
+                    apart >= 12.0,
+                    "the {} panel's first node is {apart:.1} from the line it \
+                     comes below, under {sight:?}",
+                    pane.label()
+                );
+            }
+
+            // And each rung is darker than the one before, by enough to be
+            // seen beside it: two and a half units, where two is "the same
+            // colour in two printings".
+            for pair in rungs.windows(2) {
+                let (above, below) = (lightness(painted(pair[0])), lightness(painted(pair[1])));
+                assert!(
+                    above - below >= 2.5,
+                    "two rungs of the {} panel are {:.1} apart in lightness",
+                    pane.label(),
+                    above - below
+                );
+            }
+
+            // Every rung stays above the floor where the three families stop
+            // being told apart, and every rung can be written on.
+            for rung in rungs {
+                let body = painted(rung);
+                assert!(
+                    lightness(body) >= 13.0,
+                    "a rung of the {} panel is at {:.1} of lightness, below the \
+                     floor where the families converge",
+                    pane.label(),
+                    lightness(body)
+                );
+                let legible = contrast(mark, body);
+                assert!(
+                    legible >= 4.5,
+                    "a rung of the {} panel reads {legible:.2} against its own \
+                     label",
+                    pane.label()
+                );
+            }
+
+            // The ramp is walked in order, and wraps where it runs out.
+            for (at, name) in order.iter().enumerate() {
+                assert_eq!(
+                    tint_of(name),
+                    rungs[at % rungs.len()],
+                    "{name} should take rung {} of the {} panel",
+                    at % rungs.len(),
+                    pane.label()
+                );
+            }
+            assert!(
+                order.len() <= rungs.len(),
+                "the {} panel has {} nodes and {} rungs, so it wraps -- which \
+                 is allowed, and this is where to say so deliberately",
+                pane.label(),
+                order.len(),
+                rungs.len()
+            );
+        }
+    }
+
     /// No two colours of the whole scheme look alike to anybody.
     ///
     /// Every pair of it: the three working panes, the two link lines and the
@@ -4976,22 +5098,44 @@ mod tests {
             (c.red(), c.green(), c.blue())
         };
 
-        let mut scheme: Vec<(String, (u8, u8, u8))> = Vec::new();
+        // Everything on the canvas, each tagged with the panel whose ramp it
+        // belongs to -- or none, for the panes and the lines, which belong to
+        // no ramp.
+        let mut scheme: Vec<(String, Option<Pane>, (u8, u8, u8))> = Vec::new();
         for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
             scheme.push((
                 format!("the {} pane", pane.label()),
+                None,
                 painted(&ground_of(style::ground_of(pane))),
             ));
         }
-        scheme.push(("the payload line".to_string(), painted(PAYLOAD_LINE)));
-        scheme.push(("the moc line".to_string(), painted(MOC_LINE)));
+        scheme.push(("the payload line".to_string(), None, painted(PAYLOAD_LINE)));
+        scheme.push(("the moc line".to_string(), None, painted(MOC_LINE)));
         for t in NodeType::ALL {
-            scheme.push((t.spelling().to_string(), painted(&tint_of(t.appearance().tint))));
+            scheme.push((
+                t.spelling().to_string(),
+                Some(pane_of(t.spelling())),
+                painted(&tint_of(t.spelling())),
+            ));
         }
 
         let mut closest = (f64::MAX, Sight::Normal, String::new(), String::new());
-        for (i, (one, a)) in scheme.iter().enumerate() {
-            for (two, b) in &scheme[i + 1..] {
+        for (i, (one, mine, a)) in scheme.iter().enumerate() {
+            for (two, theirs, b) in &scheme[i + 1..] {
+                // Two nodes of one panel are the exemption, and it is
+                // arithmetic rather than a relaxation somebody chose: a
+                // panel's bodies are a ramp down from its own line -- see
+                // `tint_of` -- so neighbours in it are three or four units
+                // apart by construction. Ten steps of twelve would want a
+                // hundred and twenty units of lightness out of the
+                // eighty-seven there are. What tells two nodes of one panel
+                // apart is the shape, the edge, the border width, the size
+                // and the label, two of which differ for every pair; what
+                // their colour says is which panel they are in and how far
+                // down it they sit.
+                if mine.is_some() && mine == theirs {
+                    continue;
+                }
                 for sight in Sight::ALL {
                     let apart = difference(seen(*a, sight), seen(*b, sight));
                     if apart < closest.0 {
@@ -5030,7 +5174,7 @@ mod tests {
         };
 
         for t in NodeType::ALL {
-            let node = painted(&tint_of(t.appearance().tint));
+            let node = painted(&tint_of(t.spelling()));
             let pane = pane_of(t.spelling());
             let ground = painted(&ground_of(style::ground_of(pane)));
 

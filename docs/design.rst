@@ -1886,6 +1886,35 @@ vehicle's own graph at 118, the blush of what it carries at 2 -- and the three
 are held 60 degrees apart, because a family spans 40 either side of its centre
 and two families that overlap say nothing about where a node belongs.
 
+Node body colours are **derived**, not chosen. Each panel's nodes are a ramp:
+it starts twelve CIE units below the line that carries that panel's data --
+the vehicle panel below both lines, having none of its own -- and steps three
+and a half units darker for each node, taking the panel's nodes in
+alphabetical order. The ground station takes one rung, the vehicle's four, and
+what the vehicle carries ten, from 46.2 of lightness down to 14.9. A reader
+finds a node in a panel by how dark it is, and a panel reads as one family
+instead of as a set of unrelated colours.
+
+The first step is twelve rather than the eight the tiers ask, because the
+ground station's line and its bodies are the same hue: at one hue a step in
+lightness *is* the difference between two colours, and twelve is this scheme's
+floor. The ramp stops at thirteen of lightness, which is where the three
+families stop being told apart -- at twelve a dark blue, a dark green and a
+dark blush are 11.8 apart under deuteranopia. A panel with more nodes than its
+ramp has rungs starts again at its first colour, so two of its nodes share
+one; nothing wraps today, the longest panel having ten nodes and ten rungs,
+and a test says so, so that an eleventh payload kind makes the wrap visible
+rather than two identical swatches.
+
+What this gives up is the twelve units between *neighbours* in one panel. Ten
+steps of twelve would want a hundred and twenty units of lightness out of the
+eighty-seven there are, so within a panel the steps are three to four units --
+"a shade darker" -- while across panels the closest pair is 29.9. That is a
+deliberate trade and the reason colour is the redundant channel here: every
+pair of node types differs in two of outline, edge, border width, size and the
+way its label is set, and a test holds them to it. What a body's colour says
+is which panel it belongs to and how far down the panel it sits.
+
 A body is painted in its own tint now rather than washed with a fifth of it,
 and what is written on it -- the outline, the name, the terminals, the marks
 in its corners -- is white. The pane's own shade was the first thing tried for

@@ -184,88 +184,23 @@ pub struct Appearance {
     pub label_size: u32,
     pub label_weight: u32,
     pub label_italic: bool,
-    pub tint: Tint,
 }
 
-/// The palette: one tint per node type, in three families.
-///
-/// A node's colour says two things at once. Which family it is in -- the
-/// ground link, the vehicle's own graph, what it carries -- is the *hue*, and
-/// it is the hue of that family's working pane: a payload is a plum or a
-/// maroon on a pale blush ground, a vehicle node a green on a pale green one,
-/// the ground link an azure on pale blue. Which type it is, within the family,
-/// is the step: lightness mostly, chroma and a little hue beside it.
-///
-/// Darker than its own pane, always, and by enough to read: every tint has a
-/// contrast ratio of at least three to one against the ground it is drawn on,
-/// which is the threshold for a shape rather than for text. A node has to be
-/// legible on its own pane, and nowhere else.
-///
-/// # Colour blindness
-///
-/// The fifteen were searched for, not chosen: the search maximised the
-/// smallest perceived difference between any two of them, taken in CIE
-/// L\*a\*b\* under normal vision and under simulated protanopia, deuteranopia
-/// and tritanopia at once, subject to each tint staying in its pane's hue
-/// family and keeping its contrast. The worst pair of the fifteen is 14 CIE
-/// units apart under every one of the four, where two or three is "the same
-/// colour in two printings" and ten is "clearly two colours". So a pair
-/// anybody can tell apart is a pair everybody can tell apart, which is what
-/// was asked for.
-///
-/// It is 14 and not the 17 the old palette managed, and the three units are
-/// the price of the families. A palette free to put its colours anywhere can
-/// spread them further than one whose reds must stay red; what the families
-/// buy is that the colour now says which pane a node belongs in, which is a
-/// thing a reader needs and a thing no amount of separation would have told
-/// them.
-///
-/// The families are told apart by more than hue, because hue is what a
-/// dichromacy takes: the payload family is dark (lightness 16 to 49), the
-/// vehicle family light (36 to 58), and the ground link's one tint sits where
-/// nothing else is. Lightness is the one channel every kind of colour
-/// blindness keeps, the total ones included.
-///
-/// Named by colour, as the earlier palette was, because with one per type the
-/// meaning is the type: a name like `I2cTint` would be the enum repeating
-/// [`NodeType`].
-///
-/// No red in the sense that matters: error colouring does not come from this
-/// table at all -- see [`ERROR_TINT`] -- which is what keeps the one red in
-/// the program out of the ordinary drawing by construction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Tint {
-    /// The ground link: an azure on its pale blue pane.
-    Azure,
-    // The vehicle's own graph: greens and an olive on a pale green pane.
-    Pine,
-    Olive,
-    Gold,
-    Moss,
-    // What the vehicle carries: plums, maroons and a clay on a pale blush
-    // pane, darkest first.
-    Aubergine,
-    Oxblood,
-    Crimson,
-    Magenta,
-    Mulberry,
-    Rose,
-    Plum,
-    Orchid,
-    Heather,
-    Clay,
-}
 
 /// The ground each working pane is painted, by the pane.
 ///
-/// Light and neutral, as asked: the three are 15 CIE units apart under every
+/// Light and neutral, as asked: the three are 14 CIE units apart under every
 /// one of the four ways of seeing, and none has a chroma above 14, so a pane
-/// reads as a tinted sheet of paper rather than as a coloured panel. The nodes
-/// drawn on one are darker members of its own hue family -- see [`Tint`] --
-/// which is what makes a colour say which pane a node belongs in.
+/// reads as a tinted sheet of paper rather than as a coloured panel.
 ///
-/// Here as a meaning and painted in `main.rs`, as the tints are: this file
-/// says which pane has which ground, and the window says what that ground is.
+/// The nodes drawn on one are a ramp of darker colours in its own family's
+/// hue, starting below the line that carries its data and darkening down the
+/// panel -- `tcsgui::tint_of` is the rule and `tcsgui::ground_of` the grounds
+/// themselves. A node's colour then says both which pane it belongs in and
+/// where in that pane's list it sits.
+///
+/// Here as a meaning and painted in `main.rs`: this file says which pane has
+/// which ground, and the window says what that ground is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ground {
     Moc,
@@ -1192,7 +1127,6 @@ impl NodeType {
                 edge: Single,
                 weight: Narrow,
                 size: (WIDTH, 48),
-                tint: Tint::Aubergine,
             },
             NodeType::Spi => Appearance {
                 face: Face::Mono,
@@ -1203,7 +1137,6 @@ impl NodeType {
                 edge: Double,
                 weight: Narrow,
                 size: (WIDTH, 56),
-                tint: Tint::Oxblood,
             },
             NodeType::Serial => Appearance {
                 face: Face::Mono,
@@ -1214,7 +1147,6 @@ impl NodeType {
                 edge: Dashed,
                 weight: Narrow,
                 size: (WIDTH, 48),
-                tint: Tint::Crimson,
             },
             // Wide, double-outlined and in the sand tint, with a plain face
             // at the largest label size: a square outline because it is
@@ -1228,7 +1160,6 @@ impl NodeType {
                 edge: Double,
                 weight: Wide,
                 size: (WIDTH, 56),
-                tint: Tint::Magenta,
             },
             NodeType::Can => Appearance {
                 face: Face::Mono,
@@ -1239,7 +1170,6 @@ impl NodeType {
                 edge: Double,
                 weight: Narrow,
                 size: (WIDTH, 64),
-                tint: Tint::Mulberry,
             },
             NodeType::Iio => Appearance {
                 face: Face::Plain,
@@ -1250,7 +1180,6 @@ impl NodeType {
                 edge: DashedDouble,
                 weight: Wide,
                 size: (WIDTH, 56),
-                tint: Tint::Rose,
             },
             NodeType::Rpmsg => Appearance {
                 face: Face::Mono,
@@ -1261,7 +1190,6 @@ impl NodeType {
                 edge: Single,
                 weight: Wide,
                 size: (WIDTH, 48),
-                tint: Tint::Plum,
             },
             NodeType::Network => Appearance {
                 face: Face::Plain,
@@ -1272,7 +1200,6 @@ impl NodeType {
                 edge: Dashed,
                 weight: Wide,
                 size: (WIDTH, 56),
-                tint: Tint::Orchid,
             },
             NodeType::DeviceFile => Appearance {
                 face: Face::Mono,
@@ -1283,7 +1210,6 @@ impl NodeType {
                 edge: Double,
                 weight: Wide,
                 size: (WIDTH, 64),
-                tint: Tint::Heather,
             },
             // Driven rather than read, and shaped to say so.
             NodeType::Gpio => Appearance {
@@ -1295,7 +1221,6 @@ impl NodeType {
                 edge: Single,
                 weight: Wide,
                 size: (WIDTH, 72),
-                tint: Tint::Clay,
             },
             // Software aboard.
             // The one node that does nothing to what passes: rounded, because
@@ -1312,7 +1237,6 @@ impl NodeType {
                 edge: Single,
                 weight: Narrow,
                 size: (WIDTH, 40),
-                tint: Tint::Olive,
             },
             NodeType::Compute => Appearance {
                 face: Face::Plain,
@@ -1323,7 +1247,6 @@ impl NodeType {
                 edge: Single,
                 weight: Wide,
                 size: (WIDTH, 64),
-                tint: Tint::Pine,
             },
             // A diagram of its own: a step whose insides are written down
             // somewhere else, which is a predefined process -- a rectangle
@@ -1344,7 +1267,6 @@ impl NodeType {
                 edge: Single,
                 weight: Wide,
                 size: (WIDTH, 88),
-                tint: Tint::Moss,
             },
             // Where the data is kept, which is a store and not an end: a
             // flowchart's rounded end is a terminator, where control enters or
@@ -1359,7 +1281,6 @@ impl NodeType {
                 edge: Single,
                 weight: Narrow,
                 size: (WIDTH, 96),
-                tint: Tint::Gold,
             },
             // The ground station: a plain rectangle with square corners,
             // which is the external entity of a data-flow diagram -- the thing
@@ -1383,7 +1304,6 @@ impl NodeType {
                 edge: Single,
                 weight: Wide,
                 size: (WIDTH, 72),
-                tint: Tint::Azure,
             },
         }
     }
@@ -1651,26 +1571,7 @@ mod tests {
     /// Every type has its own tint.
     ///
     /// Asked for, and worth a test rather than a glance down the table:
-    /// fifteen entries written one at a time is fifteen chances to reach for
-    /// the one above. Colour remains the redundant channel -- the rule at the
-    /// top of this file is what tells types apart -- so this is not what makes
-    /// the palette usable, only what makes it complete.
-    #[test]
-    fn no_two_types_share_a_tint() {
-        for (i, a) in NodeType::ALL.iter().enumerate() {
-            for b in &NodeType::ALL[i + 1..] {
-                assert_ne!(
-                    a.appearance().tint,
-                    b.appearance().tint,
-                    "{} and {} are the same colour",
-                    a.spelling(),
-                    b.spelling()
-                );
-            }
-        }
-    }
-
-    /// Every terminal a type has is drawn somewhere, and in the right corner.
+     /// Every terminal a type has is drawn somewhere, and in the right corner.
     ///
     /// The arrangement is the argument: the payload's own data along the top
     /// going left, what the ground sends along the bottom going right, so
@@ -1987,23 +1888,7 @@ mod tests {
 
     /// Red is not in the palette at all.    /// Red is not in the palette at all.
     ///
-    /// Checked against the names rather than against values, because the
-    /// palette holds meanings and the window holds the colours: a `Tint` that
-    /// meant red would be the failure, whatever hex the window gave it.
-    #[test]
-    fn no_node_type_is_red() {
-        for t in NodeType::ALL {
-            let tint = t.appearance().tint;
-            assert_ne!(
-                format!("{tint:?}").to_lowercase(),
-                "red",
-                "{} is tinted red, which is reserved for errors",
-                t.spelling()
-            );
-        }
-    }
-
-    /// Every label is set legibly.
+     /// Every label is set legibly.
     ///
     /// Type is a distinguishing channel, which makes it tempting to reach for
     /// a six-pixel italic to tell two things apart. A distinction nobody can

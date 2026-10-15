@@ -2976,6 +2976,16 @@ fn views_of(
         .collect();
 
     let here = |name: &str| &Qualified::parse(name).in_ == home;
+    // Every route laid so far, in the order the file holds the links, so that
+    // each line is laid clear of the ones already on the canvas: two lines
+    // that run along one track are one line on the screen, and the one drawn
+    // first is not on it at all. See `route::lay`.
+    //
+    // In the file's order rather than by any rule of its own, so that the same
+    // configuration is drawn the same way every time it is opened -- a layout
+    // that depended on which link happened to be routed first would change
+    // under somebody who only reordered two lines in a text editor.
+    let mut taken: Vec<Vec<(f32, f32)>> = Vec::new();
     let links: Vec<LinkView> = document
         .links
         .iter()
@@ -3007,16 +3017,24 @@ fn views_of(
                 (None, false) => String::new(),
             };
 
+            // The line itself, laid once and clear of the lines already laid.
+            // Everything else about its drawing comes from these points, so
+            // the path, the marker and the label cannot disagree about where
+            // the line went.
+            let points = route::lay(ends, &obstacles, &taken);
+            let drawn = route::drawn_route(&points);
+            let marker = route::marker_on(ends, &points);
             // The label goes at the middle of the route's longest run, which
             // is on the line wherever the line had to go.
-            let (label_x, label_y) = route::label_at(ends, &obstacles);
+            let (label_x, label_y) = route::label_on(ends, &points);
+            taken.push(points);
 
             LinkView {
                 // The route and the arrow, worked out where they can be
                 // tested: see route.rs.
-                route: route::route(ends, &obstacles).into(),
+                route: drawn.into(),
                 head: route::arrow(ends).into(),
-                marker: route::marker(ends, &obstacles).into(),
+                marker: marker.into(),
                 label_x,
                 label_y,
                 wide: named_input.is_some(),
@@ -6782,7 +6800,7 @@ mod tests {
     /// the file the editor opens by default and the one somebody draws their
     /// own graph in, and the worked example is where the shipped lines live.
     #[test]
-    fn no_line_of_the_worked_example_is_drawn_through_a_node() {
+    fn no_line_of_the_worked_example_is_drawn_through_a_node_or_along_another() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
         // The worked example, which is the shipped configuration with lines in
@@ -6813,17 +6831,91 @@ mod tests {
             assert!(!obstacles.is_empty(), "thermostat.{extension} has no nodes");
             assert!(!document.links.is_empty(), "and no links");
 
+            // Every route, laid in the file's order as the canvas lays them,
+            // so that each is checked against the ones already on it.
+            let mut taken: Vec<Vec<(f32, f32)>> = Vec::new();
+            // How much of the drawing is one line lying along another, and
+            // how much it would be if each route were laid in ignorance of
+            // the rest -- which is what the router did before the lanes.
+            let (mut along, mut blind) = (0u32, 0u32);
             for link in &document.links {
                 // The same ends the canvas draws, which is the point of
                 // asking here: see ends_of.
-                let through = route::runs_through(ends_of(document, link, &None), &obstacles);
+                let ends = ends_of(document, link, &None);
+                let through = route::runs_through(ends, &obstacles);
                 assert_eq!(
                     through, 0,
                     "thermostat.{extension}: the line from {} to {} runs \
                      through {through} node(s)",
                     link.from, link.to
                 );
+
+                // And no two lines run along one track. Crossing is fine --
+                // a crossing is a point, and a reader follows each line
+                // through it -- but a shared run is one line hiding another,
+                // and the hidden one reads as a link that is not there.
+                //
+                // Except where the two are joined to the same node, which is
+                // the one case nothing can route around: two lines arriving
+                // at one terminal arrive at one point, so they approach it
+                // together however they got there -- and that reads as lines
+                // meeting rather than as a line gone missing.
+                let points = route::lay(ends, &obstacles, &taken);
+                // Joined is asked of the lines rather than of the names: two
+                // routes that start or end at the same point are two lines
+                // meeting at one terminal, whatever their links are called.
+                let meets = |one: &[(f32, f32)], two: &[(f32, f32)]| {
+                    let ends = |p: &[(f32, f32)]| {
+                        [p.first().copied(), p.last().copied()]
+                    };
+                    ends(one).iter().flatten().any(|a| {
+                        ends(two)
+                            .iter()
+                            .flatten()
+                            .any(|b| (a.0 - b.0).abs() < 1.0 && (a.1 - b.1).abs() < 1.0)
+                    })
+                };
+                let apart: Vec<Vec<(f32, f32)>> = taken
+                    .iter()
+                    .filter(|theirs| !meets(&points, theirs))
+                    .cloned()
+                    .collect();
+                along += route::shared(&points, &apart);
+                // What the same link would have cost before the lanes: the
+                // route the router picks when it is told about nothing.
+                blind += route::shared(
+                    &route::lay(ends, &obstacles, &[]),
+                    &apart,
+                );
+                taken.push(points);
             }
+
+            // A budget rather than nothing, and the budget is what the
+            // router actually reaches on this drawing: twenty-two
+            // lane-widths, against the hundred and seven the same routes
+            // share when each is laid in ignorance of the others. Four fifths
+            // of it gone, and what is left is the cases with no lane free --
+            // a column with nodes either side of it, where every lane the
+            // shapes offer is taken or blocked.
+            //
+            // Stated as a number for two reasons: a change that brings
+            // wholesale overlap back fails here, and the day somebody teaches
+            // the router to clear the rest, this number comes down rather
+            // than the rule being quietly satisfied by a drawing that got
+            // simpler.
+            assert!(
+                along <= 22,
+                "thermostat.{extension}: {along} lane-widths of line lie along \
+                 another line, and the budget is 22"
+            );
+            // And laying each route against the others has to beat laying
+            // each in ignorance of them, which is the whole claim.
+            assert!(
+                blind > along * 2,
+                "thermostat.{extension}: laying the routes against each other \
+                 should more than halve the overlap, and it was {along} \
+                 against {blind}"
+            );
         }
     }
 

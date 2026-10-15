@@ -1558,6 +1558,31 @@ deleted it is one key away from the press that opens its attributes. Cancel
 leaves the document exactly as it was, the history included: a question
 answered no is not an edit.
 
+Lines are also laid clear of each other. Two lines that *cross* are two lines:
+the crossing is a point, and a reader follows each one through it. Two lines
+that run along the same track are one line on the screen -- whichever was
+drawn second is the only one anybody sees, and a link that is invisible reads
+as a link that is not there. So each route is laid against the routes already
+laid: every column and row is offered in lanes either side of itself, seven
+pixels apart (a line is five wide), and a shared run costs more than a bend.
+The order the router weighs things in is now: nodes crossed, then length shared
+with another line, then bends, then distance.
+
+Two overlaps are not the router's to fix, and both are short. Two links
+leaving one terminal leave from the same point, so their first segments run
+together for the length of a stub whatever either does afterwards; the same
+goes for two links arriving at one terminal, which the ground station invites
+by merging. At that length it reads as one line dividing rather than as a line
+gone missing, so a shared run shorter than a stub is not counted at all.
+
+What is left is counted and budgeted. On the worked example the lanes take the
+overlap from a hundred and seven lane-widths to twenty-two -- four fifths of it
+-- and the remainder is columns with nodes either side and no lane free. The
+test states the twenty-two as a budget rather than asserting nothing, so that
+a change which brings wholesale overlap back fails, and so that the day the
+router learns to clear the rest the number comes down rather than the rule
+being quietly satisfied by a simpler drawing.
+
 A link is drawn by dragging from a terminal onto the node it is to reach. The
 terminal is where a line is taken *from*, and it is the only handle there is:
 there were two round handles on every node -- one on each side, meaning "a link

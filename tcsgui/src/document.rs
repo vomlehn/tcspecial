@@ -563,7 +563,24 @@ impl Document {
     ///
     /// In the document's own order, so the list a person reads is the list in
     /// the file.
+    ///
+    /// Nothing at all while there is one node or none. A configuration that
+    /// does not exist yet opens with the ground station already in it, and
+    /// the moment it is placed every rule here has something to say about it:
+    /// nothing is linked to it, because there is nothing to link it to. A
+    /// count on a button before anybody has drawn anything is a complaint
+    /// about the editor's own first act, and it cannot be acted on until
+    /// there is a second node -- so it is not raised. The rules come back as
+    /// soon as there is a graph to apply them to.
     pub fn concerns(&self) -> Vec<Concern> {
+        if self.nodes.len() < 2 {
+            return Vec::new();
+        }
+        self.concerns_in_a_graph()
+    }
+
+    /// The rules themselves, once there is a graph to apply them to.
+    fn concerns_in_a_graph(&self) -> Vec<Concern> {
         let mut concerns = Vec::new();
 
         for node in &self.nodes {
@@ -3722,6 +3739,43 @@ mod tests {
 
     /// What might be wrong is raised; what is meant can be set aside.
     ///
+    /// A configuration with one node raises nothing.
+    ///
+    /// The ground station the editor places in a new configuration is one
+    /// node with nothing to link it to, so every rule in `concerns` has
+    /// something to say about it the moment it exists -- which is a complaint
+    /// about the editor's own first act, and nothing a person can act on.
+    #[test]
+    fn nothing_is_raised_about_a_graph_that_is_one_node() {
+        let mut document = Document::new();
+        assert!(document.concerns().is_empty(), "nothing at all");
+
+        document.apply(&Edit::AddNode {
+            name: "moc-1".to_string(),
+            node_type: "moc".to_string(),
+            home: None,
+        });
+        assert!(
+            document.concerns().is_empty(),
+            "the ground station alone: {:?}",
+            document.concerns()
+        );
+
+        // And the rules come back as soon as there is a graph for them: a
+        // payload and a ground station with nothing between them is two
+        // nodes, and the payload's readings reach nobody.
+        document.apply(&Edit::AddNode {
+            name: "i2c-1".to_string(),
+            node_type: "i2c".to_string(),
+            home: None,
+        });
+        let raised = document.concerns();
+        assert!(
+            raised.iter().any(|concern| concern.node() == "i2c-1"),
+            "two nodes and no line between them: {raised:?}"
+        );
+    }
+
     /// A duplicate name is put right by position, and the links stay with
     /// whoever keeps the name.
     #[test]

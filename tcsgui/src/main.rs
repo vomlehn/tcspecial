@@ -642,10 +642,16 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     }
 
-    // And if the configuration names a node twice, the question about it --
-    // before the window runs, because the file cannot be checked or flown
-    // until it is answered and every link naming that name is ambiguous
-    // meanwhile. See `settle_names`.
+    // And the question about whatever is wrong with the file as it arrived,
+    // before the window runs: see `settle_problems`.
+    //
+    // The alert is told to keep quiet about those first, so that a file with
+    // problems does not open with two windows about them -- one that offers
+    // something and one that offers nothing. What the alert is for after this
+    // is what goes wrong *while somebody works*: a fault they introduced,
+    // which is news, where the state the file arrived in is the question this
+    // window asks.
+    settled(&editor, &views);
     settle_problems(&editor, &views);
 
     let outcome = ui.run();
@@ -1763,36 +1769,80 @@ fn confirm_delete(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node
     }
 }
 
+/// What a row of the startup window offers to do, besides nothing.
+///
+/// One of these per problem, chosen by what kind of problem it is: there is no
+/// use offering to delete a group for a node whose address is malformed, and
+/// no use offering to open a node for a line that goes nowhere.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Fix {
+    /// A name mends it: two nodes sharing one, or a node without one. The row
+    /// carries a field and a suggestion, this being the one kind of problem
+    /// the editor can mend by itself.
+    Name,
+    /// The node has to be looked at or taken out, which is somebody's
+    /// decision: an address that is not an address, a group that is not
+    /// declared, a payload with no trigger, a type this build has not got.
+    Node,
+    /// A group nothing is in. Deleting it is the whole of the fix, so the row
+    /// offers that -- the alternative is putting a node in it, which is
+    /// drawing and not repair.
+    Group(String),
+    /// A line: one that goes nowhere, one that goes back where it came from,
+    /// one of two into a single input. Deleting it is the fix.
+    Line(Link),
+    /// The `tcspecial` section, which is edited in its own window.
+    Parameters,
+}
+
 /// One problem a configuration opened with, and what can be done about it.
 ///
-/// Built from the faults the document reports -- see `Document::faults` -- and
-/// narrowed to the ones that are about a *node*: those are the ones there is
-/// something to offer for. A link that names nothing, or a group nobody is in,
-/// is said in the alert and left to the ordinary editing.
+/// Built from every fault the document reports -- see `Document::faults` --
+/// so that nothing arrives in the alert with no offer beside it. What differs
+/// between them is the offer: see [`Fix`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Trouble {
     /// Where the node is in the document, which is how a rename reaches the
     /// right one of two nodes that share a name: see
-    /// `Document::rename_at`.
+    /// `Document::rename_at`. Nothing for a problem that is not about a node.
     at: Option<usize>,
-    /// What it is called, or nothing where that is the problem.
+    /// The node it is about, or nothing where there is none.
     node: String,
     /// What is wrong, in the words the fault itself uses.
     said: String,
-    /// Whether a name is the fix: two nodes sharing one, or a node without
-    /// one. Those are the problems the editor can mend by itself, so those
-    /// rows offer a field and a suggestion.
-    nameable: bool,
+    /// And what is offered for it.
+    fix: Fix,
 }
 
-/// Every problem a configuration opened with that is about a node.
+impl Trouble {
+    /// Whether a name is the fix.
+    fn nameable(&self) -> bool {
+        self.fix == Fix::Name && self.at.is_some()
+    }
+
+    /// The label on the one button this kind of problem offers, over and above
+    /// opening or deleting the node. Empty where it offers none.
+    fn offer(&self) -> String {
+        match &self.fix {
+            Fix::Group(name) => format!("Delete the group \"{name}\""),
+            Fix::Line(_) => "Delete the line".to_string(),
+            Fix::Parameters => "Edit the parameters".to_string(),
+            Fix::Name | Fix::Node => String::new(),
+        }
+    }
+}
+
+/// Every problem a configuration opened with, and what is offered for each.
 ///
 /// In the order the document holds the nodes, so the list a person reads is
 /// the order the file is in rather than the order the checks happen to run.
 ///
-/// A fault about a node that is not there -- a link naming a node the file
-/// does not hold -- is not here: there is no node to offer anything for. It is
-/// still said in the alert.
+/// Every fault gets a row. That is the change from the first version of this:
+/// a problem with no row went to the alert on its own, which says what is
+/// wrong and offers nothing -- and an alert with nothing to press is a
+/// complaint rather than a question. What differs between them is the offer:
+/// a name for the ones a name mends, the node for the ones somebody has to
+/// look at, the group, the line, or the parameters window for the rest.
 fn troubles_of(document: &Document) -> Vec<Trouble> {
     let sharing = document.sharing_a_name();
     let mut out: Vec<Trouble> = Vec::new();
@@ -1811,53 +1861,100 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
                  which one it means",
                 node.name
             ),
-            nameable: true,
+            fix: Fix::Name,
         });
     }
 
-    // Then everything else a fault says about a node, skipping the duplicate
-    // names: they are above, one row per node rather than one per name.
+    let at_of = |name: &str| {
+        document
+            .nodes
+            .iter()
+            .position(|node| Qualified::of(&node.name, &node.home).absolute() == name)
+    };
+
     for fault in document.faults() {
         // The duplicates are above, one row per node rather than one per
-        // name; and a problem with a line or with the configuration itself is
-        // not offered anything here -- see `Fault::about_a_node`.
-        if matches!(fault, Fault::DuplicateName { .. }) || !fault.about_a_node() {
+        // name.
+        if matches!(fault, Fault::DuplicateName { .. }) {
             continue;
         }
         let said = fault.describe();
-        match fault.node() {
-            Some(name) => {
-                let at = document
-                    .nodes
+        let (at, node, fix) = match &fault {
+            Fault::DuplicateName { .. } => continue,
+            // A node with no name at all: found by where it sits, because
+            // there is no name to find it by.
+            Fault::NamelessNode { at } => (
+                document.nodes.iter().position(|node| node.at == *at),
+                String::new(),
+                Fix::Name,
+            ),
+            // The group ones. A node in a group nobody declared is the node's
+            // to answer -- the group may be a misspelling -- and a group with
+            // nothing in it is the group's.
+            Fault::NoSuchGroup { node, .. } => (at_of(node), node.clone(), Fix::Node),
+            Fault::EmptyGroup { group } => (None, String::new(), Fix::Group(group.clone())),
+            // The lines.
+            // The line the document actually holds, not one built from the
+            // two names: a removal is matched by what a link joins, origin
+            // and input included -- see `Link::same_connection`.
+            Fault::DanglingLink { from, to } => {
+                let line = document
+                    .links
                     .iter()
-                    .position(|node| Qualified::of(&node.name, &node.home).absolute() == name);
-                if at.is_none() {
-                    // A fault about a node the document does not hold: a link
-                    // naming something that is not there. Nothing to offer.
-                    continue;
-                }
-                out.push(Trouble {
-                    at,
-                    node: name.to_string(),
-                    said,
-                    nameable: false,
-                });
-            }
-            None => {
-                // A node with no name at all is a node problem even though
-                // the fault cannot name it: it is the one fault whose node is
-                // found by where it sits.
-                if let Fault::NamelessNode { at } = fault {
-                    let found = document.nodes.iter().position(|node| node.at == at);
-                    out.push(Trouble {
-                        at: found,
-                        node: String::new(),
-                        said,
-                        nameable: true,
-                    });
+                    .find(|link| link.from == *from && link.to == *to)
+                    .cloned();
+                match line {
+                    Some(line) => (None, String::new(), Fix::Line(line)),
+                    None => continue,
                 }
             }
+            Fault::SelfLink { node } => {
+                let line = document
+                    .links
+                    .iter()
+                    .find(|link| link.from == *node && link.to == *node)
+                    .cloned();
+                match line {
+                    Some(line) => (None, String::new(), Fix::Line(line)),
+                    None => continue,
+                }
+            }
+            Fault::InputBoundTwice { node, input } => {
+                // Either of the two lines into that input would do; the one
+                // the document holds second is the one that made it a fault,
+                // so that is the one offered.
+                let line = document
+                    .links
+                    .iter()
+                    .filter(|link| {
+                        link.to == *node && link.input.as_deref() == Some(input.as_str())
+                    })
+                    .next_back()
+                    .cloned();
+                match line {
+                    Some(line) => (None, String::new(), Fix::Line(line)),
+                    None => (at_of(node), node.clone(), Fix::Node),
+                }
+            }
+            // The configuration's own parameters.
+            Fault::BadTcspecial { .. } => (None, String::new(), Fix::Parameters),
+            // And everything else is a node somebody has to look at.
+            Fault::UnknownType { node, .. }
+            | Fault::BadNode { node, .. }
+            | Fault::UntriggeredInput { node, .. } => (at_of(node), node.clone(), Fix::Node),
+        };
+        // A node fault naming a node the document does not hold has nothing
+        // to offer and nothing to point at: it cannot happen from a file the
+        // editor read, and if it did, the alert still says it.
+        if matches!(fix, Fix::Node) && at.is_none() {
+            continue;
         }
+        out.push(Trouble {
+            at,
+            node,
+            said,
+            fix,
+        });
     }
     out
 }
@@ -1959,7 +2056,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     let proposed: Rc<RefCell<BTreeMap<usize, String>>> = Rc::new(RefCell::new(
         troubles
             .iter()
-            .filter(|trouble| trouble.nameable)
+            .filter(|trouble| trouble.nameable())
             .filter_map(|trouble| trouble.at.map(|at| (at, trouble.node.clone())))
             .collect(),
     ));
@@ -2079,11 +2176,63 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         });
     }
     {
+        let editor = editor.clone();
         let views = views.clone();
-        // Doing nothing, which is one of the offers: the problems stay, drawn
-        // in red on their own nodes and counted in the alert, and every node
-        // is on the canvas.
+        let showing = showing.clone();
+        let proposed = proposed.clone();
+        window.on_acted(move |row| {
+            let fix = showing.borrow().get(row as usize).map(|t| t.fix.clone());
+            match fix {
+                // A group nothing is in: taking it out is the whole of the
+                // fix, and it is an edit like any other -- somebody who meant
+                // to put a node in it can undo this.
+                Some(Fix::Group(name)) => {
+                    let interval = editor
+                        .borrow()
+                        .document()
+                        .groups
+                        .get(&name)
+                        .cloned()
+                        .unwrap_or_default();
+                    editor
+                        .borrow_mut()
+                        .edit(Edit::RemoveGroup { name, interval });
+                }
+                // A line that goes nowhere, goes back where it came from, or
+                // is the second into one input.
+                Some(Fix::Line(link)) => {
+                    editor.borrow_mut().edit(Edit::RemoveLink { link });
+                }
+                // And the configuration's own parameters, in their own
+                // window: what is wrong there is a value somebody has to
+                // choose, not something to delete.
+                Some(Fix::Parameters) => {
+                    show_parameters(&editor, &views);
+                }
+                Some(Fix::Name) | Some(Fix::Node) | None => return,
+            }
+            again(&editor, &views, &showing, &proposed);
+        });
+    }
+    {
+        let views = views.clone();
+        // Doing nothing about this one. The problem stays, drawn in red on
+        // its own node and counted in the alert, and every node is on the
+        // canvas.
         window.on_left(move || hide_problems(&views));
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        // And doing nothing about all of them, which is what somebody opening
+        // a file to look at it wants: every node is added as it stands, and
+        // nothing says any of this again for the rest of the session. The
+        // faults are still faults -- red on their nodes, refused by
+        // tcsverify -- but the editor stops asking.
+        window.on_ignored(move || {
+            ignore_faults(&editor, &views);
+            hide_problems(&views);
+        });
     }
 
     say_problems(
@@ -2115,7 +2264,7 @@ fn again(
     *showing.borrow_mut() = left.clone();
     *proposed.borrow_mut() = left
         .iter()
-        .filter(|trouble| trouble.nameable)
+        .filter(|trouble| trouble.nameable())
         .filter_map(|trouble| trouble.at.map(|at| (at, trouble.node.clone())))
         .collect();
 
@@ -2160,8 +2309,9 @@ fn say_problems(
                     .cloned()
                     .unwrap_or_else(|| trouble.node.clone())
                     .into(),
-                nameable: trouble.nameable && trouble.at.is_some(),
+                nameable: trouble.nameable(),
                 there: trouble.at.is_some() && !trouble.node.is_empty(),
+                action: trouble.offer().into(),
             })
             .collect();
         window.set_any_nameable(rows.iter().any(|row| row.nameable));
@@ -2177,6 +2327,49 @@ fn say_problems(
             window.set_ready(false);
             window.set_trouble(why.into());
         }
+    }
+}
+
+/// Count what the file arrived with as already said, so the alert leaves it
+/// to the window that asks about it.
+///
+/// The same thing [`ignore_faults`] does, done before the first window is
+/// shown rather than on a press: two windows about one set of problems, one
+/// of them with nothing to press, is what this is for.
+fn settled(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    ignore_faults(editor, views);
+}
+
+/// Say nothing further about what is wrong with the configuration as it
+/// stands.
+///
+/// Every fault the document has now is counted as said, so the alert does not
+/// raise it again -- and so the window that asked about them does not come
+/// back. The configuration is not changed: the nodes stay as they are, on the
+/// canvas in their own panes, drawn in red, and `tcsverify` still refuses the
+/// file. What stops is the asking.
+///
+/// It is for the session rather than for the file, which is the distinction
+/// worth stating. A decision about a *concern* is written into the file, that
+/// being a judgement about the drawing somebody else should see -- see
+/// `Document::aside`. A fault is an error; nobody should inherit somebody
+/// else's decision to ignore one, so this is forgotten when the editor
+/// closes.
+///
+/// A fault that goes away and comes back is said again: the set is kept by
+/// what each one says, and `Views::alert_faults` drops what is no longer
+/// there.
+fn ignore_faults(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    let said: Vec<String> = editor
+        .borrow()
+        .faults()
+        .iter()
+        .map(|fault| fault.describe())
+        .collect();
+    let views = views.borrow();
+    let mut faulted = views.faulted.borrow_mut();
+    for fault in said {
+        faulted.insert(fault);
     }
 }
 
@@ -4691,16 +4884,18 @@ mod tests {
         assert_eq!(list_shares_after(lists(), Pane::Moc, 2.0, 800.0), lists());
     }
 
-    /// Every problem about a node is offered, with what can be done about it.
+    /// Every problem is offered, with what can be done about that kind of it.
     ///
-    /// The list the startup window is built from: one row per problem, the
-    /// ones a name can mend marked as such, and nothing for a fault that
-    /// names no node the document holds -- there would be nothing to offer.
+    /// The list the startup window is built from. Every fault gets a row --
+    /// a row that offers nothing is what the alert used to be, and an alert
+    /// with nothing to press is a complaint rather than a question -- and
+    /// what differs is the offer: a name, the node, the group, the line, or
+    /// the parameters window.
     #[test]
-    fn every_problem_with_a_node_is_offered() {
+    fn every_problem_is_offered_the_fix_its_kind_has() {
         let mut document = Document::new();
-        // A node named twice, a node of a type this build does not know, and
-        // a link to a node that is not there.
+        // A node named twice, a node of a type this build does not know, a
+        // line to a node that is not there, and a group nothing is in.
         for (name, node_type) in [("i2c", "i2c"), ("i2c", "i2c"), ("odd", "contraption")] {
             document.apply(&Edit::AddNode {
                 name: name.to_string(),
@@ -4711,14 +4906,17 @@ mod tests {
         document.apply(&Edit::AddLink {
             link: Link::new("i2c", "nowhere", None),
         });
+        document.apply(&Edit::AddGroup {
+            name: "every_second".to_string(),
+            interval: "1s".to_string(),
+        });
 
         let troubles = troubles_of(&document);
-        let said = |which: &str| {
+        let fix_for = |which: &str| {
             troubles
                 .iter()
-                .filter(|t| t.node == which)
-                .map(|t| t.said.clone())
-                .collect::<Vec<_>>()
+                .find(|t| t.said.contains(which))
+                .map(|t| t.fix.clone())
         };
 
         // Both nodes of the shared name, because the file does not say which
@@ -4726,38 +4924,45 @@ mod tests {
         // reach it.
         let shared: Vec<&Trouble> = troubles.iter().filter(|t| t.node == "i2c").collect();
         assert_eq!(shared.len(), 2, "{troubles:?}");
-        assert_eq!(shared[0].at, Some(0));
-        assert_eq!(shared[1].at, Some(1));
-        assert!(shared.iter().all(|t| t.nameable), "a name is the fix");
+        assert_eq!((shared[0].at, shared[1].at), (Some(0), Some(1)));
+        assert!(shared.iter().all(|t| t.nameable()), "a name is the fix");
 
-        // The unknown type is offered, and a name is not the fix for it.
-        let odd: Vec<&Trouble> = troubles.iter().filter(|t| t.node == "odd").collect();
-        assert!(!odd.is_empty(), "the unknown type should be offered");
-        assert!(odd.iter().all(|t| !t.nameable && t.at == Some(2)));
-        assert!(
-            odd[0].said.contains("contraption"),
-            "it should say what the type was: {}",
-            odd[0].said
+        // The unknown type: the node has to be looked at or taken out.
+        assert_eq!(fix_for("contraption"), Some(Fix::Node));
+
+        // The line that goes nowhere: deleting it is the fix, and the line
+        // offered is the one the document holds -- a removal is matched by
+        // what a link joins.
+        match fix_for("one of them is not here") {
+            Some(Fix::Line(line)) => {
+                assert_eq!((line.from.as_str(), line.to.as_str()), ("i2c", "nowhere"));
+            }
+            other => panic!("the dangling line should offer its own removal: {other:?}"),
+        }
+
+        // And the group nothing is in, which offers its own deletion.
+        assert_eq!(
+            fix_for("has no nodes in it"),
+            Some(Fix::Group("every_second".to_string()))
         );
 
-        // And nothing for the link to a node that is not there: there is no
-        // node to open or to take out. It is still said in the alert.
-        assert!(
-            troubles.iter().all(|t| t.node != "nowhere"),
-            "a fault about a node the document has not got: {troubles:?}"
-        );
-        assert!(
-            said("nowhere").is_empty() && !document.faults().is_empty(),
-            "the fault is still reported, it is just not offered a fix"
-        );
-        // Nor is the link fault offered against the node it leaves: what is
-        // wrong there is the line.
+        // Every fault has a row, which is the rule: nothing reaches the alert
+        // with no offer beside it.
         assert_eq!(
             troubles.len(),
-            3,
-            "two shared names and one unknown type, and nothing for the \
-             dangling link: {troubles:?}"
+            document.faults().len() + 1,
+            "one row per fault, and one extra because a shared name is two \
+             rows: {troubles:?} against {:?}",
+            document.faults()
         );
+        // And every row says something and offers something.
+        for trouble in &troubles {
+            assert!(!trouble.said.is_empty(), "{trouble:?}");
+            assert!(
+                trouble.nameable() || trouble.at.is_some() || !trouble.offer().is_empty(),
+                "a row with nothing to press: {trouble:?}"
+            );
+        }
     }
 
     /// Doing nothing leaves the node on the canvas, in its own working pane.

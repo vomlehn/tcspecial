@@ -76,6 +76,10 @@ export struct ProblemRow {
     nameable: bool,
     // Whether there is a node in the document to open or to delete.
     there: bool,
+    // The one other thing this kind of problem offers, as the label on its
+    // button: deleting a group, deleting a line, opening the parameters.
+    // Empty where it offers none.
+    action: string,
 }
 
 export struct TerminalView {
@@ -2883,7 +2887,12 @@ export component ProblemsWindow inherits Window {
     callback confirmed();
     callback edit(int);
     callback remove(int);
+    // The one other thing a row offers: see ProblemRow::action.
+    callback acted(int);
     callback left();
+    // And the way out that answers all of them at once: see `ignored` in
+    // tcsgui::settle_problems.
+    callback ignored();
 
     VerticalLayout {
         padding: Space.wide;
@@ -2943,6 +2952,10 @@ export component ProblemsWindow inherits Window {
                         text: "Delete";
                         clicked => { root.remove(i); }
                     }
+                    if row.action != "": Button {
+                        text: row.action;
+                        clicked => { root.acted(i); }
+                    }
                 }
                 if root.rows.length == 0: Text {
                     text: "Nothing is wrong.";
@@ -2964,8 +2977,16 @@ export component ProblemsWindow inherits Window {
             spacing: Space.step;
             Rectangle { }
             Button {
-                text: "Leave them";
+                text: "Leave this one";
                 clicked => { root.left(); }
+            }
+            // Doing nothing about every one of them, which is the other way
+            // out and the one somebody opening a file to look at it wants:
+            // the problems stay, the nodes are drawn as they are, and nothing
+            // says any of it again this session.
+            Button {
+                text: "Ignore them all";
+                clicked => { root.ignored(); }
             }
             if root.any-nameable: Button {
                 text: "Rename";

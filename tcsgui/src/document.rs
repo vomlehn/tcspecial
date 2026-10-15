@@ -335,37 +335,6 @@ pub enum Fault {
 }
 
 impl Fault {
-    /// Whether this is something wrong with a *node*, as against with a link
-    /// or with the configuration as a whole.
-    ///
-    /// What the question at startup is built from: a node problem is one the
-    /// editor can offer something for -- open that node, take it out, or give
-    /// it a name -- where a link problem is mended by drawing or deleting a
-    /// line, and a problem with the `tcspecial` section is mended in its own
-    /// window. See `tcsgui::troubles_of`.
-    ///
-    /// A link fault names a node, because that is where it is drawn, so
-    /// "names a node" is not the test: `DanglingLink` names the node the line
-    /// leaves, and what is wrong is the line.
-    pub fn about_a_node(&self) -> bool {
-        match self {
-            Fault::DuplicateName { .. }
-            | Fault::NamelessNode { .. }
-            | Fault::UnknownType { .. }
-            | Fault::NoSuchGroup { .. }
-            | Fault::BadNode { .. }
-            | Fault::UntriggeredInput { .. } => true,
-            // A line, not a node: two of them into one input, one that goes
-            // nowhere, one that goes back where it came from.
-            Fault::DanglingLink { .. }
-            | Fault::SelfLink { .. }
-            | Fault::InputBoundTwice { .. } => false,
-            // And these are about neither: a group with nothing in it, and
-            // the configuration's own parameters.
-            Fault::EmptyGroup { .. } | Fault::BadTcspecial { .. } => false,
-        }
-    }
-
     /// What the window shows beside the thing it is attached to.
     pub fn describe(&self) -> String {
         match self {

@@ -1,17 +1,49 @@
 simulated_payloads:
-  - name: "payload"
-    group: ""
-    type: ""
-    protocol: ""
-    payload_address: ""
-    payload_port: ""
-    packet_interval_ms: ""
-    segment_interval_ms: ""
-    segment_size: ""
-    drop_percent: ""
-    corrupt_percent: ""
-    truncate_percent: ""
-    jitter_ms: ""
-    silent_after: ""
-    close_after: ""
-    ignore_trigger_percent: ""
+  - name: "can-2"
+    group:
+    type:
+    protocol:
+    payload_address:
+    payload_port:
+    packet_interval_ms:
+    segment_interval_ms:
+    segment_size:
+    drop_percent:
+    corrupt_percent:
+    truncate_percent:
+    jitter_ms:
+    silent_after:
+    close_after:
+    ignore_trigger_percent:
+  - name: "can-3"
+    group:
+    type:
+    protocol:
+    payload_address:
+    payload_port:
+    packet_interval_ms:
+    segment_interval_ms:
+    segment_size:
+    drop_percent:
+    corrupt_percent:
+    truncate_percent:
+    jitter_ms:
+    silent_after:
+    close_after:
+    ignore_trigger_percent:
+  - name: "rpmsg-1"
+    group:
+    type:
+    protocol:
+    payload_address:
+    payload_port:
+    packet_interval_ms:
+    segment_interval_ms:
+    segment_size:
+    drop_percent:
+    corrupt_percent:
+    truncate_percent:
+    jitter_ms:
+    silent_after:
+    close_after:
+    ignore_trigger_percent:

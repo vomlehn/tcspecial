@@ -1,92 +1,46 @@
+# yaml-language-server: $schema=tcsgui/share/schema/tcspecial.schema.json
+
 version: "2.0"
 description: "One payload on a UDP link, its telemetry going to the ground"
 
 tcspecial:
   beacon:
-    interval_ms: "5000"
-    recv: "127.0.0.1:5650"
-    send: "0.0.0.0:5550"
-  log:
-    directory: "/var/log/tcspecial"
-    segment_size: "65536"
-  payload_command:
-    dest_base: "0.0.0.0:4200"
-    source_base: "127.0.0.1:4300"
-  payload_telemetry:
-    dest_base: "127.0.0.1:6100"
-    source_base: "0.0.0.0:6000"
-  rust-code-path: "t.rs"
-  tcs_cmd:
-    recv: "0.0.0.0:4000"
-    send: "127.0.0.1:4100"
+    interval_ms: "1000"
 
 payload_groups:
   - name: "every_second"
     interval: "1s"
 
 moc:
-  # The ground. tcspecial waits at this address for a ground station to speak
-  # to it, and sends telemetry back where the datagrams came from.
-  - name: moc
+  - name: moc-1
     type: moc
-    address: "127.0.0.1"
-    port: "5000"
+    moc-out:
+      - target: can-1
+    payload-in: true
 
 vehicle:
-  - name: mean
+  - name: hysteresis-1
     type: compute
-    function: "mean"
-    moc-out:
-      - target: payload
-    payload-in: true
-  - name: mean-2
-    type: compute
-    function: "mean"
-    payload-in: true
+    function: "hysteresis"
 
 payloads:
-  # The payload: software or a device that sends a datagram a second.
-  # 
-  # tcspecial binds this address and the payload sends to it. That is the way
-  # round a datagram link has to work: a UDP connect sends nothing, so a
-  # payload waiting to be reached would hear nothing and -- producing data
-  # because it is running rather than because it was asked -- would have
-  # nowhere to send it. The payload speaks first, and tcspecial learns where
-  # it is from the datagram that arrives.
-  # 
-  # The second is the group's: the link is read once a second, and once a
-  # second the trigger below is sent to ask for the next reading.
-  # 
-  # The trigger is also what allows the downward link at all. A payload that
-  # is read is asked for its readings, and the bytes that ask are its
-  # trigger -- so a payload that states none is one the configuration
-  # describes as only read, and `tcsverify` refuses a link delivering into
-  # it. One byte here; a real payload's would be whatever its own protocol
-  # asks with.
-  - name: payload
-    type: network
-    address: "127.0.0.1"
-    group: "every_second"
-    port: "5100"
-    protocol: "udp"
-    trigger: "01"
+  - name: can-1
+    type: can
     payload-out:
-      - target: mean
-        input: payload-in
+      - target: moc-1
     moc-in: true
-  - name: i2c
-    type: i2c
-  - name: i2c-2
-    type: i2c
-    payload-out:
-      - target: mean-2
-        input: payload-in
+  - name: can-2
+    type: can
+  - name: can-3
+    type: can
+  - name: rpmsg-1
+    type: rpmsg
 
 tcsgui:
   nodes:
-    - { name: moc, x: 24, y: 128 }
-    - { name: mean, x: 368, y: 176 }
-    - { name: mean-2, x: 280, y: 408 }
-    - { name: payload, x: 728, y: 40 }
-    - { name: i2c, x: 648, y: 456 }
-    - { name: i2c-2, x: 608, y: 600 }
+    - { name: moc-1, x: 0, y: 192 }
+    - { name: can-1, x: 672, y: 96 }
+    - { name: can-2, x: 672, y: 208 }
+    - { name: can-3, x: 664, y: 328 }
+    - { name: rpmsg-1, x: 640, y: 472 }
+    - { name: hysteresis-1, x: 208, y: 136 }

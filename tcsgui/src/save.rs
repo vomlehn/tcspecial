@@ -42,6 +42,12 @@ use std::path::{Path, PathBuf};
 /// without having to ask what state anything is in.
 #[derive(Debug)]
 pub enum SaveError {
+    /// The directory the file goes in does not exist and could not be made.
+    ///
+    /// Its own variant because its own answer is different: the others are
+    /// answered by freeing space or by waiting, and this one by naming a
+    /// directory that can exist. A file in the way of one is the common cause.
+    Directory { path: PathBuf, why: std::io::Error },
     /// The temporary file could not be created beside the target.
     Temporary { path: PathBuf, why: std::io::Error },
     /// The contents could not be written. A full device arrives here.
@@ -59,6 +65,12 @@ impl std::fmt::Display for SaveError {
         // because the first question asked of a failed save is whether the
         // previous file survived.
         match self {
+            SaveError::Directory { path, why } => write!(
+                f,
+                "{}: the directory it goes in does not exist and could not be \
+                 made ({why}). Nothing has been written",
+                path.display()
+            ),
             SaveError::Temporary { path, why } => write!(
                 f,
                 "{}: a temporary file could not be made beside it ({why}). \
@@ -103,6 +115,25 @@ pub fn write_atomically(path: &Path, contents: &[u8]) -> Result<(), SaveError> {
         // relative path with no parent is asking for.
         None => Path::new("."),
     };
+
+    // The directory the file goes in, made if it is not there.
+    //
+    // A name the editor is started on need not exist yet -- that is how a new
+    // configuration is begun -- and a name in a directory that does not exist
+    // is the same intention one level up. Without this, every write of the
+    // session failed: the editor saves each edit as it is made, so a person
+    // who named a path with a new directory in it got a window that worked
+    // and a disk with nothing on it.
+    //
+    // All of it, not just the last component, because a path somebody typed
+    // may name several new ones; and reported rather than ignored, since a
+    // directory that cannot be made is a file that cannot be written.
+    if let Err(why) = fs::create_dir_all(directory) {
+        return Err(SaveError::Directory {
+            path: path.to_path_buf(),
+            why,
+        });
+    }
 
     let temporary = temporary_beside(path);
 
@@ -228,6 +259,49 @@ mod tests {
         // editor does after every edit.
         write_atomically(&path, b"nodes: [a]\n").expect("the second write");
         assert_eq!(fs::read(&path).unwrap(), b"nodes: [a]\n");
+    }
+
+    /// A directory that is not there yet is made.
+    ///
+    /// A name the editor is started on need not exist, which is how a new
+    /// configuration is begun, and a name in a directory that does not exist
+    /// is the same intention one level up. This used to fail, and the editor
+    /// saves every edit as it is made -- so the session ran, the window
+    /// worked, and nothing reached the disk.
+    #[test]
+    fn a_directory_that_is_not_there_is_made() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        // Two levels, because a path somebody typed may name more than one
+        // that is not there.
+        let path = where_.path().join("bay/fore/graph.yaml");
+
+        write_atomically(&path, b"nodes: []\n").expect("the write");
+        assert_eq!(fs::read(&path).unwrap(), b"nodes: []\n");
+
+        // And again over what is there, which is every edit after the first.
+        write_atomically(&path, b"nodes: [a]\n").expect("the second write");
+        assert_eq!(fs::read(&path).unwrap(), b"nodes: [a]\n");
+    }
+
+    /// A directory that cannot be made is said, not swallowed.
+    #[test]
+    fn a_directory_that_cannot_be_made_is_reported() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        // A file where a directory would have to be: the one way to make
+        // `create_dir_all` fail that does not need a read-only filesystem.
+        let blocked = where_.path().join("notadirectory");
+        fs::write(&blocked, b"a file").expect("a file");
+
+        let path = blocked.join("graph.yaml");
+        let why = write_atomically(&path, b"nodes: []\n")
+            .expect_err("a file is not a directory");
+        let said = format!("{why}");
+        assert!(said.contains("graph.yaml"), "it should name the file: {said}");
+        assert!(
+            said.contains("directory"),
+            "and say what could not be made, since that is what to put right: \
+             {said}"
+        );
     }
 
     /// Nothing of ours is left in the directory afterwards.

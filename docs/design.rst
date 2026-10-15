@@ -1997,20 +1997,44 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
-A configuration that names a node twice is a configuration nothing can fly:
-the links naming that name do not say which of the two they meant, and
-``tcsverify`` refuses it. The editor asks about it when the file is opened, in
-a window of its own, before anything else can be done with the drawing. Every
-node of the shared name is offered -- not the second of each pair, because the
-file does not say which was meant -- and each can be typed over or given the
-name the **Suggest** button derives, which is the name the editor would have
-placed it with. **Rename** waits until the names all differ, none is blank and
+A configuration the editor can read and the vehicle could not fly is asked
+about when it is opened, in a window of its own: **one row per problem with a
+node**, each said in the words of the rule it breaks, each offering what can
+be done about that kind of problem. A node named twice, a node with no name, a
+type this build does not know, attributes that do not hold together, a node in
+a group nobody declared, a payload that is written to and states no trigger.
+
+What is offered depends on what is wrong. Where a *name* is the fix -- two
+nodes sharing one, or a node without one -- the row carries a field and a
+**Suggest** button, which offers the name the editor would have placed the node
+with; that is the one kind of problem the editor can mend by itself. Every row
+whose node is in the document also offers **Edit**, which opens that node's own
+window, and **Delete**, which goes through the same confirmation any other
+deletion does. **Rename** waits until the names all differ, none is blank and
 none belongs to a third node, since a repair that left the same question
-standing would be no answer; what is wrong is said under the list rather than
-beside a row, so the list does not shift as somebody types. **Leave them**
-closes it and changes nothing: the duplicate is then reported as a fault like
-any other, and somebody who would rather fix it in a text editor is not held
-there.
+standing would be no answer; what is wrong with the names is said under the
+list rather than beside a row, so the list does not shift as somebody types.
+
+**Doing nothing is one of the offers**, and the window closes with it. A
+problem left alone stays a problem -- drawn in red on its own node, counted in
+the alert, refused by ``tcsverify`` -- but **the node is on the canvas in its
+own working pane whatever is decided here**, which is what lets somebody look
+at the drawing before choosing. A type nothing knows goes in the vehicle pane,
+the two others meaning something about what a node *is* where that type says
+nothing. An editor that would not show a configuration until it was correct
+could not be used to correct one.
+
+Answering one problem leaves the window on the rest rather than closing it: a
+file with four problems should not need opening four times, and one that has
+been mended should leave the list rather than sit there answered.
+
+What does *not* reach that window is a problem with a line or with the
+configuration as a whole -- a line that goes nowhere, two lines into one
+input, a group with nothing in it, a ``tcspecial`` parameter that does not hold
+together. A line fault names a node, because that is where it is drawn, so
+"names a node" is not the test; ``Fault::about_a_node`` is. Those are said in
+the alert and mended by the ordinary editing, there being nothing a row could
+offer for them.
 
 Renaming one of two nodes that share a name is done **by position**, which is
 the one thing ``Edit::RenameNode`` cannot express: a name is how an edit says

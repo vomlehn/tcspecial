@@ -61,22 +61,21 @@ export struct ConcernRow {
     node: string,
 }
 
-// One node whose name another node also has.
-export struct NameRow {
-    // Where in the file it is, which is how it is told from the other one: a
-    // name two nodes share cannot say which of them is meant. See
-    // tcsgui::Document::rename_at.
-    at: int,
-    // What it is called now, and what it would be called instead: `now` is
-    // what the field holds, which somebody may have typed into.
-    was: string,
+// One problem a configuration opened with, and what is offered for it.
+export struct ProblemRow {
+    // What is wrong, in the words of the fault itself.
+    said: string,
+    // The node it is about, by name, or empty where not having one is the
+    // problem.
+    node: string,
+    // The name as it stands in the field, for the rows a name can mend.
     now: string,
-    // Its type, because two nodes of one name are often two different things
-    // and the type is what says which is which.
-    node-type: string,
-    // And where it is drawn, for the same reason: two i2c nodes called the
-    // same thing are told apart by where they sit on the canvas.
-    at-said: string,
+    // Whether a name is the fix: two nodes sharing one, or a node without
+    // one. Those rows get a field and a suggestion; the rest get the buttons
+    // alone.
+    nameable: bool,
+    // Whether there is a node in the document to open or to delete.
+    there: bool,
 }
 
 export struct TerminalView {
@@ -2839,43 +2838,51 @@ export component ConcernsWindow inherits Window {
 /// menu is a press somebody may have meant for Edit. Undo would put it back --
 /// a removal is one edit -- but an undo that has to be *discovered* is no
 /// answer to a node that has gone and taken four lines with it.
-/// What to do about two nodes that share a name.
+/// What to do about the problems a configuration opened with.
 ///
-/// Shown when a configuration is opened that names a node twice, which is a
-/// file nothing can fly: the links naming that name do not say which node they
-/// meant, and `tcsverify` refuses it. So this is not an edit somebody is being
-/// offered -- it is the file being made readable, and the window says so.
+/// Shown when a file is opened that the editor can read and the vehicle could
+/// not fly: a node named twice, a node with no name, a type this build does
+/// not know, attributes that do not hold together. Each is said in the words
+/// of the rule it breaks, and each row offers what can be done about that
+/// kind of problem.
 ///
-/// Every node of the shared name is offered, not the second of each pair,
-/// because the file does not say which of them was meant. A name can be typed,
-/// or taken from the button beside it, which derives one the way the editor
-/// names a node it places: `i2c-1`, `i2c-2`.
+/// Doing nothing is one of the offers, and it is the one the window closes
+/// with. A problem left alone stays a problem -- it is drawn in red on the
+/// node it is about, counted in the alert, and `tcsverify` will refuse the
+/// file -- but the node is on the canvas in its own working pane either way,
+/// which is what lets somebody look at the drawing before deciding. An editor
+/// that would not show a configuration until it was correct would be an
+/// editor that cannot be used to correct one.
 ///
-/// "Leave them" closes it and changes nothing. The duplicate is then reported
-/// as a fault like any other, which is what it was before this window existed:
-/// a person who wants to fix it in a text editor should not be held here.
-export component NamesWindow inherits Window {
-    title: "Two nodes share a name";
+/// Where a name is the fix the row has a field and a suggestion, because that
+/// is the one kind of problem the editor can mend by itself. Everything else
+/// is somebody's decision: open the node and put it right, or take it out.
+export component ProblemsWindow inherits Window {
+    title: "Problems in this configuration";
     background: #fbfbfa;
-    min-width: 440px;
-    min-height: 240px;
-    preferred-width: 560px;
-    preferred-height: 320px;
+    min-width: 520px;
+    min-height: 260px;
+    preferred-width: 680px;
+    preferred-height: 380px;
 
-    in property <[NameRow]> rows;
-    // Whether the names as they stand are all different and none is empty,
-    // which is what the renaming button waits for. Worked out in Rust, where
-    // it can be tested: see tcsgui::names_settle.
+    in property <[ProblemRow]> rows;
+    // Whether the names as they stand would settle what they are offered for:
+    // all different, none empty, none belonging to a third node. Worked out in
+    // Rust, where it can be tested: see tcsgui::names_settle.
     in property <bool> ready: false;
     // And why not, where they do not: said once, under the list, rather than
-    // beside whichever row is at fault -- a row is a field and a button, and a
-    // sentence between every pair of rows would shift the list as somebody
-    // types.
+    // beside whichever row is at fault -- a sentence between rows would shift
+    // the list as somebody types.
     in property <string> trouble: "";
+    // Whether any row offers a name at all, which is what decides whether the
+    // renaming button is there to be pressed.
+    in property <bool> any-nameable: false;
 
     callback typed(int, string);
     callback derive(int);
     callback confirmed();
+    callback edit(int);
+    callback remove(int);
     callback left();
 
     VerticalLayout {
@@ -2883,15 +2890,16 @@ export component NamesWindow inherits Window {
         spacing: Space.step;
 
         Text {
-            text: "Two nodes share a name";
+            text: "This configuration has problems the vehicle would not fly with";
             font-size: Type.strong;
             font-weight: Type.bold;
+            wrap: word-wrap;
         }
         Text {
-            text: "This configuration names a node twice. The links to it do "
-                + "not say which one they meant, so it cannot be flown or "
-                + "checked until the names are different. Type a name, or "
-                + "take the one offered.";
+            text: "Each one is drawn in red on the node it is about. Put them "
+                + "right here, open a node to edit it, or leave them and look "
+                + "at the drawing first -- every node is on the canvas either "
+                + "way.";
             font-size: Type.small;
             color: #6b7280;
             wrap: word-wrap;
@@ -2900,27 +2908,47 @@ export component NamesWindow inherits Window {
         ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
-                spacing: Space.tight;
+                spacing: Space.step;
                 for row[i] in root.rows: HorizontalLayout {
                     spacing: Space.step;
-                    Text {
-                        text: row.node-type + " at " + row.at-said;
-                        font-size: Type.small;
-                        color: #6b7280;
-                        vertical-alignment: center;
-                        width: 150px;
-                        overflow: elide;
-                    }
-                    LineEdit {
-                        text: row.now;
-                        font-size: Type.body;
+                    alignment: start;
+
+                    VerticalLayout {
                         horizontal-stretch: 1;
-                        edited(said) => { root.typed(i, said); }
+                        spacing: 1px;
+                        Text {
+                            text: row.said;
+                            font-size: Type.body;
+                            wrap: word-wrap;
+                        }
+                        if row.nameable: HorizontalLayout {
+                            spacing: Space.step;
+                            LineEdit {
+                                text: row.now;
+                                font-size: Type.body;
+                                horizontal-stretch: 1;
+                                edited(said) => { root.typed(i, said); }
+                            }
+                            Button {
+                                text: "Suggest";
+                                clicked => { root.derive(i); }
+                            }
+                        }
                     }
-                    Button {
-                        text: "Suggest";
-                        clicked => { root.derive(i); }
+                    if row.there: Button {
+                        text: "Edit";
+                        clicked => { root.edit(i); }
                     }
+                    if row.there: Button {
+                        text: "Delete";
+                        clicked => { root.remove(i); }
+                    }
+                }
+                if root.rows.length == 0: Text {
+                    text: "Nothing is wrong.";
+                    font-size: Type.body;
+                    font-italic: true;
+                    color: #6b7280;
                 }
             }
         }
@@ -2939,7 +2967,7 @@ export component NamesWindow inherits Window {
                 text: "Leave them";
                 clicked => { root.left(); }
             }
-            Button {
+            if root.any-nameable: Button {
                 text: "Rename";
                 primary: true;
                 enabled: root.ready;

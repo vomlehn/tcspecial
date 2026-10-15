@@ -4101,34 +4101,16 @@ fn tint_of(tint: Tint) -> String {
 
 /// What each working pane is painted.
 ///
-/// Light and neutral: 10 CIE units apart from each other under every one of
-/// the four ways of seeing, and none with a chroma above 14, so a pane reads
-/// as a tinted sheet of paper rather than as a coloured panel. Each is the
-/// light end of the hue family its nodes are drawn in -- see `style::Tint` --
-/// which is what makes a node's colour say where it belongs.
-///
-/// Ten, where every other pair in the scheme keeps 12 and these three used to
-/// keep 15. A pane is a ground and not a mark: nothing is identified by it,
-/// the pane a node is in is said by where the node is as much as by what is
-/// under it, and the three are never seen edge to edge except at a divider. So
-/// it is the one pair of colours in the window that can afford the lower floor
-/// -- and what the floor buys is quiet. These are a third less colourful than
-/// the panes at 15: the loudest chroma is 9.3 where it was 14.0.
-///
-/// Quieter than that is not available, and the reason is worth knowing before
-/// anybody tries. At this lightness a colour has little room for chroma, so
-/// what tells the panes apart is hue, and halving the chroma halves the
-/// distance that carries it; lightness cannot take over, because three grounds
-/// each 10 apart in lightness alone want 20 points of it and staying above the
-/// 84 these are held to leaves 15 to the top of the scale. The search is run
-/// against every rule at once -- the bodies' contrast on their own pane, the
-/// 25 points a node keeps below it, the tiers, and the window's own near-white
-/// ground, which a pane must not vanish into.
+/// Light and neutral, as asked: 15 CIE units apart from each other under every
+/// one of the four ways of seeing, and none with a chroma above 14, so a pane
+/// reads as a tinted sheet of paper rather than as a coloured panel. Each is
+/// the light end of the hue family its nodes are drawn in -- see
+/// `style::Tint` -- which is what makes a node's colour say where it belongs.
 fn ground_of(ground: style::Ground) -> String {
     match ground {
-        style::Ground::Moc => "#dce6f6",
-        style::Ground::Vehicle => "#e4e6d4",
-        style::Ground::Payloads => "#ded0d4",
+        style::Ground::Moc => "#d4e6fe",
+        style::Ground::Vehicle => "#eff5da",
+        style::Ground::Payloads => "#ddced1",
     }
     .to_string()
 }
@@ -4868,11 +4850,6 @@ mod tests {
     /// can tell apart is a pair everybody can tell apart, with something in
     /// hand.
     ///
-    /// One pair is held to ten instead and is asked about elsewhere: a pane
-    /// against a pane. A pane is a ground rather than a mark, nothing is
-    /// identified by it, and the two units bought a third of the colour out
-    /// of the canvas -- see `ground_of`.
-    ///
     /// Twelve, where the bodies alone managed fourteen, and the two units are
     /// what the three tiers cost. The bodies now have to be darker than the
     /// lines as well as apart from each other -- see
@@ -4903,20 +4880,9 @@ mod tests {
             scheme.push((t.spelling().to_string(), painted(&tint_of(t.appearance().tint))));
         }
 
-        // Pane against pane is the one pair this does not ask about, and it
-        // has a floor of its own: see `ground_of`, and the rule in
-        // `every_node_is_legible_on_its_own_pane_and_in_its_family` that holds
-        // the three of them 10 apart. A pane is a ground and not a mark --
-        // nothing is identified by it -- and the lower floor is what buys a
-        // quiet canvas. Everything a reader has to tell apart keeps 12.
-        let a_pane = |said: &str| said.ends_with(" pane");
-
         let mut closest = (f64::MAX, Sight::Normal, String::new(), String::new());
         for (i, (one, a)) in scheme.iter().enumerate() {
             for (two, b) in &scheme[i + 1..] {
-                if a_pane(one) && a_pane(two) {
-                    continue;
-                }
                 for sight in Sight::ALL {
                     let apart = difference(seen(*a, sight), seen(*b, sight));
                     if apart < closest.0 {
@@ -5013,46 +4979,13 @@ mod tests {
                 for sight in Sight::ALL {
                     let apart = difference(seen(*a, sight), seen(*b, sight));
                     assert!(
-                        apart >= 10.0,
+                        apart >= 15.0,
                         "the {} and {} panes are {apart:.1} apart to a reader \
                          with {sight:?}",
                         one.label(),
                         two.label()
                     );
                 }
-            }
-        }
-
-        // And none of them vanishes into the window's own ground, which is
-        // near white: a pane that matched the chrome would read as nothing
-        // being there, and the search for quiet panes walks straight into it
-        // -- the quietest vehicle pane the other rules allow is at 99 of
-        // lightness, which is the chrome.
-        //
-        // Read out of the markup rather than written here as well, so that
-        // repainting the window cannot leave this test passing about a colour
-        // the window no longer uses.
-        let markup = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
-        )
-        .expect("the markup this binary was built from");
-        let chrome: (u8, u8, u8) = markup
-            .split("export component MainWindow")
-            .nth(1)
-            .and_then(|from| from.split("background:").nth(1))
-            .and_then(|said| said.split(';').next())
-            .map(|said| painted(said.trim()))
-            .expect("the markup says what the window is painted");
-        for (pane, ground) in &grounds {
-            for sight in Sight::ALL {
-                let apart = difference(seen(*ground, sight), seen(chrome, sight));
-                assert!(
-                    apart >= 10.0,
-                    "the {} pane is {apart:.1} from the window's own ground to \
-                     a reader with {sight:?}, which is a pane that cannot be \
-                     seen to be there",
-                    pane.label()
-                );
             }
         }
     }

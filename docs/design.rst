@@ -1845,6 +1845,31 @@ A node body is not held to it: a faulty node is drawn in the fault's colour
 *and* in the one shape no real type uses, so a dark green body can exist
 because the shape carries the warning too. A line has no second channel.
 
+The three working panes are held 10 apart rather than 12, which is the one
+exception and a deliberate one. A pane is a ground and not a mark: nothing is
+identified by it, which pane a node is in is said by where the node sits as
+much as by what is under it, and the three are never seen edge to edge except
+at a divider. What the lower floor buys is quiet -- the panes are a third less
+colourful than the ones a floor of 15 allowed, the loudest chroma being 9.3
+where it was 14.0.
+
+Quieter is not available, and the reason is worth knowing before anybody tries
+again. At this lightness a colour has little room for chroma, so what tells
+the panes apart is hue, and halving the chroma halves the distance carrying
+it; lightness cannot take over, because three grounds each 10 apart in
+lightness alone want 20 points of it, and staying above the 84 a pane is held
+to leaves 15 to the top of the scale. Halving the panes outright -- which was
+measured before this was settled -- broke the floor on all three pairs at 9.8
+to 12.3; halving their *brightness* broke forty rules, the panes landing at
+L\* 44 to 51, no longer lighter than the lines and no longer lighter than
+three of the bodies.
+
+A pane must also not vanish into the window's own near-white chrome, which is
+a rule the search walked straight into: the quietest vehicle pane the other
+rules allow sits at 99 of lightness, which is the chrome. It is 10 from it
+now, and the test reads the window's colour out of ``main.slint`` rather than
+restating it.
+
 Getting the tiers cost two units of separation. Every colour of the scheme is
 held apart from every other -- the twenty of them, panes and lines and bodies
 together, under normal vision and each of the three dichromacies -- and the

@@ -16,6 +16,15 @@
 //! the one that crosses fewest, bends least and runs shortest is the one
 //! drawn, in that order of priority.
 //!
+//! And around the lines already drawn, which is the other thing a reader
+//! cannot recover. Two lines that *cross* are two lines: the crossing is a
+//! point, and each can be followed through it. Two lines that run along the
+//! same track are one line on the screen -- whichever was drawn second is the
+//! only one anybody sees, and a link that is invisible is a link a reader
+//! takes to be absent. So a route is laid against the routes already laid,
+//! every column and row is offered in lanes either side of itself, and a
+//! shared run costs more than a bend: see [`shared`] and [`LANE`].
+//!
 //! The route is computed here rather than in the markup, for two reasons. It
 //! is arithmetic, and arithmetic in a layout language is hard to read and
 //! impossible to test; and this way the shape of every route is checkable --
@@ -68,6 +77,31 @@ const MARKER: (f32, f32) = (11.0, 5.0);
 /// A marker on a run barely longer than itself is a shape with no room to
 /// point: it would touch both corners and read as a thickening of the line.
 const ROOM: f32 = 28.0;
+
+/// How far apart two lines have to be to read as two lines, in pixels.
+///
+/// A line is drawn five pixels wide, so two tracks less than that apart are
+/// one track with a thick line on it. Seven: the width and a little, which is
+/// a visible gap at the sizes here without spreading a bundle of links across
+/// half a pane.
+///
+/// It is both the spacing of the lanes a route may be moved into and the
+/// tolerance for calling two runs the same run.
+const LANE: f32 = 7.0;
+
+/// How much two runs have to share before it counts as an overlap.
+///
+/// A stub and a little. Two links leaving one terminal leave from the same
+/// point, so their first segments run along each other for the length of a
+/// stub whatever either of them does afterwards -- there is nothing to route
+/// around, and at that length it reads as one line dividing rather than as a
+/// line gone missing. Anything longer is a route that could have gone
+/// elsewhere.
+///
+/// It also covers the shorter case: two lines touching where they pass, which
+/// is what a crossing looks like from close up. Without a floor here a route
+/// would take a detour to save three pixels of coincidence.
+const TOUCH: f32 = STUB + 2.0;
 
 /// Something on the page a line should not run through: a node.
 ///
@@ -183,7 +217,16 @@ type Box = (f32, f32, f32, f32);
 /// that crosses nothing beats one that crosses something however long it is,
 /// and length only settles a tie between two routes that turn as often as each
 /// other.
-type Cost = (usize, usize, u32);
+/// What a route costs, in the order the terms are weighed: how many nodes it
+/// runs through, how far it runs along a line already drawn, how many times it
+/// bends, and how far it goes.
+///
+/// Nodes first, because a line through a node is a lie about the graph.
+/// Overlap next, ahead of bends: a line that cannot be seen is worse than a
+/// line with a corner in it, and the corner is what buys the lane. The shared
+/// run is counted in lane-widths rather than pixels so that a few pixels of
+/// coincidence cannot outweigh a bend.
+type Cost = (usize, u32, usize, u32);
 
 /// A route and what it costs.
 type Weighed = (Cost, Vec<(f32, f32)>);
@@ -195,7 +238,33 @@ type Weighed = (Cost, Vec<(f32, f32)>);
 /// ends are at the same height and nothing is between them the route is one
 /// straight line, which is the common case and wants no corners at all.
 pub fn route(ends: Ends, around: &[Obstacle]) -> String {
-    drawn(&way(ends, around))
+    drawn(&way(ends, around, &[]))
+}
+
+/// The same, laid clear of the routes already laid.
+///
+/// `taken` is every route already drawn on this canvas, in the order they were
+/// drawn. A link is routed against them so that no two lines run along the
+/// same track -- see [`shared`] -- and the caller keeps what comes back to
+/// pass in for the next one: see [`lay`], which is what gives it the points.
+pub fn route_among(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -> String {
+    drawn(&way(ends, around, taken))
+}
+
+/// The points a link's line visits, laid clear of the routes already laid.
+///
+/// For the caller that draws a canvas full of links: lay each one, keep the
+/// points, and hand them to the next. Everything else about a link's drawing
+/// -- its path, its arrowhead, its marker, where its label sits -- is derived
+/// from the points rather than worked out again, so the five of them cannot
+/// disagree about where the line went.
+pub fn lay(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -> Vec<(f32, f32)> {
+    way(ends, around, taken)
+}
+
+/// One laid route as path data.
+pub fn drawn_route(points: &[(f32, f32)]) -> String {
+    drawn(points)
 }
 
 /// The arrowhead at the target end, as a filled triangle.
@@ -233,8 +302,12 @@ pub fn arrow(ends: Ends) -> String {
 /// has no room for one gets none -- see [`ROOM`] -- which is a short link,
 /// where the head at the end is already next to everything else about it.
 pub fn marker(ends: Ends, around: &[Obstacle]) -> String {
-    let points = way(ends, around);
-    let (from, to) = match longest(&points) {
+    marker_on(ends, &way(ends, around, &[]))
+}
+
+/// The same, on a route already laid: see [`lay`].
+pub fn marker_on(ends: Ends, points: &[(f32, f32)]) -> String {
+    let (from, to) = match longest(points) {
         Some(run) => run,
         None => return String::new(),
     };
@@ -268,8 +341,12 @@ pub fn marker(ends: Ends, around: &[Obstacle]) -> String {
 /// the straight line between its ends, and a label sitting there is a label
 /// beside a different link -- or beside nothing at all.
 pub fn label_at(ends: Ends, around: &[Obstacle]) -> (f32, f32) {
-    let points = way(ends, around);
-    match longest(&points) {
+    label_on(ends, &way(ends, around, &[]))
+}
+
+/// The same, on a route already laid: see [`lay`].
+pub fn label_on(ends: Ends, points: &[(f32, f32)]) -> (f32, f32) {
+    match longest(points) {
         Some((from, to)) => ((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0),
         None => (
             (ends.from.0 + ends.to.0) / 2.0,
@@ -350,7 +427,7 @@ pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
 #[cfg(test)]
 pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
     let (from, to) = (ends.from, ends.to);
-    let points = way(ends, around);
+    let points = way(ends, around, &[]);
     around
         .iter()
         .filter(|b| !holds(b, from) && !holds(b, to))
@@ -363,19 +440,23 @@ pub fn runs_through(ends: Ends, around: &[Obstacle]) -> usize {
 
 /// The points a link's line visits, corners and all.
 ///
-/// Every shape worth trying is laid out and the best is taken. "Best" is three
-/// things in order: it crosses the fewest nodes, it bends the fewest times,
-/// and it is the shortest. Crossings first because a line through a node is a
-/// lie about the graph; bends before length because the lengths of two
-/// orthogonal routes between one pair of points are usually equal, and of two
-/// equal routes the one with fewer turns is the one that can be followed.
-fn way(ends: Ends, around: &[Obstacle]) -> Vec<(f32, f32)> {
+/// Every shape worth trying is laid out and the best is taken. "Best" is four
+/// things in order: it crosses the fewest nodes, it shares the least of its
+/// length with a line already drawn, it bends the fewest times, and it is the
+/// shortest. Crossings first because a line through a node is a lie about the
+/// graph; a shared run before bends because a line hidden under another is a
+/// link a reader takes to be absent, and a corner is a small price for being
+/// visible; bends before length because the lengths of two orthogonal routes
+/// between one pair of points are usually equal, and of two equal routes the
+/// one with fewer turns is the one that can be followed.
+fn way(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -> Vec<(f32, f32)> {
     let boxes = blocking(around, ends.from, ends.to);
     let mut best: Option<Weighed> = None;
 
     for points in shapes(ends, around) {
         let cost: Cost = (
             crossings(&points, &boxes),
+            shared(&points, taken),
             points.len() - 2,
             walked(&points),
         );
@@ -421,15 +502,34 @@ fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
     // Around: out, along a clear row, and back in. The only shape that
     // reaches a target behind its source, and the one a link falls back to
     // when every column between the two is blocked.
+    //
+    // Its two vertical runs are at the stubs, so two links leaving one column
+    // of nodes would run down the same line as each other for as far as they
+    // both go -- which is the overlap this shape used to be the main source
+    // of. Each is offered in lanes as well, stepped *away* from its own node:
+    // outward is clear space, where a step inward would cross the node the
+    // stub belongs to.
+    let outward = if ends.leaves_right { 1.0 } else { -1.0 };
+    let inward = if ends.arrives_right { -1.0 } else { 1.0 };
+    let lanes = |v: f32, sign: f32| -> Vec<f32> {
+        // The stub itself first, then lanes out from it on the grid: the stub
+        // is where the line leaves the node, and moving it is only worth it to
+        // get off another line's track.
+        (0..4).map(|n| v + sign * n as f32 * LANE).collect()
+    };
     for band in rows(y1, y2, around) {
-        tries.push(vec![
-            (x1, y1),
-            (out, y1),
-            (out, band),
-            (in_, band),
-            (in_, y2),
-            (x2, y2),
-        ]);
+        for left in lanes(out, outward) {
+            for right in lanes(in_, inward) {
+                tries.push(vec![
+                    (x1, y1),
+                    (left, y1),
+                    (left, band),
+                    (right, band),
+                    (right, y2),
+                    (x2, y2),
+                ]);
+            }
+        }
     }
 
     tries.iter().map(|points| tidied(points)).collect()
@@ -442,6 +542,11 @@ fn columns(out: f32, in_: f32, around: &[Obstacle]) -> Vec<f32> {
         xs.push(b.x - CLEAR);
         xs.push(b.x + b.width + CLEAR);
     }
+    // And a lane either side of each, and a second one beyond that, so two
+    // links that would run down the same column have somewhere else to go.
+    // After the columns themselves, because the shapes are tried in the order
+    // they are offered and a clear middle is still the route to prefer.
+    xs = laned(xs);
     // Only between the two stubs: a vertical run outside them would double
     // back through the node it just left. Either order, because a leftward
     // link's stubs run the other way about.
@@ -467,6 +572,8 @@ fn rows(y1: f32, y2: f32, around: &[Obstacle]) -> Vec<f32> {
         ys.push(top - ROOM);
         ys.push(bottom + ROOM);
     }
+    // Lanes either side of each, as the columns have: see `laned`.
+    ys = laned(ys);
     // Nothing above the top of the canvas: a run off the edge is a run
     // nobody can see, and the clipping makes it look like a line that stops.
     ys.retain(|y| *y >= CLEAR);
@@ -559,6 +666,87 @@ fn holds(b: &Obstacle, (x, y): (f32, f32)) -> bool {
         && x <= b.x + b.width + 0.5
         && y >= b.y - 0.5
         && y <= b.y + b.height + 0.5
+}
+
+/// The same tracks, and then a lane either side of each, and a second beyond
+/// that.
+///
+/// The tracks themselves first, so a route still prefers the middle of the gap
+/// or the side of a node; the lanes after, in the order a route should try
+/// them -- one lane out either way, then two, and so on to four. Four a side
+/// is twenty-eight pixels, which is as far as a line can be moved and still
+/// read as the line between those two nodes; a ninth line through one gap is a
+/// diagram with something else wrong with it.
+fn laned(tracks: Vec<f32>) -> Vec<f32> {
+    let mut out = tracks.clone();
+    for step in [
+        LANE,
+        -LANE,
+        2.0 * LANE,
+        -2.0 * LANE,
+        3.0 * LANE,
+        -3.0 * LANE,
+        4.0 * LANE,
+        -4.0 * LANE,
+    ] {
+        for track in &tracks {
+            out.push(track + step);
+        }
+    }
+    out
+}
+
+
+/// How far this route runs along a route already drawn, in lane-widths.
+///
+/// Only straight runs on the same track count. Two lines crossing share a
+/// point, which is a crossing and reads as one; two lines on the same track
+/// share a length, and the one drawn first is not on the screen at all. A
+/// shorter coincidence than [`TOUCH`] is not counted, because it is what a
+/// crossing looks like from close up and is not worth a detour.
+///
+/// In lane-widths rather than pixels so that the number is comparable with the
+/// bends it is weighed against: see [`Cost`].
+pub(crate) fn shared(points: &[(f32, f32)], taken: &[Vec<(f32, f32)>]) -> u32 {
+    let mut along = 0.0;
+    for mine in points.windows(2) {
+        for theirs in taken.iter().flat_map(|route| route.windows(2)) {
+            along += together(mine[0], mine[1], theirs[0], theirs[1]);
+        }
+    }
+    (along / LANE) as u32
+}
+
+/// How far two segments run along one another, in pixels.
+fn together(a1: (f32, f32), a2: (f32, f32), b1: (f32, f32), b2: (f32, f32)) -> f32 {
+    let flat = |p: (f32, f32), q: (f32, f32)| (p.1 - q.1).abs() < 0.5;
+    let upright = |p: (f32, f32), q: (f32, f32)| (p.0 - q.0).abs() < 0.5;
+    let run = |lo1: f32, hi1: f32, lo2: f32, hi2: f32| {
+        let shared = hi1.min(hi2) - lo1.max(lo2);
+        if shared > TOUCH {
+            shared
+        } else {
+            0.0
+        }
+    };
+
+    if flat(a1, a2) && flat(b1, b2) && (a1.1 - b1.1).abs() <= LANE {
+        return run(
+            a1.0.min(a2.0),
+            a1.0.max(a2.0),
+            b1.0.min(b2.0),
+            b1.0.max(b2.0),
+        );
+    }
+    if upright(a1, a2) && upright(b1, b2) && (a1.0 - b1.0).abs() <= LANE {
+        return run(
+            a1.1.min(a2.1),
+            a1.1.max(a2.1),
+            b1.1.min(b2.1),
+            b1.1.max(b2.1),
+        );
+    }
+    0.0
 }
 
 /// How many nodes a route runs through.
@@ -727,6 +915,78 @@ mod tests {
         Obstacle::new(x, y, 152.0, 56.0)
     }
 
+    /// Two links that would run along one track are laid along two.
+    ///
+    /// The rule this costs a bend for: two lines on the same track are one
+    /// line on the screen, and the one laid first is not on it at all -- so a
+    /// reader counting the lines out of a node counts one and takes the other
+    /// to be absent. Crossing is fine, and so is touching where they pass;
+    /// what must not happen is a shared *run*.
+    #[test]
+    fn two_lines_do_not_run_along_one_track() {
+        // Two links from two terminals to two others, far enough apart that
+        // nothing forces them together -- and both wanting the same column
+        // down the middle of the gap, which is the shape each prefers.
+        let first = Ends::forward(192.0, 68.0, 560.0, 240.0);
+        let second = Ends::forward(192.0, 120.0, 560.0, 300.0);
+
+        let one = way(first, &[], &[]);
+        // Laid on its own, the second takes the same column as the first:
+        // that is the shape it prefers, and the reason this rule is needed.
+        let alone = way(second, &[], &[]);
+        assert!(
+            shared(&alone, &[one.clone()]) > 0,
+            "the two would share a run if nothing stopped them: {one:?} and \
+             {alone:?}"
+        );
+
+        // Laid against it, it does not.
+        let two = way(second, &[], &[one.clone()]);
+        assert_eq!(
+            shared(&two, &[one.clone()]),
+            0,
+            "laid against the first, the second should share no run with it: \
+             {one:?} and {two:?}"
+        );
+
+        // And it is still a route: orthogonal, from the source to the target.
+        assert_eq!(two.first().copied(), Some(second.from));
+        assert_eq!(two.last().copied(), Some(second.to));
+        for pair in two.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            assert!(
+                (a.0 - b.0).abs() < 0.5 || (a.1 - b.1).abs() < 0.5,
+                "a diagonal crept in: {a:?} to {b:?}"
+            );
+        }
+    }
+
+    /// Crossing costs nothing, and neither does touching where two lines pass.
+    ///
+    /// The distinction the rule rests on. Two lines that cross share a point,
+    /// which reads as a crossing and can be followed through; a line is only
+    /// lost when it shares a length. So a short coincidence is not counted,
+    /// and a route is not bent to avoid one.
+    #[test]
+    fn crossing_is_not_overlapping() {
+        // One across, one down, meeting in the middle: a crossing.
+        let across = vec![(100.0, 200.0), (400.0, 200.0)];
+        let down = vec![(250.0, 100.0), (250.0, 300.0)];
+        assert_eq!(shared(&down, &[across.clone()]), 0, "a crossing is free");
+
+        // Two runs on the same line, overlapping by less than a line's own
+        // width and a little: what a crossing looks like from close up.
+        let brief = vec![(100.0, 200.0), (108.0, 200.0)];
+        assert_eq!(shared(&brief, &[across.clone()]), 0, "a touch is free");
+
+        // And a real shared run, which is not.
+        let along = vec![(150.0, 203.0), (350.0, 203.0)];
+        assert!(
+            shared(&along, &[across]) > 0,
+            "two hundred pixels on the same track is an overlap"
+        );
+    }
+
     /// A route starts at its source and ends at its target.
     ///
     /// The one thing that must be true of every route, whatever shape it took
@@ -788,7 +1048,7 @@ mod tests {
             (0.0, 0.0, 600.0, 120.0, &[node(280.0, 0.0)][..]),
             (600.0, 40.0, 40.0, 240.0, &[node(40.0, 212.0), node(600.0, 12.0)][..]),
         ] {
-            let route_ = way(Ends::forward(x1, y1, x2, y2), around);
+            let route_ = way(Ends::forward(x1, y1, x2, y2), around, &[]);
             for pair in route_.windows(2) {
                 let (from, to) = (pair[0], pair[1]);
                 assert!(
@@ -850,7 +1110,7 @@ mod tests {
 
         // Two nodes level with each other, with a third exactly between them:
         // the one case a straight line would otherwise be drawn for.
-        let route_ = way(Ends::forward(192.0, 68.0, 560.0, 68.0), &around);
+        let route_ = way(Ends::forward(192.0, 68.0, 560.0, 68.0), &around, &[]);
         assert!(
             !through(&route_, &between),
             "the line runs through the node between its ends: {route_:?}"
@@ -879,7 +1139,7 @@ mod tests {
 
         // From the payload's right edge back round to the ground station's
         // left edge, which is the shape of every telemetry link.
-        let route_ = way(Ends::forward(896.0, 188.0, 24.0, 104.0), &around);
+        let route_ = way(Ends::forward(896.0, 188.0, 24.0, 104.0), &around, &[]);
         assert!(
             !through(&route_, &payload),
             "the line runs back through its own source: {route_:?}"
@@ -899,7 +1159,7 @@ mod tests {
     fn a_line_keeps_off_a_node_it_passes() {
         let passed = node(300.0, 100.0);
         let around = [node(40.0, 40.0), passed, node(600.0, 300.0)];
-        let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &around);
+        let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &around, &[]);
 
         let kept = (
             passed.x - CLEAR,
@@ -942,7 +1202,7 @@ mod tests {
     fn a_clear_route_turns_as_little_as_it_can() {
         // Nothing in the way: two turns, which is a Z and the fewest a route
         // that changes height can have.
-        let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &[]);
+        let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &[], &[]);
         assert_eq!(route_.len(), 4, "{route_:?}");
         // Down the middle, so that two links between the same pair of columns
         // do not lie on top of each other.
@@ -993,7 +1253,7 @@ mod tests {
         // A step down, which is a Z the other way about: the first turn is to
         // the *left* of the source, because a stub to its right would run back
         // through the node the line just left.
-        let route_ = way(leftward(400.0, 100.0, 100.0, 200.0), &[]);
+        let route_ = way(leftward(400.0, 100.0, 100.0, 200.0), &[], &[]);
         assert_eq!(route_.len(), 4, "{route_:?}");
         assert!(route_[1].0 < 400.0, "the stub goes left: {route_:?}");
         assert!(route_[1].0 > 100.0, "and not past the target: {route_:?}");
@@ -1021,7 +1281,7 @@ mod tests {
     #[test]
     fn a_route_between_ends_that_face_each_other_goes_around() {
         let facing = Ends::new((200.0, 100.0), (500.0, 220.0), true, false);
-        let route_ = way(facing, &[]);
+        let route_ = way(facing, &[], &[]);
         assert_eq!(route_.first().copied(), Some((200.0, 100.0)), "{route_:?}");
         assert_eq!(route_.last().copied(), Some((500.0, 220.0)), "{route_:?}");
         // Out to the right of the source and in from the right of the target,
@@ -1113,7 +1373,7 @@ mod tests {
         let between = node(280.0, 40.0);
         let around = [node(40.0, 40.0), between, node(560.0, 40.0)];
         let (x1, y1, x2, y2) = (192.0, 68.0, 560.0, 68.0);
-        let route_ = way(Ends::forward(x1, y1, x2, y2), &around);
+        let route_ = way(Ends::forward(x1, y1, x2, y2), &around, &[]);
 
         let on_the_line = |(x, y): (f32, f32)| {
             route_.windows(2).any(|s| {

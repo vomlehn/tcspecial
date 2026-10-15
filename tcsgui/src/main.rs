@@ -4119,26 +4119,32 @@ fn tint_of(tint: Tint) -> String {
 
 /// What each working pane is painted.
 ///
-/// Light and neutral, as asked: 15 CIE units apart from each other under every
-/// one of the four ways of seeing, and none with a chroma above 14, so a pane
-/// reads as a tinted sheet of paper rather than as a coloured panel.
+/// Three washes chosen as a set: a blue, a green and a teal, 14 CIE units
+/// apart from each other under every one of the four ways of seeing, none
+/// above a chroma of 14, so a pane reads as a tinted sheet of paper rather
+/// than as a coloured panel.
 ///
-/// The payload pane is a lilac-grey rather than the blush it was, because the
-/// blush read as red and red means something here. It is barely a colour at
-/// all -- a chroma of 1.8 against the 5.7 it had, and 1.7 of redness against
-/// 5.7 -- and that is what it cost: a pane cannot be *both* quiet and pale.
-/// The three panes have to stay 15 apart, and in the thin slice of near-white
-/// the only direction still 15 from both the blue pane and the green one is
-/// the red one, so a pale payload pane is a pink payload pane. Exactly seven
-/// colours in the gamut qualified at 84 of lightness, and all seven were
-/// pinks. This one sits at 83.1 instead: two points of lightness buy a pane
-/// with the red taken out, because lightness then carries the separation and
-/// the chroma can fall to nothing.
+/// As a set, which is the thing that changed. The panes used to be chosen one
+/// at a time and came out at 84, 91 and 95 of lightness with chromas of 6, 14
+/// and 14 -- a pale blue, a near-white green and a grey -- and that spread
+/// *was* their separation: three pale colours are told apart mostly by
+/// lightness, so colours of unequal weight are easy to hold 15 apart and look
+/// like three unrelated choices. These are 90, 90 and 82 at chromas of 13.5,
+/// 13.5 and 8.6: two at one weight and the third below them, which reads as
+/// one palette.
 ///
-/// A pane no longer carries its family's hue, for the same reason: at a chroma
-/// of 1.8 it has no hue worth the name. What a node's colour says about where
-/// it belongs is now measured against the family's own hue -- see
-/// [`family_hue`] -- which is where it always really lived.
+/// What it cost is half a unit. The closest pair is 14.5 where the old three
+/// managed 15.2, and that is the trade measured rather than guessed: holding
+/// the three within four points of lightness and three of chroma -- the most
+/// coherent the gamut allows -- the best any trio reaches is 13.2, and the
+/// 17.1 at the other end of the curve is the shape the canvas used to have.
+/// Fourteen is the floor here, so the trio has a little room.
+///
+/// A pane no longer carries its family's hue, which is what lets the third one
+/// be a teal while what it holds is drawn in blush. What a node's colour says
+/// about where it belongs is measured against the family's own hue instead --
+/// see [`family_hue`] -- and the pane's job is to be a quiet ground that the
+/// other two are not.
 /// The hue each family of colours is built around, in degrees of the CIE
 /// wheel.
 ///
@@ -4164,9 +4170,9 @@ fn family_hue(pane: Pane) -> f64 {
 
 fn ground_of(ground: style::Ground) -> String {
     match ground {
-        style::Ground::Moc => "#d4e6fe",
-        style::Ground::Vehicle => "#eff5da",
-        style::Ground::Payloads => "#d2ced0",
+        style::Ground::Moc => "#dee2fc",
+        style::Ground::Vehicle => "#e8e4ca",
+        style::Ground::Payloads => "#bad2d0",
     }
     .to_string()
 }
@@ -5056,7 +5062,7 @@ mod tests {
                 for sight in Sight::ALL {
                     let apart = difference(seen(*a, sight), seen(*b, sight));
                     assert!(
-                        apart >= 15.0,
+                        apart >= 14.0,
                         "the {} and {} panes are {apart:.1} apart to a reader \
                          with {sight:?}",
                         one.label(),

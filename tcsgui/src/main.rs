@@ -4103,14 +4103,52 @@ fn tint_of(tint: Tint) -> String {
 ///
 /// Light and neutral, as asked: 15 CIE units apart from each other under every
 /// one of the four ways of seeing, and none with a chroma above 14, so a pane
-/// reads as a tinted sheet of paper rather than as a coloured panel. Each is
-/// the light end of the hue family its nodes are drawn in -- see
-/// `style::Tint` -- which is what makes a node's colour say where it belongs.
+/// reads as a tinted sheet of paper rather than as a coloured panel.
+///
+/// The payload pane is a lilac-grey rather than the blush it was, because the
+/// blush read as red and red means something here. It is barely a colour at
+/// all -- a chroma of 1.8 against the 5.7 it had, and 1.7 of redness against
+/// 5.7 -- and that is what it cost: a pane cannot be *both* quiet and pale.
+/// The three panes have to stay 15 apart, and in the thin slice of near-white
+/// the only direction still 15 from both the blue pane and the green one is
+/// the red one, so a pale payload pane is a pink payload pane. Exactly seven
+/// colours in the gamut qualified at 84 of lightness, and all seven were
+/// pinks. This one sits at 83.1 instead: two points of lightness buy a pane
+/// with the red taken out, because lightness then carries the separation and
+/// the chroma can fall to nothing.
+///
+/// A pane no longer carries its family's hue, for the same reason: at a chroma
+/// of 1.8 it has no hue worth the name. What a node's colour says about where
+/// it belongs is now measured against the family's own hue -- see
+/// [`family_hue`] -- which is where it always really lived.
+/// The hue each family of colours is built around, in degrees of the CIE
+/// wheel.
+///
+/// Declared rather than read off the pane, which is the change the lilac-grey
+/// payload pane forced and an improvement on its own: the rule is that a
+/// node's colour says which pane it belongs in, and a pane with a chroma of
+/// 1.8 has no hue to be said with -- the number its hue comes out as is
+/// arithmetic on a rounding error. The family is the thing that has a hue, and
+/// the bodies and the line of a family are held to it.
+///
+/// The blue the ground station is drawn in, the green of the vehicle's own
+/// graph, and the blush of what it carries. Kept far apart from each other --
+/// the test below says 60 degrees at least -- because two families a reader
+/// cannot tell apart are two families that say nothing about where a node
+/// belongs.
+fn family_hue(pane: Pane) -> f64 {
+    match pane {
+        Pane::Moc => 265.0,
+        Pane::Vehicle => 118.0,
+        Pane::Payloads => 2.0,
+    }
+}
+
 fn ground_of(ground: style::Ground) -> String {
     match ground {
         style::Ground::Moc => "#d4e6fe",
         style::Ground::Vehicle => "#eff5da",
-        style::Ground::Payloads => "#ddced1",
+        style::Ground::Payloads => "#d2ced0",
     }
     .to_string()
 }
@@ -4941,13 +4979,34 @@ mod tests {
                 lightness(node),
                 lightness(ground)
             );
-            // And in the pane's own hue family.
-            let apart = hue_apart(hue(node), hue(ground));
+            // And in its own family's hue, which is declared rather than
+            // read off the pane: a pane may be near enough neutral to have no
+            // hue worth measuring against. See `family_hue`.
+            let apart = hue_apart(hue(node), family_hue(pane));
             assert!(
                 apart <= 40.0,
-                "{}'s hue is {apart:.0} degrees from the {} pane's",
+                "{}'s hue is {apart:.0} degrees from the {} family's",
                 t.spelling(),
                 pane.label()
+            );
+        }
+
+        // The three families, far enough apart that a reader can tell which
+        // one a colour belongs to. Sixty degrees: a hue family spans forty on
+        // either side of its own centre, so anything less would let two
+        // families overlap and a node's colour would stop saying which pane
+        // it belongs in -- which is the whole of what the rule above is for.
+        for (one, two) in [
+            (Pane::Moc, Pane::Vehicle),
+            (Pane::Moc, Pane::Payloads),
+            (Pane::Vehicle, Pane::Payloads),
+        ] {
+            let apart = hue_apart(family_hue(one), family_hue(two));
+            assert!(
+                apart >= 60.0,
+                "the {} and {} families are {apart:.0} degrees apart",
+                one.label(),
+                two.label()
             );
         }
 
@@ -4961,7 +5020,7 @@ mod tests {
             .collect();
         for (pane, ground) in &grounds {
             assert!(
-                lightness(*ground) >= 84.0,
+                lightness(*ground) >= 82.0,
                 "the {} pane is {:.0} light, and a working pane is a light \
                  ground",
                 pane.label(),

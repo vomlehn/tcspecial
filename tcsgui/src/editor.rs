@@ -288,7 +288,7 @@ impl Editor {
             return;
         };
 
-        // Written by `tcsrustgen`, which is the program that turns a
+        // Written by `tcsgen-rust`, which is the program that turns a
         // configuration into Rust: the editor asks whether it is worth doing
         // and then runs it, so that a Makefile and this menu item do the same
         // thing in the same way. The directory is the generator's to make.
@@ -1014,7 +1014,7 @@ tcsgui:
         // the schema tests are when xmllint is absent.
         if !crate::codegen::available() {
             eprintln!(
-                "tcsrustgen is not built: what the editor does with the \
+                "tcsgen-rust is not built: what the editor does with the \
                  generated code was not checked"
             );
             return;
@@ -1032,8 +1032,8 @@ tcsgui:
 
         let written = where_.path().join("generated/vehicle.rs");
         let rust = std::fs::read_to_string(&written).expect("the generated code");
-        assert!(rust.contains("pub fn configuration() -> Graph"), "{rust}");
-        assert!(rust.contains("\"temp_fore\""), "{rust}");
+        assert!(rust.contains("pub fn tcspecial() -> TcSpecial"), "{rust}");
+        assert!(rust.contains("HostPort {"), "{rust}");
         // The path it was written to is not in the code: that is where the
         // code goes, not something the vehicle is told.
         assert!(!rust.contains("rust-code-path"), "{rust}");

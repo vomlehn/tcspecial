@@ -57,7 +57,7 @@ TCSGUI_DATA := $(DESTDIR)$(PREFIX)/share/$(GUI_NAME)
 #
 # The sets live under tests/manual because running one is something a person
 # does at a terminal: each opens sockets or device nodes.
-TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial4
+TCSPECIAL_CONFIG_FILE=tests/manual/tcspecial2
 
 # What the programs log, which every run target passes on. A variable rather
 # than a word in each recipe, so that it can be overridden the way the payload
@@ -491,8 +491,8 @@ distclean: clean
 install: install-data
 	@echo "Installing $(PROJECT_NAME)..."
 	cargo install --path $(PROJECT_NAME)
-	@echo "Installing tcsrustgen..."
-	cargo install --path tcsrustgen
+	@echo "Installing tcsgen-rust..."
+	cargo install --path tcsgen-rust
 
 # Install tcsgui's data: the description tree and the schemas.
 #

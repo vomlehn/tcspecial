@@ -6,13 +6,13 @@
 //! passes the configuration it is editing and the path from the
 //! `rust-code-path` attribute.
 //!
-//! What it writes and why is [`tcsrustgen`]'s own documentation; this is the
+//! What it writes and why is [`tcsgen_rust`]'s own documentation; this is the
 //! command line and nothing else.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: tcsrustgen <configuration file> <rust file>";
+const USAGE: &str = "usage: tcsgen-rust <configuration file> <rust file>";
 
 fn main() -> ExitCode {
     let files: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
@@ -28,7 +28,7 @@ fn main() -> ExitCode {
         }
     };
 
-    match tcsrustgen::generate(configuration, output) {
+    match tcsgen_rust::generate(configuration, output) {
         Ok(()) => {
             // Said, because a program that writes a file somebody named and
             // nothing else leaves them wondering whether it ran. One line, on
@@ -37,7 +37,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(why) => {
-            eprintln!("tcsrustgen: {why}");
+            eprintln!("tcsgen-rust: {why}");
             ExitCode::FAILURE
         }
     }

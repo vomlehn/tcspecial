@@ -1091,41 +1091,62 @@ fn beside(top: &Path, name: &str) -> PathBuf {
     path
 }
 
-/// A whole number with a unit: `us`, `ms` or `s`.
+/// A whole number with a unit: `us`, `ms`, `s`, `d` or `w`.
+///
+/// Microseconds, milliseconds, seconds, days and weeks. The number in front
+/// of the unit is a whole number like every other in these files -- decimal,
+/// or hexadecimal with an `0x` prefix, underscores allowed among the digits --
+/// so `1_000ms`, `0x3e8ms` and `1000ms` are one interval written three ways.
+/// See [`crate::whole`].
 ///
 /// The same grammar version 1 uses for a timeout, deliberately: a reader who
-/// has learned one has learned the other. Nought is refused -- a group read
-/// every nought seconds is a group read as fast as the bus will go, which is
-/// a thing to ask for in words rather than by writing zero.
+/// has learned one has learned the other, and both come through here.
+///
+/// Days and weeks because a housekeeping reading taken once a week is written
+/// `1w` and not `604800s`, and a number nobody can read at a glance is a
+/// number nobody can check. There is no minute and no hour: an interval
+/// between a second and a day is written in seconds, which is the unit the
+/// vehicle's own schedule is in.
+///
+/// Nought is refused -- a group read every nought seconds is a group read as
+/// fast as the bus will go, which is a thing to ask for in words rather than
+/// by writing zero -- and so is an interval too long to hold, which is the
+/// other end of the same mistake.
 pub fn parse_interval(text: &str) -> Result<Duration, String> {
+    const UNITS: [(&str, u64); 5] = [
+        // Longest first, so that the `s` of `ms` is not taken for seconds.
+        ("us", 1),
+        ("ms", 1_000),
+        ("s", 1_000_000),
+        ("d", 86_400 * 1_000_000),
+        ("w", 7 * 86_400 * 1_000_000),
+    ];
+
     let lower = text.trim().to_ascii_lowercase();
+    let (digits, unit, micros) = UNITS
+        .iter()
+        .find_map(|(unit, micros)| {
+            lower
+                .strip_suffix(unit)
+                .map(|digits| (digits, *unit, *micros))
+        })
+        .ok_or_else(|| {
+            format!(
+                "\"{text}\" has no unit: a number followed by us, ms, s, d or w"
+            )
+        })?;
 
-    let (digits, unit) = match lower.strip_suffix("us") {
-        Some(d) => (d, "us"),
-        None => match lower.strip_suffix("ms") {
-            Some(d) => (d, "ms"),
-            None => match lower.strip_suffix('s') {
-                Some(d) => (d, "s"),
-                None => {
-                    return Err(format!(
-                        "\"{text}\" has no unit: a number followed by us, ms or s"
-                    ))
-                }
-            },
-        },
-    };
-
-    let n: u64 = digits
-        .trim()
-        .parse()
+    let n = crate::whole::whole(digits)
         .map_err(|_| format!("\"{text}\" is not a whole number of {unit}"))?;
 
-    let interval = match unit {
-        "us" => Duration::from_micros(n),
-        "ms" => Duration::from_millis(n),
-        _ => Duration::from_secs(n),
-    };
+    // In microseconds throughout, so that a week and a microsecond are the
+    // same arithmetic -- and checked, because seven hundred thousand weeks
+    // overflows the count rather than being an interval anybody meant.
+    let total = n.checked_mul(micros).ok_or_else(|| {
+        format!("\"{text}\" is longer than anything this can keep track of")
+    })?;
 
+    let interval = Duration::from_micros(total);
     if interval.is_zero() {
         return Err(format!("\"{text}\" is no interval at all"));
     }
@@ -1171,14 +1192,43 @@ mod tests {
         assert_eq!(parse_interval("250us").unwrap(), Duration::from_micros(250));
         assert_eq!(parse_interval(" 3s ").unwrap(), Duration::from_secs(3));
 
-        for bad in ["3", "fast", "", "s", "3 seconds", "-1s"] {
+        // The five units, and the two long ones in the terms somebody would
+        // check them in: a day of seconds and a week of days.
+        assert_eq!(parse_interval("1d").unwrap(), Duration::from_secs(86_400));
+        assert_eq!(parse_interval("2w").unwrap(), Duration::from_secs(14 * 86_400));
+        assert_eq!(
+            parse_interval("1w").unwrap(),
+            parse_interval("7d").unwrap(),
+            "a week is seven days"
+        );
+
+        // The number in front of the unit is a whole number like any other:
+        // decimal, hexadecimal, or grouped with underscores. See
+        // crate::whole.
+        for said in ["1000ms", "1_000ms", "0x3e8ms", "0X3E8MS", "1_0_0_0ms"] {
+            assert_eq!(
+                parse_interval(said).unwrap(),
+                Duration::from_millis(1000),
+                "{said}"
+            );
+        }
+
+        for bad in [
+            "3", "fast", "", "s", "3 seconds", "-1s", "1.5s", "1h", "1m", "0b11s",
+        ] {
             assert!(parse_interval(bad).is_err(), "{bad:?} was accepted");
         }
         // Nought is refused rather than taken for "as fast as possible".
-        for zero in ["0s", "0ms", "0us"] {
+        for zero in ["0s", "0ms", "0us", "0d", "0w", "0x0s"] {
             let said = parse_interval(zero).expect_err("nought should be refused");
             assert!(said.contains("no interval at all"), "{said}");
         }
+        // And so is an interval too long to count, which is the same mistake
+        // from the other end: a number that overflowed rather than an
+        // interval anybody meant.
+        let said = parse_interval("0xffffffffffffffffw")
+            .expect_err("a number of weeks past counting should be refused");
+        assert!(said.contains("keep track"), "{said}");
     }
 
     /// A destination names a node, and an input where it says one.

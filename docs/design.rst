@@ -678,6 +678,52 @@ Requirement
     reached over a socket could be any of the four, and guessing which is how a
     stream payload comes to be addressed as datagrams.
 
+Numbers, as a configuration writes them
+---------------------------------------
+
+Every integer in every file this program reads has one grammar, in
+``tcslibgs::whole``: decimal, or hexadecimal with an ``0x`` prefix, with
+underscores anywhere among the digits. ``1000``, ``1_000``, ``0x3e8`` and
+``0X3E8`` are one number written four ways, and the underscores carry no
+meaning beyond grouping digits for a reader.
+
+Hexadecimal because half of these numbers are hardware's own: an I2C address
+is ``0x48`` in every datasheet and ``72`` in none of them, and a configuration
+that made somebody convert it by hand would be a configuration with a
+transcription error in it. Underscores because a number long enough to be
+miscounted is a number somebody will miscount, and they are the convention
+Rust and most other languages already use, so nobody has to learn one here.
+
+No sign. Every integer in these files counts something -- bytes, ports,
+microseconds, retries -- and a negative count is not a value to refuse later
+but a thing to refuse where it is read.
+
+Requirement
+    One grammar, in one place. These numbers were parsed in five places with
+    three slightly different grammars -- one took hex, one did not, one took a
+    sign nothing wanted -- which is three answers to "may I write this in
+    hex", and which answer somebody got depended on which field they were
+    filling in.
+
+Requirement
+    Two different complaints, because they have two different answers: a
+    number that is not one at all, and a number too large for what it is
+    counting. The second names the limit, since "65536 is not a port" is only
+    useful beside "a port is 1 to 65535".
+
+A payload group's ``interval`` is one of those numbers followed by a unit:
+
+.. code-block:: text
+
+   us   microseconds        d   days
+   ms   milliseconds        w   weeks
+   s    seconds
+
+The suffix is matched longest first, so the ``s`` of ``ms`` is not taken for
+seconds, and ``1w`` and ``7d`` are the same interval. An interval of nought is
+refused in every unit: it is no interval at all, and a schedule asking for one
+is a schedule asking to be run again before it has finished.
+
 The logging node
 ----------------
 

@@ -108,9 +108,8 @@ fn the_tcspecial_section_is_what_the_parameters_say() {
     let mut wanted: BTreeSet<String> = BTreeSet::new();
     for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
         // Dotted in the rules, nested in the file: `beacon.send` is `send`
-        // under `beacon`. One of them is not under a subsection at all --
-        // `rust-code-path`, which is about building the software rather than
-        // running it -- and sits at the top of the section.
+        // under `beacon`. One with no dot in it would be an attribute at the
+        // top of the section, which the schema would hold as its own property.
         match attribute.split_once('.') {
             Some((parent, name)) => {
                 wanted.insert(parent.to_string());
@@ -254,6 +253,12 @@ fn every_shipped_xml_file_is_well_formed() {
 /// and compared byte for byte against what it writes, so a reference that
 /// stopped being written would fail here. `example.*` is written by the same
 /// writer from the same function and says the same thing.
+///
+/// Every simulator configuration as well, and those are every one this
+/// repository ships: a payload set's file is the one somebody opens to change
+/// how a simulated payload behaves, which is exactly the editing the schema
+/// is installed for. They name the JSON Schema and no XSD, the editor writing
+/// that file in YAML and nothing else.
 #[test]
 fn every_shipped_configuration_says_which_schema_describes_it() {
     for (file, said) in [
@@ -264,6 +269,26 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
         (
             "tests/manual/thermostat.yaml",
             "../../tcsgui/share/schema/tcspecial.schema.json",
+        ),
+        (
+            "example-sim.yaml",
+            "tcsgui/share/schema/tcspecial-sim.schema.json",
+        ),
+        (
+            "tests/manual/tcspecial1sim.yaml",
+            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
+        ),
+        (
+            "tests/manual/tcspecial2sim.yaml",
+            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
+        ),
+        (
+            "tests/manual/tcspecial3sim.yaml",
+            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
+        ),
+        (
+            "tests/manual/tcspecial4sim.yaml",
+            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
         ),
     ] {
         let path = root().join(file);

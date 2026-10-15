@@ -2096,6 +2096,26 @@ station a new configuration is given is named the same way, by the same
 function, because a name the editor chose should look the same whichever of its
 hands chose it.
 
+Nothing the editor places itself covers a pane's own name. The three names are
+written across the top of the sheet -- "MOC", "Vehicle", "Payloads", one per
+pane at the same height -- and they are what a pane has to say when it is empty
+or when somebody has lost their bearings. A node somebody *drags* over one is
+their own business, the sheet being their drawing; a node the editor put there
+would be the editor covering a name nobody asked it to cover. So the strip they
+sit in is reserved against automatic placement: ``pane::NAMES``, four pixels
+down and sixteen tall, across every pane rather than three strips, because a
+name belongs to a pane and the panes' edges move with their dividers. Sixteen
+for a ten-pixel face is the line box and a pixel, so a node's border does not
+sit on a descender -- minimal in the sense asked for, encompassing the three
+names and nothing else.
+
+It is reserved for everything the editor places, not only for a node placed by
+hand: arranging the whole canvas goes through the same placing, and the ground
+station a new configuration is given is held clear of it by an assertion at
+the constant. A test reads the names' own geometry out of ``main.slint`` and
+holds the reserved strip against it, so a name moved down the sheet cannot
+leave the strip reserved where nothing is written.
+
 A new node goes as high as it will fit in its own pane without covering
 anything, and in view: the highest free place in the part of the sheet the
 window is showing, or failing that the lowest free place above it, or the

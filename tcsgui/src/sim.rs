@@ -258,8 +258,19 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
 pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
     let mut out = String::new();
 
+    // Which schema describes this file, in the spelling a YAML language
+    // server reads. The same thing a configuration says about its own and for
+    // the same reason: a schema an editor has to be pointed at by hand is a
+    // schema nobody points it at. The blank line under it is what keeps it a
+    // note about the file rather than about the first entry -- here it comes
+    // from whatever is written next, each of which opens with one.
+    out.push_str(&format!(
+        "# yaml-language-server: $schema={}\n",
+        crate::nodes::schema_reference(&simulator.path, crate::nodes::SIM_JSON_SCHEMA)
+    ));
+
     if let Some(description) = &simulator.description {
-        out.push_str(&format!("description: {}\n", quoted(description)));
+        out.push_str(&format!("\ndescription: {}\n", quoted(description)));
     }
 
     // Each payload of the configuration, then whatever the file holds for a

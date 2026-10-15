@@ -158,8 +158,8 @@ struct Said {
     attributes: Vec<SaidAttribute>,
     /// The four terminal flags, each absent where a type has not got that one.
     ///
-    /// Hyphenated, as `rust-code-path` is: the words a file holds are the
-    /// words a person writes, and these read as English either way about.
+    /// Hyphenated: the words a file holds are the words a person writes, and
+    /// these read as English either way about.
     #[serde(default, rename = "payload-sink")]
     payload_sink: Option<Scalar>,
     #[serde(default, rename = "payload-source")]
@@ -467,6 +467,12 @@ pub fn schema_in(data: &Path) -> PathBuf {
 /// the names the schemas are installed under.
 pub const CONFIG_XSD: &str = "tcspecial.xsd";
 pub const CONFIG_JSON_SCHEMA: &str = "tcspecial.schema.json";
+
+/// And the JSON Schema that describes a simulator's own file.
+///
+/// No XSD beside it: a simulator configuration is written in YAML, and nothing
+/// writes one in XML.
+pub const SIM_JSON_SCHEMA: &str = "tcspecial-sim.schema.json";
 
 /// How a file written to `destination` says which schema describes it.
 ///

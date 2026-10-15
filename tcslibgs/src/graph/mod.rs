@@ -1118,33 +1118,49 @@ fn beside(top: &Path, name: &str) -> PathBuf {
 
 /// A whole number with a unit: `us`, `ms`, `s`, `d` or `w`.
 ///
-/// Microseconds, milliseconds, seconds, days and weeks. The number in front
-/// of the unit is a whole number like every other in these files -- decimal,
-/// or hexadecimal with an `0x` prefix, underscores allowed among the digits --
-/// so `1_000ms`, `0x3e8ms` and `1000ms` are one interval written three ways.
-/// See [`crate::whole`].
+/// Microseconds, milliseconds, seconds, minutes, hours, days and weeks. The
+/// number in front of the unit is a whole number like every other in these
+/// files -- decimal, or hexadecimal with an `0x` prefix, underscores allowed
+/// among the digits -- so `1_000ms`, `0x3e8ms` and `1000ms` are one interval
+/// written three ways. See [`crate::whole`].
 ///
-/// The same grammar version 1 uses for a timeout, deliberately: a reader who
-/// has learned one has learned the other, and both come through here.
+/// The same shape version 1 uses for a timeout -- a number and a unit, the
+/// number read by the same grammar -- so that a reader who has learned one
+/// has learned the other. A timeout takes only `us`, `ms` and `s` of these
+/// units: there is no read anybody waits an hour for, and a timeout stated in
+/// hours is a configuration that will look like a hang.
 ///
-/// Days and weeks because a housekeeping reading taken once a week is written
-/// `1w` and not `604800s`, and a number nobody can read at a glance is a
-/// number nobody can check. There is no minute and no hour: an interval
-/// between a second and a day is written in seconds, which is the unit the
-/// vehicle's own schedule is in.
+/// Every unit from a microsecond to a week, because a housekeeping reading
+/// taken once a week is written `1w` and not `604800s`, and a number nobody
+/// can read at a glance is a number nobody can check. The same argument
+/// covers the middle of the range: `15m` and `6h` are how a schedule is
+/// discussed, and making somebody write `900s` and `21600s` is making them
+/// do the arithmetic that the mistake hides in.
+///
+/// `m` is minutes and `ms` is milliseconds, which are a thousand-fold apart
+/// and one letter apart. The suffixes are matched longest first, so `500ms`
+/// is five hundred milliseconds and never five hundred metres of anything --
+/// but a typed `m` where `ms` was meant is a reading taken sixty thousand
+/// times less often, and nothing in the file could tell. It is the one place
+/// this grammar lets a slip of a finger past, and it is the price of writing
+/// a quarter of an hour as `15m`.
 ///
 /// Nought is refused -- a group read every nought seconds is a group read as
 /// fast as the bus will go, which is a thing to ask for in words rather than
 /// by writing zero -- and so is an interval too long to hold, which is the
 /// other end of the same mistake.
 pub fn parse_interval(text: &str) -> Result<Duration, String> {
-    const UNITS: [(&str, u64); 5] = [
-        // Longest first, so that the `s` of `ms` is not taken for seconds.
+    const SECOND: u64 = 1_000_000;
+    const UNITS: [(&str, u64); 7] = [
+        // Longest first, so that the `s` of `ms` is not taken for seconds and
+        // the `m` of `ms` is not taken for minutes.
         ("us", 1),
         ("ms", 1_000),
-        ("s", 1_000_000),
-        ("d", 86_400 * 1_000_000),
-        ("w", 7 * 86_400 * 1_000_000),
+        ("s", SECOND),
+        ("m", 60 * SECOND),
+        ("h", 3_600 * SECOND),
+        ("d", 24 * 3_600 * SECOND),
+        ("w", 7 * 24 * 3_600 * SECOND),
     ];
 
     let lower = text.trim().to_ascii_lowercase();
@@ -1157,7 +1173,8 @@ pub fn parse_interval(text: &str) -> Result<Duration, String> {
         })
         .ok_or_else(|| {
             format!(
-                "\"{text}\" has no unit: a number followed by us, ms, s, d or w"
+                "\"{text}\" has no unit: a number followed by us, ms, s, m, h, \
+                 d or w"
             )
         })?;
 
@@ -1217,15 +1234,34 @@ mod tests {
         assert_eq!(parse_interval("250us").unwrap(), Duration::from_micros(250));
         assert_eq!(parse_interval(" 3s ").unwrap(), Duration::from_secs(3));
 
-        // The five units, and the two long ones in the terms somebody would
-        // check them in: a day of seconds and a week of days.
+        // The seven units, the long ones in the terms somebody would check
+        // them in: a minute of seconds, an hour of minutes, a day of hours
+        // and a week of days.
+        assert_eq!(parse_interval("1m").unwrap(), Duration::from_secs(60));
+        assert_eq!(parse_interval("15m").unwrap(), Duration::from_secs(900));
+        assert_eq!(parse_interval("1h").unwrap(), Duration::from_secs(3_600));
+        assert_eq!(parse_interval("6h").unwrap(), Duration::from_secs(21_600));
         assert_eq!(parse_interval("1d").unwrap(), Duration::from_secs(86_400));
         assert_eq!(parse_interval("2w").unwrap(), Duration::from_secs(14 * 86_400));
-        assert_eq!(
-            parse_interval("1w").unwrap(),
-            parse_interval("7d").unwrap(),
-            "a week is seven days"
-        );
+        for (long, short) in [
+            ("1h", "60m"),
+            ("1d", "24h"),
+            ("1w", "7d"),
+            ("1m", "60s"),
+            ("1m", "60000ms"),
+        ] {
+            assert_eq!(
+                parse_interval(long).unwrap(),
+                parse_interval(short).unwrap(),
+                "{long} is {short}"
+            );
+        }
+
+        // The one slip this grammar cannot catch, stated so that a reader of
+        // the test knows it is deliberate: `m` and `ms` differ by a letter
+        // and by a thousand, and the longer suffix wins.
+        assert_eq!(parse_interval("500ms").unwrap(), Duration::from_millis(500));
+        assert_eq!(parse_interval("500m").unwrap(), Duration::from_secs(30_000));
 
         // The number in front of the unit is a whole number like any other:
         // decimal, hexadecimal, or grouped with underscores. See
@@ -1239,12 +1275,12 @@ mod tests {
         }
 
         for bad in [
-            "3", "fast", "", "s", "3 seconds", "-1s", "1.5s", "1h", "1m", "0b11s",
+            "3", "fast", "", "s", "3 seconds", "-1s", "1.5s", "1y", "1min", "0b11s",
         ] {
             assert!(parse_interval(bad).is_err(), "{bad:?} was accepted");
         }
         // Nought is refused rather than taken for "as fast as possible".
-        for zero in ["0s", "0ms", "0us", "0d", "0w", "0x0s"] {
+        for zero in ["0s", "0ms", "0us", "0m", "0h", "0d", "0w", "0x0s"] {
             let said = parse_interval(zero).expect_err("nought should be refused");
             assert!(said.contains("no interval at all"), "{said}");
         }

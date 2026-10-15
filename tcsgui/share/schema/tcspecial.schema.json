@@ -161,7 +161,7 @@
               "boolean",
               "null"
             ],
-            "description": "A whole number with a unit: 500ms, 3s."
+            "description": "A whole number and a unit, written together: 500ms, 3s, 15m, 6h, 1w. The units are us, ms, s, m, h, d and w, matched longest first, so 500ms is milliseconds and 500m is minutes. The number may be decimal or hexadecimal with an 0x prefix, with underscores among the digits: 1_000ms and 0x3e8ms are 1000ms."
           }
         },
         "required": [

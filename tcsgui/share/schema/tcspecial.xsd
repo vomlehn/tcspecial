@@ -163,7 +163,22 @@
     </xs:choice>
   </xs:complexType>
 
-  <!-- A set of payloads read on one interval. -->
+  <!-- A set of payloads read on one interval.
+
+       The interval is a whole number and a unit, written together: `500ms`,
+       `3s`, `15m`, `6h`, `1w`. The units are `us`, `ms`, `s`, `m`, `h`, `d`
+       and `w`, matched longest first, so `500ms` is milliseconds and `500m`
+       is minutes. The number is a whole number as every other in these files
+       is, decimal or hexadecimal with an `0x` prefix, underscores allowed
+       among the digits, so `1_000ms` and `0x3e8ms` are the same interval as
+       `1000ms`.
+
+       A string and not a pattern. What the software accepts is
+       `graph::parse_interval`, and a pattern here would be a second copy of
+       that grammar: the copy would be the one that was wrong, and a schema
+       that refuses a file the software accepts is worse than no schema. An
+       interval that is not one is refused where the file is read, in words
+       that name the units. -->
   <xs:complexType name="payload_group">
     <xs:all>
       <xs:element name="name" type="xs:string"/>

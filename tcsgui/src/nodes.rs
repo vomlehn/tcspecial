@@ -460,6 +460,62 @@ pub fn schema_in(data: &Path) -> PathBuf {
     data.join("schema")
 }
 
+/// The XSD and the JSON Schema that describe a version 2 configuration.
+///
+/// Named here rather than spelled out where a file is written, because a
+/// configuration says which schema describes it and the two names have to be
+/// the names the schemas are installed under.
+pub const CONFIG_XSD: &str = "tcspecial.xsd";
+pub const CONFIG_JSON_SCHEMA: &str = "tcspecial.schema.json";
+
+/// How a file written to `destination` says which schema describes it.
+///
+/// A configuration carries a pointer to its own schema, so that an editor
+/// opening one validates it without being told where the schema is: that is
+/// the whole use of shipping the schemas, and a reference nobody has to set up
+/// by hand is the only kind that gets used.
+///
+/// Relative to the file where the schemas are above it, which is the source
+/// tree, and absolute where they are not, which is everywhere else. Both
+/// spellings are resolved against the file by every tool that reads one, and
+/// the relative one is what keeps a checkout's own examples pointed at the
+/// checkout's own schemas rather than at a copy somebody may not have
+/// installed.
+///
+/// Where no schema can be found at all this still names the installed path:
+/// a file that says where its schema would be is more use to a reader than a
+/// file that says nothing, and the one being written is not the place to
+/// report that this program was not installed.
+pub fn schema_reference(destination: &Path, schema: &str) -> String {
+    // The source tree, from the file outwards. Six levels is past the deepest
+    // a configuration sits in this repository (`tcslibgs/tests/actual`) with
+    // room to spare, and a search without a limit is a search that walks to
+    // the root of the filesystem.
+    let here = destination.parent().unwrap_or(Path::new(""));
+    let mut up = PathBuf::new();
+    let mut back = String::new();
+    for _ in 0..=6 {
+        let candidate = here.join(&up).join("tcsgui/share/schema").join(schema);
+        if candidate.is_file() {
+            return format!("{back}tcsgui/share/schema/{schema}");
+        }
+        up.push("..");
+        back.push_str("../");
+    }
+
+    // Then where installing puts them. Only an absolute answer: `data_dir`
+    // searches the working directory too, and a path relative to wherever the
+    // editor happened to be started is not a fact about the file.
+    if let Some(data) = data_dir().filter(|data| data.is_absolute()) {
+        let installed = schema_in(&data).join(schema);
+        if installed.is_file() {
+            return installed.display().to_string();
+        }
+    }
+
+    format!("/usr/local/share/tcsgui/schema/{schema}")
+}
+
 /// The description tree inside a data directory.
 pub fn nodes_in(data: &Path) -> PathBuf {
     data.join("nodes")

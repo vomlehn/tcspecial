@@ -2,8 +2,8 @@
 <!-- Equivalent to tcspecial.yaml. Both must deserialize into an identical
      PayloadConfig; tests/format_equivalence.rs enforces it.
 
-     Conventions this file must follow, which are what XML and YAML agree on
-     -- a payload configuration may be written in either:
+     Conventions this file must follow, which are what XML and YAML agree
+     on, a payload configuration being writable in either:
        - every value is a child element, never an attribute
        - a sequence is repeated sibling elements named for the field
          (<payloads> here), and the repeats must be contiguous

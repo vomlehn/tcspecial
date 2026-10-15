@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- TCSpecial payload set 1, in the payload configuration language.
 
-     Equivalent to tcspecial1.yaml -- a payload configuration may be
+     Equivalent to tcspecial1.yaml - a payload configuration may be
      written in either format, and both of this set are shipped. The YAML is
      the one to read: it carries the comments.
 

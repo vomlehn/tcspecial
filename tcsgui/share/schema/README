@@ -18,6 +18,14 @@ about meaning rather than shape, they are tested against real buses, and
 refused, and the refusal will say why. See `docs/design.rst`, "What is checked
 before anything runs".
 
+A configuration written by tcsgui already says which schema describes it, so
+an editor opening one needs no setting up: the XML carries
+`xsi:noNamespaceSchemaLocation` on its root element and the YAML carries a
+`# yaml-language-server: $schema=` comment at the top. The path is relative
+where the schemas sit above the file, which is a source tree, and the installed
+path otherwise. What follows is for a file that does not say, or a tool that
+does not look.
+
 A JSON Schema for YAML is not a category error: every YAML document is a JSON
 document in another spelling, and JSON Schema is what editors and language
 servers actually read. Point yours at the file:

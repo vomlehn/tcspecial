@@ -560,8 +560,10 @@ mod tests {
     fn the_shipped_example_is_the_same_in_both_spellings() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let document = read(&root.join("example.yaml")).expect("the example opens");
-        let written = document.to_xml();
         let path = root.join("example.xml");
+        // Written for the place it is going, which is what decides how it
+        // names its schema: see `nodes::schema_reference`.
+        let written = document.to_text(&path).expect("XML is a format this writes");
 
         if std::env::var("TCSGUI_WRITE_EXAMPLE").is_ok() {
             std::fs::write(&path, &written).expect("the example is writable");

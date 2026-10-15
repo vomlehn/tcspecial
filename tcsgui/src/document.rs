@@ -1523,8 +1523,8 @@ impl Document {
     /// One file's worth: the nodes at `home` and the links that start there.
     fn text_for(&self, home: &Home, path: &std::path::Path) -> Result<String, String> {
         match format_of(path)? {
-            Format::Yaml => Ok(self.to_yaml_for(home)),
-            Format::Xml => Ok(self.to_xml_for(home)),
+            Format::Yaml => Ok(self.to_yaml_for(home, path)),
+            Format::Xml => Ok(self.to_xml_for(home, path)),
         }
     }
 
@@ -1546,14 +1546,27 @@ impl Document {
     /// element it belongs to, which is where it is in the YAML as well.
     #[cfg(test)]
     pub fn to_xml(&self) -> String {
-        self.to_xml_for(&None)
+        self.to_xml_for(&None, std::path::Path::new("configuration.xml"))
     }
 
     /// One home's nodes and links, as XML.
-    fn to_xml_for(&self, home: &Home) -> String {
+    ///
+    /// `path` is where the text is going, which the file needs to know only
+    /// to say where its schema is relative to itself. See
+    /// [`crate::nodes::schema_reference`].
+    fn to_xml_for(&self, home: &Home, path: &std::path::Path) -> String {
         let mut out = String::new();
         out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        out.push_str("<configuration>\n    <version>2.0</version>\n");
+        // Which schema describes this file, in the one spelling every XML
+        // tool reads: an editor opening a configuration then validates it
+        // without being set up to.
+        let schema = crate::nodes::schema_reference(path, crate::nodes::CONFIG_XSD);
+        out.push_str("<configuration\n");
+        out.push_str("    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n");
+        out.push_str(&format!(
+            "    xsi:noNamespaceSchemaLocation=\"{schema}\">\n"
+        ));
+        out.push_str("    <version>2.0</version>\n");
         if let Some(description) = &self.description {
             out.push_str(&format!(
                 "    <description>{}</description>\n",
@@ -1741,12 +1754,24 @@ impl Document {
     /// ignores, so that reopening the file finds the diagram as it was left.
     #[cfg(test)]
     pub fn to_yaml(&self) -> String {
-        self.to_yaml_for(&None)
+        self.to_yaml_for(&None, std::path::Path::new("configuration.yaml"))
     }
 
     /// One home's nodes and links, as YAML.
-    fn to_yaml_for(&self, home: &Home) -> String {
+    ///
+    /// `path` is where the text is going, which the file needs to know only
+    /// to say where its schema is relative to itself. See
+    /// [`crate::nodes::schema_reference`].
+    fn to_yaml_for(&self, home: &Home, path: &std::path::Path) -> String {
         let mut out = String::new();
+        // Which schema describes this file, in the spelling a YAML language
+        // server reads -- a comment, YAML having no other way to say it. The
+        // blank line under it is what keeps it a note about the file rather
+        // than about the first entry: see `read::comments_of`.
+        out.push_str(&format!(
+            "# yaml-language-server: $schema={}\n\n",
+            crate::nodes::schema_reference(path, crate::nodes::CONFIG_JSON_SCHEMA)
+        ));
         out.push_str("version: \"2.0\"\n");
         if let Some(description) = &self.description {
             out.push_str(&format!("description: {}\n", quoted(description)));
@@ -3590,7 +3615,10 @@ mod tests {
         document.apply(&add("a", "i2c"));
 
         let yaml = document.to_text(Path::new("graph.yaml")).expect("yaml");
-        assert!(yaml.starts_with("version:"), "{yaml}");
+        // A YAML configuration opens by naming its schema, which is a
+        // comment, and says its version under that.
+        assert!(yaml.starts_with("# yaml-language-server: $schema="), "{yaml}");
+        assert!(yaml.contains("\nversion: \"2.0\"\n"), "{yaml}");
         assert_eq!(
             document.to_text(Path::new("graph.yml")).expect("yml"),
             yaml,
@@ -3658,7 +3686,11 @@ mod tests {
             if path == &xml {
                 assert!(text.starts_with("<?xml"), "{text}");
             } else {
-                assert!(text.starts_with("version:"), "{text}");
+                assert!(
+                    text.starts_with("# yaml-language-server: $schema="),
+                    "{text}"
+                );
+                assert!(text.contains("\nversion: \"2.0\"\n"), "{text}");
             }
             assert!(text.contains("sensor"), "{text}");
         }
@@ -4140,11 +4172,11 @@ mod tests {
         let document = thermostat_example();
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
 
-        for (name, written) in [
-            ("tests/manual/thermostat.yaml", document.to_yaml()),
-            ("tests/manual/thermostat.xml", document.to_xml()),
-        ] {
+        for name in ["tests/manual/thermostat.yaml", "tests/manual/thermostat.xml"] {
             let path = root.join(name);
+            // Written for the place it is going, which is what decides how it
+            // names its schema: see `nodes::schema_reference`.
+            let written = document.to_text(&path).expect("a format this writes");
 
             if std::env::var("TCSGUI_WRITE_EXAMPLE").is_ok() {
                 std::fs::write(&path, &written).expect("the example is writable");

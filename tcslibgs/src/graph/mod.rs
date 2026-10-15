@@ -76,6 +76,31 @@ pub struct GraphFile {
     pub version: String,
     #[serde(default)]
     pub description: Option<String>,
+    /// Which schema describes this file, where the XML spelling says.
+    ///
+    /// Read and ignored. A configuration names its own schema -- that is what
+    /// makes an editor validate one without being set up to -- and in XML the
+    /// way to say so is two attributes on the root element. They are not
+    /// configuration: nothing aboard reads them, and the file means the same
+    /// without them.
+    ///
+    /// Named here because `deny_unknown_fields` is worth keeping: a misspelled
+    /// section is a section the software silently does nothing about, so every
+    /// word a configuration may contain is a word named in this struct. These
+    /// two are words it may contain.
+    /// The namespace declaration, which keeps its prefix.
+    #[serde(default, rename = "@xmlns:xsi")]
+    pub xml_schema_namespace: Option<String>,
+    /// And the schema itself, which does not: the reader resolves a declared
+    /// prefix away, so the attribute arrives under its bare name whatever
+    /// prefix the file bound the namespace to. The prefixed spelling is
+    /// accepted as well, for a file that declares no namespace at all.
+    #[serde(
+        default,
+        rename = "@noNamespaceSchemaLocation",
+        alias = "@xsi:noNamespaceSchemaLocation"
+    )]
+    pub xml_schema_location: Option<String>,
     /// Other files this one is made of, by name without an extension.
     ///
     /// Named rather than discovered. Each is read in the same format as the

@@ -1849,27 +1849,33 @@ blocks sitting on the lines -- rather than as three unrelated colour choices,
 and a line can never be mistaken for a node's own edge. Each step is at least
 eight CIE units, which is "clearly lighter" rather than "possibly lighter".
 
-The payload pane is a **lilac-grey**, not the blush it was: the blush read as
-red, and red means something on this canvas. It is barely a colour at all -- a
-chroma of 1.8 where it was 5.7, and 1.7 of redness where it was 5.7 -- and
-what it cost is two points of lightness, 83.1 against the 84 a pane was held
-to.
+The three panes are chosen **as a set**: a blue, a green and a teal, each a
+wash, 14 CIE units apart from one another under four ways of seeing. That is
+the thing that changed. They used to be chosen one at a time, and came out at
+84, 91 and 95 of lightness with chromas of 6, 14 and 14 -- a pale blue, a
+near-white green and a grey. Three pale colours are told apart mostly by
+*lightness*, so that spread was their separation, and a canvas whose three
+grounds have nothing in common is a canvas that reads as three unrelated
+choices rather than one palette.
 
-That trade is the whole of the problem. The three panes have to stay 15 apart
-under four ways of seeing, and in the thin slice of near-white, low-chroma
-space the only direction still 15 away from both the blue pane and the green
-one is the red one: violet reads as blue to a protanope and teal sits between
-the two. Exactly seven colours in the gamut qualified at 84 of lightness, and
-all seven were pale pinks -- so a pale payload pane *is* a pink payload pane.
-Two points lower, lightness carries the separation instead and the chroma can
-fall to nothing. It is also not the nodes' doing: recomputing the payload
-bodies and the line from the pane was tried first, and changed nothing, since
-the nodes were never the constraint.
+The trade was measured before it was made. Holding the three within four
+points of lightness and three of chroma -- the most coherent the gamut allows
+-- the best floor any trio reaches is 13.2; within six, 13.8; within eight,
+14.6; and with no constraint at all, 17.1, which is the shape the canvas had.
+These three sit at 90, 90 and 82 with chromas of 13.5, 13.5 and 8.6, and their
+closest pair is 14.5 against the 15.2 of the three that came before. Half a
+unit, for a canvas that holds together.
 
-Nothing else moved. The payload line and all fifteen bodies still satisfy
-every rule against the new pane -- the contrasts run 3.3 to 9.5 to one, each
-body is 37 to 67 points below it, and the scheme floor is where it was at 12.2
--- so the diagram is the diagram it was, on a quieter sheet.
+The payload pane being a teal while what it holds is drawn in blush is not an
+oversight: a pane no longer carries its family's hue. Which pane a node
+belongs in is said by the family's own hue -- ``family_hue`` -- and a pane's
+job is to be a quiet ground that the other two are not. What a pane is still
+held to is the rest of it: above 82 of lightness, under a chroma of 14, 8
+clear of both link lines, 10 clear of the window's near-white chrome, and
+light enough that its own family's lightest body keeps three to one against it
+and sits 25 points below it. The contrasts across all fifteen bodies run 3.2
+to 9.4 to one, and the scheme floor for everything a reader must tell apart is
+where it was, at 12.2.
 
 One rule had to change to say what it always meant. A node's colour says which
 pane it belongs in, and that was checked against the *pane's* hue; a pane with

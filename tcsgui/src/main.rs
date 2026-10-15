@@ -57,7 +57,7 @@ use std::rc::Rc;
 
 use slint::{ModelRc, VecModel};
 
-use document::Document;
+use document::{Document, Fault};
 use editor::Editor;
 use pane::{
     confine, dividers_for, edges_of, is_payload, pane_of, percents_for, size_of, Dividers,
@@ -212,7 +212,7 @@ struct Views {
     deleting: Option<DeleteWindow>,
     /// The question about two nodes that share a name, while it is being
     /// asked. See `settle_names`.
-    names: Option<NamesWindow>,
+    names: Option<ProblemsWindow>,
     /// The window that says what went wrong, and what it last said.
     ///
     /// One window, re-pointed: two of them side by side would be two copies of
@@ -646,7 +646,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // before the window runs, because the file cannot be checked or flown
     // until it is answered and every link naming that name is ambiguous
     // meanwhile. See `settle_names`.
-    settle_names(&editor, &views);
+    settle_problems(&editor, &views);
 
     let outcome = ui.run();
 
@@ -1763,6 +1763,105 @@ fn confirm_delete(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node
     }
 }
 
+/// One problem a configuration opened with, and what can be done about it.
+///
+/// Built from the faults the document reports -- see `Document::faults` -- and
+/// narrowed to the ones that are about a *node*: those are the ones there is
+/// something to offer for. A link that names nothing, or a group nobody is in,
+/// is said in the alert and left to the ordinary editing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Trouble {
+    /// Where the node is in the document, which is how a rename reaches the
+    /// right one of two nodes that share a name: see
+    /// `Document::rename_at`.
+    at: Option<usize>,
+    /// What it is called, or nothing where that is the problem.
+    node: String,
+    /// What is wrong, in the words the fault itself uses.
+    said: String,
+    /// Whether a name is the fix: two nodes sharing one, or a node without
+    /// one. Those are the problems the editor can mend by itself, so those
+    /// rows offer a field and a suggestion.
+    nameable: bool,
+}
+
+/// Every problem a configuration opened with that is about a node.
+///
+/// In the order the document holds the nodes, so the list a person reads is
+/// the order the file is in rather than the order the checks happen to run.
+///
+/// A fault about a node that is not there -- a link naming a node the file
+/// does not hold -- is not here: there is no node to offer anything for. It is
+/// still said in the alert.
+fn troubles_of(document: &Document) -> Vec<Trouble> {
+    let sharing = document.sharing_a_name();
+    let mut out: Vec<Trouble> = Vec::new();
+
+    // The duplicates first, by position, because a name two nodes share
+    // cannot say which of them a row is about.
+    for at in sharing {
+        let Some(node) = document.nodes.get(at) else {
+            continue;
+        };
+        out.push(Trouble {
+            at: Some(at),
+            node: node.name.clone(),
+            said: format!(
+                "\"{}\" is the name of two nodes, so a link to it does not say \
+                 which one it means",
+                node.name
+            ),
+            nameable: true,
+        });
+    }
+
+    // Then everything else a fault says about a node, skipping the duplicate
+    // names: they are above, one row per node rather than one per name.
+    for fault in document.faults() {
+        // The duplicates are above, one row per node rather than one per
+        // name; and a problem with a line or with the configuration itself is
+        // not offered anything here -- see `Fault::about_a_node`.
+        if matches!(fault, Fault::DuplicateName { .. }) || !fault.about_a_node() {
+            continue;
+        }
+        let said = fault.describe();
+        match fault.node() {
+            Some(name) => {
+                let at = document
+                    .nodes
+                    .iter()
+                    .position(|node| Qualified::of(&node.name, &node.home).absolute() == name);
+                if at.is_none() {
+                    // A fault about a node the document does not hold: a link
+                    // naming something that is not there. Nothing to offer.
+                    continue;
+                }
+                out.push(Trouble {
+                    at,
+                    node: name.to_string(),
+                    said,
+                    nameable: false,
+                });
+            }
+            None => {
+                // A node with no name at all is a node problem even though
+                // the fault cannot name it: it is the one fault whose node is
+                // found by where it sits.
+                if let Fault::NamelessNode { at } = fault {
+                    let found = document.nodes.iter().position(|node| node.at == at);
+                    out.push(Trouble {
+                        at: found,
+                        node: String::new(),
+                        said,
+                        nameable: true,
+                    });
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Whether a set of proposed names settles the duplicate, and what is wrong
 /// with it if not.
 ///
@@ -1818,60 +1917,67 @@ fn names_settle(
     Ok(())
 }
 
-/// Ask about two nodes that share a name, which a file nothing can fly has.
+/// Ask about the problems a configuration opened with, and offer what can be
+/// done about each.
 ///
-/// Opened when a configuration is read that names a node twice -- see
-/// `Document::sharing_a_name` -- and the renaming it does is not an edit: a
-/// duplicate is the file being unreadable rather than somebody's drawing, so
-/// it is written at once and left out of the history. `Editor::settle_name`
-/// says why at length.
-fn settle_names(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
-    let sharing = editor.borrow().document().sharing_a_name();
-    if sharing.is_empty() {
+/// Shown once, at startup, when the editor has read a file the vehicle could
+/// not fly: a node named twice, a node with no name, a type this build does
+/// not know, attributes that do not hold together. See [`troubles_of`] for
+/// which faults reach this window and which are left to the alert.
+///
+/// Doing nothing is one of the offers, and the window closes with it. A
+/// problem left alone stays a problem -- red on its own node, counted in the
+/// alert, refused by `tcsverify` -- but the node is on the canvas in its own
+/// working pane whatever is decided here, which is what lets somebody look at
+/// the drawing before choosing. An editor that would not show a configuration
+/// until it was correct could not be used to correct one.
+///
+/// Where a name is the fix, the row carries a field and a suggestion: that is
+/// the one kind of problem the editor can mend by itself, and the renaming it
+/// does is not an edit -- see `Editor::settle_name`, which says why a repair
+/// is written at once and kept out of the history. Everything else is
+/// somebody's decision, so the row offers to open the node or to take it out.
+fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    let troubles = troubles_of(editor.borrow().document());
+    if troubles.is_empty() {
         return;
     }
 
-    // What the fields hold: each node's own name to begin with, so a window
-    // opened and closed again changes nothing.
-    let proposed: Rc<RefCell<BTreeMap<usize, String>>> = Rc::new(RefCell::new(
-        sharing
-            .iter()
-            .map(|at| {
-                (
-                    *at,
-                    editor
-                        .borrow()
-                        .document()
-                        .nodes
-                        .get(*at)
-                        .map(|node| node.name.clone())
-                        .unwrap_or_default(),
-                )
-            })
-            .collect(),
-    ));
-
-    let window = match NamesWindow::new() {
+    let window = match ProblemsWindow::new() {
         Ok(window) => window,
         Err(e) => {
-            // The duplicate is still reported as a fault, so this failing is
-            // a quieter editor rather than a broken one.
-            eprintln!("tcsgui: the shared names cannot be asked about: {e}");
+            // Every one of these is still reported as a fault, so this
+            // failing is a quieter editor rather than a broken one.
+            eprintln!("tcsgui: the problems cannot be asked about: {e}");
             return;
         }
     };
 
+    // What the fields hold, by the position of the node each is for: its own
+    // name to begin with, so a window opened and closed again changes
+    // nothing.
+    let proposed: Rc<RefCell<BTreeMap<usize, String>>> = Rc::new(RefCell::new(
+        troubles
+            .iter()
+            .filter(|trouble| trouble.nameable)
+            .filter_map(|trouble| trouble.at.map(|at| (at, trouble.node.clone())))
+            .collect(),
+    ));
+    // And the rows the window is showing, so a press can say which one it was
+    // about after the document has changed under it.
+    let showing: Rc<RefCell<Vec<Trouble>>> = Rc::new(RefCell::new(troubles));
+
     {
         let editor = editor.clone();
         let proposed = proposed.clone();
+        let showing = showing.clone();
         let window = window.as_weak();
         window
             .upgrade()
             .expect("the window exists")
             .on_typed(move |row, said| {
-                let at = match order(&proposed.borrow()).get(row as usize) {
-                    Some(at) => *at,
-                    None => return,
+                let Some(at) = showing.borrow().get(row as usize).and_then(|t| t.at) else {
+                    return;
                 };
                 proposed.borrow_mut().insert(at, said.to_string());
                 if let Some(window) = window.upgrade() {
@@ -1879,28 +1985,40 @@ fn settle_names(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                     // LineEdit takes the focus with it, and somebody typing a
                     // name would have to press the field again for every
                     // letter. Only the answer changes.
-                    say_names(&window, editor.borrow().document(), &proposed.borrow(), false);
+                    say_problems(
+                        &window,
+                        editor.borrow().document(),
+                        &showing.borrow(),
+                        &proposed.borrow(),
+                        false,
+                    );
                 }
             });
     }
     {
         let editor = editor.clone();
         let proposed = proposed.clone();
+        let showing = showing.clone();
         let window = window.as_weak();
         window
             .upgrade()
             .expect("the window exists")
             .on_derive(move |row| {
-                let at = match order(&proposed.borrow()).get(row as usize) {
-                    Some(at) => *at,
-                    None => return,
+                let Some(at) = showing.borrow().get(row as usize).and_then(|t| t.at) else {
+                    return;
                 };
                 let spare = editor.borrow().document().spare_name(at);
                 proposed.borrow_mut().insert(at, spare);
                 if let Some(window) = window.upgrade() {
                     // Rebuilt here, because the field's own text is what
                     // changed: a suggestion nobody can see is no suggestion.
-                    say_names(&window, editor.borrow().document(), &proposed.borrow(), true);
+                    say_problems(
+                        &window,
+                        editor.borrow().document(),
+                        &showing.borrow(),
+                        &proposed.borrow(),
+                        true,
+                    );
                 }
             });
     }
@@ -1908,6 +2026,7 @@ fn settle_names(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let editor = editor.clone();
         let views = views.clone();
         let proposed = proposed.clone();
+        let showing = showing.clone();
         window.on_confirmed(move || {
             let asked = proposed.borrow().clone();
             if names_settle(editor.borrow().document(), &asked).is_err() {
@@ -1919,63 +2038,133 @@ fn settle_names(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                     editor.settle_name(*at, name.trim());
                 }
             }
-            hide_names(&views);
-            views.borrow().refresh(&editor.borrow());
+            // What is left after that, which is the rest of the problems: the
+            // window stays on them rather than closing and leaving somebody
+            // to find them in the alert.
+            again(&editor, &views, &showing, &proposed);
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = showing.clone();
+        window.on_edit(move |row| {
+            let node = showing
+                .borrow()
+                .get(row as usize)
+                .map(|trouble| trouble.node.clone());
+            if let Some(node) = node.filter(|node| !node.is_empty()) {
+                show_node(&editor, &views, &node);
+            }
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        let showing = showing.clone();
+        let proposed = proposed.clone();
+        window.on_remove(move |row| {
+            let node = showing
+                .borrow()
+                .get(row as usize)
+                .map(|trouble| trouble.node.clone());
+            let Some(node) = node.filter(|node| !node.is_empty()) else {
+                return;
+            };
+            // Through the same question any other deletion goes through: a
+            // node and its lines are not taken out on one press, and the
+            // wording that says what goes with it is already written.
+            confirm_delete(&editor, &views, &node);
+            again(&editor, &views, &showing, &proposed);
         });
     }
     {
         let views = views.clone();
-        // Left as they are: the duplicate is reported as a fault like any
-        // other, which is where it was before this window existed. Somebody
-        // who would rather fix it in a text editor should not be held here.
-        window.on_left(move || hide_names(&views));
+        // Doing nothing, which is one of the offers: the problems stay, drawn
+        // in red on their own nodes and counted in the alert, and every node
+        // is on the canvas.
+        window.on_left(move || hide_problems(&views));
     }
 
-    say_names(&window, editor.borrow().document(), &proposed.borrow(), true);
+    say_problems(
+        &window,
+        editor.borrow().document(),
+        &showing.borrow(),
+        &proposed.borrow(),
+        true,
+    );
     if let Err(e) = window.show() {
-        eprintln!("tcsgui: the shared names cannot be asked about: {e}");
+        eprintln!("tcsgui: the problems cannot be asked about: {e}");
         return;
     }
     views.borrow_mut().names = Some(window);
 }
 
-/// The positions the window lists, in the order it lists them.
-fn order(proposed: &BTreeMap<usize, String>) -> Vec<usize> {
-    proposed.keys().copied().collect()
+/// What is left to ask about after something was done about one of them.
+///
+/// The window stays open on the rest rather than closing: a file with four
+/// problems answered one at a time should not need opening four times, and a
+/// problem that has gone should leave the list rather than sit there answered.
+fn again(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    showing: &Rc<RefCell<Vec<Trouble>>>,
+    proposed: &Rc<RefCell<BTreeMap<usize, String>>>,
+) {
+    let left = troubles_of(editor.borrow().document());
+    *showing.borrow_mut() = left.clone();
+    *proposed.borrow_mut() = left
+        .iter()
+        .filter(|trouble| trouble.nameable)
+        .filter_map(|trouble| trouble.at.map(|at| (at, trouble.node.clone())))
+        .collect();
+
+    let window = views.borrow().names.as_ref().map(|window| window.as_weak());
+    if left.is_empty() {
+        hide_problems(views);
+    } else if let Some(window) = window.and_then(|window| window.upgrade()) {
+        say_problems(
+            &window,
+            editor.borrow().document(),
+            &showing.borrow(),
+            &proposed.borrow(),
+            true,
+        );
+    }
+    views.borrow().refresh(&editor.borrow());
 }
 
-/// Put the names into the window, and say whether they settle it.
+/// Put the problems into the window, and say whether the names settle what
+/// they are offered for.
 ///
 /// `rows` says whether the list itself is rebuilt. It is not, for a letter
 /// somebody typed: replacing the model under a LineEdit takes the focus with
 /// it, and a field that had to be pressed again for every letter is the bug
 /// this editor has already had once. See `refilled`.
-fn say_names(
-    window: &NamesWindow,
+fn say_problems(
+    window: &ProblemsWindow,
     document: &Document,
+    showing: &[Trouble],
     proposed: &BTreeMap<usize, String>,
     rows: bool,
 ) {
     if rows {
-        let rows: Vec<NameRow> = order(proposed)
-            .into_iter()
-            .map(|at| {
-                let node = document.nodes.get(at);
-                NameRow {
-                    at: at as i32,
-                    was: node.map(|node| node.name.clone()).unwrap_or_default().into(),
-                    now: proposed.get(&at).cloned().unwrap_or_default().into(),
-                    node_type: node
-                        .map(|node| node.node_type.clone())
-                        .unwrap_or_default()
-                        .into(),
-                    at_said: node
-                        .map(|node| format!("{}, {}", node.at.0, node.at.1))
-                        .unwrap_or_default()
-                        .into(),
-                }
+        let rows: Vec<ProblemRow> = showing
+            .iter()
+            .map(|trouble| ProblemRow {
+                said: trouble.said.clone().into(),
+                node: trouble.node.clone().into(),
+                now: trouble
+                    .at
+                    .and_then(|at| proposed.get(&at))
+                    .cloned()
+                    .unwrap_or_else(|| trouble.node.clone())
+                    .into(),
+                nameable: trouble.nameable && trouble.at.is_some(),
+                there: trouble.at.is_some() && !trouble.node.is_empty(),
             })
             .collect();
+        window.set_any_nameable(rows.iter().any(|row| row.nameable));
         window.set_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
     }
 
@@ -1991,8 +2180,8 @@ fn say_names(
     }
 }
 
-/// Take the question away, whichever way it was answered.
-fn hide_names(views: &Rc<RefCell<Views>>) {
+/// Take the question away, however it was answered.
+fn hide_problems(views: &Rc<RefCell<Views>>) {
     let window = views.borrow_mut().names.take();
     if let Some(window) = window {
         let _ = window.hide();
@@ -4500,6 +4689,116 @@ mod tests {
         // redrawn and no settings file is written: a line nudged by a pixel on
         // a tall column is not a preference.
         assert_eq!(list_shares_after(lists(), Pane::Moc, 2.0, 800.0), lists());
+    }
+
+    /// Every problem about a node is offered, with what can be done about it.
+    ///
+    /// The list the startup window is built from: one row per problem, the
+    /// ones a name can mend marked as such, and nothing for a fault that
+    /// names no node the document holds -- there would be nothing to offer.
+    #[test]
+    fn every_problem_with_a_node_is_offered() {
+        let mut document = Document::new();
+        // A node named twice, a node of a type this build does not know, and
+        // a link to a node that is not there.
+        for (name, node_type) in [("i2c", "i2c"), ("i2c", "i2c"), ("odd", "contraption")] {
+            document.apply(&Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+        }
+        document.apply(&Edit::AddLink {
+            link: Link::new("i2c", "nowhere", None),
+        });
+
+        let troubles = troubles_of(&document);
+        let said = |which: &str| {
+            troubles
+                .iter()
+                .filter(|t| t.node == which)
+                .map(|t| t.said.clone())
+                .collect::<Vec<_>>()
+        };
+
+        // Both nodes of the shared name, because the file does not say which
+        // of them was meant, and each by its own position so a rename can
+        // reach it.
+        let shared: Vec<&Trouble> = troubles.iter().filter(|t| t.node == "i2c").collect();
+        assert_eq!(shared.len(), 2, "{troubles:?}");
+        assert_eq!(shared[0].at, Some(0));
+        assert_eq!(shared[1].at, Some(1));
+        assert!(shared.iter().all(|t| t.nameable), "a name is the fix");
+
+        // The unknown type is offered, and a name is not the fix for it.
+        let odd: Vec<&Trouble> = troubles.iter().filter(|t| t.node == "odd").collect();
+        assert!(!odd.is_empty(), "the unknown type should be offered");
+        assert!(odd.iter().all(|t| !t.nameable && t.at == Some(2)));
+        assert!(
+            odd[0].said.contains("contraption"),
+            "it should say what the type was: {}",
+            odd[0].said
+        );
+
+        // And nothing for the link to a node that is not there: there is no
+        // node to open or to take out. It is still said in the alert.
+        assert!(
+            troubles.iter().all(|t| t.node != "nowhere"),
+            "a fault about a node the document has not got: {troubles:?}"
+        );
+        assert!(
+            said("nowhere").is_empty() && !document.faults().is_empty(),
+            "the fault is still reported, it is just not offered a fix"
+        );
+        // Nor is the link fault offered against the node it leaves: what is
+        // wrong there is the line.
+        assert_eq!(
+            troubles.len(),
+            3,
+            "two shared names and one unknown type, and nothing for the \
+             dangling link: {troubles:?}"
+        );
+    }
+
+    /// Doing nothing leaves the node on the canvas, in its own working pane.
+    ///
+    /// The offer the window closes with, and the reason it can be offered: a
+    /// node the editor cannot make sense of is still drawn, still in the pane
+    /// its type belongs to, and still marked. An editor that would not show a
+    /// configuration until it was correct could not be used to correct one.
+    #[test]
+    fn a_node_nobody_fixed_is_still_drawn_in_its_pane() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\nvehicle:\n  - name: odd\n    type: contraption\n",
+        )
+        .expect("a configuration naming a type this build has not got");
+
+        let editor = Editor::open(&path, dividers());
+        assert!(
+            !troubles_of(editor.document()).is_empty(),
+            "the unknown type should be a problem"
+        );
+
+        // On the canvas, in the vehicle pane -- which is where a type nothing
+        // knows goes, because the two other panes mean something about what a
+        // node is and this says nothing.
+        let (nodes, _) = views_of(&editor, &None, None);
+        let drawn = nodes
+            .iter()
+            .find(|view| view.name == "odd")
+            .expect("the node should be drawn");
+        assert!(drawn.faulty, "and marked as the problem it is");
+        assert_eq!(pane_of("contraption"), Pane::Vehicle);
+        let (left, right) = pane::pane_for("contraption", dividers());
+        let at = editor.document().node("odd").expect("the node").at;
+        assert!(
+            at.0 >= left && at.0 <= right,
+            "a node nobody fixed should sit in its own pane: {at:?} against \
+             {left}..{right}"
+        );
     }
 
     /// A set of names settles a duplicate only if all of them are different,

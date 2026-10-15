@@ -1894,14 +1894,29 @@ that and is not light enough: the payload pane is the darkest of the three at
 the floor for text somebody has to read. White clears 4.5 to one against every
 body, and a test says so.
 
+Each link line is a **darker shade of the pane its data comes from**. The
+payload's own readings start in the payload pane and generally end at the
+ground, so that line is a teal taken from the teal pane they leave; what the
+ground sends starts in the moc pane and ends at a payload, so that line is a
+darker blue. A reader can then see where a line's data started without
+following it back, and the hue is held within twenty degrees of its own pane's
+by a test.
+
+"A bit darker" turned out to be twenty-four and thirty-two points, and the
+reason is worth writing down. A line has to stay eight points above the
+lightest node body, which puts its floor at 57.4 of lightness; and it has to be
+seen on a pane at 90, which puts the lightest usable shade at 58.2. The two
+meet, with nothing in between: anything lighter reaches about 1.3 to one
+against its own pane and vanishes, and nothing in the gamut reaches 2.5 to one
+at all while staying clear of the bodies. So both lines sit at 58.2 -- as light
+as a line can be here -- and the panes they are shades of are simply much
+paler than they are.
+
 A link line also has to be unmistakable from the fault red, which is the one
-colour that means something on its own. The payload line was a dusty red at
-hue 23 -- the fault's own side of the family, 27 CIE units from it, which is
-"another colour" to measure and "something is wrong with that line" to look
-at. The family is the reddish one and the line cannot leave it without
-stopping saying which stream it carries, so it went to the far side of it
-instead: a mauve at hue 333, 53 units from the fault red, at the same
-lightness and the same contrast against the panes as before. The floor is 35,
+colour that means something on its own. The payload line was once a dusty red at
+hue 23 -- the fault's own side of the colour space, 27 CIE units from it, which
+is "another colour" to measure and "something is wrong with that line" to look
+at. It is a teal now, 42 units away, and the ground's line is a blue at 80. The floor is 35,
 asked under each of the four ways of seeing, and it is a floor for lines only.
 A node body is not held to it: a faulty node is drawn in the fault's colour
 *and* in the one shape no real type uses, so a dark green body can exist

@@ -1864,6 +1864,18 @@ win it back leaves each colour's name describing a colour it no longer is. The
 bodies are a *range* of shades instead, spanning 33 units from the lightest to
 the darkest, and what separates any two of them is the floor above.
 
+The directory a configuration goes in is made if it is not there. A name the
+editor is started on need not exist -- that is how a new configuration is
+begun -- and a name in a directory that does not exist is the same intention
+one level up. Without that, every write of the session failed: the editor
+saves each edit as it is made, so somebody who named a path with a new
+directory in it got a window that worked, an alert about the first edit, and
+nothing on the disk. All the missing components are made, since a path
+somebody typed may name several. A directory that cannot be made at all --
+usually a file in the way of one -- is its own kind of failure with its own
+sentence, because its answer is different: the others are answered by freeing
+space or by waiting, and this one by naming a directory that can exist.
+
 Nothing is raised about a configuration that is one node or none. A new
 configuration opens with the ground station already in it, and the moment that
 node exists every rule above has something to say about it: nothing is linked

@@ -170,6 +170,33 @@ pub fn pane_of(node_type: &str) -> Pane {
     }
 }
 
+/// The strip across the top of the sheet that the panes' own names are
+/// written in.
+///
+/// `(top, height)` in the coordinates the file holds, spanning every pane: the
+/// three names sit at the same height, four pixels down, in the small italic
+/// -- see the `Text` elements at the top of `Surface` in `main.slint`, which a
+/// test holds these numbers against.
+///
+/// Nothing the editor places itself goes here. A node may still be *dragged*
+/// over a name -- it is somebody's drawing and the editor does not own the
+/// sheet -- but a node the editor put there would cover a name nobody asked
+/// it to cover, and the name is what a pane has to say when it is empty or
+/// when somebody has lost their bearings.
+///
+/// Sixteen pixels for a ten-pixel face: the line box of the small type and a
+/// pixel, so that a node's border does not sit on a descender. Minimal in the
+/// sense asked for -- it encompasses the three names and nothing else -- and
+/// across the whole width rather than three strips, because a name belongs to
+/// a pane and the panes' edges move with their dividers.
+pub const NAMES: (i32, i32) = (4, 16);
+
+/// That strip as a rectangle, for the placing to keep off.
+fn names_strip() -> (i32, i32, u32, u32) {
+    let (top, height) = NAMES;
+    (0, top, WORKING_WIDTH as u32, height as u32)
+}
+
 /// Where a node of this type may sit: the leftmost and rightmost x.
 ///
 /// The right-hand bound allows for the node's own width, so a node confined to
@@ -251,13 +278,18 @@ pub fn place_in(
     let right = right.max(left);
     let bottom = WORKING_HEIGHT - height as i32;
 
+    // What is already drawn, and the strip the panes' names are written in:
+    // nothing the editor places itself covers a name. See `NAMES`.
     let clear = |x: i32, y: i32| {
-        !taken.iter().any(|(theirs, tall, their_width, their_height)| {
-            x < theirs + *their_width as i32
-                && *theirs < x + width as i32
-                && y < tall + *their_height as i32
-                && *tall < y + height as i32
-        })
+        !taken
+            .iter()
+            .chain(std::iter::once(&names_strip()))
+            .any(|(theirs, tall, their_width, their_height)| {
+                x < theirs + *their_width as i32
+                    && *theirs < x + width as i32
+                    && y < tall + *their_height as i32
+                    && *tall < y + height as i32
+            })
     };
     let across = |y: i32| {
         let mut x = left;

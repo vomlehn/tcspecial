@@ -4,97 +4,48 @@
     <description>One payload on a UDP link, its telemetry going to the ground</description>
     <tcspecial>
         <beacon>
-            <interval_ms>5000</interval_ms>
-            <recv>127.0.0.1:5650</recv>
-            <send>0.0.0.0:5550</send>
+            <interval_ms>1000</interval_ms>
         </beacon>
-        <log>
-            <directory>/var/log/tcspecial</directory>
-            <segment_size>65536</segment_size>
-        </log>
-        <payload_command>
-            <dest_base>0.0.0.0:4200</dest_base>
-            <source_base>127.0.0.1:4300</source_base>
-        </payload_command>
-        <payload_telemetry>
-            <dest_base>127.0.0.1:6100</dest_base>
-            <source_base>0.0.0.0:6000</source_base>
-        </payload_telemetry>
-        <rust-code-path>t.rs</rust-code-path>
-        <tcs_cmd>
-            <recv>0.0.0.0:4000</recv>
-            <send>127.0.0.1:4100</send>
-        </tcs_cmd>
     </tcspecial>
     <payload_groups>
         <name>every_second</name>
         <interval>1s</interval>
     </payload_groups>
-    <!-- The ground. tcspecial waits at this address for a ground station to speak -->
-    <!-- to it, and sends telemetry back where the datagrams came from. -->
     <moc>
-        <name>moc</name>
+        <name>moc-1</name>
         <type>moc</type>
-        <address>127.0.0.1</address>
-        <port>5000</port>
+        <moc-out><target>can-1</target></moc-out>
+        <payload-in>true</payload-in>
     </moc>
     <vehicle>
-        <name>mean</name>
+        <name>hysteresis-1</name>
         <type>compute</type>
-        <function>mean</function>
-        <moc-out><target>payload</target></moc-out>
-        <payload-in>true</payload-in>
+        <function>hysteresis</function>
     </vehicle>
-    <vehicle>
-        <name>mean-2</name>
-        <type>compute</type>
-        <function>mean</function>
-        <payload-in>true</payload-in>
-    </vehicle>
-    <!-- The payload: software or a device that sends a datagram a second. -->
-    <!--  -->
-    <!-- tcspecial binds this address and the payload sends to it. That is the way -->
-    <!-- round a datagram link has to work: a UDP connect sends nothing, so a -->
-    <!-- payload waiting to be reached would hear nothing and - producing data -->
-    <!-- because it is running rather than because it was asked - would have -->
-    <!-- nowhere to send it. The payload speaks first, and tcspecial learns where -->
-    <!-- it is from the datagram that arrives. -->
-    <!--  -->
-    <!-- The second is the group&apos;s: the link is read once a second, and once a -->
-    <!-- second the trigger below is sent to ask for the next reading. -->
-    <!--  -->
-    <!-- The trigger is also what allows the downward link at all. A payload that -->
-    <!-- is read is asked for its readings, and the bytes that ask are its -->
-    <!-- trigger - so a payload that states none is one the configuration -->
-    <!-- describes as only read, and `tcsverify` refuses a link delivering into -->
-    <!-- it. One byte here; a real payload&apos;s would be whatever its own protocol -->
-    <!-- asks with. -->
     <payloads>
-        <name>payload</name>
-        <type>network</type>
-        <address>127.0.0.1</address>
-        <group>every_second</group>
-        <port>5100</port>
-        <protocol>udp</protocol>
-        <trigger>01</trigger>
-        <payload-out><target>mean</target><input>payload-in</input></payload-out>
+        <name>can-1</name>
+        <type>can</type>
+        <payload-out><target>moc-1</target></payload-out>
         <moc-in>true</moc-in>
     </payloads>
     <payloads>
-        <name>i2c</name>
-        <type>i2c</type>
+        <name>can-2</name>
+        <type>can</type>
     </payloads>
     <payloads>
-        <name>i2c-2</name>
-        <type>i2c</type>
-        <payload-out><target>mean-2</target><input>payload-in</input></payload-out>
+        <name>can-3</name>
+        <type>can</type>
+    </payloads>
+    <payloads>
+        <name>rpmsg-1</name>
+        <type>rpmsg</type>
     </payloads>
     <tcsgui>
-        <nodes><name>moc</name><x>24</x><y>128</y></nodes>
-        <nodes><name>mean</name><x>368</x><y>176</y></nodes>
-        <nodes><name>mean-2</name><x>280</x><y>408</y></nodes>
-        <nodes><name>payload</name><x>728</x><y>40</y></nodes>
-        <nodes><name>i2c</name><x>648</x><y>456</y></nodes>
-        <nodes><name>i2c-2</name><x>608</x><y>600</y></nodes>
+        <nodes><name>moc-1</name><x>0</x><y>192</y></nodes>
+        <nodes><name>hysteresis-1</name><x>208</x><y>136</y></nodes>
+        <nodes><name>can-1</name><x>672</x><y>96</y></nodes>
+        <nodes><name>can-2</name><x>672</x><y>208</y></nodes>
+        <nodes><name>can-3</name><x>664</x><y>328</y></nodes>
+        <nodes><name>rpmsg-1</name><x>640</x><y>472</y></nodes>
     </tcsgui>
 </configuration>

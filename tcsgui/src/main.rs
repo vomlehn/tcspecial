@@ -133,6 +133,9 @@ fn divider_range(document: &Document, dividers: Dividers, which: Pane) -> (i32, 
 ///
 /// The upper left of the vehicle working pane, clear of the pane's own label.
 const MOC_PLACE: (i32, i32) = (24, 40);
+// Clear of the strip the panes' names are written in, as everything the
+// editor places is: see `pane::NAMES`, which the test below holds this to.
+const _: () = assert!(MOC_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
 
 /// Every window currently showing part of the document.
 ///
@@ -7128,6 +7131,91 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// Nothing the editor places itself covers a pane's own name.
+    ///
+    /// The names are written across the top of the sheet -- "MOC", "Vehicle",
+    /// "Payloads", one per pane at the same height -- and they are what a pane
+    /// has to say when it is empty or when somebody has lost their bearings.
+    /// A node somebody *drags* there is their own business; one the editor put
+    /// there would be the editor covering a name nobody asked it to cover.
+    ///
+    /// The strip is written down in `pane::NAMES` and drawn in `main.slint`,
+    /// so this reads the markup and holds the two against each other: a name
+    /// moved down the sheet without this would leave the strip reserved where
+    /// nothing is written.
+    #[test]
+    fn nothing_placed_by_the_editor_covers_a_panes_name() {
+        let markup = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+        )
+        .expect("the markup this binary was built from");
+
+        // The three names, each at the same height, in the small face.
+        for name in ["\"MOC\"", "\"Vehicle\"", "\"Payloads\""] {
+            let at = markup
+                .split(&format!("text: {name};"))
+                .next()
+                .expect("the markup names the panes");
+            let said = at.rsplit("y:").next().expect("a y for the name");
+            assert!(
+                said.trim_start().starts_with("Space.tight"),
+                "the {name} label is no longer at Space.tight, so pane::NAMES \
+                 is out of date"
+            );
+        }
+        for said in [
+            "out property <length> tight: 4px;",
+            "out property <length> small: 10px;",
+        ] {
+            assert!(
+                markup.contains(said),
+                "the markup no longer says {said:?}, so pane::NAMES is out of \
+                 date"
+            );
+        }
+        let (top, height) = pane::NAMES;
+        assert_eq!(top, 4, "the names sit at Space.tight");
+        assert!(
+            height >= 13,
+            "a ten-pixel line wants thirteen pixels of box, and the strip is \
+             {height}"
+        );
+
+        // On an empty canvas, scrolled to the top of the sheet, every type
+        // goes below the strip rather than over it.
+        for kind in NodeType::ALL {
+            let at = pane::place_in(&[], kind.spelling(), dividers(), (0, 700));
+            assert!(
+                at.1 >= top + height,
+                "{} was placed at {at:?}, which covers the pane names at \
+                 {top}..{}",
+                kind.spelling(),
+                top + height
+            );
+        }
+
+        // And so does every node of an arrangement, which lays the whole
+        // canvas out at once.
+        let where_ = tempfile::tempdir().expect("a directory");
+        let mut editor = Editor::open(&where_.path().join("vehicle.yaml"), dividers());
+        for (name, kind) in [("a", "i2c"), ("b", "i2c"), ("c", "compute"), ("d", "moc")] {
+            editor.edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: kind.to_string(),
+                home: None,
+            });
+        }
+        editor.arrange(dividers());
+        for node in &editor.document().nodes {
+            assert!(
+                node.at.1 >= top + height,
+                "{} was arranged at {:?}, which covers the pane names",
+                node.name,
+                node.at
+            );
         }
     }
 

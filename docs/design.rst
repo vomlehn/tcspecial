@@ -2015,26 +2015,44 @@ none belongs to a third node, since a repair that left the same question
 standing would be no answer; what is wrong with the names is said under the
 list rather than beside a row, so the list does not shift as somebody types.
 
-**Doing nothing is one of the offers**, and the window closes with it. A
-problem left alone stays a problem -- drawn in red on its own node, counted in
-the alert, refused by ``tcsverify`` -- but **the node is on the canvas in its
-own working pane whatever is decided here**, which is what lets somebody look
-at the drawing before choosing. A type nothing knows goes in the vehicle pane,
-the two others meaning something about what a node *is* where that type says
-nothing. An editor that would not show a configuration until it was correct
-could not be used to correct one.
+**Every fault gets a row.** A problem with no row went to the alert on its
+own, which says what is wrong and offers nothing -- and an alert with nothing
+to press is a complaint rather than a question. So a line that goes nowhere
+offers *delete the line*, a group with nothing in it offers *delete the
+group*, and a ``tcspecial`` parameter that does not hold together offers *edit
+the parameters*, which opens that window. The line whose removal is offered is
+the one the document holds, origin and input included, because that is what a
+removal is matched by.
+
+**Doing nothing is one of the offers, and there are two of them.** *Leave this
+one* closes the window on that problem. *Ignore them all* answers every
+remaining problem at once, which is what somebody opening a file to look at it
+wants: **the nodes are added as they stand**, the faults stay faults -- drawn
+in red on their own nodes, refused by ``tcsverify`` -- and nothing says any of
+it again for the rest of the session.
+
+That last part is a decision about the session and not about the file, which is
+worth stating. A judgement about a *concern* is written into the file, since
+somebody else reading the drawing should see what was decided; nobody should
+inherit somebody else's decision to ignore an error, so this one is forgotten
+when the editor closes. A fault that goes away and comes back is raised again,
+the set being kept by what each one says.
+
+Either way **the node is on the canvas in its own working pane**, which is what
+lets somebody look at the drawing before choosing. A type nothing knows goes in
+the vehicle pane, the two others meaning something about what a node *is* where
+that type says nothing. An editor that would not show a configuration until it
+was correct could not be used to correct one.
 
 Answering one problem leaves the window on the rest rather than closing it: a
 file with four problems should not need opening four times, and one that has
 been mended should leave the list rather than sit there answered.
 
-What does *not* reach that window is a problem with a line or with the
-configuration as a whole -- a line that goes nowhere, two lines into one
-input, a group with nothing in it, a ``tcspecial`` parameter that does not hold
-together. A line fault names a node, because that is where it is drawn, so
-"names a node" is not the test; ``Fault::about_a_node`` is. Those are said in
-the alert and mended by the ordinary editing, there being nothing a row could
-offer for them.
+And the alert says nothing about the state the file arrived in. Both windows
+used to open on a file with problems -- one that offered something and one that
+offered nothing -- so what the file came with is counted as said before either
+is shown. What the alert is for afterwards is what goes wrong *while somebody
+works*, which is news.
 
 Renaming one of two nodes that share a name is done **by position**, which is
 the one thing ``Edit::RenameNode`` cannot express: a name is how an edit says

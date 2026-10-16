@@ -1,0 +1,8 @@
+[package]
+name = "app_all_pl"
+version = "0.1.0"
+edition = "2021"
+description = "A test app for the tcspecial node type app_all_pl"
+
+[dependencies]
+tcsapp = { path = "../tcsapp" }

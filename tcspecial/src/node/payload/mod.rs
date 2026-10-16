@@ -5,6 +5,12 @@
 //! part that changes between missions, which is why the tree is divided this
 //! way.
 //!
+//! Two of these are payloads that are not devices: `app_pl` and `app_all_pl`
+//! are programs the mission wrote, run by tcspecial and read the way a sensor
+//! is read. What a file may say about either is `tcslibgs::node::app`, that
+//! rule being one rule for all five app node types, and the interfaces their
+//! programs are run with are `tcsapp`.
+//!
 //! `network` is here and serves two sections: a network payload and the ground
 //! link are the same endpoint code, a socket being a socket whichever end of
 //! the mission is at the other end of it. That is why there is no `moc`
@@ -20,3 +26,7 @@ pub mod rpmsg;
 pub mod serial;
 pub mod network;
 pub mod device_file;
+// A payload that is a program rather than a device: one that is asked for a
+// reading, and one that is never asked.
+pub mod app_all_pl;
+pub mod app_pl;

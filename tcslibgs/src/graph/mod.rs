@@ -507,6 +507,11 @@ impl Node {
     /// recognises is not a payload: a misspelled type is already refused by
     /// name, and counting it as a payload would pile a second complaint on
     /// top of the one that says what is actually wrong.
+    ///
+    /// A payload need not be a device. Two of the app node types are payloads
+    /// -- a payload that is a program rather than something on a bus -- and
+    /// which app kinds those are is `crate::node::app`'s to say rather than a
+    /// second list here: see [`crate::node::app::Kind::is_payload`].
     pub fn is_payload(&self) -> bool {
         Node::is_payload_type(&self.node_type)
     }
@@ -527,7 +532,8 @@ impl Node {
                 | "network"
                 | "device-file"
                 | "gpio"
-        )
+        ) || crate::node::app::Kind::of(node_type)
+            .is_some_and(|kind| kind.is_payload())
     }
 }
 

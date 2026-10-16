@@ -134,13 +134,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "rust-code-path": {
-          "description": "Where tcsgui writes the Rust it generates from this configuration, relative to the configuration's own directory or absolute. The one attribute of this section that is about building the software rather than about running it: nothing aboard reads it.",
-          "type": [
-            "string",
-            "null"
-          ]
         }
       },
       "additionalProperties": false

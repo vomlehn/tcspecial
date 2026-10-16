@@ -1,0 +1,28 @@
+# A program of the vehicle's own that takes readings and answers with commands.
+#
+# A vehicle node: part of the telemetry and control system itself rather than
+# something bolted to the vehicle. It is run with one file interface, on which
+# it reads payload data and writes MOC data -- so it takes what travels
+# groundward and answers with what travels vehicleward, which is the shape the
+# ground link has and the thing an app of this kind stands in for. The
+# interfaces and the packets they carry are tcsapp; its Rust is
+# tcspecial/src/node/vehicle/app_payload_veh/.
+node: app_payload_veh
+type: app_payload_veh
+about: >
+  A program of its own: it reads payload data and writes MOC data.
+payload-sink: true
+payload-source: false
+moc-sink: false
+moc-source: true
+attributes:
+  - name: program
+    required: true
+    about: >
+      The program to run. It is started when the configuration is loaded, so
+      one that cannot be executed is a fault found on the ground.
+  - name: restart
+    required: false
+    about: >
+      What to do when it stops: never, which is the default, or a number of
+      times to start it again.

@@ -35,7 +35,7 @@ use tcslibgs::graph::Graph;
 
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
-use crate::runtime::port::{ComputePort, EndpointPort, LogPort, NullPort, Use};
+use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, Use};
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
 
@@ -298,6 +298,13 @@ pub fn open(
         // A node that carries both streams through and does nothing to what
         // passes. Nothing is opened for it: it is not an interface.
         "null" => Ok(Box::new(NullPort::of(&node.name))),
+        // A node whose work is a program, started here and talked to over the
+        // file interfaces `tcsapp` describes. Three of the five kinds are the
+        // vehicle's own and two are payloads -- a payload that is a program
+        // rather than a device -- and one port holds any of them.
+        other if tcslibgs::node::app::Kind::of(other).is_some() => {
+            Ok(Box::new(AppPort::open(node)?))
+        }
         // Everything else is reached over an interface, and what a node says
         // about reaching it is tcslibgs::graph::reach's business.
         _ => Ok(Box::new(EndpointPort::open(node, routes)?)),
@@ -319,6 +326,14 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
                 "compute" => "computes".to_string(),
                 "log" => "writes a log".to_string(),
                 "null" => "passes what arrives through".to_string(),
+                // An app node is a program of its own, and what it does with
+                // what arrives is in that program: nothing here can say more
+                // than which of the two streams it is run with, which its type
+                // already says. See `crate::node::vehicle::app_payload_veh`
+                // and its four neighbours.
+                other if tcslibgs::node::app::Kind::of(other).is_some() => {
+                    "runs a program of its own".to_string()
+                }
                 _ => match Use::of(&routes, &node.name) {
                     Ok(Use::Read) => "is read".to_string(),
                     Ok(Use::Driven) => "is driven".to_string(),
@@ -334,6 +349,9 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // What a port answers with, for the stand-ins below.
+    use crate::runtime::fabric::{Arriving, Taken};
     use std::cell::RefCell;
     use std::path::Path;
     use std::rc::Rc;
@@ -352,17 +370,17 @@ mod tests {
     }
 
     impl Port for Sensor {
-        fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
             let mut readings = self.readings.borrow_mut();
             if readings.is_empty() {
-                return Ok(0);
+                return Ok(Taken::NOTHING);
             }
             let datum = readings.remove(0);
             buffer[..datum.len()].copy_from_slice(&datum);
-            Ok(datum.len())
+            Ok(Taken::of(datum.len()))
         }
 
-        fn give(&mut self, _input: Option<&str>, _data: &[u8]) -> Result<(), String> {
+        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
             Err("a sensor is read and not written".to_string())
         }
 
@@ -378,11 +396,11 @@ mod tests {
     }
 
     impl Port for Ground {
-        fn take(&mut self, _buffer: &mut [u8]) -> Result<usize, String> {
-            Ok(0)
+        fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
+            Ok(Taken::NOTHING)
         }
 
-        fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<(), String> {
+        fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
             self.got.borrow_mut().push(data.to_vec());
             Ok(())
         }

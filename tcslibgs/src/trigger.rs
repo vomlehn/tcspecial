@@ -14,6 +14,36 @@
 //! string is `trigger: '"READ\r"'`, and in XML
 //! `<trigger>"READ\r"</trigger>`.
 
+/// A node that is asked for its data, and what asks it.
+///
+/// A node with a trigger is a node that is asked: tcspecial writes these bytes
+/// to it and reads what comes back. There is no separate word for the mode,
+/// because a trigger and nothing else is what makes a payload triggered and an
+/// extra word could only disagree with it.
+///
+/// A trait, because what sends the request has no business knowing which kind
+/// of node it is sending to: a generated configuration's i2c node and its
+/// serial node are two types and one question. Which is why it is declared
+/// here rather than in the generated file -- the code that does the asking is
+/// not generated, and it has to be able to name what it is asking.
+///
+/// Bytes and not text: [`trigger_bytes`] is where a file's `55 AA` or
+/// `"READ\r"` becomes what this answers with.
+pub trait Triggered {
+    /// What to write to make it answer, or `None` for a node that is only
+    /// read.
+    ///
+    /// An `Option` because being triggered is a property of the node and not
+    /// of its kind: every i2c node may be asked, and one is asked only if
+    /// somebody wrote down what to ask it.
+    ///
+    /// Named for the bytes rather than for the trigger, because a node that
+    /// holds its trigger in a field called `trigger` -- which is what the
+    /// configuration calls it -- would have that field shadow a method of the
+    /// same name, and the method would be unreachable through a value.
+    fn trigger_bytes(&self) -> Option<&[u8]>;
+}
+
 /// The bytes a file's trigger names, or what is wrong with it.
 ///
 /// Empty is refused: a payload that answers requests has to be asked

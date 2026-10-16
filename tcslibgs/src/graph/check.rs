@@ -77,6 +77,13 @@ pub enum Problem {
     DuplicateNode { name: String },
     /// Two groups of one name.
     DuplicateGroup { name: String },
+    /// A group nothing is in, which reads nothing on its interval.
+    ///
+    /// What a group whose name a node misspelled looks like from the group's
+    /// end, as version 1 says of a payload group nobody names. tcsgui marked
+    /// this as a fault long before anything aboard refused it, which made
+    /// the editor and the flight software disagree about the one file.
+    EmptyGroup { group: String },
     /// A node with no name, which nothing can link to.
     NamelessNode,
     /// A link naming a node that is not in the configuration.
@@ -214,6 +221,7 @@ impl Problem {
             Problem::DuplicateNode { name } => About::Node(name.clone()),
             Problem::NamelessNode => About::Section("nodes"),
             Problem::DuplicateGroup { name } => About::NodeGroup(name.clone()),
+            Problem::EmptyGroup { group } => About::NodeGroup(group.clone()),
             Problem::BadInterval { group, .. } => About::NodeGroup(group.clone()),
             // A link's problem is reported on the node it leaves, which is
             // where the link is written: a link is an attribute of that node.
@@ -282,6 +290,9 @@ impl Problem {
             }
             Problem::DuplicateGroup { name } => {
                 format!("two groups are called \"{name}\"")
+            }
+            Problem::EmptyGroup { group } => {
+                format!("group \"{group}\" has no nodes in it")
             }
             Problem::NamelessNode => "a node has no name".to_string(),
             Problem::NoSuchNode { link, missing, .. } => {
@@ -456,6 +467,19 @@ impl Graph {
             if *count > 1 {
                 problems.push(Problem::DuplicateGroup {
                     name: (*name).to_string(),
+                });
+            }
+        }
+
+        // A declared group must hold something.
+        for group in &self.groups {
+            if !self
+                .nodes
+                .iter()
+                .any(|node| node.group.as_deref() == Some(group.name.as_str()))
+            {
+                problems.push(Problem::EmptyGroup {
+                    group: group.name.clone(),
                 });
             }
         }
@@ -758,6 +782,29 @@ impl Graph {
             }
         }
 
+        // The apps: each is the program it names, and what else it may be told
+        // is `node::app`'s to say -- one rule for all five kinds, the three
+        // that are the vehicle's own and the two that are payloads. Checked
+        // here for the reason a computation's parameters are: a program nobody
+        // named is a node the vehicle cannot start, and a desk is where that is
+        // worth finding out.
+        for node in self
+            .nodes
+            .iter()
+            .filter(|n| crate::node::app::Kind::of(&n.node_type).is_some())
+        {
+            if let Err(why) = crate::node::app::params_of(
+                &node.name,
+                &node.node_type,
+                &node.attributes,
+            ) {
+                problems.push(Problem::BadNode {
+                    node: node.name.clone(),
+                    why,
+                });
+            }
+        }
+
         // The logs, and whether what links into each of them fits the shape it
         // writes. Settled here and not when a record is written: a log that
         // would have to refuse a record in flight loses telemetry at the
@@ -838,15 +885,20 @@ impl Graph {
         // whole class of error from flight time to desk time -- a sensor with
         // no address used to be found when the vehicle tried to open it.
         //
-        // Only the nodes that are opened. A computation and a log have their
-        // own rules below, and a node whose type nothing recognises is
-        // refused by name already -- a second complaint about its attributes
-        // would bury the one that says what is actually wrong.
-        for node in self
-            .nodes
-            .iter()
-            .filter(|node| node.is_payload() || node.node_type == "moc")
-        {
+        // Only the nodes that are reached over an interface. A computation and
+        // a log have their own rules below, and a node whose type nothing
+        // recognises is refused by name already -- a second complaint about
+        // its attributes would bury the one that says what is actually wrong.
+        //
+        // An app node is not reached over an interface at all, and two of them
+        // are payloads: a payload that is a program is reached by running it,
+        // which is why it names a program and no bus. Asking this of one would
+        // refuse every `app_pl` in every file for want of an address it has no
+        // use for.
+        for node in self.nodes.iter().filter(|node| {
+            (node.is_payload() && crate::node::app::Kind::of(&node.node_type).is_none())
+                || node.node_type == "moc"
+        }) {
             if let Err(why) = crate::graph::reach::reach_of(node) {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
@@ -869,7 +921,16 @@ impl Graph {
         // written before a read that never happens. Requiring one there would
         // be requiring an attribute that means nothing, which is how a rule
         // gets worked around rather than obeyed.
-        for node in self.nodes.iter().filter(|n| n.is_payload()) {
+        //
+        // And not of a payload that is a program. What asks an `app_all_pl`
+        // for a reading is the MOC data arriving on its interface -- that
+        // being the whole of what its program is given -- so the bytes that
+        // ask are the datum itself and there is no trigger to state. An
+        // `app_pl` is asked nothing at all and has no sink for a link to
+        // arrive at, so nothing reaches this rule by that road either.
+        for node in self.nodes.iter().filter(|n| {
+            n.is_payload() && crate::node::app::Kind::of(&n.node_type).is_none()
+        }) {
             if node.attributes.contains_key("trigger") {
                 continue;
             }
@@ -1046,6 +1107,11 @@ mod tests {
                 ("port", "5100"),
             ],
             "moc" => &[("address", "10.0.0.1"), ("port", "5000")],
+            // An app node is the program it names, and nothing else it says
+            // is required: see `crate::node::app`.
+            "app_payload_veh" | "app_moc_veh" | "app_all_veh" | "app_pl" | "app_all_pl" => {
+                &[("program", "/bin/cat")]
+            }
             "compute" => &[
                 ("function", "to_kelvin"),
                 ("format", "i16_be"),
@@ -1166,6 +1232,78 @@ mod tests {
             })
             .expect("a misspelled attribute should be refused");
         assert!(complaint.contains("max_speeed"), "{complaint}");
+    }
+
+    /// An app node is held to what an app node may say.
+    ///
+    /// The rules are `crate::node::app`'s and are tested there; what
+    /// is asked here is that this reaches them, and that what it says names
+    /// the node -- an operator reading a report wants to know which of forty
+    /// it is about.
+    ///
+    /// The graph is sound first, which is worth as much as the refusal: it is
+    /// the statement that the three kinds can be linked the way their
+    /// interfaces say. `through` stands where a `null` node would, carrying
+    /// both streams; `fore` takes a sensor's readings and answers with
+    /// commands, which is what the ground does; and `back` is asked and
+    /// answers, which is what a payload does.
+    #[test]
+    fn an_app_node_is_held_to_what_it_may_say() {
+        let mut sensor = node("a", "i2c");
+        let mut answers = node("b", "i2c");
+        for one in [&mut sensor, &mut answers] {
+            // Written to, so each says what asks it for a reading.
+            one.attributes
+                .insert("trigger".to_string(), Scalar::of("55"));
+        }
+
+        let sound = graph(
+            vec![
+                sensor,
+                answers,
+                node("through", "app_all_veh"),
+                node("fore", "app_payload_veh"),
+                node("back", "app_moc_veh"),
+                node("c", "moc"),
+            ],
+            vec![
+                link("a.payload-out", &["through.payload-in"]),
+                link("through.payload-out", &["c.payload-in"]),
+                link("c.moc-out", &["through.moc-in", "back.moc-in"]),
+                link("through.moc-out", &["a.moc-in"]),
+                link("b.payload-out", &["fore.payload-in", "c.payload-in"]),
+                link("fore.moc-out", &["b.moc-in"]),
+                link("back.payload-out", &["c.payload-in"]),
+            ],
+        );
+        assert_eq!(
+            sound
+                .check()
+                .iter()
+                .map(|p| p.describe())
+                .collect::<Vec<String>>(),
+            Vec::<String>::new()
+        );
+
+        // A node of this type that names no program is a node the vehicle
+        // cannot start, and it is said here rather than at startup.
+        let mut g = sound.clone();
+        g.nodes
+            .iter_mut()
+            .find(|n| n.name == "fore")
+            .expect("the node")
+            .attributes
+            .clear();
+        let said = g
+            .check()
+            .iter()
+            .find_map(|p| match p {
+                Problem::BadNode { node, why } if node == "fore" => Some(why.clone()),
+                _ => None,
+            })
+            .expect("a node with no program");
+        assert!(said.contains("program is not set"), "{said}");
+        assert!(said.contains("app_payload_veh"), "{said}");
     }
 
     /// A configuration must say what tcspecial itself is configured with.
@@ -1341,12 +1479,14 @@ mod tests {
         );
     }
 
-    /// The rule is about payloads and nothing else.
+    /// The rule is about payloads that are devices and nothing else.
     ///
     /// A computation, a log and the ground link all take inputs and none of
     /// them is a thing the vehicle carries: a trigger would mean nothing on
     /// any of them, and asking for one would make every configuration
-    /// unwritable.
+    /// unwritable. A payload that is a program is a payload and is still not
+    /// asked, for the reason the rule itself gives: what asks it is the datum
+    /// that arrives, there being nothing else it is given.
     #[test]
     fn only_a_payload_is_asked_for_a_trigger() {
         for node_type in ["compute", "log", "moc"] {
@@ -1366,6 +1506,23 @@ mod tests {
         ] {
             assert!(node("x", node_type).is_payload(), "{node_type}");
         }
+        // The two payloads that are programs: payloads, and asked for no
+        // trigger. One of them cannot even be written to.
+        for node_type in ["app_pl", "app_all_pl"] {
+            assert!(node("x", node_type).is_payload(), "{node_type}");
+        }
+        let g = graph(
+            vec![node("bay", "app_all_pl"), node("moc", "moc")],
+            vec![link("bay", &["moc"]), link("moc", &["bay"])],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::UntriggeredInput { .. })),
+            "{:?}",
+            g.check()
+        );
+
         // And a type nothing recognises is not a payload: it is refused by
         // name already, and a second complaint about a trigger would bury the
         // one that says what is actually wrong.
@@ -1487,6 +1644,27 @@ mod tests {
             .check()
             .iter()
             .any(|p| matches!(p, Problem::BadInterval { .. })));
+    }
+
+    /// A group nothing is in is refused, as tcsgui has always marked it.
+    #[test]
+    fn a_group_with_nothing_in_it_is_refused() {
+        let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
+        g.groups.push(Group {
+            name: "temps".to_string(),
+            interval: "3s".to_string(),
+        });
+        let problems = g.check();
+        assert_eq!(
+            problems,
+            vec![Problem::EmptyGroup {
+                group: "temps".to_string()
+            }]
+        );
+        assert_eq!(problems[0].severity(), Severity::Error);
+
+        g.nodes[0].group = Some("temps".to_string());
+        assert_eq!(g.check(), Vec::new());
     }
 
     /// A node nothing links to or from is named.
@@ -2125,6 +2303,7 @@ mod tests {
         let problems = [
             Problem::DuplicateNode { name: "a".into() },
             Problem::DuplicateGroup { name: "g".into() },
+            Problem::EmptyGroup { group: "g".into() },
             Problem::NamelessNode,
             Problem::NoSuchNode {
                 from: "a".into(),

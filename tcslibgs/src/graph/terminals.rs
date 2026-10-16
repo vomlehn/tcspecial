@@ -25,8 +25,8 @@
 //!
 //! # Which types this knows
 //!
-//! The types whose terminals are fixed: a payload kind, a `moc`, and the
-//! `null` vehicle node. A computation's sinks are the inputs it declares and a
+//! The types whose terminals are fixed: a payload kind, a `moc`, the `null`
+//! vehicle node, and the five app node types. A computation's sinks are the inputs it declares and a
 //! log's are whatever is written to it, so their terminals are their own rules'
 //! business -- see [`crate::graph::check`] -- and [`terminals_of`] says so by
 //! answering `None`.
@@ -176,11 +176,59 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         merges: false,
     };
 
+    // An app node is a program run with one or both of two file interfaces,
+    // and its terminals are which of them it has: see `crate::node::app`. The
+    // pairing is the point -- on the interface where it reads payload data it
+    // writes MOC data -- so the terminals of the first kind are the ground
+    // link's, and of the second a payload's.
+    const APP_PAYLOAD: Terminals = Terminals {
+        // Payload data read, MOC data written: it takes what travels
+        // groundward and answers with what travels vehicleward.
+        sinks: &["payload-in"],
+        sources: &["moc-out"],
+        // One source into it, for the reason a vehicle node has one: a packet
+        // carries no word for which node it came from, so two sources would be
+        // two streams the program could not tell apart. The ground merges
+        // because a payload id is in the socket it arrives on.
+        merges: false,
+    };
+    const APP_MOC: Terminals = Terminals {
+        // And the mirror of it: MOC data read, payload data written.
+        sinks: &["moc-in"],
+        sources: &["payload-out"],
+        merges: false,
+    };
+    const APP_ALL: Terminals = Terminals {
+        // Both interfaces, so all four terminals -- which is a `null` node's
+        // shape, and an app of this kind is what a `null` node is when
+        // somebody wants to do something to what passes through.
+        sinks: &["payload-in", "moc-in"],
+        sources: &["payload-out", "moc-out"],
+        merges: false,
+    };
+    const APP_PL: Terminals = Terminals {
+        // A payload that is a program and is never asked: its readings leave
+        // and nothing arrives. The one type in this table with no sink at all,
+        // which is the whole of what tells it from the payload below: a link
+        // into it would be a datum written to a program that does not read.
+        sinks: &[],
+        sources: &["payload-out"],
+        merges: false,
+    };
+
     match node_type {
         "i2c" | "spi" | "serial" | "hdlc" | "can" | "iio" | "rpmsg" | "network"
         | "device-file" | "gpio" => Some(PAYLOAD),
         "moc" => Some(MOC),
         "null" => Some(NULL),
+        "app_payload_veh" => Some(APP_PAYLOAD),
+        "app_moc_veh" => Some(APP_MOC),
+        "app_all_veh" => Some(APP_ALL),
+        "app_pl" => Some(APP_PL),
+        // A payload that is a program and is asked, which is a payload: the
+        // same table rather than a copy of it, because the two are the same
+        // fact about the same shape.
+        "app_all_pl" => Some(PAYLOAD),
         _ => None,
     }
 }
@@ -241,6 +289,15 @@ pub fn terminal_at(
         // were names for these: one terminal needs no naming.
         None => match Terminals::only(ours) {
             Some(only) => Ok(Some(only.to_string())),
+            // None at all, which is not a link that failed to say which: it is
+            // a link that cannot be made. An `app_pl` is a payload nothing
+            // asks, so nothing may arrive at it, and a complaint asking which
+            // of no terminals was meant would send a reader looking for a name
+            // to write.
+            None if ours.is_empty() => Err(format!(
+                "a {node_type} node has no {which} at all, so nothing may be \
+                 linked to it there"
+            )),
             None => Err(format!(
                 "a {node_type} node has {} {which}s, so a link has to say \
                  which of them: {}",
@@ -357,6 +414,59 @@ mod tests {
         for name in ["payload-out", "moc-out"] {
             assert!(null.sources.contains(&name), "{name} is not a source of null");
         }
+    }
+
+    /// Each app kind has the terminals its interfaces are.
+    ///
+    /// The five of them in one test, because the rule is one rule: a program
+    /// run with an interface has the pair of terminals that interface carries,
+    /// and a payload that is a program has a payload's.
+    #[test]
+    fn an_app_has_the_terminals_its_interfaces_are() {
+        // The vehicle's own three. On the interface where it reads payload
+        // data it writes MOC data, so the first wears the ground link's shape
+        // and the second a payload's.
+        let payload_veh = terminals_of("app_payload_veh").expect("a kind of app");
+        assert_eq!(payload_veh.sinks, &["payload-in"]);
+        assert_eq!(payload_veh.sources, &["moc-out"]);
+        assert_eq!(
+            terminals_of("app_moc_veh"),
+            terminals_of("i2c"),
+            "a node that is asked and answers wears a payload's shape"
+        );
+        assert_eq!(terminals_of("app_all_veh"), terminals_of("null"));
+
+        // And the two that are payloads. The asked one is a payload, down to
+        // the table it reads from; the one that is never asked is a payload
+        // with the sink taken away, which is the only type here with none.
+        assert_eq!(terminals_of("app_all_pl"), terminals_of("i2c"));
+        let pl = terminals_of("app_pl").expect("a kind of app");
+        assert_eq!(pl.sources, &["payload-out"]);
+        assert!(pl.sinks.is_empty(), "nothing is asked of it");
+        assert!(!pl.merges);
+    }
+
+    /// A node with no terminal at that end says so, and does not ask which.
+    ///
+    /// The complaint for an `app_pl` somebody has drawn a line to. "Which of
+    /// its none" would send a reader looking for a name to write, where what
+    /// they have to know is that there is nowhere for the line to go.
+    #[test]
+    fn a_link_to_a_node_with_no_sink_is_told_there_is_none() {
+        let said = terminal_at("app_pl", None, true).expect_err("nothing may arrive");
+        assert!(said.contains("no data sink at all"), "{said}");
+        assert!(!said.contains("which of them"), "{said}");
+
+        // Named, and the name is one of the four: still refused, and by the
+        // rule that was there already.
+        let said = terminal_at("app_pl", Some("moc-in"), true).expect_err("nothing may arrive");
+        assert!(said.contains("none at all"), "{said}");
+
+        // What it does have needs no naming.
+        assert_eq!(
+            terminal_at("app_pl", None, false),
+            Ok(Some("payload-out".to_string()))
+        );
     }
 
     /// The ground takes several sources into its sink, and nothing else does.

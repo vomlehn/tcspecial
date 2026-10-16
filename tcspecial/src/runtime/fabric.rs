@@ -14,6 +14,26 @@
 //! theirs. With a trait those are tests against a recording node and no
 //! hardware at all.
 //!
+//! # Which stream a datum is on
+//!
+//! A configuration has two streams in it -- what travels groundward, from what
+//! the vehicle carries towards the ground, and what travels vehicleward, the
+//! other way -- and most nodes need no opinion about which one a datum
+//! belongs to. A device has one source terminal, so where its readings go is
+//! the link's business; a computation's result is one result however many ways
+//! the configuration sends it. Those answer [`Taken`] with no stream, and
+//! every link out of them is followed, which is what this did before any of
+//! this was here.
+//!
+//! A node with more than one of either has to be told and has to say. An
+//! `app_all_veh` is one: it reads payload data on one interface and MOC data
+//! on the other, so a datum it produces belongs to one of the two and
+//! delivering it to the other's links would send telemetry out as a command.
+//! So the stream travels with the bytes -- [`Taken::stream`] on the way out,
+//! [`Arriving::stream`] on the way in -- and [`Fabric::deliver_on`] follows
+//! only the links that carry it. Which stream a link carries is settled once,
+//! where the table is built: see [`crate::runtime::route::stream_of`].
+//!
 //! Delivery is best-effort per destination and the failures are counted. That
 //! is the reliability choice and it is worth stating: a log that cannot be
 //! written must not stop the ground getting its telemetry, and a heater
@@ -23,7 +43,99 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use super::route::Routes;
+use tcslibgs::graph::terminals::Stream;
+
+use super::route::{Delivery, Routes};
+
+/// What a node handed over.
+///
+/// The bytes, and which of the two streams they belong to where the node keeps
+/// them apart. `None` is "wherever my links go", which is what every node here
+/// answered before an app node could be one of them: a device has one source
+/// terminal, so which way its data is going is the link's business and not
+/// its own, and a computation's result is one result however many ways the
+/// configuration sends it.
+///
+/// `Some` is a node that produces on more than one terminal and knows which
+/// -- an `app_all_veh`, whose two interfaces are two streams. Delivering its
+/// reading to the links leaving its `moc-out` would send telemetry out as a
+/// command, so the stream travels with the bytes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Taken {
+    /// How many bytes of the buffer were filled.
+    pub bytes: usize,
+    /// Which stream they are on, where the node says.
+    pub stream: Option<Stream>,
+}
+
+impl Taken {
+    /// Nothing to say.
+    pub const NOTHING: Taken = Taken {
+        bytes: 0,
+        stream: None,
+    };
+
+    /// This many bytes, to go wherever this node's links go.
+    pub fn of(bytes: usize) -> Taken {
+        Taken {
+            bytes,
+            stream: None,
+        }
+    }
+
+    /// And this many, on one stream.
+    pub fn on(bytes: usize, stream: Stream) -> Taken {
+        Taken {
+            bytes,
+            stream: Some(stream),
+        }
+    }
+}
+
+/// What arrived at a node, and where it arrived.
+///
+/// Two questions a delivery answers, and a node may care about either, both or
+/// neither: which of its named inputs this one fills, and which stream it is
+/// on. A device cares about neither -- it has one way in -- a mean cares about
+/// the first, and an `app_all_veh` cares about the second.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Arriving<'a> {
+    /// Which of the node's named inputs it fills, where it names them.
+    ///
+    /// `None` is a node that takes one input and does not name it, which is
+    /// most of them.
+    pub input: Option<&'a str>,
+    /// Which stream it is on, where the link settles it. See
+    /// [`crate::runtime::route::stream_of`].
+    pub stream: Option<Stream>,
+}
+
+impl<'a> Arriving<'a> {
+    /// At a node's one way in, on no stream in particular.
+    ///
+    /// What a caller with nothing to say about either wants, which is most of
+    /// the tests and anything handing a datum to a device.
+    pub const ANYWHERE: Arriving<'static> = Arriving {
+        input: None,
+        stream: None,
+    };
+
+    /// At a named input.
+    pub fn named(input: &'a str) -> Arriving<'a> {
+        Arriving {
+            input: Some(input),
+            stream: None,
+        }
+    }
+
+    /// On one stream, at whichever way in that stream arrives by.
+    pub fn on(stream: Stream) -> Arriving<'static> {
+        Arriving {
+            input: None,
+            stream: Some(stream),
+        }
+    }
+}
 
 /// Anything the fabric can hand bytes to, or take them from.
 ///
@@ -35,14 +147,13 @@ use super::route::Routes;
 pub trait Port {
     /// Take what this node has produced, if anything.
     ///
-    /// `Ok(0)` is "nothing to say", which is the ordinary answer from a
+    /// Nought bytes is "nothing to say", which is the ordinary answer from a
     /// device that is not due. An error is a failure to read a node that
     /// should have had something.
-    fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String>;
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String>;
 
-    /// Hand this node something, arriving at `input` where it names its
-    /// inputs.
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<(), String>;
+    /// Hand this node something, saying where it arrived.
+    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String>;
 
     /// Whether anything may be handed to this node.
     fn accepts(&self) -> bool {
@@ -97,6 +208,21 @@ pub trait Port {
     /// a command off it and pass it on as though it were a result.
     fn ready(&self) -> bool {
         false
+    }
+}
+
+/// Whether this link carries a datum on this stream.
+///
+/// Both ways round, and the answer is yes unless the two disagree: a delivery
+/// whose stream nothing settled takes whatever comes, and a datum on no stream
+/// in particular goes everywhere its node's links go. Which keeps every
+/// configuration that worked before working: it is only a node that says which
+/// stream it produced on, delivering to a link that says which stream it
+/// carries, that can be told apart at all.
+fn carries(delivery: &Delivery, stream: Option<Stream>) -> bool {
+    match (delivery.stream, stream) {
+        (Some(link), Some(datum)) => link == datum,
+        _ => true,
     }
 }
 
@@ -208,6 +334,22 @@ impl Fabric {
     /// operator watching telemetry would expect, and the order that loses
     /// least if a later step fails.
     pub fn deliver(&mut self, from: &str, data: &[u8]) -> Moved {
+        self.deliver_on(from, data, None)
+    }
+
+    /// And the same for a node that keeps its two streams apart.
+    ///
+    /// `stream` is which of them this datum is on, as the node that produced
+    /// it said: see [`Taken`]. Only the links leaving that stream's terminal
+    /// are followed, which is the whole point -- an `app_all_veh` reading on
+    /// its payload interface and writing on its MOC one would otherwise have
+    /// its reading delivered to both, and the ground's commands would carry
+    /// telemetry.
+    ///
+    /// `None` is a node that does not keep them apart, and then every link out
+    /// of it is followed, which is what the fabric did before and what every
+    /// device and computation still wants.
+    pub fn deliver_on(&mut self, from: &str, data: &[u8], stream: Option<Stream>) -> Moved {
         let mut moved = Moved::default();
 
         // How far a result may be passed on. A path through a graph with no
@@ -219,16 +361,25 @@ impl Fabric {
         // vehicle that stops reading its sensors.
         let most = self.nodes.len().max(1);
 
-        let mut work: VecDeque<(String, Vec<u8>, usize)> =
-            VecDeque::from(vec![(from.to_string(), data.to_vec(), 0)]);
+        let mut work: VecDeque<(String, Vec<u8>, usize, Option<Stream>)> =
+            VecDeque::from(vec![(from.to_string(), data.to_vec(), 0, stream)]);
 
-        while let Some((from, data, depth)) = work.pop_front() {
+        while let Some((from, data, depth, stream)) = work.pop_front() {
             // Cloned because the deliveries are borrowed from the table while
             // the nodes are borrowed mutably from the same struct. A handful
             // of names per datum is not the cost worth restructuring for.
             let deliveries: Vec<_> = self.routes.from(&from).to_vec();
 
             for delivery in deliveries {
+                // A datum on one stream does not go down the other's links.
+                // Nothing is said about it: a node with two streams has two
+                // sets of links and every datum it produces belongs to one of
+                // them, so the others are not refusals -- they are the rest of
+                // the graph, going about its business.
+                if !carries(&delivery, stream) {
+                    continue;
+                }
+
                 let Some(node) = self.nodes.get_mut(&delivery.to) else {
                     // A checked configuration has no such link. Counted
                     // rather than ignored, because the alternative is
@@ -248,7 +399,11 @@ impl Fabric {
                     continue;
                 }
 
-                match node.give(delivery.input.as_deref(), &data) {
+                let arriving = Arriving {
+                    input: delivery.input.as_deref(),
+                    stream: delivery.stream,
+                };
+                match node.give(arriving, &data) {
                     Ok(()) => {
                         moved.delivered += 1;
                         moved.bytes += data.len();
@@ -275,10 +430,15 @@ impl Fabric {
 
                 let mut buffer = vec![0u8; self.buffer];
                 match node.take(&mut buffer) {
-                    Ok(0) => {}
-                    Ok(n) => {
-                        buffer.truncate(n);
-                        work.push_back((delivery.to.clone(), buffer, depth + 1));
+                    Ok(taken) if taken.bytes == 0 => {}
+                    Ok(taken) => {
+                        buffer.truncate(taken.bytes);
+                        work.push_back((
+                            delivery.to.clone(),
+                            buffer,
+                            depth + 1,
+                            taken.stream,
+                        ));
                     }
                     // A node that said it had a result and then did not give
                     // one up. Counted, because the result is gone either way.
@@ -341,10 +501,10 @@ impl Fabric {
         };
 
         match taken {
-            Ok(0) => moved,
-            Ok(n) => {
-                let data = buffer[..n].to_vec();
-                moved.add(self.deliver(name, &data));
+            Ok(taken) if taken.bytes == 0 => moved,
+            Ok(taken) => {
+                let data = buffer[..taken.bytes].to_vec();
+                moved.add(self.deliver_on(name, &data, taken.stream));
                 moved
             }
             Err(why) => {
@@ -381,8 +541,13 @@ mod tests {
     /// What a node was given, and what it will say when read.
     #[derive(Default)]
     struct Record {
-        given: Vec<(Option<String>, Vec<u8>)>,
+        /// What arrived: the input it named, the stream it was on, and the
+        /// bytes.
+        given: Vec<(Option<String>, Option<Stream>, Vec<u8>)>,
         to_say: Vec<Vec<u8>>,
+        /// Which stream this node says what it produces is on, for a node
+        /// that keeps them apart. `None` is every node that does not.
+        says_a_stream: Option<Stream>,
         refuse: Option<String>,
         accepts: bool,
         produces: bool,
@@ -392,24 +557,29 @@ mod tests {
     struct Recorder(Rc<RefCell<Record>>);
 
     impl Port for Recorder {
-        fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
             let mut record = self.0.borrow_mut();
             if record.to_say.is_empty() {
-                return Ok(0);
+                return Ok(Taken::NOTHING);
             }
             let datum = record.to_say.remove(0);
             buffer[..datum.len()].copy_from_slice(&datum);
-            Ok(datum.len())
+            Ok(match record.says_a_stream {
+                Some(stream) => Taken::on(datum.len(), stream),
+                None => Taken::of(datum.len()),
+            })
         }
 
-        fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<(), String> {
+        fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
             let mut record = self.0.borrow_mut();
             if let Some(why) = record.refuse.clone() {
                 return Err(why);
             }
-            record
-                .given
-                .push((input.map(str::to_string), data.to_vec()));
+            record.given.push((
+                arriving.input.map(str::to_string),
+                arriving.stream,
+                data.to_vec(),
+            ));
             Ok(())
         }
 
@@ -457,11 +627,18 @@ mod tests {
         assert_eq!(moved.delivered, 3);
         assert_eq!(moved.bytes, 12, "four bytes to each of three places");
 
-        assert_eq!(moc.borrow().given, vec![(None, vec![1, 2, 3, 4])]);
-        assert_eq!(log.borrow().given, vec![(None, vec![1, 2, 3, 4])]);
+        let groundward = Some(Stream::Groundward);
+        assert_eq!(
+            moc.borrow().given,
+            vec![(None, groundward, vec![1, 2, 3, 4])]
+        );
+        assert_eq!(
+            log.borrow().given,
+            vec![(None, groundward, vec![1, 2, 3, 4])]
+        );
         assert_eq!(
             mean.borrow().given,
-            vec![(Some("in0".to_string()), vec![1, 2, 3, 4])],
+            vec![(Some("in0".to_string()), groundward, vec![1, 2, 3, 4])],
             "the mean should be told which input this is"
         );
     }
@@ -485,9 +662,9 @@ mod tests {
         assert_eq!(
             given.given,
             vec![
-                (Some("in0".to_string()), vec![1]),
-                (Some("in1".to_string()), vec![2]),
-                (Some("in2".to_string()), vec![3]),
+                (Some("in0".to_string()), Some(Stream::Groundward), vec![1]),
+                (Some("in1".to_string()), Some(Stream::Groundward), vec![2]),
+                (Some("in2".to_string()), Some(Stream::Groundward), vec![3]),
             ]
         );
         // And the ground and the log got all three as well, which are the
@@ -547,7 +724,7 @@ mod tests {
             .borrow()
             .given
             .iter()
-            .map(|(_, datum)| String::from_utf8_lossy(datum).to_string())
+            .map(|(_, _, datum)| String::from_utf8_lossy(datum).to_string())
             .collect();
         assert_eq!(
             payload_out,
@@ -564,7 +741,7 @@ mod tests {
             .borrow()
             .given
             .iter()
-            .map(|(_, datum)| datum.clone())
+            .map(|(_, _, datum)| datum.clone())
             .collect();
         assert_eq!(
             to_heaters,
@@ -704,7 +881,10 @@ mod tests {
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(
             heaters.borrow().given,
-            vec![(None, b"1".to_vec())],
+            // Vehicleward: what a thermostat sends a heater is a command, and
+            // the link it goes down is the one leaving the computation's
+            // `moc-out`.
+            vec![(None, Some(Stream::Vehicleward), b"1".to_vec())],
             "294 is more than two degrees below 300"
         );
     }
@@ -776,12 +956,12 @@ mod tests {
         struct Echo;
 
         impl Port for Echo {
-            fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+            fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
                 buffer[0] = 1;
-                Ok(1)
+                Ok(Taken::of(1))
             }
 
-            fn give(&mut self, _input: Option<&str>, _data: &[u8]) -> Result<(), String> {
+            fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
                 Ok(())
             }
 
@@ -917,7 +1097,10 @@ mod tests {
 
         assert_eq!(moved.delivered, 1);
         assert_eq!(moved.bytes, 2);
-        assert_eq!(k.borrow().given, vec![(None, vec![0x01, 0x90])]);
+        assert_eq!(
+            k.borrow().given,
+            vec![(None, Some(Stream::Groundward), vec![0x01, 0x90])]
+        );
     }
 
     /// A group's members are read in order, one pass each.
@@ -949,7 +1132,7 @@ mod tests {
         for (n, got) in sensors.iter().enumerate() {
             assert_eq!(
                 got.borrow().given,
-                vec![(None, vec![n as u8])],
+                vec![(None, Some(Stream::Groundward), vec![n as u8])],
                 "converter {n} got the wrong reading"
             );
         }

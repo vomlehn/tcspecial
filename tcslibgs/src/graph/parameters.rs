@@ -188,10 +188,6 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("beacon.recv", true),
     ("log.directory", false),
     ("log.segment_size", false),
-    // Where this configuration's generated Rust is written, which is the one
-    // attribute of the section that is about building the software rather than
-    // about running it: see `RUST_CODE` below and `tcsgui::codegen`.
-    ("rust-code-path", false),
 ];
 
 /// What a new configuration is given, where anything.
@@ -214,20 +210,11 @@ pub fn default_of(attribute: &str) -> Option<&'static str> {
     }
 }
 
-/// The attribute that is not the command interpreter's.
-///
-/// `rust-code-path` is a path, and nothing aboard reads it: it says where tcsgui
-/// writes the Rust it generates from this configuration, which is then
-/// compiled into tcspecial along with the node types the configuration uses.
-/// It is in this section because this is the section about the configuration
-/// as a whole, and because that is where the editor already has a window for
-/// one -- and it is named here so that
-/// [`ci_config_of`] can leave it out of the struct the interpreter reads: a
-/// field carried into the flight software and never acted on is a field
-/// somebody will one day believe in.
-pub const RUST_CODE: &str = "rust-code-path";
-
 /// The section as the command interpreter wants it, or what is wrong with it.
+///
+/// Every attribute of the section is one the interpreter reads: the section
+/// says what tcspecial is configured with, a configuration is read when
+/// tcspecial starts, and there is nothing in it about building the software.
 ///
 /// Every complaint names the attribute, because a configuration is read by
 /// somebody who needs to know which of nine words to change.

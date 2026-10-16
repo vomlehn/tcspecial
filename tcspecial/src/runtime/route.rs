@@ -19,7 +19,8 @@
 
 use std::collections::BTreeMap;
 
-use tcslibgs::graph::{Destination, Graph};
+use tcslibgs::graph::terminals::{self, Stream};
+use tcslibgs::graph::{Destination, Graph, Link};
 
 /// What a command from the ground sets.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +41,64 @@ pub struct Delivery {
     /// `None` is a node that takes one input and does not name it, which is
     /// most of them: a device, a MOC link, a log.
     pub input: Option<String>,
+    /// Which of the two streams this link carries.
+    ///
+    /// A link carries one: both of its ends are terminals of the same stream,
+    /// which is what [`tcslibgs::graph::check::Problem::CrossedStreams`]
+    /// refuses a configuration for. So it is a property of the link and is
+    /// settled here, once, from the terminals the file names or from the only
+    /// terminal the type at either end has -- see [`stream_of`].
+    ///
+    /// `None` is a link whose stream nothing settles, which a checked
+    /// configuration does not have: it is carried as "wherever its links go",
+    /// which is what every delivery was before the streams were kept apart.
+    pub stream: Option<Stream>,
+}
+
+/// Which stream a link carries, where the configuration settles it.
+///
+/// Three places to look, in the order a reader of the file would:
+///
+/// * the terminal the link leaves by, which is where a file says it --
+///   `n.payload-out` is groundward and says so;
+/// * failing that, the terminal it arrives at, for a link written from a node
+///   with one source into a node with several sinks;
+/// * and failing both, the only terminal the type at either end has. A payload
+///   has one source and one sink, so a link from one is groundward whether or
+///   not the word was written -- which is why most links in most files need
+///   none of this.
+///
+/// `None` where nothing settles it, which is a link whose two ends both have a
+/// choice and whose file named neither: `Graph::check` refuses that as a
+/// `BadTerminal`, so nothing downstream depends on it -- a `None` is carried
+/// as "wherever its links go", which is what every delivery was before.
+fn stream_of(graph: &Graph, link: &Link) -> Option<Stream> {
+    let named = |terminal: Option<&str>| {
+        terminal
+            .and_then(terminals::stream_of)
+            .map(|(_, stream)| stream)
+    };
+    // The only terminal of one end of one node, where it has one.
+    let only = |node: &str, sink: bool| {
+        let node_type = &graph.node(node)?.node_type;
+        let terminals = terminals::terminals_of(node_type)?;
+        match if sink { terminals.sinks } else { terminals.sources } {
+            [one] => named(Some(one)),
+            _ => None,
+        }
+    };
+
+    let origin = link.origin();
+    let first = link
+        .to
+        .each()
+        .first()
+        .map(|destination| Destination::parse(destination));
+
+    named(origin.input.as_deref())
+        .or_else(|| first.as_ref().and_then(|to| named(to.input.as_deref())))
+        .or_else(|| only(&origin.node, false))
+        .or_else(|| first.as_ref().and_then(|to| only(&to.node, true)))
 }
 
 /// The table: what goes where.
@@ -78,11 +137,12 @@ impl Routes {
         let mut routes = Routes::default();
 
         for link in &graph.links {
-            // The node it leaves, whatever terminal it leaves by. A terminal
-            // says which way the data is going -- see
-            // `tcslibgs::graph::terminals` -- and the routing question is
-            // which node, so `n.payload-out` and `n` are one source here.
+            // The node it leaves, whatever terminal it leaves by. The routing
+            // question is which node, so `n.payload-out` and `n` are one
+            // source here -- and which way the data is going is the link's own
+            // and is settled once, below.
             let from = link.origin().node;
+            let stream = stream_of(graph, link);
 
             for destination in link.to.each() {
                 let Destination { node, input } = Destination::parse(destination);
@@ -102,6 +162,7 @@ impl Routes {
                     .push(Delivery {
                         to: node.clone(),
                         input: input.clone(),
+                        stream,
                     });
 
                 if let Some(input) = input {
@@ -260,13 +321,21 @@ mod tests {
     fn a_terminal_on_a_link_is_not_a_named_input() {
         use tcslibgs::graph::Destinations;
 
-        // Links and nothing else: the routing is a table of what arrives
-        // where, and a node's own attributes are no part of that.
+        // The nodes are named and told nothing: a node's own attributes are
+        // no part of the routing. Their *types* are, and only for one
+        // question -- which stream a link carries, where the file left the
+        // terminals out and the type is what settles it. See `stream_of`.
+        let node = |name: &str, node_type: &str| tcslibgs::graph::Node {
+            name: name.to_string(),
+            node_type: node_type.to_string(),
+            group: None,
+            attributes: std::collections::BTreeMap::new(),
+        };
         let one_link = |from: &str, to: &str| Graph {
             description: None,
             tcspecial: None,
             groups: Vec::new(),
-            nodes: Vec::new(),
+            nodes: vec![node("a", "i2c"), node("c", "moc"), node("m", "compute")],
             links: vec![tcslibgs::graph::Link {
                 from: from.to_string(),
                 to: Destinations::of(vec![to.to_string()]),
@@ -292,6 +361,11 @@ mod tests {
             assert!(routes.inputs_of("c").is_empty());
         }
         assert_eq!(plain.from("a"), named.from("a"));
+
+        // Including the stream, which both settle the same way: the file says
+        // `payload-out` in the one and an i2c node has no other source in the
+        // other, so the link is groundward either way it was written.
+        assert_eq!(plain.from("a")[0].stream, Some(Stream::Groundward));
 
         // And a computation's named input is still carried, which is the
         // distinction: `in0` is which of several ways in, and the mean is

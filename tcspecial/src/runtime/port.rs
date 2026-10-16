@@ -46,10 +46,18 @@ use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
 
+use tcsapp::parent::Arrived;
 use tcslibgs::graph::reach::reach_of;
+use tcslibgs::graph::terminals::Stream;
 use tcslibgs::graph::Node;
+use tcslibgs::node::app;
 use tcslibgs::{EndpointConfig, TcsError, TcsResult};
 
+use crate::node::payload::app_all_pl::AppAllPl;
+use crate::node::payload::app_pl::AppPl;
+use crate::node::vehicle::app_all_veh::AppAllVeh;
+use crate::node::vehicle::app_moc_veh::AppMocVeh;
+use crate::node::vehicle::app_payload_veh::AppPayloadVeh;
 use crate::node::vehicle::compute::{self, Function};
 use crate::node::vehicle::log::LogNode;
 use crate::node::vehicle::null::Through;
@@ -58,7 +66,7 @@ use crate::endpoint::{
     bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
     WaitResult,
 };
-use crate::runtime::fabric::Port;
+use crate::runtime::fabric::{Arriving, Port, Taken};
 use crate::runtime::route::Routes;
 
 /// Which way the graph uses a node.
@@ -340,7 +348,11 @@ impl EndpointPort {
 }
 
 impl Port for EndpointPort {
-    fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+    /// What this device had, on no stream in particular.
+    ///
+    /// A device has one source terminal, so which way its data goes is the
+    /// link's business and not its own: see [`Taken`].
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         if !self.uses.produces() {
             return Err(format!(
                 "{}: nothing is read from this node -- the configuration has it \
@@ -380,12 +392,12 @@ impl Port for EndpointPort {
         // read succeeded, because a reading taken now and no question asked
         // is the last reading this node will ever produce.
         match (got, self.trigger.take()) {
-            (got, None) => got,
+            (got, None) => got.map(Taken::of),
             (got, Some(trigger)) => {
                 let asked = self.write_all(&trigger, "trigger");
                 self.trigger = Some(trigger);
                 match (got, asked) {
-                    (Ok(n), Ok(())) => Ok(n),
+                    (Ok(n), Ok(())) => Ok(Taken::of(n)),
                     (Ok(_), Err(why)) => Err(why),
                     // A read that failed is the worse news of the two, and
                     // the one an operator is looking for.
@@ -395,7 +407,8 @@ impl Port for EndpointPort {
         }
     }
 
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<(), String> {
+    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+        let input = arriving.input;
         if !self.uses.accepts() {
             return Err(format!(
                 "{}: nothing is written to this node -- the configuration has it \
@@ -478,9 +491,14 @@ impl ComputePort {
 }
 
 impl Port for ComputePort {
-    fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+    /// What this computation worked out, on no stream in particular.
+    ///
+    /// A result is one result however many ways the configuration sends it: a
+    /// thermostat's answer goes to the heaters and to the ground, and neither
+    /// of those is the stream it is "on". See [`Taken`].
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         let Some(result) = self.ready.pop_front() else {
-            return Ok(0);
+            return Ok(Taken::NOTHING);
         };
 
         // A result that will not fit is reported and not cut down to size.
@@ -498,11 +516,11 @@ impl Port for ComputePort {
         }
 
         buffer[..result.len()].copy_from_slice(&result);
-        Ok(result.len())
+        Ok(Taken::of(result.len()))
     }
 
-    fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<(), String> {
-        match self.function.give(input, data) {
+    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+        match self.function.give(arriving.input, data) {
             Ok(Some(result)) => {
                 self.ready.push_back(result);
                 Ok(())
@@ -564,7 +582,7 @@ impl Port for LogPort {
         self.0.flush()
     }
 
-    fn take(&mut self, _buffer: &mut [u8]) -> Result<usize, String> {
+    fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
         Err(format!(
             "{}: nothing is read from a log -- it is where data stops, and a link \
              out of one would be a log read back into the vehicle that wrote it",
@@ -572,7 +590,7 @@ impl Port for LogPort {
         ))
     }
 
-    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<(), String> {
+    fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
         self.0.record(data)
     }
 
@@ -605,11 +623,19 @@ impl NullPort {
 }
 
 impl Port for NullPort {
-    fn take(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
-        self.through.take(&self.what, buffer)
+    /// What arrived, on no stream in particular.
+    ///
+    /// Which is the one thing a `null` node cannot be asked to get right, and
+    /// it is written down where the queue is: both streams pass through the
+    /// one node and nothing here keeps them apart, so what it hands back goes
+    /// wherever its links go. A configuration that needs the two kept apart
+    /// has `app_all_veh` for it, whose two interfaces are two streams -- see
+    /// [`crate::node::vehicle::app_all_veh`].
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        self.through.take(&self.what, buffer).map(Taken::of)
     }
 
-    fn give(&mut self, _input: Option<&str>, data: &[u8]) -> Result<(), String> {
+    fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
         self.through.give(data);
         Ok(())
     }
@@ -622,6 +648,221 @@ impl Port for NullPort {
     /// read the node.
     fn ready(&self) -> bool {
         self.through.waiting()
+    }
+}
+
+/// An app node: a program of the vehicle's own, in the fabric.
+///
+/// One port for the three kinds, because the fabric holds one port per node
+/// and the kind is what the node is: which of the two file interfaces its
+/// program was started with, and so which streams it takes and which it
+/// produces. See [`crate::node::vehicle::app_payload_veh`] and its two
+/// neighbours, which are what this holds, and `tcsapp` for the interfaces
+/// themselves.
+///
+/// Polled rather than ready: an app is another process, so what it makes of a
+/// datum arrives when it arrives and not inside the delivery that handed it
+/// over. [`Port::ready`] is left false and the pass asks every app every time,
+/// which is what `system::is_polled` does for a node in no group -- a read of
+/// nothing is the ordinary answer and costs one system call.
+#[derive(Debug)]
+pub struct AppPort {
+    what: String,
+    program: Program,
+    /// Which stream was taken from last, for a node that has two.
+    ///
+    /// So that two busy streams take turns: a pass takes one datum from a
+    /// node, and an app whose groundward side is always ready would otherwise
+    /// never have its vehicleward side read.
+    last: Option<Stream>,
+    /// Why nothing more will come, once that is so.
+    ///
+    /// Held so that every pass says the same thing rather than the first one
+    /// saying it and the rest saying nothing: the same arrangement
+    /// `node::vehicle::compute::process` keeps for a program that has
+    /// stopped.
+    ended: Option<String>,
+}
+
+/// The program, as whichever kind of app node it is.
+#[derive(Debug)]
+enum Program {
+    Payload(AppPayloadVeh),
+    Moc(AppMocVeh),
+    All(AppAllVeh),
+    /// A payload that is never asked: it produces and takes nothing.
+    Pl(AppPl),
+    /// And one that is asked, which is a payload's own shape.
+    AllPl(AppAllPl),
+}
+
+impl AppPort {
+    /// Start this node's program and hold it.
+    ///
+    /// Started here, as the configuration is opened, so a program that cannot
+    /// be executed is a fault found before the vehicle is doing anything --
+    /// the rule a `process` computation is held to as well.
+    pub fn open(node: &Node) -> Result<AppPort, String> {
+        let params = app::params_of(&node.name, &node.node_type, &node.attributes)?;
+        let program = match params.kind {
+            app::Kind::PayloadVeh => Program::Payload(AppPayloadVeh::of(&params)?),
+            app::Kind::MocVeh => Program::Moc(AppMocVeh::of(&params)?),
+            app::Kind::AllVeh => Program::All(AppAllVeh::of(&params)?),
+            app::Kind::Pl => Program::Pl(AppPl::of(&params)?),
+            app::Kind::AllPl => Program::AllPl(AppAllPl::of(&params)?),
+        };
+        Ok(AppPort {
+            what: node.name.clone(),
+            program,
+            last: None,
+            ended: None,
+        })
+    }
+
+    /// Whatever has arrived on this stream's interface, without waiting.
+    fn asked(&mut self, stream: Stream) -> Result<Arrived, String> {
+        match (&mut self.program, stream) {
+            // What the app writes as MOC data, which it does on the payload
+            // interface: see `tcsapp`.
+            (Program::Payload(app), Stream::Vehicleward) => app.take_moc_data_now(),
+            (Program::Moc(app), Stream::Groundward) => app.take_payload_data_now(),
+            (Program::All(app), Stream::Vehicleward) => app.take_moc_data_now(),
+            (Program::All(app), Stream::Groundward) => app.take_payload_data_now(),
+            // A payload's readings, which are groundward whether anything
+            // asked for them or not.
+            (Program::Pl(app), Stream::Groundward) => app.take_payload_data_now(),
+            (Program::AllPl(app), Stream::Groundward) => app.take_payload_data_now(),
+            // A stream this kind does not produce on. Nothing, rather than a
+            // refusal: it is not a fault to ask, and `take` asks only what the
+            // kind has.
+            _ => Ok(Arrived::Nothing),
+        }
+    }
+
+    /// Which streams to ask, in the order to ask them.
+    fn to_ask(&self) -> &'static [Stream] {
+        match (&self.program, self.last) {
+            (Program::Payload(_), _) => &[Stream::Vehicleward],
+            (Program::Moc(_), _) => &[Stream::Groundward],
+            // A payload produces on the one stream, asked or not, so there is
+            // nothing to take turns with.
+            (Program::Pl(_), _) | (Program::AllPl(_), _) => &[Stream::Groundward],
+            // Turn and turn about.
+            (Program::All(_), Some(Stream::Groundward)) => {
+                &[Stream::Vehicleward, Stream::Groundward]
+            }
+            (Program::All(_), _) => &[Stream::Groundward, Stream::Vehicleward],
+        }
+    }
+}
+
+impl Port for AppPort {
+    /// One datum from one of its interfaces, saying which.
+    ///
+    /// The stream travels with the bytes because this is the node that needs
+    /// it to: an `app_all_veh` writes payload data on the one interface and
+    /// MOC data on the other, and delivering a reading down the links leaving
+    /// its `moc-out` would send telemetry out as a command. See [`Taken`].
+    ///
+    /// A packet of no bytes is read and goes no further. The interfaces carry
+    /// one -- an app with nothing to say and an app that has said something
+    /// empty are different things to `tcsapp` -- but the fabric's own contract
+    /// is that nought bytes is nothing to say, and an empty datum has nothing
+    /// to deliver.
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        if let Some(why) = &self.ended {
+            return Err(why.clone());
+        }
+
+        for stream in self.to_ask() {
+            match self.asked(*stream) {
+                Ok(Arrived::Nothing) => {}
+                Ok(Arrived::Packet(data)) => {
+                    // A datum that will not fit is reported and not cut down:
+                    // part of a packet is not a smaller packet, and the app
+                    // wrote what it wrote.
+                    if data.len() > buffer.len() {
+                        return Err(format!(
+                            "{}: a packet of {} bytes arrived and the buffer holds \
+                             {}: part of a packet is not a smaller packet",
+                            self.what,
+                            data.len(),
+                            buffer.len()
+                        ));
+                    }
+                    buffer[..data.len()].copy_from_slice(&data);
+                    self.last = Some(*stream);
+                    return Ok(Taken::on(data.len(), *stream));
+                }
+                Ok(Arrived::Ended) => {
+                    let why = format!(
+                        "{}: its program has finished with the {} interface, so \
+                         nothing more will come from it",
+                        self.what,
+                        stream.label()
+                    );
+                    self.ended = Some(why.clone());
+                    return Err(why);
+                }
+                Err(why) => return Err(format!("{}: {why}", self.what)),
+            }
+        }
+        Ok(Taken::NOTHING)
+    }
+
+    /// Hand it a datum, on the interface its stream belongs to.
+    fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
+        if let Some(why) = &self.ended {
+            return Err(why.clone());
+        }
+
+        let given = match (&mut self.program, arriving.stream) {
+            // A kind with one interface takes what arrives on it, and a link
+            // into it says the same thing its one sink does.
+            (Program::Payload(app), Some(Stream::Groundward) | None) => {
+                app.give_payload_data(data)
+            }
+            (Program::Moc(app), Some(Stream::Vehicleward) | None) => app.give_moc_data(data),
+            // What asks a payload that is a program for a reading, which is
+            // the datum itself: see `crate::node::payload::app_all_pl`.
+            (Program::AllPl(app), Some(Stream::Vehicleward) | None) => app.give_moc_data(data),
+            // And the kind nothing asks. It has no data sink at all, so
+            // `Graph::check` refuses the link that would bring this about --
+            // this is the backstop, and it says what the type is rather than
+            // which stream was wrong, there being no stream it would take.
+            (Program::Pl(_), _) => Err(format!(
+                "{}: a datum arrived and nothing may be linked into an \
+                 {}: it is a payload that is never asked, and its program \
+                 does not read",
+                self.what,
+                app::Kind::Pl.node_type()
+            )),
+            (Program::All(app), Some(Stream::Groundward)) => app.give_payload_data(data),
+            (Program::All(app), Some(Stream::Vehicleward)) => app.give_moc_data(data),
+            // A node with two ways in, and a link that does not say which.
+            // `Graph::check` refuses that as a `BadTerminal`, so this is the
+            // backstop: guessing would put the ground's commands on the
+            // groundward stream half the time.
+            (Program::All(_), None) => Err(format!(
+                "{}: a link into it says which of its two streams it carries, \
+                 and this one says neither",
+                self.what
+            )),
+            // And a datum on the stream this kind does not take at all.
+            (_, Some(stream)) => Err(format!(
+                "{}: a datum on the {} stream arrived, and this app does not \
+                 take that stream",
+                self.what,
+                stream.label()
+            )),
+        };
+        given.map_err(|why| {
+            if why.starts_with(&self.what) {
+                why
+            } else {
+                format!("{}: {why}", self.what)
+            }
+        })
     }
 }
 
@@ -841,12 +1082,12 @@ mod tests {
         script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
 
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).expect("the reading");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the reading");
         assert_eq!(&buffer[..got], b"293.15");
 
         // And the pass after it, with the device not due.
         assert_eq!(
-            port.take(&mut buffer),
+            port.take(&mut buffer).map(|taken| taken.bytes),
             Ok(0),
             "a device with nothing to say has not failed"
         );
@@ -873,7 +1114,7 @@ mod tests {
     fn a_command_is_written_whole() {
         let (script, mut port) = port("heaters", Use::Driven);
 
-        assert_eq!(port.give(None, b"1"), Ok(()));
+        assert_eq!(port.give(Arriving::ANYWHERE, b"1"), Ok(()));
         assert_eq!(script.lock().expect("the script").written, vec![b"1".to_vec()]);
     }
 
@@ -888,7 +1129,7 @@ mod tests {
         script.lock().expect("the script").write_answers = vec![Ok(3)];
 
         let said = port
-            .give(None, b"293.15")
+            .give(Arriving::ANYWHERE, b"293.15")
             .expect_err("three bytes of a six-byte reading");
         assert!(
             said.contains("moved 3 of 6") && said.contains("not a smaller datum"),
@@ -902,7 +1143,7 @@ mod tests {
         let (script, mut port) = port("moc", Use::Both);
         script.lock().expect("the script").write_answers = vec![Ok(0)];
 
-        let said = port.give(None, b"293.15").expect_err("a datum dropped");
+        let said = port.give(Arriving::ANYWHERE, b"293.15").expect_err("a datum dropped");
         assert!(
             said.contains("moved none of them") && said.contains("dropped"),
             "the complaint should say the datum is gone: {said}"
@@ -917,7 +1158,7 @@ mod tests {
             "cannot drive the lines of /dev/gpiochip0".to_string(),
         ))];
 
-        let said = port.give(None, b"1").expect_err("a chip that refused");
+        let said = port.give(Arriving::ANYWHERE, b"1").expect_err("a chip that refused");
         assert!(
             said.contains("heaters") && said.contains("/dev/gpiochip0"),
             "the complaint should name the node and the chip: {said}"
@@ -934,7 +1175,7 @@ mod tests {
     #[test]
     fn a_node_refuses_the_direction_it_is_not_used_in() {
         let (_, mut sensor) = port("temp_fore", Use::Read);
-        let said = sensor.give(None, b"1").expect_err("a write to a sensor");
+        let said = sensor.give(Arriving::ANYWHERE, b"1").expect_err("a write to a sensor");
         assert!(
             said.contains("read and not written"),
             "the complaint should say which way it is used: {said}"
@@ -958,7 +1199,7 @@ mod tests {
         let (script, mut port) = port("heaters", Use::Driven);
 
         let said = port
-            .give(Some("in0"), b"1")
+            .give(Arriving::named("in0"), b"1")
             .expect_err("a computation's input name on a device");
         assert!(
             said.contains("in0") && said.contains("no named inputs"),
@@ -980,7 +1221,7 @@ mod tests {
         // A sensor that answers in two bytes, read into a buffer with room
         // for sixty-four: two is what is asked for.
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).expect("a reading");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a reading");
         assert_eq!(got, 2, "a bus master clocks what it asks for and no more");
 
         // And the buffer is the other bound: a caller with room for one byte
@@ -988,7 +1229,7 @@ mod tests {
         let (script, port) = port_of_script("temp_fore", Use::Read, vec![Ok(b"293.15".to_vec())]);
         let mut port = port.reading(2);
         let got = port.take(&mut [0u8; 1]).expect("a reading");
-        assert_eq!(got, 1);
+        assert_eq!(got.bytes, 1);
         assert!(script.lock().expect("the script").to_read.is_empty());
     }
 
@@ -1058,13 +1299,13 @@ mod tests {
         // Nothing has been written, and this returns: without the readiness
         // question in take, this test would hang rather than fail.
         let mut buffer = [0u8; 64];
-        assert_eq!(port.take(&mut buffer), Ok(0), "nothing to say is not a wait");
+        assert_eq!(port.take(&mut buffer).map(|taken| taken.bytes), Ok(0), "nothing to say is not a wait");
 
         // And when there is something, it is read.
         let mut writer = EndpointPort::connect("writer", &config, Use::Both)
             .expect("the other end");
-        assert_eq!(writer.give(None, b"293.15"), Ok(()));
-        let got = port.take(&mut buffer).expect("the reading");
+        assert_eq!(writer.give(Arriving::ANYWHERE, b"293.15"), Ok(()));
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the reading");
         assert_eq!(&buffer[..got], b"293.15");
     }
 
@@ -1101,10 +1342,10 @@ mod tests {
 
         // Written and read back through the kernel, which is as much of a
         // device as a pipe can be.
-        assert_eq!(port.give(None, b"293.15"), Ok(()));
+        assert_eq!(port.give(Arriving::ANYWHERE, b"293.15"), Ok(()));
 
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).expect("what was written");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("what was written");
         assert_eq!(&buffer[..got], b"293.15");
 
         // And the descriptor a waiting loop would poll.
@@ -1127,21 +1368,21 @@ mod tests {
 
         // The first arrival is not a result: a mean of one of two sensors
         // would be an average of a reading and nothing.
-        assert_eq!(port.give(Some("in0"), b"290.0"), Ok(()));
+        assert_eq!(port.give(Arriving::named("in0"), b"290.0"), Ok(()));
         assert!(!port.ready(), "a mean of one input is not an average");
-        assert_eq!(port.take(&mut [0u8; 64]), Ok(0));
+        assert_eq!(port.take(&mut [0u8; 64]).map(|taken| taken.bytes), Ok(0));
 
         // The second is.
-        assert_eq!(port.give(Some("in1"), b"292.0"), Ok(()));
+        assert_eq!(port.give(Arriving::named("in1"), b"292.0"), Ok(()));
         assert!(port.ready());
 
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).expect("the average");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the average");
         assert_eq!(&buffer[..got], b"291");
 
         // And it is gone once taken, rather than being handed out again.
         assert!(!port.ready());
-        assert_eq!(port.take(&mut buffer), Ok(0));
+        assert_eq!(port.take(&mut buffer).map(|taken| taken.bytes), Ok(0));
     }
 
     /// A null node passes what arrives through, in order and unchanged.
@@ -1156,30 +1397,30 @@ mod tests {
         let mut port = NullPort::of("through");
 
         assert!(!port.ready(), "nothing has arrived");
-        assert_eq!(port.take(&mut [0u8; 64]), Ok(0));
+        assert_eq!(port.take(&mut [0u8; 64]).map(|taken| taken.bytes), Ok(0));
 
-        assert_eq!(port.give(None, b"290.0"), Ok(()));
-        assert_eq!(port.give(None, b"go\n"), Ok(()));
+        assert_eq!(port.give(Arriving::ANYWHERE, b"290.0"), Ok(()));
+        assert_eq!(port.give(Arriving::ANYWHERE, b"go\n"), Ok(()));
         assert!(port.ready());
 
         // In order, and whole.
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).expect("the first");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the first");
         assert_eq!(&buffer[..got], b"290.0");
-        let got = port.take(&mut buffer).expect("the second");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the second");
         assert_eq!(&buffer[..got], b"go\n");
 
         // And gone once taken, rather than handed out again.
         assert!(!port.ready());
-        assert_eq!(port.take(&mut buffer), Ok(0));
+        assert_eq!(port.take(&mut buffer).map(|taken| taken.bytes), Ok(0));
 
         // A datum that will not fit is kept rather than cut down: part of a
         // value is not a smaller value.
-        assert_eq!(port.give(None, b"2901234"), Ok(()));
+        assert_eq!(port.give(Arriving::ANYWHERE, b"2901234"), Ok(()));
         let said = port.take(&mut [0u8; 4]).expect_err("it does not fit");
         assert!(said.contains("through") && said.contains("7 bytes"), "{said}");
         assert!(port.ready(), "the datum is still here");
-        let got = port.take(&mut buffer).expect("with room");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("with room");
         assert_eq!(&buffer[..got], b"2901234");
     }
 
@@ -1197,7 +1438,7 @@ mod tests {
         );
 
         let said = port
-            .give(Some("in0"), b"29x.15")
+            .give(Arriving::named("in0"), b"29x.15")
             .expect_err("a reading that is not a number");
         assert!(
             said.contains("mean_temp") && said.contains("mean"),
@@ -1217,8 +1458,8 @@ mod tests {
                 inputs: vec!["in0".to_string(), "in1".to_string()],
             })),
         );
-        port.give(Some("in0"), b"293.15").expect("a reading");
-        port.give(Some("in1"), b"293.15").expect("the other reading");
+        port.give(Arriving::named("in0"), b"293.15").expect("a reading");
+        port.give(Arriving::named("in1"), b"293.15").expect("the other reading");
         assert!(port.ready(), "the set is complete");
 
         let said = port.take(&mut [0u8; 2]).expect_err("a buffer too small");
@@ -1230,7 +1471,7 @@ mod tests {
         // Still there, for a caller with room for it.
         assert!(port.ready(), "the result should not have been thrown away");
         let mut buffer = [0u8; 64];
-        let got = port.take(&mut buffer).expect("the result");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("the result");
         assert_eq!(&buffer[..got], b"293.15");
     }
 
@@ -1257,11 +1498,11 @@ mod tests {
         // Three readings and a decision, arriving as the fabric delivers
         // them: unnamed, because a log has no named inputs.
         for record in [&b"289.15"[..], b"289.15", b"287.3188", b"1"] {
-            assert_eq!(port.give(None, record), Ok(()));
+            assert_eq!(port.give(Arriving::ANYWHERE, record), Ok(()));
         }
         // And one that arrives with a name anyway, which a log takes: an
         // arrival cannot be ambiguous to a node that writes everything down.
-        assert_eq!(port.give(Some("in0"), b"291.0"), Ok(()));
+        assert_eq!(port.give(Arriving::named("in0"), b"291.0"), Ok(()));
         port.flush().expect("the log is flushed");
 
         assert!(!port.produces(), "a log is where data stops");
@@ -1295,9 +1536,9 @@ mod tests {
         })
         .expect("a log");
 
-        assert_eq!(port.give(None, b"abcd"), Ok(()));
+        assert_eq!(port.give(Arriving::ANYWHERE, b"abcd"), Ok(()));
         let said = port
-            .give(None, b"289.15")
+            .give(Arriving::ANYWHERE, b"289.15")
             .expect_err("six bytes in a four-byte log");
         assert!(said.contains("fixed_log"), "{said}");
     }
@@ -1311,7 +1552,7 @@ mod tests {
         let (script, mut port) = port("moc", Use::Both);
         script.lock().expect("the script").to_read = vec![Ok(b"293.15".to_vec())];
 
-        assert_eq!(port.give(None, b"1"), Ok(()));
+        assert_eq!(port.give(Arriving::ANYWHERE, b"1"), Ok(()));
         assert!(
             !port.ready(),
             "a reading waiting on a socket is not a result of what was sent to it"
@@ -1330,7 +1571,7 @@ mod tests {
         // A pass takes what is there and then asks. On a real device the
         // first pass takes nothing, the question not having been asked yet;
         // the stand-in answers at once, which is what lets the order be seen.
-        let got = port.take(&mut buffer).expect("a pass");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
         assert_eq!(&buffer[..got], b"42");
         assert_eq!(
             script.lock().expect("the script").written,
@@ -1340,7 +1581,7 @@ mod tests {
 
         // And the pass after it takes the answer to that question and asks
         // again.
-        let got = port.take(&mut buffer).expect("a pass");
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
         assert_eq!(&buffer[..got], b"43");
         assert_eq!(script.lock().expect("the script").written.len(), 2);
     }
@@ -1365,5 +1606,217 @@ mod tests {
             said.contains("trigger") && said.contains("will not take it"),
             "the complaint should say the asking failed: {said}"
         );
+    }
+
+    /// An app node is the program it names, and the streams do not cross.
+    ///
+    /// The whole of what the fabric's streams are for, end to end: a datum
+    /// handed to an app node on one stream reaches its program, and what the
+    /// program answers comes back saying which stream *that* is -- which for
+    /// an `app_payload_veh` is the other one, it being a node that takes
+    /// readings and answers with commands.
+    mod app {
+        use super::*;
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+
+        /// A program standing in for an app, written in shell.
+        ///
+        /// `cat` with its descriptors arranged for the kind of app it is
+        /// standing in for: the real apps are the `app_payload_veh`,
+        /// `app_moc_veh` and `app_all_veh` crates, which have tests of their
+        /// own. What is tested here is this port and the fabric's streams, and
+        /// five lines of shell keep that test about those.
+        fn stands_in(where_: &Path, redirect: &str) -> std::path::PathBuf {
+            let path = where_.join("stands_in");
+            let mut file = std::fs::File::create(&path).expect("a program");
+            write!(file, "#!/bin/sh\nexec cat {redirect}\n").expect("a program");
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+                .expect("a program that can be run");
+            path
+        }
+
+        /// A node of this type, running that program.
+        fn node(name: &str, node_type: &str, program: &std::path::Path) -> Node {
+            Node {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                group: None,
+                attributes: [(
+                    "program".to_string(),
+                    tcslibgs::Scalar::of(program.display().to_string()),
+                )]
+                .into_iter()
+                .collect(),
+            }
+        }
+
+        /// What the port has, once the program has answered.
+        ///
+        /// Polled, because that is what the pass does: an app is another
+        /// process and answers when it answers. The bound is so that a
+        /// program which never answers fails the test instead of hanging it.
+        fn taken_soon(port: &mut AppPort, buffer: &mut [u8]) -> Taken {
+            let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            loop {
+                let taken = port.take(buffer).expect("a datum");
+                if taken.bytes > 0 {
+                    return taken;
+                }
+                assert!(
+                    std::time::Instant::now() < until,
+                    "the program answered nothing"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        }
+
+        /// What an `app_payload_veh` answers is on the other stream.
+        #[test]
+        fn what_an_app_payload_veh_answers_is_vehicleward() {
+            let where_ = tempfile::tempdir().expect("a directory");
+            // Reads payload data at descriptor 0 and writes what it read back
+            // to the same descriptor, which is MOC data there.
+            let program = stands_in(where_.path(), ">&0");
+            let mut port = AppPort::open(&node("fore", "app_payload_veh", &program))
+                .expect("it starts");
+
+            port.give(Arriving::on(Stream::Groundward), b"293.15")
+                .expect("a reading it takes");
+
+            let mut buffer = [0u8; 64];
+            let taken = taken_soon(&mut port, &mut buffer);
+            assert_eq!(
+                taken.stream,
+                Some(Stream::Vehicleward),
+                "an app_payload_veh answers with what travels vehicleward"
+            );
+            assert_eq!(&buffer[..taken.bytes], b"293.15");
+        }
+
+        /// And an `app_all_veh` keeps the two apart.
+        #[test]
+        fn an_app_all_veh_keeps_the_two_streams_apart() {
+            let where_ = tempfile::tempdir().expect("a directory");
+            // Plain `cat`: payload data read at descriptor 0 is written as
+            // payload data at descriptor 1, and the vehicleward side is left
+            // alone.
+            let program = stands_in(where_.path(), "");
+            let mut port =
+                AppPort::open(&node("through", "app_all_veh", &program)).expect("it starts");
+
+            port.give(Arriving::on(Stream::Groundward), b"293.15")
+                .expect("a reading it takes");
+
+            let mut buffer = [0u8; 64];
+            let taken = taken_soon(&mut port, &mut buffer);
+            assert_eq!(
+                taken.stream,
+                Some(Stream::Groundward),
+                "what came in groundward goes on groundward"
+            );
+            assert_eq!(&buffer[..taken.bytes], b"293.15");
+        }
+
+        /// A datum on a stream an app does not take is refused, and named.
+        #[test]
+        fn a_datum_on_the_wrong_stream_is_refused() {
+            let where_ = tempfile::tempdir().expect("a directory");
+            let program = stands_in(where_.path(), ">&0");
+            let mut port = AppPort::open(&node("fore", "app_payload_veh", &program))
+                .expect("it starts");
+
+            let said = port
+                .give(Arriving::on(Stream::Vehicleward), b"SET 300")
+                .expect_err("a stream it does not take");
+            assert!(said.contains("fore"), "{said}");
+            assert!(said.contains("vehicleward"), "{said}");
+        }
+
+        /// A payload that is a program produces on the groundward stream.
+        ///
+        /// Asked for a reading and answering with one, which is what every
+        /// payload does: what tells this from an `app_moc_veh` is the section
+        /// of the file it is written in, and the fabric asks nothing about
+        /// that.
+        #[test]
+        fn what_an_app_all_pl_answers_is_groundward() {
+            let where_ = tempfile::tempdir().expect("a directory");
+            // Reads at descriptor 1 and writes back to it, which is payload
+            // data there.
+            let program = stands_in(where_.path(), "<&1");
+            let mut port =
+                AppPort::open(&node("bay", "app_all_pl", &program)).expect("it starts");
+
+            port.give(Arriving::on(Stream::Vehicleward), b"READ")
+                .expect("what asks it for a reading");
+
+            let mut buffer = [0u8; 64];
+            let taken = taken_soon(&mut port, &mut buffer);
+            assert_eq!(
+                taken.stream,
+                Some(Stream::Groundward),
+                "a payload's reading travels groundward"
+            );
+            assert_eq!(&buffer[..taken.bytes], b"READ");
+        }
+
+        /// And a payload nothing asks is read and never written to.
+        ///
+        /// The one node type with no data sink at all. `Graph::check` refuses
+        /// the link that would deliver to one; this is the port saying the same
+        /// thing, and saying what the type is rather than which stream was
+        /// wrong.
+        #[test]
+        fn an_app_pl_is_read_and_takes_nothing() {
+            let where_ = tempfile::tempdir().expect("a directory");
+            // One packet of payload data, written to descriptor 1 and read by
+            // nobody: six bytes after a length of six.
+            let path = where_.path().join("reports");
+            let mut file = std::fs::File::create(&path).expect("a program");
+            write!(
+                file,
+                "#!/bin/sh\nprintf '\\006\\000\\000\\000293.15' >&1\n"
+            )
+            .expect("a program");
+            // Closed before it is run: a program still open for writing is a
+            // program the kernel refuses to execute.
+            drop(file);
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+                .expect("a program that can be run");
+
+            let mut port = AppPort::open(&node("bay", "app_pl", &path)).expect("it starts");
+
+            let mut buffer = [0u8; 64];
+            let taken = taken_soon(&mut port, &mut buffer);
+            assert_eq!(taken.stream, Some(Stream::Groundward));
+            assert_eq!(&buffer[..taken.bytes], b"293.15");
+
+            // Nothing may be delivered to it, on either stream or on none.
+            for arriving in [
+                Arriving::on(Stream::Vehicleward),
+                Arriving::on(Stream::Groundward),
+                Arriving::ANYWHERE,
+            ] {
+                let said = port
+                    .give(arriving, b"READ")
+                    .expect_err("a payload that is never asked");
+                assert!(said.contains("bay"), "{said}");
+                assert!(said.contains("app_pl"), "{said}");
+            }
+        }
+
+        /// A node whose program cannot be started is said so at once.
+        #[test]
+        fn a_program_that_cannot_be_started_is_said_so() {
+            let where_ = tempfile::tempdir().expect("a directory");
+            let said = AppPort::open(&node(
+                "fore",
+                "app_payload_veh",
+                &where_.path().join("nothing-here"),
+            ))
+            .expect_err("a program that is not there");
+            assert!(said.contains("nothing-here"), "{said}");
+        }
     }
 }

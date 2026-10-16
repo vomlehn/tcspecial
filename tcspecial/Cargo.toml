@@ -6,6 +6,13 @@ description = "TCSpecial spacecraft command interpreter and data handler manager
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }
+# The file interfaces an app node's program is run with, and the starting of
+# one: see tcsapp. The same crate an app itself is written against, so that the
+# protocol is stated once.
+tcsapp = { path = "../tcsapp" }
+# The checks tcsverify makes, asked of the configuration before anything is
+# opened, so that what this refuses to start on is what tcsverify reports.
+tcsverify = { path = "../tcsverify" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 libc = "0.2"

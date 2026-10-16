@@ -966,6 +966,170 @@ Requirement
     two command loops used to return on it -- which would have stopped the link
     a spacecraft is commanded over because a program on it had finished.
 
+App nodes
+---------
+
+The other way of putting a program of somebody's own into the graph, and the
+one that does not pretend to be arithmetic. A compute node whose function is
+``process`` runs a program on *values*: a line of text in, a line of text out,
+one answer per arrival. An app node runs a program on *streams*: packets
+arrive, packets leave, and how many of the second follow from the first is the
+program's own business. Which is what a part of the telemetry and control
+system looks like when it is not a calculation -- a protocol converter, a
+recorder, something written in another language because that is where it
+already exists.
+
+Five node types, differing in which of two file interfaces the program is run
+with and on which side of the graph the node stands. Three are the vehicle's
+own, parts of the telemetry and control system itself:
+
+``app_payload_veh``
+    Reads payload data, writes MOC data. A sink for what travels groundward and
+    a source of what travels vehicleward, which is the shape the ground link
+    has: it takes readings and answers with commands.
+
+``app_moc_veh``
+    The mirror of it. Reads MOC data, writes payload data, which is the shape a
+    payload has: it is asked for something and answers with it.
+
+``app_all_veh``
+    Both, and so all four terminals. The one kind that can carry a stream
+    *through* -- payload data in at the one interface and out at the other --
+    which makes it what a ``null`` node is with something done to what passes.
+
+And two are payloads: what the vehicle carries this flight, where what it
+carries is a program the mission wrote rather than a device on a bus. A payload
+sends readings and is sent what asks for them, so neither of these is run with
+the payload interface -- payload data is what they *write*, and the interface
+payload data is written on is the MOC one. Both are written in the ``payloads``
+section, drawn on the payload pane, and read the way a sensor is read.
+
+``app_pl``
+    Writes payload data and reads nothing. A payload that is never asked: it
+    samples on a clock of its own, or reports when something happens, and what
+    decides is in the program. The one node type in the whole configuration
+    with no data sink at all, which is not an omission but the statement of
+    what it is -- there is nothing to ask it with, so nothing may be linked
+    into it.
+
+``app_all_pl``
+    Reads MOC data, writes payload data, which is a payload's own shape: asked
+    for a reading, and answering with one. It states no ``trigger`` as a device
+    on a bus does, and for the reason a trigger exists: the bytes that ask a
+    sensor are written before a read because a sensor has no other way of being
+    told, where a program is told by being given the packet.
+
+The payload pair hold the same interface an ``app_moc_veh`` holds and do the
+same two things with it. What tells the node types apart is which side of the
+graph each stands on -- which section of the file, which pane of the editor,
+which family of ``tcspecial::node`` opens it -- and not anything the program
+can see. Which is the right place for the difference to live: a program that
+answers what it is asked is the same program whether the thing asking is the
+ground or the vehicle's own graph.
+
+The interfaces are files in the sense that matters: things read and written the
+way a file is, which every language already has a library for. On a UNIX-like
+system they are the program's own descriptors 0, 1 and 2, inherited when
+tcspecial starts it -- the first two each one end of a socket pair, because
+each of them is read *and* written, and the third for what went wrong. A
+program that can read its standard input can take part.
+
+Every interface carries packets rather than bytes: four bytes of length and
+then that many bytes. The length is in the machine's own byte order, which is
+what makes it four bytes and not a stated encoding -- both ends are processes
+on one vehicle, started by one program, so there is no byte order to agree on.
+A zero-length packet is a packet, and that is deliberate: a program with
+nothing to say and a program that has said something empty are different
+things, so reading answers with an ``Option`` and the interface ending is the
+``None``.
+
+An interface the app does not support is not opened for it at all: the
+descriptor is closed in the child between the fork and the exec, so reaching
+for it is ``EBADF`` -- for any program that leaves it closed. A Rust program is
+not such a program, and the reason is worth writing down: its standard library
+opens ``/dev/null`` over any of descriptors 0, 1 and 2 that it finds closed,
+before ``main`` runs, guarding against this very hazard -- a closed standard
+descriptor is the number the next ``open`` hands out, and then a write meant
+for the terminal goes into somebody's file. So what a Rust app finds at an
+interface it does not support is a descriptor that swallows what is written and
+reads as having ended: no error, but no data either.
+
+Which is why the refusal that matters is the one that needs no descriptor. An
+app holds a type with nothing on it for the interface it has not got, so
+reaching for it does not compile; the closed descriptor is the second line of
+defence, and the third is that an app says at once when what it was handed is
+not what its kind is run with -- a socket where it should have none, or none
+where it needs one. Asked of what the descriptor *is* rather than of whether it
+is open, for the reason above.
+
+What a configuration says about one is a program to run and what to do when it
+stops. The program is required and there is no default: an app node is the
+program it names. ``restart`` is the same attribute a ``process`` computation
+takes, read the same way and ``never`` by default, because a part of the
+control system that restarts under load is worse than one that stays stopped
+and says so. It is started when the configuration is loaded rather than at the
+first datum, so a program that cannot be executed is a fault found on the
+ground.
+
+Where it all lives: ``tcsapp`` is the one statement of the protocol and holds
+both ends of it -- what the program itself holds, and the starting of one with
+the other end of each interface. ``tcslibgs::node::app`` is what a file may say
+and what is wrong with what it says, which is what the editor and ``tcsverify``
+read; it sits beside the two node families rather than in one of them, because
+the rule is one rule and the kind says which family a given app belongs to.
+``tcspecial::node::vehicle::app_payload_veh`` and its four neighbours are the
+flight side, two of them under ``tcspecial::node::payload`` because two of the
+kinds are payloads. And ``app_payload_veh``, ``app_moc_veh``, ``app_all_veh``,
+``app_pl`` and ``app_all_pl`` are five programs of their own, built as crates
+and not installed: they are what the arrangement is tested with -- three of
+them answer what arrives, one carries each stream through to the other
+interface, one reports without being asked, and a test that a packet comes back
+out of the interface it was *not* going to is how the streams are held apart.
+
+Which stream a datum is on
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An app node is what made the fabric learn this, and the rule is worth stating
+on its own because every node type is now part of it.
+
+Most nodes need no opinion about which stream a datum belongs to. A device has
+one source terminal, so where its readings go is the link's business and not
+its own; a computation's result is one result however many ways the
+configuration sends it -- a thermostat's answer goes to the heaters and to the
+ground, and neither of those is the stream it is "on". Those say nothing, and
+every link out of them is followed, which is what the fabric always did.
+
+A node with more than one terminal at either end has to be told and has to say.
+An ``app_all_veh`` is the one that does: it reads payload data on the one
+interface and MOC data on the other, so each datum it produces belongs to one
+of the two, and delivering a reading to the links leaving its ``moc-out`` would
+send telemetry out as a command. So the stream travels with the bytes --
+``Taken`` carries it out of a node, ``Arriving`` carries it in -- and
+``Fabric`` follows only the links that carry it.
+
+Which stream a link carries is settled once, where the routing table is built:
+from the terminal either end names, and failing that from the only terminal the
+type at either end has. A payload has one source and one sink, so a link from
+one is groundward whether or not the word was written, which is why nearly
+every link in every file needs none of this. ``route::stream_of`` is where
+those three answers are, in that order.
+
+Two consequences worth knowing. A delivery whose stream nothing settled takes
+whatever comes, and a datum on no stream in particular goes everywhere its
+node's links go: it is only a node that says which stream it produced on,
+delivering to a link that says which stream it carries, that can be told apart
+at all -- so every configuration that worked before works unchanged. And a
+``null`` node still does not keep the two apart: both streams pass through the
+one queue, which is written down where the queue is. A configuration that needs
+them kept apart has ``app_all_veh``, whose two interfaces are two streams.
+
+An app node is read like a device in no group: ``system::is_polled`` includes
+it, so every pass asks it, and both interfaces of an ``app_all_veh`` are asked
+turn and turn about so that a busy stream does not starve the other. Nothing
+waits on it -- ``tcsapp``'s reads answer with what has arrived and keep the
+packet that has half arrived until the rest of it comes -- because a vehicle
+that waited on a program would stop reading its sensors while it waited.
+
 Running a graph
 ---------------
 
@@ -2264,14 +2428,6 @@ deleted or renamed by anything at all. A file in that directory that tcsgui
 does not understand is left alone: it is not the prune's place to decide that
 somebody else's file is rubbish.
 
-The section has one attribute that is not about running the software at all:
-``rust-code-path``, a path to a Rust source file. See `The configuration as Rust`_.
-It is in this section because this is the section about the configuration as a
-whole, and because the editor already has a window for that section; it is left
-out of the struct the command interpreter reads, because a field carried into
-the flight software and never acted on is a field somebody will one day believe
-in.
-
 What tcspecial itself is configured with is edited from the Edit menu, under
 **Edit tcspecial parameters**. That is the one part of a configuration which is about
 the whole of it rather than about anything in it -- so there is nothing on the
@@ -2489,8 +2645,13 @@ fields it reads and ignores, because ``deny_unknown_fields`` is worth keeping:
 a misspelled section is one the software silently does nothing about, so every
 word a configuration may contain is a word named in that struct.
 
-Nothing aboard reads either reference. They are for the person editing the
-file, in the same way the ``tcsgui`` section is.
+The simulator's file says the same thing about ``tcspecial-sim.schema.json``,
+written by ``sim::to_yaml`` from the path the file is going to. It names no
+XSD, the editor writing that file in YAML and nothing else -- the XML spelling
+of that schema is shipped for a file written by hand.
+
+Nothing aboard reads any of these references. They are for the person editing
+the file, in the same way the ``tcsgui`` section is.
 
 A schema nothing is checked against is worse than no schema: it refuses files
 the software accepts, or accepts what the software refuses, and either way the
@@ -2500,8 +2661,9 @@ the lists the software itself reads from -- the section's parameters from
 ``sim_config::SETTINGS`` -- rather than against a copy written out there, which
 would be the same problem one step further away. Every shipped XML file is
 validated with ``xmllint``, and every key of every shipped YAML file is looked
-for in the JSON Schema, every shipped version 2 configuration is checked for
-the reference to its own schema and for that schema being where it says, and
+for in the JSON Schema, every shipped version 2 configuration and every
+shipped simulator configuration is checked for the reference to its own schema
+and for that schema being where it says, and
 every shipped XML file -- the version 1 payload sets included, which have no
 schema to be validated against -- is checked for being well formed XML at all.
 That last check found four files that were not: they said ``--`` inside a
@@ -2532,111 +2694,6 @@ under ``$(PREFIX)/share/tcsgui``, which is ``/usr/local/share/tcsgui`` for
 software built locally and ``/usr/share/tcsgui`` for a distribution's package:
 architecture-independent data belonging to one package, which is where the
 filesystem hierarchy standard puts it.
-
-The configuration as Rust
--------------------------
-
-What tcspecial does today is read a configuration file when it starts. The
-other way of building it is for the configuration to *become* Rust: a source
-file, compiled into the executable along with the node types it uses and the
-infrastructure around them. A vehicle built that way carries no configuration
-file at all and nothing aboard has to parse one.
-
-The generator is a program of its own, **tcsgen-rust**, taking two paths: the
-configuration to read and the ``.rs`` file to write. It is not a corner of the
-editor because generating the flight software's configuration should not
-require a window -- a Makefile, a build script and the Edit menu all run the
-same thing the same way, and the one that is tested is the one that runs.
-
-It reads the configuration with ``Graph::load``, which is the reader every
-other program uses, and writes what that graph is as Rust. So the generator
-never sees the editor's own idea of a document: it sees the configuration, as
-the vehicle will.
-
-The editor's half of that is **Edit → Generate Rust code**. It runs the
-generator, passing the configuration it is editing and the file the
-configuration's own ``tcspecial`` section names under ``rust-code-path``:
-a path, relative to the configuration's own directory or absolute. Relative to
-the configuration and not to wherever the editor was started from, because a
-configuration and the code generated from it belong together and a path that
-meant different files depending on the working directory would be a path nobody
-could check. The directory is made if it is not there -- somebody who typed
-``generated/aurora.rs`` meant the directory as much as the file -- and the
-window says where it wrote, in the line that otherwise says ``saved``.
-
-Asked for rather than done on every save. Generating the code is a second
-output of the editor and not part of what editing means, and a half-finished
-configuration in a file somebody's build is reading would be a build of
-something nobody meant.
-
-Which is also why it is the one command that insists on a finished
-configuration. Everywhere else the editor is lazy on purpose -- see `The editor
-is lazy`_ -- and here the laziness has to end: what comes out of this is
-compiled into the program the vehicle runs, so a sensor whose device nobody
-named would be a payload the binary cannot open. So the command asks
-``Graph::check`` of the configuration as the files hold it and refuses while
-anything is outstanding, warnings as well as errors, listing the first few of
-them and counting the rest -- the same five-and-``and others`` shape
-``tcsverify`` prints, so that a person who has run the verifier meets a report
-they recognise. Nothing is written when it refuses: the generated file from
-before is still the generated file from before.
-
-Where the generator is looked for: ``$TCSGEN_RUST``, then beside the editor's
-own executable, then one directory above that -- which is where the pair sits
-when the thing running is a test binary under ``target/debug/deps`` -- and
-failing those, the ``PATH``. A program that cannot be found is said so by
-name, because "no such file or directory" about a program nobody asked for
-by name is a sentence that explains nothing.
-
-It asks the files rather than the document in hand, for the same reason it
-generates from them: every edit is written as it is made, so the two say the
-same thing, and a session whose last write failed has nothing to generate from
--- which the command says in those words rather than as a complaint about a
-configuration that may be perfectly good.
-
-What is generated is a section of the configuration at a time, each as a struct
-of its own and a function that builds one. So far the ``tcspecial`` section:
-``TcSpecial``, with a field for every parameter the section holds and a struct
-for every subsection of it, built by ``tcspecial()``. The nodes, the links, the
-payload groups and the command bindings are each their own section and are to
-come. What does not vary -- what an i2c node does, what a mean computes, what
-the command interpreter answers -- is the code that is already there, and the
-generated file names those types rather than repeating them.
-
-The fields are typed as what the attributes mean rather than as the text a file
-holds them in: a socket is a ``HostPort``, which is an address and a port, the
-beacon's interval is a ``Duration``, and the log's directory is a ``PathBuf``.
-That is most of the point of generating this at all -- the splitting of
-``0.0.0.0:4000`` and the reading of ``5000`` happen once, while the file is
-being written and there is still somebody reading the error, and what is
-compiled into the vehicle is the answer.
-
-Which is also why the generator refuses a ``tcspecial`` section that is not
-finished: a typed field cannot be written from an attribute nobody stated. The
-section is read with ``parameters::ci_config_of`` and ``to_ci_config``, the two
-calls tcsverify and the flight software read it with, so a section the
-generator refuses is one they would have refused and in the same words --
-naming the attribute, because a section of nine attributes is read by somebody
-who needs to know which one to change. Nothing is written when it refuses.
-``rust-code-path`` is not generated at all: it says where the file goes, which
-is not something the vehicle is told, and a field carried into the flight
-software and never acted on is a field somebody will one day believe in.
-
-A generated file that nothing compiles is a generator that can emit something
-that does not build, and nobody would find out until a build of the flight
-software failed. So the generated form of the shipped thermostat is committed
-as ``tcsgen-rust/tests/generated/thermostat.rs`` and compiled by
-``tcsgen-rust/tests/generated.rs``, which then holds what it says against the
-same configuration read from its file and put through those same two calls. The
-compiler is the test: a change to ``HostPort`` that the generator has not kept
-up with fails there.
-
-What is still to come is the rest of the sections, and then the build that uses
-them: a tcspecial whose ``main`` reads the generated ``tcspecial()`` instead of
-a path, and a build that compiles in only the node types a configuration names.
-**Needs examination.** That is a change to how the flight software is built
-rather than to what the editor writes, which is why the editor's half landed
-first.
 
 The editor is lazy
 ------------------

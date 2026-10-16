@@ -9,6 +9,12 @@
 //! What a file may say about one, and what is wrong with what it says, is
 //! `tcslibgs::node::vehicle`.
 
+// A program of the vehicle's own, taking part in the graph over the file
+// interfaces `tcsapp` describes: three node types, which differ in which of
+// them the program is run with.
+pub mod app_all_veh;
+pub mod app_moc_veh;
+pub mod app_payload_veh;
 // Computation aboard: the arithmetic, the control loops, and the program a
 // configuration may run.
 pub mod compute;

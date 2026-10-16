@@ -1707,9 +1707,6 @@ export component MainWindow inherits Window {
     callback node-delete(string);
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
-    // Write this configuration as Rust, where the tcspecial section's
-    // `rust-code` says: see tcsgui::codegen.
-    callback generate-rust();
     // Every node to the top of its own pane: see the menu item.
     callback arrange();
     // And for the groups, the simulator's groups of settings, and the way
@@ -1784,15 +1781,6 @@ export component MainWindow inherits Window {
             MenuItem {
                 title: "Arrange the nodes";
                 activated => { root.arrange(); }
-            }
-            MenuSeparator { }
-            // The configuration as Rust, compiled into tcspecial along with
-            // the node types it uses. Asked for rather than done on every
-            // save: a half-finished configuration in a file somebody's build
-            // is reading would be a build of something nobody meant.
-            MenuItem {
-                title: "Generate Rust code";
-                activated => { root.generate-rust(); }
             }
         }
     }
@@ -1936,9 +1924,6 @@ export component SubWindow inherits Window {
     callback node-edit(string);
     callback node-delete(string);
     callback edit-parameters();
-    // Write this configuration as Rust, where the tcspecial section's
-    // `rust-code` says: see tcsgui::codegen.
-    callback generate-rust();
     // Every node to the top of its own pane: see the menu item.
     callback arrange();
     callback edit-groups();
@@ -2010,15 +1995,6 @@ export component SubWindow inherits Window {
             MenuItem {
                 title: "Arrange the nodes";
                 activated => { root.arrange(); }
-            }
-            MenuSeparator { }
-            // The configuration as Rust, compiled into tcspecial along with
-            // the node types it uses. Asked for rather than done on every
-            // save: a half-finished configuration in a file somebody's build
-            // is reading would be a build of something nobody meant.
-            MenuItem {
-                title: "Generate Rust code";
-                activated => { root.generate-rust(); }
             }
         }
     }

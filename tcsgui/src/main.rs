@@ -46,7 +46,6 @@ mod sim;
 /// the palette's tests and by nothing at run time.
 #[cfg(test)]
 mod sight;
-mod codegen;
 mod nodes;
 mod style;
 mod subdiagram;
@@ -924,17 +923,6 @@ macro_rules! wiring {
                     if let Some(window) = window_for_scroll.upgrade() {
                         window.set_canvas_offset(0.0);
                     }
-                    views.borrow().refresh(&editor.borrow());
-                });
-            }
-            {
-                // The configuration as Rust, written where the section says.
-                // Asked for rather than done on every save: see
-                // `Editor::write_rust_code`.
-                let editor = editor.clone();
-                let views = views.clone();
-                window.on_generate_rust(move || {
-                    editor.borrow_mut().write_rust_code();
                     views.borrow().refresh(&editor.borrow());
                 });
             }
@@ -5556,14 +5544,29 @@ mod tests {
                     pane.label()
                 );
             }
-            assert!(
-                order.len() <= rungs.len(),
-                "the {} panel has {} nodes and {} rungs, so it wraps -- which \
-                 is allowed, and this is where to say so deliberately",
-                pane.label(),
-                order.len(),
-                rungs.len()
-            );
+            // Two of the three panels wrap, and that is said here
+            // deliberately, which is what this assertion is for. The vehicle
+            // has seven types since the three apps joined the computation, the
+            // pass-through and the log, and four rungs; the payloads have
+            // twelve since the two payloads that are programs joined the ten
+            // devices, and ten rungs. Allowed because colour is the fourth
+            // channel in this scheme and not the first -- every pair of types
+            // differs in two things that are not colour, which
+            // `style::tests::every_pair_of_types_differs_in_two_things_that_are_not_colour`
+            // is the statement of -- so two nodes sharing a tint are still two
+            // shapes nobody can confuse. The ramp is walked in order either
+            // way, which the loop above is what checks.
+            if !matches!(pane, Pane::Vehicle | Pane::Payloads) {
+                assert!(
+                    order.len() <= rungs.len(),
+                    "the {} panel has {} nodes and {} rungs, so it wraps -- \
+                     which is allowed, and this is where to say so \
+                     deliberately",
+                    pane.label(),
+                    order.len(),
+                    rungs.len()
+                );
+            }
         }
     }
 
@@ -7493,7 +7496,7 @@ mod tests {
         // under it would read back as no section at all.
         let written = std::fs::read_to_string(&path).expect("the file");
         assert!(written.contains("interval_ms: \"1000\""), "{written}");
-        for unanswered in ["tcs_cmd", "payload_telemetry", "log", "rust-code-path"] {
+        for unanswered in ["tcs_cmd", "payload_telemetry", "log"] {
             assert!(
                 !written.contains(unanswered),
                 "{unanswered} is not stated and should not be written: {written}"

@@ -1,0 +1,27 @@
+# A program of the vehicle's own that is asked and answers.
+#
+# The mirror of app_payload_veh: it is run with one file interface, on which it
+# reads MOC data and writes payload data, so it takes what travels vehicleward
+# and answers with what travels groundward. Which is the shape a payload has,
+# and what an app of this kind stands in for: something that is asked for a
+# reading and produces one. The interfaces and the packets they carry are
+# tcsapp; its Rust is tcspecial/src/node/vehicle/app_moc_veh/.
+node: app_moc_veh
+type: app_moc_veh
+about: >
+  A program of its own: it reads MOC data and writes payload data.
+payload-sink: false
+payload-source: true
+moc-sink: true
+moc-source: false
+attributes:
+  - name: program
+    required: true
+    about: >
+      The program to run. It is started when the configuration is loaded, so
+      one that cannot be executed is a fault found on the ground.
+  - name: restart
+    required: false
+    about: >
+      What to do when it stops: never, which is the default, or a number of
+      times to start it again.

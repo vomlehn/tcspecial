@@ -481,7 +481,10 @@ distclean: clean
 # does not claim a path of its own.
 #
 # tcsmoc and tcssim are test software and are not installed. Either can be,
-# with cargo install --path tcsmoc, if that is wanted.
+# with cargo install --path tcsmoc, if that is wanted. So are app_payload_veh,
+# app_moc_veh, app_all_veh, app_pl and app_all_pl, which are what the five app
+# node types are tested with: a mission's own app is its own program,
+# installed wherever its node's `program` attribute says.
 #
 # Note that tcspecial finds its configuration by relative path -- tcspecial1.yaml
 # and tcspecial/src/tcspecial.yaml -- so an installed copy run from elsewhere
@@ -491,8 +494,6 @@ distclean: clean
 install: install-data
 	@echo "Installing $(PROJECT_NAME)..."
 	cargo install --path $(PROJECT_NAME)
-	@echo "Installing tcsgen-rust..."
-	cargo install --path tcsgen-rust
 
 # Install tcsgui's data: the description tree and the schemas.
 #

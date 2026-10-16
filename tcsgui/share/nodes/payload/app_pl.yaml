@@ -1,0 +1,30 @@
+# A payload that is a program and is never asked: it reports of its own accord.
+#
+# A payload: what the vehicle carries this flight, and this one is a program
+# the mission wrote rather than a device on a bus. Its readings leave by
+# payload-out on their way to the ground, and nothing arrives: it is the one
+# node type with no data sink at all, because there is nothing to ask it with
+# -- it samples on a clock of its own, or reports when something happens, and
+# what decides is in the program. It is run with one file interface, which it
+# only writes. The interfaces and the packets they carry are tcsapp; its Rust
+# is tcspecial/src/node/payload/app_pl/.
+node: app_pl
+type: app_pl
+about: >
+  A payload of its own making: a program that writes readings and is asked
+  nothing.
+payload-sink: false
+payload-source: true
+moc-sink: false
+moc-source: false
+attributes:
+  - name: program
+    required: true
+    about: >
+      The program to run. It is started when the configuration is loaded, so
+      one that cannot be executed is a fault found on the ground.
+  - name: restart
+    required: false
+    about: >
+      What to do when it stops: never, which is the default, or a number of
+      times to start it again.

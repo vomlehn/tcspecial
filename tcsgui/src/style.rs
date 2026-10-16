@@ -758,6 +758,19 @@ pub enum NodeType {
     /// it the statement of what a vehicle node is.
     Null,
     Log,
+    /// A program of the vehicle's own, taking part in the graph over the file
+    /// interfaces `tcsapp` describes. Three of them, which differ in which of
+    /// the two data interfaces the program is run with: see
+    /// `tcslibgs::node::app`.
+    AppPayloadVeh,
+    AppMocVeh,
+    AppAllVeh,
+    /// And a payload that is a program rather than a device: one that is asked
+    /// for a reading and answers, and one that is never asked and reports of
+    /// its own accord. The same file interfaces, on the other side of the
+    /// graph, so these two are placed on the payload pane.
+    AppPl,
+    AppAllPl,
     Moc,
     /// A diagram of its own, kept in its own file and shown here as one box.
     Subdiagram,
@@ -765,7 +778,7 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 15] = [
+    pub const ALL: [NodeType; 20] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::Serial,
@@ -779,6 +792,11 @@ impl NodeType {
         NodeType::Compute,
         NodeType::Null,
         NodeType::Log,
+        NodeType::AppPayloadVeh,
+        NodeType::AppMocVeh,
+        NodeType::AppAllVeh,
+        NodeType::AppPl,
+        NodeType::AppAllPl,
         NodeType::Moc,
         NodeType::Subdiagram,
     ];
@@ -801,6 +819,11 @@ impl NodeType {
             NodeType::Compute => "compute",
             NodeType::Null => "null",
             NodeType::Log => "log",
+            NodeType::AppPayloadVeh => "app_payload_veh",
+            NodeType::AppMocVeh => "app_moc_veh",
+            NodeType::AppAllVeh => "app_all_veh",
+            NodeType::AppPl => "app_pl",
+            NodeType::AppAllPl => "app_all_pl",
             NodeType::Moc => "moc",
             NodeType::Subdiagram => "subdiagram",
         }
@@ -945,6 +968,15 @@ impl NodeType {
             // refuses any attribute written on one.
             NodeType::Null => &[],
             NodeType::Log => &[("directory", true), ("format", true)],
+            // Read from the rules rather than repeated, as the terminals are:
+            // what an app node may say is `tcslibgs::node::app`'s,
+            // and a third attribute added there appears in a node's window
+            // without this file being touched.
+            NodeType::AppPayloadVeh
+            | NodeType::AppMocVeh
+            | NodeType::AppAllVeh
+            | NodeType::AppPl
+            | NodeType::AppAllPl => tcslibgs::node::app::ATTRIBUTES,
             NodeType::Moc => &[("address", true), ("port", true)],
             NodeType::Subdiagram => &[("file", true)],
         }
@@ -1057,6 +1089,20 @@ impl NodeType {
             // two different panes, so one heading over both was never read as
             // a group by anybody.
             NodeType::Log => "Ends of the graph",
+            // A family of three, and the heading says what they have in
+            // common: the node is a program, and what it does is not in this
+            // software at all.
+            NodeType::AppPayloadVeh | NodeType::AppMocVeh | NodeType::AppAllVeh => {
+                "Programs of their own"
+            }
+            // The same thing on the other side of the canvas, and a heading of
+            // its own because it is a different sentence: these are not parts
+            // of the system written elsewhere, they are what the vehicle
+            // carries -- a payload whose readings come from something the
+            // mission wrote rather than from a bus. Which pane a family
+            // appears on is `is_payload`, and the two must agree: see
+            // `tests::a_payload_is_a_device_or_a_driven_line`.
+            NodeType::AppPl | NodeType::AppAllPl => "Payloads of their own",
             NodeType::Moc => "The ground station",
             NodeType::Subdiagram => "Pages",
         }
@@ -1090,10 +1136,19 @@ impl NodeType {
             | NodeType::Rpmsg
             | NodeType::Network
             | NodeType::DeviceFile
-            | NodeType::Gpio => true,
+            | NodeType::Gpio
+            // A payload need not be a device. These two are programs, and
+            // what makes them payloads is that they are what the vehicle
+            // carries this flight: they are written in the `payloads` section
+            // and read the way a sensor is read.
+            | NodeType::AppPl
+            | NodeType::AppAllPl => true,
             NodeType::Compute
             | NodeType::Null
             | NodeType::Log
+            | NodeType::AppPayloadVeh
+            | NodeType::AppMocVeh
+            | NodeType::AppAllVeh
             | NodeType::Moc
             | NodeType::Subdiagram => false,
         }
@@ -1247,6 +1302,86 @@ impl NodeType {
                 edge: Single,
                 weight: Wide,
                 size: (WIDTH, 64),
+            },
+            // A program of its own: the barred rectangle, which is a step
+            // whose insides are written down somewhere else. That is exactly
+            // what one of these is -- the node is a program, and what it does
+            // is in that program and not in this software -- and it is the
+            // standard mark for it.
+            //
+            // The same shape a page of its own wears, which is the one place
+            // this grammar doubles up, and for a reason that holds: a page and
+            // an app are both a step written down elsewhere, and the two are
+            // told apart by height and by the weight of the label, the page
+            // being the tallest thing on the canvas and bold with it. The
+            // three apps are one shape among themselves, as the nine devices
+            // are: which of the two streams each carries is what its terminals
+            // say, and terminals are drawn.
+            // One shape for the three, as the nine devices wear one shape,
+            // and told apart from each other by the line and the height: the
+            // one with both interfaces is the tallest and doubled, the two
+            // with one apiece are the shorter pair. Which stream each carries
+            // is said by its terminals, that being what terminals are for.
+            NodeType::AppPayloadVeh => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: false,
+                outline: Barred,
+                edge: Single,
+                weight: Wide,
+                size: (WIDTH, 72),
+            },
+            NodeType::AppMocVeh => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: false,
+                outline: Barred,
+                edge: Dashed,
+                weight: Wide,
+                size: (WIDTH, 64),
+            },
+            NodeType::AppAllVeh => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: false,
+                outline: Barred,
+                edge: Double,
+                weight: Wide,
+                size: (WIDTH, 80),
+            },
+            // The two payloads that are programs: barred, because what they
+            // do is written down somewhere else as every app's is, and narrow,
+            // because they stand among the payloads and a payload's line is
+            // narrow. So the shape says "a program" and the weight says "what
+            // the vehicle carries", which is what each of them is.
+            //
+            // Told apart from each other by the line and the height, as the
+            // other three are. The broken line doubled is the one nothing
+            // arrives at: a payload with no data sink is the odd thing about
+            // it, and a line that is twice broken is the line that says least
+            // is coming.
+            NodeType::AppPl => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: false,
+                outline: Barred,
+                edge: DashedDouble,
+                weight: Narrow,
+                size: (WIDTH, 48),
+            },
+            NodeType::AppAllPl => Appearance {
+                face: Face::Plain,
+                label_size: 12,
+                label_weight: 400,
+                label_italic: false,
+                outline: Barred,
+                edge: Double,
+                weight: Narrow,
+                size: (WIDTH, 56),
             },
             // A diagram of its own: a step whose insides are written down
             // somewhere else, which is a predefined process -- a rectangle
@@ -1959,10 +2094,17 @@ mod tests {
     /// is what stops them. The families are the shape grammar, and the grammar
     /// already divides what the vehicle carries from what the system is made
     /// of.
+    ///
+    /// Three families are what the vehicle carries now, the third being the
+    /// payloads that are programs. A family belongs to one pane or the other
+    /// and never to both: that is why the apps are two families and not one
+    /// heading over five types, the vehicle's three being on the vehicle pane
+    /// and the payload pair on the payload pane.
     #[test]
     fn a_payload_is_a_device_or_a_driven_line() {
         for t in NodeType::ALL {
-            let by_family = matches!(t.family(), "Devices" | "Driven");
+            let by_family =
+                matches!(t.family(), "Devices" | "Driven" | "Payloads of their own");
             assert_eq!(
                 t.is_payload(),
                 by_family,

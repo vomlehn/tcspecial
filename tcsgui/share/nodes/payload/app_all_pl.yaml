@@ -1,0 +1,30 @@
+# A payload that is a program and is asked: it answers with a reading.
+#
+# A payload: what the vehicle carries this flight, and this one is a program
+# the mission wrote rather than a device on a bus. Its readings leave by
+# payload-out on their way to the ground, and what asks for them -- a trigger,
+# a command -- arrives at moc-in, which is the shape every payload has. It is
+# run with one file interface, on which it reads what asks and writes the
+# answer, so the bytes that ask are the datum itself and there is no trigger to
+# state. The interfaces and the packets they carry are tcsapp; its Rust is
+# tcspecial/src/node/payload/app_all_pl/.
+node: app_all_pl
+type: app_all_pl
+about: >
+  A payload of its own making: a program that is asked for a reading and
+  answers with one.
+payload-sink: false
+payload-source: true
+moc-sink: true
+moc-source: false
+attributes:
+  - name: program
+    required: true
+    about: >
+      The program to run. It is started when the configuration is loaded, so
+      one that cannot be executed is a fault found on the ground.
+  - name: restart
+    required: false
+    about: >
+      What to do when it stops: never, which is the default, or a number of
+      times to start it again.

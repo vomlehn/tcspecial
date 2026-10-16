@@ -61,13 +61,12 @@ impl Format {
 }
 
 /// What to do when an external program stops.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Restart {
-    /// Leave it stopped and refuse the link. The default.
-    Never,
-    /// Start it again, up to this many times.
-    UpTo(u32),
-}
+///
+/// Declared by the family rather than by this module, two of its node types
+/// running a program of their own: a computation whose function is `process`,
+/// and an app node. Named from here as well, because this is where the
+/// attribute was first written and where every caller of it has looked since.
+pub use super::Restart;
 
 /// Raw counts to kelvin: read the bytes, scale, add an offset.
 #[derive(Debug, Clone, Copy, PartialEq)]

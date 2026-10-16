@@ -287,11 +287,20 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
              interface",
             node.name
         )),
+        // An app node is a program of its own, and what is opened for it is a
+        // pair of sockets held by this process rather than an interface
+        // reached by address: see `crate::node::app` and `tcsapp`.
+        other if crate::node::app::Kind::of(other).is_some() => Err(format!(
+            "\"{}\" is an app node: it is a program of its own, and what it is \
+             reached over is made when it is started rather than named here",
+            node.name
+        )),
         other => Err(format!(
             "\"{}\": there is no node type called \"{other}\". The interfaces are \
              i2c, spi, serial, hdlc, can, iio, rpmsg, gpio, device-file and \
              network; a \
-             ground link is moc; and compute and log are the rest",
+             ground link is moc; and compute, log, null and the app nodes are \
+             the rest",
             node.name
         )),
     }

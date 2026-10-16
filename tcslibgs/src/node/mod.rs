@@ -32,6 +32,15 @@
 //! `payload/network` holds the three transports it covers, and
 //! `payload/serial` holds the two-wire variant that is one of its own terms.
 
+/// What any app node says, whichever side of the graph it stands on.
+///
+/// The one module here that is not a family. An app node is a node whose work
+/// is a program, and a configuration says the same things about one wherever
+/// it sits -- the program to run, and what to do when it stops -- so the rule
+/// is written once and the kind says which family the node belongs to. Three
+/// of the five kinds are the vehicle's own and two are payloads: see
+/// `app::Kind::is_payload`, which `crate::graph::section_of` reads.
+pub mod app;
 /// What the vehicle itself runs: a computation, a log.
 pub mod vehicle;
 /// What the vehicle carries: a device on a bus, a line it drives, a link to

@@ -560,6 +560,10 @@ mod tests {
                 // Rust of its own, then the two families in the order the
                 // code tree holds them.
                 "moc",
+                // What the vehicle carries: the two that are programs first,
+                // the tree being sorted by path.
+                "app_all_pl",
+                "app_pl",
                 "can",
                 "device-file",
                 "gpio",
@@ -570,6 +574,11 @@ mod tests {
                 "rpmsg",
                 "serial",
                 "spi",
+                // The vehicle's own, and the three programs among them come
+                // first because the tree is sorted by path.
+                "app_all_veh",
+                "app_moc_veh",
+                "app_payload_veh",
                 "hysteresis",
                 "mean",
                 "process",

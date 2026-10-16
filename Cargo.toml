@@ -9,7 +9,15 @@ members = [
     "tcssim",
     "tcsverify",
     "tcsgui",
-    "tcsgen-rust",
+    # The file interfaces an app node's program is run with, and the five
+    # apps that are run over them: see tcsapp. Three are nodes of the
+    # vehicle's own and two are payloads.
+    "tcsapp",
+    "app_payload_veh",
+    "app_moc_veh",
+    "app_all_veh",
+    "app_pl",
+    "app_all_pl",
 ]
 
 [workspace.package]

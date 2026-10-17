@@ -18,7 +18,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
-    ArmKey, BeaconTime, Command, CommandLink, CommandStatus, ConfigCommand, DHName, DHState,
+    ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, DHName, DHState,
     DHSample, DHType, Timestamp,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
     ConfigDigest, ConfigVersion, ConnectCommand,
@@ -289,7 +289,7 @@ impl TcsClient {
     }
 
     /// Send a CONFIG command
-    pub fn configure(&mut self, beacon_interval: BeaconTime) -> TcsResult<CommandStatus> {
+    pub fn configure(&mut self, beacon_interval: BeaconInterval) -> TcsResult<CommandStatus> {
         let seq = self.next_sequence();
         let cmd = Command::Config(ConfigCommand::new(seq, beacon_interval));
         let response = self.send_command(cmd)?;

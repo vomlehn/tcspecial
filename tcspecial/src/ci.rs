@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tcslibgs::{
-    answer_to, came_from, ArmKey, HostPort, BeaconTime, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
+    answer_to, came_from, ArmKey, HostPort, BeaconInterval, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry,
     DHConfig, DHName, DHSample, DHState, EndpointConfig, PingTelemetry, QueryDHSampleTelemetry,
     QueryDHTelemetry, RestartArmTelemetry, RestartTelemetry,
@@ -375,7 +375,7 @@ pub struct CommandInterpreter {
     /// The beacon sender, once the main loop has started it. Held so that a
     /// Config command can retime it.
     beacon: Option<BeaconSend>,
-    beacon_interval: BeaconTime,
+    beacon_interval: BeaconInterval,
     /// Where beacons come from, as the configuration said: the address and
     /// port this binds to send them.
     beacon_send: tcslibgs::HostPort,
@@ -670,7 +670,7 @@ impl CommandInterpreter {
         };
 
         Ok(Self {
-            beacon_interval: BeaconTime(config.beacon_interval.as_millis() as u32),
+            beacon_interval: BeaconInterval::of(config.beacon_interval),
             beacon_send: config.beacon_send.clone(),
             beacon_recv: config.beacon_recv.clone(),
             beacon: None,
@@ -791,7 +791,7 @@ impl CommandInterpreter {
                 // expires the current wait, so the next beacon goes out at
                 // once rather than after the old interval elapses.
                 if let Some(beacon) = self.beacon.as_mut() {
-                    beacon.set_interval(Duration::from_millis(cmd.beacon_interval.0 as u64));
+                    beacon.set_interval(cmd.beacon_interval.duration());
                 }
                 Telemetry::Config(ConfigTelemetry::new(cmd.header.sequence, CommandStatus::Success))
             }
@@ -826,7 +826,7 @@ impl CommandInterpreter {
         // log as the responses sent below, so the log holds everything that
         // went to the ground.
         self.beacon = BeaconSend::new(
-            Duration::from_millis(self.beacon_interval.0 as u64),
+            self.beacon_interval.duration(),
             self.beacon_send.clone(),
             self.beacon_recv.clone(),
             self.telemetry_log.clone(),

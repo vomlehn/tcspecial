@@ -4277,18 +4277,40 @@ Configure various TCSpecial values
 
 +----------------+-------------------------------------------------------------+
 | Name           | Parameters                                                  |
-+================+============+===========+====================================+
-| CONFIG_CM      | Name       | Type      | Description                        |
-|                +------------+-----------+------------------------------------+
-|                | beacon_int | BeaconTime| Interval at which BEACON telemetry |
-|                |            |           | is sent                            |
-+----------------+------------+-----------+------------------------------------+
++================+============+================+===============================+
+| CONFIG_CM      | Name       | Type           | Description                   |
+|                +------------+----------------+-------------------------------+
+|                | beacon_int | BeaconInterval | Interval at which BEACON      |
+|                |            |                | telemetry is sent             |
++----------------+------------+----------------+-------------------------------+
 | CONFIG_TM      | Parameters                                                  |
-|                +------------+-----------+------------------------------------+
-|                | Name       | Type      |  Description                       |
-|                +------------+-----------+------------------------------------+
+|                +------------+----------------+-------------------------------+
+|                | Name       | Type           |  Description                  |
+|                +------------+----------------+-------------------------------+
 |                | None                                                        |
-+----------------+------------+-----------+------------------------------------+
++----------------+------------+----------------+-------------------------------+
+
+Requirement
+    The interval is eight bytes of microseconds, least significant byte
+    first: the unit and the order a timestamp uses, so that a number crossing
+    this link means one thing whichever field it is in. There is no reserved
+    value in it -- an interval, unlike a clock, cannot fail to be read -- and
+    nought is refused where the sender is retimed rather than meaning
+    anything here.
+
+Requirement
+    A spacecraft asked for an interval longer than eight bytes of
+    microseconds can state uses the longest it can state. The alternative is
+    a very long interval arriving as a very short one, which is a spacecraft
+    beaconing as fast as it can because the ground asked it to beacon once a
+    century. Nothing will meet the limit: eight bytes of microseconds are
+    584,554 years.
+
+It is called ``BeaconInterval`` because it is a length of time and not a time
+of day. It was ``BeaconTime``, which read as the time a beacon was sent --
+and the time a beacon carries is the timestamp in its header, so the one
+thing in the system named "beacon time" was the one thing that was not a
+time.
 
 Configure Data Handler
 ~~~~~~~~~~~~~~~~~~~~~~

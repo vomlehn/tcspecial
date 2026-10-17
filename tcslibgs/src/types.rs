@@ -651,13 +651,62 @@ impl DHName {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ArmKey(pub u64);
 
-/// Beacon interval time in milliseconds
+/// How often beacons are sent, in microseconds.
+///
+/// A length of time and not a time of day, which is what it was called:
+/// `BeaconTime` read as the time a beacon was sent, and the time a beacon
+/// carries is the [`Timestamp`] in its header. The two are nothing alike --
+/// one is how often, the other is when -- and the only thing in the system
+/// named "beacon time" was the one that is not a time.
+///
+/// Microseconds, as every other time on this wire is, so that a number
+/// crossing the link means one thing. It cost nothing to agree: the longest
+/// interval eight bytes of microseconds can state is longer than the mission
+/// of anything that flies, and the shortest is a microsecond.
+///
+/// On the wire it is eight bytes, least significant byte first, like a
+/// [`Timestamp`]. There is no reserved value: unlike a clock, an interval
+/// cannot fail to be read, and nought is refused where the sender is retimed
+/// rather than being given a meaning here.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BeaconTime(pub u32);
+pub struct BeaconInterval(pub u64);
 
-impl Default for BeaconTime {
+impl Default for BeaconInterval {
+    /// Five seconds, which is what a configuration that states nothing gets.
     fn default() -> Self {
-        Self(5000) // 5 seconds default
+        Self(5 * 1_000_000)
+    }
+}
+
+impl BeaconInterval {
+    /// This interval as a length of time, for setting a timer by.
+    ///
+    /// The one way the number is read, so that nothing outside this type
+    /// knows what unit it is in.
+    pub fn duration(&self) -> Duration {
+        Duration::from_micros(self.0)
+    }
+
+    /// A length of time as the interval that states it.
+    ///
+    /// A length too long to state saturates rather than wrapping: the
+    /// alternative is a very long interval arriving as a very short one,
+    /// which is a spacecraft beaconing as fast as it can because the ground
+    /// asked it to beacon once a century.
+    pub fn of(interval: Duration) -> Self {
+        Self(u64::try_from(interval.as_micros()).unwrap_or(u64::MAX))
+    }
+
+    /// This interval as it goes on the wire: eight bytes, little-endian.
+    ///
+    /// The order a [`Timestamp`] goes in, for the reason given there.
+    pub fn to_le_bytes(&self) -> [u8; 8] {
+        self.0.to_le_bytes()
+    }
+
+    /// An interval read off the wire, those eight bytes back again.
+    pub fn from_le_bytes(bytes: [u8; 8]) -> Self {
+        Self(u64::from_le_bytes(bytes))
     }
 }
 
@@ -3516,6 +3565,37 @@ payloads:
         // And the epoch itself is a real time, which is why nought is not
         // what a clock fault sends.
         assert!(!Timestamp { micros: 0 }.clock_failed());
+    }
+
+    /// The beacon interval goes on the wire as eight little-endian bytes,
+    /// and is a length of time at both ends of that.
+    ///
+    /// The byte order written out by hand rather than taken from
+    /// `to_le_bytes` on both sides, which would pass whichever order it used.
+    #[test]
+    fn a_beacon_interval_is_eight_little_endian_bytes() {
+        let every = BeaconInterval::of(Duration::from_secs(5));
+        assert_eq!(every.0, 5_000_000, "microseconds, as every time here is");
+        assert_eq!(every.duration(), Duration::from_secs(5));
+        assert_eq!(
+            every.to_le_bytes(),
+            [0x40, 0x4B, 0x4C, 0x00, 0x00, 0x00, 0x00, 0x00],
+            "least significant byte first"
+        );
+        assert_eq!(BeaconInterval::from_le_bytes(every.to_le_bytes()), every);
+
+        // Five seconds is also what a configuration stating nothing gets.
+        assert_eq!(BeaconInterval::default(), every);
+
+        // A microsecond is the shortest interval statable, and an interval
+        // too long to state saturates rather than wrapping round to a short
+        // one -- a spacecraft asked to beacon once a century must not answer
+        // by beaconing as fast as it can.
+        assert_eq!(BeaconInterval::of(Duration::from_micros(1)).0, 1);
+        assert_eq!(
+            BeaconInterval::of(Duration::from_secs(u64::MAX)).0,
+            u64::MAX
+        );
     }
 
     /// A clock that cannot be read says so, however it failed.

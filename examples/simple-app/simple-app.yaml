@@ -53,5 +53,5 @@ payloads:
 
 tcsgui:
   nodes:
-    - { name: moc-1, x: 597, y: 72 }
-    - { name: lorem, x: 42, y: 76 }
+    - { name: moc-1, x: 790, y: 129 }
+    - { name: lorem, x: 15, y: 204 }

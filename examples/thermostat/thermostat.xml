@@ -151,16 +151,16 @@
         <sets>thermostat.setpoint</sets>
     </commands>
     <tcsgui>
-        <nodes><name>temp_fore</name><x>42</x><y>42</y></nodes>
-        <nodes><name>temp_aft</name><x>42</x><y>159</y></nodes>
-        <nodes><name>temp_bay</name><x>42</x><y>280</y></nodes>
-        <nodes><name>k_fore</name><x>238</x><y>42</y></nodes>
-        <nodes><name>k_aft</name><x>238</x><y>159</y></nodes>
-        <nodes><name>k_bay</name><x>238</x><y>280</y></nodes>
-        <nodes><name>mean_temp</name><x>461</x><y>159</y></nodes>
-        <nodes><name>thermostat</name><x>612</x><y>238</y></nodes>
-        <nodes><name>moc</name><x>794</x><y>42</y></nodes>
-        <nodes><name>heaters</name><x>42</x><y>401</y></nodes>
-        <nodes><name>housekeeping</name><x>461</x><y>382</y></nodes>
+        <nodes><name>temp_fore</name><x>34</x><y>34</y></nodes>
+        <nodes><name>temp_aft</name><x>34</x><y>166</y></nodes>
+        <nodes><name>temp_bay</name><x>34</x><y>280</y></nodes>
+        <nodes><name>k_fore</name><x>242</x><y>34</y></nodes>
+        <nodes><name>k_aft</name><x>242</x><y>166</y></nodes>
+        <nodes><name>k_bay</name><x>242</x><y>280</y></nodes>
+        <nodes><name>mean_temp</name><x>469</x><y>166</y></nodes>
+        <nodes><name>thermostat</name><x>601</x><y>242</y></nodes>
+        <nodes><name>moc</name><x>790</x><y>34</y></nodes>
+        <nodes><name>heaters</name><x>34</x><y>393</y></nodes>
+        <nodes><name>housekeeping</name><x>469</x><y>374</y></nodes>
     </tcsgui>
 </configuration>

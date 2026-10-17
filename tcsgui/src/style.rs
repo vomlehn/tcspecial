@@ -24,77 +24,56 @@
 
 /// The outline a node is drawn with.
 ///
-/// Slint draws all of these from its own primitives -- a `Rectangle` with and
-/// without `border-radius`, and one with a radius of half its shorter side for
-/// a fully rounded end -- so none of this needs an image or a font.
+/// Three, one to a pane: a payload is a parallelogram, a part of the vehicle
+/// a rectangle with rounded corners, and the ground the plain rectangle. So
+/// the outline alone says which of the three a node belongs to, and what
+/// tells two of one family apart is the line around it, the line's weight and
+/// the way the name is set. Every one is drawn as a path, from
+/// [`polygon_of`], so every one can take any of the edges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outline {
     /// Square corners. Something outside the system: the ground station.
     ///
     /// The external entity of a data-flow diagram, which is what the ground
-    /// is: the far end of the link, not part of the vehicle. It was the
-    /// payloads' shape, and they have the data symbol now, so the plain
-    /// rectangle is free for the one node it is the standard symbol for.
+    /// is: the far end of the link, not part of the vehicle.
     Square,
-    /// A parallelogram. Data arriving or leaving: a payload.
+    /// A parallelogram. Data arriving or leaving: a payload, every one.
     ///
     /// The flowchart symbol for input and output on an unspecified medium,
-    /// which is exactly what the nine device kinds are -- a bus, a socket, a
-    /// channel, a sample buffer, a file -- and the one symbol in the notation
-    /// that means *data crossing a boundary* rather than a thing or a step.
+    /// which is exactly what a payload is -- a bus, a socket, a channel, a
+    /// sample buffer, a file, lines driven, a program -- and the one symbol in
+    /// the notation that means *data crossing a boundary* rather than a thing
+    /// or a step.
     ///
     /// It leans right, as the symbol is drawn, so its missing corners are the
-    /// top left and the bottom right. The top left is where a payload's
-    /// `payload-out` terminal is, which is why [`room_at`] exists: a terminal
-    /// in a corner the shape has given away is a terminal floating outside
-    /// its node, so the terminals of a slanted shape move in with the slant,
-    /// and so does the row its name is padded away from.
-    ///
-    /// Drawn from [`parallelogram`], for the reason [`Outline::Store`] gives.
-    ///
+    /// top left and the bottom right. A terminal in a corner the shape has
+    /// given away would float outside its node, so the terminals of a slanted
+    /// shape move in with the slant -- see [`room_at`] -- and so does the row
+    /// its name is padded away from.
     Parallelogram,
-    /// Rounded corners. Software aboard: a computation.
+    /// Rounded corners. A part of the vehicle, every one: a computation, a
+    /// log, a null node, a page of its own, an app aboard.
+    ///
+    /// The process of a data-flow diagram, which is what the vehicle's own
+    /// graph is made of. Drawn as a path, with each corner an arc of
+    /// [`RADIUS`] in [`ARC_STEPS`] straight pieces, rather than as a corner
+    /// radius on a rectangle: a radius cannot be dashed or doubled, and seven
+    /// vehicle types of one outline need the edges to be told apart by.
     Rounded,
-    /// Two long sides and one end: the data store of a data-flow diagram.
-    ///
-    /// What a log is. It was a pill, which is the flowchart symbol for a
-    /// *terminator* -- where control enters or leaves a program -- and a log
-    /// is not that: it is somewhere data is kept. Both notations in common use
-    /// draw a store as a rectangle with at least one end left open, and
-    /// leaving an end open is also the one way to stop being a rectangle
-    /// without touching a corner.
-    ///
-    /// Open on the left, because a log's one terminal is `payload-in`, in its
-    /// top right. The pill it replaced put that arrow about fifteen pixels
-    /// outside its own outline, which is the defect this fixes as much as the
-    /// meaning: a radius of half the shorter side rounds away the very corner
-    /// the terminal is drawn in.
-    ///
-    /// Drawn from [`store`] rather than from a corner radius, because a
-    /// radius cannot leave a side out. The arithmetic is there, where it can
-    /// be tested, as the link routes' is.
-    Store,
-    /// A rectangle with one pair of corners rounded and one square, which
-    /// reads as a direction. Interfaces that are driven rather than read.
-    Keyed,
-    /// A square rectangle with a bar inset at each end: a predefined process.
-    ///
-    /// The flowchart symbol for a step whose insides are written down
-    /// somewhere else -- a subroutine -- which is what a page of its own is.
-    /// It was a rounded rectangle with a second outline inside it, which was
-    /// this symbol by accident and at one remove; the bars say the same thing
-    /// the way every reader of a flowchart has already been taught it.
-    ///
-    /// Square corners, because a page of its own carries all four terminals
-    /// and a terminal is drawn in a corner. The bars are inside the shape, so
-    /// they cost nothing a corner needs: that is why this is the one standard
-    /// symbol available to a node with every terminal.
-    ///
-    /// Drawn from a radius of nothing and two bars in the markup, not from a
-    /// path: the bars are not one closed shape, and the markup already draws
-    /// the keyed corner the same way.
-    Barred,
 }
+
+/// How round a rounded outline's corners are, in pixels.
+///
+/// Tight enough that a terminal three pixels in from the border -- see
+/// [`TERMINAL_INSET`] -- is inside the curve, so a rounded node's terminals sit
+/// where every other node's do and nothing has to move in for the corner:
+/// at nine, the corner of a terminal's box is eight and a half pixels from the
+/// arc's centre, inside even the straight pieces the arc is drawn in.
+pub const RADIUS: f32 = 9.0;
+
+/// How many straight pieces each rounded corner is drawn in: enough that the
+/// pieces read as a curve at any size the canvas is drawn at.
+pub const ARC_STEPS: usize = 8;
 
 /// How a node's outline is drawn: one line, two, or a broken one.
 ///
@@ -128,24 +107,31 @@ pub enum Edge {
     /// took away the channel that told nine payload types apart, and four
     /// edges by two weights is eight -- see `HEIGHT`.
     Dotted,
+    /// Two lines of dots: the dotted line doubled, as the dashed one is. A
+    /// sixth edge because every payload is a parallelogram, and twelve
+    /// payload types need twelve lines between six edges and two weights.
+    DottedDouble,
 }
 
 impl Edge {
     /// Whether a second line is drawn inside the first.
     pub fn doubled(self) -> bool {
-        matches!(self, Edge::Double | Edge::DashedDouble)
+        matches!(self, Edge::Double | Edge::DashedDouble | Edge::DottedDouble)
     }
 
     /// Whether the line is broken.
     pub fn broken(self) -> bool {
-        matches!(self, Edge::Dashed | Edge::DashedDouble | Edge::Dotted)
+        matches!(
+            self,
+            Edge::Dashed | Edge::DashedDouble | Edge::Dotted | Edge::DottedDouble
+        )
     }
 
     /// The pattern a broken line is drawn in: how long a piece of it is, and
     /// the gap after it.
     fn pattern(self) -> (f32, f32) {
         match self {
-            Edge::Dotted => (DOT, DOT_GAP),
+            Edge::Dotted | Edge::DottedDouble => (DOT, DOT_GAP),
             _ => (DASH, GAP),
         }
     }
@@ -372,10 +358,9 @@ pub struct Corner {
 /// strings each formatting its own arithmetic, which is four places to get a
 /// corner wrong.
 ///
-/// Empty for a rounded outline, which is a corner radius and not a polygon:
-/// an arc in a path is a different kind of arithmetic, and the two types drawn
-/// with one need neither a dash nor a second line. The test below is what says
-/// so, rather than this comment.
+/// A rounded outline's corners are arcs, each drawn as [`ARC_STEPS`] straight
+/// pieces, so it is a polygon like the others and takes a dash or a second
+/// line the same way.
 ///
 /// Wound clockwise, starting at the top left, and inset half a pixel so the
 /// stroke sits inside the node: a path drawn on the boundary is drawn half
@@ -385,13 +370,25 @@ pub fn polygon_of(outline: Outline, (width, height): (u32, u32)) -> Vec<(f32, f3
     let (w, h) = (width as f32 - 0.5, height as f32 - 0.5);
     let (left, top) = (0.5, 0.5);
     match outline {
-        // A radius, not a polygon.
-        Outline::Rounded => Vec::new(),
-        // The square one, and the two that are a square with something drawn
-        // on it: the keyed corner and the two bars are overlays, so the
-        // outline underneath them is the plain rectangle.
-        Outline::Square | Outline::Keyed | Outline::Barred | Outline::Store => {
-            vec![(left, top), (w, top), (w, h), (left, h)]
+        Outline::Square => vec![(left, top), (w, top), (w, h), (left, h)],
+        // Each corner an arc about a centre RADIUS in from both of its sides,
+        // clockwise from the top left as the others are wound.
+        Outline::Rounded => {
+            let r = RADIUS.min((w - left) / 2.0).min((h - top) / 2.0);
+            let corners = [
+                ((left + r, top + r), std::f32::consts::PI),
+                ((w - r, top + r), 1.5 * std::f32::consts::PI),
+                ((w - r, h - r), 0.0),
+                ((left + r, h - r), 0.5 * std::f32::consts::PI),
+            ];
+            let mut points = Vec::with_capacity(4 * (ARC_STEPS + 1));
+            for ((cx, cy), from) in corners {
+                for step in 0..=ARC_STEPS {
+                    let angle = from + std::f32::consts::FRAC_PI_2 * step as f32 / ARC_STEPS as f32;
+                    points.push((cx + r * angle.cos(), cy + r * angle.sin()));
+                }
+            }
+            points
         }
         Outline::Parallelogram => {
             let slant = (h - top) / 2.0;
@@ -403,16 +400,6 @@ pub fn polygon_of(outline: Outline, (width, height): (u32, u32)) -> Vec<(f32, f3
             ]
         }
     }
-}
-
-/// Whether the outline's own line comes back to where it started.
-///
-/// Every shape's does but the data store's, which is a store because its left
-/// side is not drawn. The shape it *fills* is closed all the same -- a fill
-/// closes a path the way SVG does -- so this is a fact about the line and not
-/// about the shape.
-fn closes(outline: Outline) -> bool {
-    outline != Outline::Store
 }
 
 /// The shape to fill, as path data in the node's own coordinates.
@@ -434,18 +421,16 @@ pub fn shape_of(outline: Outline, size: (u32, u32)) -> String {
 /// The line to stroke: the outline itself, broken into dashes where the edge
 /// is a broken one.
 ///
-/// Empty for a rounded outline, which the markup strokes with a Rectangle's
-/// own border.
 pub fn edge_of(outline: Outline, edge: Edge, size: (u32, u32)) -> String {
-    line_of(&polygon_of(outline, size), outline, edge)
+    line_of(&polygon_of(outline, size), edge)
 }
 
 /// The second line of a doubled edge, inset four pixels from the first.
 ///
 /// Empty unless the edge is a doubled one. The inset is taken as a smaller box
 /// rather than by moving the points, so that each shape insets the way it is
-/// shaped: a parallelogram's inner line leans by its own slant, and a store's
-/// is open on the same side.
+/// shaped: a parallelogram's inner line leans by its own slant, and a rounded
+/// one's corners are rounded about their own centres.
 pub fn inner_of(outline: Outline, edge: Edge, (width, height): (u32, u32)) -> String {
     if !edge.doubled() || width <= 2 * DOUBLE || height <= 2 * DOUBLE {
         return String::new();
@@ -455,7 +440,7 @@ pub fn inner_of(outline: Outline, edge: Edge, (width, height): (u32, u32)) -> St
         .into_iter()
         .map(|(x, y)| (x + inset, y + inset))
         .collect();
-    line_of(&points, outline, edge)
+    line_of(&points, edge)
 }
 
 /// How far the second line of a doubled edge is from the first, in pixels.
@@ -477,18 +462,16 @@ const DOT: f32 = 2.0;
 const DOT_GAP: f32 = 4.0;
 
 /// One polygon as a line, dashed or whole.
-fn line_of(points: &[(f32, f32)], outline: Outline, edge: Edge) -> String {
+fn line_of(points: &[(f32, f32)], edge: Edge) -> String {
     if points.is_empty() {
         return String::new();
     }
     if !edge.broken() {
         let mut out = run_of(points);
-        if closes(outline) {
-            out.push_str(" Z");
-        }
+        out.push_str(" Z");
         return out;
     }
-    dashes_of(points, closes(outline), edge.pattern())
+    dashes_of(points, true, edge.pattern())
 }
 
 /// A polygon's points as one move and a line to each of the rest.
@@ -644,36 +627,37 @@ pub const TERMINAL_INSET: u32 = 3;
 /// tested. The test below is what says the four of them land in four
 /// different corners and clear each other.
 ///
-/// On the grid: the box's upper left corner is a grid point, as a node's is
-/// -- see `pane::PX_PER_MM` -- so the terminals of nodes on the grid line up
-/// with each other and with the grid, and a line between two of them runs
-/// along it. Which is why the node's place is asked: a grid point is not a
-/// whole number of pixels from the last, so the same corner of two nodes is
-/// not the same number of pixels in from each. Rounded inwards -- down and
-/// right at the top and the left, up and left at the bottom and the right --
-/// so a terminal is never pushed out of its node or across its slant, and
-/// keeps at least its inset on every side.
+/// On the grid: the box's upper left corner is on one of the lines five
+/// millimetres apart -- see `pane::NODE_STEP_MM` -- so the terminals of nodes
+/// line up with each other and with those lines, and a line between two level
+/// terminals runs along one. Which is why the node's place is asked: a
+/// millimetre is not a whole number of pixels, so the same corner of two nodes
+/// is not the same number of pixels in from each. The first line in from the
+/// border at the top and the left, the last at the bottom and the right, so a
+/// terminal is never pushed out of its node or across its slant and keeps at
+/// least its inset on every side. A node where a node may be -- a step of five
+/// millimetres -- has its two rows ten millimetres apart.
 pub fn terminal_at(
     outline: Outline,
     corner: Corner,
     (width, height): (u32, u32),
     at: (i32, i32),
 ) -> (i32, i32) {
-    use crate::pane::{grid_ceil, grid_floor};
+    use crate::pane::{line_ceil, line_floor};
 
     let inset = TERMINAL_INSET as i32;
     let far = |whole: u32, box_: u32| whole as i32 - box_ as i32 - inset;
     // In by whatever the outline is missing at this row: see `room_at`.
     let room = room_at(outline, (width, height), corner);
     let x = if corner.left {
-        grid_ceil(at.0 + inset + room)
+        line_ceil(at.0 + inset + room)
     } else {
-        grid_floor(at.0 + far(width, TERMINAL.0) - room)
+        line_floor(at.0 + far(width, TERMINAL.0) - room)
     };
     let y = if corner.top {
-        grid_ceil(at.1 + inset)
+        line_ceil(at.1 + inset)
     } else {
-        grid_floor(at.1 + far(height, TERMINAL.1))
+        line_floor(at.1 + far(height, TERMINAL.1))
     };
     (x - at.0, y - at.1)
 }
@@ -1124,15 +1108,12 @@ impl NodeType {
 
     /// Which family this type belongs to.    /// Which family this type belongs to.
     ///
-    /// The families are the shape grammar, and it is the standard notations'
-    /// grammar rather than one of our own: a parallelogram is data crossing a
-    /// boundary, a rounded box is a process, a plain rectangle is something
-    /// outside the system, a box with an end left open is somewhere data is
-    /// kept, a barred one is a step written down elsewhere, and a keyed
-    /// rectangle -- the one mark here that is nobody's standard -- is an
-    /// interface that is driven rather than read. The palette shows them under these headings, which is how the
-    /// grammar gets taught -- a flat list of thirteen shapes hides the pattern
-    /// that would make them learnable.
+    /// The families are what the types are for, within the three outlines: a
+    /// parallelogram is data crossing a boundary, a payload; a rounded box is
+    /// a process, a part of the vehicle; and a plain rectangle is something
+    /// outside the system, the ground. The palette shows the types under these
+    /// headings, which is how the grammar gets taught -- a flat list of twenty
+    /// shapes hides the pattern that would make them learnable.
     pub fn family(self) -> &'static str {
         match self {
             NodeType::I2c
@@ -1220,16 +1201,12 @@ impl NodeType {
 
     /// How this type is drawn.
     ///
-    /// The groupings are meant to be learnable rather than arbitrary: square
-    /// a parallelogram is data crossing a boundary, rounded corners are a
-    /// process aboard, a keyed rectangle is an interface that is driven, a
-    /// barred one is a page written down somewhere else, and the two ends of
-    /// the graph are the
-    /// two shapes nothing else uses -- a pill where it stops on board, a
-    /// store where it is kept, and the ground is the plain rectangle of
-    /// something outside the system altogether. Within a shape the types
-    /// differ by the edge, the weight and the way the label is set -- not the
-    /// size, every node being one size: see `HEIGHT`.
+    /// One outline to a pane, so the outline says which pane a node belongs in:
+    /// a parallelogram is data crossing a boundary, a payload; rounded corners
+    /// are a process aboard, a part of the vehicle; and the plain rectangle is
+    /// something outside the system altogether, the ground. Within an outline
+    /// the types differ by the edge, the weight and the way the label is set
+    /// -- not the size, every node being one size: see `HEIGHT`.
     pub fn appearance(self) -> Appearance {
         use Outline::*;
         use Edge::*;
@@ -1333,15 +1310,16 @@ impl NodeType {
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
-            // Driven rather than read, and shaped to say so.
+            // Driven rather than read: a payload, so a parallelogram, told from
+            // the others by a dotted line and a plain name.
             NodeType::Gpio => Appearance {
                 face: Face::Plain,
                 label_size: 14,
-                label_weight: 700,
+                label_weight: 400,
                 label_italic: false,
-                outline: Keyed,
-                edge: Single,
-                weight: Wide,
+                outline: Parallelogram,
+                edge: Dotted,
+                weight: Narrow,
                 size: (WIDTH, HEIGHT),
             },
             // Software aboard.
@@ -1370,32 +1348,20 @@ impl NodeType {
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
-            // A program of its own: the barred rectangle, which is a step
-            // whose insides are written down somewhere else. That is exactly
-            // what one of these is -- the node is a program, and what it does
-            // is in that program and not in this software -- and it is the
-            // standard mark for it.
-            //
-            // The same shape a page of its own wears, which is the one place
-            // this grammar doubles up, and for a reason that holds: a page and
-            // an app are both a step written down elsewhere, and the two are
-            // told apart by the line and by the label, the page's being the
-            // larger and bold. The
-            // three apps are one shape among themselves, as the nine devices
-            // are: which of the two streams each carries is what its terminals
-            // say, and terminals are drawn.
-            // One shape for the three, as the nine devices wear one shape,
-            // and told apart from each other by the line and the label: the
-            // one with both interfaces is doubled and bold, the one the ground
-            // drives is dashed and italic, and the payload's is plain. Which stream each carries
-            // is said by its terminals, that being what terminals are for.
+            // A program of its own aboard: a part of the vehicle, so rounded,
+            // and told from the vehicle's other nodes and from each other by
+            // the line and the label -- the one with both interfaces is
+            // doubled and bold, the one the ground drives is dashed and
+            // italic, and the payload's is doubled and broken. Which stream
+            // each carries is said by its terminals, that being what terminals
+            // are for.
             NodeType::AppPayloadVeh => Appearance {
                 face: Face::Plain,
                 label_size: 12,
                 label_weight: 400,
                 label_italic: false,
-                outline: Barred,
-                edge: Single,
+                outline: Rounded,
+                edge: DashedDouble,
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
@@ -1404,7 +1370,7 @@ impl NodeType {
                 label_size: 12,
                 label_weight: 400,
                 label_italic: true,
-                outline: Barred,
+                outline: Rounded,
                 edge: Dashed,
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
@@ -1414,73 +1380,62 @@ impl NodeType {
                 label_size: 12,
                 label_weight: 700,
                 label_italic: false,
-                outline: Barred,
+                outline: Rounded,
                 edge: Double,
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
-            // The two payloads that are programs: barred, because what they
-            // do is written down somewhere else as every app's is, and narrow,
-            // because they stand among the payloads and a payload's line is
-            // narrow. So the shape says "a program" and the weight says "what
-            // the vehicle carries", which is what each of them is.
+            // The two payloads that are programs: parallelograms, because they
+            // are payloads and every payload wears that shape, with the dotted
+            // line doubled -- the one edge no other node has -- saying "a
+            // program" among them.
             //
-            // Told apart from each other by the line and the label, as the
-            // other three are. The broken line doubled is the one nothing
-            // arrives at: a payload with no data sink is the odd thing about
-            // it, and a line that is twice broken is the line that says least
-            // is coming.
+            // Told apart from each other by the weight and the label: the one
+            // nothing arrives at is narrow and set small, the one that is
+            // asked is wide.
             NodeType::AppPl => Appearance {
                 face: Face::Plain,
                 label_size: 10,
                 label_weight: 400,
                 label_italic: false,
-                outline: Barred,
-                edge: DashedDouble,
+                outline: Parallelogram,
+                edge: DottedDouble,
                 weight: Narrow,
                 size: (WIDTH, HEIGHT),
             },
             NodeType::AppAllPl => Appearance {
                 face: Face::Plain,
-                label_size: 14,
+                label_size: 12,
                 label_weight: 400,
                 label_italic: false,
-                outline: Barred,
-                edge: Double,
-                weight: Narrow,
+                outline: Parallelogram,
+                edge: DottedDouble,
+                weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
-            // A diagram of its own: a step whose insides are written down
-            // somewhere else, which is a predefined process -- a rectangle
-            // with a bar inset at each end. It was a rounded box with a second
-            // outline inside it, which was this symbol by accident and at one
-            // remove.
-            //
-            // Open now rather than doubled, because the bars are the second
-            // thing inside the shape and two of those is a busy node. Narrow,
-            // which with its large bold label is what tells it from the apps
-            // that share its shape.
+            // A diagram of its own: a part of the vehicle, so rounded, with a
+            // second line inside the first and a large bold name -- a page is
+            // a step whose insides are drawn somewhere else.
             NodeType::Subdiagram => Appearance {
                 face: Face::Plain,
                 label_size: 14,
                 label_weight: 700,
                 label_italic: false,
-                outline: Barred,
-                edge: Single,
+                outline: Rounded,
+                edge: Double,
                 weight: Narrow,
                 size: (WIDTH, HEIGHT),
             },
-            // Where the data is kept, which is a store and not an end: a
-            // flowchart's rounded end is a terminator, where control enters or
-            // leaves, and a log is neither. Narrow still, so the one thing
-            // that changed is the thing that was wrong.
+            // Where the data is kept aboard: rounded, as every part of the
+            // vehicle is, and told from the others by a dotted line and a small
+            // italic name.
             NodeType::Log => Appearance {
                 face: Face::Plain,
-                label_size: 12,
+                label_size: 10,
                 label_weight: 400,
-                label_italic: false,
-                outline: Store,
-                edge: Single,
+                label_italic: true,
+                outline: Rounded,
+                edge: Dotted,
                 weight: Narrow,
                 size: (WIDTH, HEIGHT),
             },
@@ -1515,52 +1470,29 @@ impl NodeType {
 mod tests {
     use super::*;
 
-    /// Every outline is drawn by one of the two means, stays inside its own
-    /// box, and holds the terminals it is drawn with.
+    /// Every outline is a polygon, stays inside its own box, and holds the
+    /// terminals it is drawn with.
     ///
-    /// Two means, because a corner radius draws the rounded outline and
-    /// nothing else: every other shape is a polygon, and a polygon is what a
-    /// dash and a second line are walked along. The markup picks between them
-    /// on the paths being empty, so an outline added later with a radius and a
-    /// polygon both -- or with neither -- would be drawn twice or not at all,
-    /// and in neither case would anything say so.
+    /// A polygon because a polygon is what a dash and a second line are walked
+    /// along: the rounded outline was a corner radius once, and could take
+    /// neither, which left the vehicle's seven types two channels to be told
+    /// apart by. The markup draws the paths, so an outline with no polygon
+    /// would be drawn not at all and nothing would say so.
     #[test]
-    fn every_outline_is_either_a_radius_or_a_polygon() {
+    fn every_outline_is_a_polygon() {
         for kind in NodeType::ALL {
             let drawn = kind.appearance();
             let (width, height) = drawn.size;
             let points = polygon_of(drawn.outline, drawn.size);
             let shape = shape_of(drawn.outline, drawn.size);
             let edge = edge_of(drawn.outline, drawn.edge, drawn.size);
-            let rounded = drawn.outline == Outline::Rounded;
 
-            assert_eq!(
-                rounded,
-                points.is_empty(),
-                "{} is {:?} and its polygon has {} corners",
-                kind.spelling(),
-                drawn.outline,
-                points.len()
-            );
-            assert_eq!(
-                points.is_empty(),
-                shape.is_empty() && edge.is_empty(),
+            assert!(!points.is_empty(), "{} has no polygon", kind.spelling());
+            assert!(
+                !shape.is_empty() && !edge.is_empty(),
                 "{}'s polygon and its paths disagree: {shape:?}, {edge:?}",
                 kind.spelling()
             );
-
-            if rounded {
-                // A radius has no polygon to walk, so it can carry neither a
-                // dash nor a second line, and the markup would silently draw
-                // a plain rounded rectangle instead of saying so.
-                assert!(
-                    !drawn.edge.broken() && !drawn.edge.doubled(),
-                    "{} is drawn with a radius and asks for a {:?} edge",
-                    kind.spelling(),
-                    drawn.edge
-                );
-                continue;
-            }
 
             // Inside its own box, every coordinate of it. A shape that
             // overhangs is a shape whose terminals and lines are all drawn
@@ -1598,7 +1530,7 @@ mod tests {
             // shape would be a line beside the node.
             for spot in points_of(&edge) {
                 assert!(
-                    on_edge(&points, spot, closes(drawn.outline)),
+                    on_edge(&points, spot, true),
                     "{}'s edge has a dash at {spot:?}, which is not on its \
                      outline",
                     kind.spelling()
@@ -1819,22 +1751,29 @@ mod tests {
         let inset = TERMINAL_INSET as i32;
         let (box_width, box_height) = (TERMINAL.0 as i32, TERMINAL.1 as i32);
 
-        // Wherever the node is: a terminal's place in it depends on where the
-        // grid falls, so every place a grid point can be from a node's corner
-        // is tried -- a few millimetres' worth of positions covers them all.
-        for (t, node) in NodeType::ALL
-            .iter()
-            .flat_map(|t| (0..40).map(move |n| (t, (n * 7, n * 5 + 3))))
-        {
+        // Wherever a node may be: a terminal's place in it depends on where
+        // the millimetres fall in pixels, so a run of the places a node may
+        // be is tried, which covers every way they can fall.
+        let places: Vec<i32> = std::iter::successors(Some(crate::pane::node_ceil(0)), |at| {
+            Some(crate::pane::node_after(*at))
+        })
+        .take(40)
+        .collect();
+        for (t, node) in NodeType::ALL.iter().flat_map(|t| {
+            places
+                .iter()
+                .zip(places.iter().rev())
+                .map(move |(x, y)| (t, (*x, *y)))
+        }) {
             let (width, height) = t.appearance().size;
             let mut boxes: Vec<(i32, i32)> = Vec::new();
             for terminal in t.terminals().each() {
                 let corner = corner_of(terminal).expect("a corner");
                 let at = terminal_at(t.appearance().outline, corner, (width, height), node);
-                // On the grid, where the node is.
+                // On the lines five millimetres apart, where the node is.
                 assert!(
-                    crate::pane::is_on_grid(node.0 + at.0) && crate::pane::is_on_grid(node.1 + at.1),
-                    "{}: {terminal} at {at:?} in a node at {node:?} is off the grid",
+                    crate::pane::is_on_line(node.0 + at.0) && crate::pane::is_on_line(node.1 + at.1),
+                    "{}: {terminal} at {at:?} in a node at {node:?} is off the lines",
                     t.spelling()
                 );
                 // Inside the node, with its inset on every side.

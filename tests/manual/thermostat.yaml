@@ -141,14 +141,14 @@ commands:
 
 tcsgui:
   nodes:
-    - { name: temp_fore, x: 42, y: 42 }
-    - { name: temp_aft, x: 42, y: 159 }
-    - { name: temp_bay, x: 42, y: 280 }
-    - { name: k_fore, x: 238, y: 42 }
-    - { name: k_aft, x: 238, y: 159 }
-    - { name: k_bay, x: 238, y: 280 }
-    - { name: mean_temp, x: 461, y: 159 }
-    - { name: thermostat, x: 612, y: 238 }
-    - { name: moc, x: 794, y: 42 }
-    - { name: heaters, x: 42, y: 401 }
-    - { name: housekeeping, x: 461, y: 382 }
+    - { name: temp_fore, x: 34, y: 34 }
+    - { name: temp_aft, x: 34, y: 166 }
+    - { name: temp_bay, x: 34, y: 280 }
+    - { name: k_fore, x: 242, y: 34 }
+    - { name: k_aft, x: 242, y: 166 }
+    - { name: k_bay, x: 242, y: 280 }
+    - { name: mean_temp, x: 469, y: 166 }
+    - { name: thermostat, x: 601, y: 242 }
+    - { name: moc, x: 790, y: 34 }
+    - { name: heaters, x: 34, y: 393 }
+    - { name: housekeeping, x: 469, y: 374 }

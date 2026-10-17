@@ -54,6 +54,6 @@
         <port>5001</port>
     </payloads>
     <tcsgui>
-        <nodes><name>sensor</name><x>42</x><y>42</y></nodes>
+        <nodes><name>sensor</name><x>34</x><y>34</y></nodes>
     </tcsgui>
 </configuration>

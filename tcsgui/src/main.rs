@@ -137,10 +137,10 @@ fn divider_range(document: &Document, dividers: Dividers, which: Pane) -> (i32, 
 /// Where the ground station goes in a configuration that is new.
 ///
 /// The upper right of the moc working pane, clear of the pane's own label: the
-/// moc pane being the rightmost, the node is held off its right edge. On the
-/// grid, at 207 millimetres across and 11 down -- see `pane::PX_PER_MM` and the
-/// test below, which holds it there.
-const MOC_PLACE: (i32, i32) = (782, 42);
+/// moc pane being the rightmost, the node is held off its right edge. Where a
+/// node may be, at 209 millimetres across and 9 down -- see
+/// `pane::NODE_STEP_MM` and the test below, which holds it there.
+const MOC_PLACE: (i32, i32) = (790, 34);
 // Clear of the strip the panes' names are written in, as everything the
 // editor places is: see `pane::NAMES`, which the test below holds this to.
 const _: () = assert!(MOC_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
@@ -4451,14 +4451,15 @@ fn next_place(
 
 /// The nearest point on the grid.
 ///
-/// A node's upper left corner sits on a one-millimetre grid -- see
-/// `pane::PX_PER_MM`. Three things come of it and none is merely decorative: a
+/// A node's upper left corner sits on the millimetre grid, in steps of five
+/// millimetres so that its terminals are on lines five millimetres apart --
+/// see `pane::PX_PER_MM` and `pane::NODE_STEP_MM`. Three things come of it and none is merely decorative: a
 /// diagram stops looking approximate, nodes line up without anybody nudging
 /// them, and the positions written to the file are points a person can name,
 /// so a file edited by hand and a file written by the editor differ in what
 /// was meant rather than in a pixel.
 fn snap((x, y): (i32, i32)) -> (i32, i32) {
-    (pane::on_grid(x), pane::on_grid(y))
+    (pane::on_node_grid(x), pane::on_node_grid(y))
 }
 
 /// One of every node type on one side of the canvas, under its family's
@@ -4662,17 +4663,12 @@ fn view_of(
         outline: match outline {
             Outline::Square => "square",
             Outline::Rounded => "rounded",
-            Outline::Store => "store",
             Outline::Parallelogram => "parallelogram",
-            Outline::Keyed => "keyed",
-            Outline::Barred => "barred",
         }
         .into(),
         // The shape to fill, the line to stroke and the second line of a
-        // doubled edge, all as paths in the node's own coordinates. Empty for
-        // a rounded outline, which is the one the markup draws as a Rectangle
-        // with a corner radius -- and emptiness is what tells it to. See
-        // style::polygon_of, which all three come from.
+        // doubled edge, all as paths in the node's own coordinates, for every
+        // outline. See style::polygon_of, which all three come from.
         shape: style::shape_of(outline, size).into(),
         edge: style::edge_of(outline, edge, size).into(),
         inner: style::inner_of(outline, edge, size).into(),
@@ -5189,7 +5185,14 @@ mod tests {
                 .iter()
                 .find(|row| !row.is_heading)
                 .expect("every list offers something");
-            let wanted = ABOVE_THE_FIRST + first.node.height;
+            // At the size the list draws it, which the markup says.
+            let shrink: f32 = markup
+                .split("property <float> shrink:")
+                .nth(1)
+                .and_then(|rest| rest.split(';').next())
+                .and_then(|said| said.trim().parse().ok())
+                .expect("the markup says how small a list draws its shapes");
+            let wanted = ABOVE_THE_FIRST + first.node.height * shrink;
             let got = tall * share as f32 / 100.0;
             assert!(
                 got >= wanted,
@@ -5810,7 +5813,10 @@ mod tests {
     /// its left. Checked at the view, which is what the markup draws from.
     #[test]
     fn a_node_is_drawn_with_the_terminals_its_type_has() {
-        let view = |node_type: &str| view_of("x", node_type, (0, 0), None, false, None);
+        // Where a node may be, which is where the terminals' places are
+        // worked out from: see `style::terminal_at`.
+        let at = (pane::node_ceil(0), pane::node_ceil(0));
+        let view = |node_type: &str| view_of("x", node_type, at, None, false, None);
 
         // A payload: what the ground sends arrives, and its readings leave.
         let sensor = view("i2c");
@@ -6410,21 +6416,26 @@ mod tests {
     /// A node lands on the grid, wherever it was dragged to.
     ///
     /// A millimetre grid: 96/25.4 pixels a step, each point rounded to the
-    /// nearest pixel -- 0, 4, 8, 11, 15, 19, 23, 26 and on.
+    /// nearest pixel -- 0, 4, 8, 11, 15, 19, 23, 26 and on -- and a node on
+    /// every fifth of them, a millimetre short of each line its terminals are
+    /// on: 4 mm, 9 mm, 14 mm, which are 15, 34 and 53 pixels.
     #[test]
     fn a_node_lands_on_the_grid() {
         for (dragged, expected) in [
-            ((0, 0), (0, 0)),
-            ((3, 5), (4, 4)),
-            ((4, 4), (4, 4)),
-            ((12, 20), (11, 19)),
-            ((-3, -5), (-4, -4)),
+            ((15, 15), (15, 15)),
+            ((20, 30), (15, 34)),
+            ((30, 40), (34, 34)),
+            ((44, 50), (53, 53)),
         ] {
             assert_eq!(snap(dragged), expected, "{dragged:?}");
         }
-        // And everything the grid produces is on it.
-        for x in -40..40 {
-            assert!(pane::is_on_grid(snap((x, x)).0), "{x}");
+        // And everything snapped is a place a node may be, and the nearest:
+        // never more than half a step away.
+        let half = (pane::NODE_STEP_MM as f64 * pane::PX_PER_MM / 2.0).ceil() as i32;
+        for x in -40..400 {
+            let at = snap((x, x)).0;
+            assert!(pane::is_on_node_grid(at), "{x} snapped to {at}");
+            assert!((at - x).abs() <= half, "{x} snapped to {at}");
         }
         // Every point is its own count of millimetres from the edge, to
         // within the half pixel it is rounded by, however far across the
@@ -6440,7 +6451,7 @@ mod tests {
             assert_eq!(pane::grid_before(at), pane::grid_point(mm - 1), "{mm} mm");
         }
         // The ground station a new configuration starts with is on it too.
-        assert!(pane::is_on_grid(MOC_PLACE.0) && pane::is_on_grid(MOC_PLACE.1));
+        assert!(pane::is_on_node_grid(MOC_PLACE.0) && pane::is_on_node_grid(MOC_PLACE.1));
         assert!(MOC_PLACE.0 + style::WIDTH as i32 <= WORKING_WIDTH);
     }
 
@@ -7465,15 +7476,16 @@ mod tests {
         let width = style::WIDTH as i32;
         let d = dividers();
         let (payloads, vehicle) = (d.payloads, d.vehicle);
-        // Every answer is on the grid as well as in the pane: the edges are
-        // the grid points just inside them.
-        let y = pane::on_grid(100);
-        let payload_right = pane::grid_floor(payloads - width);
+        // Every answer is a place a node may be as well as in the pane: the
+        // edges are the places just inside them.
+        let y = pane::on_node_grid(100);
+        let payload_left = pane::node_ceil(0);
+        let payload_right = pane::node_floor(payloads - width);
 
         // A payload: the leftmost pane, and nowhere right of its own divider.
-        assert_eq!(confine("i2c", d, (0, 100)), (0, y));
-        assert_eq!(confine("i2c", d, (-40, 100)), (0, y));
-        assert_eq!(confine("i2c", d, (8, 100)), (8, y));
+        assert_eq!(confine("i2c", d, (0, 100)), (payload_left, y));
+        assert_eq!(confine("i2c", d, (-40, 100)), (payload_left, y));
+        assert_eq!(confine("i2c", d, (40, 100)), (pane::on_node_grid(40), y));
         assert_eq!(
             confine("i2c", d, (payload_right + 1, 100)),
             (payload_right, y)
@@ -7482,32 +7494,39 @@ mod tests {
         assert!(payload_right + width <= payloads);
 
         // The ground link: left to the vehicle divider, right to the far edge.
-        assert_eq!(confine("moc", d, (0, 100)), (vehicle, y));
-        assert_eq!(confine("moc", d, (vehicle - 1, 100)), (vehicle, y));
+        assert_eq!(confine("moc", d, (0, 100)), (pane::node_ceil(vehicle), y));
+        assert_eq!(
+            confine("moc", d, (vehicle - 1, 100)),
+            (pane::node_ceil(vehicle), y)
+        );
         assert_eq!(
             confine("moc", d, (WORKING_WIDTH, 100)),
-            (pane::grid_floor(WORKING_WIDTH - width), y)
+            (pane::node_floor(WORKING_WIDTH - width), y)
         );
 
         // And the vehicle's own graph, between the two.
-        assert_eq!(confine("compute", d, (0, 100)), (payloads, y));
-        assert_eq!(confine("compute", d, (-40, 100)), (payloads, y));
+        assert_eq!(confine("compute", d, (0, 100)), (pane::node_ceil(payloads), y));
+        assert_eq!(confine("compute", d, (-40, 100)), (pane::node_ceil(payloads), y));
         assert_eq!(
             confine("compute", d, (WORKING_WIDTH, 100)),
-            (pane::grid_floor(vehicle - width), y)
+            (pane::node_floor(vehicle - width), y)
         );
 
         // A node is never dragged off the top, whichever pane it is in: a
         // negative y is a node nobody can reach to drag back.
         for node_type in ["i2c", "compute", "moc"] {
-            assert_eq!(confine(node_type, d, (vehicle, -80)).1, 0, "{node_type}");
+            assert_eq!(
+                confine(node_type, d, (vehicle, -80)).1,
+                pane::node_ceil(0),
+                "{node_type}"
+            );
         }
 
         // A type this build does not know goes in the vehicle pane, which is
         // where something that needs looking at should be.
         assert!(!is_payload("contraption"));
         let (left, right) = pane::pane_for("contraption", d);
-        assert_eq!(left, payloads);
+        assert_eq!(left, pane::node_ceil(payloads));
         assert!(right < vehicle);
     }
 
@@ -10077,8 +10096,8 @@ mod tests {
         assert_eq!(
             now,
             (
-                pane::grid_floor(dividers().payloads - style::WIDTH as i32),
-                pane::on_grid(was.1 + by.1 as i32)
+                pane::node_floor(dividers().payloads - style::WIDTH as i32),
+                pane::on_node_grid(was.1 + by.1 as i32)
             ),
             "a payload dragged {by:?} from {was:?} left its pane and is at {now:?}"
         );

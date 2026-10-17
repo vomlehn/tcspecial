@@ -549,7 +549,7 @@ impl Document {
                 if !clashes {
                     break;
                 }
-                want.1 = crate::pane::grid_ceil(want.1 + 32);
+                want.1 = crate::pane::node_ceil(want.1 + 32);
             }
 
             self.nodes[at].at = want;
@@ -2375,7 +2375,7 @@ pub fn thermostat_example() -> Document {
     // hardware allows.
     document.groups.insert("cabin_temps".to_string(), "3s".to_string());
 
-    place(&mut document, "temp_fore", "i2c", (42, 42));
+    place(&mut document, "temp_fore", "i2c", (34, 34));
     set(&mut document, "temp_fore", "path", "/dev/i2c-1");
     set(&mut document, "temp_fore", "address", "0x48");
     set(&mut document, "temp_fore", "group", "cabin_temps");
@@ -2386,14 +2386,14 @@ pub fn thermostat_example() -> Document {
         "Forward bulkhead. Two bytes, signed, big endian.",
     );
 
-    place(&mut document, "temp_aft", "i2c", (42, 159));
+    place(&mut document, "temp_aft", "i2c", (34, 166));
     set(&mut document, "temp_aft", "path", "/dev/i2c-1");
     set(&mut document, "temp_aft", "address", "0x49");
     set(&mut document, "temp_aft", "group", "cabin_temps");
     set(&mut document, "temp_aft", "read_size", "2");
     note(&mut document, "temp_aft", "Aft bulkhead; same part as temp_fore.");
 
-    place(&mut document, "temp_bay", "spi", (42, 280));
+    place(&mut document, "temp_bay", "spi", (34, 280));
     set(&mut document, "temp_bay", "path", "/dev/spidev0.0");
     set(&mut document, "temp_bay", "max_speed", "1000000");
     set(&mut document, "temp_bay", "spi_mode", "0");
@@ -2406,9 +2406,9 @@ pub fn thermostat_example() -> Document {
     );
 
     for (name, at, format, scale, offset) in [
-        ("k_fore", (238, 42), "i16_be", "0.0625", "273.15"),
-        ("k_aft", (238, 159), "i16_be", "0.0625", "273.15"),
-        ("k_bay", (238, 280), "u24_be", "0.0078", "255.37"),
+        ("k_fore", (242, 34), "i16_be", "0.0625", "273.15"),
+        ("k_aft", (242, 166), "i16_be", "0.0625", "273.15"),
+        ("k_bay", (242, 280), "u24_be", "0.0078", "255.37"),
     ] {
         place(&mut document, name, "compute", at);
         set(&mut document, name, "function", "to_kelvin");
@@ -2417,11 +2417,11 @@ pub fn thermostat_example() -> Document {
         set(&mut document, name, "offset", offset);
     }
 
-    place(&mut document, "mean_temp", "compute", (461, 159));
+    place(&mut document, "mean_temp", "compute", (469, 166));
     set(&mut document, "mean_temp", "function", "mean");
     set(&mut document, "mean_temp", "inputs", "in0,in1,in2");
 
-    place(&mut document, "thermostat", "compute", (612, 238));
+    place(&mut document, "thermostat", "compute", (601, 242));
     set(&mut document, "thermostat", "function", "hysteresis");
     set(&mut document, "thermostat", "setpoint", "293.15");
     set(&mut document, "thermostat", "above", "2.0");
@@ -2432,20 +2432,20 @@ pub fn thermostat_example() -> Document {
         "setpoint is set from the ground; above and below are the two\ndegrees either side that the heaters are switched at.",
     );
 
-    place(&mut document, "moc", "moc", (794, 42));
+    place(&mut document, "moc", "moc", (790, 34));
     set(&mut document, "moc", "address", "10.0.0.1");
     set(&mut document, "moc", "port", "5000");
     // Where the ground station is: each node linked into this one sends to
     // this port plus its own device id, from the start.
     set(&mut document, "moc", "ground_base", "10.0.0.2:5100");
 
-    place(&mut document, "heaters", "gpio", (42, 401));
+    place(&mut document, "heaters", "gpio", (34, 393));
     set(&mut document, "heaters", "path", "/dev/gpiochip0");
     set(&mut document, "heaters", "direction", "output");
     set(&mut document, "heaters", "lines", "3,4,5");
     note(&mut document, "heaters", "Three circuits, driven together.");
 
-    place(&mut document, "housekeeping", "log", (461, 382));
+    place(&mut document, "housekeeping", "log", (469, 374));
     set(&mut document, "housekeeping", "directory", "/var/log/tcspecial");
     set(&mut document, "housekeeping", "format", "variable_ts_rc");
 
@@ -2814,7 +2814,7 @@ mod tests {
         let divider = dividers.payloads;
         let mut document = Document::new();
 
-        use crate::pane::{grid_floor, on_grid};
+        use crate::pane::{node_floor, on_node_grid as on_grid};
 
         // A payload on the wrong side, a vehicle node on the wrong side, and
         // one of each where it belongs, on the grid.
@@ -2841,9 +2841,9 @@ mod tests {
         // The payload is in its own pane now, at the near edge of it: the
         // smallest move that obeys the rule, which is its own width short of
         // the divider, taken back to the grid.
-        assert_eq!(at("stray_sensor"), (grid_floor(divider - width), on_grid(120)));
+        assert_eq!(at("stray_sensor"), (node_floor(divider - width), on_grid(120)));
         // And the computation is out of it, against the divider.
-        assert_eq!(at("stray_compute"), (divider, on_grid(200)));
+        assert_eq!(at("stray_compute"), (crate::pane::node_ceil(divider), on_grid(200)));
         // The two that were already right are untouched, which matters: a
         // reader who arranged a diagram should find it as they left it.
         assert_eq!(at("good_sensor"), (on_grid(16), on_grid(320)));

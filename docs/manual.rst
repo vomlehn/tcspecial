@@ -1556,6 +1556,23 @@ computed -- the vehicle is serving a different configuration, so its sources
 may not send where the panels say -- tcsmoc says so and asks whether to
 continue anyway; Quit stops tcspecial and tcssim and exits.
 
+It also commands the vehicle, on the two links the ``tcspecial`` section
+states. Connect brings the link up and sends a ``CONNECT``, which is how the
+two ends compare what they read; Ping says the link reaches the vehicle,
+which is a different fact from the beacon's. Each panel's Enable and Disable
+start and stop that panel's node -- any node, so a computation and a log are
+each something to stop as much as a sensor is -- and a Disable is answered
+once the node has stopped and given up what it held, so its device, bus
+address or socket is free.
+
+A command names a node by the device id its panel shows, which is the node's
+position in the configuration. That is why nothing is sent until ``CONNECT``
+has agreed: the same id means a different node in a different configuration,
+and a command sent under that misunderstanding would stop something nobody
+chose. Until then, and for a vehicle whose answer disagreed, the buttons say
+so rather than sending. Query All says nothing is asked yet -- a node's
+counters are not kept -- rather than sending a command the vehicle refuses.
+
 A payload that nothing in the configuration touches -- no line to it or from
 it, and no command binding naming it -- reports over the ``tcspecial``
 section's ``payload_telemetry`` instead, from ``source_base`` plus its device

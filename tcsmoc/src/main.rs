@@ -52,9 +52,9 @@ const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
 /// colour it is shown in, and defaults it to "Disconnected"; these are the
 /// same strings, named here so the two files can be checked against each
 /// other.
-const CONNECTED_STATUS: &str = "Connected";
-const DISCONNECTED_STATUS: &str = "Disconnected";
-const ERROR_STATUS: &str = "Error";
+pub(crate) const CONNECTED_STATUS: &str = "Connected";
+pub(crate) const DISCONNECTED_STATUS: &str = "Disconnected";
+pub(crate) const ERROR_STATUS: &str = "Error";
 
 /// What a panel's status says of a handler that is moving data, and of one
 /// that is not.

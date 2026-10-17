@@ -2369,7 +2369,7 @@ the beacon box
 
      Beacon:    (indicator)
      Last rcvd: 02:02:02
-     Last msg:  v0.1.0 config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
+     Last msg:  tcspecial v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
 
   Each beacon also carries its own number, counted from one by the
   spacecraft, and the MOC says on the console what the numbers say about the
@@ -2565,13 +2565,14 @@ the answer said:
 
 .. code-block:: console
 
-   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
-   v0.1.0, configuration tests/manual/tcspecial2.yaml config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
-   tcspecial answers v0.1.0 config v1.0.0 md5: 36999e46a4bf436854442d8f97a2248d
+   tcsmoc v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
+   tcspecial v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
+   CONNECT answer: tcspecial v0.1.0, config v1.0.0, md5 36999e46a4bf436854442d8f97a2248d
 
-The first two lines are written the same way by the two programs, so two ends
-reading one payload set print the same line twice -- which is what makes a
-difference in any part of it worth reading. The third says what came back over
+The first two lines are written the same way by the two programs, each naming
+itself, so two ends reading one payload set print the same version,
+configuration version and digest -- which is what makes a difference in any
+part of it worth reading. The third says what came back over
 the link.
 
 ``Last Response`` says whether the two agree:

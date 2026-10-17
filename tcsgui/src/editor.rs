@@ -73,6 +73,14 @@ pub struct Editor {
     /// session is about, and it is what `tcsverify` is asked about as the
     /// editor starts -- see [`Editor::files`].
     simulator_path: Option<PathBuf>,
+    /// Whether this session may change anything: false for one started with
+    /// `--read-only`.
+    ///
+    /// Held here, where every change is made and every file is written,
+    /// rather than only in the window: a window can grey a button, and the
+    /// one way to be sure a session started to look writes nothing is for the
+    /// thing that writes to refuse. See [`Editor::set_read_only`].
+    read_only: bool,
 }
 
 impl Editor {
@@ -86,7 +94,20 @@ impl Editor {
             trouble: None,
             said: None,
             simulator_path: None,
+            read_only: false,
         }
+    }
+
+    /// Make this session one that looks and does not touch: no edit is made,
+    /// no file is written -- not the configuration, not the simulator's, not
+    /// the history -- and no history is thrown away.
+    ///
+    /// What is opened is still read and checked as it always is, and what is
+    /// wrong with it is still said: a configuration somebody opened to look at
+    /// is one they want to know the state of. What came in is still settled
+    /// into its panes on the screen, which changes nothing on the disk.
+    pub fn set_read_only(&mut self, read_only: bool) {
+        self.read_only = read_only;
     }
 
     /// Open a configuration: the document from the file, the history from
@@ -307,6 +328,12 @@ impl Editor {
     /// unable to save, and the person at the keyboard is better served by
     /// being told plainly and allowed to carry on until they can fix it.
     pub fn edit(&mut self, edit: Edit) {
+        // A session that may not change anything takes no edit, whatever
+        // asked for it: the window greys what would make one, and this is
+        // what holds when something it did not grey asks anyway.
+        if self.read_only {
+            return;
+        }
         self.document.apply(&edit);
         self.journal.record(edit);
         self.persist();
@@ -331,6 +358,9 @@ impl Editor {
     /// Written at once, for the same reason: the document and the file must
     /// not disagree about a name while the session carries on.
     pub fn settle_name(&mut self, at: usize, now: &str) {
+        if self.read_only {
+            return;
+        }
         self.document.rename_at(at, now);
         self.persist();
     }
@@ -356,6 +386,9 @@ impl Editor {
 
     /// Take back the last edit.
     pub fn undo(&mut self) -> bool {
+        if self.read_only {
+            return false;
+        }
         match self.journal.undo() {
             Some(inverse) => {
                 self.document.apply(&inverse);
@@ -368,6 +401,9 @@ impl Editor {
 
     /// Put back an edit that was taken off.
     pub fn redo(&mut self) -> bool {
+        if self.read_only {
+            return false;
+        }
         match self.journal.redo() {
             Some(edit) => {
                 self.document.apply(&edit);
@@ -386,6 +422,12 @@ impl Editor {
     /// Write the document and then the journal. See the module comment for
     /// why that order.
     fn persist(&mut self) {
+        // Nothing reaches the disk from a session that may not change it --
+        // not even a Save asked for, which would rewrite the files as they
+        // were read.
+        if self.read_only {
+            return;
+        }
         self.trouble = None;
         // What the last command said is about that command and not about this
         // one: an edit after generating the code is not a second report that
@@ -441,6 +483,11 @@ impl Editor {
     /// What is kept is the history of a session that ended *badly*, which is
     /// the one somebody will want -- see `crate::history`.
     pub fn forget_history(&self) {
+        // Another session's history, as far as a read-only one is concerned:
+        // it made none and has no business throwing one away.
+        if self.read_only {
+            return;
+        }
         crate::history::forget(&self.path);
     }
 }
@@ -496,6 +543,59 @@ mod tests {
         editor.edit(add("temp_aft", "i2c"));
         let after_two = std::fs::read_to_string(&path).unwrap();
         assert!(after_two.contains("temp_aft"), "{after_two}");
+    }
+
+    /// A read-only session takes no edit and writes no file, whatever it is
+    /// asked to do.
+    ///
+    /// Every way the editor changes something is asked: an edit, a save, an
+    /// undo and a redo, the repair of a duplicated name, an arrangement and
+    /// the forgetting of a history. The file is byte for byte what it was, no
+    /// history is written beside it, and the document in memory is the one
+    /// that was read.
+    #[test]
+    fn a_read_only_session_changes_nothing() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        let by_hand = "version: \"2.0\"\n\npayloads:\n  - name: temp_fore\n    type: i2c\n";
+        std::fs::write(&path, by_hand).expect("a file");
+        let journal = crate::history::journal_for(&path);
+        let journal_before = journal.as_ref().map(|j| std::fs::read(j).ok());
+
+        let mut editor = Editor::open(&path, crate::pane::default_dividers());
+        editor.set_read_only(true);
+        let read = editor.document().clone();
+
+        editor.edit(Edit::AddNode {
+            name: "added".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        editor.edit(Edit::SetNodeComment {
+            node: "temp_fore".into(),
+            was: None,
+            now: Some("a comment".into()),
+        });
+        editor.save();
+        assert!(!editor.undo());
+        assert!(!editor.redo());
+        editor.settle_name(0, "renamed");
+        editor.arrange(crate::pane::default_dividers());
+        editor.forget_history();
+
+        assert_eq!(editor.document(), &read, "the document changed");
+        assert_eq!(editor.undo_depth(), 0);
+        assert!(!editor.unsaved(), "nothing is waiting to be written");
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            by_hand,
+            "a read-only session wrote the configuration"
+        );
+        assert_eq!(
+            journal.as_ref().map(|j| std::fs::read(j).ok()),
+            journal_before,
+            "a read-only session touched the history"
+        );
     }
 
     /// Opening a configuration settles its nodes and writes nothing.

@@ -468,6 +468,28 @@ impl Views {
 /// [`put`] because nothing here depends on the document or on what anybody has
 /// moved: a refresh after every edit would rebuild two models that cannot have
 /// changed. Where the divider is does change, so that is in `put`.
+/// Whether this session was started with `--read-only`: see `main`.
+///
+/// Once, at startup, and then only read: a session is one or the other for
+/// as long as it runs. Unset is a session that may edit, which is what every
+/// test and every window made outside `main` is.
+static READ_ONLY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Whether this session may change nothing.
+fn read_only() -> bool {
+    READ_ONLY.get().copied().unwrap_or(false)
+}
+
+/// Tell a window whether this session may change anything, which is what
+/// greys the controls that would: see `Session` in the markup. Every window
+/// is told as it is made, a global being one per window rather than one per
+/// program.
+macro_rules! session {
+    ($window:expr) => {
+        $window.global::<Session>().set_read_only(read_only())
+    };
+}
+
 macro_rules! furnish {
     ($window:expr, $described:expr) => {{
         let window = $window;
@@ -488,9 +510,55 @@ macro_rules! furnish {
     }};
 }
 
+/// The files named on the command line, in order, and whether the session is
+/// to be read-only.
+///
+/// The flag wherever it is, in any of its three spellings. Any other word
+/// starting with a dash is refused rather than taken for a file name: a
+/// mistyped flag would otherwise be a configuration created under that name.
+/// More than two files is refused too, there being nothing for a third to be.
+fn command_line(words: impl Iterator<Item = String>) -> Result<(Vec<String>, bool), String> {
+    let mut files = Vec::new();
+    let mut read_only = false;
+    for word in words {
+        match word.as_str() {
+            "-r" | "--read-only" | "--readonly" => read_only = true,
+            flag if flag.starts_with('-') && flag != "-" => {
+                return Err(format!("there is no option {flag:?}"));
+            }
+            _ => files.push(word),
+        }
+    }
+    if files.len() > 2 {
+        return Err(format!(
+            "{} files were named, and tcsgui takes a configuration and a simulator file",
+            files.len()
+        ));
+    }
+    Ok((files, read_only))
+}
+
+/// What is said when the command line is not one tcsgui takes.
+const USAGE: &str = "usage: tcsgui [-r | --read-only] <configuration file> [<simulator file>]";
+
 fn main() -> Result<(), slint::PlatformError> {
-    let path = std::env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("tcsgui: usage: tcsgui <configuration file> [<simulator file>]");
+    // The flags, wherever they are, and the files in the order given. One
+    // flag: `-r`, `--read-only` or `--readonly`, a session that shows a
+    // configuration and changes nothing -- see `Editor::set_read_only` and
+    // `command_line`.
+    let (files, read_only_asked) = match command_line(std::env::args().skip(1)) {
+        Ok(said) => said,
+        Err(why) => {
+            eprintln!("tcsgui: {why}");
+            eprintln!("tcsgui: {USAGE}");
+            std::process::exit(2);
+        }
+    };
+    let _ = READ_ONLY.set(read_only_asked);
+    let mut files = files.into_iter();
+
+    let path = files.next().unwrap_or_else(|| {
+        eprintln!("tcsgui: {USAGE}");
         eprintln!(
             "tcsgui: the file need not exist yet; it is written as edits are made, \
              and its history is kept beside it"
@@ -499,6 +567,10 @@ fn main() -> Result<(), slint::PlatformError> {
             "tcsgui: a second file is the simulator's own configuration -- how fast \
              a simulated payload sends and what it does wrong -- and is edited from \
              the menu. It is written as YAML, so its name has to end in \".yaml\""
+        );
+        eprintln!(
+            "tcsgui: -r, --read-only or --readonly opens the files to look at: \
+             nothing in them can be changed and nothing is written"
         );
         std::process::exit(2);
     });
@@ -510,7 +582,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // YAML one: it is the command line that is wrong, the window would be
     // showing a session with half of what was asked for, and the remedy is to
     // type the name again. See `sim::must_be_yaml`.
-    let simulator = std::env::args().nth(2);
+    let simulator = files.next();
     if let Some(simulator) = &simulator {
         if let Err(why) = sim::must_be_yaml(std::path::Path::new(simulator)) {
             eprintln!("tcsgui: {why}");
@@ -541,9 +613,14 @@ fn main() -> Result<(), slint::PlatformError> {
     // The histories of sessions nobody is coming back to: a week old, or whose
     // configuration is no longer there. Once, at startup, before anything is
     // opened -- see `crate::history::prune`.
-    let gone = history::prune(std::time::SystemTime::now());
-    if gone > 0 {
-        eprintln!("tcsgui: {gone} old session histories were removed");
+    //
+    // Not in a read-only session, which deletes nothing: the histories are
+    // other sessions' business.
+    if !read_only() {
+        let gone = history::prune(std::time::SystemTime::now());
+        if gone > 0 {
+            eprintln!("tcsgui: {gone} old session histories were removed");
+        }
     }
 
     // The configuration: see Editor::open.
@@ -551,6 +628,9 @@ fn main() -> Result<(), slint::PlatformError> {
         std::path::Path::new(&path),
         divider.get(),
     )));
+    // Before anything can be edited -- the seeding below included, which is
+    // an edit like any other and so is not made.
+    editor.borrow_mut().set_read_only(read_only());
     if let Some(simulator) = &simulator {
         editor
             .borrow_mut()
@@ -559,6 +639,7 @@ fn main() -> Result<(), slint::PlatformError> {
     seed(&mut editor.borrow_mut());
 
     let ui = MainWindow::new()?;
+    session!(&ui);
     furnish!(&ui, descriptions());
 
     let views = Rc::new(RefCell::new(Views {
@@ -635,7 +716,10 @@ fn main() -> Result<(), slint::PlatformError> {
             }
 
             let window = match SubWindow::new() {
-                Ok(window) => window,
+                Ok(window) => {
+                    session!(&window);
+                    window
+                },
                 Err(e) => {
                     eprintln!("tcsgui: {name} cannot be opened: {e}");
                     return;
@@ -1312,7 +1396,10 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
 fn show_node(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node: &str) {
     if !views.borrow().attributes.contains_key(node) {
         let window = match NodeWindow::new() {
-            Ok(window) => window,
+            Ok(window) => {
+                session!(&window);
+                window
+            },
             Err(e) => {
                 eprintln!("tcsgui: {node} cannot be opened: {e}");
                 return;
@@ -1617,7 +1704,10 @@ fn list_shares_after(
 fn show_concerns(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, aside: bool) {
     if views.borrow().concerns.is_none() {
         let window = match ConcernsWindow::new() {
-            Ok(window) => window,
+            Ok(window) => {
+                session!(&window);
+                window
+            },
             Err(e) => {
                 eprintln!("tcsgui: the list cannot be shown: {e}");
                 return;
@@ -1767,7 +1857,10 @@ fn confirm_delete(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, node
 
     if views.borrow().deleting.is_none() {
         let window = match DeleteWindow::new() {
-            Ok(window) => window,
+            Ok(window) => {
+                session!(&window);
+                window
+            },
             Err(e) => {
                 eprintln!("tcsgui: {node} cannot be asked about: {e}");
                 return;
@@ -2208,7 +2301,10 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     }
 
     let window = match ProblemsWindow::new() {
-        Ok(window) => window,
+        Ok(window) => {
+            session!(&window);
+            window
+        },
         Err(e) => {
             // Every one of these is still reported as a fault, so this
             // failing is a quieter editor rather than a broken one.
@@ -2724,7 +2820,10 @@ fn hide_deleting(views: &Rc<RefCell<Views>>) {
 /// output, so this failing is a quieter editor and not a broken one.
 fn alerting(views: &Rc<RefCell<Views>>) {
     let window = match AlertWindow::new() {
-        Ok(window) => window,
+        Ok(window) => {
+            session!(&window);
+            window
+        },
         Err(e) => {
             eprintln!("tcsgui: errors cannot be shown in a window: {e}");
             return;
@@ -2765,7 +2864,10 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 
     if views.borrow().leaving.is_none() {
         let window = match LeaveWindow::new() {
-            Ok(window) => window,
+            Ok(window) => {
+                session!(&window);
+                window
+            },
             Err(e) => {
                 // Nothing to ask with. The work is still on the disk as of
                 // the last write that succeeded, and refusing to quit would
@@ -3080,7 +3182,10 @@ fn settings_of(
 fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     if views.borrow().parameters.is_none() {
         let window = match ParametersWindow::new() {
-            Ok(window) => window,
+            Ok(window) => {
+                session!(&window);
+                window
+            },
             Err(e) => {
                 eprintln!("tcsgui: the tcspecial parameters cannot be opened: {e}");
                 return;
@@ -3133,7 +3238,10 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     if views.borrow().sim_groups.is_none() {
         let window = match SimWindow::new() {
-            Ok(window) => window,
+            Ok(window) => {
+                session!(&window);
+                window
+            },
             Err(e) => {
                 eprintln!("tcsgui: a simulator window cannot be opened: {e}");
                 return;
@@ -3317,7 +3425,10 @@ fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 
     if views.borrow().group.is_none() {
         let window = match GroupWindow::new() {
-            Ok(window) => window,
+            Ok(window) => {
+                session!(&window);
+                window
+            },
             Err(e) => {
                 eprintln!("tcsgui: a group window cannot be opened: {e}");
                 return;
@@ -5195,6 +5306,66 @@ mod tests {
                  wants {wanted:.0}",
                 pane.label()
             );
+        }
+    }
+
+    /// The read-only flag is taken in all three spellings and anywhere on the
+    /// line, and nothing else that looks like a flag is taken at all.
+    #[test]
+    fn the_command_line_takes_the_read_only_flag() {
+        let said = |words: &[&str]| command_line(words.iter().map(|w| w.to_string()));
+        assert_eq!(said(&["a.yaml"]), Ok((vec!["a.yaml".to_string()], false)));
+        for flag in ["-r", "--read-only", "--readonly"] {
+            assert_eq!(said(&[flag, "a.yaml"]), Ok((vec!["a.yaml".to_string()], true)));
+            assert_eq!(
+                said(&["a.yaml", "a-sim.yaml", flag]),
+                Ok((vec!["a.yaml".to_string(), "a-sim.yaml".to_string()], true))
+            );
+        }
+        assert!(said(&["--readonley", "a.yaml"]).is_err(), "a misspelled flag");
+        assert!(said(&["-x", "a.yaml"]).is_err());
+        assert!(said(&["a.yaml", "b.yaml", "c.yaml"]).is_err());
+    }
+
+    /// In a read-only session the problems window's Edit and Delete are
+    /// greyed, and what would rename or act on a node is greyed with them;
+    /// the ways out of the window are not.
+    #[test]
+    fn a_read_only_session_greys_what_would_edit() {
+        use i_slint_backend_testing::ElementHandle;
+
+        i_slint_backend_testing::init_no_event_loop();
+        let window = ProblemsWindow::new().expect("a window");
+        window.global::<Session>().set_read_only(true);
+        window.set_rows(ModelRc::from(Rc::new(VecModel::from(vec![ProblemRow {
+            said: "\"twice\" is the name of two nodes".into(),
+            node: "twice".into(),
+            now: "twice".into(),
+            nameable: true,
+            there: true,
+            action: "".into(),
+        }]))));
+        window.set_any_nameable(true);
+        window.set_ready(true);
+        window.show().expect("the window shows");
+
+        let enabled = |label: &str| {
+            ElementHandle::find_by_accessible_label(&window, label)
+                .next()
+                .unwrap_or_else(|| panic!("there is no {label} button"))
+                .accessible_enabled()
+        };
+        for label in ["Edit", "Delete", "Suggest", "Rename"] {
+            assert_eq!(enabled(label), Some(false), "{label} is not greyed");
+        }
+        for label in ["Quit", "Leave this one", "Ignore them all"] {
+            assert_eq!(enabled(label), Some(true), "{label} is greyed");
+        }
+
+        // And the same window in a session that may edit has them all.
+        window.global::<Session>().set_read_only(false);
+        for label in ["Edit", "Delete", "Suggest", "Rename"] {
+            assert_eq!(enabled(label), Some(true), "{label} is greyed");
         }
     }
 

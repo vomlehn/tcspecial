@@ -9,6 +9,20 @@ import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 // window comes to look assembled rather than designed. A scale also answers
 // the question a literal provokes: "why is this one different" has an answer
 // when the answer is "it is the next step up".
+// Whether this session may change the configuration: false for one started
+// with `--read-only`, which shows everything and changes nothing. Set from
+// Rust on every window as it is made -- see `session!` in main.rs -- and read
+// by every control that would make an edit, which is greyed rather than
+// hidden: a session started to look should look like the editor, with what
+// it cannot do in its place and plainly not to be done.
+//
+// The greying is the window's half. The editor's is that it takes no edit
+// and writes no file in such a session, whatever asks: see
+// Editor::set_read_only.
+export global Session {
+    in property <bool> read-only: false;
+}
+
 export global Space {
     // Four steps, doubling. Enough for every gap this window needs and few
     // enough to be remembered.
@@ -329,6 +343,8 @@ component Terminal inherits Rectangle {
         width: 100%;
         height: 100%;
         mouse-cursor: MouseCursor.crosshair;
+        // No line drawn in a read-only session.
+        enabled: !Session.read-only;
         pointer-event(event) => {
             if (event.kind == PointerEventKind.down) {
                 grabbed();
@@ -419,10 +435,12 @@ component NodeShape inherits Rectangle {
     // While a drag is running the node follows the pointer by this much, and
     // the document still says where it was: nothing is recorded until the
     // gesture ends.
-    property <length> drag-x: draggable && grip.pressed
+    // Not in a read-only session, where a node stays where it is: a press
+    // still opens its window.
+    property <length> drag-x: draggable && !Session.read-only && grip.pressed
         ? grip.mouse-x - grip.pressed-x
         : 0px;
-    property <length> drag-y: draggable && grip.pressed
+    property <length> drag-y: draggable && !Session.read-only && grip.pressed
         ? grip.mouse-y - grip.pressed-y
         : 0px;
 
@@ -672,10 +690,12 @@ component NodeShape inherits Rectangle {
             // is what a click used to do on its own.
             MenuItem {
                 title: "Edit";
+                enabled: !Session.read-only;
                 activated => { root.edit-requested(); }
             }
             MenuItem {
                 title: "Delete";
+                enabled: !Session.read-only;
                 activated => { root.delete-requested(); }
             }
         }
@@ -968,6 +988,8 @@ component SelectionPane inherits Rectangle {
                 // shape: a rounded end's corners are not part of the shape,
                 // and a press there should still place one.
                 if !p.is-heading: TouchArea {
+                    // Nothing placed in a read-only session.
+                    enabled: !Session.read-only;
                     mouse-cursor: MouseCursor.pointer;
                     clicked => { root.place-node(p.node.name, p.node.node-type, p.sets); }
                 }
@@ -1254,14 +1276,14 @@ component Surface inherits Rectangle {
                 icon: @image-url("undo.svg");
                 colorize-icon: true;
                 text: undo-label;
-                enabled: undo-depth > 0;
+                enabled: undo-depth > 0 && !Session.read-only;
                 clicked => { undo-clicked(); }
             }
             Button {
                 icon: @image-url("redo.svg");
                 colorize-icon: true;
                 text: redo-label;
-                enabled: redo-depth > 0;
+                enabled: redo-depth > 0 && !Session.read-only;
                 clicked => { redo-clicked(); }
             }
             // Saving needs no button -- every edit is written as it is made --
@@ -1280,6 +1302,7 @@ component Surface inherits Rectangle {
                 icon: @image-url("save.svg");
                 colorize-icon: true;
                 accessible-label: "Save";
+                enabled: !Session.read-only;
                 clicked => { root.save-clicked(); }
             }
 
@@ -1629,7 +1652,9 @@ component Surface inherits Rectangle {
 }
 
 export component MainWindow inherits Window {
-    title: "TCSpecial Configuration";
+    // Saying in the title bar when this session changes nothing, which is
+    // where somebody looks to see what a window is.
+    title: Session.read-only ? "TCSpecial Configuration (read-only)" : "TCSpecial Configuration";
     background: #fbfbfa;
     // Wide enough for both working panes and both selection panes, which is
     // what the preferred width is: 960 of working area, 180 of selection
@@ -1761,7 +1786,7 @@ export component MainWindow inherits Window {
             // has been taught by every other program to save their work. Both
             // files of a session go together, each written atomically.
             MenuItem {
-                enabled: !root.inert;
+                enabled: !root.inert && !Session.read-only;
                 title: "Save";
                 activated => { root.save-clicked(); }
             }
@@ -1810,7 +1835,7 @@ export component MainWindow inherits Window {
             // over more sheet than the window shows, and for a morning's
             // dragging that has left one nobody can read.
             MenuItem {
-                enabled: !root.inert;
+                enabled: !root.inert && !Session.read-only;
                 title: "Arrange the nodes";
                 activated => { root.arrange(); }
             }
@@ -1996,6 +2021,7 @@ export component SubWindow inherits Window {
             // has been taught by every other program to save their work. Both
             // files of a session go together, each written atomically.
             MenuItem {
+                enabled: !Session.read-only;
                 title: "Save";
                 activated => { root.save-clicked(); }
             }
@@ -2041,6 +2067,7 @@ export component SubWindow inherits Window {
             // over more sheet than the window shows, and for a morning's
             // dragging that has left one nobody can read.
             MenuItem {
+                enabled: !Session.read-only;
                 title: "Arrange the nodes";
                 activated => { root.arrange(); }
             }
@@ -2166,6 +2193,7 @@ export component GroupWindow inherits Window {
             }
             Button {
                 text: "New";
+                enabled: !Session.read-only;
                 clicked => { root.add(); }
             }
         }
@@ -2186,6 +2214,7 @@ export component GroupWindow inherits Window {
         }
         LineEdit {
             text: root.group;
+            read-only: Session.read-only;
             font-size: Type.body;
             // On accept and not on every keystroke: a group's name is what
             // its payloads refer to, so each letter typed would be a rename
@@ -2201,6 +2230,7 @@ export component GroupWindow inherits Window {
         }
         LineEdit {
             text: root.interval;
+            read-only: Session.read-only;
             placeholder-text: "500ms, 3s";
             font-size: Type.body;
             edited => { root.interval-set(self.text); }
@@ -2247,6 +2277,7 @@ export component GroupWindow inherits Window {
                     }
                     LineEdit {
                         text: f.value;
+                        read-only: Session.read-only;
                         placeholder-text: f.differs ? "different on each" : "";
                         font-size: Type.body;
                         edited => { root.attribute-set(f.name, self.text); }
@@ -2269,7 +2300,7 @@ export component GroupWindow inherits Window {
             Rectangle { }
             Button {
                 text: "Remove this group";
-                enabled: root.group != "";
+                enabled: root.group != "" && !Session.read-only;
                 clicked => { root.removed(); }
             }
         }
@@ -2368,6 +2399,7 @@ export component ParametersWindow inherits Window {
                     }
                     LineEdit {
                         text: f.value;
+                        read-only: Session.read-only;
                         font-size: Type.body;
                         edited => { root.parameter-set(f.name, self.text); }
                     }
@@ -2453,11 +2485,12 @@ export component SimWindow inherits Window {
             }
             if root.can-add: Button {
                 text: "New";
+                enabled: !Session.read-only;
                 clicked => { root.add(); }
             }
             if root.can-add: Button {
                 text: "Remove";
-                enabled: root.chosen != "";
+                enabled: root.chosen != "" && !Session.read-only;
                 clicked => { root.remove(); }
             }
         }
@@ -2485,6 +2518,7 @@ export component SimWindow inherits Window {
                     }
                     LineEdit {
                         text: f.value;
+                        read-only: Session.read-only;
                         font-size: Type.body;
                         edited => { root.setting-set(f.name, self.text); }
                     }
@@ -2621,6 +2655,7 @@ export component NodeWindow inherits Window {
                     // writes the word, so what the file ends up saying is a
                     // word somebody chose and not a box they left alone.
                     if !f.is-heading && f.kind == "boolean": CheckBox {
+                        enabled: !Session.read-only;
                         text: f.value == "true" ? "true" : "false";
                         checked: f.value == "true";
                         toggled => {
@@ -2632,6 +2667,7 @@ export component NodeWindow inherits Window {
                         }
                     }
                     if !f.is-heading && f.kind != "boolean": LineEdit {
+                        read-only: Session.read-only;
                         text: f.value;
                         font-size: Type.body;
                         edited => {
@@ -2672,6 +2708,7 @@ export component NodeWindow inherits Window {
             height: 14px;
         }
         TextEdit {
+            read-only: Session.read-only;
             height: 72px;
             text: root.comment;
             font-size: Type.body;
@@ -2870,6 +2907,7 @@ export component ConcernsWindow inherits Window {
                     }
                     Button {
                         text: root.aside ? "Take up again" : "Set aside";
+                        enabled: !Session.read-only;
                         clicked => { root.decided(i); }
                     }
                 }
@@ -3007,26 +3045,31 @@ export component ProblemsWindow inherits Window {
                             spacing: Space.step;
                             LineEdit {
                                 text: row.now;
+                                read-only: Session.read-only;
                                 font-size: Type.body;
                                 horizontal-stretch: 1;
                                 edited(said) => { root.typed(i, said); }
                             }
                             Button {
                                 text: "Suggest";
+                                enabled: !Session.read-only;
                                 clicked => { root.derive(i); }
                             }
                         }
                     }
                     if row.there: Button {
                         text: "Edit";
+                        enabled: !Session.read-only;
                         clicked => { root.edit(i); }
                     }
                     if row.there: Button {
                         text: "Delete";
+                        enabled: !Session.read-only;
                         clicked => { root.remove(i); }
                     }
                     if row.action != "": Button {
                         text: row.action;
+                        enabled: !Session.read-only;
                         clicked => { root.acted(i); }
                     }
                 }
@@ -3076,7 +3119,7 @@ export component ProblemsWindow inherits Window {
             if root.any-nameable: Button {
                 text: "Rename";
                 primary: true;
-                enabled: root.ready;
+                enabled: root.ready && !Session.read-only;
                 clicked => { root.confirmed(); }
             }
         }

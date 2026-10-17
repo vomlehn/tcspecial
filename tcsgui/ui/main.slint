@@ -100,7 +100,7 @@ export struct NodeView {
     y: length,
     width: length,
     height: length,
-    // square | rounded | keyed | barred | store | parallelogram
+    // square | rounded | parallelogram
     outline: string,
     // The shape to fill, as path data in this node's own coordinates. Empty
     // for the rounded outline, which is a corner radius on a Rectangle, and
@@ -365,9 +365,8 @@ component Terminal inherits Rectangle {
 // One node.
 //
 // The outline is chosen by name rather than by a number so that the markup
-// reads as the table in style.rs does: square corners are hardware, rounded
-// are software aboard, a circle is an end of the graph, and a keyed rectangle
-// is an interface that is driven rather than read.
+// reads as the table in style.rs does: a parallelogram is a payload, rounded
+// corners are a part of the vehicle, and the square one is the ground.
 component NodeShape inherits Rectangle {
     in property <NodeView> node;
     // Whether this one can be dragged. False in the palette, where a press
@@ -451,14 +450,10 @@ component NodeShape inherits Rectangle {
         width: 100%;
         height: 100%;
         background: transparent;
-        // The shape itself. One Rectangle, with the corner radius saying
-        // which outline this is: 0 for square and a quarter of the height for
-        // rounded. A keyed shape is the square one with a corner squared off
-        // by the triangle below it.
-        //
-        // Every outline but the rounded one arrives as path data instead, and
-        // then this Rectangle keeps the geometry and the shadow and draws
-        // neither border nor ground: the paths below it are the shape.
+        // The node's box. Every outline arrives as path data -- the rounded
+        // one too, its corners drawn in pieces so it can take any edge -- and
+        // this Rectangle keeps the geometry and the shadow and draws neither
+        // border nor ground: the paths below it are the shape.
         body := Rectangle {
             width: 100%;
             height: 100%;
@@ -478,7 +473,9 @@ component NodeShape inherits Rectangle {
             drop-shadow-blur: grip.pressed ? 12px : 0px;
             drop-shadow-color: grip.pressed ? #00000033 : transparent;
             drop-shadow-offset-y: grip.pressed ? 3px : 0px;
-            border-radius: node.outline == "rounded" ? self.height / 4 : 0px;
+            // The rounded outline's own radius -- style::RADIUS -- so the ring
+            // a selected node is drawn in follows its corners.
+            border-radius: node.outline == "rounded" ? 9px : 0px;
             background: node.shape != "" ? transparent : ink;
 
             // The lift a dragged node gets, for the shapes drawn as paths: a
@@ -539,44 +536,6 @@ component NodeShape inherits Rectangle {
                 stroke-width: 1px;
                 fill: transparent;
             }
-        }
-
-        // The two bars of a predefined process: a step whose insides are
-        // written down somewhere else. Inset eight pixels, which is about a
-        // twentieth of the width and where a flowchart puts them, and the full
-        // height, so they read as bars rather than as ticks. The terminals are
-        // drawn after these and are nearly opaque, so a bar passes behind the
-        // two it meets.
-        if node.outline == "barred": Rectangle {
-            x: 8px;
-            y: 0;
-            width: node.border;
-            height: 100%;
-            background: mark;
-        }
-        if node.outline == "barred": Rectangle {
-            x: root.width - 8px - node.border;
-            y: 0;
-            width: node.border;
-            height: 100%;
-            background: mark;
-        }
-
-        // The key: a square corner cut into an otherwise rounded shape, which is
-        // what says "driven" without a word or a colour.
-        if node.outline == "keyed": Rectangle {
-            x: 0;
-            y: 0;
-            width: root.width / 4;
-            height: node.border;
-            background: mark;
-        }
-        if node.outline == "keyed": Rectangle {
-            x: 0;
-            y: 0;
-            width: node.border;
-            height: root.height / 4;
-            background: mark;
         }
 
         // The name, and under it the type. The type is shown always and not only
@@ -950,6 +909,10 @@ component LinkLine inherits Rectangle {
 // same way. A component rather than the markup twice, because two copies of a
 // list are two places a row's height or a heading's weight gets changed in.
 component SelectionPane inherits Rectangle {
+    // How large a shape is drawn here, against its size on the canvas. In
+    // the markup because it is a property of the list and not of the shape;
+    // tcsgui's tests read it from here. See NodeShape's transform below.
+    property <float> shrink: 0.75;
     in property <string> heading: "";
     in property <[PaletteEntry]> palette: [];
     // The ground of the working pane these go in, which is what the shapes in
@@ -977,7 +940,7 @@ component SelectionPane inherits Rectangle {
             // taller shapes into the row below them, which made a list of
             // fourteen types read as a list of ten and a tangle.
             for p in root.palette: Rectangle {
-                height: p.is-heading ? 22px : p.node.height + Space.step;
+                height: p.is-heading ? 22px : p.node.height * root.shrink + Space.step;
                 background: transparent;
 
                 // A family's heading. Quiet: it is there to group the shapes
@@ -991,8 +954,15 @@ component SelectionPane inherits Rectangle {
                     color: #6b7280;
                 }
 
+                // At three quarters of the size it is drawn on the canvas, the
+                // whole of it -- outline, terminals and name -- so a list is a
+                // list of the shapes rather than a column of the canvas, and
+                // more of it is in view at once. Shrunk from its top left
+                // corner, which is where the row starts.
                 if !p.is-heading: NodeShape {
                     node: p.node;
+                    transform-scale: root.shrink;
+                    transform-origin: { x: 0px, y: 0px };
                 }
                 // The whole row, so the hit area is the row and not only the
                 // shape: a rounded end's corners are not part of the shape,

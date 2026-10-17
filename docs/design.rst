@@ -1763,21 +1763,29 @@ a node, so one height is what puts every node's two rows of terminals the same
 distance apart. Two nodes level on the grid have their terminals level too, and
 a line between them runs straight across rather than stepping by the
 difference between two heights. Height used to be one of the channels that
-told two types apart, running from 40 to 96 pixels; without it, four edges by
-two weights could no longer keep the nine payload types two channels apart,
-so there is a fifth edge, a dotted line, and the types that leaned on height
-were given an edge, a weight or a typeface of their own instead. The rule that
-no two types differ by colour alone is unchanged, and the test that holds it
-is unchanged.
+told two types apart, running from 40 to 96 pixels; without it, and with every
+payload a parallelogram, four edges by two weights could no longer keep the
+twelve payload types two channels apart. So there are six edges -- one line,
+two, dashed, dashed and doubled, dotted, and dotted and doubled -- each payload
+has a line and a weight no other payload has and a typeface of its own, and the
+other types that leaned on height were given an edge, a weight or a typeface
+instead. The rule that no two types differ by colour alone is unchanged, and
+the test that holds it is unchanged.
 
-A node's upper left corner sits on a grid of one millimetre -- 96/25.4 of the
-canvas's pixels, which is what the window toolkit means by a millimetre -- each
-grid point rounded to the nearest whole pixel, so positions in the file stay
-whole numbers and the grid never drifts. A node placed, a node dragged and a
-node read from a file all land on it; the dividers between the panes sit on it
-too, and a pane's edges are taken in to the grid points just inside them, so a
-node held against an edge is on the grid as well. The canvas draws a faint line
-every ten millimetres.
+The canvas is measured in millimetres -- 96/25.4 of its pixels, which is what
+the window toolkit means by a millimetre -- each one rounded to the nearest
+whole pixel, so positions in the file stay whole numbers and the grid never
+drifts. A node's terminals are on lines five millimetres apart, and a node
+moves in steps of five millimetres to keep them there: its upper left corner is
+a millimetre short of a line -- at 4 mm, 9 mm, 14 mm and so on -- which puts
+its terminals' first line a millimetre inside it. A node at any millimetre
+would have its terminals rounded up to five millimetres from where they belong,
+and in a node seventeen millimetres tall the two rows would meet. A node
+placed, a node dragged and a node read from a file all land on one of these
+places; the dividers between the panes sit on the millimetre grid, and a pane's
+edges are taken in to the places just inside them, so a node held against an
+edge is where a node may be as well. The canvas draws a faint line every ten
+millimetres.
 
 Each working pane is painted, and every node type has its own colour inside its
 pane's family. The MOC pane is a pale blue, the vehicle pane a pale green and
@@ -1864,11 +1872,13 @@ travels across the canvas. Two rows, which are the two streams. Along the top,
 left to right, the payload's own data on its way to the ground: it arrives at
 ``payload-in`` and leaves at ``payload-out``. Along the bottom, right to left,
 what the ground sends on its way to a payload: it arrives at ``moc-in`` and
-leaves at ``moc-out``. Each box's upper left corner is on the millimetre grid,
-as a node's is, so the terminals of nodes on the grid line up with each other
-and with the grid: worked out from where the node is, a grid point not being a
-whole number of pixels from the last, and rounded inwards so a box never leaves
-its node or crosses its slant.
+leaves at ``moc-out``. Each box's upper left corner is on one of the lines
+five millimetres apart, so the terminals of nodes line up with each other and
+with those lines, and a line between two level terminals runs along one: worked
+out from where the node is, a millimetre not being a whole number of pixels,
+and taken at the first line in from the border -- the last at the bottom and
+the right -- so a box never leaves its node or crosses its slant. The two rows
+are ten millimetres apart.
 
 So the arrows along the top point right and the arrows along the bottom point
 left, because that is the way the canvas itself is laid out -- the payloads
@@ -2130,6 +2140,11 @@ shape, and a five-pixel line is read far more easily than its contrast ratio
 suggests -- but it is a trade and it is written down here rather than left to
 be noticed.
 
+Each selection panel draws its shapes at three quarters of the size they are
+on the canvas -- outline, terminals and name together -- so a list is a list of
+the shapes rather than a column of the canvas, and more of it is in view at
+once.
+
 Each selection panel is in alphabetical order under each of its headings. A
 palette is a thing people look in rather than read, and the order it had was
 the order the type table happens to declare things in, which is no order at
@@ -2140,28 +2155,31 @@ landed in. The headings keep the table's order, which is the one place that
 order says something -- devices, then the things that are driven, then the ends
 of the graph.
 
-The two ends of the graph are two shapes rather than one. A log is a data
-store -- two long sides and a cap on the right, the left end left open -- and
-the ground station is a plain rectangle with square corners, the **external
-entity**: the thing outside the system that data comes from and goes to, which
-is what the ground is. They were
-both pills, under one heading, on the strength of both being "an end"; but a
-file written on board and everybody on the ground are not the same kind of
-end, and the two were never in the same pane for the shared heading to group
-anything.
+There are three outlines, one to a pane, so the outline says which pane a node
+belongs in before anything else is read: a payload is a parallelogram, a part
+of the vehicle a rectangle with rounded corners, and the ground the plain
+rectangle. Within an outline the types are told apart by the line around them,
+its weight and the way the name is set.
 
-A page of its own is a *predefined process* -- a rectangle with a bar inset at
-each end, the flowchart symbol for a step whose insides are written down
-somewhere else. It was a rounded box with a second outline inside it, which
-was this symbol by accident and at one remove. It is also the one standard
-symbol available to that node at all: a page carries all four terminals, a
-terminal is drawn in a corner, and every other symbol in the vocabulary buys
-its distinctiveness with a corner. The bars are inside the shape, so they cost
-nothing a corner needs.
+Every part of the vehicle is a **rectangle with rounded corners**, the process
+of a data-flow diagram: a computation, a log, a null node, a page of its own
+and the three apps aboard. They were five shapes once -- a log the open-ended
+data store, a page and the apps the barred predefined process -- and each of
+those said something about the node at the cost of saying it is part of the
+vehicle. The corners are arcs of nine pixels drawn as a path, in eight straight
+pieces each, rather than a corner radius on a rectangle: a radius cannot be
+dashed or doubled, and seven types of one outline need the edges to be told
+apart by. Nine pixels is tight enough that a terminal three pixels in from the
+border is inside the curve, so a rounded node's terminals sit where every other
+node's do.
 
-A payload is a **parallelogram**, the flowchart symbol for input and output on
-an unspecified medium -- which is what the nine device kinds are: a bus, a
-socket, a channel, a sample buffer, a file. It is the one symbol in the
+A payload is a **parallelogram**, every one of them, the flowchart symbol for
+input and output on an unspecified medium -- which is what a payload is: a
+bus, a socket, a channel, a sample buffer, a file, lines driven, a program.
+The outline alone then says which nodes are what the vehicle carries; ``gpio``
+was a keyed rectangle and the two payloads that are programs wore the bars of
+a predefined process, and each of those said something about the node at the
+cost of saying it is a payload. It is the one symbol in the
 notation that means *data crossing a boundary* rather than a thing or a step,
 and a payload is exactly that boundary. It leans right, as the symbol is
 drawn, so the corners it gives away are the top left and the bottom right.
@@ -2183,15 +2201,9 @@ line of a doubled edge is inset as a *smaller box* and so leans by its own
 slant, and a test holds it inside the outer line.
 
 The shapes are the ones the standard notations use, which is worth more than
-being inventive: a reader who has seen a data-flow diagram already knows that
-a parallelogram is data crossing a boundary, a rounded box is a process, a
-plain rectangle is something outside the system and a box with an end left
-open is somewhere data is kept. The pill a log used
-to be is the flowchart symbol for a *terminator*, where control enters or
-leaves a program, which is not what a log is. It also rounded away the one
-corner the log's own terminal is drawn in, and put that arrow about fifteen
-pixels outside the outline; leaving an end open is the one way to stop being a
-rectangle without touching a corner at all.
+being inventive: a reader who has seen a data-flow diagram already knows that a
+parallelogram is data crossing a boundary, a rounded box is a process and a
+plain rectangle is something outside the system.
 
 The ground station has worn a pill and a five-sided point before this. Both
 said "not like the others" by being unlike anything; the rectangle says it by
@@ -2201,8 +2213,8 @@ same size as everything else, 152 by 64, and it is wide, solid, azure and
 set in the largest italic, so it catches the eye without being the node shaped
 oddly.
 
-A side left out and a side that leans are not corner radii, so those shapes
-arrive as path data from ``style::shape_of`` and the markup draws them with a
+Every outline -- a side that leans, corners drawn in pieces, a plain box --
+arrives as path data from ``style::shape_of`` and the markup draws them with a
 ``Path`` -- the same arrangement as the link routes, and for the same reason:
 geometry that can be read and tested belongs in Rust rather than in a layout
 language. A ``Path`` has no drop shadow, so the lift such a node gets while it

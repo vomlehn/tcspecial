@@ -47,4 +47,4 @@ payloads:
 
 tcsgui:
   nodes:
-    - { name: sensor, x: 42, y: 42 }
+    - { name: sensor, x: 34, y: 34 }

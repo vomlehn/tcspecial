@@ -63,11 +63,13 @@ pub fn grid_floor(v: i32) -> i32 {
 }
 
 /// The grid point after `v`, which is a step of one millimetre from a point.
+#[cfg(test)]
 pub fn grid_after(v: i32) -> i32 {
     grid_ceil(v + 1)
 }
 
 /// And the one before it.
+#[cfg(test)]
 pub fn grid_before(v: i32) -> i32 {
     grid_floor(v - 1)
 }
@@ -75,6 +77,103 @@ pub fn grid_before(v: i32) -> i32 {
 /// Whether `v` is a grid point.
 pub fn is_on_grid(v: i32) -> bool {
     on_grid(v) == v
+}
+
+/// How far apart, in millimetres, the places a node may be are, and the lines
+/// its terminals are on.
+///
+/// A node's terminals are on lines five millimetres apart -- see
+/// `style::terminal_at` -- so that a line between two level terminals runs
+/// along one, and so a node moves in steps of five: a node at an arbitrary
+/// millimetre would have its terminals rounded up to five millimetres from
+/// where they belong, and in a node seventeen millimetres tall the two rows
+/// would meet.
+pub const NODE_STEP_MM: i32 = 5;
+
+/// Where in each step a node's upper left corner is: a millimetre short of a
+/// line, so the terminals' first line is a millimetre inside the node -- in
+/// from its border, as a terminal is meant to be -- and the node's corner is
+/// still on the millimetre grid.
+pub const NODE_OFFSET_MM: i32 = NODE_STEP_MM - 1;
+
+/// Whether the millimetre `mm` is a place a node's corner may be.
+fn is_node_mm(mm: i32) -> bool {
+    mm.rem_euclid(NODE_STEP_MM) == NODE_OFFSET_MM
+}
+
+/// The millimetre a pixel is nearest.
+fn mm_of(v: i32) -> i32 {
+    (v as f64 / PX_PER_MM).round() as i32
+}
+
+/// The place a node may be that is nearest `v`.
+pub fn on_node_grid(v: i32) -> i32 {
+    let mm = mm_of(v);
+    let below = mm - (mm - NODE_OFFSET_MM).rem_euclid(NODE_STEP_MM);
+    let above = below + NODE_STEP_MM;
+    let (low, high) = (grid_point(below), grid_point(above));
+    if v - low <= high - v {
+        low
+    } else {
+        high
+    }
+}
+
+/// The lowest place a node may be at or above `v`.
+pub fn node_ceil(v: i32) -> i32 {
+    let mut mm = mm_of(grid_ceil(v));
+    while !is_node_mm(mm) {
+        mm += 1;
+    }
+    grid_point(mm)
+}
+
+/// The highest place a node may be at or below `v`.
+pub fn node_floor(v: i32) -> i32 {
+    let mut mm = mm_of(grid_floor(v));
+    while !is_node_mm(mm) {
+        mm -= 1;
+    }
+    grid_point(mm)
+}
+
+/// The next place a node may be after `v`, one step on.
+pub fn node_after(v: i32) -> i32 {
+    node_ceil(v + 1)
+}
+
+/// And the one before it.
+pub fn node_before(v: i32) -> i32 {
+    node_floor(v - 1)
+}
+
+/// The lowest point on one of the lines terminals are on -- every
+/// [`NODE_STEP_MM`] millimetres -- at or after `v`.
+pub fn line_ceil(v: i32) -> i32 {
+    let mut mm = (v as f64 / PX_PER_MM).floor() as i32;
+    while mm.rem_euclid(NODE_STEP_MM) != 0 || grid_point(mm) < v {
+        mm += 1;
+    }
+    grid_point(mm)
+}
+
+/// And the highest at or before it.
+pub fn line_floor(v: i32) -> i32 {
+    let mut mm = (v as f64 / PX_PER_MM).ceil() as i32;
+    while mm.rem_euclid(NODE_STEP_MM) != 0 || grid_point(mm) > v {
+        mm -= 1;
+    }
+    grid_point(mm)
+}
+
+/// Whether `v` is on one of those lines.
+pub fn is_on_line(v: i32) -> bool {
+    line_ceil(v) == v
+}
+
+/// Whether `v` is a place a node may be.
+pub fn is_on_node_grid(v: i32) -> bool {
+    is_on_grid(v) && is_node_mm(mm_of(v))
 }
 
 /// How wide the whole working area is, in the coordinates the file holds.
@@ -281,7 +380,7 @@ pub fn pane_for(node_type: &str, dividers: Dividers) -> (i32, i32) {
     let (width, _) = size_of(node_type);
     let width = width as i32;
     let (left, right) = edges_of(pane_of(node_type), dividers);
-    (grid_ceil(left), grid_floor(right - width))
+    (node_ceil(left), node_floor(right - width))
 }
 
 /// Where a pane begins and ends, in the coordinates the file holds.
@@ -312,9 +411,12 @@ pub fn confine(node_type: &str, dividers: Dividers, (x, y): (i32, i32)) -> (i32,
     // has a right bound to the left of its left one, and a node in it sits at
     // its left edge and overhangs.
     //
-    // On the grid: the nearest grid point, which the bounds are as well, so a
-    // node held at an edge is on the grid too.
-    (on_grid(x).clamp(left, right.max(left)), on_grid(y.max(0)))
+    // On the grid: the nearest place a node may be -- a step of five
+    // millimetres, see `NODE_STEP_MM` -- which the bounds are as well, so a
+    // node held at an edge is on the grid too. Never above the first of them:
+    // a node off the top of the sheet is a node nobody can reach.
+    let y = on_node_grid(y).max(node_ceil(0));
+    (on_node_grid(x).clamp(left, right.max(left)), y)
 }
 
 /// Where a new node of this type goes.
@@ -352,7 +454,7 @@ pub fn place_in(
     let (width, height) = size_of(node_type);
     let (left, right) = pane_for(node_type, dividers);
     let right = right.max(left);
-    let bottom = grid_floor(WORKING_HEIGHT - height as i32);
+    let bottom = node_floor(WORKING_HEIGHT - height as i32);
 
     // What is already drawn, and the band at the top of each pane that its
     // name is written in: nothing the editor places itself covers a name. See
@@ -369,14 +471,14 @@ pub fn place_in(
                     && *tall < y + height as i32
             })
     };
-    // Every place tried is a grid point, a millimetre apart.
+    // Every place tried is one a node may be, a step apart.
     let across = |y: i32| {
         let mut x = left;
         while x <= right {
             if clear(x, y) {
                 return Some((x, y));
             }
-            x = grid_after(x);
+            x = node_after(x);
         }
         None
     };
@@ -385,33 +487,33 @@ pub fn place_in(
     // hanging half off the bottom of the window is not in view.
     let (top, how_much) = visible;
     let top = top.max(0);
-    let mut y = grid_ceil(top);
+    let mut y = node_ceil(top);
     while y <= (top + how_much - height as i32).min(bottom) {
         if let Some(at) = across(y) {
             return at;
         }
-        y = grid_after(y);
+        y = node_after(y);
     }
 
     // Above the view, lowest first: the nearest place is the shortest scroll.
-    let mut y = grid_floor((top - height as i32).min(bottom));
+    let mut y = node_floor((top - height as i32).min(bottom));
     while y >= 0 {
         if let Some(at) = across(y) {
             return at;
         }
-        y = grid_before(y);
+        y = node_before(y);
     }
 
     // Below it, highest first.
-    let mut y = grid_ceil((top + how_much).max(0));
+    let mut y = node_ceil((top + how_much).max(0));
     while y <= bottom {
         if let Some(at) = across(y) {
             return at;
         }
-        y = grid_after(y);
+        y = node_after(y);
     }
 
-    (left, 0)
+    (left, node_ceil(0))
 }
 
 /// The nominal size of a type, for placing a link's ends.

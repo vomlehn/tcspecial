@@ -556,7 +556,7 @@ tcsgui:
         // Drawn well below the ground link: a node that came home on top of
         // another steps down the grid, and that is a rule of its own rather
         // than this one.
-        assert_eq!(sensor.at.1, crate::pane::on_grid(240));
+        assert_eq!(sensor.at.1, crate::pane::on_node_grid(240));
         // And the ground link, which the file drew in the vehicle's pane: it
         // belongs in the moc pane now, so it comes home at the same height.
         let moc = editor.document().node("moc").expect("the ground link");
@@ -565,7 +565,7 @@ tcsgui:
             "the ground link opened at {:?}, outside its pane",
             moc.at
         );
-        assert_eq!(moc.at.1, crate::pane::on_grid(40));
+        assert_eq!(moc.at.1, crate::pane::on_node_grid(40));
 
         // The file is untouched.
         assert_eq!(
@@ -586,7 +586,7 @@ tcsgui:
         let written = std::fs::read_to_string(&path).unwrap();
         assert_ne!(written, by_hand);
         assert!(
-            written.contains(&format!("x: {}", dividers.vehicle)),
+            written.contains(&format!("x: {}", crate::pane::node_ceil(dividers.vehicle))),
             "the settled position was not written: {written}"
         );
     }

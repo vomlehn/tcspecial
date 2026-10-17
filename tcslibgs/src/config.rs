@@ -48,6 +48,24 @@ pub fn load_payload_config<P: AsRef<Path>>(path: P) -> TcsResult<Vec<DHConfig>> 
     payload_config.to_dh_configs().map_err(TcsError::Config)
 }
 
+/// The simulator file beside a configuration and named for it, where there is
+/// one.
+///
+/// Two spellings, both in use: `<stem>-sim.yaml`, which the examples use, and
+/// `<stem>sim.yaml`, which the version 1 payload sets under `tests/manual`
+/// use. The stem is the configuration's name without `.yaml`, `.yml` or
+/// `.xml`, so either spelling of a configuration finds the same simulator
+/// file. One function for every program that looks, so that tcsmoc and the
+/// tcssim it starts cannot pick different files.
+pub fn sim_path_beside(payload_path: &str) -> Option<String> {
+    let stem = [".yaml", ".yml", ".xml"]
+        .iter()
+        .find_map(|ext| payload_path.strip_suffix(ext))?;
+    [format!("{stem}-sim.yaml"), format!("{stem}sim.yaml")]
+        .into_iter()
+        .find(|candidate| Path::new(candidate).is_file())
+}
+
 /// The tcspecial configuration file a program was told to read.
 ///
 /// Every program that serves, controls or simulates a payload set needs to be
@@ -210,6 +228,16 @@ pub fn load_tcspecial_section<P: AsRef<Path>>(path: P) -> TcsResult<Option<CICon
 /// than no program at all.
 pub fn load_config_version<P: AsRef<Path>>(path: P) -> TcsResult<ConfigVersion> {
     let path = path.as_ref();
+    // A version 2 configuration states the language's version, 2.0, and
+    // that is what its beacons announce.
+    if crate::graph::is_version_2(path) {
+        return crate::graph::version_of(path)
+            .as_deref()
+            .and_then(ConfigVersion::of_text)
+            .ok_or_else(|| {
+                TcsError::Config(format!("{}: its version cannot be read", path.display()))
+            });
+    }
     let format = ConfigFormat::of_file(path)?;
     let text = fs::read_to_string(path)?;
 

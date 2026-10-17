@@ -50,9 +50,10 @@ see what an app node is. Two programs, both in `examples/simple-app`:
   the text to send, counting from one. It sends one word per packet and then a
   packet holding the line terminator.
 - `lorem_moc` is the ground station, a Rust program in the crate beside the
-  configuration. It listens where the `moc` node's `ground_address` and
-  `ground_port` say the ground is, writes out each word it receives with one
-  space between them, and stops when the terminator arrives.
+  configuration. It gets `lorem`'s words from the configuration's `moc`
+  node with one function call, `tcslib::moc::Moc::receive`, which works out
+  from the configuration which port they arrive at; it writes out each word
+  with one space between them, and stops when the terminator arrives.
 
 ```
 make run-simple-app

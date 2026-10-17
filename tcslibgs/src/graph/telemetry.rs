@@ -9,11 +9,11 @@
 //! # Device ids
 //!
 //! Every node has one: its position among the configuration's nodes, counting
-//! from nought, in the order they are read -- each file's `moc` section, then
-//! its `vehicle` section, then its `payloads`, the top file first and then the
-//! files it includes, in the order it names them. So adding or removing a node
-//! moves the ids of the nodes read after it, and a ground station working from
-//! the same file counts the same way.
+//! from nought, in the order the files declare them -- the order they are
+//! written, whatever the sections are, the top file first and then the files
+//! it includes, in the order it names them (see `crate::graph::order`). So
+//! adding or removing a node moves the ids of the nodes written after it, and
+//! a ground station working from the same file counts the same way.
 //!
 //! # Two kinds of link
 //!

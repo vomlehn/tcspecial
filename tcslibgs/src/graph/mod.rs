@@ -48,8 +48,10 @@
 
 pub mod check;
 pub mod mirror;
+pub mod order;
 pub mod parameters;
 pub mod reach;
+pub mod simulated;
 pub mod telemetry;
 pub mod terminals;
 
@@ -952,6 +954,7 @@ impl Graph {
         file: &GraphFile,
         mirror: &mut mirror::Mirror,
     ) -> TcsResult<()> {
+        let first = self.nodes.len();
         for (section, nodes) in [
             (Section::Moc, &file.moc),
             (Section::Vehicle, &file.vehicle),
@@ -977,6 +980,13 @@ impl Graph {
                 mirror.record(from, said);
             }
         }
+
+        // In the order the file declares them, which the sections above do
+        // not keep: a node's device id is its position, and that is the order
+        // somebody reading the file sees. See `order`.
+        let declared = order::declared(from)?;
+        let at = |name: &str| declared.iter().position(|n| n == name).unwrap_or(usize::MAX);
+        self.nodes[first..].sort_by_key(|node| at(&node.name));
 
         self.groups.extend(file.payload_groups.iter().cloned());
         self.commands.extend(file.commands.iter().cloned());

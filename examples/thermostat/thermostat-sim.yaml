@@ -2,8 +2,10 @@
 
 # How tcssim stands in for the payloads of thermostat.yaml.
 #
-# The two files are joined by name: every data handler there has an entry
-# here, and nothing here names a payload that file does not have.
+# The two files are joined by name, and nothing here names a payload that
+# file does not have. Only the payloads named here are simulated: the heaters
+# are driven and never read, so there is nothing to send in their place, and
+# they are left out.
 description: Simulator settings for the payloads of thermostat.yaml
 
 simulated_payload_groups:
@@ -24,7 +26,3 @@ simulated_payloads:
   - name: temp_bay
     type: spi
     group: cabin_temps
-
-  # Commanded rather than read: nothing for an interval to mean.
-  - name: heaters
-    type: gpio

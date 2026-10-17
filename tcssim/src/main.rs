@@ -218,8 +218,8 @@ fn update_row(model: &Rc<VecModel<PayloadInfo>>, row: usize, f: impl FnOnce(&mut
 /// `startup` whatever stops it being simulated.
 ///
 /// Every one of these is a refusal tcsverify has already made, bar the ones
-/// that are the simulator's alone -- a version 2 configuration, which it does
-/// not run, and a set with no payloads, which leaves it nothing to be. They
+/// that are the simulator's alone -- a version 2 payload it cannot stand in
+/// for, and a set with no payloads to simulate, which leaves it nothing to be. They
 /// are asked again rather than assumed: the files can change between the two
 /// reads, and a simulator running on a half-read pair would be worse than one
 /// that says so.
@@ -228,29 +228,34 @@ fn load(
     sim_path: &str,
     startup: &mut Startup,
 ) -> Option<(Vec<DHConfig>, SimConfigFile, Vec<ResolvedSim>, Vec<PayloadConfig>)> {
-    if tcslibgs::graph::is_version_2(Path::new(payload_path)) {
-        startup.error(format!(
-            "{payload_path}: a version 2 configuration, which tcssim does not \
-             simulate: it simulates the payloads of a version 1 payload set"
-        ));
-        return None;
-    }
-
-    let dh_configs = match load_dh_configs(payload_path) {
-        Ok(dh_configs) => dh_configs,
-        Err(e) => {
-            startup.error(format!(
-                "Error loading payload configuration from {payload_path}: {e}"
-            ));
-            return None;
-        }
-    };
+    let version_2 = tcslibgs::graph::is_version_2(Path::new(payload_path));
 
     let sim_file = match SimConfigFile::load(sim_path) {
         Ok(sim_file) => sim_file,
         Err(e) => {
             startup.error(format!(
                 "Error loading simulator configuration from {sim_path}: {e}"
+            ));
+            return None;
+        }
+    };
+
+    // A version 2 configuration's payloads are nodes of a graph, and the ones
+    // simulated are the ones the simulator file names: see
+    // tcslibgs::graph::simulated, which makes of each what a version 1 set
+    // describes, reached where tcspecial reaches it.
+    let loaded = if version_2 {
+        tcslibgs::graph::Graph::load(payload_path)
+            .map_err(|e| e.to_string())
+            .and_then(|graph| tcslibgs::graph::simulated::handlers(&graph, &sim_file))
+    } else {
+        load_dh_configs(payload_path).map_err(|e| e.to_string())
+    };
+    let dh_configs = match loaded {
+        Ok(dh_configs) => dh_configs,
+        Err(e) => {
+            startup.error(format!(
+                "Error loading payload configuration from {payload_path}: {e}"
             ));
             return None;
         }
@@ -354,8 +359,12 @@ fn main() {
             process::exit(1);
         }
     };
-    let sim_path = env::var(SIM_CONFIG_PATH_VAR)
-        .unwrap_or_else(|_| DEFAULT_SIM_CONFIG_PATH.to_string());
+    // The one PAYLOAD_SIM_YAML names, and otherwise the one beside the
+    // configuration and named for it, found as tcsmoc finds it.
+    let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
+        tcslibgs::config::sim_path_beside(&payload_path)
+            .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
+    });
 
     // Everything wrong with the pair, in tcsverify's words and before
     // anything else is read from either: every problem at once, each with its
@@ -544,6 +553,46 @@ mod tests {
 
     fn repo_file(name: &str) -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
+    }
+
+    /// A version 2 example is simulated: its simulated payload nodes, reached
+    /// where tcspecial reaches them, with the simulator file beside it found
+    /// as tcsmoc finds it.
+    #[test]
+    fn a_version_2_example_is_simulated() {
+        let payload = repo_file("examples/minimal/minimal.yaml");
+        let payload = payload.to_str().expect("a path");
+        let sim = tcslibgs::config::sim_path_beside(payload).expect("its simulator file");
+        assert!(sim.ends_with("minimal-sim.yaml"), "{sim}");
+
+        let mut startup = Startup::default();
+        let (dh_configs, _, sims, configs) =
+            load(payload, &sim, &mut startup).expect("it loads");
+        assert!(startup.is_empty(), "{:?}", startup.lines());
+        assert_eq!(dh_configs.len(), 1);
+        assert_eq!(dh_configs[0].name.0, "sensor");
+        assert_eq!(sims.len(), 1);
+        assert_eq!(configs.len(), 1);
+    }
+
+    /// One whose simulator file names nothing is refused, saying so: there is
+    /// nothing for a simulator to be.
+    #[test]
+    fn a_version_2_example_with_nothing_simulated_is_refused() {
+        let payload = repo_file("examples/simple-app/simple-app.yaml");
+        let payload = payload.to_str().expect("a path");
+        let sim = tcslibgs::config::sim_path_beside(payload).expect("its simulator file");
+
+        let mut startup = Startup::default();
+        assert!(load(payload, &sim, &mut startup).is_none());
+        assert!(
+            startup
+                .lines()
+                .iter()
+                .any(|(error, line)| *error && line.contains("no payloads to simulate")),
+            "{:?}",
+            startup.lines()
+        );
     }
 
     /// A sample of a transfer, as the stats hold it.

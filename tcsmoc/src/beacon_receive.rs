@@ -10,7 +10,7 @@ use slint::{Color, Weak};
 
 use crate::MainWindow;
 use slint::SharedString;
-use tcslibgs::{came_from, TcsResult, Telemetry, Timestamp, NO_TRANSFER_TIME};
+use tcslibgs::{came_from, ConfigDigest, TcsResult, Telemetry, Timestamp, NO_TRANSFER_TIME};
 use tcspecial::config::Beacon;
 
 const DEBUG_BEACON: bool = false;
@@ -277,7 +277,19 @@ pub struct BeaconReceive {
     beacon:             Beacon,
     ui_weak:            Weak<MainWindow>,
     indicator_states:   IndicatorStates,
+    /// The digest this MOC computed from the configuration files it read,
+    /// which every beacon's digest -- the one tcspecial computed from the
+    /// files it read -- is compared with. `None` where this MOC could not
+    /// digest its own, and then nothing is compared.
+    expected:           Option<ConfigDigest>,
+    /// What to do when beacons start announcing a different configuration:
+    /// ask the operator whether to continue. Called from this thread, so it
+    /// takes the question to the window itself.
+    ask:                Option<Ask>,
 }
+
+/// Asks the operator, with what differs, whether to continue anyway.
+pub type Ask = Arc<dyn Fn(String) + Send + Sync>;
 
 /// What a pass of the receive loop found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -404,17 +416,48 @@ pub(crate) struct Heard {
     pub message: String,
     /// The beacon's own number, if it was a beacon this build can read.
     pub sequence: Option<u32>,
+    /// What is wrong with the configuration it announces, if anything: see
+    /// [`differs`].
+    pub differs: Option<String>,
 }
 
-/// Read a datagram from the beacon group.
-pub(crate) fn hear(datagram: &[u8]) -> Heard {
+/// Read a datagram from the beacon group, comparing the digest it carries
+/// with `expected`, this MOC's own.
+pub(crate) fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
+    let beacon = match serde_json::from_slice::<Telemetry>(datagram) {
+        Ok(Telemetry::Beacon(beacon)) => Some(beacon),
+        _ => None,
+    };
+    let differs = match (&beacon, expected) {
+        (Some(beacon), Some(ours)) => differs(beacon.digest, ours),
+        _ => None,
+    };
+    let message = beacon_message(datagram);
     Heard {
-        message: beacon_message(datagram),
-        sequence: match serde_json::from_slice::<Telemetry>(datagram) {
-            Ok(Telemetry::Beacon(beacon)) => Some(beacon.header.sequence),
-            _ => None,
+        message: match &differs {
+            Some(why) => format!("{why} -- {message}"),
+            None => message,
         },
+        sequence: beacon.map(|beacon| beacon.header.sequence),
+        differs,
     }
+}
+
+/// Whether the configuration tcspecial announces is the one this MOC read.
+///
+/// `theirs` is the digest tcspecial computed from the configuration files it
+/// read and sent in its beacon; `ours` is the one this MOC computed from the
+/// files it read. Different digests are different configurations -- a node,
+/// an attribute or a device id that is not the same -- so what this MOC's
+/// panels say about where each source's data arrives may not be where the
+/// vehicle sends it. `None` when they agree.
+pub(crate) fn differs(theirs: ConfigDigest, ours: ConfigDigest) -> Option<String> {
+    (theirs != ours).then(|| {
+        format!(
+            "CONFIGURATION DIFFERS: tcspecial is serving md5 {theirs}, and this MOC \
+             read md5 {ours}"
+        )
+    })
 }
 
 /// What a beacon's number says about the ones before it.
@@ -497,6 +540,8 @@ impl BeaconReceive {
         beacon:             Beacon,
         indicator_states:   IndicatorStates,
         contact:            Arc<Mutex<Contact>>,
+        expected:           Option<ConfigDigest>,
+        ask:                Option<Ask>,
     ) -> Option<BeaconReceive> {
         let last_beacon = Arc::new(CondPair {
             lock: Mutex::new(None),
@@ -510,6 +555,8 @@ impl BeaconReceive {
             ui_weak,
             indicator_states,
             contact,
+            expected,
+            ask,
         };
 
         let b_clone = b.clone();
@@ -542,6 +589,8 @@ impl BeaconReceive {
         // The number of the last beacon heard, so that the next one can say
         // what happened in between.
         let mut last_sequence: Option<u32> = None;
+        // Whether the last beacon announced a different configuration.
+        let mut differed = false;
 
         loop {
             // How long to wait: until the colour would change by itself, so
@@ -571,7 +620,24 @@ impl BeaconReceive {
                     Arrived::Nothing
                 }
                 Ok((size, _from)) => {
-                    let heard = hear(&buf[..size]);
+                    let heard = hear(&buf[..size], self.expected);
+                    // Said on the console as well, when it starts and when it
+                    // stops: a configuration that differs is the one thing a
+                    // beacon can say that makes every panel suspect.
+                    if heard.differs.is_some() != differed {
+                        match &heard.differs {
+                            Some(why) => {
+                                eprintln!("{why}");
+                                if let Some(ask) = &self.ask {
+                                    ask(why.clone());
+                                }
+                            }
+                            None => eprintln!(
+                                "tcspecial is serving the configuration this MOC read again"
+                            ),
+                        }
+                        differed = heard.differs.is_some();
+                    }
 
                     // What its number says about the ones before it. Said on
                     // the console rather than in the window: a gap is about
@@ -903,6 +969,35 @@ mod tests {
         assert_eq!(broken.color, states.unset_color());
     }
 
+    /// The digest tcspecial sent is compared with the one this MOC computed:
+    /// the same says nothing, and a different one says both.
+    #[test]
+    fn a_beacon_announcing_another_configuration_says_so() {
+        let ours = tcslibgs::ConfigDigest([0xab; 16]);
+        let theirs = tcslibgs::ConfigDigest([0xcd; 16]);
+        assert_eq!(differs(ours, ours), None);
+        let said = differs(theirs, ours).expect("they differ");
+        assert!(said.contains(&theirs.to_string()), "{said}");
+        assert!(said.contains(&ours.to_string()), "{said}");
+
+        let version = tcslibgs::ConfigVersion::of_this_build();
+        let datagram = serde_json::to_vec(&Telemetry::Beacon(tcslibgs::BeaconTelemetry::new(
+            1, version, version, theirs,
+        )))
+        .expect("it serializes");
+
+        let heard = hear(&datagram, Some(ours));
+        assert!(heard.differs.is_some());
+        assert!(heard.message.starts_with("CONFIGURATION DIFFERS"), "{}", heard.message);
+
+        let heard = hear(&datagram, Some(theirs));
+        assert_eq!(heard.differs, None);
+        assert!(!heard.message.contains("DIFFERS"), "{}", heard.message);
+
+        // And with nothing to compare against, nothing is said.
+        assert_eq!(hear(&datagram, None).differs, None);
+    }
+
     /// A beacon's own words are what the line shows: the build flying and the
     /// configuration it read.
     ///
@@ -942,8 +1037,8 @@ mod tests {
 
         // The beacon's own number comes back beside the message, which is
         // what tells a beacon that was missed from one that was never sent.
-        assert_eq!(hear(&datagram).sequence, Some(3));
-        assert_eq!(hear(b"hello").sequence, None, "not a beacon, no number");
+        assert_eq!(hear(&datagram, None).sequence, Some(3));
+        assert_eq!(hear(b"hello", None).sequence, None, "not a beacon, no number");
 
         let shown = beacon_message(&datagram);
         assert!(shown.contains("1.2.3"), "{shown}");

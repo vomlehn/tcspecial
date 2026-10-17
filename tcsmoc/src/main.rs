@@ -40,6 +40,7 @@ mod config;
 mod endpoint;
 mod freshness;
 mod oc_link;
+mod version_2;
 
 /// Default CI address
 const DEFAULT_CI_ADDRESS: &str = "127.0.0.1:4000";
@@ -446,13 +447,12 @@ fn simulator_settings(
 /// Which simulator file goes with this payload set.
 ///
 /// The one `PAYLOAD_SIM_YAML` names, and otherwise the one beside the
-/// tcspecial configuration and named for it, which is the convention the
-/// whole payload set mechanism rests on.
+/// tcspecial configuration and named for it -- see
+/// `tcslibgs::config::sim_path_beside`, which tcssim asks as well -- which is
+/// the convention the whole payload set mechanism rests on.
 fn sim_path_for(payload_path: &str) -> String {
     env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
-        payload_path
-            .strip_suffix(".yaml")
-            .map(|stem| format!("{stem}sim.yaml"))
+        tcslibgs::config::sim_path_beside(payload_path)
             .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
     })
 }
@@ -874,13 +874,13 @@ fn main() {
         &tcsverify::verify(Path::new(&payload_path), Some(Path::new(&sim_path))),
         Path::new(&sim_path),
     );
-    if tcslibgs::graph::is_version_2(Path::new(&payload_path)) {
-        startup.error(format!(
-            "{payload_path}: a version 2 configuration, which tcsmoc does not \
-             control: it controls the payloads of a version 1 payload set"
-        ));
-    }
     present_and_stop_if_fatal(&startup);
+
+    // A version 2 configuration is a graph whose ground end is data, not a
+    // command interpreter: see version_2, which runs the window for it.
+    if tcslibgs::graph::is_version_2(Path::new(&payload_path)) {
+        version_2::run(&payload_path, &sim_path, startup);
+    }
 
     let dh_configs: Arc<Vec<DHConfig>> = match load_dh_configs(&payload_path) {
         Ok(dh_configs) => Arc::new(dh_configs),
@@ -1108,6 +1108,11 @@ fn main() {
                 beacon,
                 BEACON_INDICATOR.clone(),
                 contact.clone(),
+                digest,
+                Some(ask_whether_to_continue(
+                    process_manager_tcssim.clone(),
+                    process_manager_tcspecial.clone(),
+                )),
             )
         }
         Err(e) => {
@@ -2033,6 +2038,40 @@ fn handle_close(
 /// something else started it, something else may still be using it, and
 /// shutting down a spacecraft's command interpreter because a ground display
 /// was closed is not the MOC's decision to make.
+/// What to do when tcspecial's beacons announce a configuration other than
+/// the one this MOC read: ask the operator whether to continue anyway.
+///
+/// Continue closes the question and leaves everything running; Quit stops
+/// tcspecial and tcssim, where this MOC started them, and exits, as the Quit
+/// button does. Asked from the beacon thread, so the window is made on the
+/// event loop.
+fn ask_whether_to_continue(
+    pm_tcssim: Arc<ProcessManager>,
+    pm_tcspecial: Option<Arc<ProcessManager>>,
+) -> beacon_receive::Ask {
+    Arc::new(move |why: String| {
+        let pm_tcssim = pm_tcssim.clone();
+        let pm_tcspecial = pm_tcspecial.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            let Ok(window) = DiffersWindow::new() else {
+                return;
+            };
+            window.set_message(SharedString::from(why));
+            // The window holds a handle on itself through this callback, so
+            // that it stays up until it is answered rather than until this
+            // function returns.
+            let held = window.clone_strong();
+            window.on_continue_anyway(move || {
+                let _ = held.hide();
+            });
+            window.on_quit(move || {
+                kill_and_exit_all(&pm_tcssim, pm_tcspecial.as_ref());
+            });
+            let _ = window.show();
+        });
+    })
+}
+
 fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<ProcessManager>>) {
     pm_tcssim.kill();
     if let Some(pm_tcspecial) = pm_tcspecial {

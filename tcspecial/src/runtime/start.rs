@@ -18,9 +18,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use log::{error, info, warn};
+use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
 use tcslibgs::graph::Graph;
 
+use crate::beacon_send::BeaconSend;
 use crate::runtime::fabric::Moved;
+use crate::telemetry_log::TelemetryLog;
 use crate::runtime::system::{described, System};
 
 /// Whether something has asked this process to stop.
@@ -52,8 +55,25 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
         eprintln!("  {name}: {what}");
     }
 
+    // What this vehicle is serving, said as version 1 says it: the build,
+    // the configuration's version and its digest. The ground compares the
+    // digest in every beacon with its own, which is how it knows the vehicle
+    // is running the configuration it is reading -- the same ports, the same
+    // device ids, the same nodes.
+    let digest = digest_of_graph(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
+    let config_version = ConfigVersion::of_text(tcslibgs::graph::VERSION)
+        .expect("the language's own version reads");
+    eprintln!(
+        "v{}, configuration {path} config v{config_version} md5: {digest}",
+        ConfigVersion::of_this_build()
+    );
+
     let mut system = System::of(&graph, Instant::now())?;
     info!("{path}: {system:?}");
+
+    // Beacons, once everything has opened: a vehicle that will not start has
+    // nothing to announce. Held until the vehicle stops.
+    let _beacon = beacons(&graph, config_version, digest).map_err(|why| vec![format!("{path}: {why}")])?;
 
     listen_for_stop();
 
@@ -61,6 +81,43 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 
     info!("{path}: stopped");
     Ok(())
+}
+
+/// Start sending beacons where the configuration's `tcspecial` section says.
+///
+/// From `beacon.send` to `beacon.recv`, every `beacon.interval_ms`, carrying
+/// this build's version, the configuration's and the configuration's digest:
+/// the same beacon a version 1 vehicle sends, by the same code. An interval of
+/// nought sends none, as it does in version 1. Recorded in no telemetry log:
+/// a version 2 vehicle logs through its own log nodes.
+fn beacons(
+    graph: &Graph,
+    config_version: ConfigVersion,
+    digest: ConfigDigest,
+) -> Result<Option<BeaconSend>, String> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(None);
+    };
+    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
+        section,
+    ))?
+    .to_ci_config()?;
+    let sending = BeaconSend::new(
+        Duration::from_millis(u64::from(ci.beacon_interval.0)),
+        ci.beacon_send.clone(),
+        ci.beacon_recv.clone(),
+        TelemetryLog::disabled(),
+        ConfigVersion::of_this_build(),
+        config_version,
+        digest,
+    );
+    if sending.is_some() {
+        eprintln!(
+            "beacons every {} ms from {} to {}",
+            ci.beacon_interval.0, ci.beacon_send, ci.beacon_recv
+        );
+    }
+    Ok(sending)
 }
 
 /// Whether the loop should stop.

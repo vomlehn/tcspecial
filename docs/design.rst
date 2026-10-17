@@ -685,15 +685,48 @@ Requirement
     stream payload comes to be addressed as datagrams.
 
 Requirement
-    A ``moc`` node over UDP states where the ground station is, as
-    ``ground_address`` and ``ground_port``, beside the ``address`` and
-    ``port`` the vehicle binds. The vehicle sends telemetry there from the
-    first reading. A ground link whose far end was not written down could
-    learn it only from what the ground sent, so it would report nothing until
-    the ground had spoken -- and it could learn it only by being read, which a
-    ground link with nothing linked out of it is not. Both attributes are
-    refused on every other node, and on a ``moc`` node over a stream, whose
-    far end is whoever connected.
+    A ``moc`` node is the ground's end of the vehicle's data, and states where
+    the ground is as ``ground_base``, ``address:port``. What each node drawn
+    into it produces is sent by tcspecial as UDP datagrams to that address, at
+    that port plus the source node's device id -- its position among all the
+    configuration's nodes, in the order the files write them
+    (``tcslibgs::graph::order``). So each source arrives
+    on a port of its own and the ground tells them apart by the port, and the
+    vehicle sends from the first reading without being spoken to.
+    ``tcslibgs::graph::telemetry`` is the one place that counts the ports, for
+    both ends; two sources landing on one port are refused.
+
+Requirement
+    The ground and the vehicle are held to one configuration. Both digest the
+    configuration files they read with one function,
+    ``tcslibgs::config_digest::digest_of_graph``: an MD5 over everything the
+    vehicle and the ground act on -- the ``tcspecial`` section, the payload
+    groups, the nodes in the order the files write them with their
+    attributes, the links and the command bindings -- across every included
+    file, the same for either spelling, and not the editor's layout or the
+    description. A version 2 tcspecial says its digest as it starts and sends
+    it in a beacon every ``beacon.interval_ms``, from ``beacon.send`` to
+    ``beacon.recv``, by the code version 1 beacons with. tcsmoc compares the
+    digest in each beacon with the one it computed itself; when they differ
+    it says so on the beacon line and the console and asks the operator
+    whether to continue anyway, quitting -- and stopping the tcspecial and
+    tcssim it started -- if not. Version 1 does the same, beside the
+    comparison it makes when it connects.
+
+Requirement
+    Ground software gets a ``moc`` node's data with a function call --
+    ``tcslib::moc::Moc::open`` names the node in the configuration, and
+    ``Moc::receive`` returns each datum with the name of the node that
+    produced it -- rather than opening sockets of its own. One function
+    between the configuration and the data is one place that counts ports,
+    and it counts them as the vehicle does.
+
+Requirement
+    A ``moc`` node that the ground sends through -- a command binding comes
+    from it, or a line leaves it -- states the ``address`` and ``port``
+    tcspecial binds to receive what the ground sends. One that only receives
+    the vehicle's data states neither. ``ground_base`` is refused on every
+    other node.
 
 Numbers, as a configuration writes them
 ---------------------------------------
@@ -3094,7 +3127,7 @@ they are asserted.
          params: { setpoint: 293.15, above: 2.0, below: 2.0 } }
 
      - { name: moc, type: moc, address: 10.0.0.1, port: 5000,
-         ground_address: 10.0.0.2, ground_port: 5100 }
+         ground_base: 10.0.0.2:5100 }
      - { name: heaters, type: gpio, direction: output,
          path: /dev/gpiochip0, lines: [3, 4, 5] }
 

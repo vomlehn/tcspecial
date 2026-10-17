@@ -1189,18 +1189,44 @@ configuration beside it, ``<name>-sim.yaml``. Every example is checked by
 ``tcsverify`` on every test run and must pass with no errors and no warnings,
 so an example is always a configuration that can be copied.
 
-The diagrams use one set of conventions. Blue lines carry data toward the
-ground and orange lines carry it toward the vehicle; a dotted orange line is a
-command binding, and a dashed blue line is a payload's telemetry link, which no
-line in the configuration draws: it comes from the ``tcspecial`` section, from
-``payload_telemetry.source_base`` plus the payload's device id to
-``payload_telemetry.dest_base`` plus the same id. The device id is the
-payload's position among the configuration's payloads, counting from nought.
-Only a payload that nothing in the configuration touches -- no line to it or
-from it, and no command binding naming it -- has a telemetry link: that is the
-only way its readings can reach the ground. A payload with lines goes where
-its lines say and nowhere else. The dashed box around the middle of each
-diagram is what runs inside tcspecial.
+Every node has a *device id*: its position among the configuration's nodes,
+counting from nought, in the order the file writes them -- whatever the
+sections are, and in the XML spelling however they interleave -- the top file
+first and then the files it includes. The ids say which port each node's data
+reaches the ground on.
+
+A ``moc`` node is the ground's end of the vehicle's data. tcspecial sends what
+each node drawn into a ``moc`` node produces as UDP datagrams to the address in
+the ``moc`` node's ``ground_base``, at its port plus the source node's device
+id, so each source arrives on a port of its own. Ground software does not open
+those ports itself: it gets the data from the ``moc`` node with a function
+call, ``tcslib::moc::Moc::receive``, which works the ports out from the same
+configuration and says which node each datum came from. What it does with the
+data then -- process it, display it, log it -- is its own business. A ``moc``
+node that the ground sends commands or other data through also states the
+``address`` and ``port`` tcspecial binds to receive them.
+
+tcsmoc runs a version 2 configuration as a ground station for that data: one
+panel per source, filled through ``tcslib::moc``, with tcspecial started on
+the same file and tcssim where the simulator file simulates anything. Both
+it and tcspecial digest the configuration files they read, and tcspecial
+sends its digest in every beacon. If tcspecial's digest is not the one tcsmoc
+computed -- the vehicle is serving a different configuration, so its sources
+may not send where the panels say -- tcsmoc says so and asks whether to
+continue anyway; Quit stops tcspecial and tcssim and exits.
+
+A payload that nothing in the configuration touches -- no line to it or from
+it, and no command binding naming it -- reports over the ``tcspecial``
+section's ``payload_telemetry`` instead, from ``source_base`` plus its device
+id to ``dest_base`` plus the same id. A node with lines goes where its lines
+say and nowhere else.
+
+In the diagrams, blue lines carry data toward the ground and orange lines
+carry it toward the vehicle; a dotted orange line is a command binding; a
+dashed blue line is a payload's ``payload_telemetry`` link; and a heavy grey
+arrow is the function call that gets data from a ``moc`` node. The dashed box
+in the middle of each diagram is what runs inside tcspecial, and the one on
+the right is the ground.
 
 ``make help`` in the ``examples`` directory lists the targets that run them.
 
@@ -1248,13 +1274,14 @@ together as the hardware allows.
 
 Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_fore``,
 ``k_aft`` or ``k_bay``, and each converted reading goes three ways: to the
-ground through the ``moc`` node -- which sends to the ground station at its
-``ground_address`` and ``ground_port``, ``127.0.0.1:5100`` -- into
-``mean_temp`` as the input ``in0``, ``in1`` or ``in2``, and into the log
-``housekeeping``. The mean goes to the ground and to ``thermostat``, a
-hysteresis that holds the cabin at its setpoint, 293.15 K, switching two
-degrees either side of it. The thermostat's decision is logged and drives the
-three heater circuits, ``heaters``, on GPIO lines 3, 4 and 5.
+ground through the ``moc`` node -- at its ``ground_base``, ``127.0.0.1:5100``,
+plus each source's device id, so ``k_fore``, ``k_aft`` and ``k_bay``, ids 1 to
+3, arrive on ports 5101 to 5103 -- into ``mean_temp`` as the input ``in0``,
+``in1`` or ``in2``, and into the log ``housekeeping``. The mean goes to the
+ground and to ``thermostat``, a hysteresis that holds the cabin at its
+setpoint, 293.15 K, switching two degrees either side of it. The thermostat's
+decision is logged and drives the three heater circuits, ``heaters``, on GPIO
+lines 3, 4 and 5.
 
 Every payload here has lines, so none has a telemetry link of its own: the
 sensors' readings reach the ground through their conversions, and the heaters
@@ -1286,13 +1313,12 @@ configuration with the argument
 the first line of the lorem ipsum text one word per packet, then a packet
 holding the line terminator.
 
-The words go to the ``moc`` node, bound at ``127.0.0.1:5000``, which sends
-them to the ground station at its ``ground_address`` and ``ground_port``,
-``127.0.0.1:5100``. Every ``moc`` node over UDP states those two: the ground's
-address is in the configuration, so the vehicle sends from the first reading
-without waiting to be spoken to. The ground is ``lorem_moc``, the example's
-second program: it listens at that address, prints each word it receives with
-one space between them, and stops at the end of the line.
+tcspecial sends the words to the ``moc`` node on the ground, at its
+``ground_base``, ``127.0.0.1:5100``, plus ``lorem``'s device id, 1: port 5101.
+The ground is ``lorem_moc``, the example's second program. It gets the words
+from the ``moc`` node with ``tcslib::moc::Moc::receive``, prints each with one
+space between them, and stops at the end of the line. The ``moc`` node states
+no ``address`` or ``port``, because nothing goes back up to the vehicle.
 
 Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.

@@ -47,6 +47,7 @@
 //! the same code that runs again aboard.
 
 pub mod check;
+pub mod interface;
 pub mod mirror;
 pub mod order;
 pub mod parameters;

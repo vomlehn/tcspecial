@@ -463,6 +463,203 @@ refused: a payload that answers requests has to be asked something. Writing
 the escapes yourself is also how an XML configuration states a trigger that a
 YAML one states with the format's own escapes.
 
+How a Payload's Data Is Read
+----------------------------
+
+This is how a version 2 configuration -- a graph of nodes -- gets data out of
+its payloads. Three things decide it: whether the payload sends on its own or
+has to be asked, whether it is in a payload group, and, for one that is
+asked, how long it takes to answer. The sections above describe the version 1
+payload set, whose rules differ.
+
+**Three ways data arrives.**
+
+*Asked.* The payload answers when it is sent something. The configuration
+states that something as the payload's ``trigger``, and tcspecial sends it.
+A sensor behind a command protocol -- ``READ\r`` on a serial line, a register
+number on an I\ :superscript:`2`\ C bus -- is asked.
+
+*Read without asking.* The payload produces data by itself: datagrams on a
+socket, bytes on a serial line, frames on a CAN bus, samples in an IIO buffer,
+edges on a GPIO line. It states no trigger, and tcspecial takes what has
+arrived. On I\ :superscript:`2`\ C and SPI, where nothing moves unless the bus
+is clocked, a read is itself the bus transaction, so a payload there with no
+trigger is read rather than asked.
+
+*A program.* An ``app_pl`` is a program that writes its readings when it
+chooses and is never asked; an ``app_all_pl`` answers whatever arrives on its
+MOC interface, so the data that arrives is the question. Neither states a
+trigger.
+
+**When tcspecial reads.** The main loop works in passes.
+
+* A payload **in a group** is read when the group is due, every ``interval``
+  of the group, and every payload in the group is read in the same pass, one
+  after another, so readings that will be compared are taken as close
+  together as the hardware allows. Every group is due as the vehicle starts.
+  The next time is counted from when the group was due, not from when the
+  reads finished, so a group does not drift.
+* A payload **in no group** is polled, and may state how often:
+
+  * ``trigger_interval``, for one that is asked, is a rate, counted from when
+    it was due as a group's interval is, so it does not drift. On a part that
+    originates nothing -- I\ :superscript:`2`\ C, SPI, a device file -- it
+    times the whole exchange: ask, wait any ``read_delay``, read. On a part
+    that sends -- a socket, a line, a bus of peers -- it times the trigger
+    alone, and the part is read on every pass, its answers being taken as
+    they arrive.
+  * ``poll_interval``, for one that is not asked, is a floor rather than a
+    rate: the least time between one read and the next, counted from the
+    read. Only a part that originates nothing states one. A part that sends
+    and is not asked is read as its data arrives, and a ``poll_interval`` on
+    one is refused: nothing aboard decides when its data exists.
+  * One that states neither is read on every pass, and a pass is then made at
+    least every 20 ms.
+* Between passes the loop waits until the next group or payload is due, so a
+  configuration in which every payload has a group or a rate wakes only when
+  something is.
+* A read never waits. tcspecial asks whether there is anything to read first,
+  and a payload with nothing is a read of no bytes -- no reading, and nothing
+  delivered.
+
+**What a trigger does.** A payload that states a ``trigger`` is sent it every
+time it is read, in one of two orders:
+
+* **No** ``read_delay``: read, then ask. A pass takes whatever the last ask
+  produced and sends the trigger again, so each reading answers the
+  *previous* pass's question. The first pass reads before anything has been
+  asked.
+* **With** ``read_delay``: ask, wait, then read. A pass sends the trigger,
+  waits the delay -- what the part takes to answer, such as a conversion time
+  -- and reads the answer to the question it just asked. The whole pass waits
+  with it, so keep the delay as short as the part allows.
+
+**The attributes.**
+
+.. list-table:: What decides when a payload is read
+   :header-rows: 1
+   :widths: 20 45 35
+
+   * - Attribute
+     - Means
+     - Allowed
+   * - ``group``
+     - Read when the group is due, every ``interval`` of the group
+     - Any payload except a program
+   * - ``trigger``
+     - The bytes that ask the payload to answer
+     - A payload that is read, other than GPIO and a program
+   * - ``read_delay``
+     - How long to wait between asking and reading
+     - Only with ``trigger``
+   * - ``trigger_interval``
+     - How often a payload in no group is asked: a rate
+     - Only with ``trigger``, and only in no group
+   * - ``poll_interval``
+     - The least time between reads of a payload nothing asks: a floor
+     - Only without ``trigger``, only in no group, and only on a part that originates nothing: I\ :superscript:`2`\ C, SPI or a device file
+   * - ``state_interval``
+     - How often a GPIO input's levels are reported, beside its edges
+     - GPIO inputs
+
+A payload in a group states neither ``trigger_interval`` nor
+``poll_interval`` -- the group's ``interval`` is its rate -- and the two are
+never stated together. A payload that is read and has a link *into* it
+must state a ``trigger``: what is written to it is the question it answers.
+A payload that is only written -- a heater, a valve -- states none.
+
+A payload in no group that states neither is read on every pass: an asked
+one is asked on every pass, and an I\ :superscript:`2`\ C or SPI one is a bus
+transaction on every pass. Give such a payload a group or a rate.
+
+**The payload types compared.**
+
+.. list-table:: How each type of payload's data reaches tcspecial
+   :header-rows: 1
+   :widths: 18 32 22 28
+
+   * - Type
+     - Sends without being asked
+     - Can be asked
+     - One read takes
+   * - ``network`` (UDP)
+     - Yes: datagrams
+     - Yes: a datagram
+     - One datagram
+   * - ``network`` (TCP, Unix)
+     - Yes: bytes
+     - Yes: bytes
+     - What has arrived
+   * - ``serial``
+     - Yes: bytes on the line
+     - Yes: bytes
+     - What has arrived, up to where a read of a line ends
+   * - ``hdlc``
+     - Yes: frames
+     - Yes: a frame
+     - One frame
+   * - ``can``
+     - Yes: frames
+     - Yes: a frame
+     - One frame
+   * - ``rpmsg``
+     - Yes: messages from the other core
+     - Yes: a message
+     - One message
+   * - ``iio``
+     - Yes: samples, at the device's own sampling rate
+     - Yes: bytes
+     - What is in the buffer
+   * - ``device-file``
+     - What the file or device gives
+     - Yes: bytes
+     - What the file gives
+   * - ``i2c``
+     - No: the bus is clocked by tcspecial
+     - Yes: a write, often a register number
+     - ``read_size`` bytes, one bus transaction
+   * - ``spi``
+     - No: the bus is clocked by tcspecial
+     - Yes: bytes clocked out
+     - ``read_size`` bytes, one transfer
+   * - ``gpio``
+     - Yes: edges on input lines, and levels every ``state_interval``
+     - No
+     - One event per edge
+   * - ``app_pl``
+     - Yes: whatever the program writes
+     - No
+     - One packet
+   * - ``app_all_pl``
+     - When MOC data arrives
+     - By the data that arrives
+     - One packet
+
+.. list-table:: Which way to read a payload
+   :header-rows: 1
+   :widths: 40 60
+
+   * - The payload
+     - Configure it
+   * - Sends on its own, as fast as it likes
+     - No trigger, no group: read on every pass, which takes whatever has arrived
+   * - Sends on its own; its readings are compared with others'
+     - No trigger, in a group with the others: read together when the group is due
+   * - Answers a request, quickly
+     - ``trigger``, in a group: asked each interval, each reading answering the last interval's ask
+   * - Answers a request, at a rate of its own
+     - ``trigger`` and ``trigger_interval``, in no group: asked every ``trigger_interval``, and, on a part that sends, its answers taken on every pass
+   * - A bus register or a device file, read at a rate of its own
+     - ``poll_interval``, in no group: read at most every ``poll_interval``
+   * - Answers a request after a known delay
+     - ``trigger`` and ``read_delay``, in a group: asked, waited for and read in one pass
+   * - A bus sensor that holds its last value (I\ :superscript:`2`\ C, SPI)
+     - No trigger, in a group: each read is a bus transaction that returns the value
+   * - Only written to -- a heater, a valve
+     - No trigger, no group: it is driven, never read
+   * - A program
+     - ``app_pl`` to send of its own accord, ``app_all_pl`` to answer what the MOC sends
+
 Lengths of Time
 ---------------
 

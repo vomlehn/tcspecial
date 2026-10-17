@@ -132,7 +132,7 @@ impl TcsClient {
                 "{:?} is a payload command and names no payload",
                 command.cmd_type()
             ))),
-            (CommandLink::Spacecraft | CommandLink::Either, _) => Ok(&mut self.connection),
+            (CommandLink::Spacecraft, _) => Ok(&mut self.connection),
         }
     }
 
@@ -193,83 +193,24 @@ impl TcsClient {
         version: ConfigVersion,
         digest: ConfigDigest,
     ) -> TcsResult<(ConfigVersion, ConfigVersion, ConfigDigest)> {
-        let spacecraft = self.connect_on(ConnectLink::Spacecraft, version, digest)?;
-
-        // And the first payload's link, where there is one. Two links pointed
-        // at two processes is the one way this arrangement can be wrong that
-        // nothing else would catch: each link would work, each answer would
-        // look right, and the payloads being commanded would not be the ones
-        // being restarted.
-        //
-        // The first of them rather than all: the payload links are sockets of
-        // one process, so one of them answering as the spacecraft link does
-        // says what asking all of them would, and a set of forty would be
-        // forty exchanges before the window opened.
-        if !self.payloads.is_empty() {
-            let payload = self.connect_on(ConnectLink::Payload, version, digest)?;
-            if spacecraft != payload {
-                return Err(TcsError::Protocol(format!(
-                    "the two command links answered differently -- {} {} {} on one \
-                     and {} {} {} on the other -- so they are not one spacecraft",
-                    spacecraft.0, spacecraft.1, spacecraft.2, payload.0, payload.1,
-                    payload.2
-                )));
-            }
-        }
-
-        Ok(spacecraft)
-    }
-
-    /// Ask one link what the end that answers it read.
-    ///
-    /// `ConnectLink::Payload` is the first payload's link, and asking it with
-    /// no payloads is a caller's mistake rather than a thing to guess at.
-    fn connect_on(
-        &mut self,
-        which: ConnectLink,
-        version: ConfigVersion,
-        digest: ConfigDigest,
-    ) -> TcsResult<(ConfigVersion, ConfigVersion, ConfigDigest)> {
         let seq = self.next_sequence();
         let command = Command::Connect(ConnectCommand::new(seq, version, digest));
         let timeout = self.timeout;
-        let link = Self::connect_link(&mut self.connection, &mut self.payloads, which)?;
 
-        link.send(&command)?;
+        // The spacecraft's own link, and only that one. A CONNECT is about
+        // having a connection to the vehicle, which is what this link is; a
+        // payload's link carries what is asked of a payload, and a ground
+        // station with no connection has nothing to ask one. See
+        // `tcslibgs::CommandType::link`.
+        self.connection.send(&command)?;
         self.last_sent = Some(Timestamp::now());
 
-        let answer =
-            Self::connect_link(&mut self.connection, &mut self.payloads, which)?
-                .receive_timeout(timeout)?;
+        let answer = self.connection.receive_timeout(timeout)?;
         self.last_received = Some(Timestamp::now());
 
         match answer {
             Telemetry::Connect(tm) => Ok((tm.version, tm.config_version, tm.digest)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
-        }
-    }
-
-    /// Which link a CONNECT goes on, as a borrow of one field or another.
-    ///
-    /// Taken apart from `self` so that the send and the receive can each have
-    /// it in turn: one `&mut self` method cannot hand out two.
-    fn connect_link<'a>(
-        connection: &'a mut Box<dyn Connection>,
-        payloads: &'a mut [(DHName, Box<dyn Connection>)],
-        which: ConnectLink,
-    ) -> TcsResult<&'a mut Box<dyn Connection>> {
-        match which {
-            ConnectLink::Spacecraft => Ok(connection),
-            ConnectLink::Payload => payloads
-                .first_mut()
-                .map(|(_, link)| link)
-                .ok_or_else(|| {
-                    TcsError::Config(
-                        "this payload set describes no payloads, so there is no \
-                         payload link to ask"
-                            .to_string(),
-                    )
-                }),
         }
     }
 
@@ -388,16 +329,6 @@ impl TcsClient {
         }
         outcome
     }
-}
-
-/// Which link a CONNECT is being asked on.
-///
-/// A CONNECT is answered on either, so asking takes a side; every other
-/// command has one by its kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ConnectLink {
-    Spacecraft,
-    Payload,
 }
 
 /// Builder for TcsClient
@@ -529,37 +460,30 @@ mod tests {
         assert!(received >= sent && received <= after, "answered at {received}");
     }
 
-    /// Two links pointed at two spacecraft are refused.
+    /// A CONNECT is asked of the spacecraft's link and of no payload's.
     ///
-    /// The one way this arrangement can be wrong that nothing else would
-    /// catch: each link works, each answer looks right, and the payloads
-    /// being commanded are not the ones being restarted. So the handshake is
-    /// asked of both links and the answers have to agree.
+    /// It is about having a connection to the vehicle, which is what that
+    /// link is; a payload's link carries what is asked of a payload, and a
+    /// ground station with no connection has nothing to ask one.
+    ///
+    /// The payload link here answers with something a CONNECT never gets, so
+    /// a handshake that asked it would fail rather than pass by luck.
     #[test]
-    fn two_links_that_answer_differently_are_not_one_spacecraft() {
+    fn what_each_end_read_is_asked_of_the_spacecraft_alone() {
         let mut client = TcsClient::new(
             Canned::answering(an_answer(a_version(1))),
-            vec![(DHName::new("DH0"), Canned::answering(an_answer(a_version(2))))],
+            vec![(
+                DHName::new("DH0"),
+                Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
+                    1,
+                    CommandStatus::Success,
+                ))),
+            )],
         );
 
-        let said = client
-            .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-            .expect_err("two spacecraft are not one")
-            .to_string();
-        assert!(
-            said.contains("not one spacecraft") && said.contains("1.0.0") && said.contains("2.0.0"),
-            "the error should name both answers, but said: {said}"
-        );
-
-        // And two links at one spacecraft answer alike, which is what the
-        // test above is about: see them agree before believing the refusal.
-        let mut client = TcsClient::new(
-            Canned::answering(an_answer(a_version(1))),
-            vec![(DHName::new("DH0"), Canned::answering(an_answer(a_version(1))))],
-        );
         let (_, config_version, _) = client
             .connect(ConfigVersion::of_this_build(), ConfigDigest([0x5A; 16]))
-            .expect("one spacecraft");
+            .expect("the spacecraft's link is the one that answers it");
         assert_eq!(config_version, a_version(1));
     }
 }

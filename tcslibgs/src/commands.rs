@@ -20,7 +20,11 @@ pub struct CommandHeader {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CommandType {
     Ping,
-    /// What each end reads, said at the start of a link.
+    /// What each end reads, asked of the spacecraft as a link comes up.
+    ///
+    /// About the link to the vehicle and not about anything the vehicle
+    /// carries, which is why it belongs on the spacecraft's own link: a
+    /// ground station with no connection has nothing to ask a payload.
     Connect,
     RestartArm,
     Restart,
@@ -46,8 +50,6 @@ pub enum CommandLink {
     Spacecraft,
     /// A payload's link: start one, stop one, ask one what it has moved.
     Payload,
-    /// Either of them.
-    Either,
 }
 
 impl CommandLink {
@@ -56,7 +58,6 @@ impl CommandLink {
         match self {
             CommandLink::Spacecraft => "spacecraft command",
             CommandLink::Payload => "payload command",
-            CommandLink::Either => "either command",
         }
     }
 }
@@ -73,12 +74,15 @@ impl CommandType {
     /// a command added later is placed deliberately -- by someone who has to
     /// decide, rather than by whichever side of a default it fell on.
     ///
-    /// CONNECT is on neither side of the question. It says what the end that
-    /// answers read, and the holder of either link wants that of the link it
-    /// holds, so both answer it.
+    /// CONNECT is the spacecraft's. It is about having a connection to the
+    /// vehicle at all -- what the end that answers read, asked as a link comes
+    /// up -- and a ground station with no connection has nothing to ask a
+    /// payload. A CONNECT that arrives on a payload's link is refused like any
+    /// other command on the wrong one.
     pub fn link(&self) -> CommandLink {
         match self {
             CommandType::Ping
+            | CommandType::Connect
             | CommandType::RestartArm
             | CommandType::Restart
             | CommandType::Config => CommandLink::Spacecraft,
@@ -88,8 +92,6 @@ impl CommandType {
             | CommandType::QueryDH
             | CommandType::QueryDHSample
             | CommandType::ConfigDH => CommandLink::Payload,
-
-            CommandType::Connect => CommandLink::Either,
         }
     }
 
@@ -101,10 +103,7 @@ impl CommandType {
     /// other is. Serving it would hide that, and hide it in the one place the
     /// split is supposed to be reliable.
     pub fn may_arrive_on(&self, link: CommandLink) -> bool {
-        match (self.link(), link) {
-            (CommandLink::Either, _) | (_, CommandLink::Either) => true,
-            (wanted, arrived) => wanted == arrived,
-        }
+        self.link() == link
     }
 
     pub fn to_u8(&self) -> u8 {
@@ -436,6 +435,7 @@ mod tests {
     fn every_command_says_which_link_it_belongs_on() {
         let spacecraft = [
             CommandType::Ping,
+            CommandType::Connect,
             CommandType::RestartArm,
             CommandType::Restart,
             CommandType::Config,
@@ -472,7 +472,6 @@ mod tests {
         let mut all: Vec<u8> = spacecraft
             .iter()
             .chain(payload.iter())
-            .chain([CommandType::Connect].iter())
             .map(|kind| kind.to_u8())
             .collect();
         all.sort_unstable();
@@ -483,15 +482,16 @@ mod tests {
         assert_eq!(all, known, "a command was left out of both lists");
     }
 
-    /// A CONNECT is answered on either link.
+    /// A CONNECT is the spacecraft's link's, and no payload's.
     ///
-    /// It says what the end that answers read, and the holder of either link
-    /// wants that of the link it holds.
+    /// It is about having a connection to the vehicle, which is what the
+    /// spacecraft's link is; a ground station with none has nothing to ask a
+    /// payload.
     #[test]
-    fn what_each_end_read_is_asked_on_either_link() {
-        assert_eq!(CommandType::Connect.link(), CommandLink::Either);
+    fn what_each_end_read_is_asked_of_the_spacecraft() {
+        assert_eq!(CommandType::Connect.link(), CommandLink::Spacecraft);
         assert!(CommandType::Connect.may_arrive_on(CommandLink::Spacecraft));
-        assert!(CommandType::Connect.may_arrive_on(CommandLink::Payload));
+        assert!(!CommandType::Connect.may_arrive_on(CommandLink::Payload));
     }
 
     #[test]

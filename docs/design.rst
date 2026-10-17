@@ -1291,6 +1291,210 @@ waits on it -- ``tcsapp``'s reads answer with what has arrived and keep the
 packet that has half arrived until the rest of it comes -- because a vehicle
 that waited on a program would stop reading its sensors while it waited.
 
+The version 2 architecture
+--------------------------
+
+A version 2 vehicle is a graph of nodes and the links between them, and the
+software that runs one is in two halves that never meet: what the file becomes,
+which opens nothing, and what runs, which opens everything. The first half is
+arithmetic over the configuration and can be exercised with no vehicle present;
+the second is threads, descriptors and bytes.
+
+.. figure:: version-2.svg
+   :alt: The version 2 architecture. At startup tcslibgs::graph reads and
+         checks the file and four pieces that open nothing -- route, schedule,
+         telemetry and parameters -- turn it into tables. Then system opens a
+         port per node and holds them in a fabric. Four things run at once: the
+         command interpreter on its own thread, the conductor running one pass,
+         a pool of workers running the node operations of a stage in parallel,
+         and the beacons. Each node has a state and a wakeup descriptor, so a
+         command that disables a node reaches it while it is waiting. On the
+         ground, data arrives as UDP and is taken with tcslib::moc::Moc::receive.
+   :width: 100%
+
+   What a version 2 configuration becomes, and what runs at once. The
+   dash-dotted pieces are the design; what runs today is one thread for the
+   whole pass and the beacons beside it.
+
+What the file becomes
+~~~~~~~~~~~~~~~~~~~~~
+
+``tcslibgs::graph`` reads the file and checks it whole: a fault refuses the
+configuration rather than the node it is in, because a vehicle that started
+with one node missing would be a vehicle flying a configuration nobody wrote.
+What survives the check is turned into four tables, described under `Running a
+graph`_: ``route`` says where each node's output goes and which link fills each
+of its named inputs, ``schedule`` says when each group is next read,
+``telemetry`` gives each source its own link to the ground -- a ``moc`` node's
+``ground_base`` counted on by that source's device id -- and ``parameters``
+reads the ``tcspecial`` section for the beacons, the log and the two command
+ports. None of the four opens anything, which is what lets each be tested
+against a file on a workstation.
+
+``system`` then opens one port per node and one per ground link, and holds them
+in a ``fabric``. A port that will not open stops the start and names itself: a
+vehicle half opened is a vehicle whose configuration nobody has run.
+
+What runs at once
+~~~~~~~~~~~~~~~~~
+
+Four things run at the same time, and the division between them is what keeps
+any one of them from holding up the others.
+
+the command interpreter
+    Its own thread, owning both command links -- the spacecraft's and the
+    payloads' -- so that a command is read and answered while the pass is
+    running. The two links are version 1's, kept for version 1's reason: what
+    the ground needs in a hurry must never be queued behind what it asked for
+    at leisure.
+
+the conductor
+    One thread, running one pass: it asks the schedule which group is due,
+    hands that group's reads to the workers together, waits for them, and then
+    walks the routes, one breadth-first wave at a time.
+
+the workers
+    A pool. Every node operation of a stage -- a read, a delivery, a
+    computation, a write to the ground -- may run at the same time as every
+    other operation of that stage, and no node operation waits on another node.
+
+the beacons
+    Their own thread, from the first version of the runtime: a beacon every
+    ``beacon.interval``, carrying the digest of the configuration, from
+    ``beacon.send`` to ``beacon.recv``.
+
+Requirement
+    Commands are read and answered on a thread of their own, and never on the
+    thread that runs the pass. A command interpreter that took its turn inside
+    a pass would answer at the rate of the slowest group in the configuration,
+    and the one command that matters most -- stop that payload -- would be the
+    one waiting on it.
+
+Requirement
+    What a command *changes* takes effect between stages, so that no node has
+    its configuration altered in the middle of an operation. The exception is
+    stopping a node, which takes effect at once: a payload the ground has
+    disabled is a payload that must stop, not one that stops after the current
+    read finishes.
+
+Requirement
+    Every node operation of a stage may run at the same time as every other.
+    What is ordered is the stages: the reads of a due group go out together and
+    are all collected before any delivery begins, and delivery follows the
+    routes breadth first, a wave at a time. That is the order the graph's
+    meaning rests on -- readings that will be compared are taken together, and
+    the ground has a reading before an on-board computation over it begins --
+    and it is the only ordering parallel execution may not take away.
+
+Requirement
+    A port is held by one worker at a time. A node is a thing with a
+    descriptor, a position in a stream and a buffer, so two workers inside one
+    port would be two readers of one socket: the fabric hands a port to a
+    worker for an operation and has it back before the stage ends.
+
+Requirement
+    A node's state -- enabled, disabled or faulted -- is its own, and is read
+    without taking anything the pass holds across an operation. A pass that had
+    to take a lock the command interpreter also takes would be a pass the
+    command interpreter could stall, which is the thing the separate thread was
+    for.
+
+How a command names a node
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By its node id: the number the node has from the order the configuration
+declares it, counted across every node whatever its kind. It is not a number
+invented for commands -- it is the one a node's link to the ground is already
+counted by, a ``moc`` node's ``ground_base`` plus that node's id -- so the id
+in a command and the port its telemetry arrives on are the same number, worked
+out in one place.
+
+Requirement
+    A command about a node names it by its node id, in a field of fixed
+    length. A name is text of no particular length, and every message carrying
+    one is a message whose construction and parsing have a length to get
+    right; a number is a field like the sequence and the type beside it.
+
+Requirement
+    Node ids are given by one algorithm, in one place, from the order the
+    configuration is read in. Two components that compute them separately
+    would be two tables that can drift apart, and the drift would show as
+    commands about the wrong node rather than as an error.
+
+Requirement
+    What makes the two ends' ids the same is the digest. It is computed over
+    the configuration *including the order the nodes appear in* -- see
+    `What Each End Read`_ -- so two ends whose digests agree have read the
+    same nodes in the same order and cannot disagree about which node an id
+    names. Agreeing about the digest is what ``CONNECT`` establishes, and it
+    is asked on the spacecraft's link before any node command is sent.
+
+Requirement
+    A ground station whose digest does not match the vehicle's does not send
+    commands about nodes. The id it would send means a node of the
+    configuration it read, which is not the one being flown, and a command
+    acted on under that misunderstanding is a command that starts or stops
+    something nobody chose.
+
+Requirement
+    An id the configuration does not have is refused, saying which id and how
+    many nodes there are. A fixed-length field holds any number, so a command
+    carrying one is a thing to answer rather than a thing to parse: the range
+    check is the whole of what the vehicle can say about it.
+
+Requirement
+    An answer carries the id the command carried, so a response can be matched
+    to its command without the name. The ground shows the name, which it has
+    from the configuration it read -- the same file the id is counted from --
+    so what an operator sees is a name and what the link carries is a number.
+
+Disabling a node that is waiting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Nothing in a pass waits for data to arrive. A descriptor is asked whether it is
+ready and a node with nothing to say reads as nought bytes, so a device that is
+silent costs a poll and not a pass -- see ``EndpointPort::ready_to_read``. What
+remains are the waits that are part of an operation rather than a wait for one:
+a ``process`` computation waits for its program's answer up to the deadline the
+configuration gives it, and a write to a part that is not ready can wait on the
+part.
+
+Requirement
+    Every wait a port makes has that node's wakeup descriptor in its poll set.
+    Disabling a node writes to that descriptor, so the wait returns at once,
+    the operation is abandoned and the node stops where it is. A disable that
+    waited out a deadline would be a disable that arrives up to a timeout late,
+    which on a part that has stopped answering is exactly when it is wanted.
+
+Requirement
+    A disabled node releases what it held: the endpoint is closed and the
+    device, bus address or socket is free. A node held open but idle looks from
+    outside like a node that is running, and the port it keeps is a port
+    nothing else may take.
+
+Requirement
+    A delivery to a disabled node is dropped and counted, not queued. A queue
+    for a node nobody has re-enabled is a queue that grows without bound, and a
+    reading delivered minutes later is a reading that describes a moment that
+    has passed.
+
+This is what version 1's conduits already do, and it is why they can be stopped
+at all: ``Conduit::stop`` sets the running flag down and writes one byte to the
+conduit's command pipe, which is in the poll set beside the endpoint's
+descriptor, so a thread waiting on a silent payload returns at once and is
+joined. The version 2 design is that mechanism per node rather than per
+conduit.
+
+.. note::
+   **What runs today.** One thread makes the whole pass, in order, with the
+   beacons beside it on a thread of their own. It never blocks waiting for data
+   -- that part of the design is already true -- and the only wait inside a
+   pass is a ``process`` computation's deadline. There is no command link at
+   all: the ``commands`` section of a graph is checked when the file is read
+   and nothing applies it, so no payload is started, stopped or queried from
+   the ground. The command interpreter, the worker pool, the per-node state and
+   the wakeup descriptors are the design above, not the code below.
+
 Running a graph
 ---------------
 

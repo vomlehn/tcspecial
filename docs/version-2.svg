@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="940" viewBox="0 0 1200 940" role="img" aria-labelledby="title desc">
+  <title id="title">The version 2 architecture, and what runs in parallel</title>
+  <desc id="desc">A version 2 configuration is a graph of nodes. At startup tcslibgs::graph reads and checks the whole file, and four pieces that open nothing turn it into tables: route, which says where each node's output goes and which link fills each named input; schedule, which says when each group is next read; telemetry, which gives each source a link to the ground at a moc node's ground_base plus that source's device id; and parameters, which reads the tcspecial section for the beacons, the log and the two command ports. Then system opens one port per node and holds them in a fabric. Four things then run at once, each on its own thread. The command thread owns both command links -- the spacecraft's and the payloads' -- so that a command is read and answered while node work is going on, and never queued behind it. The conductor runs the pass: it asks the schedule which group is due, hands that group's reads to the workers all together and waits for them, then delivers along the routes breadth first, one wave at a time, each wave's deliveries handed out together, so that a result carries on in the same pass. The workers are a pool: every node operation of a stage runs in parallel with the others, and no node operation waits on another node. The beacon thread sends a beacon every beacon.interval from beacon.send to beacon.recv, carrying the configuration's digest. Each node has a state of its own -- enabled, disabled or faulted -- and a wakeup descriptor that is in every poll set the node's port ever waits on, so a command that disables a node reaches it at once even while it is waiting for input or output: the wait returns, the operation is abandoned, the endpoint is released, and deliveries to it are dropped and counted rather than queued. No read waits for data to arrive: a descriptor is asked whether it is ready and a node with nothing to say reads as nought bytes. On the ground, each source's data arrives as UDP at the moc node's port and ground software takes it with one call, tcslib::moc::Moc::receive; tcsmoc shows a panel per source, and its Enable, Disable and Query buttons go to the command thread. tcssim stands in for the payloads, reading the simulator configuration. The command thread, the worker pool, the per-node state and the wakeup descriptors are the design; what runs today is one thread making the whole pass in order, never blocking on a read, with the beacons beside it and no command link at all.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 14px; font-weight: bold; }
+      .kind { font-size: 12px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11px; fill: #4b5563; }
+      .step { font-size: 12px; fill: #1f2937; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .lane { font-size: 12px; font-weight: bold; fill: #475569; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 11.5px; fill: #4b5563; font-style: italic; }
+      .file { fill: #ffffff; stroke: #4b5563; stroke-width: 1.6; }
+      .piece { fill: #fbfbfd; stroke: #6b7280; stroke-width: 1.4; stroke-dasharray: 6 3; }
+      .port { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
+      .holder { fill: #f7fafc; stroke: #2f6db5; stroke-width: 1.4; }
+      .moc { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .thread { fill: #fff7ed; stroke: #b45309; stroke-width: 1.8; }
+      .tobuild { fill: #fff7ed; stroke: #b45309; stroke-width: 1.8; stroke-dasharray: 9 3 2 3; }
+      .band { fill: #fdfdfe; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .groundward { fill: none; stroke: #2563eb; stroke-width: 2.2; }
+      .becomes { fill: none; stroke: #4b5563; stroke-width: 1.8; }
+      .commanding { fill: none; stroke: #b45309; stroke-width: 2.2; }
+      .waking { fill: none; stroke: #b45309; stroke-width: 1.8; stroke-dasharray: 2 3; }
+      .standin { fill: none; stroke: #6b7280; stroke-width: 1.8; stroke-dasharray: 6 4; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="940" fill="#ffffff"/>
+
+  <!-- The three bands -->
+  <rect class="band" x="24" y="56" width="304" height="470" rx="16"/>
+  <text class="heading" x="40" y="82">THE FILE, AT STARTUP</text>
+
+  <rect class="band" x="356" y="56" width="508" height="802" rx="16"/>
+  <text class="heading" x="372" y="82">TCSPECIAL: FOUR THINGS AT ONCE</text>
+
+  <rect class="band" x="892" y="56" width="284" height="470" rx="16"/>
+  <text class="heading" x="908" y="82">THE GROUND</text>
+
+  <!-- What the file becomes -->
+  <rect class="file" x="42" y="94" width="268" height="58" rx="10"/>
+  <text class="name" x="56" y="117">configuration.yaml</text>
+  <text class="kind" x="56" y="135">a graph: nodes, links, groups</text>
+  <text class="detail" x="56" y="148">version: "2.0", or .xml</text>
+
+  <path class="becomes" d="M176,152 L176,180" marker-end="url(#arrow-grey)"/>
+
+  <rect class="file" x="42" y="182" width="268" height="58" rx="10"/>
+  <text class="name" x="56" y="205">tcslibgs::graph</text>
+  <text class="kind" x="56" y="223">reads it, checks it whole</text>
+  <text class="detail" x="56" y="236">a fault refuses the file</text>
+
+  <path class="becomes" d="M176,240 L176,266" marker-end="url(#arrow-grey)"/>
+
+  <rect class="piece" x="42" y="268" width="268" height="52" rx="8"/>
+  <text class="name" x="56" y="289">route</text>
+  <text class="kind" x="56" y="307">where output goes, what fills an input</text>
+
+  <rect class="piece" x="42" y="328" width="268" height="52" rx="8"/>
+  <text class="name" x="56" y="349">schedule</text>
+  <text class="kind" x="56" y="367">when each group is next read, from due</text>
+
+  <rect class="piece" x="42" y="388" width="268" height="52" rx="8"/>
+  <text class="name" x="56" y="409">telemetry</text>
+  <text class="kind" x="56" y="427">a link per source: ground_base + its id</text>
+
+  <rect class="piece" x="42" y="448" width="268" height="52" rx="8"/>
+  <text class="name" x="56" y="469">parameters</text>
+  <text class="kind" x="56" y="487">the tcspecial section: beacons, the log</text>
+
+  <text class="note" x="24" y="548">dashed: opens nothing, so each is tested with no vehicle present</text>
+
+  <path class="becomes" d="M314,290 L352,290" marker-end="url(#arrow-grey)"/>
+  <text class="label" x="316" y="280">tables</text>
+
+  <!-- The command thread -->
+  <text class="lane" x="372" y="110">THREAD 1</text>
+  <rect class="tobuild" x="372" y="118" width="476" height="86" rx="10"/>
+  <text class="name" x="388" y="141">the command interpreter</text>
+  <text class="kind" x="388" y="159">reads and answers while the pass runs, so a command is never</text>
+  <text class="kind" x="388" y="175">queued behind node work. Two links, as version 1 has: a</text>
+  <text class="kind" x="388" y="191">RESTART must not wait behind a payload's statistics</text>
+
+  <!-- The conductor -->
+  <text class="lane" x="372" y="232">THREAD 2</text>
+  <rect class="thread" x="372" y="240" width="476" height="110" rx="10"/>
+  <text class="name" x="388" y="263">the conductor: one pass</text>
+  <text class="step" x="388" y="283">1. the schedule says which group is due</text>
+  <text class="step" x="388" y="301">2. that group's reads go out together, and are waited for</text>
+  <text class="step" x="388" y="319">3. delivery follows the routes, one breadth-first wave at a time</text>
+  <text class="detail" x="388" y="339">a stage is ordered; what is in a stage is not</text>
+
+  <path class="becomes" d="M610,350 L610,378" marker-end="url(#arrow-grey)"/>
+  <text class="label" x="620" y="369">a stage of work</text>
+
+  <!-- The workers -->
+  <text class="lane" x="372" y="400">THREAD 3..n</text>
+  <rect class="tobuild" x="372" y="408" width="476" height="104" rx="10"/>
+  <text class="name" x="388" y="431">the workers</text>
+  <text class="kind" x="388" y="449">every node operation of a stage at once: a read, a delivery, a</text>
+  <text class="kind" x="388" y="465">computation, a write to the ground. No node waits on another</text>
+  <rect class="port" x="392" y="474" width="130" height="28" rx="6"/>
+  <text class="detail" x="404" y="492">worker 1</text>
+  <rect class="port" x="534" y="474" width="130" height="28" rx="6"/>
+  <text class="detail" x="546" y="492">worker 2</text>
+  <rect class="port" x="676" y="474" width="152" height="28" rx="6"/>
+  <text class="detail" x="688" y="492">... one per core</text>
+
+  <path class="becomes" d="M610,512 L610,540" marker-end="url(#arrow-grey)"/>
+
+  <!-- The ports, held in the fabric -->
+  <rect class="holder" x="372" y="542" width="476" height="192" rx="12"/>
+  <text class="heading" x="388" y="566">FABRIC: A PORT PER NODE, AND ITS STATE</text>
+
+  <rect class="port" x="386" y="578" width="222" height="56" rx="8"/>
+  <text class="name" x="398" y="599">EndpointPort</text>
+  <text class="kind" x="398" y="616">a device, socket, bus or line</text>
+  <text class="detail" x="398" y="629">asked if ready, not waited on</text>
+
+  <rect class="port" x="620" y="578" width="214" height="56" rx="8"/>
+  <text class="name" x="632" y="599">ComputePort</text>
+  <text class="kind" x="632" y="616">to_kelvin, mean, hysteresis,</text>
+  <text class="detail" x="632" y="629">process: a program, timed</text>
+
+  <rect class="port" x="386" y="642" width="222" height="56" rx="8"/>
+  <text class="name" x="398" y="663">AppPort, LogPort</text>
+  <text class="kind" x="398" y="680">a program of its own; a log</text>
+  <text class="detail" x="398" y="693">packets over descriptors</text>
+
+  <rect class="moc" x="620" y="642" width="214" height="56" rx="8"/>
+  <text class="name" x="632" y="663">ground link, per source</text>
+  <text class="kind" x="632" y="680">UDP to ground_base + its id</text>
+  <text class="detail" x="632" y="693">written to and never read</text>
+
+  <text class="note" x="386" y="722">each node: enabled, disabled or faulted, and a wakeup descriptor</text>
+
+  <!-- Waking a node that is waiting -->
+  <path class="waking" d="M848,186 L866,186 L866,606 L852,606" marker-end="url(#arrow-amber)"/>
+  <path class="waking" d="M866,670 L852,670" marker-end="url(#arrow-amber)"/>
+
+  <!-- Beacons -->
+  <text class="lane" x="372" y="762">THREAD n+1</text>
+  <rect class="thread" x="372" y="770" width="476" height="58" rx="10"/>
+  <text class="name" x="388" y="793">beacons</text>
+  <text class="kind" x="388" y="811">every beacon.interval, carrying the digest: beacon.send to beacon.recv</text>
+
+  <text class="note" x="356" y="884">what runs today: one thread for the whole pass, in order, and the beacons</text>
+  <text class="note" x="356" y="902">beside it. No command link, no pool, no per-node state: the dash-dotted</text>
+  <text class="note" x="356" y="920">pieces are the design.</text>
+
+  <!-- The ground -->
+  <rect class="tobuild" x="906" y="110" width="256" height="76" rx="10"/>
+  <text class="name" x="920" y="133">Enable, Disable, Query</text>
+  <text class="kind" x="920" y="151">one payload at a time, answered</text>
+  <text class="kind" x="920" y="167">by the command interpreter</text>
+
+  <rect class="moc" x="906" y="212" width="256" height="58" rx="10"/>
+  <text class="name" x="920" y="235">a moc node</text>
+  <text class="kind" x="920" y="253">the ground's end of the data</text>
+  <text class="detail" x="920" y="266">ground_base 127.0.0.1:5100</text>
+
+  <path class="groundward" d="M1034,270 L1034,298" marker-end="url(#arrow-blue)"/>
+
+  <rect class="ground" x="906" y="300" width="256" height="58" rx="10"/>
+  <text class="name" x="920" y="323">Moc::receive</text>
+  <text class="kind" x="920" y="341">one call takes one datum</text>
+  <text class="detail" x="920" y="354">tcslib::moc, says which node</text>
+
+  <path class="groundward" d="M1034,358 L1034,386" marker-end="url(#arrow-blue)"/>
+
+  <rect class="ground" x="906" y="388" width="256" height="58" rx="10"/>
+  <text class="name" x="920" y="411">tcsmoc</text>
+  <text class="kind" x="920" y="429">a panel per source</text>
+  <text class="detail" x="920" y="442">or ground software of your own</text>
+
+  <!-- Data out, commands in -->
+  <path class="groundward" d="M838,670 L880,670 L880,241 L902,241" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="806" y="748">UDP</text>
+  <path class="commanding" d="M902,148 L852,148" marker-end="url(#arrow-amber)"/>
+
+  <!-- The stand-in for the payloads -->
+  <rect class="ground" x="42" y="596" width="268" height="72" rx="10"/>
+  <text class="name" x="56" y="619">tcssim</text>
+  <text class="kind" x="56" y="637">stands in for the payloads</text>
+  <text class="detail" x="56" y="650">reads the simulator configuration</text>
+  <text class="detail" x="56" y="663">a rate, segments and faults</text>
+
+  <path class="standin" d="M314,632 L340,632 L340,606 L382,606" marker-end="url(#arrow-grey)"/>
+  <text class="label" x="150" y="690">in place of the hardware</text>
+
+  <!-- Legend -->
+  <line x1="24" y1="860" x2="330" y2="860" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="groundward" d="M24,886 L64,886" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="72" y="890">data to the ground</text>
+  <rect class="tobuild" x="200" y="878" width="22" height="16" rx="4"/>
+  <text class="label" x="230" y="890">the design</text>
+  <path class="commanding" d="M24,910 L64,910" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="72" y="914">a command</text>
+  <path class="waking" d="M164,910 L204,910" marker-end="url(#arrow-amber)"/>
+  <text class="label" x="212" y="914">a wakeup</text>
+</svg>

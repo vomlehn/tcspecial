@@ -1868,9 +1868,11 @@ behind what it asked for at leisure: a restart waiting behind a payload's
 statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
 ``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``tcs_cmd.recv``;
 ``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and
-``CONFIGURE_DH`` go to that payload's own socket under ``payload_command``;
-``CONNECT`` is answered on either. One table in the library says which is which, so the two ends cannot
-disagree about it.
+``CONFIGURE_DH`` go to that payload's own socket under ``payload_command``.
+``CONNECT`` goes to ``tcs_cmd.recv`` with the rest of the spacecraft's own:
+it asks whether there is a connection to the vehicle at all, and a ground
+station without one has nothing to ask a payload. One table in the library
+says which is which, so the two ends cannot disagree about it.
 
 Both are required, and they must differ -- one socket cannot be two links.
 Nothing else may bind either of them: a payload given port 4000 is refused
@@ -1918,9 +1920,9 @@ The MOC opens both when it connects, and says so:
 The address box is the host and the spacecraft's command port, as before;
 payload commands go to the same host on the port ``tcspecial.yaml`` states,
 so moving the link moves both by typing one address. The MOC sends each
-command on the link it belongs on, and asks ``CONNECT`` of both -- if the two
-answer differently they are not one spacecraft, and ``Last Response`` says
-so.
+command on the link it belongs on, and asks ``CONNECT`` of the spacecraft's:
+what comes back is what that end read, and ``Last Response`` says whether it
+is what this MOC read.
 
 Where its beacons come from, where they are received, and how often belong to
 the payload set -- a set's ground station being what listens for its beacons -- and are

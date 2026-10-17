@@ -3000,6 +3000,26 @@ Requirement
     and a file nobody writes is a format nobody has read back. ``.yml`` is
     refused with the rest, being the same language under a second name.
 
+Requirement
+    ``-r``, ``--read-only`` or ``--readonly``, anywhere on the command line,
+    starts a session that shows the configuration and changes nothing:
+    ``tcsgui --read-only thermostat.yaml``. The window is the editor's, with
+    the controls that would change something greyed rather than hidden -- Edit
+    and Delete on a node and in the window about the file's problems,
+    renaming, Undo, Redo, Save, arranging, placing a node, drawing a line,
+    every field in every window -- and nodes stay where they are when dragged.
+    What the file came with is still checked and still said as the editor
+    starts, in the same windows, because a configuration somebody opened to
+    look at is one they want to know the state of; and every window that
+    shows something can still be opened. The title bar says ``(read-only)``.
+
+    The greying is the window's half. The editor's is that a read-only session
+    takes no edit and writes no file -- not the configuration, not the
+    simulator's, not the history beside them -- whatever asks, and deletes no
+    other session's history as it starts or ends. Any other word starting with
+    a dash is refused, as a misspelled flag would otherwise be taken for the
+    name of a configuration to create.
+
 Nothing of it is on the canvas, and that is not a shortcut. The simulator file
 adds settings to payloads that are already drawn and declares groups of
 settings for them to share; it introduces no nodes and no connections, so a
@@ -3483,7 +3503,7 @@ finer than anything here measures, and a u64 of them is half a billion years.
 
 
 PING
-^^^^
+~~~~
 Verify that TLSpecial is able to process commands.
 
 +----------------+-------------------------------------------------------------+
@@ -3499,7 +3519,7 @@ Verify that TLSpecial is able to process commands.
 +----------------+-------------------------------------------------------------+
 
 RESTART_ARM
-^^^^^^^^^^^
+~~~~~~~~~~~
 Enable a restart of TCSpecial for the next TBD interval.
 
 +----------------+-------------------------------------------------------------+
@@ -3518,7 +3538,7 @@ Enable a restart of TCSpecial for the next TBD interval.
 +----------------+------------+-----------+------------------------------------+
 
 RESTART
-^^^^^^^
+~~~~~~~
 Restart TCSpecial if the time is within TBD interval from the last RESTART_ARM
 command and arm_key matches the value of arm_key from the last RESTART_ARM
 command
@@ -3541,7 +3561,7 @@ command
 **The rest of these need work done, but do list the applicatable commands**
 
 START_DH
-^^^^^^^^
+~~~~~~~~
 Start a data handler. 
 
 +----------------+-------------------------------------------------------------+
@@ -3570,7 +3590,7 @@ Start a data handler.
 +----------------+------------+-----------+------------------------------------+
 
 STOP_DH
-^^^^^^^
+~~~~~~~
 Stop stop a data handler. To make this idempotent, if the command has previously
 been executed sucessfully, supplying a DH that has been stopped must also
 produce a successful value. This, in turn, means a handler's name must not be
@@ -3591,7 +3611,7 @@ reused.
 +----------------+------------+-----------+------------------------------------+
 
 QUERY_DH
-^^^^^^^^
+~~~~~~~~
 Return what the indicated data handler is doing and what it has moved.
 
 Requirement
@@ -3658,7 +3678,7 @@ The statistics are:
 +----------------+------------+-----------+------------------------------------+
 
 QUERY_DH_SAMPLE
-^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~
 Return what the indicated data handler last sent and last received. Each is
 the time the data moved and the first few bytes of it.
 
@@ -3714,7 +3734,7 @@ on a display, where a blocked conduit costs data.
 +----------------+------------+-----------+------------------------------------+
 
 Configure
-^^^^^^^^^
+~~~~~~~~~
 Configure various TCSpecial values
 
 +----------------+-------------------------------------------------------------+
@@ -3733,7 +3753,7 @@ Configure various TCSpecial values
 +----------------+------------+-----------+------------------------------------+
 
 Configure Data Handler
-^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~
 Configure various TCSpecial data handler values
 
 +----------------+-------------------------------------------------------------+
@@ -3963,7 +3983,7 @@ but also stackable DH protocols that can be
 employed to build custom protocol stacks.
 
 Command Interpreter (CI)
-^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~
 The payload system
 software has a command interpreter with two threads. The threads manage
 commands from the OC and status messages to the OC. I/O is done
@@ -3994,7 +4014,7 @@ Shut Down
 During CI shutdown, all DHs are also shut down.
 
 Data Handlers (DHs)
-^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~
 The usual lifetime of a DH starts with creation by CI, followed by start up
 of the threads used and allocation of any other resources. It then waits for
 activation. 
@@ -4223,7 +4243,7 @@ When data is being read as a stream, there are two options:
 :Wait for full: Wait for the buffer to fill up. A timer is set so that, if the buffer does not fill up, all data in the input buffer is sent
 
 EndPoints
-^^^^^^^^^
+~~~~~~~~~
 Endpoints handle the low level I/O and each one is associated with a thread.
 
 The EndpointWaitable trait defines wait_for_event() as a function that waits for
@@ -4302,14 +4322,14 @@ Datagrams differ in that all data in a datagram is either transferred in a compl
 block with no errors, or it is discarded.
 
 Datagram Endpoints
-..................
+^^^^^^^^^^^^^^^^^^
 A consequence of datagrams being transferred in a single block is that select()-like
 calls indicate that the entire datagram is present or none is. There is no need to
 read a piece at a time. It is possible to read the amount of data available and allocate
 a bigger buffer but tcspecial does not support this capability.
 
 Stream Endpoints
-................
+^^^^^^^^^^^^^^^^
 Streams do not have embedded markers to indicate data boundaries, so select()-like
 calls indicate only that one or more bytes are available. Transferring one byte
 at a time will incur a significant amount of overhead, so tcspecial can delay for
@@ -4328,7 +4348,7 @@ file descriptors are generally stream devices, network-related file
 descriptors may behave like streams or datagrams.
 
 Network Endpoints
-.................
+^^^^^^^^^^^^^^^^^
 
 The table below lists network protocols supported on Linux-based systems. The
 protocols below are generally available, see the man page for socket(2) and
@@ -4481,7 +4501,7 @@ reach the handler that opens them.
 
 
 Conduits
-^^^^^^^^
+~~~~~~~~
 Conduits contain two Endpoints, an EndpointReadable and an EndpointWritable. Data
 flows in just one direction, from the EndpointReadable to the EndpointWriteable.
 A Conduit is implemented as a thread that simply looks between the Read and
@@ -4489,7 +4509,7 @@ EndpointWriteables, handling commands from the Command Interpreter as necessary.
 The directions are denoted "Ground to Payload" and "Payload to Ground"
 
 Data Handlers
-^^^^^^^^^^^^^
+~~~~~~~~~~~~~
 Data Handlers package two Conduits, one in one direction and one in the
 other. File descriptors are shared between the EndpointReadable of one direction
 and the EndpointWriteable of the other direction, and the EndpointWriteable of
@@ -4512,7 +4532,7 @@ the first direction and the EndpointReadable of the other direction, as show bel
 
 
 Resource Allocation
-^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~
 In an ideal world, resources would be allocated at link time (really, process
 load time). From a practical standpoint, however, the constraint of
 pre-execution allocation is not possible to meet for verious reasons. For
@@ -4531,7 +4551,7 @@ interpreter and some number of data handlers (DHs). The CI talks to ground
 software and to the DHs. The DHs talk to the CI and to the payloads.
 
 DH Links
-^^^^^^^^
+~~~~~~~~
 Supported DH protocols include networking protocols and device interfaces,
 such as RS-422, as well as stackable protocols. These links can be divided
 into stream and datagram types. Stream data has no delimiters, no error
@@ -5301,7 +5321,7 @@ Requirement
     mean both.
 
 What Is Experimental
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~
 Some of what follows is **experimental and not yet supported**: RS-485 on a
 serial line, and the ``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc`` types
 of payload. Each is written, parses, reaches a handler and has tests of its
@@ -5318,7 +5338,7 @@ where the five supported types -- ``network``, ``device-file``, ``serial``,
 and ``spi`` -- will not.
 
 GPIO Payloads: Discrete Lines
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Experimental, not yet supported.**
 
 Not every payload is a stream of data. A deployment switch, an arming line, a
@@ -5440,7 +5460,7 @@ Requirement
     edge on each of its lines every packet interval.
 
 rpmsg Payloads: Another Core
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Experimental, not yet supported.**
 
 A flight computer is commonly one package with cores of more than one type in
@@ -5496,7 +5516,7 @@ Requirement
     the stand-in differs from the thing.
 
 IIO Payloads: a Sensor's Buffer
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Experimental, not yet supported.**
 
 The kernel's Industrial I/O subsystem is what a sensor looks like on Linux. A
@@ -5547,7 +5567,7 @@ Requirement
     handler too, which touches none of those attributes.
 
 CAN Payloads: a Bus of Peers
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Experimental, not yet supported.**
 
 A CAN controller is a network interface rather than a device file, so a CAN
@@ -5621,7 +5641,7 @@ Requirement
     I\ :superscript:`2`\ C stand-in does for its kernel module.
 
 Serial Payloads: a Line
-^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~
 A start-stop line: each byte delimited by its own start and stop bits, which is
 what ``termios`` drives. A line whose bits are carried on a clock is not one of
 these -- Linux drives such a line as a network interface rather than as a
@@ -5661,7 +5681,7 @@ Requirement
 
 
 RS-485: a Two-Wire Bus
-^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~
 **Experimental, not yet supported.**
 
 A start-stop line may be half of an RS-485 bus rather than one end of a
@@ -5745,7 +5765,7 @@ Requirement
     so there is always a rule deciding where one read ends.
 
 HDLC Payloads: a Synchronous Line
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Experimental, not yet supported, and the one type with nothing to be run
 against.**
 
@@ -5871,7 +5891,7 @@ Requirement
 +---------------+----------+--------------------------------------------------+
 
 I2C Payloads: a Bus
-^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~
 A serial port is configured by describing how a byte is framed on the wire.
 I2C needs none of that, because the protocol fixes it: every byte is eight
 data bits, most significant bit first, followed by an acknowledge bit. What a
@@ -5934,7 +5954,7 @@ Requirement
     recorded and never applied, and is refused by name now.
 
 SPI Payloads: a Peripheral
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 SPI is clocked and full duplex, so, as with I2C, there is no parity and there
 are no stop bits; a transfer is delimited by the chip select rather than by
 framing bits. What a payload carries is the shape of the clock and of a word.
@@ -5977,7 +5997,7 @@ Requirement
     rate the payload gives.
 
 Where a Read of a Line Ends
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A stream delivers bytes with no frame boundaries of its own, so a payload
 on one needs to be told where one read ends. Three attributes say so.
 
@@ -6023,7 +6043,7 @@ guess. Writing ``timeout: none`` says the first explicitly, and a section with
 neither attribute is reported as an error rather than being taken for it.
 
 Value Syntax
-^^^^^^^^^^^^
+~~~~~~~~~~~~
 XML carries every attribute value as text, while YAML distinguishes
 numbers from strings. Both are accepted everywhere a value is expected, so the
 same value may be written ``8`` or ``"8"`` without changing its meaning.
@@ -6544,7 +6564,7 @@ Requirement
     from a payload deliberately left out.
 
 Which Types Can Be Simulated
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A simulated payload has to be whatever is at the far end of its handler's
 payload endpoint, and the types of endpoint are not equally easy to be. The
 experimental types are covered where each of them is: a CAN bus of peers, a
@@ -7109,7 +7129,7 @@ Requirement
     about which file is being read than something meant to be ignored.
 
 Where the Addresses Are
-^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~
 Requirement
     No address appears on tcspecial's command line. The configuration file is
     its only argument.
@@ -7125,7 +7145,11 @@ Requirement
     ``tcs_cmd.recv``; a command about a payload -- ``START_DH``, ``STOP_DH``,
     ``QUERY_DH``, ``QUERY_DH_SAMPLE``, ``CONFIGURE_DH`` -- arrives on
     ``payload_command.dest_base`` counted on by that payload's id, and is
-    answered there. ``CONNECT`` is answered on any of them.
+    answered there. ``CONNECT`` is the spacecraft's: it asks whether there is
+    a connection to the vehicle, which is what that link is, and a ground
+    station without one has nothing to ask a payload. A ``CONNECT`` that
+    arrives on a payload's link is refused like any other command on the wrong
+    one.
 
 Requirement
     A command about one payload that arrives on another payload's link is
@@ -7250,11 +7274,19 @@ Requirement
     use.
 
 Requirement
-    The ground asks ``CONNECT`` on both links, and the two answers have to
-    agree. Two links pointed at two spacecraft is the one way this
-    arrangement can be wrong that nothing else would catch: each link works,
-    each answer looks right, and the payloads being commanded are not the
-    ones being restarted.
+    The ground asks ``CONNECT`` on the spacecraft's link alone. It is the
+    question "is there a connection to the vehicle", and the vehicle's own
+    link is where that is asked; a payload's link carries what is asked of a
+    payload.
+
+    What this gives up is a check: two links pointed at two spacecraft is the
+    one way this arrangement can be wrong that nothing else catches -- each
+    link works, each answer looks right, and the payloads being commanded are
+    not the ones being restarted. It was caught by asking both links and
+    comparing the answers. Catching it again means a payload command's answer
+    carrying what that end read, which is where to put it if it is wanted:
+    on the link whose correctness is in question, in an answer the ground
+    already waits for.
 
 Requirement
     The MOC takes the payload port from the command interpreter's own
@@ -7981,7 +8013,7 @@ TCSpecial must have a trait named data handler (DH) that is called by CI to proc
    the traits are.
 
 CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
    Implemented differently. There is no ``CI_UDP``: the command interpreter
@@ -7989,7 +8021,7 @@ CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP
    and one for commands about a payload.
 
 DH_UDP must implement DH and use UDP to send telemetry to tcslib
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
    Implemented differently. There is no ``DH_UDP``. A handler's endpoints are
@@ -8010,7 +8042,7 @@ CI must support the following functions for implementing commands: ping(), exit(
    configuration it read, and ``restart_arm`` with ``restart``.
 
 CI must have an element named dh of type BTreeMap
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
    Implemented, named ``data_handlers``, and behind a mutex and a reference
@@ -8019,10 +8051,10 @@ CI must have an element named dh of type BTreeMap
    reach it.
 
 CI must support sending telemetry responses to all CI commands
-..............................................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication
-........................................................................................................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
    Implemented. ``TelemetryHeader`` carries the sequence number, the
@@ -8032,7 +8064,7 @@ Each CI telemetry response to a command must contain a timestamp, command sequen
    milliseconds since the UNIX epoch, wherever one is carried.
 
 CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number
-.................................................................................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
    Implemented, from one stated socket to another: a beacon went to a
@@ -8045,13 +8077,13 @@ CI must periodically send a Telemetry::Beacon message with a timestamp and uniqu
    the configuration file the spacecraft read -- which this did not ask for.
 
 CI must parse commands from the ground receved via UDP/IP
-.........................................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 All CI commands must include a sequence number that increments for each command sent
-....................................................................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 CI must support an EXIT command that terminates the tcspecial process
-.....................................................................
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
    Not implemented. There is no EXIT command. RESTART comes nearest, and is
@@ -8068,7 +8100,7 @@ CI must support a STATUS command that sends telemetry containing status to groun
    ground station asks about every handler by asking about each.
 
 Tcspecial includes zero or more components named Data Handler (DH)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 The top part of the tcsmoc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI

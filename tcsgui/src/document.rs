@@ -2902,17 +2902,18 @@ mod tests {
         };
         assert_eq!(about_lorem(&document), Vec::<String>::new());
 
-        // And one that says something an app does not take is told which
-        // word, and what an app does take, in tcspecial's words.
+        // And one that says something an app does not take -- a device's
+        // path, which an app has no use for -- is told which word, and what an
+        // app does take, in tcspecial's words.
         document.apply(&Edit::SetAttribute {
             node: "lorem".into(),
-            attribute: "program".into(),
+            attribute: "path".into(),
             was: None,
-            now: Some("examples/simple-app/lorem_pl.py".into()),
+            now: Some("/dev/ttyS0".into()),
         });
         let said = about_lorem(&document);
         assert!(
-            said.iter().any(|s| s.contains("nothing called \"program\"")
+            said.iter().any(|s| s.contains("nothing called \"path\"")
                 && s.contains("It takes executable")),
             "{said:?}"
         );

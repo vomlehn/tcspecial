@@ -540,7 +540,7 @@ distclean: clean
 # with cargo install --path tcsmoc, if that is wanted. So are app_payload_veh,
 # app_moc_veh, app_all_veh, app_pl and app_all_pl, which are what the five app
 # node types are tested with: a mission's own app is its own program,
-# installed wherever its node's `program` attribute says.
+# installed wherever its node's `executable` attribute says.
 #
 # Note that tcspecial finds its configuration by relative path -- tcspecial1.yaml
 # and tcspecial/src/tcspecial.yaml -- so an installed copy run from elsewhere

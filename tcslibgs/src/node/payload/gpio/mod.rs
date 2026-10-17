@@ -21,6 +21,8 @@
 //! nothing to write a request to, and writing would mean driving an output,
 //! which is commanding a payload rather than asking it for data.
 
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 
 use crate::endpoint_config::{
@@ -30,10 +32,11 @@ use crate::endpoint_config::{
 
 /// How many bytes one line event takes as payload data.
 ///
-/// Sixteen: the time in milliseconds since the epoch as eight, the line's
-/// offset as four, and what it became as four. The time is in the unit every
-/// other time in this project is in, so a line's change and a telemetry
-/// response can be read against each other; the offset is there because one
+/// Sixteen: the time as eight, the line's offset as four, and what it became
+/// as four. The time is a [`crate::Timestamp`] -- microseconds since the
+/// epoch, least significant byte first -- which is what every other time in
+/// this project is, so a line's change and a telemetry response can be read
+/// against each other; the offset is there because one
 /// payload may watch several lines, and without it an event says only that
 /// something moved.
 pub const EVENT_BYTES: usize = 16;
@@ -121,21 +124,31 @@ pub struct GpioParams {
     pub edge: Edge,
     /// What holds the lines.
     pub bias: Bias,
-    /// How long a line must be steady before a change counts, in
-    /// microseconds, where the file asks for it.
+    /// How long a line must be steady before a change counts, where the file
+    /// asks for it.
     ///
     /// Applied by the kernel, which does the debouncing: a mechanical switch
     /// closes several times in a few milliseconds, and a handler that
     /// reported each of them would be reporting the switch's bounce as the
     /// payload's state.
-    pub debounce_us: Option<u32>,
-    /// How often what the lines are is reported, in milliseconds, where the
-    /// file asks for it.
+    pub debounce: Option<Duration>,
+    /// How often what the lines are is reported, where the file asks for it.
     ///
     /// Edges say when a line changed and this says what it is now: the two
     /// answer different questions, and a set of lines may ask for either or
     /// both.
-    pub state_interval_ms: Option<u32>,
+    pub state_interval: Option<Duration>,
+}
+
+/// A length of time a set of lines states, or what is wrong with it.
+///
+/// Nought is refused by the grammar itself -- a line that need not be steady
+/// at all is a line with no debouncing, and a report every no time at all is
+/// a line read as fast as the chip will answer -- so neither needs a rule of
+/// its own here.
+fn length_of_time(name: &str, term: &str, stated: &Scalar) -> EndpointConfigResult<Duration> {
+    crate::graph::parse_interval(stated.as_str())
+        .map_err(|why| bad(name, &format!("{term}: {why}")))
 }
 
 /// Read a list of line offsets as a file writes one: `0, 1, 5` or `0 1 5`.
@@ -191,7 +204,7 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         name,
         "gpio",
         &g,
-        &["lines", "edge", "bias", "debounce_us", "direction"],
+        &["lines", "edge", "bias", "debounce", "state_interval", "direction"],
     )?;
 
     // An event is its own length, so there is nothing for a rule about where
@@ -232,34 +245,13 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         None => Bias::None,
     };
 
-    let debounce_us = match g.debounce_us.as_ref() {
-        Some(stated) => {
-            let us = parse_u32(name, "debounce_us", stated)?;
-            if us == 0 {
-                return Err(bad(
-                    name,
-                    "debounce_us must be greater than zero: a line that need not be \
-                     steady at all is a line with no debouncing, which is what \
-                     stating nothing asks for",
-                ));
-            }
-            Some(us)
-        }
+    let debounce = match g.debounce.as_ref() {
+        Some(stated) => Some(length_of_time(name, "debounce", stated)?),
         None => None,
     };
 
-    let state_interval_ms = match g.state_interval_ms.as_ref() {
-        Some(stated) => {
-            let ms = parse_u32(name, "state_interval_ms", stated)?;
-            if ms == 0 {
-                return Err(bad(
-                    name,
-                    "state_interval must be greater than zero: a report every no \
-                     time at all is a line read as fast as the chip will answer",
-                ));
-            }
-            Some(ms)
-        }
+    let state_interval = match g.state_interval.as_ref() {
+        Some(stated) => Some(length_of_time(name, "state_interval", stated)?),
         None => None,
     };
 
@@ -278,8 +270,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         for (term, given) in [
             ("edge", g.edge.is_some()),
             ("bias", g.bias.is_some()),
-            ("debounce_us", g.debounce_us.is_some()),
-            ("state_interval", g.state_interval_ms.is_some()),
+            ("debounce", g.debounce.is_some()),
+            ("state_interval", g.state_interval.is_some()),
         ] {
             if given {
                 return Err(bad(
@@ -299,7 +291,7 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
     // report -- and that is a payload that would send nothing at all: the
     // configuration asked for the lines and then asked for nothing about
     // them.
-    if !direction.is_output() && edge == Edge::None && state_interval_ms.is_none() {
+    if !direction.is_output() && edge == Edge::None && state_interval.is_none() {
         return Err(bad(
             name,
             "these lines are watched for no edges and reported at no interval, \
@@ -313,8 +305,8 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         direction,
         edge,
         bias,
-        debounce_us,
-        state_interval_ms,
+        debounce,
+        state_interval,
     }))
 }
 
@@ -330,8 +322,8 @@ mod tests {
                 "lines" => g.lines = value,
                 "edge" => g.edge = value,
                 "bias" => g.bias = value,
-                "debounce_us" => g.debounce_us = value,
-                "state_interval_ms" => g.state_interval_ms = value,
+                "debounce" => g.debounce = value,
+                "state_interval" => g.state_interval = value,
                 "direction" => g.direction = value,
                 "datarate" => g.datarate = value,
                 other => panic!("{other} is not a term this test states"),
@@ -358,8 +350,8 @@ mod tests {
                 direction: Direction::Input,
                 edge: Edge::Both,
                 bias: Bias::None,
-                debounce_us: None,
-                state_interval_ms: None,
+                debounce: None,
+                state_interval: None,
             }
         );
     }
@@ -376,18 +368,18 @@ mod tests {
         // The default, unchanged: edges, and no report.
         let said = params(&[("lines", "0")]);
         assert_eq!(said.edge, Edge::Both);
-        assert_eq!(said.state_interval_ms, None);
+        assert_eq!(said.state_interval, None);
 
         // A report and no edges, which is a set of lines read for what they
         // are rather than for when they changed.
-        let said = params(&[("lines", "0"), ("edge", "none"), ("state_interval_ms", "5000")]);
+        let said = params(&[("lines", "0"), ("edge", "none"), ("state_interval", "5 s")]);
         assert_eq!(said.edge, Edge::None);
-        assert_eq!(said.state_interval_ms, Some(5_000));
+        assert_eq!(said.state_interval, Some(Duration::from_secs(5)));
 
         // And both, which is edges with a refresh behind them.
-        let said = params(&[("lines", "0"), ("state_interval_ms", "1000")]);
+        let said = params(&[("lines", "0"), ("state_interval", "1 s")]);
         assert_eq!(said.edge, Edge::Both);
-        assert_eq!(said.state_interval_ms, Some(1_000));
+        assert_eq!(said.state_interval, Some(Duration::from_secs(1)));
 
         // Neither is refused, and the complaint says both ways out.
         let why = group_kind_of(
@@ -398,13 +390,14 @@ mod tests {
         let why = format!("{why}");
         assert!(why.contains("state_interval") && why.contains("edge"), "{why}");
 
-        // A report of no time at all is refused, as a debounce of none is.
+        // A report of no time at all is refused by the grammar itself: a
+        // length of time is never nought, here or anywhere else.
         let why = group_kind_of(
             "discretes",
-            terms(&[("lines", "0"), ("state_interval_ms", "0")]),
+            terms(&[("lines", "0"), ("state_interval", "0 s")]),
         )
         .expect_err("a report every no time");
-        assert!(format!("{why}").contains("greater than zero"), "{why}");
+        assert!(format!("{why}").contains("no interval at all"), "{why}");
 
         // And a driven line says nothing about reports, as it says nothing
         // about edges.
@@ -413,7 +406,7 @@ mod tests {
             terms(&[
                 ("lines", "17"),
                 ("direction", "output"),
-                ("state_interval_ms", "1000"),
+                ("state_interval", "1 s"),
             ]),
         )
         .expect_err("a report of a line this node drives");
@@ -462,11 +455,11 @@ mod tests {
             ("lines", "2"),
             ("edge", "falling"),
             ("bias", "pull_up"),
-            ("debounce_us", "5000"),
+            ("debounce", "5 ms"),
         ]);
         assert_eq!(said.edge, Edge::Falling);
         assert_eq!(said.bias, Bias::PullUp);
-        assert_eq!(said.debounce_us, Some(5000));
+        assert_eq!(said.debounce, Some(Duration::from_micros(5_000)));
 
         for (field, value, expected) in [
             ("edge", "sideways", "rising, falling, both or none"),
@@ -480,10 +473,10 @@ mod tests {
             );
         }
 
-        let said = group_kind_of("discretes", terms(&[("lines", "0"), ("debounce_us", "0")]))
+        let said = group_kind_of("discretes", terms(&[("lines", "0"), ("debounce", "0 s")]))
             .expect_err("no debouncing at all");
         assert!(
-            format!("{said}").contains("debounce_us"),
+            format!("{said}").contains("debounce") && format!("{said}").contains("no interval"),
             "the error should name the term: {said}"
         );
     }
@@ -534,7 +527,7 @@ mod tests {
     /// they were, and the one that was missed is the one worth naming.
     #[test]
     fn a_driven_line_says_nothing_about_watching() {
-        for (term, value) in [("edge", "rising"), ("bias", "pull_up"), ("debounce_us", "5000")] {
+        for (term, value) in [("edge", "rising"), ("bias", "pull_up"), ("debounce", "5 ms")] {
             let said = group_kind_of(
                 "heaters",
                 terms(&[("lines", "17"), ("direction", "output"), (term, value)]),
@@ -555,8 +548,8 @@ mod tests {
                 direction: Direction::Output,
                 edge: Edge::Both,
                 bias: Bias::None,
-                debounce_us: None,
-                state_interval_ms: None,
+                debounce: None,
+                state_interval: None,
             }
         );
     }

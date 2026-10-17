@@ -50,10 +50,10 @@ payloads:
   - name: udp-grouped
     group: udp_localhost
     payload_interface: localhost:5000
-    stale_interval_ms: 3000
+    stale_interval: "3000 ms"
   # States every attribute for itself, naming no group.
   - name: device-alone
     type: device-file
     path: /dev/ttyS0
     packet_size: 64
-    stale_interval_ms: 3000
+    stale_interval: "3000 ms"

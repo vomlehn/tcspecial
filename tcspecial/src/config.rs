@@ -176,7 +176,7 @@ mod tests {
                 "127.0.0.1:4300",
                 "{ext}"
             );
-            assert_eq!(config.beacon_interval.0, 5000, "{ext}");
+            assert_eq!(config.beacon_interval.as_millis(), 5000, "{ext}");
             // Absent in every actual input, so the serde defaults must apply.
             assert_eq!(config.log_dir, None, "{ext}");
             assert_eq!(config.log_segment_bytes, 65_536, "{ext}");
@@ -195,7 +195,7 @@ mod tests {
         let config = load_from(".yaml", YAML).expect("the configuration loads");
         assert_eq!(config.beacon_send.to_string(), "0.0.0.0:5550");
         assert_eq!(config.beacon_recv.to_string(), "127.0.0.1:5650");
-        assert_eq!(config.beacon_interval.0, 5000);
+        assert_eq!(config.beacon_interval.as_millis(), 5000);
 
         for missing in [
             "  send: 0.0.0.0:5550\n  recv: 127.0.0.1:5650\n",

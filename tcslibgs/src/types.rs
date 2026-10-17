@@ -11,38 +11,76 @@ use crate::node::payload::spi::{BitOrder, CsActive, SpiMode};
 use crate::verify::Problem;
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// A time, in milliseconds since the UNIX epoch.
+/// A time, in microseconds since the UNIX epoch.
 ///
 /// One number, one unit, everywhere a time is carried: in telemetry headers,
 /// in a handler's samples and statistics, and in the times a program reads
 /// off its own clock. Two ends comparing times, or a log read later, then
 /// have nothing to agree about beyond the epoch.
 ///
-/// It was a pair -- seconds and nanoseconds within the second -- which is two
-/// fields to carry, two to serialize, and two to get wrong: arithmetic on it
-/// had to borrow across the second, and the nanoseconds were never shown or
-/// read by anything. Milliseconds are finer than anything here measures and
-/// coarse enough that a u64 holds half a billion years of them.
+/// On the wire it is eight bytes, little-endian, and all ones says the
+/// spacecraft could not tell the time; see [`Timestamp::CLOCK_FAULT`].
+///
+/// Eight bytes because four will not do. Four bytes of microseconds run out
+/// 4294.967295 seconds after the epoch -- 1970-01-01 01:11:34 UTC -- so a
+/// four-byte field would have overflowed before this software was first
+/// written. Eight reach 586524-01-19, which is long enough for anything that
+/// flies.
+///
+/// Microseconds rather than the milliseconds this was. A payload that is
+/// triggered and read a fraction of a millisecond later is two transfers a
+/// millisecond clock stamps with one time, and the ground cannot then tell
+/// which happened first; microseconds are finer than any interval here is
+/// written in and still leave the range above.
+///
+/// Before the milliseconds it was a pair -- seconds and nanoseconds within
+/// the second -- which is two fields to carry, two to serialize, and two to
+/// get wrong: arithmetic on it had to borrow across the second, and the
+/// nanoseconds were never shown or read by anything.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Timestamp {
-    /// Milliseconds since the UNIX epoch.
-    pub millis: u64,
+    /// Microseconds since the UNIX epoch, or all ones for a clock that could
+    /// not be read: [`Timestamp::CLOCK_FAULT`].
+    pub micros: u64,
 }
 
 impl std::fmt::Display for Timestamp {
-    /// The milliseconds, which is what the value is.
+    /// The microseconds, which is what the value is.
     ///
     /// A time of day is [`Timestamp::time_of_day`]; this is for a message
     /// that wants the number -- a test saying which times it bracketed, a log
     /// line that will be read against another program's.
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} ms", self.millis)
+        if self.clock_failed() {
+            return write!(f, "no clock");
+        }
+        write!(f, "{} us", self.micros)
     }
 }
 
 impl Timestamp {
+    /// What the spacecraft sends when it cannot tell the time: all ones.
+    ///
+    /// A clock nobody has set, one set to before the epoch, or one reading so
+    /// far ahead that the count will not fit. The ground is told that instead
+    /// of being given a number, because a time nobody can vouch for looks
+    /// exactly like a time somebody can: a log full of 1970 reads as data
+    /// from the epoch rather than as a clock that was never set, and every
+    /// interval computed from it reads as fifty years.
+    ///
+    /// All ones rather than nought, because nought is a real time -- the
+    /// epoch itself -- and a field of them is a time the ground might
+    /// believe.
+    ///
+    /// It is the largest value, so a time that cannot be told sorts after
+    /// every time that can. That is the safe direction for the comparisons
+    /// here: [`Timestamp::since`] refuses it outright, and a caller taking
+    /// the later of two times gets the fault and so gets no answer, rather
+    /// than quietly getting a real time and believing it.
+    pub const CLOCK_FAULT: Self = Self { micros: u64::MAX };
+
     /// Create a new timestamp from the current system time
     pub fn now() -> Self {
         Self::at(SystemTime::now())
@@ -54,20 +92,74 @@ impl Timestamp {
     /// telemetry -- a beacon's arrival, say -- so that they are shown by the
     /// one function that shows every other time here.
     ///
-    /// A reading before the epoch is the epoch. A clock set backwards that
-    /// far is a fault of its own, and a time that cannot be told is better
-    /// shown as the start of the count than as a panic in a program watching
-    /// a spacecraft.
+    /// A reading before the epoch, or one too far past it to count in
+    /// microseconds, is [`Timestamp::CLOCK_FAULT`]. A clock set that wrongly
+    /// is a fault in its own right, and saying so is better both than a
+    /// panic in a program watching a spacecraft and than the epoch, which is
+    /// a time the ground would take for a real one.
     pub fn at(time: SystemTime) -> Self {
-        let since = time.duration_since(UNIX_EPOCH).unwrap_or_default();
-        Self {
-            millis: u64::try_from(since.as_millis()).unwrap_or(u64::MAX),
+        let Ok(since) = time.duration_since(UNIX_EPOCH) else {
+            return Self::CLOCK_FAULT;
+        };
+        match u64::try_from(since.as_micros()) {
+            Ok(micros) if micros != Self::CLOCK_FAULT.micros => Self { micros },
+            _ => Self::CLOCK_FAULT,
         }
     }
 
-    /// This time in milliseconds since the epoch, which is what it is.
-    pub fn millis(&self) -> u64 {
-        self.millis
+    /// This time in microseconds since the epoch, which is what it is.
+    pub fn micros(&self) -> u64 {
+        self.micros
+    }
+
+    /// Whether this is a clock that could not be read.
+    ///
+    /// Asked before a time is used for anything but showing it: see
+    /// [`Timestamp::CLOCK_FAULT`].
+    pub fn clock_failed(&self) -> bool {
+        *self == Self::CLOCK_FAULT
+    }
+
+    /// How long after `earlier` this time is, or `None` if it is not after it.
+    ///
+    /// The one way an elapsed time is taken from two timestamps, so that no
+    /// caller has to know the unit. `None` for a clock fault at either end as
+    /// well as for this time being the earlier of the two: an interval
+    /// measured against a clock that could not be read is a number with
+    /// nothing behind it, and a time from the future is a clock that moved.
+    /// Both are "cannot say", which is what every caller here does with the
+    /// absence.
+    pub fn since(&self, earlier: Timestamp) -> Option<Duration> {
+        if self.clock_failed() || earlier.clock_failed() {
+            return None;
+        }
+        self.micros
+            .checked_sub(earlier.micros)
+            .map(Duration::from_micros)
+    }
+
+    /// This time as it goes on the wire: eight bytes, little-endian.
+    ///
+    /// Little-endian because both ends run on little-endian machines, so
+    /// network order would be a byte swap at each of them to agree with
+    /// nothing, and because the records a payload reads are written that way
+    /// already -- the GPIO node's, for one.
+    ///
+    /// Here rather than at each place that sends a time, so that the format
+    /// is written down once and the test below is the whole of what holds it.
+    pub fn to_le_bytes(&self) -> [u8; 8] {
+        self.micros.to_le_bytes()
+    }
+
+    /// A time read off the wire, those eight bytes back again.
+    ///
+    /// All ones arrives as [`Timestamp::CLOCK_FAULT`] and is not rejected
+    /// here: it is a value the spacecraft means to send, and what to do about
+    /// it belongs to whatever was going to use the time.
+    pub fn from_le_bytes(bytes: [u8; 8]) -> Self {
+        Self {
+            micros: u64::from_le_bytes(bytes),
+        }
     }
 
     /// The time of day this names, as a panel shows it.
@@ -78,12 +170,17 @@ impl Timestamp {
     /// being watched, so one of them showing local time would make a transfer
     /// look an hour old.
     ///
-    /// The milliseconds within the second are deliberately unused. A panel
-    /// refreshed twice a second cannot show them, and a time that changed in
-    /// its last digits between two looks would read as traffic that had not
-    /// happened.
+    /// A clock that could not be read shows [`NO_TRANSFER_TIME`], which is
+    /// the shape every panel here already has for a time it cannot show.
+    ///
+    /// The fractions of a second are deliberately unused. A panel refreshed
+    /// twice a second cannot show them, and a time that changed in its last
+    /// digits between two looks would read as traffic that had not happened.
     pub fn time_of_day(&self) -> String {
-        let within_a_day = (self.millis / 1_000) % 86_400;
+        if self.clock_failed() {
+            return NO_TRANSFER_TIME.to_string();
+        }
+        let within_a_day = (self.micros / 1_000_000) % 86_400;
         format!(
             "{:02}:{:02}:{:02}",
             within_a_day / 3600,
@@ -845,11 +942,11 @@ pub struct GpioConfig {
     pub edge: crate::LineEdge,
     /// What holds a line nothing is driving.
     pub bias: crate::Bias,
-    /// How long a line must be steady before a change counts, in
-    /// microseconds, where the file asks for it.
-    pub debounce_us: Option<u32>,
-    /// How often the current level of every line is reported, in
-    /// milliseconds, where the file asks for it.
+    /// How long a line must be steady before a change counts, where the file
+    /// asks for it.
+    pub debounce: Option<Duration>,
+    /// How often the current level of every line is reported, where the file
+    /// asks for it.
     ///
     /// Events say when a line changed; this says what it is now. A ground
     /// station that connected after the last edge knows nothing about a line
@@ -857,7 +954,7 @@ pub struct GpioConfig {
     /// flood can leave the ground holding a value that is simply wrong. A
     /// report every so often closes both: after one interval at most, what
     /// the ground has is the truth.
-    pub state_interval_ms: Option<u32>,
+    pub state_interval: Option<Duration>,
 }
 
 /// Configuration for an endpoint that is an rpmsg channel
@@ -1012,10 +1109,15 @@ pub enum DHMode {
         /// document asks for, which is as likely to be `0x55AA` as `READ\r`.
         /// A file may write it either way; see [`crate::trigger`].
         trigger: Vec<u8>,
-        /// How often to send it, in milliseconds. The tcspecial configuration's
-        /// `packet_interval_ms`: tcspecial does the sending, so the rate is
+        /// How often to send it. The tcspecial configuration's
+        /// `packet_interval`: tcspecial does the sending, so the rate is
         /// flight behaviour.
-        interval_ms: u32,
+        ///
+        /// A `Duration` and not a count, because what is done with it is to
+        /// wait: the file says a length of time and the code that sleeps,
+        /// schedules and compares wants one too, so nothing in between has to
+        /// remember which unit a number was in.
+        interval: Duration,
     },
 }
 
@@ -1029,13 +1131,10 @@ impl Default for DHMode {
 
 impl DHMode {
     /// What to send and how often, for a handler that has to ask.
-    pub fn polling(&self) -> Option<(&[u8], u32)> {
+    pub fn polling(&self) -> Option<(&[u8], Duration)> {
         match self {
             DHMode::Periodic => None,
-            DHMode::Triggered {
-                trigger,
-                interval_ms,
-            } => Some((trigger, *interval_ms)),
+            DHMode::Triggered { trigger, interval } => Some((trigger, *interval)),
         }
     }
 }
@@ -1097,7 +1196,7 @@ pub struct DHConfig {
     /// what a sensible interval is for a payload that answers requests -- its
     /// data arriving only when tcspecial asks -- has not been worked through.
     #[serde(default)]
-    pub stale_interval_ms: Option<u32>,
+    pub stale_interval: Option<Duration>,
 }
 
 /// What tcspecial opens to reach a payload on a line, a bus or a peripheral.
@@ -1364,18 +1463,18 @@ fn link_terms_of(
         cs_active: inherited!(cs_active),
         rs485: inherited!(rs485),
         rs485_rts_on_send: inherited!(rs485_rts_on_send),
-        rs485_delay_before_send_ms: inherited!(rs485_delay_before_send_ms),
-        rs485_delay_after_send_ms: inherited!(rs485_delay_after_send_ms),
+        rs485_delay_before_send: inherited!(rs485_delay_before_send),
+        rs485_delay_after_send: inherited!(rs485_delay_after_send),
         can_fd: inherited!(can_fd),
         service: inherited!(service),
         max_message_bytes: inherited!(max_message_bytes),
         lines: inherited!(lines),
         edge: inherited!(edge),
         bias: inherited!(bias),
-        debounce_us: inherited!(debounce_us),
+        debounce: inherited!(debounce),
         // Version 1 has no state report: its gpio payloads are watched for
         // edges and nothing else.
-        state_interval_ms: None,
+        state_interval: None,
         direction: inherited!(direction),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
@@ -1385,6 +1484,20 @@ fn link_terms_of(
     };
 
     wire
+}
+
+/// A length of time, named so that a bad one says which attribute it was.
+///
+/// Kept as a [`Duration`] from here down, because what these values are for
+/// is waiting: a timer is set from one, a sleep takes one, and a staleness is
+/// one subtraction. A count of milliseconds in between would be a unit for
+/// every reader to remember and for one of them to forget.
+///
+/// The one grammar is [`crate::graph::parse_interval`]; nought is no length
+/// of time and is refused there, which is what a trigger sent without pause
+/// would have been.
+fn as_length_of_time(attribute: &str, said: &str) -> Result<Duration, String> {
+    crate::graph::parse_interval(said).map_err(|why| format!("{attribute}: {why}"))
 }
 
 /// Payload configuration file structure
@@ -1675,9 +1788,10 @@ pub struct DHGroupJson {
     #[serde(default)]
     pub payload_port: Option<u16>,
     /// How long the ground waits for these payloads' data before calling it
-    /// stale; see [`DHConfig::stale_interval_ms`].
+    /// stale, as a length of time: `3 s`. See [`DHConfig::stale_interval_ms`],
+    /// which is the same figure in the milliseconds the ground counts in.
     #[serde(default)]
-    pub stale_interval_ms: Option<u32>,
+    pub stale_interval: Option<String>,
     #[serde(default)]
     pub path: Option<String>,
     #[serde(default)]
@@ -1688,20 +1802,25 @@ pub struct DHGroupJson {
     /// What to send to make a triggered payload answer. Triggered only.
     #[serde(default)]
     pub trigger: Option<String>,
-    /// How often to send it. Triggered only.
+    /// How often to send it, as a length of time: `500 ms`. Triggered only.
     #[serde(default)]
-    pub trigger_interval_ms: Option<u32>,
-    /// Named here only to be refused.
+    pub packet_interval: Option<String>,
+    /// Named here only to be refused, with the four others whose name said
+    /// what unit they were in.
     ///
-    /// How fast a payload sends is a property of the simulation, so an
-    /// interval belongs in the simulator configuration file. It was ignored
-    /// here for a while, which was the same silence the mode rules exist to
-    /// prevent: a file that states an interval has said something about the
-    /// payload's timing, and reading it as though it had not is reading a
-    /// different file than the one that was written. Kept as a field rather
-    /// than left unknown so that the error can name the file it belongs in.
+    /// A length of time says its own unit now, so the name does not have to:
+    /// `packet_interval: 500 ms` where this was `packet_interval_ms: 500`. A
+    /// file written for the older spelling is told the name the attribute has
+    /// now rather than told its word is unknown, because the value changes
+    /// with the name and a reader who was told only "unknown" would write the
+    /// number again.
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
+    /// Named here only to be refused; see [`DHConfigJson::packet_interval_ms`].
+    #[serde(default)]
+    pub trigger_interval_ms: Option<u32>,
+    #[serde(default)]
+    pub stale_interval_ms: Option<u32>,
     /// How fast a serial line runs. Serial payloads only.
     #[serde(default)]
     pub datarate: Option<Scalar>,
@@ -1774,10 +1893,17 @@ pub struct DHGroupJson {
     /// The logical level of RTS while an RS-485 line transmits.
     #[serde(default)]
     pub rs485_rts_on_send: Option<Scalar>,
-    /// Milliseconds an RS-485 line holds the bus before its first bit.
+    /// How long an RS-485 line holds the bus before its first bit, as a
+    /// length of time: `2 ms`.
+    #[serde(default)]
+    pub rs485_delay_before_send: Option<Scalar>,
+    /// And how long it holds the bus after its last.
+    #[serde(default)]
+    pub rs485_delay_after_send: Option<Scalar>,
+    /// Named here only to be refused: the names these had when the name said
+    /// the unit. See [`DHConfigJson::packet_interval_ms`].
     #[serde(default)]
     pub rs485_delay_before_send_ms: Option<Scalar>,
-    /// Milliseconds it holds the bus after its last.
     #[serde(default)]
     pub rs485_delay_after_send_ms: Option<Scalar>,
     /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
@@ -1817,8 +1943,12 @@ pub struct DHGroupJson {
     /// What holds a line nothing is driving: none, pull_up or pull_down.
     #[serde(default)]
     pub bias: Option<Scalar>,
-    /// How long a line must be steady before a change counts, in
-    /// microseconds.
+    /// How long a line must be steady before a change counts, as a length of
+    /// time: `50 us`.
+    #[serde(default)]
+    pub debounce: Option<Scalar>,
+    /// Named here only to be refused; see
+    /// [`DHConfigJson::packet_interval_ms`].
     #[serde(default)]
     pub debounce_us: Option<Scalar>,
     /// Whether a set of discrete lines is read or driven.
@@ -1896,9 +2026,10 @@ pub struct DHConfigJson {
     #[serde(default)]
     pub payload_port: Option<u16>,
     /// How long the ground waits for this payload's data before calling it
-    /// stale, in milliseconds. See [`DHConfig::stale_interval_ms`].
+    /// stale, as a length of time: `3 s`. See [`DHConfig::stale_interval_ms`],
+    /// which is the same figure in the milliseconds the ground counts in.
     #[serde(default)]
-    pub stale_interval_ms: Option<u32>,
+    pub stale_interval: Option<String>,
     #[serde(default)]
     pub path: Option<String>,
     #[serde(default)]
@@ -1909,12 +2040,16 @@ pub struct DHConfigJson {
     /// What to send to make a triggered payload answer. Triggered only.
     #[serde(default)]
     pub trigger: Option<String>,
-    /// How often to send it. Triggered only.
+    /// How often to send it, as a length of time: `500 ms`. Triggered only.
     #[serde(default)]
-    pub trigger_interval_ms: Option<u32>,
+    pub packet_interval: Option<String>,
     /// Named here only to be refused; see [`DHGroupJson::packet_interval_ms`].
     #[serde(default)]
     pub packet_interval_ms: Option<u32>,
+    #[serde(default)]
+    pub trigger_interval_ms: Option<u32>,
+    #[serde(default)]
+    pub stale_interval_ms: Option<u32>,
     /// How fast a serial line runs. Serial payloads only.
     #[serde(default)]
     pub datarate: Option<Scalar>,
@@ -1987,10 +2122,17 @@ pub struct DHConfigJson {
     /// The logical level of RTS while an RS-485 line transmits.
     #[serde(default)]
     pub rs485_rts_on_send: Option<Scalar>,
-    /// Milliseconds an RS-485 line holds the bus before its first bit.
+    /// How long an RS-485 line holds the bus before its first bit, as a
+    /// length of time: `2 ms`.
+    #[serde(default)]
+    pub rs485_delay_before_send: Option<Scalar>,
+    /// And how long it holds the bus after its last.
+    #[serde(default)]
+    pub rs485_delay_after_send: Option<Scalar>,
+    /// Named here only to be refused: the names these had when the name said
+    /// the unit. See [`DHConfigJson::packet_interval_ms`].
     #[serde(default)]
     pub rs485_delay_before_send_ms: Option<Scalar>,
-    /// Milliseconds it holds the bus after its last.
     #[serde(default)]
     pub rs485_delay_after_send_ms: Option<Scalar>,
     /// The network interface a CAN payload is on: `can0`, or `vcan0` for the
@@ -2030,8 +2172,12 @@ pub struct DHConfigJson {
     /// What holds a line nothing is driving: none, pull_up or pull_down.
     #[serde(default)]
     pub bias: Option<Scalar>,
-    /// How long a line must be steady before a change counts, in
-    /// microseconds.
+    /// How long a line must be steady before a change counts, as a length of
+    /// time: `50 us`.
+    #[serde(default)]
+    pub debounce: Option<Scalar>,
+    /// Named here only to be refused; see
+    /// [`DHConfigJson::packet_interval_ms`].
     #[serde(default)]
     pub debounce_us: Option<Scalar>,
     /// Whether a set of discrete lines is read or driven.
@@ -2137,14 +2283,19 @@ impl DHConfigJson {
             .trigger
             .as_deref()
             .or_else(|| group.and_then(|g| g.trigger.as_deref()));
-        let trigger_interval_ms = self
-            .trigger_interval_ms
-            .or_else(|| group.and_then(|g| g.trigger_interval_ms));
         // The rate a triggered payload's trigger goes out at, which is the
-        // one interval this file states.
-        let packet_interval_ms = self
-            .packet_interval_ms
-            .or_else(|| group.and_then(|g| g.packet_interval_ms));
+        // one interval this file states. A length of time in the file and
+        // milliseconds below it: the protocol counts in those, and the one
+        // grammar for a length of time is `graph::parse_interval`.
+        let stated = |field: Option<&String>, group: Option<&String>| field.or(group).cloned();
+        let packet_interval = stated(
+            self.packet_interval.as_ref(),
+            group.and_then(|g| g.packet_interval.as_ref()),
+        );
+        let packet_interval = match packet_interval.as_deref() {
+            Some(said) => Some(as_length_of_time("packet_interval", said)?),
+            None => None,
+        };
 
         let kind = match dh_type {
             Some(text) => DHType::from_spelling(text).ok_or_else(|| {
@@ -2469,16 +2620,33 @@ impl DHConfigJson {
         let oc = None;
         let ground = None;
 
-        // What the trigger's rate used to be called. Named so that a file
-        // using it is told the name it has now rather than told the word is
-        // unknown.
-        if trigger_interval_ms.is_some() {
-            return Err(format!(
-                "payload \"{}\" states trigger_interval_ms, which is \
-                 packet_interval_ms now: a triggered payload's rate is the rate its \
-                 trigger goes out at, and it is the only interval this file states",
-                self.name
-            ));
+        // The names these attributes had when the name said the unit, each
+        // refused by name: a length of time says its own unit now, so the
+        // value changes with the name and a reader told only "unknown" would
+        // write the number again.
+        for (old, now, example) in [
+            ("packet_interval_ms", "packet_interval", "500 ms"),
+            ("trigger_interval_ms", "packet_interval", "500 ms"),
+            ("stale_interval_ms", "stale_interval", "3 s"),
+            ("rs485_delay_before_send_ms", "rs485_delay_before_send", "2 ms"),
+            ("rs485_delay_after_send_ms", "rs485_delay_after_send", "2 ms"),
+            ("debounce_us", "debounce", "50 us"),
+        ] {
+            let said = match old {
+                "packet_interval_ms" => self.packet_interval_ms.is_some(),
+                "trigger_interval_ms" => self.trigger_interval_ms.is_some(),
+                "stale_interval_ms" => self.stale_interval_ms.is_some(),
+                "rs485_delay_before_send_ms" => self.rs485_delay_before_send_ms.is_some(),
+                "rs485_delay_after_send_ms" => self.rs485_delay_after_send_ms.is_some(),
+                _ => self.debounce_us.is_some(),
+            };
+            if said {
+                return Err(format!(
+                    "payload \"{}\" states {old}, which is {now} now and is a length \
+                     of time: {example} rather than a bare number",
+                    self.name
+                ));
+            }
         }
 
         // Which kind of payload this is, and the fields that belong to that
@@ -2489,7 +2657,7 @@ impl DHConfigJson {
         // for.
         let mode = match mode {
             None | Some("periodic") => {
-                if trigger.is_some() || packet_interval_ms.is_some() {
+                if trigger.is_some() || packet_interval.is_some() {
                     return Err(
                         "a periodic payload sends on its own, so it takes no trigger \
                          and no packet interval here: how fast a simulated one sends \
@@ -2553,20 +2721,12 @@ impl DHConfigJson {
                 // crate::trigger. The error says which was being read.
                 let trigger = crate::trigger::trigger_bytes(written)?;
 
-                let interval_ms = packet_interval_ms.ok_or(
+                let interval = packet_interval.ok_or(
                     "a triggered payload states how often its trigger is sent, as \
-                     packet_interval_ms: tcspecial does the sending, so the rate is \
+                     packet_interval: tcspecial does the sending, so the rate is \
                      flight behaviour and not a simulation setting",
                 )?;
-                if interval_ms == 0 {
-                    return Err("a packet interval of zero would send triggers without \
-                                pause"
-                        .to_string());
-                }
-                DHMode::Triggered {
-                    trigger,
-                    interval_ms,
-                }
+                DHMode::Triggered { trigger, interval }
             }
             Some(other) => {
                 return Err(format!(
@@ -2584,9 +2744,15 @@ impl DHConfigJson {
             mode,
             // Read by the ground alone, and taken from the group like
             // anything else a payload does not state for itself.
-            stale_interval_ms: self
-                .stale_interval_ms
-                .or_else(|| group.and_then(|g| g.stale_interval_ms)),
+            stale_interval: match stated(
+                self.stale_interval.as_ref(),
+                group.and_then(|g| g.stale_interval.as_ref()),
+            )
+            .as_deref()
+            {
+                Some(said) => Some(as_length_of_time("stale_interval", said)?),
+                None => None,
+            },
         })
     }
 }
@@ -2906,7 +3072,7 @@ pub struct CIConfig {
     /// From [`PayloadCommandJson`]; see [`HostPort::at`].
     pub payload_command_source_base: HostPort,
     pub payload_command_dest_base: HostPort,
-    pub beacon_interval: BeaconTime,
+    pub beacon_interval: Duration,
     /// Where beacons originate: tcspecial binds this and sends from it.
     ///
     /// Settled when the file is read rather than where the beacon is sent,
@@ -2957,18 +3123,17 @@ impl CIConfigJson {
                     .to_string(),
             );
         }
-        // Milliseconds here, which is what a beacon's timing is counted in
-        // and what the command that changes it carries.
+        // A length of time, which is what a beacon is sent on. The
+        // protocol counts milliseconds in four bytes, so an interval longer
+        // than that could be set here and never commanded -- refused where
+        // the file is read rather than at the first CONFIG.
         let beacon_interval = crate::graph::parse_interval(&self.beacon.interval)
-            .map_err(|why| format!("beacon.interval: {why}"))
-            .and_then(|interval| {
-                u32::try_from(interval.as_millis()).map_err(|_| {
-                    "beacon.interval: longer than the protocol can carry, which \
-                     counts milliseconds in four bytes"
-                        .to_string()
-                })
-            })
-            .map(BeaconTime)?;
+            .map_err(|why| format!("beacon.interval: {why}"))?;
+        if u32::try_from(beacon_interval.as_millis()).is_err() {
+            return Err("beacon.interval: longer than the protocol can carry, which \
+                        counts milliseconds in four bytes"
+                .to_string());
+        }
 
         // One socket cannot be two links. A file that gave both the same port
         // would describe a split it has not made, and the half of it that
@@ -3094,7 +3259,7 @@ mod tests {
             mode: None,
             trigger: None,
             trigger_interval_ms: None,
-            packet_interval_ms: None,
+            packet_interval: None,
             ..Default::default()
         };
 
@@ -3122,7 +3287,7 @@ mod tests {
             // than a list of byte values, so they are part of the value.
             trigger: Some("\"READ\r\"".to_string()),
             trigger_interval_ms: None,
-            packet_interval_ms: Some(500),
+            packet_interval: Some("500 ms".to_string()),
             ..Default::default()
         };
 
@@ -3131,10 +3296,53 @@ mod tests {
             config.mode,
             DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             }
         );
-        assert_eq!(config.mode.polling(), Some((b"READ\r".as_slice(), 500)));
+        assert_eq!(
+            config.mode.polling(),
+            Some((b"READ\r".as_slice(), Duration::from_millis(500)))
+        );
+    }
+
+    /// The names that said their own unit are refused by name, each told the
+    /// name it has now.
+    ///
+    /// The value changes with the name -- `500` became `500 ms` -- so a file
+    /// told only that a word is unknown would write the number again under
+    /// the new name and be wrong by a factor nobody would see.
+    #[test]
+    fn a_name_that_said_its_unit_is_told_the_name_it_has_now() {
+        let payload_file = |extra: &str| {
+            format!(
+                "version: \"1.0\"
+description: a payload
+payloads:
+  - name: DH0
+    type: network
+    protocol: tcp
+    payload_interface: localhost:5000
+    packet_size: 12
+{extra}
+"
+            )
+        };
+
+        // The two any payload may state. The three that belong to a line or
+        // to a set of discrete lines -- the two rs485 turnarounds and the
+        // debounce -- go through the same loop, keyed by the same names.
+        for (old, now) in [
+            ("    packet_interval_ms: 500", "packet_interval"),
+            ("    stale_interval_ms: 3000", "stale_interval"),
+        ] {
+            let said = payload(&payload_file(old))
+                .to_dh_configs()
+                .expect_err(&format!("{old} is not a word this file knows"));
+            assert!(
+                said.contains(now) && said.contains("length of time"),
+                "{old}: {said}"
+            );
+        }
     }
 
     /// The two kinds do not mix, in either direction, and the complaint says
@@ -3143,7 +3351,7 @@ mod tests {
     fn the_two_kinds_of_payload_do_not_mix() {
         use super::*;
 
-        let bare = |mode: Option<&str>, trigger: Option<&str>, interval: Option<u32>| {
+        let bare = |mode: Option<&str>, trigger: Option<&str>, interval: Option<&str>| {
             DHConfigJson {
                 name: "DH2".to_string(),
                 group: None,
@@ -3155,7 +3363,7 @@ mod tests {
                 mode: mode.map(str::to_string),
                 trigger: trigger.map(str::to_string),
                 trigger_interval_ms: None,
-                packet_interval_ms: interval,
+                packet_interval: interval.map(str::to_string),
                 ..Default::default()
             }
         };
@@ -3164,13 +3372,13 @@ mod tests {
         // its rate is the simulator's business.
         let e = bare(None, Some("READ"), None).to_dh_config().unwrap_err();
         assert!(e.contains("no trigger"), "{e}");
-        let e = bare(Some("periodic"), None, Some(500))
+        let e = bare(Some("periodic"), None, Some("500 ms"))
             .to_dh_config()
             .unwrap_err();
         assert!(e.contains("simulator configuration"), "{e}");
 
         // A payload that answers requests needs both halves of the request.
-        let e = bare(Some("triggered"), None, Some(500))
+        let e = bare(Some("triggered"), None, Some("500 ms"))
             .to_dh_config()
             .unwrap_err();
         assert!(e.contains("states the trigger"), "{e}");
@@ -3205,7 +3413,7 @@ mod tests {
                 mode: Some("triggered".to_string()),
                 trigger: Some("\"READ\"".to_string()),
                 trigger_interval_ms: None,
-                packet_interval_ms: Some(500),
+                packet_interval: Some("500 ms".to_string()),
                 ..Default::default()
             };
 
@@ -3273,7 +3481,79 @@ mod tests {
     #[test]
     fn test_timestamp_now() {
         let ts = Timestamp::now();
-        assert!(ts.millis > 0, "milliseconds since the epoch, and it is not 1970");
+        assert!(!ts.clock_failed(), "the clock on the machine running this reads");
+        assert!(
+            ts.micros > 0,
+            "microseconds since the epoch, and it is not 1970"
+        );
+    }
+
+    /// A time goes on the wire as eight little-endian bytes and comes back.
+    ///
+    /// The byte order written out by hand rather than taken from
+    /// `to_le_bytes` on both sides, which would pass whichever order it used:
+    /// this is the format the ground has to agree with, so the test states it.
+    #[test]
+    fn a_time_is_eight_little_endian_bytes() {
+        let at = Timestamp { micros: 0x0807_0605_0403_0201 };
+        assert_eq!(
+            at.to_le_bytes(),
+            [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
+            "least significant byte first"
+        );
+        assert_eq!(Timestamp::from_le_bytes(at.to_le_bytes()), at);
+
+        // All ones is the clock fault, and it survives the round trip: a
+        // ground station has to be able to read it as what it is.
+        assert_eq!(Timestamp::CLOCK_FAULT.to_le_bytes(), [0xFF; 8]);
+        assert_eq!(
+            Timestamp::from_le_bytes([0xFF; 8]),
+            Timestamp::CLOCK_FAULT,
+            "all ones read back as the clock fault"
+        );
+        assert!(Timestamp::from_le_bytes([0xFF; 8]).clock_failed());
+
+        // And the epoch itself is a real time, which is why nought is not
+        // what a clock fault sends.
+        assert!(!Timestamp { micros: 0 }.clock_failed());
+    }
+
+    /// A clock that cannot be read says so, however it failed.
+    #[test]
+    fn a_clock_that_cannot_be_read_says_so() {
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+        // Set to before the epoch.
+        assert_eq!(
+            Timestamp::at(UNIX_EPOCH - Duration::from_secs(1)),
+            Timestamp::CLOCK_FAULT
+        );
+        // Set so far ahead that microseconds since the epoch will not fit.
+        assert_eq!(
+            Timestamp::at(UNIX_EPOCH + Duration::from_secs(1 << 60)),
+            Timestamp::CLOCK_FAULT
+        );
+        // And a clock that reads is not a fault.
+        assert!(!Timestamp::at(SystemTime::now()).clock_failed());
+
+        // Shown as a time nobody can vouch for, in both the places a time is
+        // shown: no number, and the panels' own placeholder.
+        assert_eq!(Timestamp::CLOCK_FAULT.to_string(), "no clock");
+        assert_eq!(Timestamp::CLOCK_FAULT.time_of_day(), NO_TRANSFER_TIME);
+    }
+
+    /// An elapsed time comes from the two timestamps, and refuses to be
+    /// guessed at.
+    #[test]
+    fn an_elapsed_time_needs_two_clocks_that_read() {
+        let early = Timestamp { micros: 1_000_000 };
+        let late = Timestamp { micros: 1_500_000 };
+
+        assert_eq!(late.since(early), Some(Duration::from_millis(500)));
+        assert_eq!(late.since(late), Some(Duration::ZERO));
+        assert_eq!(early.since(late), None, "a time from the future");
+        assert_eq!(late.since(Timestamp::CLOCK_FAULT), None);
+        assert_eq!(Timestamp::CLOCK_FAULT.since(early), None);
     }
 
     /// Bytes read as hex pairs, and a transfer longer than what is kept
@@ -3305,7 +3585,7 @@ mod tests {
         let mut sample = DHSample::new();
         sample.record(&[0x52, 0x45, 0x41, 0x44, 0x0D]);
         sample.time = Some(Timestamp {
-            millis: 3661000,
+            micros: 3_661_000_000,
         });
         assert_eq!(
             sample.panel_lines(),
@@ -3318,7 +3598,7 @@ mod tests {
         let mut sample = DHSample::new();
         sample.record(&[0xAB; 12]);
         sample.time = Some(Timestamp {
-            millis: 0,
+            micros: 0,
         });
         let (_, data) = sample.panel_lines();
         assert_eq!(data, "AB AB AB AB AB AB AB AB...");
@@ -3332,11 +3612,11 @@ mod tests {
     /// showing the epoch.
     #[test]
     fn a_timestamp_reads_as_a_time_of_day() {
-        // A time is milliseconds since the epoch, so a test that means a
+        // A time is microseconds since the epoch, so a test that means a
         // second says so.
         let at = |seconds: u64| {
             Timestamp {
-                millis: seconds * 1_000,
+                micros: seconds * 1_000_000,
             }
             .time_of_day()
         };
@@ -3351,13 +3631,13 @@ mod tests {
             "a timestamp of the kind a clock actually gives"
         );
 
-        // The milliseconds within the second are not shown, so two times
-        // within one second read alike: a panel refreshed twice a second
-        // cannot show them, and a time whose last digits changed between two
-        // looks would read as traffic that had not happened.
+        // The fractions of a second are not shown, so two times within one
+        // second read alike: a panel refreshed twice a second cannot show
+        // them, and a time whose last digits changed between two looks would
+        // read as traffic that had not happened.
         assert_eq!(
             Timestamp {
-                millis: 1_700_000_000_999,
+                micros: 1_700_000_000_999_999,
             }
             .time_of_day(),
             at(1_700_000_000)
@@ -4187,7 +4467,7 @@ payloads:
             oc: None,
             ground: None,
             mode: DHMode::Periodic,
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         no_two_handlers_claim_one_thing(&[on_bus("DH0", 0x48), on_bus("DH1", 0x49)])
@@ -4220,7 +4500,7 @@ payloads:
             oc: None,
             ground: None,
             mode: DHMode::Periodic,
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let said = no_two_handlers_claim_one_thing(&[socket("DH0", 0), socket("DH1", 7)])
@@ -4432,7 +4712,7 @@ payloads:
     payload_interface: localhost:5000
     packet_size: 12
     mode: triggered
-    packet_interval_ms: 500
+    packet_interval: 500 ms
     trigger: {trigger}
 "
             ))
@@ -4502,8 +4782,8 @@ payloads:
         // Periodic, which is what a file states by saying nothing: the
         // interval is refused and told which file it belongs in.
         for stated in [
-            "    packet_interval_ms: 250",
-            "    mode: periodic\n    packet_interval_ms: 250",
+            "    packet_interval: 250 ms",
+            "    mode: periodic\n    packet_interval: 250 ms",
         ] {
             let said = payload(&payload_file(stated))
                 .to_dh_configs()
@@ -4516,7 +4796,7 @@ payloads:
 
         // Triggered: the interval is this file's, and required.
         let handlers = payload(&payload_file(
-            "    mode: triggered\n    trigger: '\"READ\\r\"'\n    packet_interval_ms: 500",
+            "    mode: triggered\n    trigger: '\"READ\\r\"'\n    packet_interval: 500 ms",
         ))
         .to_dh_configs()
         .expect("a triggered payload states its trigger's rate here");
@@ -4524,7 +4804,7 @@ payloads:
             handlers[0].mode,
             DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             }
         );
 
@@ -4533,7 +4813,7 @@ payloads:
         ))
         .to_dh_configs()
         .expect_err("a triggered payload with no rate for its trigger");
-        assert!(said.contains("packet_interval_ms"), "{said}");
+        assert!(said.contains("packet_interval"), "{said}");
 
         // And the name that rate used to have is told the name it has now.
         let said = payload(&payload_file(
@@ -4542,7 +4822,7 @@ payloads:
         .to_dh_configs()
         .expect_err("trigger_interval_ms is not a word this file knows");
         assert!(
-            said.contains("trigger_interval_ms") && said.contains("packet_interval_ms now"),
+            said.contains("trigger_interval_ms") && said.contains("packet_interval now"),
             "{said}"
         );
 
@@ -4556,7 +4836,7 @@ payload_groups:
     protocol: tcp
     mode: triggered
     trigger: \'\"READ\\r\"\'
-    packet_interval_ms: 500
+    packet_interval: 500 ms
 payloads:
   - name: DH0
     group: asked
@@ -4567,11 +4847,8 @@ payloads:
             .to_dh_configs()
             .expect("the group states it");
         assert!(matches!(
-            handlers[0].mode,
-            DHMode::Triggered {
-                interval_ms: 500,
-                ..
-            }
+            &handlers[0].mode,
+            DHMode::Triggered { interval, .. } if *interval == Duration::from_millis(500)
         ));
     }
 
@@ -4680,7 +4957,7 @@ payloads:
     fn an_rs485_line_carries_its_turnaround_to_the_handler() {
         let bus = format!(
             "{A_LINE}    rs485: true\n    rs485_rts_on_send: false\n    \
-             rs485_delay_after_send_ms: 2\n    packet_size: 8\n    stream:\n      \
+             rs485_delay_after_send: 2 ms\n    packet_size: 8\n    stream:\n      \
              timeout: none\n      max_length: 64\n"
         );
         let handlers = link("serial", &bus)
@@ -4692,8 +4969,8 @@ payloads:
             EndpointConfig::Serial(serial) => {
                 let rs485 = serial.rs485.expect("the bus reached the handler");
                 assert!(!rs485.rts_on_send, "RTS is low while sending on this board");
-                assert_eq!(rs485.delay_before_send_ms, 0, "nothing was asked for");
-                assert_eq!(rs485.delay_after_send_ms, 2);
+                assert_eq!(rs485.delay_before_send, Duration::ZERO, "nothing was asked for");
+                assert_eq!(rs485.delay_after_send, Duration::from_millis(2));
             }
             other => panic!("expected a serial endpoint, got {other:?}"),
         }
@@ -4810,7 +5087,7 @@ payloads:
     #[test]
     fn a_gpio_payload_is_a_chip_and_the_lines_it_watches() {
         let discretes = "    path: /dev/gpiochip0\n    lines: 3, 7\n    edge: rising\n    \
-                         bias: pull_up\n    debounce_us: 5000\n    packet_size: 32\n";
+                         bias: pull_up\n    debounce: 5000 us\n    packet_size: 32\n";
         let handlers = link("gpio", discretes)
             .expect("a set of discretes")
             .to_dh_configs()
@@ -4822,7 +5099,7 @@ payloads:
                 assert_eq!(gpio.lines, vec![3, 7]);
                 assert_eq!(gpio.edge, crate::LineEdge::Rising);
                 assert_eq!(gpio.bias, crate::Bias::PullUp);
-                assert_eq!(gpio.debounce_us, Some(5000));
+                assert_eq!(gpio.debounce, Some(Duration::from_micros(5_000)));
             }
             other => panic!("expected a GPIO endpoint, got {other:?}"),
         }
@@ -4897,7 +5174,7 @@ payloads:
         let said = link(
             "gpio",
             "    path: /dev/gpiochip0\n    lines: 0\n    packet_size: 16\n    \
-             mode: triggered\n    trigger: '\"READ\"'\n    packet_interval_ms: 100\n",
+             mode: triggered\n    trigger: '\"READ\"'\n    packet_interval: 100 ms\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -4974,7 +5251,7 @@ payloads:
         let asked = link(
             "rpmsg",
             "    path: /dev/rpmsg0\n    service: payload\n    packet_size: 8\n    \
-             mode: triggered\n    trigger: '\"READ\"'\n    packet_interval_ms: 100\n",
+             mode: triggered\n    trigger: '\"READ\"'\n    packet_interval: 100 ms\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -5031,7 +5308,7 @@ payloads:
         let said = link(
             "iio",
             "    path: /dev/iio:device0\n    packet_size: 4\n    mode: triggered\n    \
-             trigger: '\"READ\"'\n    packet_interval_ms: 100\n",
+             trigger: '\"READ\"'\n    packet_interval: 100 ms\n",
         )
         .expect("it parses")
         .to_dh_configs()

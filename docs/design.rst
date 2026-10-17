@@ -3395,7 +3395,7 @@ comment, which XML forbids, and nothing had noticed because ``quick-xml``
 reads them anyway and no other tool had been asked to.
 
 The reference is only on the version 2 configurations. The version 1 payload
-language has no schema -- ``stale_interval_ms``, ``payload_interface`` and
+language has no schema -- ``stale_interval``, ``payload_interface`` and
 ``packet_size`` are words ``tcspecial.xsd`` has never heard of, and its root
 element is ``payload`` rather than ``configuration`` -- so a file of that
 language pointed at that schema would be a file reported as invalid rather
@@ -3986,15 +3986,58 @@ and the time the spacecraft made it. The tables below list what each type
 adds to that.
 
 Requirement
-    A timestamp is milliseconds since the UNIX epoch: one number and one
+    A timestamp is microseconds since the UNIX epoch: one number and one
     unit, wherever a time is carried -- a response's header, a handler's
     samples and statistics, a beacon. Two ends comparing times, or a log read
     long afterwards, then have nothing to agree about beyond the epoch.
 
-It was a pair, seconds and nanoseconds within the second, which is two fields
-to carry, two to serialize and two to get wrong: arithmetic had to borrow
-across the second, and nothing ever read the nanoseconds. Milliseconds are
-finer than anything here measures, and a u64 of them is half a billion years.
+Requirement
+    On the wire a timestamp is eight bytes, least significant byte first.
+    Little-endian because both ends run on little-endian machines, so network
+    order would be a byte swap at each of them to agree with nothing, and
+    because the records a payload reads are already written that way.
+
+Requirement
+    All ones -- ``FF FF FF FF FF FF FF FF`` -- is the one value that is not a
+    time: it says the spacecraft could not tell what time it was. A clock
+    nobody has set, one set to before the epoch, and one reading so far ahead
+    that the count will not fit are all sent as that.
+
+The ground is told the clock failed rather than given a number, because a
+time nobody can vouch for looks exactly like a time somebody can. A telemetry
+log full of 1970 reads as data from the epoch rather than as a clock that was
+never set, and every interval worked out from it reads as fifty years. All
+ones rather than nought for the same reason the other way round: nought is a
+real time, the epoch itself, and a field of them is a time the ground might
+believe.
+
+Requirement
+    Nothing computes an interval from a timestamp the clock failed on, and
+    nothing computes one from a later time minus an earlier one that comes out
+    negative. Both are "cannot say", and a display shows what it shows for a
+    reading it has not got. A clock that moved is not a reason to call a
+    payload's data current.
+
+Requirement
+    A time that cannot be shown is shown as ``--:--:--``, which is what a
+    panel already shows for a transfer that has not happened.
+
+Eight bytes because four will not do. Four bytes of microseconds run out
+4294.967295 seconds after the epoch -- 1970-01-01 01:11:34 UTC -- so a
+four-byte field would have overflowed before this software was first written.
+Eight reach 586524-01-19 08:01:49 UTC, one microsecond short of which is the
+last time that is not the clock fault.
+
+Microseconds rather than the milliseconds this was: a payload that is
+triggered and read a fraction of a millisecond later is two transfers a
+millisecond clock stamps with one time, and the ground cannot then tell which
+happened first. Microseconds are finer than any interval here is written in
+and still leave the range above.
+
+Before the milliseconds it was a pair, seconds and nanoseconds within the
+second, which is two fields to carry, two to serialize and two to get wrong:
+arithmetic had to borrow across the second, and nothing ever read the
+nanoseconds.
 
 
 PING
@@ -4297,7 +4340,10 @@ Beacon
 Requirement
     A beacon's time is the one in its header, which every response carries.
     It had a second one of its own, which was the same time said twice and
-    two things to keep in step.
+    two things to keep in step. It is eight bytes of microseconds since the
+    epoch like every other time here, and all ones in it says the
+    spacecraft's clock could not be read -- a beacon still arrives, and still
+    says the spacecraft is alive, when its clock does not.
 
 Requirement
     A beacon carries the version and the digest a CONNECT is answered with,
@@ -5441,9 +5487,9 @@ Requirement
 |                     |        | payload with one is asked; a payload with   |
 |                     |        | none sends of its own accord                |
 +---------------------+--------+---------------------------------------------+
-| packet_interval_ms  | number | How often the triggers of a group's         |
-|                     |        | payloads are sent. A group's attribute: a   |
-|                     |        | payload that is asked takes its rate from   |
+| packet_interval     | length | How often the triggers of a group's         |
+|                     | of     | payloads are sent. A group's attribute: a   |
+|                     | time   | payload that is asked takes its rate from   |
 |                     |        | its group, and a payload that sends of its  |
 |                     |        | own accord has its rate in the simulator    |
 |                     |        | configuration                               |
@@ -5496,7 +5542,7 @@ Requirement
     nothing and the segments of one answer go as fast as they can.
 
 Requirement
-    How often a triggered payload is asked is the ``packet_interval_ms`` of
+    How often a triggered payload is asked is the ``packet_interval`` of
     the payload group it is in, and no payload states an interval of its own.
     A rate is a property of a schedule rather than of one payload, and
     payloads read on one schedule are what a group is -- so a payload with a
@@ -5510,10 +5556,11 @@ Requirement
     ground exactly like a payload that had stopped answering.
 
 Requirement
-    The rate was ``trigger_interval_ms`` in the payload configuration section
-    and ``packet_interval_ms`` on a payload after that. A file using either on
-    a payload is told where that figure belongs now rather than told the word
-    is unknown.
+    A name this language no longer has is refused with the name it has now,
+    rather than reported as a word nothing knows. The value commonly changes
+    with the name -- a bare count became a length of time -- so a reader told
+    only "unknown" would write the number again under the new name and be
+    wrong by whatever the unit was.
 
 The two attributes are exclusive, and a file giving both is reported rather
 than run: either guess about what was meant would operate the payload in a way
@@ -5706,7 +5753,7 @@ Requirement
     A word that is not an attribute is an error. A misspelled attribute is
     otherwise ignored, which is silence about something the file plainly
     meant: a payload whose ``oc_address`` is misspelled has nowhere to send
-    its data and nothing says so. ``packet_interval_ms`` on a payload and
+    its data and nothing says so. ``packet_interval`` on a payload and
     ``mode`` are the words this language still knows without accepting: each
     is named so that a file stating one is told where that figure belongs, or
     what says what it said, rather than told the word is unknown.
@@ -5778,8 +5825,8 @@ Requirement
     belongs to the controller the platform configures, a CAN bitrate to the
     interface as it is brought up, and a sensor's channels and rate to the
     ``sysfs`` entries whoever brought the sensor up wrote. A file that states
-    one is refused by name and told why, as a file writing
-    ``trigger_interval_ms`` is told the name that has now.
+    one is refused by name and told why, as a file writing any other name
+    this language has dropped is told what to say instead.
 
     The one place this rule is not yet kept is a synchronous serial line,
     whose ``clock_type``, ``encoding`` and ``loopback`` are recorded and not
@@ -5847,7 +5894,7 @@ The rules are in ``tcslibgs::endpoint_config_gpio``, the endpoint in
 
 Requirement
     A GPIO payload states a ``path`` and the ``lines`` it watches, and may
-    state the ``edge``, the ``bias``, a ``debounce_us`` and a
+    state the ``edge``, the ``bias``, a ``debounce`` and a
     ``state_interval``. Offsets are separated by commas or spaces and written
     in decimal or hexadecimal, because a file written for a board copies them
     out of a schematic in whichever form the schematic used.
@@ -5923,11 +5970,13 @@ Requirement
 Requirement
     This is the one type whose payload data is made rather than carried, so
     its shape is settled here: each event becomes a record of sixteen bytes
-    -- eight of time, four of line offset, four of value. The time is
-    milliseconds since the UNIX epoch, which is what every other time in this
-    project is, so a line's change and a telemetry response can be read
-    against each other; the kernel's own timestamp is nanoseconds on a
-    monotonic clock, which says nothing to a ground station.
+    -- eight of time, four of line offset, four of value. The time is a
+    timestamp as every other time here is: microseconds since the UNIX epoch,
+    least significant byte first, and all ones for a clock that could not be
+    read. A line's change and a telemetry response can then be read against
+    each other, which is the whole reason the field is a time since the epoch
+    at all; the kernel's own timestamp is nanoseconds on a monotonic clock,
+    which says nothing to a ground station.
 
 Requirement
     A ``packet_size`` that is not a whole number of records is refused. A
@@ -5947,7 +5996,7 @@ Requirement
     cannot be deduced from anything else the file says.
 
 Requirement
-    ``edge``, ``bias`` and ``debounce_us`` are refused on an output rather
+    ``edge``, ``bias`` and ``debounce`` are refused on an output rather
     than ignored. They are about watching a line, an output has no edges to
     report and nothing to debounce, and a file that states one of them for a
     driven line is saying something it does not mean -- commonly a set of
@@ -7625,7 +7674,7 @@ Requirement
 
 Requirement
     Each payload states how long the ground should wait for its data before
-    saying so: ``stale_interval_ms``, in its own entry or in its group. It is
+    saying so: ``stale_interval``, in its own entry or in its group. It is
     read by the ground and by nothing aboard, which is a shape no other
     attribute in a payload configuration has; it is there because how often a
     particular instrument has something to say is a property of the
@@ -7898,11 +7947,9 @@ Requirement
 
 Requirement
     How often is a length of time, like every other length of time in these
-    files: ``5 s`` rather than ``5000``. It was ``beacon.interval_ms``, a bare
-    count of milliseconds, in every one of the three configurations that
-    states the section -- the interpreter's own file, a payload set's section
-    and a graph's -- and a file still writing that name is told the name it
-    has now rather than told the attribute is missing. The protocol still
+    files: ``5 s`` rather than ``5000``. That is so in every one of the three
+    configurations that states the section -- the interpreter's own file, a
+    payload set's section and a graph's. The protocol still
     counts milliseconds, the command that changes the interval carrying four
     bytes of them, so the conversion happens where the file is read and in one
     place: ``CIConfigJson::to_ci_config``.
@@ -8618,7 +8665,9 @@ Each CI telemetry response to a command must contain a timestamp, command sequen
    telemetry type, the status and the time the spacecraft made the answer.
    Two responses used to carry a time of their own and the other eight
    carried none; it is in the header for all of them now. A timestamp is
-   milliseconds since the UNIX epoch, wherever one is carried.
+   microseconds since the UNIX epoch, wherever one is carried: eight bytes,
+   least significant first, and all ones for a clock the spacecraft could not
+   read.
 
 CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

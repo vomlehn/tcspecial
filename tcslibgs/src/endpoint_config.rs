@@ -210,8 +210,8 @@ pub(crate) fn endpoint_of(
                 lines: gpio.lines.clone(),
                 edge: gpio.edge,
                 bias: gpio.bias,
-                debounce_us: gpio.debounce_us,
-                state_interval_ms: gpio.state_interval_ms,
+                debounce: gpio.debounce,
+                state_interval: gpio.state_interval,
                 direction: gpio.direction,
             })),
             GroupKind::Rpmsg(rpmsg) => Ok(EndpointConfig::Rpmsg(RpmsgConfig {
@@ -417,8 +417,8 @@ pub(crate) struct LinkTerms {
     /// turnaround is; see [`crate::node::payload::serial::rs485`].
     pub(crate) rs485: Option<Scalar>,
     pub(crate) rs485_rts_on_send: Option<Scalar>,
-    pub(crate) rs485_delay_before_send_ms: Option<Scalar>,
-    pub(crate) rs485_delay_after_send_ms: Option<Scalar>,
+    pub(crate) rs485_delay_before_send: Option<Scalar>,
+    pub(crate) rs485_delay_after_send: Option<Scalar>,
     /// Bits per second on a CAN bus, and whether its frames are CAN FD; see
     /// [`crate::node::payload::can`].
     pub(crate) can_fd: Option<Scalar>,
@@ -433,10 +433,10 @@ pub(crate) struct LinkTerms {
     pub(crate) lines: Option<Scalar>,
     pub(crate) edge: Option<Scalar>,
     pub(crate) bias: Option<Scalar>,
-    pub(crate) debounce_us: Option<Scalar>,
+    pub(crate) debounce: Option<Scalar>,
     /// How often the current level of every line is reported, where the file
     /// asks for it; see [`crate::node::payload::gpio`].
-    pub(crate) state_interval_ms: Option<Scalar>,
+    pub(crate) state_interval: Option<Scalar>,
     /// Whether a set of discrete lines is read or driven. See
     /// `node::payload::gpio::Direction`.
     pub(crate) direction: Option<Scalar>,
@@ -815,12 +815,12 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 32] {
         ("rs485", g.rs485.is_some()),
         ("rs485_rts_on_send", g.rs485_rts_on_send.is_some()),
         (
-            "rs485_delay_before_send_ms",
-            g.rs485_delay_before_send_ms.is_some(),
+            "rs485_delay_before_send",
+            g.rs485_delay_before_send.is_some(),
         ),
         (
-            "rs485_delay_after_send_ms",
-            g.rs485_delay_after_send_ms.is_some(),
+            "rs485_delay_after_send",
+            g.rs485_delay_after_send.is_some(),
         ),
         ("stop_bits", g.stop_bits.is_some()),
         ("parity", g.parity.is_some()),
@@ -842,7 +842,7 @@ fn type_specific_fields(g: &LinkTerms) -> [(&'static str, bool); 32] {
         ("lines", g.lines.is_some()),
         ("edge", g.edge.is_some()),
         ("bias", g.bias.is_some()),
-        ("debounce_us", g.debounce_us.is_some()),
+        ("debounce", g.debounce.is_some()),
         ("direction", g.direction.is_some()),
         // SPI.
         ("max_speed", g.max_speed.is_some()),

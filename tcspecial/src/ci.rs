@@ -670,7 +670,7 @@ impl CommandInterpreter {
         };
 
         Ok(Self {
-            beacon_interval: config.beacon_interval,
+            beacon_interval: BeaconTime(config.beacon_interval.as_millis() as u32),
             beacon_send: config.beacon_send.clone(),
             beacon_recv: config.beacon_recv.clone(),
             beacon: None,
@@ -1009,7 +1009,7 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 6100,
             },
-            beacon_interval: BeaconTime(5000),
+            beacon_interval: Duration::from_millis(5000),
             beacon_send: a_beacon_send(),
             beacon_recv: a_beacon_send(),
             log_dir: None,
@@ -1060,7 +1060,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1116,7 +1116,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1148,7 +1148,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1235,9 +1235,9 @@ mod tests {
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"go".to_vec(),
-                interval_ms: 50,
+                interval: Duration::from_millis(50),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1269,7 +1269,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1370,7 +1370,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1402,7 +1402,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1474,7 +1474,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1506,7 +1506,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1625,7 +1625,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1654,7 +1654,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1709,7 +1709,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let mut ci = CommandInterpreter::new(
@@ -1741,7 +1741,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1821,7 +1821,7 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 6100,
             },
-            beacon_interval: BeaconTime(5000),
+            beacon_interval: Duration::from_millis(5000),
             beacon_send: a_beacon_send(),
             beacon_recv: a_beacon_send(),
             log_dir: None,
@@ -1890,7 +1890,7 @@ mod tests {
                     address: "127.0.0.1".to_string(),
                     port: 6100,
                 },
-                beacon_interval: BeaconTime(5000),
+                beacon_interval: Duration::from_millis(5000),
                 beacon_send: a_beacon_send(),
                 beacon_recv: a_beacon_send(),
                 log_dir: None,
@@ -1918,7 +1918,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         }
     }
 

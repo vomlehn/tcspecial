@@ -23,9 +23,11 @@
 //! HDLC and a network interface; a synchronous line stating these would be
 //! describing hardware that cannot be told about them.
 
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 
-use crate::endpoint_config::{bad, parse_flag, parse_u32, EndpointConfigResult, LinkTerms};
+use crate::endpoint_config::{bad, parse_flag, EndpointConfigResult, LinkTerms};
 
 /// What a line's RS-485 turnaround is set to.
 ///
@@ -44,27 +46,27 @@ pub struct Rs485Params {
     /// way round has a line that drives the bus exactly when it should not,
     /// which is why this is stated rather than assumed.
     pub rts_on_send: bool,
-    /// Milliseconds to hold the bus before the first bit.
+    /// How long to hold the bus before the first bit.
     ///
     /// Time for every other transceiver on the bus to turn its driver off.
-    /// Nought is right wherever the transceivers are quick enough, which is
+    /// Nothing is right wherever the transceivers are quick enough, which is
     /// the usual case, and is the default.
-    pub delay_before_send_ms: u32,
-    /// Milliseconds to hold the bus after the last bit.
+    pub delay_before_send: Duration,
+    /// How long to hold the bus after the last bit.
     ///
     /// Time for the last stop bit to be clear of the wire before this
     /// transmitter lets go of it. Nought by default, for the reason above.
-    pub delay_after_send_ms: u32,
+    pub delay_after_send: Duration,
 }
 
-/// The longest delay a file may ask for, in milliseconds.
+/// The longest delay a file may ask for.
 ///
 /// A turnaround is measured in bit times: a millisecond is already a
 /// generous one at 9600 baud and an age at anything faster. A file asking for
 /// seconds of it has mistaken the unit -- microseconds, most likely -- and a
 /// line that held the bus for that long would look like a line that had
 /// failed.
-pub const LONGEST_DELAY_MS: u32 = 1_000;
+pub const LONGEST_DELAY: Duration = Duration::from_millis(1_000);
 
 /// What a serial device said about RS-485, and what it must say to say
 /// anything at all.
@@ -85,12 +87,12 @@ pub(crate) fn rs485_of(
     let details = [
         ("rs485_rts_on_send", g.rs485_rts_on_send.is_some()),
         (
-            "rs485_delay_before_send_ms",
-            g.rs485_delay_before_send_ms.is_some(),
+            "rs485_delay_before_send",
+            g.rs485_delay_before_send.is_some(),
         ),
         (
-            "rs485_delay_after_send_ms",
-            g.rs485_delay_after_send_ms.is_some(),
+            "rs485_delay_after_send",
+            g.rs485_delay_after_send.is_some(),
         ),
     ];
 
@@ -147,32 +149,34 @@ pub(crate) fn rs485_of(
     let delay = |field: &str, stated: Option<&crate::endpoint_config::Scalar>| {
         match stated {
             Some(s) => {
-                let ms = parse_u32(name, field, s)?;
-                if ms > LONGEST_DELAY_MS {
+                let held = crate::graph::parse_interval(s.as_str())
+                    .map_err(|why| bad(name, &format!("{field}: {why}")))?;
+                if held > LONGEST_DELAY {
                     return Err(bad(
                         name,
                         &format!(
-                            "{field} {ms} is longer than {LONGEST_DELAY_MS} ms: a \
-                             turnaround is a few bit times, and a line that held the \
-                             bus for this long would look like one that had failed"
+                            "{field} is longer than {} ms: a turnaround is a few bit \
+                             times, and a line that held the bus for this long would \
+                             look like one that had failed",
+                            LONGEST_DELAY.as_millis()
                         ),
                     ));
                 }
-                Ok(ms)
+                Ok(held)
             }
-            None => Ok(0),
+            None => Ok(Duration::ZERO),
         }
     };
 
     Ok(Some(Rs485Params {
         rts_on_send,
-        delay_before_send_ms: delay(
-            "rs485_delay_before_send_ms",
-            g.rs485_delay_before_send_ms.as_ref(),
+        delay_before_send: delay(
+            "rs485_delay_before_send",
+            g.rs485_delay_before_send.as_ref(),
         )?,
-        delay_after_send_ms: delay(
-            "rs485_delay_after_send_ms",
-            g.rs485_delay_after_send_ms.as_ref(),
+        delay_after_send: delay(
+            "rs485_delay_after_send",
+            g.rs485_delay_after_send.as_ref(),
         )?,
     }))
 }
@@ -190,8 +194,8 @@ mod tests {
             match *field {
                 "rs485" => g.rs485 = value,
                 "rs485_rts_on_send" => g.rs485_rts_on_send = value,
-                "rs485_delay_before_send_ms" => g.rs485_delay_before_send_ms = value,
-                "rs485_delay_after_send_ms" => g.rs485_delay_after_send_ms = value,
+                "rs485_delay_before_send" => g.rs485_delay_before_send = value,
+                "rs485_delay_after_send" => g.rs485_delay_after_send = value,
                 other => panic!("{other} is not an RS-485 term"),
             }
         }
@@ -231,8 +235,8 @@ mod tests {
             .expect("a line with its level stated"),
             Some(Rs485Params {
                 rts_on_send: true,
-                delay_before_send_ms: 0,
-                delay_after_send_ms: 0,
+                delay_before_send: Duration::from_millis(0),
+                delay_after_send: Duration::from_millis(0),
             }),
             "and the delays default to nought, which is right for a quick transceiver"
         );
@@ -246,8 +250,8 @@ mod tests {
             &terms(&[
                 ("rs485", "true"),
                 ("rs485_rts_on_send", "false"),
-                ("rs485_delay_before_send_ms", "2"),
-                ("rs485_delay_after_send_ms", "3"),
+                ("rs485_delay_before_send", "2 ms"),
+                ("rs485_delay_after_send", "3 ms"),
             ]),
             true,
         )
@@ -256,8 +260,8 @@ mod tests {
             good,
             Some(Rs485Params {
                 rts_on_send: false,
-                delay_before_send_ms: 2,
-                delay_after_send_ms: 3,
+                delay_before_send: Duration::from_millis(2),
+                delay_after_send: Duration::from_millis(3),
             })
         );
 
@@ -268,7 +272,7 @@ mod tests {
             &terms(&[
                 ("rs485", "true"),
                 ("rs485_rts_on_send", "true"),
-                ("rs485_delay_before_send_ms", "5000"),
+                ("rs485_delay_before_send", "5 s"),
             ]),
             true,
         )
@@ -284,8 +288,8 @@ mod tests {
     fn a_turnaround_on_a_line_that_is_not_a_bus_is_refused() {
         for field in [
             "rs485_rts_on_send",
-            "rs485_delay_before_send_ms",
-            "rs485_delay_after_send_ms",
+            "rs485_delay_before_send",
+            "rs485_delay_after_send",
         ] {
             let said = rs485_of("line", &terms(&[(field, "1")]), true)
                 .expect_err("a turnaround with the mode off");
@@ -299,7 +303,7 @@ mod tests {
     /// A synchronous line is told that none of this is about it.
     #[test]
     fn a_synchronous_line_has_no_turnaround() {
-        for field in ["rs485", "rs485_rts_on_send", "rs485_delay_after_send_ms"] {
+        for field in ["rs485", "rs485_rts_on_send", "rs485_delay_after_send"] {
             let said = rs485_of("line", &terms(&[(field, "true")]), false)
                 .expect_err("RS-485 on a synchronous line");
             assert!(

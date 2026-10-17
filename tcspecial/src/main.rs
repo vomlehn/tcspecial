@@ -137,7 +137,9 @@ fn main() {
     );
     eprintln!(
         "{} ms beacon: {} to {}",
-        tcspecial_config.beacon_interval.0, beacon.send, beacon.recv
+        tcspecial_config.beacon_interval.as_millis(),
+        beacon.send,
+        beacon.recv
     );
 
     // Load configuration

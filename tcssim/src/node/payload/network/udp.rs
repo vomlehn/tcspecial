@@ -369,7 +369,7 @@ mod tests {
         assert!(
             (before..=after).contains(&went),
             "a packet sent between {before} and {after} was timed at {}",
-            went.millis
+            went.micros
         );
 
         // And what went: the head of the packet, and its whole length, which
@@ -422,7 +422,7 @@ mod tests {
         assert!(
             (before..=after).contains(&came),
             "a packet received between {before} and {after} was timed at {}",
-            came.millis
+            came.micros
         );
         assert_eq!(
             received.data(),

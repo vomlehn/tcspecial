@@ -179,7 +179,7 @@ fn beacons(
     ))?
     .to_ci_config()?;
     let sending = BeaconSend::new(
-        Duration::from_millis(u64::from(ci.beacon_interval.0)),
+        ci.beacon_interval,
         ci.beacon_send.clone(),
         ci.beacon_recv.clone(),
         telemetry_log,
@@ -190,7 +190,9 @@ fn beacons(
     if sending.is_some() {
         eprintln!(
             "{} ms beacon: {} to {}",
-            ci.beacon_interval.0, ci.beacon_send, ci.beacon_recv
+            ci.beacon_interval.as_millis(),
+            ci.beacon_send,
+            ci.beacon_recv
         );
     }
     Ok(sending)

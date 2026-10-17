@@ -176,8 +176,8 @@ fn payload_info_from(dev_id: usize, dh: &DHConfig, sim: &ResolvedSim) -> Payload
         config: SharedString::from(endpoint_description(&dh.endpoint)),
         packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
         segment_size: sim.segment_size as i32,
-        packet_interval: sim.packet_interval_ms as i32,
-        segment_interval: sim.segment_interval_ms as i32,
+        packet_interval: sim.packet_interval.as_millis() as i32,
+        segment_interval: sim.segment_interval.as_millis() as i32,
         status: SharedString::from(STOPPED_STATUS),
         last_sent_time: SharedString::from(NO_TRANSFER_TIME),
         last_sent_data: SharedString::new(),
@@ -546,6 +546,7 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
     use super::*;
     use std::path::Path;
     use tcslibgs::{DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
@@ -597,12 +598,12 @@ mod tests {
     /// A sample of a transfer, as the stats hold it.
     ///
     /// Taking the time in seconds, which is what these tests mean; a time is
-    /// carried in milliseconds since the epoch.
+    /// carried in microseconds since the epoch.
     fn sample_of(seconds: u64, data: &[u8]) -> DHSample {
         let mut sample = DHSample::new();
         sample.record(data);
         sample.time = Some(tcslibgs::Timestamp {
-            millis: seconds * 1_000,
+            micros: seconds * 1_000_000,
         });
         sample
     }
@@ -1323,14 +1324,14 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         }
     }
 
     fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
         ResolvedSim {
-            packet_interval_ms,
-            segment_interval_ms,
+            packet_interval: Duration::from_millis(u64::from(packet_interval_ms)),
+            segment_interval: Duration::from_millis(u64::from(segment_interval_ms)),
             segment_size,
             triggered: false,
             faults: Default::default(),
@@ -1567,8 +1568,8 @@ mod tests {
         // each before anything has moved.
         let mut asked = sim(1000, 1000, 12);
         asked.triggered = true;
-        asked.packet_interval_ms = 0;
-        asked.segment_interval_ms = 0;
+        asked.packet_interval = Duration::ZERO;
+        asked.segment_interval = Duration::ZERO;
         let (sent, recv, pkts) = shown(payload_info_from(0, &handler("DH0"), &asked));
         assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
         assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME} ")]);
@@ -1726,7 +1727,7 @@ mod tests {
      oc: None,
      ground: None,
       mode: Default::default(),
-      stale_interval_ms: None,
+      stale_interval: None,
  };
 
         let info = payload_info_from(0, &dh, &sim(500, 250, 5));

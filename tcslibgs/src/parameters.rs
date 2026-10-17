@@ -50,10 +50,7 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
         DHMode::Periodic => {
             let _ = writeln!(out, "  mode             periodic, so it sends on its own");
         }
-        DHMode::Triggered {
-            trigger,
-            interval_ms,
-        } => {
+        DHMode::Triggered { trigger, interval } => {
             let _ = writeln!(out, "  mode             triggered, so it answers requests");
             // As a file could have written it: a trigger is bytes, and the
             // notation every trigger can be written in is hexadecimal.
@@ -62,7 +59,11 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
                 "  trigger          {}",
                 crate::trigger::trigger_as_written(trigger)
             );
-            let _ = writeln!(out, "  packet_interval  {interval_ms} ms, the rate its trigger goes out at");
+            let _ = writeln!(
+                out,
+                "  packet_interval  {} ms, the rate its trigger goes out at",
+                interval.as_millis()
+            );
         }
     }
 
@@ -70,7 +71,7 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
     // Read by the ground and by nothing aboard, which is why it says where it
     // is read: a line in this list is otherwise taken for something tcspecial
     // acts on.
-    match dh.stale_interval_ms {
+    match dh.stale_interval.map(|d| d.as_millis()) {
         Some(ms) => {
             let _ = writeln!(
                 out,
@@ -144,7 +145,8 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                 let _ = writeln!(
                     out,
                     "  rs485 turnaround {} ms before, {} ms after",
-                    rs485.delay_before_send_ms, rs485.delay_after_send_ms
+                    rs485.delay_before_send.as_millis(),
+                    rs485.delay_after_send.as_millis()
                 );
             }
         }
@@ -163,8 +165,12 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                                               rather than when they change",
                 }
             );
-            if let Some(ms) = gpio.state_interval_ms {
-                let _ = writeln!(out, "  state_interval   {ms} ms, what every line is");
+            if let Some(every) = gpio.state_interval {
+                let _ = writeln!(
+                    out,
+                    "  state_interval   {} ms, what every line is",
+                    every.as_millis()
+                );
             }
             let _ = writeln!(
                 out,
@@ -175,12 +181,12 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                     crate::Bias::PullDown => "pull_down",
                 }
             );
-            match gpio.debounce_us {
-                Some(us) => {
-                    let _ = writeln!(out, "  debounce_us      {us} us");
+            match gpio.debounce {
+                Some(steady) => {
+                    let _ = writeln!(out, "  debounce         {} us", steady.as_micros());
                 }
                 None => {
-                    let _ = writeln!(out, "  debounce_us      none, so every change is an event");
+                    let _ = writeln!(out, "  debounce         none, so every change is an event");
                 }
             }
         }
@@ -323,8 +329,8 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
         let _ = writeln!(
             out,
             "  packet_interval  {} ms{}",
-            sim.packet_interval_ms,
-            if sim.packet_interval_ms == 0 {
+            sim.packet_interval.as_millis(),
+            if sim.packet_interval.is_zero() {
                 ", as fast as the payload can be driven"
             } else {
                 ""
@@ -332,7 +338,11 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
         );
     }
 
-    let _ = writeln!(out, "  segment_interval {} ms", sim.segment_interval_ms);
+    let _ = writeln!(
+        out,
+        "  segment_interval {} ms",
+        sim.segment_interval.as_millis()
+    );
     // A segment is a piece of a packet: equal to the packet is one piece, and
     // larger than the packet is a pair that cannot be sent -- which tcssim
     // will not start, so it is said here rather than left to be found by a
@@ -382,7 +392,7 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
         ("drop_percent", u64::from(faults.drop_percent), "% of packets"),
         ("corrupt_percent", u64::from(faults.corrupt_percent), "% of packets"),
         ("truncate_percent", u64::from(faults.truncate_percent), "% of packets"),
-        ("jitter_ms", u64::from(faults.jitter_ms), " ms late at most"),
+        ("jitter", faults.jitter.as_millis() as u64, " ms late at most"),
         ("silent_after", faults.silent_after, " packets"),
         ("close_after", faults.close_after, " packets"),
         (
@@ -401,6 +411,7 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
     use super::*;
     use crate::sim_config::SimConfigFile;
     use crate::{
@@ -423,7 +434,7 @@ mod tests {
             }),
             ground: None,
             mode: DHMode::Periodic,
-            stale_interval_ms: None,
+            stale_interval: None,
         }
     }
 
@@ -519,7 +530,7 @@ mod tests {
         });
         dh.mode = DHMode::Triggered {
             trigger: b"READ\r".to_vec(),
-            interval_ms: 500,
+            interval: Duration::from_millis(500),
         };
 
         let sim = settled(
@@ -562,7 +573,7 @@ mod tests {
 
         let shown = payload_parameters(&dh, Some(&sim));
         assert!(shown.contains("drop_percent           10% of packets"), "{shown}");
-        assert!(shown.contains("jitter_ms              25 ms late at most"), "{shown}");
+        assert!(shown.contains("jitter                 25 ms late at most"), "{shown}");
         assert!(
             !shown.contains("corrupt_percent") && !shown.contains("silent_after"),
             "a fault nobody asked for is not worth a line of nought:\n{shown}"

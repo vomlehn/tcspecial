@@ -192,8 +192,8 @@ pub(crate) fn group_kind_of(
             "parity",
             "rs485",
             "rs485_rts_on_send",
-            "rs485_delay_before_send_ms",
-            "rs485_delay_after_send_ms",
+            "rs485_delay_before_send",
+            "rs485_delay_after_send",
         ],
     )?;
 

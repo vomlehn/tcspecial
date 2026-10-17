@@ -71,7 +71,7 @@ fn the_shipped_tcspecial_config_loads() {
     // produced a configuration the program could not act on.
     assert!(!config.address.is_empty(), "no address");
     assert_ne!(config.port, 0, "no port");
-    assert_ne!(config.beacon_interval.0, 0, "no beacon interval");
+    assert_ne!(config.beacon_interval.as_millis(), 0, "no beacon interval");
     assert_ne!(config.log_segment_bytes, 0, "no log segment size");
 }
 

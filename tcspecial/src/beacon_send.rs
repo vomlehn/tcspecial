@@ -187,7 +187,7 @@ struct CondPair<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::{BeaconTime, CIConfig};
+    use tcslibgs::CIConfig;
 
     /// Every beacon carries the next number, from one.
     ///
@@ -232,7 +232,7 @@ mod tests {
                 address: "127.0.0.1".to_string(),
                 port: 6100,
             },
-            beacon_interval: BeaconTime(50),
+            beacon_interval: Duration::from_millis(50),
             beacon_send: tcslibgs::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 0,

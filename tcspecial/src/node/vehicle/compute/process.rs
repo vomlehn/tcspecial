@@ -51,6 +51,8 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use nix::poll::{poll, PollFd, PollFlags};
+
+use crate::runtime::node_state::Abandon;
 use tcslibgs::node::vehicle::compute::{ProcessParams, Restart};
 
 use super::Function;
@@ -85,6 +87,13 @@ pub struct Process {
     /// Held so that every refused datum says the same thing, rather than the
     /// first one saying why and the rest saying nothing.
     stopped: Option<String>,
+    /// What ends the wait for an answer, besides the answer and the deadline.
+    ///
+    /// The node's own, so that disabling the node abandons a wait it is in the
+    /// middle of: a deadline may be seconds, and a disable that waited one out
+    /// is a disable that arrives seconds late. See
+    /// [`crate::runtime::node_state::Abandon`].
+    abandon: Abandon,
 }
 
 impl Process {
@@ -102,7 +111,17 @@ impl Process {
             running: None,
             restarts: 0,
             stopped: None,
+            abandon: Abandon::nothing(),
         }
+    }
+
+    /// What ends the wait for an answer besides the answer and the deadline.
+    ///
+    /// Given when the node is opened. A process given none waits out its
+    /// deadline, which is what one in a test does.
+    pub fn abandoned_for(mut self, abandon: Abandon) -> Process {
+        self.abandon = abandon;
+        self
     }
 
     /// Start the program.
@@ -183,17 +202,38 @@ impl Process {
                 ));
             }
 
-            // SAFETY: a descriptor the child's pipe owns, borrowed for the
-            // call and not kept.
+            // SAFETY: both descriptors are owned by something that outlives
+            // the call -- the child's pipe by `running`, the node's wakeup by
+            // the Arc inside `abandon` -- and neither is kept.
             let borrowed = unsafe {
                 std::os::fd::BorrowedFd::borrow_raw(running.stdout.as_raw_fd())
             };
-            let mut fds = [PollFd::new(&borrowed, PollFlags::POLLIN)];
+            let woken = self
+                .abandon
+                .io_fd()
+                .map(|fd| unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) });
+            let mut fds = vec![PollFd::new(&borrowed, PollFlags::POLLIN)];
+            if let Some(woken) = woken.as_ref() {
+                fds.push(PollFd::new(woken, PollFlags::POLLIN));
+            }
             let waiting = left.as_millis().min(i32::MAX as u128) as i32;
             match poll(&mut fds, waiting) {
                 Ok(0) => continue,
                 Ok(_) => {}
                 Err(e) => return Err(format!("waiting for its answer failed: {e}")),
+            }
+
+            // The node has been disabled. The wait is given up where it
+            // stands and no answer is produced: not an error, because
+            // stopping the node is what the ground asked for, and the program
+            // is put down by the disabling itself. What it must not do is
+            // wait out the rest of a deadline that may be seconds long.
+            if fds
+                .get(1)
+                .and_then(|fd| fd.revents())
+                .is_some_and(|events| events.contains(PollFlags::POLLIN))
+            {
+                return Ok(None);
             }
 
             let mut buffer = [0u8; 256];

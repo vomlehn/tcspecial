@@ -63,6 +63,8 @@ use crate::node::vehicle::compute::{self, Function};
 use crate::node::vehicle::log::LogNode;
 use crate::node::vehicle::null::Through;
 
+use crate::runtime::node_state::Abandon;
+
 use crate::endpoint::{
     bind_endpoint_pair, connect_endpoint_pair, EndpointReadable, EndpointWritable,
     WaitResult,
@@ -163,6 +165,11 @@ pub struct EndpointPort {
     ///
     /// See [`EndpointPort::reading`].
     read_size: Option<usize>,
+    /// What the wait between asking and reading is abandoned for.
+    ///
+    /// The one wait this port makes that is a wait rather than a look: see
+    /// [`Abandon`], and [`EndpointPort::abandoned_for`].
+    abandon: Abandon,
 }
 
 impl EndpointPort {
@@ -208,6 +215,7 @@ impl EndpointPort {
             trigger: None,
             read_delay: None,
             read_size: None,
+            abandon: Abandon::nothing(),
         }
     }
 
@@ -222,7 +230,11 @@ impl EndpointPort {
     /// follows from which end exists first: the ground sends to an address it
     /// was told, so the vehicle waits at it, where a device is something the
     /// vehicle opens.
-    pub fn open(node: &Node, routes: &Routes) -> Result<EndpointPort, String> {
+    pub fn open(
+        node: &Node,
+        routes: &Routes,
+        abandon: &Abandon,
+    ) -> Result<EndpointPort, String> {
         let uses = Use::of(routes, &node.name)?;
         let reach = reach_of(node)?;
 
@@ -242,6 +254,7 @@ impl EndpointPort {
         if let Some(delay) = reach.read_delay {
             port = port.waiting(delay);
         }
+        port = port.abandoned_for(abandon.clone());
 
         Ok(port)
     }
@@ -292,6 +305,17 @@ impl EndpointPort {
     /// read.
     pub fn waiting(mut self, read_delay: Duration) -> EndpointPort {
         self.read_delay = Some(read_delay);
+        self
+    }
+
+    /// What ends the wait between asking and reading, besides the clock.
+    ///
+    /// The node's own, so that disabling the node abandons an exchange it is
+    /// in the middle of rather than letting the delay run out first. A port
+    /// given none waits out its delay, which is what a port in a test does
+    /// and what a port nothing can disable does.
+    pub fn abandoned_for(mut self, abandon: Abandon) -> EndpointPort {
+        self.abandon = abandon;
         self
     }
 
@@ -427,7 +451,15 @@ impl Port for EndpointPort {
                 let asked = self.write_all(&trigger, "trigger");
                 self.trigger = Some(trigger);
                 asked?;
-                std::thread::sleep(delay);
+                // The delay, or the node being disabled, whichever comes
+                // first. Abandoned rather than read anyway: the node has been
+                // told to stop, and what is on its interface is an answer to
+                // a question that is no longer being asked. Nothing is
+                // reported, a node the ground stopped being the
+                // configuration working as asked.
+                if self.abandon.wait(delay) {
+                    return Ok(Taken::NOTHING);
+                }
             }
         }
 
@@ -556,8 +588,15 @@ impl ComputePort {
     /// `inputs` is what the routing found bound to the node, which a
     /// computation over several of them needs: a mean cannot know it is
     /// waiting for three until something tells it how many links arrive.
-    pub fn make(node: &Node, inputs: &[&str]) -> Result<ComputePort, String> {
-        Ok(ComputePort::of(&node.name, compute::make(node, inputs)?))
+    pub fn make(
+        node: &Node,
+        inputs: &[&str],
+        abandon: &Abandon,
+    ) -> Result<ComputePort, String> {
+        Ok(ComputePort::of(
+            &node.name,
+            compute::make(node, inputs, abandon)?,
+        ))
     }
 
     /// What this node computes, for a log line that says what is running.
@@ -1323,7 +1362,11 @@ mod tests {
         let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
         let routes = Routes::of(&graph);
 
-        let said = match EndpointPort::open(graph.node("temp_fore").expect("a sensor"), &routes) {
+        let said = match EndpointPort::open(
+            graph.node("temp_fore").expect("a sensor"),
+            &routes,
+            &Abandon::nothing(),
+        ) {
             Err(why) => why,
             Ok(_) => {
                 // A machine with an I2C bus 1 and something at 0x48 on it.
@@ -1341,6 +1384,7 @@ mod tests {
         let said = match EndpointPort::open(
             graph.node("thermostat").expect("the thermostat"),
             &routes,
+            &Abandon::nothing(),
         ) {
             Err(why) => why,
             Ok(_) => panic!("a computation was opened as a device"),
@@ -1722,6 +1766,55 @@ mod tests {
             script.lock().expect("the script").written,
             vec![b"R".to_vec()],
             "asked once, before the read rather than after it"
+        );
+    }
+
+    /// Disabling a node ends the wait between asking and reading, where the
+    /// delay would otherwise have run out first.
+    ///
+    /// The one wait this port makes that is a wait rather than a look. A
+    /// disable that waited it out would arrive up to that delay late, which on
+    /// a part that has stopped answering is exactly when it is wanted. The
+    /// delay here is five seconds and the test takes none of them: what proves
+    /// the point is that it returns at once.
+    ///
+    /// Nothing is produced and nothing is reported. The node has been told to
+    /// stop, and what is on its interface is an answer to a question that is
+    /// no longer being asked.
+    #[test]
+    fn disabling_a_node_ends_the_wait_between_asking_and_reading() {
+        use crate::runtime::node_state::NodeState;
+        use tcslibgs::NodeId;
+
+        let state = NodeState::new("temp_bay", NodeId::of(0)).expect("a state");
+        let (script, port) = port("temp_bay", Use::Read);
+        let mut port = port
+            .triggered_by(b"R".to_vec())
+            .waiting(Duration::from_secs(5))
+            .abandoned_for(state.abandon());
+        script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
+
+        // Stopped before the read, as the command interpreter stops it: the
+        // flag goes down and the node's wakeup is poked.
+        state.disable();
+
+        let began = std::time::Instant::now();
+        let taken = port.take(&mut [0u8; 64]).expect("no failure to report");
+        assert_eq!(taken.bytes, 0, "nothing is produced");
+        assert!(
+            began.elapsed() < Duration::from_secs(1),
+            "the five-second delay was waited out: {:?}",
+            began.elapsed()
+        );
+        assert_eq!(
+            script.lock().expect("the script").written,
+            vec![b"R".to_vec()],
+            "the question went out, and the answer was not waited for"
+        );
+        assert_eq!(
+            script.lock().expect("the script").to_read.len(),
+            1,
+            "and the reading on its interface was left there"
         );
     }
 

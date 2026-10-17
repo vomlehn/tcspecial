@@ -352,6 +352,19 @@ impl Fabric {
         self.nodes.contains_key(name)
     }
 
+    /// Take a node out, and with it whatever it had open.
+    ///
+    /// For a node the ground has disabled: dropping the port is what closes
+    /// the device, frees the bus address or gives up the socket, because every
+    /// port owns what it opened. `None` is a node that was not held, which a
+    /// stop arriving twice gives.
+    ///
+    /// Nothing else changes. The routing still names the node, and a delivery
+    /// to it is dropped by the gate before it gets this far: see [`Gate`].
+    pub fn release(&mut self, name: &str) -> Option<Box<dyn Port>> {
+        self.nodes.remove(name)
+    }
+
     /// How many nodes are held.
     pub fn len(&self) -> usize {
         self.nodes.len()
@@ -368,6 +381,11 @@ impl Fabric {
     /// answers. A name that is not held is reported, as a delivery to one is:
     /// a log that is not there is a log nothing is being written to.
     pub fn flush(&mut self, name: &str) -> Option<String> {
+        // A node the ground has stopped holds nothing to flush, and may hold
+        // no port at all: nothing has been delivered to it since it stopped.
+        if !self.gate.is_enabled(name) {
+            return None;
+        }
         match self.nodes.get_mut(name) {
             Some(node) => node.flush().err(),
             None => Some("there is no such node in this fabric".to_string()),
@@ -642,6 +660,7 @@ impl Fabric {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::node_state::Abandon;
     use std::cell::RefCell;
     use std::rc::Rc;
     use std::path::Path;
@@ -824,7 +843,7 @@ mod tests {
         for name in ["k_fore", "k_aft", "k_bay", "mean_temp", "thermostat"] {
             let node = graph.node(name).expect("a node of the example");
             let inputs = routes.inputs_of(name);
-            let port = ComputePort::make(node, &inputs)
+            let port = ComputePort::make(node, &inputs, &Abandon::nothing())
                 .unwrap_or_else(|why| panic!("{name}: {why}"));
             fabric.hold(name, Box::new(port));
         }
@@ -895,7 +914,7 @@ mod tests {
             let inputs = routes.inputs_of(name);
             fabric.hold(
                 name,
-                Box::new(ComputePort::make(node, &inputs).expect("the computation")),
+                Box::new(ComputePort::make(node, &inputs, &Abandon::nothing()).expect("the computation")),
             );
         }
         let (_, moc_port) = recorder();
@@ -936,7 +955,7 @@ mod tests {
         let node = graph.node("k_fore").expect("the converter");
         fabric.hold(
             "k_fore",
-            Box::new(ComputePort::make(node, &routes.inputs_of("k_fore")).expect("it builds")),
+            Box::new(ComputePort::make(node, &routes.inputs_of("k_fore"), &Abandon::nothing()).expect("it builds")),
         );
         let (moc, moc_port) = recorder();
         fabric.hold("moc", moc_port);
@@ -975,7 +994,7 @@ mod tests {
         let thermostat = graph.node("thermostat").expect("the thermostat");
         fabric.hold(
             "thermostat",
-            Box::new(ComputePort::make(thermostat, &[]).expect("it builds")),
+            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
         );
         let (heaters, heater_port) = recorder();
         let (_, log_port) = recorder();
@@ -1024,7 +1043,7 @@ mod tests {
         let thermostat = graph.node("thermostat").expect("the thermostat");
         fabric.hold(
             "thermostat",
-            Box::new(ComputePort::make(thermostat, &[]).expect("it builds")),
+            Box::new(ComputePort::make(thermostat, &[], &Abandon::nothing()).expect("it builds")),
         );
 
         // The band either side of the setpoint is in the file and no binding

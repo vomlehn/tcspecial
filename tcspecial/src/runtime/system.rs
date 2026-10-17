@@ -34,9 +34,12 @@ use std::time::{Duration, Instant};
 use tcslibgs::graph::telemetry::Telemetered;
 use tcslibgs::graph::Graph;
 
+use std::sync::Arc;
+
 use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
+use crate::runtime::node_state::NodeStates;
 use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, Use};
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
@@ -71,6 +74,12 @@ pub struct System {
     paced: BTreeMap<String, (Pace, Instant)>,
     /// The logs, which are flushed at the end of a pass.
     logs: Vec<String>,
+    /// What each node's state is, shared with whatever reads commands.
+    ///
+    /// The fabric holds the same `Arc` as its gate, so the pass asks the one
+    /// table the command interpreter stores into: see
+    /// [`crate::runtime::node_state`].
+    states: Arc<NodeStates>,
 }
 
 impl System {
@@ -98,7 +107,14 @@ impl System {
         mut ground: impl FnMut(&Telemetered) -> Result<Box<dyn Port>, String>,
     ) -> Result<System, Vec<String>> {
         let routes = Routes::of(graph);
+        // Before anything opens, because a node's state is what decides
+        // whether the pass touches it and every node has one from the start.
+        let states = Arc::new(
+            NodeStates::of(graph)
+                .map_err(|e| vec![format!("a node's wakeup descriptor: {e}")])?,
+        );
         let mut fabric = Fabric::new(routes.clone(), DATUM_BYTES);
+        fabric.gated_by(states.clone());
         let mut refused = Vec::new();
         let mut logs = Vec::new();
         let mut polled = Vec::new();
@@ -150,6 +166,7 @@ impl System {
             polled,
             paced,
             logs,
+            states,
         })
     }
 
@@ -291,6 +308,16 @@ impl System {
     /// The logs this system flushes.
     pub fn logs(&self) -> &[String] {
         &self.logs
+    }
+
+    /// What each node's state is, for whatever reads commands.
+    ///
+    /// Handed out rather than reached through: the command interpreter runs on
+    /// a thread of its own and this is the whole of what it shares with the
+    /// pass, which is what keeps a command from waiting on a pass and a pass
+    /// from waiting on a command.
+    pub fn states(&self) -> Arc<NodeStates> {
+        self.states.clone()
     }
 
     /// Apply a command from the ground.
@@ -609,6 +636,40 @@ mod tests {
         }
     }
 
+    /// A device that answers with whatever it was given and counts the asks.
+    ///
+    /// [`Sensor`] with the asking counted, for the one test where stopping a
+    /// node has to stop an ask as well as a read.
+    struct Asked {
+        readings: Rc<RefCell<Vec<Vec<u8>>>>,
+        asks: Rc<std::cell::Cell<usize>>,
+    }
+
+    impl Port for Asked {
+        fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+            let mut readings = self.readings.borrow_mut();
+            if readings.is_empty() {
+                return Ok(Taken::NOTHING);
+            }
+            let datum = readings.remove(0);
+            buffer[..datum.len()].copy_from_slice(&datum);
+            Ok(Taken::of(datum.len()))
+        }
+
+        fn ask(&mut self) -> Result<(), String> {
+            self.asks.set(self.asks.get() + 1);
+            Ok(())
+        }
+
+        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            Err("a part that is asked is read and not written".to_string())
+        }
+
+        fn accepts(&self) -> bool {
+            false
+        }
+    }
+
     /// Reads and asks, by node.
     type Counts = BTreeMap<String, (Rc<std::cell::Cell<usize>>, Rc<std::cell::Cell<usize>>)>;
 
@@ -800,6 +861,112 @@ payloads:
             system.until_next_pass(start + Duration::from_millis(30)),
             POLL_PAUSE
         );
+    }
+
+    /// A node the ground has stopped is not read, not asked, and not
+    /// delivered to.
+    ///
+    /// Through a whole pass rather than through the fabric alone, because what
+    /// is being tested is that the state the command interpreter stores into
+    /// is the state the pass reads: the fabric asks its gate, the gate is the
+    /// node states, and `System` is where the two are joined.
+    ///
+    /// Two nodes, so that both ends of a link can be stopped in turn -- the
+    /// one that produces and the one that is delivered to -- which are the two
+    /// things stopping a node has to mean.
+    #[test]
+    fn a_node_the_ground_has_stopped_moves_nothing() {
+        let start = Instant::now();
+
+        // A part that sends and is triggered on a timer, which is the pace
+        // whose ask is a step of its own: stopping such a node has to stop the
+        // trigger as well as the read, and the two are separate calls.
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("stopped.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"
+payloads:
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7005\",
+      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
+vehicle:
+  - { name: average, type: compute, function: mean, inputs: 1 }
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+
+        let readings = Rc::new(RefCell::new(Vec::new()));
+        let arrived: Rc<RefCell<Vec<Vec<u8>>>> = Rc::new(RefCell::new(Vec::new()));
+        let asks = Rc::new(std::cell::Cell::new(0usize));
+
+        let scripted = readings.clone();
+        let watched = arrived.clone();
+        let counted = asks.clone();
+        let mut system = System::of_opening(
+            &graph,
+            start,
+            move |node: &Node, _: &Routes| match node.node_type.as_str() {
+                "network" => Ok(Box::new(Asked {
+                    readings: scripted.clone(),
+                    asks: counted.clone(),
+                }) as Box<dyn Port>),
+                _ => Ok(Box::new(Ground {
+                    got: watched.clone(),
+                }) as Box<dyn Port>),
+            },
+            |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
+        .expect("it opens");
+
+        // Running: the part is asked, the reading is taken, and it reaches the
+        // node the link goes to.
+        readings.borrow_mut().push(b"warm".to_vec());
+        let moved = system.pass(start);
+        assert_eq!(moved.delivered, 1, "{moved:?}");
+        assert_eq!(moved.dropped, 0);
+        assert_eq!(asks.get(), 1, "it was asked");
+        assert_eq!(arrived.borrow().len(), 1);
+
+        let states = system.states();
+
+        // Stopped, as a STOP_NODE stops it: not asked, not read, and the
+        // reading waiting in it stays there.
+        states.named("asked").expect("the node").disable();
+        assert_eq!(states.disabled(), vec!["asked"]);
+        readings.borrow_mut().push(b"cold".to_vec());
+        let moved = system.pass(start + Duration::from_millis(100));
+        assert_eq!(moved.delivered, 0, "{moved:?}");
+        assert!(moved.all_delivered(), "and nothing is reported: {moved:?}");
+        assert_eq!(asks.get(), 1, "a stopped node is not asked either");
+        assert_eq!(readings.borrow().len(), 1, "the reading was not taken");
+        assert_eq!(arrived.borrow().len(), 1);
+
+        // And with the other end stopped instead, the reading is taken and the
+        // delivery is dropped and counted -- not queued. A queue for a node
+        // nobody has re-enabled is a queue that grows without bound, and a
+        // reading delivered minutes later is a reading that describes a moment
+        // that has passed.
+        states.named("asked").expect("the node").enable();
+        states.named("average").expect("the computation").disable();
+        let moved = system.pass(start + Duration::from_millis(200));
+        assert_eq!(moved.dropped, 1, "the delivery was dropped: {moved:?}");
+        assert_eq!(moved.delivered, 0, "{moved:?}");
+        assert!(
+            moved.all_delivered(),
+            "dropped is not refused: a node the ground stopped is the \
+             configuration working as asked and not a fault: {moved:?}"
+        );
+        assert_eq!(arrived.borrow().len(), 1, "nothing new arrived");
+
+        // Started again, it moves what it moves.
+        states.named("average").expect("the computation").enable();
+        assert!(states.disabled().is_empty());
+        readings.borrow_mut().push(b"warm".to_vec());
+        let moved = system.pass(start + Duration::from_millis(300));
+        assert_eq!(moved.delivered, 1, "{moved:?}");
+        assert_eq!(moved.dropped, 0);
+        assert_eq!(arrived.borrow().len(), 2);
     }
 
     /// The shipped example, with the three sensors scripted and the ground

@@ -14,13 +14,19 @@
 //!   opened endpoint as a node the fabric can move bytes to and from.
 //! * [`system`] is the assembly and the loop: a port per node, held in a
 //!   fabric, with the schedule deciding when each group is read.
+//! * [`node_state`] is what each node's state is -- enabled or disabled -- and
+//!   the descriptor through which a disable reaches a node that is waiting.
+//! * [`command`] is the ground's two command links, answered on a thread of
+//!   their own so that a command never waits for the pass.
 //!
 //! The first two open nothing. They are the arithmetic of the graph, and they
 //! are separate from the moving of bytes on purpose: both can be tested
 //! against a configuration with no vehicle present, where a fault in either
 //! would otherwise look like a fault in a device.
 
+pub mod command;
 pub mod fabric;
+pub mod node_state;
 pub mod port;
 pub mod route;
 pub mod schedule;

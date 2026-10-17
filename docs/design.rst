@@ -1518,10 +1518,19 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     the next beacon goes at the new interval rather than after the old one
     elapses.
 
-``START_DH`` and ``STOP_DH``
+``START_NODE`` and ``STOP_NODE``
     Enable and disable a node. This is where version 2 differs most: the unit
     is a node of the graph rather than a data handler, so a computation, a log
     and a payload are each something the ground can stop.
+
+    Kinds of their own rather than version 1's ``START_DH`` and ``STOP_DH``
+    carrying a different body. The two name their subject differently -- a
+    data handler by name, a node by id -- and a vehicle flying one version has
+    no use for the other's, so a single kind would be one message meaning two
+    things and each end guessing which from what else it knows. A version 1
+    vehicle refuses these as unimplemented, and a version 2 one refuses
+    version 1's the same way: either is the ground reading a configuration
+    that end has never seen.
 
 ``QUERY_DH``
     What that node has moved, from the node's own counters.
@@ -1567,11 +1576,16 @@ Requirement
     useful and does not suit a graph whose links describe one machine.
 
 Requirement
-    A ``START_DH`` carries no kind. Version 1's carried the type of handler it
-    expected and refused a mismatch, which was a check against the two ends
-    reading different configurations; the node id and the digest make that
-    check beforehand and for every command, so a kind in the message would be
-    a second answer to a settled question.
+    A ``START_NODE`` carries no kind. Version 1's ``START_DH`` carried the type
+    of handler it expected and refused a mismatch, which was a check against
+    the two ends reading different configurations; the node id and the digest
+    make that check beforehand and for every command, so a kind in the message
+    would be a second answer to a settled question.
+
+Requirement
+    Both carry one thing, the node id, and both are answered with the status
+    and that same id. One body for the two: there is nothing to say about a
+    node beyond which node it is.
 
 Requirement
     Every node counts what it has moved: bytes taken and bytes given, the
@@ -1671,8 +1685,28 @@ Requirement
     ground.
 
 Requirement
+    That link is bound at ``payload_command.dest_base`` with nothing added to
+    it, and commands on it are taken from ``payload_command.source_base``.
+    Version 1 counts a socket off each base by the payload's id; version 2
+    uses the base itself, the id having moved into the message.
+
+Requirement
+    Both links are waited on together, with the descriptor that stops the
+    interpreter in the same poll set. The thread therefore wakes when there is
+    a command or a shutdown and for nothing else. Version 1 gives each link a
+    thread and a read timeout, which is a wakeup several times a second per
+    link to ask a question whose answer is almost always no.
+
+Requirement
+    A command this vehicle does not implement is refused and not ignored. It
+    is something the ground can see and work around, where a command that goes
+    quiet is a link the ground cannot tell from a dead one. A refusal carries
+    the telemetry type the command asked for, so the ground can pair it with
+    what it sent.
+
+Requirement
     The command interpreter does not do a node's work on its thread. It hands
-    the work over and answers when the work is done, so that a ``START_DH``
+    the work over and answers when the work is done, so that a ``START_NODE``
     opening a device does not stop the next command being read. An answer
     carries the sequence of the command it answers, so answers that overtake
     one another are still matched to what was asked.
@@ -1778,13 +1812,31 @@ conduit.
 
 .. note::
    **What runs today.** One thread makes the whole pass, in order, with the
-   beacons beside it on a thread of their own. It never blocks waiting for data
-   -- that part of the design is already true -- and the only wait inside a
-   pass is a ``process`` computation's deadline. There is no command link at
-   all: the ``commands`` section of a graph is checked when the file is read
-   and nothing applies it, so no payload is started, stopped or queried from
-   the ground. The command interpreter, the worker pool, the per-node state and
-   the wakeup descriptors are the design above, not the code below.
+   beacons beside it on a thread of their own and the command interpreter on a
+   third. It never blocks waiting for data -- that part of the design is
+   already true -- and the only wait inside a pass is a ``process``
+   computation's deadline.
+
+   The command interpreter is there: two links, each taking commands only from
+   the address the configuration states, answering PING, CONNECT, CONFIG,
+   START_NODE and STOP_NODE, and recording every answer in the telemetry log
+   beside the beacons. Each node has a state and a wakeup descriptor, and
+   stopping a node takes effect at once -- it is not read, not asked, and
+   deliveries to it are dropped and counted.
+
+   Three things are still the design and not the code. A disabled node does
+   not yet *release* what it held: the endpoint stays open, so a stopped node
+   still holds its device, bus address or socket, and enabling one is a flag
+   rather than an opening that can fail. The wakeup descriptors exist and are
+   poked, but the ports do not yet carry them in their poll sets, so a disable
+   that lands during a ``process`` deadline still waits that deadline out.
+   And there is no worker pool: a stage's node operations run one after
+   another on the one thread.
+
+   RESTART_ARM, RESTART, QUERY_DH, QUERY_DH_SAMPLE and CONFIG_DH are refused
+   as unimplemented rather than left unanswered. A command the vehicle does
+   not implement is something the ground can see and work around; a command
+   that goes quiet is a link the ground cannot tell from a dead one.
 
 Running a graph
 ---------------

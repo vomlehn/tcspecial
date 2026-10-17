@@ -22,6 +22,7 @@ use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
 use tcslibgs::graph::Graph;
 
 use crate::beacon_send::BeaconSend;
+use crate::runtime::command::{Commands, Flying};
 use crate::runtime::fabric::Moved;
 use crate::telemetry_log::TelemetryLog;
 use crate::runtime::system::{described, System};
@@ -81,12 +82,37 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let _beacon = beacons(&graph, config_version, digest, telemetry_log.clone())
+    let beacon = beacons(&graph, config_version, digest, telemetry_log.clone())
         .map_err(|why| vec![format!("{path}: {why}")])?;
+
+    // And the ground's commands, on a thread of their own. After the beacons
+    // because a CONFIG retimes them, and after the ports because the first
+    // thing the ground may do is stop a node: a command link that opened
+    // before the nodes did could be asked to stop one that does not exist
+    // yet.
+    let flying = Flying {
+        version: ConfigVersion::of_this_build(),
+        config_version,
+        digest,
+    };
+    let mut commands = command_links(
+        &graph,
+        system.states(),
+        flying,
+        beacon.clone(),
+        telemetry_log.clone(),
+    )
+    .map_err(|why| vec![format!("{path}: {why}")])?;
 
     listen_for_stop();
 
     system.run(&asked_to_stop, report, pause);
+
+    // The links closed before the log is flushed, so that nothing records an
+    // answer into a log whose last page has already been written.
+    if let Some(commands) = commands.as_mut() {
+        commands.stop();
+    }
 
     // What was recorded and not yet written, before the process goes: the
     // log is the account of what the vehicle sent, and an account missing
@@ -196,6 +222,46 @@ fn beacons(
         );
     }
     Ok(sending)
+}
+
+/// Take the ground's commands where the configuration's `tcspecial` section
+/// says.
+///
+/// Two links, as version 1 has: the spacecraft's at `tcs_cmd.recv`, and the
+/// one commands about nodes arrive on at `payload_command.dest_base`. See
+/// [`crate::runtime::command`], which says why the second is one socket here
+/// where version 1 bound one per payload.
+///
+/// A configuration with no `tcspecial` section takes no commands, as it sends
+/// no beacons: the section is where the ports are written down, and a vehicle
+/// that chose its own would be a vehicle no ground station could find.
+fn command_links(
+    graph: &Graph,
+    states: std::sync::Arc<crate::runtime::node_state::NodeStates>,
+    flying: Flying,
+    beacon: Option<BeaconSend>,
+    telemetry_log: TelemetryLog,
+) -> Result<Option<Commands>, String> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(None);
+    };
+    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
+        section,
+    ))?
+    .to_ci_config()?;
+
+    let commands = Commands::start(&ci, states, flying, beacon, telemetry_log)
+        .map_err(|e| e.to_string())?;
+    // Where they are taken, as the sockets were bound: a configuration may ask
+    // for port 0, and then the socket is the only statement of which port that
+    // is. On stderr as the beacon line is, because it is what somebody
+    // standing at a console reads to find out where to send.
+    eprintln!(
+        "commands: spacecraft on {}, nodes on {}",
+        commands.spacecraft_address(),
+        commands.node_address()
+    );
+    Ok(Some(commands))
 }
 
 /// Whether the loop should stop.

@@ -16,6 +16,7 @@ use std::time::Duration;
 
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
+    NodeTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry, DHName,
     DHSample, DHState, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
     RestartArmTelemetry,
@@ -125,6 +126,20 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Command::ConfigDH(_) => {
                     Telemetry::ConfigDH(ConfigDHTelemetry::new(seq, CommandStatus::Success))
                 }
+                // A version 2 vehicle's own two. This client is version 1's,
+                // so it sends neither; they are answered here because the
+                // stub reads whatever arrives and a command it could not
+                // answer would look like a link that had gone quiet.
+                Command::StartNode(cmd) => Telemetry::StartNode(NodeTelemetry::started(
+                    seq,
+                    CommandStatus::Success,
+                    cmd.node,
+                )),
+                Command::StopNode(cmd) => Telemetry::StopNode(NodeTelemetry::stopped(
+                    seq,
+                    CommandStatus::Success,
+                    cmd.node,
+                )),
             };
 
             let data = serde_json::to_vec(&answer).expect("serialise");

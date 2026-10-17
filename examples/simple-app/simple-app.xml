@@ -54,7 +54,7 @@
         <payload-out><target>moc</target></payload-out>
     </payloads>
     <tcsgui>
-        <nodes><name>moc</name><x>32</x><y>104</y></nodes>
-        <nodes><name>lorem</name><x>584</x><y>120</y></nodes>
+        <nodes><name>moc</name><x>792</x><y>104</y></nodes>
+        <nodes><name>lorem</name><x>40</x><y>120</y></nodes>
     </tcsgui>
 </configuration>

@@ -268,45 +268,45 @@ impl Terminals {
 /// Where a terminal is drawn, and which way its arrow points.
 ///
 /// Two rows and two columns, and the arrangement is the two streams: the
-/// vehicleward one along the top, left to right, arriving from the ground at
-/// `moc-in` and leaving for the payload at `moc-out`; the groundward one
-/// along the bottom, right to left, arriving from the payload at
-/// `payload-in` and leaving for the ground at `payload-out`.
+/// groundward one along the top, left to right, arriving from the payload at
+/// `payload-in` and leaving for the ground at `payload-out`; the vehicleward
+/// one along the bottom, right to left, arriving from the ground at `moc-in`
+/// and leaving for the payload at `moc-out`.
 ///
 /// Which means the arrows all point the way the data actually travels across
-/// the canvas, because the canvas is laid out the same way: the ground is the
-/// leftmost pane and the payloads the rightmost. A reader who has noticed that
+/// the canvas, because the canvas is laid out the same way: the payloads are
+/// the leftmost pane and the ground the rightmost. A reader who has noticed that
 /// once does not have to read the names again.
 ///
 /// `None` for a name that is not one of the four, which is a computation's
 /// own input: those are drawn where the link arrives and not as a terminal.
 pub fn corner_of(terminal: &str) -> Option<Corner> {
     match terminal {
-        // The payload's own data along the top, travelling leftwards: it
-        // arrives from a payload on the right and leaves for the ground on
-        // the left.
-        "payload-out" => Some(Corner {
-            top: true,
-            left: true,
-            rightward: false,
-        }),
+        // The payload's own data along the top, travelling rightwards: it
+        // arrives from a payload on the left and leaves for the ground on the
+        // right.
         "payload-in" => Some(Corner {
             top: true,
-            left: false,
-            rightward: false,
-        }),
-        // And what the ground sends along the bottom, travelling rightwards:
-        // it arrives from the ground on the left and leaves for a payload on
-        // the right.
-        "moc-in" => Some(Corner {
-            top: false,
             left: true,
             rightward: true,
         }),
-        "moc-out" => Some(Corner {
-            top: false,
+        "payload-out" => Some(Corner {
+            top: true,
             left: false,
             rightward: true,
+        }),
+        // And what the ground sends along the bottom, travelling leftwards:
+        // it arrives from the ground on the right and leaves for a payload on
+        // the left.
+        "moc-out" => Some(Corner {
+            top: false,
+            left: true,
+            rightward: false,
+        }),
+        "moc-in" => Some(Corner {
+            top: false,
+            left: false,
+            rightward: false,
         }),
         _ => None,
     }
@@ -318,13 +318,13 @@ pub fn corner_of(terminal: &str) -> Option<Corner> {
 pub struct Corner {
     pub top: bool,
     pub left: bool,
-    /// Whether the arrow points right, which is to say towards the payloads.
+    /// Whether the arrow points right, which is to say towards the ground.
     ///
     /// The way the data on this terminal travels across the canvas, which is
-    /// the way the canvas is laid out: the ground is the leftmost working pane
-    /// and the payloads the rightmost. So the payload's own data -- telemetry,
-    /// on its way to the ground -- points left, and what the ground sends
-    /// points right.
+    /// the way the canvas is laid out: the payloads are the leftmost working
+    /// pane and the ground the rightmost. So the payload's own data --
+    /// telemetry, on its way to the ground -- points right, and what the ground
+    /// sends points left.
     ///
     /// All four carry one. A terminal's name says whose data it is and whether
     /// it arrives or leaves -- `payload-in`, `moc-out` -- and the arrow says
@@ -1716,9 +1716,9 @@ mod tests {
      /// Every terminal a type has is drawn somewhere, and in the right corner.
     ///
     /// The arrangement is the argument: the payload's own data along the top
-    /// going left, what the ground sends along the bottom going right, so
+    /// going right, what the ground sends along the bottom going left, so
     /// every arrow points the way the data travels across a canvas whose
-    /// leftmost pane is the ground and whose rightmost is the payloads. A
+    /// leftmost pane is the payloads and whose rightmost is the ground. A
     /// terminal in the wrong corner would make the drawing say the opposite of
     /// the file.
     #[test]
@@ -1732,11 +1732,11 @@ mod tests {
                 // Each row runs one way.
                 let payloads = terminal.starts_with("payload-");
                 assert_eq!(corner.top, payloads, "{terminal}");
-                assert_eq!(corner.rightward, !payloads, "{terminal}");
+                assert_eq!(corner.rightward, payloads, "{terminal}");
                 // Leaving on the side the data is going to, arriving on the
-                // side it comes from: the ground is to the left of the vehicle
-                // and the payloads to its right.
-                let from_the_left = *terminal == "moc-in" || *terminal == "payload-out";
+                // side it comes from: the payloads are to the left of the
+                // vehicle and the ground to its right.
+                let from_the_left = *terminal == "payload-in" || *terminal == "moc-out";
                 assert_eq!(corner.left, from_the_left, "{terminal}");
             }
         }
@@ -1854,19 +1854,19 @@ mod tests {
     /// leaves -- `payload-in`, `moc-out` -- and the arrow says which way that
     /// is on the screen. One statement of it, derived from the stream rather
     /// than written out per corner: the payload's own data is on its way to
-    /// the ground, which is leftwards, and what the ground sends is on its way
-    /// to a payload, which is rightwards.
+    /// the ground, which is rightwards, and what the ground sends is on its
+    /// way to a payload, which is leftwards.
     #[test]
     fn every_terminal_carries_an_arrow_the_way_its_data_goes() {
         for terminal in ["payload-in", "payload-out"] {
             assert!(
-                !corner_of(terminal).expect("a corner").rightward,
+                corner_of(terminal).expect("a corner").rightward,
                 "{terminal}: the payload's own data is on its way to the ground"
             );
         }
         for terminal in ["moc-in", "moc-out"] {
             assert!(
-                corner_of(terminal).expect("a corner").rightward,
+                !corner_of(terminal).expect("a corner").rightward,
                 "{terminal}: what the ground sends is on its way to a payload"
             );
         }
@@ -1887,17 +1887,17 @@ mod tests {
             assert_eq!(t.terminals().sources, schema.sources, "{}", t.spelling());
         }
 
-        // A payload is the right-hand end of both streams, so both of its
-        // terminals are drawn on its left; the ground is the left-hand end,
-        // and both of its are on its right. Spelled out here because it is
+        // A payload is the left-hand end of both streams, so both of its
+        // terminals are drawn on its right; the ground is the right-hand end,
+        // and both of its are on its left. Spelled out here because it is
         // the thing a reader of the canvas sees first.
         for t in NodeType::ALL.iter().filter(|t| t.is_payload()) {
             for terminal in t.terminals().each() {
-                assert!(corner_of(terminal).unwrap().left, "{terminal}");
+                assert!(!corner_of(terminal).unwrap().left, "{terminal}");
             }
         }
         for terminal in NodeType::Moc.terminals().each() {
-            assert!(!corner_of(terminal).unwrap().left, "{terminal}");
+            assert!(corner_of(terminal).unwrap().left, "{terminal}");
         }
     }
 
@@ -1999,27 +1999,26 @@ mod tests {
         let (width, height) = drawn.size;
         let at = (400, 200);
 
-        // A payload's pair, both on its left: its readings leave at the top
-        // going left, and what asks for them arrives at the bottom going
-        // right.
+        // A payload's pair, both on its right: its readings leave at the top
+        // going right, and what asks for them arrives at the bottom going
+        // left.
         let ((x, y), rightward) = attachment("i2c", at, "payload-out").expect("a payload");
         let room = room_at(drawn.outline, drawn.size, corner_of("payload-out").unwrap());
-        assert!(room > 0, "a payload leans, so its upper left is in from the side");
+        assert!(room > 0, "a payload leans, so its upper right is in from the side");
         assert_eq!(
             x,
-            at.0 as f32 + room as f32,
-            "a terminal on the left joins the shape's own left"
+            (at.0 + width as i32) as f32 - room as f32,
+            "a terminal on the right joins the shape's own right"
         );
-        assert!(!rightward, "the readings leave towards the ground");
+        assert!(rightward, "the readings leave towards the ground");
         assert!(y < at.1 as f32 + height as f32 / 2.0, "the upper corner");
 
         let ((_, lower), rightward) = attachment("i2c", at, "moc-in").expect("a payload");
-        assert!(rightward && lower > y, "what asks arrives at the lower corner");
+        assert!(!rightward && lower > y, "what asks arrives at the lower corner");
 
-        // And the ground link's pair, both on its right.
+        // And the ground link's pair, both on its left.
         let ((x, _), _) = attachment("moc", at, "payload-in").expect("the ground");
-        let (moc_width, _) = NodeType::Moc.appearance().size;
-        assert_eq!(x, (at.0 + moc_width as i32) as f32);
+        assert_eq!(x, at.0 as f32);
 
         // A terminal a node does not have is not a place to join it, and
         // neither is a name that is not a terminal at all.

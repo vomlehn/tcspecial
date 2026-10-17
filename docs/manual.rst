@@ -178,14 +178,16 @@ terminal
     ``moc-in``, a ``moc-in`` to a ``moc-out``. Anything else would carry
     one stream into the other. In tcsgui the terminals are drawn as small boxes
     in a node's corners, each with an arrow saying which way its data goes: the
-    payload's own data along the top pointing left, towards the ground, and
-    what the ground sends along the bottom pointing right, towards the
-    payloads. A link is made by dragging from one of them onto the node the
-    line is to reach: anywhere on that node will do, and the line is drawn to
-    whichever of its terminals the stream arrives at. A node with no terminal
-    of that stream takes nothing, and a MOC link has none on its left at all:
-    the payload data it receives arrives at the ``payload-in`` in its upper
-    right, and what it sends leaves by the ``moc-out`` in its lower right.
+    payload's own data along the top pointing right, towards the ground, and
+    what the ground sends along the bottom pointing left, towards the
+    payloads -- the canvas having the payloads on the left, the vehicle in the
+    middle and the MOC on the right. A link is made by dragging from one of
+    them onto the node the line is to reach: anywhere on that node will do,
+    and the line is drawn to whichever of its terminals the stream arrives at.
+    A node with no terminal of that stream takes nothing, and a MOC link has
+    none on its right at all: the payload data it receives arrives at the
+    ``payload-in`` in its upper left, and what it sends leaves by the
+    ``moc-out`` in its lower left.
 
 ``null`` node
     A vehicle node that carries both streams through and does nothing to what

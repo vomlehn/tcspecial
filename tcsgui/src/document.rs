@@ -2351,7 +2351,7 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "mean_temp", "function", "mean");
     set(&mut document, "mean_temp", "inputs", "in0,in1,in2");
 
-    place(&mut document, "thermostat", "compute", (660, 240));
+    place(&mut document, "thermostat", "compute", (616, 240));
     set(&mut document, "thermostat", "function", "hysteresis");
     set(&mut document, "thermostat", "setpoint", "293.15");
     set(&mut document, "thermostat", "above", "2.0");
@@ -2362,14 +2362,14 @@ pub fn thermostat_example() -> Document {
         "setpoint is set from the ground; above and below are the two degrees\neither side that the heaters are switched at.",
     );
 
-    place(&mut document, "moc", "moc", (660, 40));
+    place(&mut document, "moc", "moc", (792, 40));
     set(&mut document, "moc", "address", "10.0.0.1");
     set(&mut document, "moc", "port", "5000");
     // Where the ground station is: each node linked into this one sends to
     // this port plus its own device id, from the start.
     set(&mut document, "moc", "ground_base", "10.0.0.2:5100");
 
-    place(&mut document, "heaters", "gpio", (860, 240));
+    place(&mut document, "heaters", "gpio", (40, 400));
     set(&mut document, "heaters", "path", "/dev/gpiochip0");
     set(&mut document, "heaters", "direction", "output");
     set(&mut document, "heaters", "lines", "3,4,5");
@@ -2741,16 +2741,16 @@ mod tests {
     #[test]
     fn reading_a_configuration_settles_its_nodes_into_their_panes() {
         let dividers = crate::pane::default_dividers();
-        let (moc, divider) = (dividers.moc, dividers.vehicle);
+        let divider = dividers.payloads;
         let mut document = Document::new();
 
         // A payload on the wrong side, a vehicle node on the wrong side, and
         // one of each where it belongs.
         for (name, node_type, at) in [
-            ("stray_sensor", "i2c", (40, 120)),
-            ("stray_compute", "compute", (divider + 40, 200)),
-            ("good_sensor", "i2c", (divider + 16, 320)),
-            ("good_compute", "compute", (moc + 240, 40)),
+            ("stray_sensor", "i2c", (divider + 40, 120)),
+            ("stray_compute", "compute", (40, 200)),
+            ("good_sensor", "i2c", (16, 320)),
+            ("good_compute", "compute", (divider + 240, 40)),
         ] {
             document.apply(&add(name, node_type));
             document.apply(&Edit::MoveNode {
@@ -2767,14 +2767,15 @@ mod tests {
         let width = crate::style::WIDTH as i32;
 
         // The payload is in its own pane now, at the near edge of it: the
-        // smallest move that obeys the rule.
-        assert_eq!(at("stray_sensor"), (divider, 120));
-        // And the computation is out of it, by its own width.
-        assert_eq!(at("stray_compute"), (divider - width, 200));
+        // smallest move that obeys the rule, which is its own width short of
+        // the divider.
+        assert_eq!(at("stray_sensor"), (divider - width, 120));
+        // And the computation is out of it, against the divider.
+        assert_eq!(at("stray_compute"), (divider, 200));
         // The two that were already right are untouched, which matters: a
         // reader who arranged a diagram should find it as they left it.
-        assert_eq!(at("good_sensor"), (divider + 16, 320));
-        assert_eq!(at("good_compute"), (moc + 240, 40));
+        assert_eq!(at("good_sensor"), (16, 320));
+        assert_eq!(at("good_compute"), (divider + 240, 40));
 
         // Settling twice changes nothing, which is what makes it safe to do
         // on every open.
@@ -2789,7 +2790,7 @@ mod tests {
     #[test]
     fn settling_does_not_stack_nodes_on_one_another() {
         let dividers = crate::pane::default_dividers();
-        let divider = dividers.vehicle;
+        let divider = dividers.payloads;
         let mut document = Document::new();
 
         // Four sensors in a row at one height, all of them in the wrong pane.
@@ -2798,7 +2799,7 @@ mod tests {
             document.apply(&Edit::MoveNode {
                 node: (*name).into(),
                 was: (0, 0),
-                now: (40 + n as i32 * 160, 80),
+                now: (divider + 8 + n as i32 * 160, 80),
             });
         }
 
@@ -2811,7 +2812,10 @@ mod tests {
             .map(|node| (node.at, crate::pane::size_of(&node.node_type)))
             .collect();
         for (at, _) in &boxes {
-            assert!(at.0 >= divider, "{at:?} is not in the payload pane");
+            assert!(
+                at.0 + crate::style::WIDTH as i32 <= divider,
+                "{at:?} is not in the payload pane"
+            );
         }
         for (i, (one, one_size)) in boxes.iter().enumerate() {
             for (two, two_size) in &boxes[i + 1..] {

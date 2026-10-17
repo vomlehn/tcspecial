@@ -102,13 +102,18 @@ fn divider_range(document: &Document, dividers: Dividers, which: Pane) -> (i32, 
     // Which panes this divider is between, and the room its neighbours keep.
     let step = WORKING_WIDTH * settings::LEAST / 100;
     let (left, right, mut low, mut high) = match which {
-        // The moc divider: between the moc pane and the vehicle's.
-        Pane::Moc => (Pane::Moc, Pane::Vehicle, step, dividers.vehicle - step),
-        // And the vehicle divider, between the vehicle's and the payloads'.
+        // The payload divider: between the payload pane and the vehicle's.
+        Pane::Payloads => (
+            Pane::Payloads,
+            Pane::Vehicle,
+            step,
+            dividers.vehicle - step,
+        ),
+        // And the vehicle divider, between the vehicle's and the moc pane.
         _ => (
             Pane::Vehicle,
-            Pane::Payloads,
-            dividers.moc + step,
+            Pane::Moc,
+            dividers.payloads + step,
             WORKING_WIDTH - step,
         ),
     };
@@ -131,8 +136,9 @@ fn divider_range(document: &Document, dividers: Dividers, which: Pane) -> (i32, 
 
 /// Where the ground station goes in a configuration that is new.
 ///
-/// The upper left of the vehicle working pane, clear of the pane's own label.
-const MOC_PLACE: (i32, i32) = (24, 40);
+/// The upper right of the moc working pane, clear of the pane's own label: the
+/// moc pane being the rightmost, the node is held off its right edge.
+const MOC_PLACE: (i32, i32) = (WORKING_WIDTH - style::WIDTH as i32 - 24, 40);
 // Clear of the strip the panes' names are written in, as everything the
 // editor places is: see `pane::NAMES`, which the test below holds this to.
 const _: () = assert!(MOC_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
@@ -158,9 +164,9 @@ struct Views {
     /// Not in the document: it is a working preference and not part of the
     /// diagram. See `settings.rs`.
     divider: Rc<std::cell::Cell<Dividers>>,
-    /// And how the selection column is divided, as the first two lists'
-    /// percentages of it: the moc list's and the vehicle list's, the payload
-    /// list taking what is left.
+    /// And how the selection column is divided, as two lists' percentages of
+    /// it: the moc list's and the vehicle list's, the payload list taking what
+    /// is left. By list rather than by position, as the settings keep them.
     ///
     /// Percentages rather than pixels, because the column is as tall as the
     /// window and a share is what somebody chose -- the same distinction
@@ -993,8 +999,8 @@ macro_rules! wiring {
                 {
                     let editor = editor.clone();
                     let views = views.clone();
-                    window.on_moc_divider_moved(move |dx: f32| {
-                        drag_divider(&editor, &views, Pane::Moc, dx);
+                    window.on_payload_divider_moved(move |dx: f32| {
+                        drag_divider(&editor, &views, Pane::Payloads, dx);
                     });
                 }
                 {
@@ -1009,8 +1015,8 @@ macro_rules! wiring {
                 {
                     let editor = editor.clone();
                     let views = views.clone();
-                    window.on_moc_list_divider_moved(move |dy: f32, tall: f32| {
-                        drag_list_divider(&editor, &views, Pane::Moc, dy, tall);
+                    window.on_payload_list_divider_moved(move |dy: f32, tall: f32| {
+                        drag_list_divider(&editor, &views, Pane::Payloads, dy, tall);
                     });
                 }
                 {
@@ -1223,7 +1229,7 @@ fn put(
     lists: (i32, i32),
     held: Option<&Link>,
 ) {
-    ui.set_moc_divider(dividers.moc as f32);
+    ui.set_payload_divider(dividers.payloads as f32);
     ui.set_vehicle_divider(dividers.vehicle as f32);
     ui.set_moc_list_percent(lists.0);
     ui.set_vehicle_list_percent(lists.1);
@@ -1255,7 +1261,7 @@ fn put_sub(
     lists: (i32, i32),
     held: Option<&Link>,
 ) {
-    window.set_moc_divider(dividers.moc as f32);
+    window.set_payload_divider(dividers.payloads as f32);
     window.set_vehicle_divider(dividers.vehicle as f32);
     window.set_moc_list_percent(lists.0);
     window.set_vehicle_list_percent(lists.1);
@@ -1458,9 +1464,9 @@ fn wire_node(
 ///
 /// Settle one divider where a gesture left it.
 ///
-/// `which` is the pane on the divider's left -- `Pane::Moc` for the line
-/// between the moc pane and the vehicle's, `Pane::Vehicle` for the one between
-/// the vehicle's and the payloads'. Both gestures are the same work, and
+/// `which` is the pane on the divider's left -- `Pane::Payloads` for the line
+/// between the payload pane and the vehicle's, `Pane::Vehicle` for the one
+/// between the vehicle's and the moc pane. Both gestures are the same work, and
 /// writing it twice is two places for the clamping to be got wrong in.
 fn drag_divider(
     editor: &Rc<RefCell<Editor>>,
@@ -1473,7 +1479,11 @@ fn drag_divider(
         let editor = editor.borrow();
         let was = dividers.get();
         let (low, high) = divider_range(editor.document(), was, which);
-        let from = if which == Pane::Moc { was.moc } else { was.vehicle };
+        let from = if which == Pane::Payloads {
+            was.payloads
+        } else {
+            was.vehicle
+        };
         let now = snap((from + dx.round() as i32, 0)).0.clamp(low, high);
         if now == from {
             // It did not move, or it was already against what stops it.
@@ -1482,8 +1492,11 @@ fn drag_divider(
             // nothing.
             return;
         }
-        dividers.set(if which == Pane::Moc {
-            Dividers { moc: now, ..was }
+        dividers.set(if which == Pane::Payloads {
+            Dividers {
+                payloads: now,
+                ..was
+            }
         } else {
             Dividers { vehicle: now, ..was }
         });
@@ -1546,9 +1559,10 @@ fn drag_list_divider(
 /// What the two shares become when a line is dragged this far.
 ///
 /// `was` is the moc list's share and the vehicle list's, the payload list
-/// taking what is left; `which` says which line moved -- the upper one, above
-/// the vehicle list, or the lower one above the payload list; `dy` is how far
-/// it went and `tall` how tall the column is, both in pixels.
+/// taking what is left; `which` is the list above the line that moved -- the
+/// payload list for the upper line, the vehicle list for the lower one, the
+/// lists running payloads, vehicle, moc down the column; `dy` is how far it
+/// went and `tall` how tall the column is, both in pixels.
 ///
 /// A share of the column, worked out here rather than in the markup: a
 /// percentage is what somebody chose and what the settings file keeps, where a
@@ -1568,12 +1582,23 @@ fn list_shares_after(
     if step == 0 {
         return (moc, vehicle);
     }
-    // The upper line takes from the vehicle list and gives to the moc one; the
-    // lower line takes from the payload list, which is whatever is left, and
-    // gives to the vehicle's.
+    // Each line moves only the boundary between its own two neighbours, so
+    // the step is held to what both of them can give: the third list is not
+    // touched however far the line goes.
+    let payload = 100 - moc - vehicle;
+    let least = settings::LEAST;
     let asked = match which {
-        Pane::Moc => (moc + step, vehicle - step),
-        _ => (moc, vehicle + step),
+        // The upper line takes from the vehicle list and gives to the payload
+        // one, which is whatever is left.
+        Pane::Payloads => {
+            let step = step.clamp(least - payload, vehicle - least);
+            (moc, vehicle - step)
+        }
+        // The lower line takes from the moc list and gives to the vehicle's.
+        _ => {
+            let step = step.clamp(least - vehicle, moc - least);
+            (moc - step, vehicle + step)
+        }
     };
     settings::shares(asked.0, asked.1)
 }
@@ -3748,7 +3773,7 @@ fn views_of(
 /// corner would be two statements about one link. See [`style::attachment`].
 ///
 /// The direction comes with the point, and that is the other half of it. A
-/// groundward link leaves a node's left side and arrives at the next one's
+/// vehicleward link leaves a node's left side and arrives at the next one's
 /// right side, so "out of the source, across, into the target" is no longer
 /// always left to right -- see [`route::Ends`].
 ///
@@ -5144,8 +5169,8 @@ mod tests {
         // A column 800 pixels tall, and each line dragged a long way past
         // either end of its travel.
         for (which, dy) in [
-            (Pane::Moc, -4000.0),
-            (Pane::Moc, 4000.0),
+            (Pane::Payloads, -4000.0),
+            (Pane::Payloads, 4000.0),
             (Pane::Vehicle, -4000.0),
             (Pane::Vehicle, 4000.0),
         ] {
@@ -5161,25 +5186,27 @@ mod tests {
         }
 
         // An ordinary drag moves the two it is between and leaves the third
-        // alone: the list above grows by what the list below gives up.
+        // alone: the list above grows by what the list below gives up. The
+        // upper line gives the payload list, which has no share of its own,
+        // what it takes from the vehicle list.
         let (was_moc, was_vehicle) = lists();
-        let (moc, vehicle) = list_shares_after(lists(), Pane::Moc, 80.0, 800.0);
-        assert_eq!((moc, vehicle), (was_moc + 10, was_vehicle - 10));
+        let (moc, vehicle) = list_shares_after(lists(), Pane::Payloads, 80.0, 800.0);
+        assert_eq!((moc, vehicle), (was_moc, was_vehicle - 10));
+
+        // And the lower line takes from the moc list and gives to the
+        // vehicle's, leaving the payload list alone.
+        let (moc, vehicle) = list_shares_after(lists(), Pane::Vehicle, 80.0, 800.0);
+        assert_eq!((moc, vehicle), (was_moc - 10, was_vehicle + 10));
         assert_eq!(
             100 - moc - vehicle,
             100 - was_moc - was_vehicle,
             "the third list is left alone"
         );
 
-        // And the lower line takes from the payload list, which is the one
-        // that has no share of its own.
-        let (moc, vehicle) = list_shares_after(lists(), Pane::Vehicle, 80.0, 800.0);
-        assert_eq!((moc, vehicle), (was_moc, was_vehicle + 10));
-
         // A gesture that worked out to nothing changes nothing, so nothing is
         // redrawn and no settings file is written: a line nudged by a pixel on
         // a tall column is not a preference.
-        assert_eq!(list_shares_after(lists(), Pane::Moc, 2.0, 800.0), lists());
+        assert_eq!(list_shares_after(lists(), Pane::Payloads, 2.0, 800.0), lists());
     }
 
     /// Every problem is offered, with what can be done about that kind of it.
@@ -5695,9 +5722,9 @@ mod tests {
     ///
     /// What the canvas says about what may be linked to what, which is the one
     /// thing a reader of a diagram cannot work out from the shapes: a payload
-    /// is the right-hand end of both streams, so both of its terminals are on
-    /// its left, and the ground is the left-hand end, so both of its are on
-    /// its right. Checked at the view, which is what the markup draws from.
+    /// is the left-hand end of both streams, so both of its terminals are on
+    /// its right, and the ground is the right-hand end, so both of its are on
+    /// its left. Checked at the view, which is what the markup draws from.
     #[test]
     fn a_node_is_drawn_with_the_terminals_its_type_has() {
         let view = |node_type: &str| view_of("x", node_type, (0, 0), None, false, None);
@@ -5706,20 +5733,20 @@ mod tests {
         let sensor = view("i2c");
         assert!(sensor.moc_in.shown && sensor.payload_out.shown);
         assert!(!sensor.moc_out.shown && !sensor.payload_in.shown);
-        // Both on its left, and the arrows point the way the data travels:
-        // its own readings leave along the top going left, and what asks for
-        // them arrives along the bottom going right.
-        assert!(sensor.moc_in.x < sensor.width / 2.0);
-        assert!(sensor.payload_out.x < sensor.width / 2.0);
+        // Both on its right, and the arrows point the way the data travels:
+        // its own readings leave along the top going right, and what asks for
+        // them arrives along the bottom going left.
+        assert!(sensor.moc_in.x > sensor.width / 2.0);
+        assert!(sensor.payload_out.x > sensor.width / 2.0);
         assert!(sensor.payload_out.y < sensor.moc_in.y);
-        assert!(sensor.moc_in.rightward && !sensor.payload_out.rightward);
+        assert!(!sensor.moc_in.rightward && sensor.payload_out.rightward);
 
-        // The ground: the other end of both, and both on its right.
+        // The ground: the other end of both, and both on its left.
         let moc = view("moc");
         assert!(moc.moc_out.shown && moc.payload_in.shown);
         assert!(!moc.moc_in.shown && !moc.payload_out.shown);
-        assert!(moc.moc_out.x > moc.width / 2.0);
-        assert!(moc.payload_in.x > moc.width / 2.0);
+        assert!(moc.moc_out.x < moc.width / 2.0);
+        assert!(moc.payload_in.x < moc.width / 2.0);
         assert!(moc.payload_in.y < moc.moc_out.y);
 
         // A page has all four: what is inside it may have any of them, and
@@ -6478,10 +6505,10 @@ mod tests {
     /// A link's ends are placed on the terminals it is attached to.
     ///
     /// Which is the drawing the canvas is for: the readings leave a payload by
-    /// its `payload-out`, in its lower left corner, and arrive at the computation
-    /// by its `payload-in`, in that node's lower right -- so the line runs
-    /// leftward along the bottom of both, the way the data goes and the way
-    /// the panes are arranged. It used to leave the middle of the source's
+    /// its `payload-out`, in its upper right corner, and arrive at the
+    /// computation by its `payload-in`, in that node's upper left -- so the
+    /// line runs rightward along the top of both, the way the data goes and
+    /// the way the panes are arranged. It used to leave the middle of the source's
     /// right edge and arrive at the middle of the target's left edge, which
     /// was the only thing a line could do before terminals.
     #[test]
@@ -6526,18 +6553,18 @@ mod tests {
                 node_type: "compute".into(),
                 home: None,
             },
-            // The payload to the right of the computation, which is where
-            // the panes put it: payloads are the rightmost working pane and
+            // The payload to the left of the computation, which is where
+            // the panes put it: payloads are the leftmost working pane and
             // the vehicle's own graph is the middle one.
             Edit::MoveNode {
                 node: "a".into(),
                 was: (0, 0),
-                now: (504, 24),
+                now: (24, 24),
             },
             Edit::MoveNode {
                 node: "b".into(),
                 was: (0, 0),
-                now: (200, 40),
+                now: (400, 40),
             },
             Edit::AddLink {
                 link: Link::new("a", "b", Some("in0")),
@@ -6551,13 +6578,13 @@ mod tests {
         let view = &links[0];
 
         // It starts on the payload's own `payload-out` terminal, which is the
-        // left edge of its lower left corner, and finishes on the
-        // computation's `payload-in`, the right edge of its lower right
+        // right edge of its upper right corner, and finishes on the
+        // computation's `payload-in`, the left edge of its upper left
         // corner -- so the line touches both boxes it joins and crosses
         // neither shape.
         let ((start_x, start_y), leaves_right) =
-            style::attachment("i2c", (504, 24), "payload-out").expect("a payload's source");
-        assert!(!leaves_right, "the readings leave towards the ground");
+            style::attachment("i2c", (24, 24), "payload-out").expect("a payload's source");
+        assert!(leaves_right, "the readings leave towards the ground");
         assert!(
             view.route
                 .starts_with(&format!("M {start_x:.1} {start_y:.1}")),
@@ -6566,7 +6593,7 @@ mod tests {
         );
 
         let ((end_x, end_y), _) =
-            style::attachment("compute", (200, 40), "payload-in").expect("a sink");
+            style::attachment("compute", (400, 40), "payload-in").expect("a sink");
         assert!(
             view.route.ends_with(&format!("{end_x:.1} {end_y:.1}")),
             "{}",
@@ -7321,7 +7348,7 @@ mod tests {
         );
 
         // On the grid, so that a node held against a divider is on it too.
-        assert_eq!(dividers.moc % GRID, 0);
+        assert_eq!(dividers.payloads % GRID, 0);
         assert_eq!(dividers.vehicle % GRID, 0);
     }
 
@@ -7329,32 +7356,38 @@ mod tests {
     ///
     /// Both directions, because a clamp written one-sided is a clamp that
     /// looks right until somebody drags the other way: a payload must not
-    /// cross the divider leftwards and must not leave the working area
-    /// rightwards.
+    /// cross the divider rightwards and must not leave the working area
+    /// leftwards.
     #[test]
     fn a_node_is_held_in_its_own_pane() {
         let width = style::WIDTH as i32;
         let d = dividers();
-        let (moc, vehicle) = (d.moc, d.vehicle);
+        let (payloads, vehicle) = (d.payloads, d.vehicle);
 
-        // A payload: left to the vehicle divider, right to the far edge.
-        assert_eq!(confine("i2c", d, (0, 100)), (vehicle, 100));
-        assert_eq!(confine("i2c", d, (vehicle - 1, 100)), (vehicle, 100));
-        assert_eq!(confine("i2c", d, (vehicle + 8, 100)), (vehicle + 8, 100));
+        // A payload: the leftmost pane, and nowhere right of its own divider.
+        assert_eq!(confine("i2c", d, (0, 100)), (0, 100));
+        assert_eq!(confine("i2c", d, (-40, 100)), (0, 100));
+        assert_eq!(confine("i2c", d, (8, 100)), (8, 100));
+        assert_eq!(
+            confine("i2c", d, (payloads - width + 1, 100)),
+            (payloads - width, 100)
+        );
         assert_eq!(
             confine("i2c", d, (WORKING_WIDTH, 100)),
+            (payloads - width, 100)
+        );
+
+        // The ground link: left to the vehicle divider, right to the far edge.
+        assert_eq!(confine("moc", d, (0, 100)), (vehicle, 100));
+        assert_eq!(confine("moc", d, (vehicle - 1, 100)), (vehicle, 100));
+        assert_eq!(
+            confine("moc", d, (WORKING_WIDTH, 100)),
             (WORKING_WIDTH - width, 100)
         );
 
-        // The ground link: the leftmost pane, and nowhere right of its own
-        // divider.
-        assert_eq!(confine("moc", d, (0, 100)), (0, 100));
-        assert_eq!(confine("moc", d, (-40, 100)), (0, 100));
-        assert_eq!(confine("moc", d, (WORKING_WIDTH, 100)), (moc - width, 100));
-
         // And the vehicle's own graph, between the two.
-        assert_eq!(confine("compute", d, (0, 100)), (moc, 100));
-        assert_eq!(confine("compute", d, (-40, 100)), (moc, 100));
+        assert_eq!(confine("compute", d, (0, 100)), (payloads, 100));
+        assert_eq!(confine("compute", d, (-40, 100)), (payloads, 100));
         assert_eq!(
             confine("compute", d, (WORKING_WIDTH, 100)),
             (vehicle - width, 100)
@@ -7370,7 +7403,7 @@ mod tests {
         // where something that needs looking at should be.
         assert!(!is_payload("contraption"));
         let (left, right) = pane::pane_for("contraption", d);
-        assert_eq!(left, moc);
+        assert_eq!(left, payloads);
         assert!(right < vehicle);
     }
 
@@ -7425,7 +7458,7 @@ mod tests {
             document.apply(&Edit::MoveNode {
                 node: name.into(),
                 was: (0, 0),
-                now: (d.moc + 24, at.1),
+                now: (d.payloads + 24, at.1),
             });
         }
         assert_eq!(
@@ -7457,8 +7490,8 @@ mod tests {
     /// Neither line can squeeze a pane below a twentieth of the working area.
     ///
     /// Both lines and all three panes, which is three rules in one place: the
-    /// moc line keeps the moc pane and the vehicle's open, and the vehicle
-    /// line keeps the vehicle's and the payloads' open. A pane with nothing
+    /// payload line keeps the payload pane and the vehicle's open, and the
+    /// vehicle line keeps the vehicle's and the moc pane open. A pane with nothing
     /// visible in it is a pane whose nodes cannot be reached, and the drag
     /// that does it is one press away.
     #[test]
@@ -7467,36 +7500,39 @@ mod tests {
         let least = WORKING_WIDTH * settings::LEAST / 100;
 
         for (which, dividers) in [
-            (Pane::Moc, dividers()),
+            (Pane::Payloads, dividers()),
             (Pane::Vehicle, dividers()),
             // And from the ends of their travel, where an off-by-one would
             // show: a line already against what stops it.
             (
-                Pane::Moc,
+                Pane::Payloads,
                 Dividers {
-                    moc: least,
+                    payloads: least,
                     vehicle: least * 2,
                 },
             ),
             (
                 Pane::Vehicle,
                 Dividers {
-                    moc: least,
+                    payloads: least,
                     vehicle: WORKING_WIDTH - least,
                 },
             ),
         ] {
             let (low, high) = divider_range(&document, dividers, which);
             for at in [low, high] {
-                let settled = if which == Pane::Moc {
-                    Dividers { moc: at, ..dividers }
+                let settled = if which == Pane::Payloads {
+                    Dividers {
+                        payloads: at,
+                        ..dividers
+                    }
                 } else {
                     Dividers {
                         vehicle: at,
                         ..dividers
                     }
                 };
-                for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
+                for pane in [Pane::Payloads, Pane::Vehicle, Pane::Moc] {
                     let (left, right) = edges_of(pane, settled);
                     assert!(
                         right - left >= least,
@@ -7654,9 +7690,9 @@ mod tests {
         // depth, and each painted in its own pane's tint. Three of them: a
         // band belongs to the pane whose name is in it.
         for (ground, width) in [
-            ("moc-ground", "root.moc-divider;"),
-            ("vehicle-ground", "root.vehicle-divider - root.moc-divider;"),
-            ("payload-ground", "root.working-width - root.vehicle-divider;"),
+            ("payload-ground", "root.payload-divider;"),
+            ("vehicle-ground", "root.vehicle-divider - root.payload-divider;"),
+            ("moc-ground", "root.working-width - root.vehicle-divider;"),
         ] {
             let band = format!(
                 "y: 0; width: {width} height: canvas.heading-tall; \
@@ -7815,21 +7851,22 @@ mod tests {
             for vehicle in [settings::LEAST, 25, settings::DEFAULT_VEHICLE] {
                 let (moc, vehicle) = settings::shares(moc, vehicle);
                 let dividers = dividers_for(moc, vehicle);
-                assert_eq!(dividers.moc % GRID, 0, "{moc}% is off the grid");
-                assert_eq!(dividers.vehicle % GRID, 0, "{vehicle}% is off the grid");
+                assert_eq!(dividers.payloads % GRID, 0, "{vehicle}% is off the grid");
+                assert_eq!(dividers.vehicle % GRID, 0, "{moc}% is off the grid");
                 // And a percentage means what it says: that much of the
-                // working pane, within the grid step it is snapped to.
+                // working pane, within the grid step it is snapped to, counted
+                // from the right where the moc pane is.
                 assert!(
-                    (dividers.moc - WORKING_WIDTH * moc / 100).abs() <= GRID / 2,
-                    "a moc pane of {moc}% was placed at {} of {WORKING_WIDTH}",
-                    dividers.moc
+                    (dividers.vehicle - WORKING_WIDTH * (100 - moc) / 100).abs() <= GRID / 2,
+                    "a moc pane of {moc}% left the divider at {} of {WORKING_WIDTH}",
+                    dividers.vehicle
                 );
                 assert!(
-                    (dividers.vehicle - WORKING_WIDTH * (moc + vehicle) / 100).abs()
+                    (dividers.payloads - WORKING_WIDTH * (100 - moc - vehicle) / 100).abs()
                         <= GRID / 2,
                     "a vehicle pane of {vehicle}% left the divider at {} of \
                      {WORKING_WIDTH}",
-                    dividers.vehicle
+                    dividers.payloads
                 );
                 let (moc_again, vehicle_again) = percents_for(dividers);
                 assert_eq!(
@@ -7867,16 +7904,16 @@ mod tests {
         let d = dividers();
         let step = WORKING_WIDTH * settings::LEAST / 100;
 
-        let (low, high) = divider_range(&document, d, Pane::Moc);
-        assert_eq!(low, step, "the moc pane keeps a twentieth");
+        let (low, high) = divider_range(&document, d, Pane::Payloads);
+        assert_eq!(low, step, "the payload pane keeps a twentieth");
         assert_eq!(high, d.vehicle - step, "and so does the vehicle's");
 
         let (low, high) = divider_range(&document, d, Pane::Vehicle);
-        assert_eq!(low, d.moc + step);
+        assert_eq!(low, d.payloads + step);
         assert_eq!(
             high,
             WORKING_WIDTH - step,
-            "the payload pane keeps a twentieth"
+            "the moc pane keeps a twentieth"
         );
         assert!(low > 0 && high < WORKING_WIDTH);
     }
@@ -7892,7 +7929,7 @@ mod tests {
         let width = style::WIDTH as i32;
         let d = dividers();
 
-        // A computation in the vehicle pane and a payload in the payload
+        // A computation in the vehicle pane and the ground link in the moc
         // pane, both where they belong.
         document.apply(&Edit::AddNode {
             name: "to_kelvin".into(),
@@ -7905,19 +7942,19 @@ mod tests {
             now: (400, 40),
         });
         document.apply(&Edit::AddNode {
-            name: "temp_fore".into(),
-            node_type: "i2c".into(),
+            name: "ground".into(),
+            node_type: "moc".into(),
             home: None,
         });
         document.apply(&Edit::MoveNode {
-            node: "temp_fore".into(),
+            node: "ground".into(),
             was: (0, 0),
             now: (d.vehicle + 48, 40),
         });
 
         let (low, high) = divider_range(&document, d, Pane::Vehicle);
         assert_eq!(low, 400 + width, "the computation's right edge stops it");
-        assert_eq!(high, d.vehicle + 48, "the payload's left edge stops it");
+        assert_eq!(high, d.vehicle + 48, "the ground link's left edge stops it");
         assert!(low <= d.vehicle && d.vehicle <= high, "{low}..{high}");
 
         // A node on the wrong side of the divider holds nothing. Otherwise one
@@ -7926,18 +7963,18 @@ mod tests {
         // the thing somebody would be using the divider to make room for.
         document.apply(&Edit::AddNode {
             name: "stray".into(),
-            node_type: "spi".into(),
+            node_type: "moc".into(),
             home: None,
         });
         document.apply(&Edit::MoveNode {
             node: "stray".into(),
             was: (0, 0),
-            now: (40, 200),
+            now: (d.payloads + 8, 200),
         });
         assert_eq!(
             divider_range(&document, d, Pane::Vehicle),
             (low, high),
-            "a payload left of the divider should not pin it"
+            "a ground link left of the divider should not pin it"
         );
     }
 
@@ -9188,7 +9225,7 @@ mod tests {
         // where neither node is, and inside the window so the toolkit
         // delivers the event.
         let onto = slint::LogicalPosition::new(
-            origin.x + dividers().moc as f32 + 100.0,
+            origin.x + dividers().payloads as f32 + 100.0,
             origin.y + 380.0,
         );
         ui.window()
@@ -9532,7 +9569,7 @@ mod tests {
                 .collect();
             // Every node the file holds, in the order its sections are read:
             // the ground link, then the vehicle's own graph, then what it
-            // carries -- which is the three working panes left to right.
+            // carries -- which is the three working panes right to left.
             //
             // What the file holds rather than a list written out here: this is
             // the file the editor opens by default, so what is in it is
@@ -9629,7 +9666,7 @@ mod tests {
         editor.borrow_mut().edit(Edit::MoveNode {
             node: "to_kelvin".to_string(),
             was: (0, 0),
-            now: (dividers().moc + 120, 88),
+            now: (dividers().payloads + 120, 88),
         });
         let was = editor
             .borrow()
@@ -9770,7 +9807,7 @@ mod tests {
             home: None,
         });
         // In its own pane, a little in from the divider.
-        let was = (dividers().vehicle + 24, 88);
+        let was = (24, 88);
         editor.borrow_mut().edit(Edit::MoveNode {
             node: "temp_fore".to_string(),
             was: (0, 0),
@@ -9821,8 +9858,8 @@ mod tests {
             at.x + was.0 as f32 + width as f32 / 2.0,
             at.y + was.1 as f32 + height as f32 / 2.0,
         );
-        // Far enough left to be in the vehicle pane if nothing stopped it.
-        let by = (-240.0, 24.0);
+        // Far enough right to be in the vehicle pane if nothing stopped it.
+        let by = (240.0, 24.0);
         let to = slint::LogicalPosition::new(from.x + by.0, from.y + by.1);
 
         ui.window()
@@ -9846,7 +9883,10 @@ mod tests {
             .at;
         assert_eq!(
             now,
-            (dividers().vehicle, was.1 + by.1 as i32),
+            (
+                dividers().payloads - style::WIDTH as i32,
+                was.1 + by.1 as i32
+            ),
             "a payload dragged {by:?} from {was:?} left its pane and is at {now:?}"
         );
     }
@@ -10219,7 +10259,7 @@ mod tests {
             let mut editor = editor.borrow_mut();
             // Inside the vehicle working pane, which is where a computation
             // belongs: a click lands on a node where it is drawn.
-            let left = dividers().moc;
+            let left = dividers().payloads;
             for (name, node_type, at) in [
                 ("to_kelvin", "compute", (left + 120, 88)),
                 ("mean_temp", "compute", (left + 120, 240)),
@@ -10227,7 +10267,7 @@ mod tests {
                 // purpose: a click has to open the window for whatever was
                 // clicked, and a payload is the one a person reaches for
                 // first.
-                ("sensor", "i2c", (dividers().vehicle + 24, 88)),
+                ("sensor", "i2c", (24, 88)),
             ] {
                 editor.edit(Edit::AddNode {
                     name: name.to_string(),
@@ -10302,7 +10342,7 @@ mod tests {
 
         assert!(views.borrow().attributes.is_empty(), "nothing open yet");
 
-        click((dividers().moc + 120, 88), "compute");
+        click((dividers().payloads + 120, 88), "compute");
         assert!(
             views.borrow().attributes.is_empty(),
             "a click opens the menu and nothing else: {:?}",
@@ -10334,7 +10374,7 @@ mod tests {
 
         // A second node opens a second window, and the first stays: which is
         // the whole point of this not being a panel.
-        click((dividers().moc + 120, 240), "compute");
+        click((dividers().payloads + 120, 240), "compute");
         ui.invoke_node_edit("mean_temp".into());
         assert_eq!(
             views.borrow().attributes.len(),
@@ -10346,7 +10386,7 @@ mod tests {
 
         // Clicking the same node again raises its window rather than making a
         // second one saying the same thing.
-        click((dividers().moc + 120, 88), "compute");
+        click((dividers().payloads + 120, 88), "compute");
         ui.invoke_node_edit("to_kelvin".into());
         assert_eq!(views.borrow().attributes.len(), 2);
 
@@ -10822,21 +10862,21 @@ mod tests {
 
         let window = MainWindow::new().expect("a window");
         furnish!(&window, descriptions());
-        window.set_moc_divider(dividers().moc as f32);
+        window.set_payload_divider(dividers().payloads as f32);
         window.set_vehicle_divider(dividers().vehicle as f32);
 
         // Both of them, because there are two and each should report its own
         // gesture: a window that wired one callback to both lines would pass
         // this test for the wrong reason.
         let moved: Rc<Cell<Option<f32>>> = Rc::new(Cell::new(None));
-        let moc_moved: Rc<Cell<Option<f32>>> = Rc::new(Cell::new(None));
+        let payload_moved: Rc<Cell<Option<f32>>> = Rc::new(Cell::new(None));
         {
             let moved = moved.clone();
             window.on_vehicle_divider_moved(move |dx| moved.set(Some(dx)));
         }
         {
-            let moc_moved = moc_moved.clone();
-            window.on_moc_divider_moved(move |dx| moc_moved.set(Some(dx)));
+            let payload_moved = payload_moved.clone();
+            window.on_payload_divider_moved(move |dx| payload_moved.set(Some(dx)));
         }
         window.show().expect("the window shows");
 
@@ -10874,14 +10914,14 @@ mod tests {
             "the divider dragged by {by} reported {said}"
         );
         assert_eq!(
-            moc_moved.get(),
+            payload_moved.get(),
             None,
-            "dragging the vehicle divider moved the moc divider too"
+            "dragging the vehicle divider moved the payload divider too"
         );
 
         // And the other line, which is its own control.
         let from =
-            slint::LogicalPosition::new(at.x + dividers().moc as f32, at.y + 200.0);
+            slint::LogicalPosition::new(at.x + dividers().payloads as f32, at.y + 200.0);
         let by = 40.0;
         let to = slint::LogicalPosition::new(from.x + by, from.y);
         window
@@ -10898,7 +10938,7 @@ mod tests {
             position: to,
             button: PointerEventButton::Left,
         });
-        let said = moc_moved
+        let said = payload_moved
             .get()
             .expect("dragging the moc divider should report how far it went");
         assert!(

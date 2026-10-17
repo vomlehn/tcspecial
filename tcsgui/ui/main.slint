@@ -162,12 +162,12 @@ export struct NodeView {
     // drawing that says nothing about what may be linked to what.
     //
     // Two rows, which are the two streams. Along the top, left to right, what
-    // the ground sends: it arrives at `moc-in` and leaves at `moc-out`.
-    // Along the bottom, right to left, what comes back: it arrives at
-    // `payload-in` and leaves at `payload-out`. The arrows therefore point the
-    // way the canvas itself is laid out -- the ground is the leftmost working
-    // pane and the payloads the rightmost -- so a reader who has worked that
-    // out once need not read the names again. The table is in style.rs, taken
+    // comes back from the payloads: it arrives at `payload-in` and leaves at
+    // `payload-out`. Along the bottom, right to left, what the ground sends: it
+    // arrives at `moc-in` and leaves at `moc-out`. The arrows therefore point
+    // the way the canvas itself is laid out -- the payloads are the leftmost
+    // working pane and the ground the rightmost -- so a reader who has worked
+    // that out once need not read the names again. The table is in style.rs, taken
     // from tcslibgs::graph::terminals.
     moc-in: TerminalView,
     moc-out: TerminalView,
@@ -344,9 +344,9 @@ component Terminal inherits Rectangle {
     }
 
     // The arrow, which says which way the data on this terminal travels
-    // across the canvas: the ground is the leftmost working pane and the
-    // payloads the rightmost, so the payload's own data points left and what
-    // the ground sends points right.
+    // across the canvas: the payloads are the leftmost working pane and the
+    // ground the rightmost, so the payload's own data points right and what
+    // the ground sends points left.
     Path {
         width: 100%;
         height: 100%;
@@ -1161,7 +1161,7 @@ component Surface inherits Rectangle {
     in property <[PaletteEntry]> moc-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
-    in property <length> moc-divider: 0px;
+    in property <length> payload-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
     // How long the sheet is, in the coordinates the file holds: one length
@@ -1228,16 +1228,16 @@ component Surface inherits Rectangle {
     // this much. Two callbacks and not one with a name in it: which divider
     // moved is known where the gesture happened, and a string crossing the
     // boundary would be a name to keep in step in two files.
-    // How the selection column is divided, as the first two lists' shares of
-    // it. From Rust, where the settings file keeps them: see
-    // tcsgui::Views::lists.
+    // How the selection column is divided, as the moc and vehicle lists'
+    // shares of it, the payload list taking what is left. From Rust, where the
+    // settings file keeps them: see tcsgui::Views::lists.
     in property <int> moc-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
     // And the two lines between the lists, dragged: how far it went and how
     // tall the whole column is. See tcsgui::drag_list_divider.
-    callback moc-list-divider-moved(length, length);
+    callback payload-list-divider-moved(length, length);
     callback vehicle-list-divider-moved(length, length);
-    callback moc-divider-moved(length);
+    callback payload-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
     // Write every file of the configuration now.
@@ -1357,9 +1357,9 @@ component Surface inherits Rectangle {
             // be looked up rather than remembered.
             //
             // Three of them because the canvas has three working panes, and a
-            // shape's pane is decided by which list it came from: the ground
-            // link goes on the left, everything the vehicle carries is a
-            // payload and goes on the right, and the rest of the graph goes
+            // shape's pane is decided by which list it came from: everything
+            // the vehicle carries is a payload and goes on the left, the
+            // ground link goes on the right, and the rest of the graph goes
             // in between. A single list would leave that rule to be
             // discovered by placing something and watching where it lands.
             //
@@ -1372,15 +1372,16 @@ component Surface inherits Rectangle {
             // share is a share of the whole -- and a share of the whole is
             // what somebody chose and what the settings file keeps.
             //
-            // Top to bottom in the order the working panes are left to right,
-            // so the two readings of the same rule agree. The payload list
-            // takes what is left, being the longest: ten of the fifteen types
-            // are payloads.
+            // Top to bottom in the order the working panes are left to right --
+            // payloads, vehicle, moc -- so the two readings of the same rule
+            // agree. The payload list takes what is left, being the longest:
+            // ten of the fifteen types are payloads.
             lists := Rectangle {
                 width: 180px;
                 // What the shares are of. Named so the dividers can report it:
                 // see ListDivider.
                 property <length> whole: self.height;
+                property <length> payload-tall: whole - moc-tall - vehicle-tall;
                 property <length> moc-tall: whole * root.moc-list-percent / 100;
                 property <length> vehicle-tall: whole * root.vehicle-list-percent / 100;
 
@@ -1388,22 +1389,22 @@ component Surface inherits Rectangle {
                     x: 0;
                     y: 0;
                     width: 100%;
-                    height: lists.moc-tall - 4px;
-                    heading: "MOC node types";
-                    ground: root.moc-ground;
-                    palette: root.moc-palette;
+                    height: lists.payload-tall - 4px;
+                    heading: "Payload node types";
+                    ground: root.payload-ground;
+                    palette: root.payload-palette;
                     place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
                 ListDivider {
                     x: 0;
-                    y: lists.moc-tall - 7px;
+                    y: lists.payload-tall - 7px;
                     width: 100%;
                     parent-height: lists.whole;
-                    moved(dy, tall) => { root.moc-list-divider-moved(dy, tall); }
+                    moved(dy, tall) => { root.payload-list-divider-moved(dy, tall); }
                 }
                 SelectionPane {
                     x: 0;
-                    y: lists.moc-tall;
+                    y: lists.payload-tall;
                     width: 100%;
                     height: lists.vehicle-tall - 4px;
                     heading: "Vehicle node types";
@@ -1413,19 +1414,19 @@ component Surface inherits Rectangle {
                 }
                 ListDivider {
                     x: 0;
-                    y: lists.moc-tall + lists.vehicle-tall - 7px;
+                    y: lists.payload-tall + lists.vehicle-tall - 7px;
                     width: 100%;
                     parent-height: lists.whole;
                     moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
                 }
                 SelectionPane {
                     x: 0;
-                    y: lists.moc-tall + lists.vehicle-tall;
+                    y: lists.payload-tall + lists.vehicle-tall;
                     width: 100%;
-                    height: lists.whole - lists.moc-tall - lists.vehicle-tall;
-                    heading: "Payload node types";
-                    ground: root.payload-ground;
-                    palette: root.payload-palette;
+                    height: lists.moc-tall;
+                    heading: "MOC node types";
+                    ground: root.moc-ground;
+                    palette: root.moc-palette;
                     place-node(name, t, sets) => { root.place-node(name, t, sets); }
                 }
             }
@@ -1497,9 +1498,9 @@ component Surface inherits Rectangle {
 
                 // And which pane is which, left to right: a band at the top
                 // of each working pane with one word in it. The rule about
-                // what may go where is worth that word -- the ground link on
-                // the left, the vehicle's own graph in the middle, and what it
-                // carries on the right.
+                // what may go where is worth that word -- what the vehicle
+                // carries on the left, its own graph in the middle, and the
+                // ground link on the right.
                 //
                 // A band apiece rather than one across the canvas, because
                 // each is its own pane's: it spans that pane, from its left
@@ -1528,23 +1529,23 @@ component Surface inherits Rectangle {
                 Rectangle {
                     x: 0;
                     y: 0;
-                    width: root.moc-divider;
+                    width: root.payload-divider;
                     height: canvas.heading-tall;
-                    background: root.moc-ground;
+                    background: root.payload-ground;
 
-                    moc-heading := Text {
+                    payload-heading := Text {
                         x: Space.step;
                         y: Space.tight;
-                        text: "MOC";
+                        text: "Payloads";
                         font-size: Type.small;
                         font-italic: true;
                         color: #9ca3af;
                     }
                 }
                 Rectangle {
-                    x: root.moc-divider;
+                    x: root.payload-divider;
                     y: 0;
-                    width: root.vehicle-divider - root.moc-divider;
+                    width: root.vehicle-divider - root.payload-divider;
                     height: canvas.heading-tall;
                     background: root.vehicle-ground;
 
@@ -1562,12 +1563,12 @@ component Surface inherits Rectangle {
                     y: 0;
                     width: root.working-width - root.vehicle-divider;
                     height: canvas.heading-tall;
-                    background: root.payload-ground;
+                    background: root.moc-ground;
 
-                    payload-heading := Text {
+                    moc-heading := Text {
                         x: Space.step;
                         y: Space.tight;
-                        text: "Payloads";
+                        text: "MOC";
                         font-size: Type.small;
                         font-italic: true;
                         color: #9ca3af;
@@ -1637,8 +1638,8 @@ component Surface inherits Rectangle {
                 PaneDivider {
                     width: 100%;
                     height: 100%;
-                    at: root.moc-divider + sheet.content-x;
-                    moved(dx) => { root.moc-divider-moved(dx); }
+                    at: root.payload-divider + sheet.content-x;
+                    moved(dx) => { root.payload-divider-moved(dx); }
                 }
                 PaneDivider {
                     width: 100%;
@@ -1696,7 +1697,7 @@ export component MainWindow inherits Window {
     in property <[PaletteEntry]> moc-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
-    in property <length> moc-divider: 0px;
+    in property <length> payload-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
     // How long the sheet is, in the coordinates the file holds: one length
@@ -1733,16 +1734,16 @@ export component MainWindow inherits Window {
     // this much. Two callbacks and not one with a name in it: which divider
     // moved is known where the gesture happened, and a string crossing the
     // boundary would be a name to keep in step in two files.
-    // How the selection column is divided, as the first two lists' shares of
-    // it. From Rust, where the settings file keeps them: see
-    // tcsgui::Views::lists.
+    // How the selection column is divided, as the moc and vehicle lists'
+    // shares of it, the payload list taking what is left. From Rust, where the
+    // settings file keeps them: see tcsgui::Views::lists.
     in property <int> moc-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
     // And the two lines between the lists, dragged: how far it went and how
     // tall the whole column is. See tcsgui::drag_list_divider.
-    callback moc-list-divider-moved(length, length);
+    callback payload-list-divider-moved(length, length);
     callback vehicle-list-divider-moved(length, length);
-    callback moc-divider-moved(length);
+    callback payload-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback open-subdiagram(string);
     callback save-clicked();
@@ -1843,11 +1844,11 @@ export component MainWindow inherits Window {
         moc-palette: root.moc-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
-        moc-divider: root.moc-divider;
+        payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
         moc-list-percent: root.moc-list-percent;
         vehicle-list-percent: root.vehicle-list-percent;
-        moc-list-divider-moved(dy, tall) => { root.moc-list-divider-moved(dy, tall); }
+        payload-list-divider-moved(dy, tall) => { root.payload-list-divider-moved(dy, tall); }
         vehicle-list-divider-moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
         working-width: root.working-width;
         working-height: root.working-height;
@@ -1870,7 +1871,7 @@ export component MainWindow inherits Window {
         redo-clicked => { root.redo-clicked(); }
         place-node(name, t, sets) => { root.place-node(name, t, sets); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
-        moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
+        payload-divider-moved(dx) => { root.payload-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         open-subdiagram(n) => { root.open-subdiagram(n); }
         link-started(n, terminal) => { root.link-started(n, terminal); }
@@ -1933,7 +1934,7 @@ export component SubWindow inherits Window {
     in property <[PaletteEntry]> moc-palette: [];
     in property <[PaletteEntry]> vehicle-palette: [];
     in property <[PaletteEntry]> payload-palette: [];
-    in property <length> moc-divider: 0px;
+    in property <length> payload-divider: 0px;
     in property <length> vehicle-divider: 0px;
     in property <length> working-width: 0px;
     // How long the sheet is, in the coordinates the file holds: one length
@@ -1975,9 +1976,9 @@ export component SubWindow inherits Window {
     // way and dragging one of its lines arranges every window's.
     in property <int> moc-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
-    callback moc-list-divider-moved(length, length);
+    callback payload-list-divider-moved(length, length);
     callback vehicle-list-divider-moved(length, length);
-    callback moc-divider-moved(length);
+    callback payload-divider-moved(length);
     callback vehicle-divider-moved(length);
     callback save-clicked();
     callback link-started(string, string);
@@ -2074,11 +2075,11 @@ export component SubWindow inherits Window {
         moc-palette: root.moc-palette;
         vehicle-palette: root.vehicle-palette;
         payload-palette: root.payload-palette;
-        moc-divider: root.moc-divider;
+        payload-divider: root.payload-divider;
         vehicle-divider: root.vehicle-divider;
         moc-list-percent: root.moc-list-percent;
         vehicle-list-percent: root.vehicle-list-percent;
-        moc-list-divider-moved(dy, tall) => { root.moc-list-divider-moved(dy, tall); }
+        payload-list-divider-moved(dy, tall) => { root.payload-list-divider-moved(dy, tall); }
         vehicle-list-divider-moved(dy, tall) => { root.vehicle-list-divider-moved(dy, tall); }
         working-width: root.working-width;
         working-height: root.working-height;
@@ -2101,7 +2102,7 @@ export component SubWindow inherits Window {
         redo-clicked => { root.redo-clicked(); }
         place-node(name, t, sets) => { root.place-node(name, t, sets); }
         node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
-        moc-divider-moved(dx) => { root.moc-divider-moved(dx); }
+        payload-divider-moved(dx) => { root.payload-divider-moved(dx); }
         vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
         link-started(n, terminal) => { root.link-started(n, terminal); }
         link-finished(x, y) => { root.link-finished(x, y); }

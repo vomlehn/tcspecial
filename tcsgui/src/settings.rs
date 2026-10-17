@@ -4,9 +4,11 @@
 //! Four settings, in two pairs. How much of the working pane the moc working
 //! pane takes and how much the vehicle's takes, across; and how much of the
 //! selection column the moc list takes and how much the vehicle's takes,
-//! down. Each set of panes is always in the same order -- moc, vehicle,
-//! payloads -- so two percentages and that sentence are the whole of where a
-//! pair of dividers is, the payload one taking what is left.
+//! down. Each set of panes is always in the same order -- payloads, vehicle,
+//! moc -- so two percentages and that sentence are the whole of where a pair
+//! of dividers is, the payload one taking what is left. The two are kept by
+//! the pane they are about and not by position, so a file written when the
+//! moc pane came first means the same widths now that it comes last.
 //!
 //! Here rather than in the configuration, which is the distinction worth
 //! stating. A node's position is in the configuration because it is part of
@@ -302,11 +304,11 @@ fn written(moc: i32, vehicle: i32, list_moc: i32, list_vehicle: i32) -> String {
      This is not a configuration: nothing here flies. It is where the editor
      keeps what the person using it arranged. -->
 <settings>
-    <!-- How much of the working pane each of the first two working panes
-         takes, as a percentage of the whole. The three are always in this
-         order, left to right: the moc working pane, which holds the ground
-         link; the vehicle working pane, which holds the graph itself; and the
-         payload working pane, which holds what the vehicle carries. The
+    <!-- How much of the working pane the moc and vehicle working panes
+         take, as a percentage of the whole. The three are always in this
+         order, left to right: the payload working pane, which holds what the
+         vehicle carries; the vehicle working pane, which holds the graph
+         itself; and the moc working pane, which holds the ground link. The
          payload pane takes what is left, so {rest}% here.
 
          Each between {LEAST} and {MOST}, and every pane keeps at least
@@ -315,10 +317,10 @@ fn written(moc: i32, vehicle: i32, list_moc: i32, list_vehicle: i32) -> String {
     <moc_pane_percent>{moc}</moc_pane_percent>
     <vehicle_pane_percent>{vehicle}</vehicle_pane_percent>
 
-    <!-- And how much of the selection column down the left each of the first
-         two lists takes, in the same order and under the same rule: the moc
-         list, the vehicle list, and the payload list taking what is left,
-         so {list_rest}% here. -->
+    <!-- And how much of the selection column down the left the moc and
+         vehicle lists take, under the same rule and in the same order top
+         to bottom: the payload list, the vehicle list and the moc list, the
+         payload list taking what is left, so {list_rest}% here. -->
     <moc_list_percent>{list_moc}</moc_list_percent>
     <vehicle_list_percent>{list_vehicle}</vehicle_list_percent>
 </settings>

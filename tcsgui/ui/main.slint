@@ -1,4 +1,4 @@
-import { Button, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+import { Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
 
 // The two scales, stated once.
 //
@@ -226,6 +226,16 @@ export struct FieldView {
     // row has to say which it is: the two go to different callbacks and are
     // recorded as different edits.
     simulated: bool,
+    // What kind of value this one takes, which decides what it is offered
+    // with: "boolean" is a control with two states, and everything else is a
+    // box to write in.
+    //
+    // From the description tree -- see `tcsgui::nodes::KINDS`, which is the
+    // list of the words -- because what an attribute takes is a property of
+    // the node type and is written down beside the node type. An empty kind
+    // is text, which is what a field whose description says nothing is and
+    // what every simulator setting is for now.
+    kind: string,
 }
 
 // One attribute a group sets on every payload in it.
@@ -1158,11 +1168,14 @@ component Surface inherits Rectangle {
     // for all three panes, which is what makes them scroll together. From
     // Rust -- see tcsgui::pane::WORKING_HEIGHT -- as the width is.
     in property <length> working-height: 0px;
-    // What each working pane is painted: light, neutral, and the light end of
-    // the hue family its own nodes are drawn in, so that a node's colour says
-    // which pane it belongs in. From Rust -- see tcsgui::style::Ground -- for
-    // the reason the tints come from there: what a colour means is a rule with
-    // tests on it, and this file paints.
+    // What each pane's own tint is: light, neutral, and the light end of the
+    // hue family its own nodes are drawn in, so that a node's colour says
+    // which pane it belongs in. It paints two things -- the heading band at
+    // the top of that working pane, and the selection pane a node of its is
+    // taken from -- and not the working pane itself, which is one sheet with
+    // the other two. From Rust -- see tcsgui::style::Ground -- for the reason
+    // the tints come from there: what a colour means is a rule with tests on
+    // it, and this file paints.
     in property <color> moc-ground: white;
     in property <color> vehicle-ground: white;
     in property <color> payload-ground: white;
@@ -1436,6 +1449,13 @@ component Surface inherits Rectangle {
                 content-height: root.working-height;
                 content-y <=> root.canvas-offset;
 
+                // One ground for all three panes, with a heading band at the
+                // top of each: the panes are columns of one sheet, so one
+                // sheet is what they are painted. Which pane a reader is
+                // looking at is said by the band at its head and by the
+                // dividers between them, and the tints are kept for the two
+                // places they say something -- those bands, and the selection
+                // panes a node is taken from.
                 canvas := Rectangle {
                     width: root.working-width;
                     height: root.working-height;
@@ -1443,34 +1463,15 @@ component Surface inherits Rectangle {
                     border-width: 1px;
                     border-color: #d8d8d4;
 
-                // The three working panes, each on its own ground.
-                //
-                // Under the grid and under everything else: a ground is what
-                // the pane is made of, and the grid, the labels, the lines and
-                // the nodes are drawn on it. The dividers are drawn over the
-                // sheet, so the edge between two grounds is also a line
-                // somebody can take hold of.
-                Rectangle {
-                    x: 0;
-                    y: 0;
-                    width: root.moc-divider;
-                    height: 100%;
-                    background: root.moc-ground;
-                }
-                Rectangle {
-                    x: root.moc-divider;
-                    y: 0;
-                    width: root.vehicle-divider - root.moc-divider;
-                    height: 100%;
-                    background: root.vehicle-ground;
-                }
-                Rectangle {
-                    x: root.vehicle-divider;
-                    y: 0;
-                    width: root.working-width - root.vehicle-divider;
-                    height: 100%;
-                    background: root.payload-ground;
-                }
+                    // How deep the three heading bands are: what the tallest
+                    // of the three labels needs, and the same for all three.
+                    // Asked of the labels, so a change to the type scale is a
+                    // change to the bands as well.
+                    property <length> heading-tall:
+                        max(moc-heading.preferred-height,
+                            max(vehicle-heading.preferred-height,
+                                payload-heading.preferred-height))
+                        + 2 * Space.tight;
 
                 // A faint grid, which the nodes snap to.
                 //
@@ -1494,45 +1495,83 @@ component Surface inherits Rectangle {
                     background: #f3f4f6;
                 }
 
-                // And which pane is which, left to right. Named, because
-                // the rule about what may go where is worth one word at the
-                // top of each: the ground link on the left, the vehicle's own
-                // graph in the middle, and what it carries on the right.
+                // And which pane is which, left to right: a band at the top
+                // of each working pane with one word in it. The rule about
+                // what may go where is worth that word -- the ground link on
+                // the left, the vehicle's own graph in the middle, and what it
+                // carries on the right.
+                //
+                // A band apiece rather than one across the canvas, because
+                // each is its own pane's: it spans that pane, from its left
+                // edge to the divider, and is painted in that pane's tint. So
+                // the colour that says which pane a node belongs in is at the
+                // head of the pane it belongs to, and the panes themselves are
+                // the one ground -- a sheet of paper with three headed columns
+                // on it, rather than three washes of colour.
+                //
+                // All three the same depth, which is what the tallest of the
+                // three labels needs: three bands of three depths would read
+                // as three panes that had been drawn separately, and the depth
+                // is asked of the labels rather than chosen so that a larger
+                // type scale moves them all together.
+                //
+                // Over the grid and *under* the nodes, which is the order they
+                // are written in here. A node may cover a band: the label is
+                // there to be found when the pane is empty and when somebody
+                // has lost their bearings, and a pane that reserved a row for
+                // it would be a pane with a row nothing can be put in.
                 //
                 // Light grey and italic, which is this window's way of saying
                 // "not part of the drawing": a label in the colour and the
                 // face of a node would read as something placed. The same grey
                 // as the hint below.
-                //
-                // In the top left corner of each pane and *under* the nodes,
-                // which is the order they are written in here. A node may
-                // cover a label: the label is there to be found when the pane
-                // is empty and when somebody has lost their bearings, and a
-                // pane that reserved a row for it would be a pane with a row
-                // nothing can be put in.
-                Text {
-                    x: Space.step;
-                    y: Space.tight;
-                    text: "MOC";
-                    font-size: Type.small;
-                    font-italic: true;
-                    color: #9ca3af;
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: root.moc-divider;
+                    height: canvas.heading-tall;
+                    background: root.moc-ground;
+
+                    moc-heading := Text {
+                        x: Space.step;
+                        y: Space.tight;
+                        text: "MOC";
+                        font-size: Type.small;
+                        font-italic: true;
+                        color: #9ca3af;
+                    }
                 }
-                Text {
-                    x: root.moc-divider + Space.step;
-                    y: Space.tight;
-                    text: "Vehicle";
-                    font-size: Type.small;
-                    font-italic: true;
-                    color: #9ca3af;
+                Rectangle {
+                    x: root.moc-divider;
+                    y: 0;
+                    width: root.vehicle-divider - root.moc-divider;
+                    height: canvas.heading-tall;
+                    background: root.vehicle-ground;
+
+                    vehicle-heading := Text {
+                        x: Space.step;
+                        y: Space.tight;
+                        text: "Vehicle";
+                        font-size: Type.small;
+                        font-italic: true;
+                        color: #9ca3af;
+                    }
                 }
-                Text {
-                    x: root.vehicle-divider + Space.step;
-                    y: Space.tight;
-                    text: "Payloads";
-                    font-size: Type.small;
-                    font-italic: true;
-                    color: #9ca3af;
+                Rectangle {
+                    x: root.vehicle-divider;
+                    y: 0;
+                    width: root.working-width - root.vehicle-divider;
+                    height: canvas.heading-tall;
+                    background: root.payload-ground;
+
+                    payload-heading := Text {
+                        x: Space.step;
+                        y: Space.tight;
+                        text: "Payloads";
+                        font-size: Type.small;
+                        font-italic: true;
+                        color: #9ca3af;
+                    }
                 }
 
                 // An empty canvas looks broken rather than new, so it says
@@ -1633,6 +1672,16 @@ export component MainWindow inherits Window {
 
     in property <[NodeView]> nodes: [];
     in property <[LinkView]> links: [];
+    // Whether this window takes no presses: true while a window that came up
+    // as the editor started is still being read.
+    //
+    // Shown and inert rather than held back. The drawing is what the question
+    // is about -- somebody deciding what to do about a group nothing is in
+    // wants to see the diagram it belongs to -- so the window is there to be
+    // looked at from the first moment, and nothing in it can be edited behind
+    // the window that is asking. Set from Rust, which knows what came up: see
+    // `startup_waiting` and `listen_when_read` in main.rs.
+    in property <bool> inert: false;
     // The line a gesture is drawing, as SVG path data in canvas coordinates,
     // and empty when no gesture is running. Dashed, and in pieces because a
     // path here has no dash pattern: see tcsgui::route::drawing.
@@ -1831,6 +1880,22 @@ export component MainWindow inherits Window {
         node-selected(n) => { root.node-selected(n); }
         node-edit(n) => { root.node-edit(n); }
         node-delete(n) => { root.node-delete(n); }
+    }
+
+    // What makes it inert: an area over the whole window that takes presses
+    // and does nothing with them. Last, so it is over the surface and over
+    // the menus -- a menu is a way of editing too -- and there only while it
+    // is wanted, so the ordinary window has nothing in front of it.
+    //
+    // Nothing is drawn over the drawing: it is not dimmed or greyed, because
+    // what it says is still true and still worth reading. What says the
+    // window is not taking presses is the window in front of it asking a
+    // question.
+    if root.inert: TouchArea {
+        x: 0;
+        y: 0;
+        width: 100%;
+        height: 100%;
     }
 }
 
@@ -2562,7 +2627,28 @@ export component NodeWindow inherits Window {
                         color: #6b7280;
                         height: 14px;
                     }
-                    if !f.is-heading: LineEdit {
+                    // A true or false, which is a control with two states
+                    // rather than a box to write the word in: the two answers
+                    // are the whole of what the attribute takes, so offering
+                    // anything else to type is offering a way to be wrong.
+                    //
+                    // Unticked is both "false" and a file that says nothing,
+                    // those meaning the same thing -- see
+                    // `tcslibgs::node::vehicle::Restart::of` -- and ticking it
+                    // writes the word, so what the file ends up saying is a
+                    // word somebody chose and not a box they left alone.
+                    if !f.is-heading && f.kind == "boolean": CheckBox {
+                        text: f.value == "true" ? "true" : "false";
+                        checked: f.value == "true";
+                        toggled => {
+                            if (f.simulated) {
+                                root.sim-attribute-set(f.name, self.checked ? "true" : "false");
+                            } else {
+                                root.attribute-set(f.name, self.checked ? "true" : "false");
+                            }
+                        }
+                    }
+                    if !f.is-heading && f.kind != "boolean": LineEdit {
                         text: f.value;
                         font-size: Type.body;
                         edited => {
@@ -2869,6 +2955,9 @@ export component ProblemsWindow inherits Window {
     // And the way out that answers all of them at once: see `ignored` in
     // tcsgui::settle_problems.
     callback ignored();
+    // Out of the editor, which is the one answer that is not about the
+    // configuration at all.
+    callback quit();
 
     VerticalLayout {
         padding: Space.wide;
@@ -2952,6 +3041,16 @@ export component ProblemsWindow inherits Window {
         HorizontalLayout {
             spacing: Space.step;
             Rectangle { }
+            // Out of the editor altogether, for a file that arrived in a
+            // state somebody would rather put right elsewhere: a question
+            // about a configuration should not be a reason to go looking for
+            // a way to close the window it came up over. Leftmost, away from
+            // the button that acts, because it is the one press here that
+            // cannot be undone by pressing something else.
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
             Button {
                 text: "Leave this one";
                 clicked => { root.left(); }
@@ -2959,7 +3058,8 @@ export component ProblemsWindow inherits Window {
             // Doing nothing about every one of them, which is the other way
             // out and the one somebody opening a file to look at it wants:
             // the problems stay, the nodes are drawn as they are, and nothing
-            // says any of it again this session.
+            // says any of it again this session. The window's own close box
+            // does this, for the reason the comment on it in main.rs gives.
             Button {
                 text: "Ignore them all";
                 clicked => { root.ignored(); }

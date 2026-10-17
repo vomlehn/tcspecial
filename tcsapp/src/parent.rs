@@ -17,6 +17,12 @@
 //!
 //! The error interface is a socket pair too, of which only this end is read.
 //!
+//! # What it is told on its command line
+//!
+//! A short, fixed list, built by `tcslibgs::node::app`: the name of the node
+//! it is, and then the argument the configuration states for each stream its
+//! kind handles, payload before MOC. See [`start`].
+//!
 //! An interface the app does not support is not opened for it at all: the
 //! descriptor is closed in the child between the fork and the exec, so the
 //! program starts with nothing there. Not `/dev/null`, which would be a write
@@ -319,13 +325,29 @@ pub struct Running {
     waits: Option<Duration>,
 }
 
-/// Start `program` as an app supporting `supports`.
+/// Start `program` as an app supporting `supports`, run with `arguments`.
 ///
-/// The program is started as it is: no arguments, and the environment it is
-/// given is the one this process has. What an app is told about its work comes
-/// over its interfaces, not from its command line, so that what a node does is
-/// in the configuration and in the program and nowhere in between.
-pub fn start(program: &Path, supports: Supports) -> Result<Running, String> {
+/// The environment it is given is the one this process has. The arguments are
+/// a short, fixed list and are the one thing an app is told other than over
+/// its interfaces: the name of the node it is, and then what the
+/// configuration says about each stream its kind handles -- payload before
+/// MOC. `tcslibgs::node::app::AppParams::arguments` is what builds the list,
+/// and the order is fixed by the kind rather than by what a file happened to
+/// state, so a program reads argument two without counting.
+///
+/// The name is first because a program may be several nodes at once: three
+/// `app_pl` nodes running one program are three processes which otherwise
+/// could not say which of them each is, in a complaint or in anything they
+/// write.
+///
+/// The data itself never comes this way. What arrives on an interface is what
+/// the node was given, and a command line that carried readings would be a
+/// node whose work was outside both the configuration and the program.
+pub fn start(
+    program: &Path,
+    arguments: &[String],
+    supports: Supports,
+) -> Result<Running, String> {
     let named = |what: &str, e: io::Error| format!("{}: {what}: {e}", program.display());
 
     let payload = supports
@@ -339,6 +361,7 @@ pub fn start(program: &Path, supports: Supports) -> Result<Running, String> {
     let errors = UnixStream::pair().map_err(|e| named("the error interface", e))?;
 
     let mut command = Command::new(program);
+    command.args(arguments);
     // Each of the three descriptors is set from this end's own pair, or to
     // nothing where the app does not support it -- and the nothing is closed
     // below, `Stdio::null` being a descriptor that is open on /dev/null.

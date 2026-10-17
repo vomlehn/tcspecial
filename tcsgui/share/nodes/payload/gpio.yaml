@@ -13,6 +13,7 @@ moc-source: false
 attributes:
   - name: path
     required: true
+    kind: path
     about: >
       The GPIO chip the lines are on: /dev/gpiochip0.
   - name: lines
@@ -33,6 +34,7 @@ attributes:
       pull_down or none.
   - name: debounce_us
     required: false
+    kind: whole
     about: >
       How long a line must hold its level to count as an event, in
       microseconds.
@@ -41,6 +43,7 @@ attributes:
     about: The payload group that reads it, where it is in one.
   - name: trigger
     required: false
+    kind: bytes
     about: >
       What to send to make it answer, as hex bytes. A payload with none
       is one the configuration describes as only read.

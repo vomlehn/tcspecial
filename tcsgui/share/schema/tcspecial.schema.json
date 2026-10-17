@@ -270,6 +270,15 @@
               "null"
             ]
           },
+          "ground_base": {
+            "description": "Where the ground station is, as address:port. What each node linked into this moc node produces is sent to that address, at that port plus the node's device id.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
           "protocol": {
             "type": [
               "string",
@@ -1177,6 +1186,25 @@
             ]
           },
           "program": {
+            "description": "The program a node runs: an app node's application, or the program of a `process` computation. An app node's is executed with `~` and `$HOME` expanded as a shell would expand them, and with the node's name as its first argument.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "app-payload-arg": {
+            "description": "What an app node's program is told about the payload stream, as the argument after the node's name. Said by the kinds that handle payload data -- app_payload_veh, app_all_veh, app_pl, app_all_pl -- and required of them, the arguments being a fixed list.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "app-moc-arg": {
+            "description": "And what it is told about the MOC stream, as the argument after the payload one where a kind has both. Said by the kinds that handle MOC data -- app_moc_veh, app_all_veh, app_all_pl -- and required of them.",
             "type": [
               "string",
               "number",
@@ -1707,6 +1735,25 @@
             ]
           },
           "program": {
+            "description": "The program a node runs: an app node's application, or the program of a `process` computation. An app node's is executed with `~` and `$HOME` expanded as a shell would expand them, and with the node's name as its first argument.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "app-payload-arg": {
+            "description": "What an app node's program is told about the payload stream, as the argument after the node's name. Said by the kinds that handle payload data -- app_payload_veh, app_all_veh, app_pl, app_all_pl -- and required of them, the arguments being a fixed list.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "app-moc-arg": {
+            "description": "And what it is told about the MOC stream, as the argument after the payload one where a kind has both. Said by the kinds that handle MOC data -- app_moc_veh, app_all_veh, app_all_pl -- and required of them.",
             "type": [
               "string",
               "number",

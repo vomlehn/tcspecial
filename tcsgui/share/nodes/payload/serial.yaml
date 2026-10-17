@@ -13,13 +13,16 @@ moc-source: false
 attributes:
   - name: path
     required: true
+    kind: path
     about: >
       The serial line it is reached through: /dev/ttyS0.
   - name: datarate
     required: true
+    kind: whole
     about: The line rate, in bits a second.
   - name: byte_length
     required: true
+    kind: whole
     about: >
       How many data bits a byte is: 7 or 8.
   - name: stop_bits
@@ -35,6 +38,7 @@ attributes:
     about: The payload group that reads it, where it is in one.
   - name: trigger
     required: false
+    kind: bytes
     about: >
       What to send to make it answer, as hex bytes. A payload with none
       is one the configuration describes as only read.

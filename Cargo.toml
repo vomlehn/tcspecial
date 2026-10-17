@@ -18,6 +18,8 @@ members = [
     "app_all_veh",
     "app_pl",
     "app_all_pl",
+    # The programs of an example: see examples/README.md.
+    "examples/simple-app",
 ]
 
 [workspace.package]

@@ -57,6 +57,7 @@ use std::rc::Rc;
 use slint::{ModelRc, VecModel};
 
 use document::{Document, Fault};
+use tcslibgs::graph::check::Problem;
 use editor::Editor;
 use pane::{
     confine, dividers_for, edges_of, is_payload, pane_of, percents_for, size_of, Dividers,
@@ -595,6 +596,23 @@ fn main() -> Result<(), slint::PlatformError> {
     // ends nowhere leaves no trace.
     let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
 
+    // What the file arrived with is counted as said before anything is drawn,
+    // so that the alert leaves it to the window that asks about it: see
+    // `settle_problems`, below. Drawing is what raises the alert, and the
+    // first drawing is the next line.
+    closing(&ui, &views);
+
+    // The main window first, so that whatever came up as the editor started
+    // is read over a drawing rather than instead of one -- and so that those
+    // windows are in front of it: a window shown later is a window on top.
+    // Nothing is painted until the event loop runs, which is after all of
+    // this, so it is shown before it is filled and is never seen empty.
+    //
+    // It takes no presses while any of them is up. See `inert` in the markup,
+    // set below once what came up is known.
+    ui.show()?;
+
+    settled(&editor, &views);
     views.borrow().refresh(&editor.borrow());
 
     views.borrow_mut().chosen = chosen.clone();
@@ -645,7 +663,7 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     // And the question about whatever is wrong with the file as it arrived,
-    // before the window runs: see `settle_problems`.
+    // in front of the window that is already up: see `settle_problems`.
     //
     // The alert is told to keep quiet about those first, so that a file with
     // problems does not open with two windows about them -- one that offers
@@ -653,10 +671,17 @@ fn main() -> Result<(), slint::PlatformError> {
     // is what goes wrong *while somebody works*: a fault they introduced,
     // which is news, where the state the file arrived in is the question this
     // window asks.
-    settled(&editor, &views);
     settle_problems(&editor, &views);
 
-    let outcome = ui.run();
+    // And the main window takes no presses while any of that is still being
+    // read: the question about the file's problems, the alert about a file
+    // that could not be read. The drawing is there to be looked at -- it is
+    // what the question is about -- and nothing in it can be edited behind a
+    // window asking about the state the file arrived in. Each of those
+    // windows gives the presses back as it goes: see `listen_when_read`.
+    ui.set_inert(startup_waiting(&views, None));
+    let outcome = slint::run_event_loop();
+    let _ = ui.hide();
 
     // On the way out, anything the files do not have.
     //
@@ -1784,6 +1809,10 @@ enum Fix {
     Line(Link),
     /// The `tcspecial` section, which is edited in its own window.
     Parameters,
+    /// Nothing the editor can offer, beyond leaving it: a problem `tcsverify`
+    /// finds in the files that is about no node on the canvas -- a group's
+    /// interval, the simulator file -- and has no window of its own here.
+    Nothing,
 }
 
 /// One problem a configuration opened with, and what can be done about it.
@@ -1818,7 +1847,7 @@ impl Trouble {
             Fix::Group(name) => format!("Delete the group \"{name}\""),
             Fix::Line(_) => "Delete the line".to_string(),
             Fix::Parameters => "Edit the parameters".to_string(),
-            Fix::Name | Fix::Node => String::new(),
+            Fix::Name | Fix::Node | Fix::Nothing => String::new(),
         }
     }
 }
@@ -1950,6 +1979,123 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
     out
 }
 
+/// Every problem the configuration opened with: the editor's own, with what
+/// it can offer for each, and then whatever else `tcsverify` finds in the
+/// files.
+///
+/// The second half is what makes the editor say what every other program
+/// says. The editor's faults are its own checks of the drawing, made as it
+/// changes, and deliberately lazy about what has not been typed yet; tcsverify
+/// is the rules tcspecial, tcsmoc and tcssim refuse a file by, asked of the
+/// files as they are on the disk. A file the editor opened quietly and the
+/// vehicle would refuse is the disagreement this is here to end, so what the
+/// rules find is listed too -- warnings included, the unfinished being worth
+/// knowing about as a session starts -- in tcsverify's own words.
+///
+/// Of the files on the disk rather than the document, because the files are
+/// what those programs read. They are the same thing here: every edit is
+/// written as it is made.
+fn startup_troubles(editor: &Editor) -> Vec<Trouble> {
+    let mut troubles = troubles_of(editor.document());
+    troubles.extend(verified(editor));
+    troubles
+}
+
+/// What `tcsverify` finds in the files that the editor's own faults do not
+/// already say.
+///
+/// Nothing for a file that is not there yet, which is how a new configuration
+/// is begun: an empty session is not one with a problem.
+fn verified(editor: &Editor) -> Vec<Trouble> {
+    let (config, simulator) = editor.files();
+    if !config.exists() {
+        return Vec::new();
+    }
+    let simulator = simulator.filter(|path| path.exists());
+    let report = tcsverify::verify(config, simulator);
+
+    let document = editor.document();
+    let faults = document.faults();
+    let at_of = |name: &str| {
+        document
+            .nodes
+            .iter()
+            .position(|node| Qualified::of(&node.name, &node.home).absolute() == name)
+    };
+
+    report
+        .ordered()
+        .into_iter()
+        .filter(|finding| {
+            finding
+                .problem
+                .as_ref()
+                .is_none_or(|problem| !said_already(problem, &faults))
+        })
+        .map(|finding| {
+            let node = match finding.problem.as_ref().map(|problem| problem.about()) {
+                Some(tcslibgs::About::Node(name)) => name,
+                _ => String::new(),
+            };
+            let at = (!node.is_empty()).then(|| at_of(&node)).flatten();
+            let fix = match &finding.problem {
+                _ if at.is_some() => Fix::Node,
+                Some(Problem::NoTcspecial) | Some(Problem::BadTcspecial { .. }) => {
+                    Fix::Parameters
+                }
+                Some(Problem::EmptyGroup { group }) => Fix::Group(group.clone()),
+                _ => Fix::Nothing,
+            };
+            Trouble {
+                at,
+                node: if at.is_some() { node } else { String::new() },
+                said: finding.to_string(),
+                fix,
+            }
+        })
+        .collect()
+}
+
+/// Whether one of the editor's own faults already says what this problem
+/// says.
+///
+/// By what each is about rather than by its words: the editor's sentences
+/// were written for a node's own window and the rules' for a file and a line,
+/// and the same mistake is said both ways. Saying it twice in one list would
+/// read as two mistakes.
+fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
+    faults.iter().any(|fault| match (problem, fault) {
+        (Problem::DuplicateNode { name }, Fault::DuplicateName { name: said }) => name == said,
+        (Problem::NamelessNode, Fault::NamelessNode { .. }) => true,
+        (Problem::NoSuchNode { from, missing, .. }, Fault::DanglingLink { from: f, to }) => {
+            (from == f || missing == f) && (missing == to || from == to)
+        }
+        (Problem::SelfLink { node }, Fault::SelfLink { node: said }) => node == said,
+        (Problem::NoSuchGroup { node, .. }, Fault::NoSuchGroup { node: said, .. }) => {
+            node == said
+        }
+        (Problem::EmptyGroup { group }, Fault::EmptyGroup { group: said }) => group == said,
+        (
+            Problem::InputBoundTwice { node, input },
+            Fault::InputBoundTwice {
+                node: said,
+                input: into,
+            },
+        ) => node == said && input == into,
+        (Problem::BadNode { node, .. }, Fault::BadNode { node: said, .. })
+        | (Problem::BadNode { node, .. }, Fault::UnknownType { node: said, .. }) => node == said,
+        (Problem::BadTcspecial { .. }, Fault::BadTcspecial { .. }) => true,
+        (
+            Problem::UntriggeredInput { node, from },
+            Fault::UntriggeredInput {
+                node: said,
+                from: by,
+            },
+        ) => node == said && from == by,
+        _ => false,
+    })
+}
+
 /// Whether a set of proposed names settles the duplicate, and what is wrong
 /// with it if not.
 ///
@@ -2026,7 +2172,7 @@ fn names_settle(
 /// is written at once and kept out of the history. Everything else is
 /// somebody's decision, so the row offers to open the node or to take it out.
 fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
-    let troubles = troubles_of(editor.borrow().document());
+    let troubles = startup_troubles(&editor.borrow());
     if troubles.is_empty() {
         return;
     }
@@ -2200,7 +2346,7 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 Some(Fix::Parameters) => {
                     show_parameters(&editor, &views);
                 }
-                Some(Fix::Name) | Some(Fix::Node) | None => return,
+                Some(Fix::Name) | Some(Fix::Node) | Some(Fix::Nothing) | None => return,
             }
             again(&editor, &views, &showing, &proposed);
         });
@@ -2223,6 +2369,31 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         window.on_ignored(move || {
             ignore_faults(&editor, &views);
             hide_problems(&views);
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        // A way out of the editor, which is the one answer here that is not
+        // about the configuration. Through the same path the menu's Exit
+        // takes: nothing has been edited yet, so it ends there and then, and
+        // a session that somehow has something unwritten is offered the same
+        // chance to write it.
+        window.on_quit(move || leave(&editor, &views));
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        // Closed by the window manager, which is ignoring the rest of them:
+        // the same as the button that says so, the faults included. Taking
+        // the window away without that would be a close box that asks the
+        // question again at the next drawing -- so somebody who answers a
+        // window by closing it would be answering it over and over, which is
+        // not what closing a window means anywhere else.
+        window.window().on_close_requested(move || {
+            ignore_faults(&editor, &views);
+            hide_problems(&views);
+            slint::CloseRequestResponse::HideWindow
         });
     }
 
@@ -2251,7 +2422,7 @@ fn again(
     showing: &Rc<RefCell<Vec<Trouble>>>,
     proposed: &Rc<RefCell<BTreeMap<usize, String>>>,
 ) {
-    let left = troubles_of(editor.borrow().document());
+    let left = startup_troubles(&editor.borrow());
     *showing.borrow_mut() = left.clone();
     *proposed.borrow_mut() = left
         .iter()
@@ -2366,9 +2537,113 @@ fn ignore_faults(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 
 /// Take the question away, however it was answered.
 fn hide_problems(views: &Rc<RefCell<Views>>) {
+    listen_when_read(views, Some(Startup::Problems));
     let window = views.borrow_mut().names.take();
     if let Some(window) = window {
         let _ = window.hide();
+    }
+}
+
+/// What the main window's close box does.
+///
+/// Closed by the window manager, which is the end of the session: the windows
+/// that say what is wrong with the drawing go with it. Through the close box
+/// rather than through `leave`, which is the menu's Exit: there is nothing to
+/// ask about, every edit having been written as it was made, and a window
+/// that asked would be a window somebody closed and then had to answer.
+///
+/// Its own function so that the tests close a window the way the window
+/// manager closes it, rather than calling what the handler would have called.
+fn closing(ui: &MainWindow, views: &Rc<RefCell<Views>>) {
+    let views = views.clone();
+    ui.window().on_close_requested(move || {
+        hide_what_is_wrong(&views);
+        slint::CloseRequestResponse::HideWindow
+    });
+}
+
+/// Take down the windows that say what is wrong, whichever are up.
+///
+/// What closing the main window comes to: the question about the state the
+/// file arrived in, the alert about something that failed, and the list of
+/// concerns are all *about* the drawing, so none of them has anything to say
+/// once the drawing has gone. A window left behind by a closed main window is
+/// worse than untidy -- the toolkit stops when its last window closes, so one
+/// still up is an editor still running with nothing to edit in, and the only
+/// way out of it is to close that window as well.
+///
+/// Taken out of `Views` as each window's own answer does, so nothing holds a
+/// window that is not there.
+fn hide_what_is_wrong(views: &Rc<RefCell<Views>>) {
+    let (names, alert, concerns) = {
+        let mut views = views.borrow_mut();
+        (
+            views.names.take(),
+            views.alert.take(),
+            views.concerns.take(),
+        )
+    };
+    // Each held only long enough to be hidden: the three are three types, so
+    // they are hidden one at a time rather than walked over as one list.
+    if let Some(window) = names {
+        let _ = window.hide();
+    }
+    if let Some(window) = alert {
+        let _ = window.hide();
+    }
+    if let Some(window) = concerns {
+        let _ = window.hide();
+    }
+}
+
+/// The windows that can come up as the editor starts, in front of the main
+/// one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Startup {
+    /// The question about the problems the file opened with.
+    Problems,
+    /// The alert, about a file that could not be read or a simulator file
+    /// that could not be used.
+    Alert,
+}
+
+/// Whether any window that came up as the editor started is still showing,
+/// leaving out `going`, which is on its way.
+fn startup_waiting(views: &Rc<RefCell<Views>>, going: Option<Startup>) -> bool {
+    let views = views.borrow();
+    let problems = going != Some(Startup::Problems)
+        && views
+            .names
+            .as_ref()
+            .is_some_and(|window| window.window().is_visible());
+    let alert = going != Some(Startup::Alert)
+        && views
+            .alert
+            .as_ref()
+            .is_some_and(|window| window.window().is_visible());
+    problems || alert
+}
+
+/// Give the main window its presses back, once what came up as the editor
+/// started has been read and `going` was the last of it.
+///
+/// Called as each of those windows goes, and before it goes, `going` being
+/// the one on its way: a window that is still up is still a question, and the
+/// drawing behind it stays inert until the last of them has been answered.
+///
+/// The main window is up throughout -- it is shown before any of them, so
+/// they are in front of it -- so this is about presses and not about showing.
+/// After the start it does nothing: nothing sets `inert` again, and the
+/// windows that come up while somebody works are their own business.
+fn listen_when_read(views: &Rc<RefCell<Views>>, going: Option<Startup>) {
+    if startup_waiting(views, going) {
+        return;
+    }
+    // Through a weak handle, so nothing of `views` is borrowed while the
+    // window is touched: a handler that borrowed it is what runs next.
+    let top = views.borrow().top.clone();
+    if let Some(top) = top.upgrade() {
+        top.set_inert(false);
     }
 }
 
@@ -2401,11 +2676,22 @@ fn alerting(views: &Rc<RefCell<Views>>) {
     {
         let views = views.clone();
         window.on_acknowledged(move || {
+            listen_when_read(&views, Some(Startup::Alert));
             // Hidden and kept, not dropped: see above.
             let window = views.borrow().alert.as_ref().map(|window| window.as_weak());
             if let Some(window) = window.and_then(|window| window.upgrade()) {
                 let _ = window.hide();
             }
+        });
+    }
+    {
+        // Closed by the window manager rather than by OK, which is the same
+        // answer -- and as the editor starts, the main window behind it is
+        // taking no presses until it is answered.
+        let views = views.clone();
+        window.window().on_close_requested(move || {
+            listen_when_read(&views, Some(Startup::Alert));
+            slint::CloseRequestResponse::HideWindow
         });
     }
     views.borrow_mut().alert = Some(window);
@@ -2620,6 +2906,10 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
                 required: *required,
                 is_heading: false,
                 simulated: false,
+                // The section's own parameters are not described in the tree,
+                // which is about node types: each is a box to write in until
+                // something says otherwise.
+                kind: nodes::TEXT.into(),
             }
         })
         .collect();
@@ -2703,6 +2993,10 @@ fn settings_of(
             required: false,
             is_heading: false,
             simulated: true,
+            // The simulator's settings are described by `tcslibgs::sim_config`
+            // rather than by the tree, so they are boxes to write in until
+            // that says what each takes.
+            kind: nodes::TEXT.into(),
         })
         .collect();
 
@@ -2719,6 +3013,7 @@ fn settings_of(
             required: false,
             is_heading: false,
             simulated: true,
+            kind: nodes::TEXT.into(),
         });
     }
     shown
@@ -3186,16 +3481,23 @@ fn panel_of(
     //
     // Otherwise the type's own list, which is what every node was asked for
     // before there was a tree and what a payload is asked for still.
-    let declared: Vec<(String, bool)> =
+    // Each with what it takes, which decides the control it is offered with:
+    // see `nodes::KINDS`. A type the tree does not describe falls back to its
+    // own list, which says what is asked for and not what kind it is, so
+    // those are text -- and every type has a description, which is what
+    // `nodes::tests::every_description_has_its_rust` is for.
+    let declared: Vec<(String, bool, String)> =
         match nodes::matching(descriptions(), &node.node_type, &node.attributes) {
-            Some(described) => described.asked(),
+            Some(described) => described.fields(),
             None => NodeType::ALL
                 .iter()
                 .find(|t| t.spelling() == node.node_type)
                 .map(|t| {
                     t.attributes()
                         .iter()
-                        .map(|(name, required)| ((*name).to_string(), *required))
+                        .map(|(name, required)| {
+                            ((*name).to_string(), *required, nodes::TEXT.to_string())
+                        })
                         .collect()
                 })
                 .unwrap_or_default(),
@@ -3203,7 +3505,7 @@ fn panel_of(
 
     let mut fields: Vec<FieldView> = declared
         .iter()
-        .map(|(name, required)| {
+        .map(|(name, required, kind)| {
             let value = node.attributes.get(name).cloned().unwrap_or_default();
             FieldView {
                 name: name.clone().into(),
@@ -3211,6 +3513,7 @@ fn panel_of(
                 required: *required,
                 is_heading: false,
                 simulated: false,
+                kind: kind.clone().into(),
             }
         })
         .collect();
@@ -3220,7 +3523,7 @@ fn panel_of(
     // nobody can see is one that gets written back out without anybody
     // knowing it is there.
     for (name, value) in &node.attributes {
-        if declared.iter().any(|(declared, _)| declared == name) {
+        if declared.iter().any(|(declared, _, _)| declared == name) {
             continue;
         }
         fields.push(FieldView {
@@ -3229,6 +3532,7 @@ fn panel_of(
             required: false,
             is_heading: false,
             simulated: false,
+            kind: nodes::TEXT.into(),
         });
     }
 
@@ -3254,6 +3558,9 @@ fn panel_of(
                 required: false,
                 is_heading: true,
                 simulated: true,
+                // A rule across the panel rather than a field: it takes
+                // nothing, so what it would be typed with is not a question.
+                kind: nodes::TEXT.into(),
             });
             fields.extend(
                 settings_of(&crate::sim::Simulator::fields(true), said)
@@ -4995,6 +5302,72 @@ mod tests {
             "a node nobody fixed should sit in its own pane: {at:?} against \
              {left}..{right}"
         );
+    }
+
+    /// What tcsverify finds is listed as the editor starts, and what the
+    /// editor already marks is not listed twice.
+    ///
+    /// The editor is lazy about a node that is not finished; the rules are
+    /// not, and a vehicle would refuse the file. So the startup list says what
+    /// tcsverify says about it -- in its words, with the file and the line --
+    /// beside the editor's own rows.
+    #[test]
+    fn the_startup_list_says_what_tcsverify_says() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\n\
+             payload_groups:\n  - name: idle\n    interval: 3s\n\
+             payloads:\n  - name: a\n    type: i2c\n    payload-out: moc\n\
+             moc:\n  - name: moc\n    type: moc\n",
+        )
+        .expect("a configuration with an empty group and an unfinished node");
+
+        let editor = Editor::open(&path, dividers());
+        let troubles = startup_troubles(&editor);
+        let said: Vec<&str> = troubles.iter().map(|t| t.said.as_str()).collect();
+
+        // The empty group is the editor's own fault and the rules' too: one
+        // row, the editor's, which offers to delete it.
+        assert_eq!(
+            said.iter().filter(|said| said.contains("\"idle\"")).count(),
+            1,
+            "{said:#?}"
+        );
+
+        // The unfinished node is the rules' alone, and it is there, said as
+        // tcsverify says it and offering the node.
+        let report = tcsverify::verify(&path, None);
+        let unfinished = report
+            .findings
+            .iter()
+            .find(|f| f.severity == tcslibgs::graph::check::Severity::Warning)
+            .expect("tcsverify should warn about the unfinished node");
+        let row = troubles
+            .iter()
+            .find(|t| t.said == unfinished.to_string())
+            .unwrap_or_else(|| panic!("{unfinished} should be listed: {said:#?}"));
+        assert_eq!(row.fix, Fix::Node);
+        assert!(row.at.is_some());
+
+        // And nothing tcsverify reports is missing from the list.
+        for finding in &report.findings {
+            let listed = troubles.iter().any(|t| t.said == finding.to_string())
+                || finding
+                    .problem
+                    .as_ref()
+                    .is_some_and(|p| said_already(p, &editor.faults()));
+            assert!(listed, "{finding} is not listed: {said:#?}");
+        }
+    }
+
+    /// A configuration that is not there yet has nothing wrong with it.
+    #[test]
+    fn a_new_configuration_starts_with_nothing_to_say() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Editor::open(&where_.path().join("new.yaml"), dividers());
+        assert!(verified(&editor).is_empty());
     }
 
     /// A set of names settles a duplicate only if all of them are different,
@@ -7137,26 +7510,133 @@ mod tests {
         }
     }
 
+    /// A node's window offers each attribute the control its kind takes.
+    ///
+    /// The kind comes from the description tree and reaches the window on the
+    /// field, which is what decides whether the row is a box to write in or a
+    /// control with two states: see `FieldView::kind` in the markup. So this
+    /// asks what the window is given -- an app node's `restart` is a true or
+    /// false, its `program` a path, and its argument text -- and that the
+    /// markup offers a two-state control for the one of those that is a true
+    /// or false.
+    #[test]
+    fn a_fields_kind_reaches_the_window() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayloads:\n  - name: bay\n    type: app_pl\n    \
+             program: /bin/true\n    app-payload-arg: \"--bay\"\n",
+        )
+        .expect("a payload that is a program");
+        let editor = Editor::open(&path, dividers());
+
+        let (_, _, _, fields) = panel_of(&editor, &None, Some("bay"));
+        let kind = |name: &str| {
+            fields
+                .iter()
+                .find(|field| field.name == name)
+                .map(|field| field.kind.to_string())
+                .unwrap_or_else(|| panic!("the window offers {name}"))
+        };
+        assert_eq!(kind("restart"), "boolean");
+        assert_eq!(kind("program"), "path");
+        assert_eq!(kind("app-payload-arg"), "text");
+
+        // And what a boolean is offered with. The markup is read because the
+        // control is in it: a kind that reached the window and chose the same
+        // box as everything else would be a kind that did nothing.
+        let markup = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+        )
+        .expect("the markup this binary was built from");
+        let tightened: String = markup
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join(" ");
+        assert!(
+            tightened.contains("if !f.is-heading && f.kind == \"boolean\": CheckBox {"),
+            "a boolean field is not offered with a control of two states"
+        );
+        assert!(
+            tightened.contains("if !f.is-heading && f.kind != \"boolean\": LineEdit {"),
+            "the other kinds are not offered with a box to write in"
+        );
+    }
+
+    /// An inert main window has something over it that takes the presses.
+    ///
+    /// `inert` is set from Rust and what it does is in the markup, so this
+    /// reads the markup: an area over the whole window, and the last thing in
+    /// it, which is what puts it over the surface and over the menus. A menu
+    /// is a way of editing too, and a window that stopped presses reaching
+    /// the canvas but not the menus would be inert in the half nobody would
+    /// test by hand.
+    #[test]
+    fn an_inert_main_window_has_an_area_over_it() {
+        let markup = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+        )
+        .expect("the markup this binary was built from");
+
+        let window = markup
+            .split("export component MainWindow inherits Window {")
+            .nth(1)
+            .expect("the markup has a main window");
+        let body = window
+            .split("\n}\n")
+            .next()
+            .expect("the main window has a body");
+
+        let overlay = body
+            .find("if root.inert: TouchArea {")
+            .expect("an inert main window has an area over it");
+        let surface = body
+            .find("surface := Surface {")
+            .expect("the main window has its surface");
+        assert!(
+            overlay > surface,
+            "the area that takes the presses is written before the surface, \
+             so the surface is over it and takes them instead"
+        );
+        for said in ["width: 100%;", "height: 100%;"] {
+            assert!(
+                body[overlay..].contains(said),
+                "the area over an inert window does not say {said:?}, so it \
+                 covers only part of it"
+            );
+        }
+    }
+
     /// Nothing the editor places itself covers a pane's own name.
     ///
-    /// The names are written across the top of the sheet -- "MOC", "Vehicle",
-    /// "Payloads", one per pane at the same height -- and they are what a pane
-    /// has to say when it is empty or when somebody has lost their bearings.
-    /// A node somebody *drags* there is their own business; one the editor put
-    /// there would be the editor covering a name nobody asked it to cover.
+    /// Each pane has a band at its top with its name in it -- "MOC",
+    /// "Vehicle", "Payloads" -- painted in that pane's own tint, and the band
+    /// is what a pane has to say when it is empty or when somebody has lost
+    /// their bearings. A node somebody *drags* there is their own business;
+    /// one the editor put there would be the editor covering a name nobody
+    /// asked it to cover.
     ///
-    /// The strip is written down in `pane::NAMES` and drawn in `main.slint`,
-    /// so this reads the markup and holds the two against each other: a name
-    /// moved down the sheet without this would leave the strip reserved where
-    /// nothing is written.
+    /// The bands are written down in `pane::NAMES` and drawn in `main.slint`,
+    /// so this reads the markup and holds the two against each other: a band
+    /// made deeper in the window without this would leave the row reserved
+    /// shallower than the row that is drawn, and a node would be placed over
+    /// a name.
     #[test]
     fn nothing_placed_by_the_editor_covers_a_panes_name() {
         let markup = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
         )
         .expect("the markup this binary was built from");
+        // The same markup with its line breaks and indentation taken out, so
+        // that what is asked of it is what it says rather than how it is laid
+        // out.
+        let tightened: String = markup
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join(" ");
 
-        // The three names, each at the same height, in the small face.
+        // The three names, each at the same height inside its own band.
         for name in ["\"MOC\"", "\"Vehicle\"", "\"Payloads\""] {
             let at = markup
                 .split(&format!("text: {name};"))
@@ -7169,6 +7649,37 @@ mod tests {
                  is out of date"
             );
         }
+
+        // One band per pane, each starting at the top of its pane, all of one
+        // depth, and each painted in its own pane's tint. Three of them: a
+        // band belongs to the pane whose name is in it.
+        for (ground, width) in [
+            ("moc-ground", "root.moc-divider;"),
+            ("vehicle-ground", "root.vehicle-divider - root.moc-divider;"),
+            ("payload-ground", "root.working-width - root.vehicle-divider;"),
+        ] {
+            let band = format!(
+                "y: 0; width: {width} height: canvas.heading-tall; \
+                 background: root.{ground};"
+            );
+            assert!(
+                tightened.contains(&band),
+                "the band painted root.{ground} is not a pane-wide row at the \
+                 top of its pane, so pane::NAMES is out of date"
+            );
+        }
+
+        // And its depth is asked of the labels rather than chosen, which is
+        // what `NAMES` is the generous answer to.
+        assert!(
+            tightened.contains(
+                "property <length> heading-tall: max(moc-heading.preferred-height, \
+                 max(vehicle-heading.preferred-height, \
+                 payload-heading.preferred-height)) + 2 * Space.tight;"
+            ),
+            "the bands' depth is no longer the tallest label plus Space.tight \
+             above and below, so pane::NAMES is out of date"
+        );
         for said in [
             "out property <length> tight: 4px;",
             "out property <length> small: 10px;",
@@ -7179,16 +7690,17 @@ mod tests {
                  date"
             );
         }
+
         let (top, height) = pane::NAMES;
-        assert_eq!(top, 4, "the names sit at Space.tight");
+        assert_eq!(top, 0, "a band is drawn, so it starts at the pane's top");
         assert!(
-            height >= 13,
-            "a ten-pixel line wants thirteen pixels of box, and the strip is \
-             {height}"
+            height >= 13 + 2 * 4,
+            "a ten-pixel line wants thirteen pixels of box, with four above it \
+             and four below, and the band is {height}"
         );
 
         // On an empty canvas, scrolled to the top of the sheet, every type
-        // goes below the strip rather than over it.
+        // goes below its pane's band rather than over it.
         for kind in NodeType::ALL {
             let at = pane::place_in(&[], kind.spelling(), dividers(), (0, 700));
             assert!(
@@ -7740,6 +8252,262 @@ mod tests {
         the_menu_arranges_the_nodes_and_shows_them();
         the_line_being_drawn_follows_the_pointer();
         deleting_a_node_asks_first();
+        the_main_window_is_inert_until_what_came_up_is_read();
+        closing_the_question_ignores_the_rest();
+        the_question_offers_a_way_out_of_the_editor();
+        closing_the_main_window_closes_what_says_what_is_wrong();
+    }
+
+    /// What the editor holds about its windows, for a test that drives one.
+    ///
+    /// The same structure `main` builds, with nothing open: the two tests
+    /// about what comes up at startup both want it, and a second copy of
+    /// twenty fields is a second place to add the twenty-first.
+    fn views_for(ui: &MainWindow) -> Rc<RefCell<Views>> {
+        Rc::new(RefCell::new(Views {
+            top: ui.as_weak(),
+            open: BTreeMap::new(),
+            chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            drawing: Rc::new(RefCell::new(None)),
+            divider: Rc::new(std::cell::Cell::new(dividers())),
+            lists: Rc::new(std::cell::Cell::new((
+                settings::DEFAULT_LIST_MOC,
+                settings::DEFAULT_LIST_VEHICLE,
+            ))),
+            group: None,
+            parameters: None,
+            attributes: BTreeMap::new(),
+            leaving: None,
+            concerns: None,
+            deleting: None,
+            names: None,
+            alert: None,
+            alerted: Rc::new(RefCell::new(String::new())),
+            faulted: Rc::new(RefCell::new(Default::default())),
+            sim_groups: None,
+            showing_sim_group: Rc::new(RefCell::new(String::new())),
+            showing: Rc::new(RefCell::new(String::new())),
+        }))
+    }
+
+    /// The main window is there from the start and takes no presses until the
+    /// problems the file arrived with have been read.
+    ///
+    /// Shown beside the question rather than held back, because the drawing is
+    /// what the question is about -- and inert while it is up, so nothing is
+    /// edited behind a window asking about the state the file arrived in.
+    /// Answering it, however it is answered, gives the presses back.
+    fn the_main_window_is_inert_until_what_came_up_is_read() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+        )
+        .expect("a configuration with a group nothing is in");
+        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        // The order main() goes in: the window first, then what came up over
+        // it.
+        ui.show().expect("the window shows");
+        alerting(&views);
+        settled(&editor, &views);
+        views.borrow().refresh(&editor.borrow());
+        settle_problems(&editor, &views);
+        ui.set_inert(startup_waiting(&views, None));
+
+        assert!(
+            startup_waiting(&views, None),
+            "the question about the empty group should be up"
+        );
+        assert!(ui.window().is_visible(), "the main window is up beside it");
+        assert!(ui.get_inert(), "and takes no presses while it is");
+
+        let question = views
+            .borrow()
+            .names
+            .as_ref()
+            .map(|window| window.as_weak())
+            .and_then(|window| window.upgrade())
+            .expect("the question");
+        question.invoke_left();
+
+        assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(ui.window().is_visible(), "the main window is still up");
+        assert!(!ui.get_inert(), "and takes presses again");
+        let _ = ui.hide();
+    }
+
+    /// Closing the question with its own close box ignores the rest of them.
+    ///
+    /// What the window manager's close box means everywhere else: the question
+    /// has been answered and will not be asked again. The button that says so
+    /// is "Ignore them all", and this is that button -- so the two are held
+    /// against each other rather than against a list of what each does, and a
+    /// change to what the button does is a change to the close box.
+    fn closing_the_question_ignores_the_rest() {
+        use std::rc::Rc;
+
+        // What the editor is left holding after the question is answered this
+        // way: which faults are being ignored, and whether the window has
+        // gone and the main window taken its presses back.
+        let answered = |how: &dyn Fn(&ProblemsWindow)| {
+            let where_ = tempfile::tempdir().expect("a directory");
+            let path = where_.path().join("vehicle.yaml");
+            std::fs::write(
+                &path,
+                "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+            )
+            .expect("a configuration with a group nothing is in");
+            let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+
+            let ui = MainWindow::new().expect("a window");
+            let views = views_for(&ui);
+            ui.show().expect("the window shows");
+            alerting(&views);
+            settled(&editor, &views);
+            views.borrow().refresh(&editor.borrow());
+            settle_problems(&editor, &views);
+            ui.set_inert(startup_waiting(&views, None));
+
+            let question = views
+                .borrow()
+                .names
+                .as_ref()
+                .map(|window| window.as_weak())
+                .and_then(|window| window.upgrade())
+                .expect("the question");
+            how(&question);
+
+            let left = (
+                views.borrow().faulted.borrow().clone(),
+                views.borrow().names.is_none(),
+                ui.get_inert(),
+            );
+            let _ = ui.hide();
+            left
+        };
+
+        let by_button = answered(&|question| question.invoke_ignored());
+        let by_close_box = answered(&|question| {
+            question
+                .window()
+                .dispatch_event(slint::platform::WindowEvent::CloseRequested)
+        });
+
+        assert_eq!(
+            by_button, by_close_box,
+            "closing the question should leave what the button that ignores \
+             them all leaves"
+        );
+        // And what that is, so this says something whichever way they agree:
+        // the question gone, the faults ignored, and the drawing taking
+        // presses again.
+        let (ignored, gone, inert) = by_close_box;
+        assert!(!ignored.is_empty(), "the faults are being ignored");
+        assert!(gone, "the question has gone");
+        assert!(!inert, "and the main window takes presses again");
+    }
+
+    /// The question offers a way out of the editor.
+    ///
+    /// A file that arrived in a state somebody would rather put right
+    /// elsewhere is a reason to leave, and a question about it should not be
+    /// a reason to go looking for how. The same path the menu's Exit takes:
+    /// with nothing unwritten it goes straight out, which is what this says
+    /// by there being no offer to save.
+    fn the_question_offers_a_way_out_of_the_editor() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+        )
+        .expect("a configuration with a group nothing is in");
+        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        ui.show().expect("the window shows");
+        alerting(&views);
+        settled(&editor, &views);
+        views.borrow().refresh(&editor.borrow());
+        settle_problems(&editor, &views);
+
+        let question = views
+            .borrow()
+            .names
+            .as_ref()
+            .map(|window| window.as_weak())
+            .and_then(|window| window.upgrade())
+            .expect("the question");
+        assert!(
+            !editor.borrow().unsaved(),
+            "every edit is written as it is made, so a file just opened has \
+             nothing unwritten"
+        );
+
+        question.invoke_quit();
+
+        assert!(
+            views.borrow().leaving.is_none(),
+            "with nothing to write it leaves rather than offering to save"
+        );
+        let _ = ui.hide();
+    }
+
+    /// Closing the main window closes the windows that say what is wrong.
+    ///
+    /// All three of them: the question about the state the file arrived in,
+    /// the alert about something that failed, and the list of concerns. Each
+    /// is about the drawing, so none of them has anything to say once the
+    /// drawing has gone -- and the toolkit stops when its last window closes,
+    /// so one left up is an editor still running with nothing to edit in.
+    fn closing_the_main_window_closes_what_says_what_is_wrong() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+        )
+        .expect("a configuration with a group nothing is in");
+        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        closing(&ui, &views);
+        ui.show().expect("the window shows");
+        alerting(&views);
+        settled(&editor, &views);
+        views.borrow().refresh(&editor.borrow());
+        settle_problems(&editor, &views);
+
+        // All three up: the question came up with the file, the alert is told
+        // to say something of its own, and the list is opened as the bar's
+        // count opens it.
+        views
+            .borrow()
+            .say("Something did not work.", "a device that is full", "");
+        show_concerns(&editor, &views, false);
+        assert!(views.borrow().names.is_some(), "the question is up");
+        assert!(views.borrow().alert.is_some(), "the alert is up");
+        assert!(views.borrow().concerns.is_some(), "the list is up");
+
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::CloseRequested);
+
+        assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(views.borrow().alert.is_none(), "the alert has gone");
+        assert!(views.borrow().concerns.is_none(), "the list has gone");
+        let _ = ui.hide();
     }
 
     /// Delete asks, and only takes the node away if it is answered.

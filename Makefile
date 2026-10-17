@@ -1,7 +1,5 @@
 # Makefile for TCSpecial
 
-.PHONY: all build test clean install help
-
 # Project variables
 PROJECT_NAME := tcspecial
 MOC_NAME := tcsmoc
@@ -73,6 +71,7 @@ RELEASE =
 all: build test
 
 # Display help
+.PHONY: help
 help:
 	@echo "Makefile for TCSpecial"
 	@echo ""

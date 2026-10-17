@@ -14,10 +14,18 @@ fn app() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_app_payload_veh"))
 }
 
+/// The arguments an `app_payload_veh` is run with.
+///
+/// The node's name, then the argument for the one stream its kind handles:
+/// the list tcspecial builds, which is `tcslibgs::node::app`'s to say.
+fn arguments() -> Vec<String> {
+    vec!["fore".to_string(), "--readings".to_string()]
+}
+
 /// Payload data in, the same bytes out as MOC data.
 #[test]
 fn a_packet_of_payload_data_comes_back_as_moc_data() {
-    let mut running = parent::start(&app(), Supports::PAYLOAD).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD).expect("it starts");
 
     running.write_payload(b"293.15").expect("it takes a packet");
     assert_eq!(
@@ -49,7 +57,7 @@ fn a_packet_of_payload_data_comes_back_as_moc_data() {
 /// is the one that proves the second survives the round trip.
 #[test]
 fn a_zero_length_packet_comes_back() {
-    let mut running = parent::start(&app(), Supports::PAYLOAD).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD).expect("it starts");
 
     running.write_payload(b"").expect("it takes an empty packet");
     assert_eq!(running.read_moc().expect("an answer"), Some(Vec::new()));
@@ -65,7 +73,7 @@ fn a_zero_length_packet_comes_back() {
 /// mistake, which is what the strictness of this arrangement is for.
 #[test]
 fn the_interface_it_has_not_got_cannot_be_reached() {
-    let mut running = parent::start(&app(), Supports::PAYLOAD).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::PAYLOAD).expect("it starts");
 
     let said = running
         .write_moc(b"SET 300")
@@ -91,7 +99,7 @@ fn the_interface_it_has_not_got_cannot_be_reached() {
 /// goes.
 #[test]
 fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
-    let mut running = parent::start(&app(), Supports::ALL).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
     running.waits(Some(Duration::from_secs(5)));
 
     let said = running
@@ -106,4 +114,25 @@ fn run_as_a_kind_it_is_not_it_refuses_and_says_why() {
         !running.waited_for().expect("it stops").success(),
         "an app that would not start has not succeeded"
     );
+}
+
+/// Run with the wrong number of arguments, it refuses and says so.
+///
+/// The list is fixed by the kind of app it is, so a program given a short one
+/// would read the wrong word as its first argument. Refused where the
+/// interfaces are refused, and for the same reason: something that started it
+/// has misunderstood what it is.
+#[test]
+fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
+    let mut running =
+        parent::start(&app(), &["fore".to_string()], Supports::PAYLOAD).expect("it starts");
+
+    let said = running
+        .read_complaint()
+        .expect("it complains")
+        .expect("a message");
+    assert!(said.contains("app_payload_veh"), "{said}");
+    assert!(said.contains("argument"), "{said}");
+
+    assert!(!running.waited_for().expect("it stops").success());
 }

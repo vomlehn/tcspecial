@@ -25,6 +25,12 @@
 //!   numbers and nothing else: a problem about a node is reported in the file
 //!   that node is written in, which is not always the file named on the
 //!   command line.
+//! * The simulator file, if one is given: that it parses, and that every name
+//!   in it is one the graph and the file itself agree on -- a simulated
+//!   payload the graph has, a group the file declares and uses, no setting
+//!   that is not one. A graph's payloads are nodes rather than data handlers,
+//!   so the rules about what a handler is settled into are not asked of them;
+//!   see `tcslibgs::SimConfigFile::problems_by_name`.
 //!
 //! A version 1 configuration -- a set of payloads, with a simulator file:
 //!
@@ -51,6 +57,7 @@ use tcslibgs::{
 };
 
 pub mod locate;
+pub mod startup;
 
 use locate::{Where, THE_FILE_ITSELF};
 
@@ -78,6 +85,14 @@ pub struct Finding {
     /// saying it. See [`Severity`], which is `tcslibgs`'s: the split belongs
     /// with the rules and not with the program that prints them.
     pub severity: Severity,
+    /// The rule's own answer, where it came from a version 2 configuration's
+    /// [`tcslibgs::graph::Graph::check`].
+    ///
+    /// Kept for a program that has rules of its own about the same thing and
+    /// has to tell which of these it has already said: tcsgui marks faults on
+    /// the nodes as somebody draws, and lists beside them what this finds that
+    /// it does not. Not printed: the message is what it says.
+    pub problem: Option<tcslibgs::graph::check::Problem>,
 }
 
 impl fmt::Display for Finding {
@@ -153,20 +168,55 @@ impl Report {
     /// half-built graph most of those lines are one unfinished node said
     /// twice.
     pub fn write(&self, out: &mut impl Write) -> io::Result<()> {
-        let ordered = self.ordered();
-        for finding in ordered.iter().take(LISTED) {
-            writeln!(out, "{finding}")?;
+        for line in self.said() {
+            writeln!(out, "{line}")?;
         }
+        Ok(())
+    }
+
+    /// The lines [`Report::write`] prints, one per element.
+    ///
+    /// For a program that says them somewhere other than a stream -- a log, a
+    /// window -- so that every program reading these files says what this one
+    /// says about them, in the same words and the same order.
+    pub fn said(&self) -> Vec<String> {
+        self.lines().into_iter().map(|(_, line)| line).collect()
+    }
+
+    /// The same lines, each with whether it is about an error.
+    ///
+    /// The count of the rest, and the line saying the run halted, are counted
+    /// with the errors when there are any: they stand for more of what was
+    /// listed above them, and errors are listed first.
+    pub fn lines(&self) -> Vec<(bool, String)> {
+        let ordered = self.ordered();
+        let mut said: Vec<(bool, String)> = ordered
+            .iter()
+            .take(LISTED)
+            .map(|finding| (finding.severity == Severity::Error, finding.to_string()))
+            .collect();
+        let errors = self.found_errors();
         let rest = ordered.len().saturating_sub(LISTED);
         if rest > 0 {
-            writeln!(out, "{AND_OTHERS} ({rest} more)")?;
+            said.push((errors, format!("{AND_OTHERS} ({rest} more)")));
         }
         // And whether there were more than were even looked for, which is a
         // different thing from more than were printed.
         if self.halted {
-            writeln!(out, "{TOO_MANY}")?;
+            said.push((errors, TOO_MANY.to_string()));
         }
-        Ok(())
+        said
+    }
+
+    /// Whether any of what was found is about this file.
+    ///
+    /// For a program that reads one of the two files loosely: tcsmoc shows
+    /// what a simulator file says and runs without it, so a problem there is
+    /// worth saying and not worth stopping for.
+    pub fn found_errors_in(&self, file: &Path) -> bool {
+        self.findings
+            .iter()
+            .any(|finding| finding.severity == Severity::Error && finding.file == file)
     }
 
     /// The findings, errors first. See [`Report::write`].
@@ -185,7 +235,7 @@ impl Report {
     }
 
     fn add(&mut self, file: &Path, line: usize, message: impl Into<String>) {
-        self.found(file, line, message, Severity::Error)
+        self.found(file, line, message, Severity::Error, None)
     }
 
     fn found(
@@ -194,6 +244,7 @@ impl Report {
         line: usize,
         message: impl Into<String>,
         severity: Severity,
+        problem: Option<tcslibgs::graph::check::Problem>,
     ) {
         if self.halted {
             return;
@@ -203,6 +254,7 @@ impl Report {
             line,
             message: message.into(),
             severity,
+            problem,
         });
         // The one past the limit is kept so that the count is honest, and is
         // what says there were too many.
@@ -231,19 +283,14 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
     // version 2", and version 1's path reports it -- it has the better
     // messages for a file that does not parse, having had them longer.
     if tcslibgs::graph::is_version_2(payload_path) {
-        check_graph(payload_path, &mut report);
+        let payloads = check_graph(payload_path, &mut report);
         if let Some(sim_path) = sim_path {
-            // A version 2 configuration has no simulator file: what a node
-            // stands in for is the node's own business. Said rather than
-            // ignored, because a second file on the command line is a person
-            // expecting it to be read.
-            report.add(
-                sim_path,
-                crate::locate::THE_FILE_ITSELF,
-                "a version 2 configuration takes one file: what a node stands \
-                 in for is in the node, and there is no simulator file beside it"
-                    .to_string(),
-            );
+            // Against the graph's payloads by name, which is all a graph's
+            // simulator file is joined to it by -- and only when the graph
+            // read, as version 1's is only when its handlers settled: see
+            // the module comment.
+            report.joined = payloads.is_some();
+            check_graph_simulator(sim_path, payloads.as_deref(), &mut report);
         }
         return report;
     }
@@ -267,14 +314,17 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
 /// tcspecial runs aboard. This adds only the line numbers, which it gets the
 /// way version 1's problems get theirs: by scanning the text for the name the
 /// problem is about.
-fn check_graph(path: &Path, report: &mut Report) {
+///
+/// Hands back the names of the graph's payloads, for a simulator file to be
+/// joined to, when the graph read at all.
+fn check_graph(path: &Path, report: &mut Report) -> Option<Vec<String>> {
     let graph = match tcslibgs::graph::Graph::load(path) {
         Ok(graph) => graph,
         Err(e) => {
             // A file that would not load at all: reported from where the
             // reader stopped if it said, and from the first line otherwise.
             report.add(path, line_in_message(&e.to_string()), e.to_string());
-            return;
+            return None;
         }
     };
 
@@ -312,7 +362,52 @@ fn check_graph(path: &Path, report: &mut Report) {
             .map(|(_, where_)| where_.line_of(&about))
             .unwrap_or(crate::locate::THE_FILE_ITSELF);
 
-        report.found(&home, line, problem.describe(), problem.severity());
+        report.found(
+            &home,
+            line,
+            problem.describe(),
+            problem.severity(),
+            Some(problem.clone()),
+        );
+    }
+
+    Some(
+        graph
+            .nodes
+            .iter()
+            .filter(|node| node.is_payload())
+            .map(|node| node.name.clone())
+            .collect(),
+    )
+}
+
+/// Check a version 2 configuration's simulator file, against the names of its
+/// payloads if the configuration read.
+///
+/// By name only: see `tcslibgs::SimConfigFile::problems_by_name`, which says
+/// which of the simulator's rules a graph has anything to be asked of.
+fn check_graph_simulator(path: &Path, payloads: Option<&[String]>, report: &mut Report) {
+    let Some((text, format)) = read(path, report) else {
+        return;
+    };
+
+    let sim: SimConfigFile = match format.parse(&text) {
+        Ok(sim) => sim,
+        Err(parse_error) => {
+            report.add(path, line_of(&parse_error), parse_error.to_string());
+            return;
+        }
+    };
+
+    let Some(payloads) = payloads else { return };
+    let names: Vec<&str> = payloads.iter().map(String::as_str).collect();
+
+    let found = Where::of(&text, format);
+    for problem in sim.problems_by_name(&names) {
+        if !report.room() {
+            break;
+        }
+        report.add(path, found.line_of(&problem.about()), problem.to_string());
     }
 }
 
@@ -490,7 +585,7 @@ payload_groups:
 payloads:
   - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\", payload-out: moc }
 moc:
-  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
+  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
 ";
 
     /// A sound version 2 configuration is accepted in silence.
@@ -594,21 +689,54 @@ vehicle:
         assert_eq!(lonely.line, 3, "{lonely}");
     }
 
-    /// A version 2 configuration takes one file, and a second is said so.
+    /// A version 2 configuration's simulator file is joined to it by name.
+    ///
+    /// The rule the editor holds a simulator file to as it opens one, asked
+    /// here of the same pair: an entry for a payload the graph does not have
+    /// is somebody's misspelling, and drives nothing.
     #[test]
-    fn a_second_file_is_not_a_simulator_file_for_a_graph() {
+    fn a_graphs_simulator_file_names_its_payloads() {
         let (dir, path) = graph_written(".yaml", SOUND_GRAPH);
-        let other = dir.path().join("setsim.yaml");
-        std::fs::write(&other, "description: settings\n").unwrap();
+        let sim = dir.path().join("vehiclesim.yaml");
 
-        let report = verify(&path, Some(&other));
-        let said = report
+        std::fs::write(&sim, "simulated_payloads:\n  - name: sensor\n").unwrap();
+        let report = verify(&path, Some(&sim));
+        assert!(!report.found_anything(), "{:?}", report.findings);
+        assert!(report.joined);
+
+        std::fs::write(
+            &sim,
+            "simulated_payloads:\n  - name: sensor\n  - name: sensr\n    group: none\n",
+        )
+        .unwrap();
+        let report = verify(&path, Some(&sim));
+        let said: Vec<String> = report.findings.iter().map(|f| f.to_string()).collect();
+        let all = said.join("\n");
+        assert!(all.contains("\"sensr\" is simulated"), "{all}");
+        assert!(all.contains("names group \"none\""), "{all}");
+        for finding in &report.findings {
+            assert_eq!(finding.file, sim, "{finding}");
+            assert_eq!(finding.line, 3, "{finding}");
+        }
+    }
+
+    /// The example's simulator file names only payloads the example has.
+    ///
+    /// The example itself is asked nothing here: it is a drawing somebody is
+    /// working on, and what is unfinished in it is not this test's business.
+    #[test]
+    fn the_shipped_examples_simulator_file_fits_it() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let sim = root.join("example-sim.yaml");
+        let report = verify(&root.join("example.yaml"), Some(&sim));
+        assert!(report.joined);
+        let about_sim: Vec<String> = report
             .findings
             .iter()
+            .filter(|f| f.file == sim)
             .map(|f| f.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-        assert!(said.contains("takes one file"), "{said}");
+            .collect();
+        assert!(about_sim.is_empty(), "{about_sim:?}");
     }
 
     /// The same configuration in XML is checked the same way.
@@ -752,6 +880,7 @@ payloads:
             line: 7,
             message: "payload \"DH0\" has no packet_size".to_string(),
             severity: Severity::Error,
+            problem: None,
         };
         assert_eq!(
             finding.to_string(),

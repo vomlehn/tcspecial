@@ -13,12 +13,14 @@ moc-source: false
 attributes:
   - name: path
     required: true
+    kind: path
     about: The device file it is read from and written to.
   - name: group
     required: false
     about: The payload group that reads it, where it is in one.
   - name: trigger
     required: false
+    kind: bytes
     about: >
       What to send to make it answer, as hex bytes. A payload with none
       is one the configuration describes as only read.

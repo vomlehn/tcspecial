@@ -29,7 +29,6 @@
 //! answers. What it answers is on the groundward stream, which is the only
 //! stream it has.
 
-use std::path::Path;
 use std::process::ExitStatus;
 
 use tcsapp::parent::{self, Arrived, Running, Supports};
@@ -66,7 +65,7 @@ impl AppPl {
         // on: what a payload sends is what it writes, and this kind writes and
         // nothing else. See `tcsapp::parent::Supports::MOC`.
         Ok(AppPl {
-            running: parent::start(Path::new(&params.program), Supports::MOC)?,
+            running: parent::start(&params.program_path()?, &params.arguments(), Supports::MOC)?,
         })
     }
 
@@ -139,8 +138,11 @@ mod tests {
     /// What such a node is told, for a program at `program`.
     fn says(program: &std::path::Path) -> AppParams {
         AppParams {
+            name: "bay".to_string(),
             kind: Kind::Pl,
             program: program.display().to_string(),
+            payload_arg: Some("--bay-2".to_string()),
+            moc_arg: None,
             restart: Restart::Never,
         }
     }
@@ -153,7 +155,7 @@ mod tests {
     fn what_the_program_writes_is_taken_as_a_reading() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = AppPl::of(&says(&program)).expect("it starts");
+        let mut node = crate::when_not_busy(|| AppPl::of(&says(&program))).expect("it starts");
 
         assert_eq!(
             node.take_payload_data().expect("a reading"),

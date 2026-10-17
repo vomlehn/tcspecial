@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <version>2.0</version>
+    <description>One payload, its telemetry going to the ground</description>
+    <tcspecial>
+        <!-- tcspecial sends beacons from the interface the send attribute
+             names, and the MOC receives them on the address the recv
+             attribute names. -->
+        <beacon>
+            <interval_ms>5000</interval_ms>
+            <recv>127.0.0.1:5650</recv>
+            <send>0.0.0.0:5550</send>
+        </beacon>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <!-- Commands to a payload are sent to tcspecial at dest_base plus
+             the payload's device id, and the responses are read on the
+             network interface source_base names.
+
+             Simple payloads, such as this sensor, do not use payload
+             commands: what a simple payload is configured with is in this
+             file, and it is not changed while tcspecial is running. At
+             present only applications use the payload_command values. -->
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
+        <!-- tcspecial sends telemetry from the network interface
+             source_base names, plus the payload's device id, and the MOC
+             receives it on the network interface dest_base names, plus the
+             payload's device id. -->
+        <payload_telemetry>
+            <dest_base>127.0.0.1:6100</dest_base>
+            <source_base>0.0.0.0:6000</source_base>
+        </payload_telemetry>
+        <!-- Commands to tcspecial are sent from the MOC's address,
+             tcs_cmd.send, to tcspecial at tcs_cmd.recv, and tcspecial sends
+             its responses back to tcs_cmd.send. -->
+        <tcs_cmd>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:4100</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- Software on this host that sends its readings over UDP. -->
+    <payloads>
+        <name>sensor</name>
+        <type>network</type>
+        <protocol>udp</protocol>
+        <address>127.0.0.1</address>
+        <port>5001</port>
+    </payloads>
+    <tcsgui>
+        <nodes><name>sensor</name><x>40</x><y>40</y></nodes>
+    </tcsgui>
+</configuration>

@@ -34,6 +34,7 @@
         <name>moc</name>
         <type>moc</type>
         <address>10.0.0.1</address>
+        <ground_base>10.0.0.2:5100</ground_base>
         <port>5000</port>
         <payload-in>true</payload-in>
     </moc>

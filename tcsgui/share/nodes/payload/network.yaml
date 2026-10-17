@@ -28,6 +28,7 @@ attributes:
     about: The payload group that reads it, where it is in one.
   - name: trigger
     required: false
+    kind: bytes
     about: >
       What to send to make it answer, as hex bytes. A payload with none
       is one the configuration describes as only read.

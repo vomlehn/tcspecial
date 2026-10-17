@@ -5,6 +5,7 @@
 
 use slint::{LogicalSize, Model, ModelRc, SharedString, VecModel};
 use std::env;
+use std::path::Path;
 use std::process::{Child, Command, exit};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -21,6 +22,7 @@ use tcslibgs::{
     HostPort, ResolvedSim, SimConfigFile, Timestamp, NO_TRANSFER_TIME,
 };
 use tcspecial::config::{beacon, load_tcspecial_config, tcspecial_config_path, Beacon};
+use tcsverify::startup::Startup;
 
 use crate::beacon_receive::{BeaconReceive, Contact};
 use crate::oc_link::Arrivals;
@@ -408,23 +410,20 @@ fn dh_info_from(dev_id: usize, dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHIn
 /// controlling payloads. Each of those is said once on the way past and the
 /// panels then say, where the parameters are shown, that this half was not
 /// read.
-fn simulator_settings(payload_path: &str, dh_configs: &[DHConfig]) -> Option<Vec<ResolvedSim>> {
-    let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
-        // Beside the tcspecial configuration and named for it, which is the
-        // convention the whole payload set mechanism rests on.
-        payload_path
-            .strip_suffix(".yaml")
-            .map(|stem| format!("{stem}sim.yaml"))
-            .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
-    });
+fn simulator_settings(
+    payload_path: &str,
+    dh_configs: &[DHConfig],
+    startup: &mut Startup,
+) -> Option<Vec<ResolvedSim>> {
+    let sim_path = sim_path_for(payload_path);
 
     let file = match SimConfigFile::load(&sim_path) {
         Ok(file) => file,
         Err(e) => {
-            eprintln!(
+            startup.warning(format!(
                 "Not showing simulator settings: {} could not be read: {}",
                 sim_path, e
-            );
+            ));
             return None;
         }
     };
@@ -435,13 +434,91 @@ fn simulator_settings(payload_path: &str, dh_configs: &[DHConfig]) -> Option<Vec
             Some(sims)
         }
         Err(e) => {
-            eprintln!(
+            startup.warning(format!(
                 "Not showing simulator settings: {} does not fit {}: {}",
                 sim_path, payload_path, e
-            );
+            ));
             None
         }
     }
+}
+
+/// Which simulator file goes with this payload set.
+///
+/// The one `PAYLOAD_SIM_YAML` names, and otherwise the one beside the
+/// tcspecial configuration and named for it, which is the convention the
+/// whole payload set mechanism rests on.
+fn sim_path_for(payload_path: &str) -> String {
+    env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
+        payload_path
+            .strip_suffix(".yaml")
+            .map(|stem| format!("{stem}sim.yaml"))
+            .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
+    })
+}
+
+/// Say what was found as tcsmoc started, in a window of its own, and wait for
+/// it to be closed.
+///
+/// Before the main window is shown, so that nobody is commanding payloads
+/// from panels for a set with something wrong with it without having been
+/// told -- and on stderr as well, for a run from a terminal and for one with
+/// no display to open a window on.
+fn present(startup: &Startup) {
+    startup.eprint("tcsmoc");
+
+    let window = match StartupWindow::new() {
+        Ok(window) => window,
+        Err(e) => {
+            eprintln!("tcsmoc: what was found cannot be shown in a window: {e}");
+            return;
+        }
+    };
+    window.set_program("tcsmoc".into());
+    window.set_heading(
+        if startup.fatal() {
+            "Something is wrong with the configuration."
+        } else {
+            "Something about the configuration is worth knowing."
+        }
+        .into(),
+    );
+    window.set_fatal(startup.fatal());
+    let lines: Vec<StartupLine> = startup
+        .lines()
+        .iter()
+        .map(|(error, text)| StartupLine {
+            text: text.clone().into(),
+            error: *error,
+        })
+        .collect();
+    window.set_lines(ModelRc::from(Rc::new(VecModel::from(lines))));
+    {
+        let weak = window.as_weak();
+        window.on_acknowledged(move || {
+            if let Some(window) = weak.upgrade() {
+                let _ = window.hide();
+            }
+        });
+    }
+    // Runs until it is closed, by its button or by the window manager: either
+    // is the person having read it.
+    if let Err(e) = window.run() {
+        eprintln!("tcsmoc: what was found cannot be shown in a window: {e}");
+    }
+}
+
+/// Say what was found and stop, where any of it stops tcsmoc.
+fn present_and_stop_if_fatal(startup: &Startup) {
+    if startup.fatal() {
+        stop(startup);
+    }
+}
+
+/// Say what was found, and stop.
+fn stop(startup: &Startup) -> ! {
+    present(startup);
+    exit(1);
 }
 
 /// What one panel shows, gathered from a handler.
@@ -782,17 +859,79 @@ fn main() {
     };
     eprintln!("Loading payload configuration from: {}", payload_path);
 
+    // Everything wrong with the payload set, in tcsverify's words: every
+    // problem at once, each with its file and line, which is what tcsverify,
+    // tcspecial, tcssim and tcsgui say about the same files. The simulator
+    // file is read loosely, as it is below: what is wrong with it is said,
+    // and costs the panels the simulator half of what they show.
+    //
+    // All of what this finds, and what the MOC finds for itself below, is
+    // shown before the main window is -- and the window is not shown at all
+    // where any of it stops the MOC.
+    let sim_path = sim_path_for(&payload_path);
+    let mut startup = Startup::default();
+    startup.report_loosely(
+        &tcsverify::verify(Path::new(&payload_path), Some(Path::new(&sim_path))),
+        Path::new(&sim_path),
+    );
+    if tcslibgs::graph::is_version_2(Path::new(&payload_path)) {
+        startup.error(format!(
+            "{payload_path}: a version 2 configuration, which tcsmoc does not \
+             control: it controls the payloads of a version 1 payload set"
+        ));
+    }
+    present_and_stop_if_fatal(&startup);
+
     let dh_configs: Arc<Vec<DHConfig>> = match load_dh_configs(&payload_path) {
         Ok(dh_configs) => Arc::new(dh_configs),
         Err(e) => {
-            eprintln!(
+            startup.error(format!(
                 "Error loading payload configuration from {}: {}",
                 payload_path, e
-            );
-            exit(1);
+            ));
+            stop(&startup);
         }
     };
     eprintln!("Loaded {} data handler configurations", dh_configs.len());
+
+    // Where each payload is commanded: both ends of its own link, counted
+    // from the two bases by its id. A MOC that cannot work this out cannot
+    // command a payload at all, so it says so and stops rather than coming up
+    // with panels whose buttons would be refused.
+    //
+    // Asked here, before tcspecial and tcssim are started, so that a MOC that
+    // is going to stop does so before it has started anything.
+    let payload_links = match payload_command_links(&dh_configs) {
+        Ok(links) => Some(links),
+        Err(e) => {
+            startup.error(format!("Cannot tell where payload commands go: {e}"));
+            None
+        }
+    };
+
+    // And where it sends spacecraft commands from, which tcspecial checks
+    // every one of them against: both ends read `tcs_cmd.send` out of the
+    // same file. A MOC that cannot work this out would have every command
+    // ignored by a spacecraft that says nothing about it, so it says so and
+    // stops.
+    let command_from = match moc_command_socket() {
+        Ok(from) => Some(from),
+        Err(e) => {
+            startup.error(format!("Cannot tell where the MOC sends commands from: {e}"));
+            None
+        }
+    };
+
+    // Where the MOC listens for beacons: see below, where it starts. Asked
+    // here so that a MOC that cannot work it out says so with the rest.
+    let beacon = beacon_to_listen_for(&payload_path);
+    if let Err(e) = &beacon {
+        startup.warning(format!("Not listening for beacons: {e}"));
+    }
+
+    let (Some(payload_links), Some(command_from)) = (payload_links, command_from) else {
+        stop(&startup);
+    };
 
     let ui = MainWindow::new().unwrap();
 
@@ -802,7 +941,7 @@ fn main() {
     // And the simulator file beside it, for the panels to show. Loosely: the
     // MOC simulates nothing, so a file it cannot read costs it the simulator
     // half of what a panel can show and nothing else.
-    let sims = simulator_settings(&payload_path, &dh_configs);
+    let sims = simulator_settings(&payload_path, &dh_configs, &mut startup);
 
     // One panel per configured data handler.
     let dh_model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(
@@ -920,38 +1059,11 @@ fn main() {
     // Open the link to the command interpreter on startup, by the same call
     // the Connect button makes, so the link the window comes up with is the
     // one that button would have given it.
-    // Where each payload is commanded: both ends of its own link, counted
-    // from the two bases by its id. A MOC that cannot work this out cannot
-    // command a payload at all, so it says so and stops rather than coming up
-    // with panels whose buttons would be refused.
-    let payload_links = match payload_command_links(&dh_configs) {
-        Ok(links) => links,
-        Err(e) => {
-            eprintln!("Cannot tell where payload commands go: {e}");
-            exit(1);
-        }
-    };
-
-    // And where it sends spacecraft commands from, which tcspecial checks
-    // every one of them against: both ends read `tcs_cmd.send` out of the
-    // same file. A MOC that cannot work this out would have every command
-    // ignored by a spacecraft that says nothing about it, so it says so and
-    // stops.
-    let command_from = match moc_command_socket() {
-        Ok(from) => from,
-        Err(e) => {
-            eprintln!("Cannot tell where the MOC sends commands from: {e}");
-            exit(1);
-        }
-    };
-
     let mut link = CiLink::down_from(&command_from, payload_links);
     if let Err(e) = link.connect(DEFAULT_CI_ADDRESS) {
-        eprintln!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e);
-        ui.set_ci_status(SharedString::from(ERROR_STATUS));
-        ui.set_last_response(SharedString::from(format!("Connection failed: {}", e)));
         // Exit since we can't operate without a connection
-        exit(1);
+        startup.error(format!("Failed to connect to {}: {}", DEFAULT_CI_ADDRESS, e));
+        present_and_stop_if_fatal(&startup);
     }
     eprintln!(
         "Connected to {}, payload commands to {}",
@@ -985,7 +1097,7 @@ fn main() {
     // of this.
     let contact = Arc::new(Mutex::new(Contact::Lost));
     let beacon_ui_weak = ui_weak.clone();
-    let _beacon_receive = match beacon_to_listen_for(&payload_path) {
+    let _beacon_receive = match beacon {
         Ok(beacon) => {
             eprintln!(
                 "Listening for beacons at {}, which {} sends from",
@@ -999,7 +1111,8 @@ fn main() {
             )
         }
         Err(e) => {
-            eprintln!("Not listening for beacons: {e}");
+            // Said with the rest as tcsmoc started, and kept on the window
+            // for as long as nothing else has been said there.
             ui.set_last_response(SharedString::from(format!(
                 "Not listening for beacons: {e}"
             )));
@@ -1121,6 +1234,13 @@ fn main() {
         });
     }
 */
+
+    // Whatever was found as it started and did not stop it, said before the
+    // window it is about is shown -- and before that window asks for its
+    // edge, which it can do only once it is on the screen.
+    if !startup.is_empty() {
+        present(&startup);
+    }
 
     // Against the top of the display, with tcssim asking for the bottom: the
     // two windows are read together, and left where a window manager puts
@@ -2676,7 +2796,7 @@ mod tests {
 
         // Named from the tcspecial configuration, since nothing in this test's
         // environment says otherwise.
-        let sims = simulator_settings(payload_path.to_str().unwrap(), &dh_configs)
+        let sims = simulator_settings(payload_path.to_str().unwrap(), &dh_configs, &mut Startup::default())
             .expect("the simulator file beside the shipped tcspecial configuration");
         assert_eq!(
             sims.len(),
@@ -2688,7 +2808,7 @@ mod tests {
         // the MOC that half and nothing else: it controls payloads, it does not
         // simulate them.
         assert!(
-            simulator_settings("no_such_payload_set.yaml", &dh_configs).is_none(),
+            simulator_settings("no_such_payload_set.yaml", &dh_configs, &mut Startup::default()).is_none(),
             "a missing simulator file must not stop the MOC"
         );
     }

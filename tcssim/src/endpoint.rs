@@ -5,10 +5,10 @@
 //! so this is where an endpoint is read -- turned into the configuration a
 //! simulated payload runs on, and into the line a panel shows for it.
 //!
-//! It is also where the kinds of endpoint tcssim cannot stand in for are
-//! refused. A Unix socket handler is a configuration the simulator has
-//! nothing to be, and saying so is better than simulating something else at
-//! that address.
+//! The kinds of payload tcssim cannot stand in for are refused by
+//! `tcslibgs::simulable`, which this asks first: the rule is there so that
+//! `tcsverify` asks it of the same files, and saying so is better than
+//! simulating something else at that address.
 //!
 //! What a payload then does with the endpoint is in the file for its kind:
 //! [`crate::node::payload::network::tcp`], [`crate::node::payload::network::udp`], [`crate::node::payload::device_file`].
@@ -29,6 +29,10 @@ use tcslibgs::ResolvedSim;
 /// address the simulated payload uses. Everything about how the payload behaves
 /// comes from `sim`, which is what the simulator file settled.
 pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadConfig, String> {
+    // What the simulator cannot be, which is tcslibgs's rule so that tcsverify
+    // asks it too: see `tcslibgs::simulable`.
+    tcslibgs::simulable(dh)?;
+
     let (protocol, address, port, bus_address) = match &dh.endpoint {
         EndpointConfig::Network(net) => {
             // A Unix socket divides as TCP and UDP divide, and which end binds
@@ -68,19 +72,14 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         // and the other. Found rather than made, as the I2C stub is; see
         // payload_gpio.
         EndpointConfig::Gpio(gpio) => (PayloadProtocol::Gpio, gpio.path.clone(), 0, 0),
-        // The one type nothing here can stand in for. Every other has
-        // something in the kernel to be: vcan for a CAN bus, i2c-stub for a
-        // bus device, gpio-sim for discrete lines, a pty for a line or a
-        // buffer. A synchronous line has none -- there is no virtual HDLC
-        // interface -- so what is said is that, rather than a payload that
-        // looks simulated and is not.
-        EndpointConfig::Hdlc(hdlc) => {
+        // A synchronous line, which nothing in the kernel stands in for.
+        // Refused by `simulable` above, where the reason is written; said
+        // again here rather than assumed.
+        EndpointConfig::Hdlc(_) => {
             return Err(format!(
-                "simulated payload \"{}\" is on a synchronous line ({}), and there \
-                 is nothing in the kernel that stands in for one: a card is needed \
-                 -- a wanxl, a pci200syn, a pc300too or a FarSync -- and tcspecial \
-                 reads it directly. Unlike a CAN bus there is no virtual one",
-                dh.name.0, hdlc.interface
+                "simulated payload \"{}\" is on a synchronous line, which \
+                 nothing stands in for",
+                dh.name.0
             ))
         }
         // A line the simulator can be: a pty's slave is a device file with a
@@ -119,29 +118,6 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
 
     let packet_size = u32::try_from(dh.packet_size)
         .map_err(|_| format!("{} has a packet size too large to simulate", dh.name.0))?;
-
-    // A payload that answers requests has to be able to hear one. Two kinds
-    // cannot: tcspecial opens a device and reads it, so there is nothing for
-    // the simulator to be written to, and an I2C master's read is the trigger
-    // itself, which a second master on the bus cannot see. Refused here
-    // rather than simulated as a payload that answers nothing, which would
-    // look exactly like a handler whose polling had stopped working.
-    if dh.mode.polling().is_some() {
-        let cannot = match protocol {
-            PayloadProtocol::Device => Some("a device, which tcspecial reads directly"),
-            PayloadProtocol::I2c => {
-                Some("a bus, where the master's own read is the trigger")
-            }
-            _ => None,
-        };
-        if let Some(cannot) = cannot {
-            return Err(format!(
-                "{} is triggered, but the simulator cannot stand in for a triggered \
-                 payload on {cannot}",
-                dh.name.0
-            ));
-        }
-    }
 
     // What a CAN payload is identified by, which no other kind has: taken
     // from the endpoint rather than from `bus_address`, a CAN identifier

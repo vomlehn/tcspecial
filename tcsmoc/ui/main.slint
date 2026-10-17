@@ -1,4 +1,7 @@
 import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
+// What was found wrong as the program started, shown before this window: the
+// one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
+export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
 
 // One data handler, as the tcspecial configuration file describes it plus what
 // tcspecial reports about it at run time.

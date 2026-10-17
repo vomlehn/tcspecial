@@ -11,3 +11,6 @@ serde_json = "1.0"
 libc = "0.2"
 thiserror = "1.0"
 #log = "0.4"
+
+[dev-dependencies]
+tempfile = "3"

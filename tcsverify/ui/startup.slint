@@ -1,0 +1,83 @@
+// What a program found wrong with its configuration as it started, shown
+// before its main window.
+//
+// One window for tcsmoc and tcssim, imported by both, so that the two say
+// what tcsverify says in the same shape: the lines are `tcsverify::Report`'s
+// own, errors first, labelled. It is shown and closed before the main window
+// is shown at all, so that nobody starts work in a window whose configuration
+// has something wrong with it without having been told.
+//
+// Two ways out, and which one depends on what was found: a program that cannot
+// run offers to quit, and one that can offers to go on.
+
+import { Button, ScrollView } from "std-widgets.slint";
+
+export struct StartupLine {
+    // One line of the report, as tcsverify prints it.
+    text: string,
+    // Whether it is an error rather than a warning or a note, which is what
+    // decides its colour: the reader's eye goes to what is wrong first.
+    error: bool,
+}
+
+export component StartupWindow inherits Window {
+    title: root.program;
+    background: #fbfbfa;
+    min-width: 420px;
+    min-height: 180px;
+    preferred-width: 640px;
+    preferred-height: 300px;
+
+    // Which program this is, for the title and the heading.
+    in property <string> program: "";
+    // What the program read, said once above the lines rather than in each.
+    in property <string> heading: "";
+    in property <[StartupLine]> lines: [];
+    // Whether the program cannot run with what it found, in which case the one
+    // button quits.
+    in property <bool> fatal: false;
+
+    callback acknowledged();
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+
+        Text {
+            text: root.heading;
+            font-size: 15px;
+            font-weight: 700;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                for line in root.lines: Text {
+                    text: line.text;
+                    color: line.error ? #c0392b : #8a5a00;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        Text {
+            text: root.fatal
+                ? "\{root.program} cannot start until this is put right."
+                : "\{root.program} will start with this as it is.";
+            font-size: 12px;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            Rectangle { }
+            Button {
+                text: root.fatal ? "Quit" : "Continue";
+                clicked => { root.acknowledged(); }
+            }
+        }
+    }
+}

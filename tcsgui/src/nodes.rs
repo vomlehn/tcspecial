@@ -42,6 +42,7 @@
 //! attributes:                # what a node of this kind says for itself
 //!   - name: inputs
 //!     required: true
+//!     kind: text             # what it takes: see KINDS. Unstated is text
 //!     about: Which inputs it is over, comma separated.
 //! ```
 //!
@@ -49,6 +50,10 @@
 //! palette: `compute` is one node type and `mean`, `hysteresis`, `to_kelvin`
 //! and `process` are four things to place, each of which is a compute node with
 //! its `function` already answered.
+//!
+//! `kind` is what the node's window offers a field with: a `boolean` takes a
+//! control with two states, and everything else a box to write in. See
+//! [`KINDS`] for the words and for where the rules behind them live.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -136,7 +141,45 @@ pub struct Attribute {
     pub name: String,
     pub required: bool,
     pub about: String,
+    /// What kind of value it takes, as the description says.
+    ///
+    /// What the window offers to type it with: a true or false takes a
+    /// control with two states and not a box to write the word in. The kinds
+    /// are [`KINDS`] and nothing else, and a description that says nothing
+    /// means [`TEXT`] -- which is what every description written before this
+    /// existed means, and what an attribute whose rule is its own business
+    /// means still.
+    pub kind: String,
 }
+
+/// The kind an attribute has where its description says nothing.
+///
+/// A box to write in, which is what every field was before the kinds existed:
+/// an attribute nobody has classified is one the window asks for in the way
+/// that can say anything.
+pub const TEXT: &str = "text";
+
+/// What an attribute may say it takes.
+///
+/// One word each, and the list is short on purpose: a kind earns its place by
+/// changing what the window offers or what it checks, not by naming a rule.
+/// The rules themselves are `tcslibgs`' -- `whole::whole_u32`,
+/// `graph::parse_interval`, `trigger::trigger_bytes`,
+/// `node::vehicle::Restart::of` -- and this says which of them a field is
+/// typed into, so the window can offer the right thing and say what is wanted
+/// before somebody types the wrong one.
+///
+/// * `text` -- anything, which is the default: a name, a word a rule of its
+///   own reads, a path on the far side of a link.
+/// * `path` -- a file, a device, a program: text, and known apart from it
+///   because a window will one day offer to go and find one.
+/// * `whole` -- a whole number, decimal or `0x`, as `whole::whole_u32` reads
+///   one.
+/// * `interval` -- a length of time with its unit, `500ms` or `3s`, as
+///   `graph::parse_interval` reads one.
+/// * `bytes` -- hex bytes, as a trigger is written.
+/// * `boolean` -- `true` or `false`, and nothing else.
+pub const KINDS: &[&str] = &[TEXT, "path", "whole", "interval", "bytes", "boolean"];
 
 /// A description as a file writes it.
 ///
@@ -176,6 +219,8 @@ struct SaidAttribute {
     name: Scalar,
     #[serde(default)]
     required: Option<Scalar>,
+    #[serde(default)]
+    kind: Option<Scalar>,
     #[serde(default)]
     about: Option<Scalar>,
 }
@@ -299,9 +344,26 @@ fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
                 }
             },
         };
+        // What it takes, and one of the words there are for it: a kind
+        // nothing knows would be a field offered in whatever way the window
+        // falls back to, which is the kind of mistake a description is read
+        // by a program to catch.
+        let said_kind = attribute.kind.as_ref().map(|k| k.as_str().trim().to_string());
+        let kind = match said_kind {
+            None => TEXT.to_string(),
+            Some(said) if KINDS.contains(&said.as_str()) => said,
+            Some(other) => {
+                return Err(named(&format!(
+                    "\"{node}\", attribute \"{name}\": there is no kind called \
+                     \"{other}\". They are {}",
+                    KINDS.join(", ")
+                )))
+            }
+        };
         attributes.push(Attribute {
             name,
             required,
+            kind,
             about: said_about(attribute.about.as_ref()),
         });
     }
@@ -370,15 +432,33 @@ impl Described {
     /// Shown rather than hidden, for the reason an unrecognised attribute is
     /// shown: a value that is in the file and not on the panel is a value
     /// somebody has to open the file to find.
+    #[cfg(test)]
     pub fn asked(&self) -> Vec<(String, bool)> {
-        let mut asked: Vec<(String, bool)> = self
+        self.fields()
+            .into_iter()
+            .map(|(name, required, _)| (name, required))
+            .collect()
+    }
+
+    /// The same, with what each one takes.
+    ///
+    /// For the window, which offers a control per kind: see [`KINDS`]. An
+    /// attribute the description sets rather than asks for is text, like any
+    /// other it says nothing about -- it is not offered at all, the editor
+    /// having filled it in.
+    pub fn fields(&self) -> Vec<(String, bool, String)> {
+        let mut asked: Vec<(String, bool, String)> = self
             .sets
             .keys()
-            .map(|name| (name.clone(), true))
+            .map(|name| (name.clone(), true, TEXT.to_string()))
             .collect();
         for attribute in &self.attributes {
-            if !asked.iter().any(|(named, _)| named == &attribute.name) {
-                asked.push((attribute.name.clone(), attribute.required));
+            if !asked.iter().any(|(named, _, _)| named == &attribute.name) {
+                asked.push((
+                    attribute.name.clone(),
+                    attribute.required,
+                    attribute.kind.clone(),
+                ));
             }
         }
         asked
@@ -626,6 +706,73 @@ mod tests {
         assert!(null.attributes.is_empty());
         assert!(null.sets.is_empty());
         assert!(!null.about.is_empty(), "every description says what it is");
+    }
+
+    /// Every attribute says what it takes, and says one of the words there
+    /// are for it.
+    ///
+    /// The reader refuses a kind it does not know, so what this adds is the
+    /// other direction: that the words in the tree are the words the window
+    /// offers controls for, and that the ones which say `boolean` are the
+    /// attributes `tcslibgs` reads as true or false. Two statements of one
+    /// fact, so one is held against the other -- an attribute that became a
+    /// true or false in the rules and stayed text here would be a field
+    /// offered as a box to type `treu` into.
+    #[test]
+    fn every_kind_is_one_the_window_knows() {
+        let (described, trouble) = read_tree(&shipped());
+        assert!(trouble.is_empty(), "{trouble:?}");
+
+        // What `tcslibgs` reads as true or false: `endpoint_config::parse_flag`
+        // for a device's own flags, and `node::vehicle::Restart::of` for
+        // whether a program comes back.
+        let booleans = [
+            "ten_bit",
+            "pec",
+            "rs485",
+            "rs485_rts_on_send",
+            "loopback",
+            "can_fd",
+            "restart",
+        ];
+
+        for one in &described {
+            for attribute in &one.attributes {
+                assert!(
+                    KINDS.contains(&attribute.kind.as_str()),
+                    "{}: \"{}\" takes a kind called \"{}\", which is not one of {}",
+                    one.path.display(),
+                    attribute.name,
+                    attribute.kind,
+                    KINDS.join(", ")
+                );
+                assert_eq!(
+                    attribute.kind == "boolean",
+                    booleans.contains(&attribute.name.as_str()),
+                    "{}: \"{}\" says the kind \"{}\", and the rules read it the \
+                     other way",
+                    one.path.display(),
+                    attribute.name,
+                    attribute.kind
+                );
+            }
+        }
+
+        // And the tree says it where it matters: every app node is asked
+        // whether its program comes back, and the answer is a true or false.
+        let apps: Vec<&Described> = described
+            .iter()
+            .filter(|one| one.node.starts_with("app_"))
+            .collect();
+        assert_eq!(apps.len(), 5, "five kinds of app node");
+        for app in apps {
+            let restart = app
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "restart")
+                .unwrap_or_else(|| panic!("{} says nothing about restarting", app.node));
+            assert_eq!(restart.kind, "boolean", "{}", app.node);
+        }
     }
 
     /// The tree's terminals are the ones the vehicle is flown by.

@@ -12,6 +12,7 @@
 
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::env;
+use std::path::Path;
 use std::process;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -28,6 +29,7 @@ mod pty;
 use endpoint::{endpoint_description, payload_config_from};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
 use tcslibgs::{ResolvedSim, SimConfigFile};
+use tcsverify::startup::Startup;
 
 slint::include_modules!();
 
@@ -212,6 +214,131 @@ fn update_row(model: &Rc<VecModel<PayloadInfo>>, row: usize, f: impl FnOnce(&mut
     }
 }
 
+/// Read the pair, once tcsverify has found nothing wrong with it, and say in
+/// `startup` whatever stops it being simulated.
+///
+/// Every one of these is a refusal tcsverify has already made, bar the ones
+/// that are the simulator's alone -- a version 2 configuration, which it does
+/// not run, and a set with no payloads, which leaves it nothing to be. They
+/// are asked again rather than assumed: the files can change between the two
+/// reads, and a simulator running on a half-read pair would be worse than one
+/// that says so.
+fn load(
+    payload_path: &str,
+    sim_path: &str,
+    startup: &mut Startup,
+) -> Option<(Vec<DHConfig>, SimConfigFile, Vec<ResolvedSim>, Vec<PayloadConfig>)> {
+    if tcslibgs::graph::is_version_2(Path::new(payload_path)) {
+        startup.error(format!(
+            "{payload_path}: a version 2 configuration, which tcssim does not \
+             simulate: it simulates the payloads of a version 1 payload set"
+        ));
+        return None;
+    }
+
+    let dh_configs = match load_dh_configs(payload_path) {
+        Ok(dh_configs) => dh_configs,
+        Err(e) => {
+            startup.error(format!(
+                "Error loading payload configuration from {payload_path}: {e}"
+            ));
+            return None;
+        }
+    };
+
+    let sim_file = match SimConfigFile::load(sim_path) {
+        Ok(sim_file) => sim_file,
+        Err(e) => {
+            startup.error(format!(
+                "Error loading simulator configuration from {sim_path}: {e}"
+            ));
+            return None;
+        }
+    };
+
+    // Join the two by name. Every data handler needs settings and every
+    // settings entry needs a handler, so this is where a file naming a payload
+    // that does not exist, or leaving one undriven, is caught.
+    let sims = match sim_file.resolve(&dh_configs) {
+        Ok(sims) => sims,
+        Err(e) => {
+            startup.error(format!("Error in {sim_path} against {payload_path}: {e}"));
+            return None;
+        }
+    };
+
+    let configs: Vec<PayloadConfig> = match dh_configs
+        .iter()
+        .zip(&sims)
+        .map(|(dh, sim)| payload_config_from(dh, sim))
+        .collect()
+    {
+        Ok(configs) => configs,
+        Err(e) => {
+            startup.error(format!("Error in payload configuration {payload_path}: {e}"));
+            return None;
+        }
+    };
+
+    if configs.is_empty() {
+        startup.error(format!("{payload_path} describes no payloads to simulate"));
+        return None;
+    }
+
+    Some((dh_configs, sim_file, sims, configs))
+}
+
+/// Say what was found as tcssim started, in a window of its own, and wait for
+/// it to be closed.
+///
+/// Before the main window is shown, so that nobody is looking at panels for a
+/// pair with something wrong with it without having been told -- and on
+/// stderr as well, for a run from a terminal and for one with no display to
+/// open a window on.
+fn present(startup: &Startup) {
+    startup.eprint("tcssim");
+
+    let window = match StartupWindow::new() {
+        Ok(window) => window,
+        Err(e) => {
+            eprintln!("tcssim: what was found cannot be shown in a window: {e}");
+            return;
+        }
+    };
+    window.set_program("tcssim".into());
+    window.set_heading(
+        if startup.fatal() {
+            "Something is wrong with the configuration."
+        } else {
+            "Something about the configuration is worth knowing."
+        }
+        .into(),
+    );
+    window.set_fatal(startup.fatal());
+    let lines: Vec<StartupLine> = startup
+        .lines()
+        .iter()
+        .map(|(error, text)| StartupLine {
+            text: text.clone().into(),
+            error: *error,
+        })
+        .collect();
+    window.set_lines(ModelRc::from(Rc::new(VecModel::from(lines))));
+    {
+        let weak = window.as_weak();
+        window.on_acknowledged(move || {
+            if let Some(window) = weak.upgrade() {
+                let _ = window.hide();
+            }
+        });
+    }
+    // Runs until it is closed, by its button or by the window manager: either
+    // is the person having read it.
+    if let Err(e) = window.run() {
+        eprintln!("tcssim: what was found cannot be shown in a window: {e}");
+    }
+}
+
 fn main() {
 //    env_logger::init();
 
@@ -230,50 +357,28 @@ fn main() {
     let sim_path = env::var(SIM_CONFIG_PATH_VAR)
         .unwrap_or_else(|_| DEFAULT_SIM_CONFIG_PATH.to_string());
 
-    let dh_configs = match load_dh_configs(&payload_path) {
-        Ok(dh_configs) => dh_configs,
-        Err(e) => {
-            eprintln!("Error loading payload configuration from {}: {}", payload_path, e);
-            process::exit(1);
-        }
+    // Everything wrong with the pair, in tcsverify's words and before
+    // anything else is read from either: every problem at once, each with its
+    // file and line, which is what tcsverify, tcsmoc, tcspecial and tcsgui
+    // say about the same files. Then what only a simulator has to ask. All of
+    // it is shown before the main window is, and the window is not shown at
+    // all where any of it is an error.
+    let mut startup = Startup::default();
+    startup.report(
+        &tcsverify::verify(Path::new(&payload_path), Some(Path::new(&sim_path))),
+        true,
+    );
+    let loaded = if startup.fatal() {
+        None
+    } else {
+        load(&payload_path, &sim_path, &mut startup)
     };
-
-    let sim_file = match SimConfigFile::load(&sim_path) {
-        Ok(sim_file) => sim_file,
-        Err(e) => {
-            eprintln!("Error loading simulator configuration from {}: {}", sim_path, e);
-            process::exit(1);
-        }
-    };
-
-    // Join the two by name. Every data handler needs settings and every
-    // settings entry needs a handler, so this is where a file naming a payload
-    // that does not exist, or leaving one undriven, is caught.
-    let sims = match sim_file.resolve(&dh_configs) {
-        Ok(sims) => sims,
-        Err(e) => {
-            eprintln!("Error in {} against {}: {}", sim_path, payload_path, e);
-            process::exit(1);
-        }
-    };
-
-    let configs: Vec<PayloadConfig> = match dh_configs
-        .iter()
-        .zip(&sims)
-        .map(|(dh, sim)| payload_config_from(dh, sim))
-        .collect()
-    {
-        Ok(configs) => configs,
-        Err(e) => {
-            eprintln!("Error in payload configuration {}: {}", payload_path, e);
-            process::exit(1);
-        }
-    };
-
-    if configs.is_empty() {
-        eprintln!("{} describes no payloads to simulate", payload_path);
-        process::exit(1);
+    if !startup.is_empty() {
+        present(&startup);
     }
+    let Some((dh_configs, sim_file, sims, configs)) = loaded.filter(|_| !startup.fatal()) else {
+        process::exit(1);
+    };
 
     eprintln!(
         "Simulating {} payloads from {} and {}",

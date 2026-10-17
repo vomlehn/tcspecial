@@ -2365,6 +2365,9 @@ pub fn thermostat_example() -> Document {
     place(&mut document, "moc", "moc", (660, 40));
     set(&mut document, "moc", "address", "10.0.0.1");
     set(&mut document, "moc", "port", "5000");
+    // Where the ground station is: each node linked into this one sends to
+    // this port plus its own device id, from the start.
+    set(&mut document, "moc", "ground_base", "10.0.0.2:5100");
 
     place(&mut document, "heaters", "gpio", (860, 240));
     set(&mut document, "heaters", "path", "/dev/gpiochip0");

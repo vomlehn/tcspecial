@@ -21,7 +21,6 @@
 //! arrives on the groundward stream, which is the other one from what it was
 //! given.
 
-use std::path::Path;
 use std::process::ExitStatus;
 
 use tcsapp::parent::{self, Arrived, Running, Supports};
@@ -55,7 +54,7 @@ impl AppMocVeh {
             ));
         }
         Ok(AppMocVeh {
-            running: parent::start(Path::new(&params.program), Supports::MOC)?,
+            running: parent::start(&params.program_path()?, &params.arguments(), Supports::MOC)?,
         })
     }
 
@@ -125,8 +124,11 @@ mod tests {
     /// What such a node is told, for a program at `program`.
     fn says(program: &std::path::Path) -> AppParams {
         AppParams {
+            name: "back".to_string(),
             kind: Kind::MocVeh,
             program: program.display().to_string(),
+            payload_arg: None,
+            moc_arg: Some("--commands".to_string()),
             restart: Restart::Never,
         }
     }
@@ -140,7 +142,7 @@ mod tests {
     fn packets_reach_the_program_and_come_back() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = AppMocVeh::of(&says(&program)).expect("it starts");
+        let mut node = crate::when_not_busy(|| AppMocVeh::of(&says(&program))).expect("it starts");
 
         node.give_moc_data(b"SET 300").expect("it takes a packet");
         assert_eq!(

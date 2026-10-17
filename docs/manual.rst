@@ -1180,6 +1180,127 @@ other file's stem.
   which ``bin/mki2c`` does -- or ``make mkstubs``, which runs it along with the
   other three -- and which tcssim says how to do if it is not there.
 
+The Examples
+============
+The ``examples`` directory holds one directory per example, each a version 2
+configuration in both formats -- ``<name>.yaml`` and ``<name>.xml``, which a
+test holds to describing the same configuration -- and the simulator
+configuration beside it, ``<name>-sim.yaml``. Every example is checked by
+``tcsverify`` on every test run and must pass with no errors and no warnings,
+so an example is always a configuration that can be copied.
+
+The diagrams use one set of conventions. Blue lines carry data toward the
+ground and orange lines carry it toward the vehicle; a dotted orange line is a
+command binding, and a dashed blue line is a payload's telemetry link, which no
+line in the configuration draws: it comes from the ``tcspecial`` section, from
+``payload_telemetry.source_base`` plus the payload's device id to
+``payload_telemetry.dest_base`` plus the same id. The device id is the
+payload's position among the configuration's payloads, counting from nought.
+Only a payload that nothing in the configuration touches -- no line to it or
+from it, and no command binding naming it -- has a telemetry link: that is the
+only way its readings can reach the ground. A payload with lines goes where
+its lines say and nowhere else. The dashed box around the middle of each
+diagram is what runs inside tcspecial.
+
+``make help`` in the ``examples`` directory lists the targets that run them.
+
+The minimal example
+-------------------
+.. figure:: ../examples/minimal/minimal.svg
+   :alt: The minimal example: one UDP payload, sensor, whose readings
+         tcspecial sends to the ground over the sensor's telemetry link.
+   :width: 100%
+
+   ``examples/minimal``: one payload, and its telemetry going to the ground.
+
+The smallest configuration that does something. It has one payload,
+``sensor``, a UDP socket at ``127.0.0.1:5001``, and no other node: no line is
+drawn from the sensor at all. tcspecial binds the sensor's address and reads
+whatever arrives there, and sends each reading to the ground over the
+sensor's telemetry link -- from ``0.0.0.0:6000`` to ``127.0.0.1:6100``, the
+two ``payload_telemetry`` bases plus device id 0.
+
+The comments in its ``tcspecial`` section say which end of each link is which,
+and they are worth reading before writing a configuration of your own.
+Payload commands are not used by a simple payload such as this one: what it is
+configured with is in the configuration file and is not changed while
+tcspecial is running.
+
+The simulator configuration has the sensor send one packet a second.
+``make -C examples run-simple`` runs tcspecial on the example.
+
+The thermostat example
+----------------------
+.. figure:: ../examples/thermostat/thermostat.svg
+   :alt: The thermostat example: three temperature sensors, converted to
+         kelvin, averaged, logged and sent to the ground, with a hysteresis
+         thermostat driving GPIO heaters.
+   :width: 100%
+
+   ``examples/thermostat``: three sensors, a mean, a thermostat and its
+   heaters.
+
+The worked example of computing aboard. Three temperature sensors --
+``temp_fore`` and ``temp_aft`` on I\ :superscript:`2`\ C, ``temp_bay`` on SPI --
+are read together every three seconds as the group ``cabin_temps``, which is
+what a group is for: readings that will be compared are taken as close
+together as the hardware allows.
+
+Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_fore``,
+``k_aft`` or ``k_bay``, and each converted reading goes three ways: to the
+ground through the ``moc`` node -- which sends to the ground station at its
+``ground_address`` and ``ground_port``, ``127.0.0.1:5100`` -- into
+``mean_temp`` as the input ``in0``, ``in1`` or ``in2``, and into the log
+``housekeeping``. The mean goes to the ground and to ``thermostat``, a
+hysteresis that holds the cabin at its setpoint, 293.15 K, switching two
+degrees either side of it. The thermostat's decision is logged and drives the
+three heater circuits, ``heaters``, on GPIO lines 3, 4 and 5.
+
+Every payload here has lines, so none has a telemetry link of its own: the
+sensors' readings reach the ground through their conversions, and the heaters
+are driven and never read.
+
+The command binding on the ``moc`` node says the ground may set the
+thermostat's setpoint. The configuration is checked for it, but the running
+vehicle does not yet apply commands from the ground.
+
+The sensors and heaters are hardware, so ``make -C examples run-thermostat``
+needs ``/dev/i2c-1``, ``/dev/spidev0.0`` and ``/dev/gpiochip0``; ``make
+mkstubs`` provides stand-ins for some of them where there is no hardware.
+
+The simple-app example
+----------------------
+.. figure:: ../examples/simple-app/simple-app.svg
+   :alt: The simple-app example: a payload that is a program, lorem, sending
+         a line of text one word per packet through the moc node to the ground
+         station program lorem_moc.
+   :width: 100%
+
+   ``examples/simple-app``: a payload that is a program, and a ground station
+   that prints what it sends.
+
+A payload need not be a device. ``lorem`` is an ``app_pl`` node: a program,
+``lorem_pl.py``, written in Python 3, that tcspecial starts from the
+configuration with the argument
+``1`` and talks to over the file interfaces an app node is run with. It sends
+the first line of the lorem ipsum text one word per packet, then a packet
+holding the line terminator.
+
+The words go to the ``moc`` node, bound at ``127.0.0.1:5000``, which sends
+them to the ground station at its ``ground_address`` and ``ground_port``,
+``127.0.0.1:5100``. Every ``moc`` node over UDP states those two: the ground's
+address is in the configuration, so the vehicle sends from the first reading
+without waiting to be spoken to. The ground is ``lorem_moc``, the example's
+second program: it listens at that address, prints each word it receives with
+one space between them, and stops at the end of the line.
+
+Both programs are beside the configuration: the payload is a Python 3 script
+that uses only the standard library, and the ground station is a Rust crate.
+``make -C examples run-simple-app`` checks that ``python3`` is installed -- 3.6
+or later -- builds the vehicle and the ground station, runs them together,
+prints the line, and stops. ``make -C examples check-python3`` makes the check
+on its own.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how
@@ -1700,6 +1821,12 @@ for the same reason ``payload_telemetry`` does: the link has two ends. A
 payload's socket on each side is that side's base plus **the payload's own
 id**, so a set of four payloads based at 4300 and 4200 is commanded from 4300
 to 4303 on the ground and takes those commands on 4200 to 4203 aboard.
+
+Simple payloads -- a device or a socket that tcspecial reads or drives -- do
+not use payload commands. What a simple payload is configured with is in the
+tcspecial configuration file, and it is not changed while tcspecial is
+running. At present only applications, the payloads and vehicle nodes that are
+programs of their own, use the ``payload_command`` values.
 
 Both ends come out of the file, including the host: this is the one link the
 address box does not move. Every payload command link is written down at both

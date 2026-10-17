@@ -601,10 +601,28 @@ mod tests {
         (record.clone(), Box::new(Recorder(record)))
     }
 
+    /// The example's links, and only its links.
+    ///
+    /// Without its links to the ground: these tests hold a recorder for every
+    /// node the file draws and are about what the drawn links do. The links to
+    /// the ground are `runtime::route`'s and `runtime::system`'s to test,
+    /// where they are worked out and opened.
     fn thermostat() -> Routes {
+        Routes::of(&drawn())
+    }
+
+    /// The example itself, without its links to the ground: see
+    /// [`thermostat`]. With no `tcspecial` section no payload reports on its
+    /// own, and with no `ground_base` on the moc node what is drawn into it
+    /// is delivered to it, as drawn.
+    fn drawn() -> Graph {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
-        Routes::of(&graph)
+        let mut graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        graph.tcspecial = None;
+        for node in graph.nodes.iter_mut().filter(|n| n.node_type == "moc") {
+            node.attributes.remove("ground_base");
+        }
+        graph
     }
 
     /// One datum reaches all three places its link names.
@@ -690,8 +708,7 @@ mod tests {
     fn the_worked_example_computes_from_three_readings() {
         use crate::runtime::port::ComputePort;
 
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = drawn();
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
@@ -760,8 +777,7 @@ mod tests {
     fn a_pass_that_changes_nothing_delivers_nothing_onward() {
         use crate::runtime::port::ComputePort;
 
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = drawn();
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
@@ -804,8 +820,7 @@ mod tests {
     fn a_computation_that_refuses_does_not_stop_the_telemetry() {
         use crate::runtime::port::ComputePort;
 
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = drawn();
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
@@ -844,8 +859,7 @@ mod tests {
     fn a_commanded_setpoint_changes_the_decision() {
         use crate::runtime::port::ComputePort;
 
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = drawn();
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes.clone(), 64);
@@ -894,8 +908,7 @@ mod tests {
     fn an_attribute_no_binding_names_cannot_be_set() {
         use crate::runtime::port::ComputePort;
 
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("tests/manual/thermostat.yaml")).expect("it reads");
+        let graph = drawn();
         let routes = Routes::of(&graph);
 
         let mut fabric = Fabric::new(routes, 64);

@@ -45,6 +45,17 @@
             "description": "Whether it must be stated before the configuration can be flown. Absent is false.",
             "type": "boolean"
           },
+          "kind": {
+            "description": "What kind of value it takes, which decides what the node's window offers to type it with: `boolean` is a control with two states, and the rest are a box to write in. Absent is `text`, which is what an attribute whose rule is its own business takes. The rules themselves are tcslibgs': `whole` is a whole number as `whole::whole_u32` reads one, `interval` a length of time with its unit, `bytes` hex bytes as a trigger is written, `path` a file or a program, and `text` anything.",
+            "enum": [
+              "text",
+              "path",
+              "whole",
+              "interval",
+              "bytes",
+              "boolean"
+            ]
+          },
           "about": {
             "description": "One line about it, for the field in the node's window.",
             "type": "string"

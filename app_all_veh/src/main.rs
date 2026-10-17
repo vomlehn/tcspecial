@@ -31,6 +31,9 @@ fn main() -> ExitCode {
         }
     };
     let AppAllVeh {
+        name,
+        payload_arg: _,
+        moc_arg: _,
         mut payload,
         mut moc,
         mut errors,
@@ -46,10 +49,10 @@ fn main() -> ExitCode {
                 (writes_moc, writes_payload, other_errors)
             }
             _ => {
-                let _ = errors.say(
-                    "app_all_veh: its interfaces could not be held twice over, and it \
-                     carries one stream on each",
-                );
+                let _ = errors.say(&format!(
+                    "app_all_veh {name}: its interfaces could not be held twice \
+                     over, and it carries one stream on each"
+                ));
                 return ExitCode::FAILURE;
             }
         };

@@ -15,7 +15,7 @@ use std::process::ExitCode;
 use tcsapp::app::{complain, AppMocVeh};
 
 fn main() -> ExitCode {
-    let mut app = match AppMocVeh::inherited() {
+    let app = match AppMocVeh::inherited() {
         Ok(app) => app,
         Err(why) => {
             complain(&format!("app_moc_veh: {why}"));
@@ -23,12 +23,22 @@ fn main() -> ExitCode {
         }
     };
 
+    // Which node this process is, for every complaint it makes: see
+    // `tcsapp::app`.
+    let AppMocVeh {
+        name,
+        moc_arg: _,
+        mut moc,
+        mut errors,
+    } = app;
+
     loop {
-        match app.moc.read_moc() {
+        match moc.read_moc() {
             Ok(Some(data)) => {
-                if let Err(e) = app.moc.write_payload(&data) {
-                    let _ = app.errors.say(&format!(
-                        "app_moc_veh: {} bytes of payload data could not be written: {e}",
+                if let Err(e) = moc.write_payload(&data) {
+                    let _ = errors.say(&format!(
+                        "app_moc_veh {name}: {} bytes of payload data could not \
+                         be written: {e}",
                         data.len()
                     ));
                     return ExitCode::FAILURE;
@@ -36,9 +46,9 @@ fn main() -> ExitCode {
             }
             Ok(None) => return ExitCode::SUCCESS,
             Err(e) => {
-                let _ = app
-                    .errors
-                    .say(&format!("app_moc_veh: MOC data could not be read: {e}"));
+                let _ = errors.say(&format!(
+                    "app_moc_veh {name}: MOC data could not be read: {e}"
+                ));
                 return ExitCode::FAILURE;
             }
         }

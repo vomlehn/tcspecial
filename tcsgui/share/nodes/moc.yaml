@@ -15,11 +15,17 @@ payload-source: false
 moc-sink: false
 moc-source: true
 attributes:
-  - name: address
+  - name: ground_base
     required: true
     about: >
-      The host the ground station is reached at, or bound at: tcspecial
-      sends telemetry back where the datagrams came from.
+      Where the ground station is, as address:port. What each node linked
+      into this one produces is sent to that address, at that port plus the
+      node's device id, from the start.
+  - name: address
+    required: false
+    about: >
+      The address tcspecial binds for what the ground sends: needed, with
+      port, when commands or a line come from this node.
   - name: port
-    required: true
+    required: false
     about: The port that goes with the address.

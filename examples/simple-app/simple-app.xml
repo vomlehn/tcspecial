@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    <version>2.0</version>
+    <description>A payload that is a program, sending a line of text a word at a time</description>
+    <tcspecial>
+        <beacon>
+            <interval_ms>5000</interval_ms>
+            <recv>127.0.0.1:5650</recv>
+            <send>0.0.0.0:5550</send>
+        </beacon>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:6100</dest_base>
+            <source_base>0.0.0.0:6000</source_base>
+        </payload_telemetry>
+        <tcs_cmd>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:4100</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- The ground link. The vehicle binds address and port, and sends what -->
+    <!-- arrives at this node to the ground station at ground_address and -->
+    <!-- ground_port from the first word: where the ground is, is written down, so -->
+    <!-- the ground does not have to speak first. Run `lorem_moc` to be that ground. -->
+    <moc>
+        <name>moc</name>
+        <type>moc</type>
+        <ground_base>127.0.0.1:5100</ground_base>
+        <payload-in>true</payload-in>
+    </moc>
+    <!-- A payload that is a program rather than a device: it is never asked, and -->
+    <!-- reports one word of its line at a time, then a packet holding the line -->
+    <!-- terminator. `app-payload-arg` is which line it sends, counting from one. -->
+    <!--  -->
+    <!-- The program is a Python 3 script beside this file, named relative to -->
+    <!-- the repository&apos;s root because that is where tcspecial is run from: see -->
+    <!-- examples/Makefile. -->
+    <payloads>
+        <name>lorem</name>
+        <type>app_pl</type>
+        <app-payload-arg>1</app-payload-arg>
+        <program>examples/simple-app/lorem_pl.py</program>
+        <payload-out><target>moc</target></payload-out>
+    </payloads>
+    <tcsgui>
+        <nodes><name>moc</name><x>32</x><y>104</y></nodes>
+        <nodes><name>lorem</name><x>584</x><y>120</y></nodes>
+    </tcsgui>
+</configuration>

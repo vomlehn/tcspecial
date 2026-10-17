@@ -1322,15 +1322,14 @@ the second is threads, descriptors and bytes.
          telemetry and parameters -- turn it into tables. Then system opens a
          port per node and holds them in a fabric. Four things run at once: the
          command interpreter on its own thread, the conductor running one pass,
-         a pool of workers running the node operations of a stage in parallel,
-         and the beacons. Each node has a state and a wakeup descriptor, so a
+         a thread started for each node operation of a stage, and the beacons. Each node has a state and a wakeup descriptor, so a
          command that disables a node reaches it while it is waiting. On the
          ground, data arrives as UDP and is taken with tcslib::moc::Moc::receive.
    :width: 100%
 
    What a version 2 configuration becomes, and what runs at once. The
    dash-dotted pieces are the design; what runs today is one thread for the
-   whole pass and the beacons beside it.
+   whole pass, the command interpreter and the beacons beside it.
 
 What the file becomes
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1366,13 +1365,14 @@ the command interpreter
 
 the conductor
     One thread, running one pass: it asks the schedule which group is due,
-    hands that group's reads to the workers together, waits for them, and then
-    walks the routes, one breadth-first wave at a time.
+    starts a thread for each of that group's reads, waits for them all, and
+    then walks the routes, one breadth-first wave at a time.
 
-the workers
-    A pool. Every node operation of a stage -- a read, a delivery, a
-    computation, a write to the ground -- may run at the same time as every
-    other operation of that stage, and no node operation waits on another node.
+the node threads
+    One per node operation, for as long as that operation takes. Every
+    operation of a stage -- a read, a delivery, a computation, a write to the
+    ground -- may run at the same time as every other operation of that stage,
+    and no node operation waits on another node.
 
 the beacons
     Their own thread, from the first version of the runtime: a beacon every
@@ -1403,10 +1403,31 @@ Requirement
     and it is the only ordering parallel execution may not take away.
 
 Requirement
-    A port is held by one worker at a time. A node is a thing with a
-    descriptor, a position in a stream and a buffer, so two workers inside one
+    A thread is started for each node operation and joined before the stage
+    ends. Not taken from a pool: a pool has a size, and nothing can choose
+    that size correctly.
+
+A pool smaller than the stage serialises operations the graph says may run
+together, which is the one ordering parallel execution may not take away --
+and the figure that is too small depends on the configuration, so a number
+chosen here would be wrong for some file somebody writes later. A pool larger
+than the stage holds threads that do nothing. And a pool needs a queue
+between the conductor and the workers, which is a second place for a stage to
+stall and a place where one slow operation delays an operation it has nothing
+to do with.
+
+How many operations a stage has is what the configuration says -- a group of
+three sensors is three reads, a wave of two deliveries is two -- so starting
+one thread each gives exactly the parallelism the file describes, bounded by
+the file rather than by a figure nobody chose. What that costs is a thread
+started and joined per operation, which against a device read measured in
+milliseconds is noise.
+
+Requirement
+    A port is held by one thread at a time. A node is a thing with a
+    descriptor, a position in a stream and a buffer, so two threads inside one
     port would be two readers of one socket: the fabric hands a port to a
-    worker for an operation and has it back before the stage ends.
+    thread for an operation and has it back before the stage ends.
 
 Requirement
     A node's state -- enabled, disabled or faulted -- is its own, and is read
@@ -1678,8 +1699,8 @@ Requirement
     One link for every node, and not one per node. Version 1 bound a socket
     per payload, which did two things: it said which payload a command was
     about, and it kept a command that takes time from delaying a command about
-    another payload. The node id does the first now, and the workers do the
-    second. A graph also has more nodes than a payload set has payloads -- a
+    another payload. The node id does the first now, and the thread a node
+    operation runs on does the second. A graph also has more nodes than a payload set has payloads -- a
     thermostat of four sensors is eleven nodes -- so a socket apiece would
     spend ports on computations and logs that nothing addresses from the
     ground.
@@ -1867,8 +1888,9 @@ conduit.
    ``process`` computation's deadline. Disabling the node ends either one
    where it stands.
 
-   What is still the design and not the code is the worker pool: a stage's
-   node operations run one after another on the one thread.
+   What is still the design and not the code is the parallel execution of a
+   stage: a stage's node operations run one after another on the conductor's
+   own thread, where the design starts a thread for each of them.
 
    RESTART_ARM, RESTART, QUERY_DH, QUERY_DH_SAMPLE and CONFIG_DH are refused
    as unimplemented rather than left unanswered. A command the vehicle does

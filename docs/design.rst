@@ -1555,12 +1555,13 @@ looking hand-written. For the shipped examples that is what ``git diff`` is
 for; for a working configuration it is worth knowing before the first Save.
 
 The canvas is divided in three, and each part says in its top left corner what
-it is for. Left to right: the *moc working pane*, labelled ``MOC``, which holds
-the ground link; the *vehicle working pane*, labelled ``Vehicle``, which holds
-the vehicle's own graph -- the computations, the log, a page of its own; and the
-*payload working pane*, labelled ``Payloads``, which holds everything the
-vehicle carries: a device on a bus, a line it drives, a link to something
-aboard.
+it is for. Left to right: the *payload working pane*, labelled ``Payloads``,
+which holds everything the vehicle carries: a device on a bus, a line it
+drives, a link to something aboard; the *vehicle working pane*, labelled
+``Vehicle``, which holds the vehicle's own graph -- the computations, the log,
+a page of its own; and the *moc working pane*, labelled ``MOC``, which holds
+the ground link. It is the order the examples' diagrams in the manual are drawn
+in, so a diagram there and the same configuration in the editor read alike.
 
 The labels are light grey and italic, which is this window's way of saying "not
 part of the drawing": one in the colour and the face of a node would read as
@@ -1570,16 +1571,19 @@ their bearings, and a pane that reserved a row for its own name would be a pane
 with a row nothing can be put in.
 
 There is a selection pane for each, one above another in the same order the
-working panes are in, and which one a shape was pressed in is what decides
-where it lands. A node stays in its pane: a drag that would carry a payload
-leftwards across a divider stops at it.
+working panes are in -- payloads at the top, then the vehicle's, then the
+MOC's -- and which one a shape was pressed in is what decides where it lands.
+A node stays in its pane: a drag that would carry a payload rightwards across a
+divider stops at it.
 
 Each of the three lists is as tall as its own share of the column, with a line
 between each pair that can be dragged to change the two it is between -- the
 same arrangement as the working panes, turned on its side, and kept in the same
 settings file as percentages. A line moves the boundary between its own two
 neighbours and leaves the third alone, which is what a person dragging it
-expects: the list above grows by what the list below gives up. The arithmetic
+expects: the list above grows by what the list below gives up. The upper line
+is between the payload list and the vehicle's, the lower one between the
+vehicle's and the MOC's. The arithmetic
 is ``tcsgui::list_shares_after``, in Rust where it can be tested, and the
 markup reports a drag as how far it went and how tall the column is -- what a
 share is depends on what it is a share of.
@@ -1624,19 +1628,21 @@ node already on the wrong side holds nothing, so one such node cannot freeze
 the control.
 
 Where the dividers sit is kept in ``$HOME/.tcsgui/preferences.xml``, as the
-percentages of the working pane the moc and vehicle working panes take -- the
-panes being always in that order, so two percentages and that sentence are the
-whole of it, the payload pane taking what is left. The file is read when the
-editor starts and is what places the dividers; it is written whenever a line is
-moved. The directory is made automatically, and a preferences file that is
-missing, unreadable or hand-edited into nonsense leaves the defaults in place
-and says so on the error output: an editor that refused to start because it
-could not remember a pane width would be an editor traded for a preference. A
-file written before there was a moc working pane states only the vehicle's
-share, and the new pane's share is taken out of that one rather than out of the
-payload column somebody had arranged. The file was called ``config.xml`` in one
-build and is still read under that name when the current one is absent, so the
-rename forgets nothing; the old file is left for its owner to delete.
+percentages of the working pane the moc and vehicle working panes take, the
+payload pane taking what is left. Each is kept by the pane it is about rather
+than by its place on the screen, so a file written when the moc pane was the
+leftmost still means the same widths now that it is the rightmost. The file is
+read when the editor starts and is what places the dividers; it is written
+whenever a line is moved. The directory is made automatically, and a
+preferences file that is missing, unreadable or hand-edited into nonsense
+leaves the defaults in place and says so on the error output: an editor that
+refused to start because it could not remember a pane width would be an editor
+traded for a preference. A file written before there was a moc working pane
+states only the vehicle's share, and the new pane's share is taken out of that
+one rather than out of the payload column somebody had arranged. The file was
+called ``config.xml`` in one build and is still read under that name when the
+current one is absent, so the rename forgets nothing; the old file is left for
+its owner to delete.
 
 That file and not the configuration, which is the distinction worth stating. A
 node's position is in the configuration because it is part of the diagram --
@@ -1647,8 +1653,8 @@ section at the end of the file rather than on the node it is about:
 
    tcsgui:
      nodes:
-       - { name: moc, x: 24, y: 40 }
-       - { name: payload, x: 744, y: 160 }
+       - { name: payload, x: 40, y: 160 }
+       - { name: moc, x: 784, y: 40 }
 
 Last, and in a section of its own, because it is a different kind of thing.
 The sections above say what the vehicle carries and what it is told; this says
@@ -1743,29 +1749,29 @@ A link is drawn as an orthogonal route rather than a straight line -- out of
 the source, across, into the target, corners rounded -- and it goes around
 whatever is in the way. Out of the source and into the target, and which way
 each of those is, is what the terminals decide: the groundward stream leaves a
-node's left side and arrives at the next one's right side, and the next one is
-usually drawn further left, the ground being the leftmost working pane. So a
-line's first turn is to the left of a node whose terminal is on its left, and
-the arrowhead at the end points the way the line is actually travelling when it
-arrives. Before there were terminals a link left every node by the middle of
-its right edge and arrived at the middle of the next one's left edge, which
-made a payload reporting to a ground link drawn to its left run out to the
-right and all the way back. A line that runs through a node says there is a
-connection where there is none, which is worse than a line that is hard to
-follow: a reader tracing it arrives at the wrong node and has no way of
-knowing. So a route is chosen rather than computed. A handful of shapes are
-laid out -- straight through, a vertical run down the middle or beside each
-node in the way, and a run along a clear row above or below everything -- each
-is checked against every node on the page, and the one that crosses fewest,
-turns least and runs shortest is drawn, in that order of priority. Crossings
-first because a line through a node is a lie about the graph; turns before
-length because two orthogonal routes between one pair of points are usually
-the same length, and of two equal routes the one with fewer corners is the one
-that can be followed. A line keeps six pixels off any node it only passes,
-because a line along a node's edge reads as a line that touches it. Where
-nothing misses everything -- a target walled in on every side -- the best
-available is drawn anyway: a link with no line is a connection that does not
-appear in the drawing at all.
+node's right side and arrives at the next one's left side, the ground being the
+rightmost working pane, and the vehicleward stream leaves a node's left side
+and arrives at the next one's right side. So a line's first turn is to the left
+of a node whose terminal is on its left, and the arrowhead at the end points
+the way the line is actually travelling when it arrives. Before there were
+terminals a link left every node by the middle of its right edge and arrived at
+the middle of the next one's left edge, which made a command from the ground to
+a payload drawn to its left run out to the right and all the way back. A line
+that runs through a node says there is a connection where there is none, which
+is worse than a line that is hard to follow: a reader tracing it arrives at the
+wrong node and has no way of knowing. So a route is chosen rather than
+computed. A handful of shapes are laid out -- straight through, a vertical run
+down the middle or beside each node in the way, and a run along a clear row
+above or below everything -- each is checked against every node on the page,
+and the one that crosses fewest, turns least and runs shortest is drawn, in
+that order of priority. Crossings first because a line through a node is a lie
+about the graph; turns before length because two orthogonal routes between one
+pair of points are usually the same length, and of two equal routes the one
+with fewer corners is the one that can be followed. A line keeps six pixels off
+any node it only passes, because a line along a node's edge reads as a line
+that touches it. Where nothing misses everything -- a target walled in on every
+side -- the best available is drawn anyway: a link with no line is a connection
+that does not appear in the drawing at all.
 
 What is wrong with a node is not drawn on it. The node is painted red -- its
 outline, its label and its terminals, and in the one shape no real type uses,
@@ -1777,14 +1783,14 @@ paragraph in the middle of a diagram; a diagram is read for its shape.
 A node is drawn with its terminals on it: a rectangle of 36 by 14 pixels in
 each corner it has one in, with an arrow in it pointing the way the data on it
 travels across the canvas. Two rows, which are the two streams. Along the top,
-right to left, the payload's own data on its way to the ground: it arrives at
-``payload-in`` and leaves at ``payload-out``. Along the bottom, left to right,
+left to right, the payload's own data on its way to the ground: it arrives at
+``payload-in`` and leaves at ``payload-out``. Along the bottom, right to left,
 what the ground sends on its way to a payload: it arrives at ``moc-in`` and
 leaves at ``moc-out``.
 
-So the arrows along the top point left and the arrows along the bottom point
-right, because that is the way the canvas itself is laid out -- the ground is
-the leftmost working pane and the payloads the rightmost. A reader who has
+So the arrows along the top point right and the arrows along the bottom point
+left, because that is the way the canvas itself is laid out -- the payloads
+are the leftmost working pane and the ground the rightmost. A reader who has
 worked that out once need not read the names again; and a reader who reads them
 is told whose data it is and whether it arrives or leaves, which is the
 question somebody about to draw a line is asking.
@@ -2314,7 +2320,7 @@ and it cannot be acted on until there is a second node. The rules come back as
 soon as there is a graph to apply them to.
 
 A configuration that does not exist yet opens with the ground station already
-in it, at the upper left. Every graph has
+in it, at the upper right, in the moc working pane. Every graph has
 one -- a vehicle whose telemetry reaches nobody is a vehicle nobody is
 operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be

@@ -148,7 +148,7 @@ tcsgui:
     - { name: k_aft, x: 240, y: 160 }
     - { name: k_bay, x: 240, y: 280 }
     - { name: mean_temp, x: 460, y: 160 }
-    - { name: thermostat, x: 660, y: 240 }
-    - { name: moc, x: 660, y: 40 }
-    - { name: heaters, x: 860, y: 240 }
+    - { name: thermostat, x: 616, y: 240 }
+    - { name: moc, x: 792, y: 40 }
+    - { name: heaters, x: 40, y: 400 }
     - { name: housekeeping, x: 460, y: 380 }

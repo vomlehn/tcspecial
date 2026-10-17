@@ -537,7 +537,7 @@ payloads:
 tcsgui:
   nodes:
     - { name: moc, x: 240, y: 40 }
-    - { name: temp_fore, x: 40, y: 240 }
+    - { name: temp_fore, x: 400, y: 240 }
 ";
         std::fs::write(&path, by_hand).expect("a file");
 
@@ -547,7 +547,7 @@ tcsgui:
         // The payload is in the payload working pane.
         let sensor = editor.document().node("temp_fore").expect("the sensor");
         assert!(
-            sensor.at.0 >= dividers.vehicle,
+            sensor.at.0 + crate::style::WIDTH as i32 <= dividers.payloads,
             "the payload opened at {:?}, outside its pane",
             sensor.at
         );
@@ -561,7 +561,7 @@ tcsgui:
         // belongs in the moc pane now, so it comes home at the same height.
         let moc = editor.document().node("moc").expect("the ground link");
         assert!(
-            moc.at.0 + crate::style::WIDTH as i32 <= dividers.moc,
+            moc.at.0 >= dividers.vehicle,
             "the ground link opened at {:?}, outside its pane",
             moc.at
         );

@@ -134,8 +134,8 @@ impl Obstacle {
 /// every node by the middle of its right edge and arrive at the middle of the
 /// next one's left edge, so "out, across, in" meant one thing and the
 /// arrowhead always pointed right. Now a link leaves the terminal it is
-/// attached to -- and the groundward stream leaves a node's *left* side, on
-/// its way to a ground link drawn further left -- so the way out of the source
+/// attached to -- and the vehicleward stream leaves a node's *left* side, on
+/// its way from the ground link to a payload drawn further left -- so the way out of the source
 /// and the way into the target are two separate facts, and neither of them is
 /// always right.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1233,10 +1233,10 @@ mod tests {
 
     /// A link that goes the other way is routed the other way about.
     ///
-    /// The groundward stream, which is what terminals made necessary: it
+    /// The vehicleward stream, which is what terminals made necessary: it
     /// leaves a node's left side and arrives at the next one's right side, and
     /// the next one is drawn further left -- the ground link being the
-    /// leftmost working pane. Every piece of the route has to turn around for
+    /// rightmost working pane and the payloads the leftmost. Every piece of the route has to turn around for
     /// it: the stub, the straight run, the arrowhead.
     #[test]
     fn a_leftward_link_runs_leftward() {

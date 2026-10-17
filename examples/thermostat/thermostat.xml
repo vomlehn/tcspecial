@@ -158,9 +158,9 @@
         <nodes><name>k_aft</name><x>240</x><y>160</y></nodes>
         <nodes><name>k_bay</name><x>240</x><y>280</y></nodes>
         <nodes><name>mean_temp</name><x>460</x><y>160</y></nodes>
-        <nodes><name>thermostat</name><x>660</x><y>240</y></nodes>
-        <nodes><name>moc</name><x>660</x><y>40</y></nodes>
-        <nodes><name>heaters</name><x>860</x><y>240</y></nodes>
+        <nodes><name>thermostat</name><x>616</x><y>240</y></nodes>
+        <nodes><name>moc</name><x>792</x><y>40</y></nodes>
+        <nodes><name>heaters</name><x>40</x><y>400</y></nodes>
         <nodes><name>housekeeping</name><x>460</x><y>380</y></nodes>
     </tcsgui>
 </configuration>

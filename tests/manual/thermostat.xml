@@ -5,7 +5,7 @@
     <version>2.0</version>
     <tcspecial>
         <beacon>
-            <interval>5s</interval>
+            <interval>5 s</interval>
             <recv>127.0.0.1:5650</recv>
             <send>0.0.0.0:5550</send>
         </beacon>
@@ -28,7 +28,7 @@
     </tcspecial>
     <payload_groups>
         <name>cabin_temps</name>
-        <interval>3s</interval>
+        <interval>3 s</interval>
     </payload_groups>
     <moc>
         <name>moc</name>

@@ -109,6 +109,17 @@
       <!-- How it is read. -->
       <xs:element name="read_size" type="xs:string"/>
       <xs:element name="trigger" type="xs:string"/>
+      <!-- How a node that is asked is driven, and how one that is not.
+           `trigger_interval` is how often the trigger goes out and
+           `read_delay` how long the part takes to answer, both of which go
+           with a `trigger` and mean nothing without one. `poll_interval` is
+           the least time between one read of a node nothing asks and the
+           next: a floor rather than a cadence, there being no telling how
+           soon a descriptor will have anything. A node in a group states none
+           of the rates: its group says when it is read. -->
+      <xs:element name="trigger_interval" type="xs:string"/>
+      <xs:element name="read_delay" type="xs:string"/>
+      <xs:element name="poll_interval" type="xs:string"/>
       <xs:element name="max_length" type="xs:string"/>
       <xs:element name="read_timeout" type="xs:string"/>
       <xs:element name="terminators" type="xs:string"/>
@@ -147,6 +158,11 @@
       <xs:element name="edge" type="xs:string"/>
       <xs:element name="bias" type="xs:string"/>
       <xs:element name="debounce" type="xs:string"/>
+      <!-- How often a set of discrete lines reports what it is. Events say
+           when a line changed and this says what the lines are: a payload may
+           ask for either or both, and `edge: none` with no state_interval is
+           refused because nothing would be sent. Inputs only. -->
+      <xs:element name="state_interval" type="xs:string"/>
       <!-- A computation, and what each of them is told. -->
       <xs:element name="function" type="xs:string"/>
       <xs:element name="inputs" type="xs:string"/>
@@ -183,23 +199,21 @@
 
   <!-- A set of payloads read on one interval.
 
-       The interval is a number and a unit, written together: `500ms`, `3s`,
-       `1.5s`, `15min`, `6h`, `1w`. The units are `us`, `ms`, `s`, `min`, `h`,
-       `d` and `w`, matched longest first, so `500ms` is milliseconds.
-       Minutes are `min` and never `m`, a single `m` being one letter from
-       `ms` and a thousand-fold apart from it; a month and a year are not
-       units here at all. The number is decimal, whole or a fraction, with
-       underscores allowed among the digits, so `1_000ms`, `1.5s` and
-       `1500ms` are the same interval written three ways. There is no
-       hexadecimal: `d` is a hexadecimal digit, and `0x1d` would be a number
-       that is also "0x1 days".
+       The interval is a number, whitespace, and a unit: `500 ms`, `3 s`,
+       `1.5 s`, `15 min`, `6 h`, `1 w`. The whitespace is required and one or
+       more characters of it will do, so `500 ms` and `500  ms` are the same
+       interval and `500ms` is refused. The units are `us`, `ms`, `s`, `min`,
+       `h`, `d` and `w`, each a word of its own. Minutes are `min` and never
+       `m`, a single `m` being one letter from `ms` and a thousand-fold apart
+       from it; a month and a year are not units here. The number is decimal,
+       whole or a fraction, with underscores allowed among the digits, so
+       `1_000 ms`, `1.5 s` and `1500 ms` are one interval written three ways.
+       There is no hexadecimal and none is planned.
 
-       A string and not a pattern. What the software accepts is
-       `graph::parse_interval`, and a pattern here would be a second copy of
-       that grammar: the copy would be the one that was wrong, and a schema
-       that refuses a file the software accepts is worse than no schema. An
-       interval that is not one is refused where the file is read, in words
-       that name the units. -->
+       Checked by the reader and not by a pattern here: the one grammar is
+       `graph::parse_interval`, and a pattern would be a second copy of it to
+       drift away from. An interval that is not one is refused where the file
+       is read, in words that say what is wrong with it. -->
   <xs:complexType name="payload_group">
     <xs:all>
       <xs:element name="name" type="xs:string"/>

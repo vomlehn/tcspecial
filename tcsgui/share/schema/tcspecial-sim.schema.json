@@ -54,7 +54,7 @@
               "boolean",
               "null"
             ],
-            "description": "How often it sends, as a length of time -- 1s, 500ms -- or the word `continuous` for as fast as the payload can be driven. Nought is no length of time and is refused, being the one value a file arrives at by accident. For a payload that sends on its own: one the configuration gives a trigger is asked instead, at the interval of the payload group it is in, so it states none here and there is nothing for an interval to mean."
+            "description": "How often it sends, as a length of time -- 1 s, 500 ms -- or the word `continuous` for as fast as the payload can be driven. Nought is no length of time and is refused, being the one value a file arrives at by accident. For a payload that sends on its own: one the configuration gives a trigger is asked instead, at the interval of the payload group it is in, so it states none here and there is nothing for an interval to mean."
           },
           "segment_interval": {
             "type": [

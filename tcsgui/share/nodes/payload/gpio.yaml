@@ -37,16 +37,16 @@ attributes:
     kind: interval
     about: >
       How long a line must hold its level to count as an event, as a length of
-      time: 50us, 2ms.
+      time: 50 us, 2 ms.
   - name: group
     required: false
     about: >
-      The payload group that reads it, where it is in one. Optional, though a
-      payload that states a trigger needs one: the interval of its group is
-      how often it is asked.
-  - name: trigger
+      The payload group it belongs to, where it is in one.
+  - name: state_interval
     required: false
-    kind: bytes
+    kind: interval
     about: >
-      What to send to make it answer, as hex bytes. A payload with none
-      is one the configuration describes as only read.
+      How often to report what the lines are: 5 s. Edges say when a line
+      changed and this says what it is now, so a set of lines may ask for
+      either or both -- and a line that has not changed since the vehicle
+      started tells the ground nothing until this is stated. Inputs only.

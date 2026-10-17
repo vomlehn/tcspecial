@@ -926,12 +926,12 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5s
+    interval: 5 s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
 payload_groups:
   - name: temps
-    interval: \"3s\"
+    interval: \"3 s\"
 payloads:
   - { name: sensor, type: i2c, group: temps, path: \"/dev/i2c-1\", address: \"0x48\", payload-out: moc }
 moc:
@@ -991,7 +991,7 @@ vehicle:
         let all = said.join("\n");
 
         assert!(all.contains("two nodes are called \"a\""), "{all}");
-        assert!(all.contains("no unit"), "{all}");
+        assert!(all.contains("is not a length of time"), "{all}");
         assert!(all.contains("there is no node called \"nowhere\""), "{all}");
         assert_eq!(report.status(), 1);
 
@@ -1146,11 +1146,11 @@ description: settings
 simulated_payloads:
   - name: DH0
     type: device-file
-    packet_interval: 1s
+    packet_interval: 1 s
   - name: DH1
     type: network
     protocol: udp
-    packet_interval: 1s
+    packet_interval: 1 s
 ";
 
     #[test]
@@ -1346,10 +1346,10 @@ description: settings
 simulated_payloads:
   - name: DH0
     type: device-file
-    packet_interval: 1s
+    packet_interval: 1 s
   - name: nobody
     type: device-file
-    packet_interval: 1s
+    packet_interval: 1 s
 ";
         let set = written(".yaml", GOOD, sim);
         let report = verify(&set.payload, Some(&set.sim));

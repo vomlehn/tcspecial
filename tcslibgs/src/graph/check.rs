@@ -102,11 +102,23 @@ pub enum Problem {
     NoSuchGroup { node: String, group: String },
     /// A group whose interval cannot be read.
     BadInterval { group: String, why: String },
-    /// A node that states an interval of its own while in a group.
+    /// A node that states a rate of its own while in a group.
     ///
-    /// Two sensors in one group with intervals of their own is a
-    /// configuration whose own description disagrees with itself.
-    IntervalInAGroup { node: String, group: String },
+    /// Two sensors in one group with rates of their own is a configuration
+    /// whose own description disagrees with itself.
+    IntervalInAGroup {
+        node: String,
+        group: String,
+        attribute: &'static str,
+    },
+    /// A node that says how often it is asked and has nothing to ask with.
+    TriggerIntervalWithoutTrigger { node: String },
+    /// A node that says how long to wait for an answer and asks nothing.
+    ReadDelayWithoutTrigger { node: String },
+    /// A node that is asked and says how often it is simply read.
+    PollIntervalWithTrigger { node: String },
+    /// A node that says both how often it is asked and how often it is read.
+    TwoRates { node: String },
     /// Two links arriving at one input of one node.
     InputBoundTwice { node: String, input: String },
     /// A link end naming a terminal its node does not have, or naming one at
@@ -229,6 +241,10 @@ impl Problem {
             Problem::SelfLink { node } => About::Node(node.clone()),
             Problem::NoSuchGroup { node, .. } => About::Node(node.clone()),
             Problem::IntervalInAGroup { node, .. } => About::Node(node.clone()),
+            Problem::TriggerIntervalWithoutTrigger { node }
+            | Problem::ReadDelayWithoutTrigger { node }
+            | Problem::PollIntervalWithTrigger { node }
+            | Problem::TwoRates { node } => About::Node(node.clone()),
             Problem::InputBoundTwice { node, .. } => About::Node(node.clone()),
             // And so is a terminal's problem, and a crossed link's.
             Problem::BadTerminal { from, .. } => About::Node(from.clone()),
@@ -307,9 +323,29 @@ impl Problem {
             Problem::BadInterval { group, why } => {
                 format!("group \"{group}\": {why}")
             }
-            Problem::IntervalInAGroup { node, group } => format!(
-                "\"{node}\" states an interval of its own and is in group \
-                 \"{group}\", which states one for it"
+            Problem::IntervalInAGroup {
+                node,
+                group,
+                attribute,
+            } => format!(
+                "\"{node}\" states {attribute} and is in group \"{group}\", which \
+                 says when it is read"
+            ),
+            Problem::TriggerIntervalWithoutTrigger { node } => format!(
+                "\"{node}\" states trigger_interval and has no trigger: that is how \
+                 often the trigger goes out, and there is nothing to send"
+            ),
+            Problem::ReadDelayWithoutTrigger { node } => format!(
+                "\"{node}\" states read_delay and has no trigger: that is how long \
+                 to wait between asking and reading, and nothing asks it"
+            ),
+            Problem::PollIntervalWithTrigger { node } => format!(
+                "\"{node}\" states poll_interval and a trigger: a node that is asked \
+                 is read when it has been asked, so say trigger_interval"
+            ),
+            Problem::TwoRates { node } => format!(
+                "\"{node}\" states both trigger_interval and poll_interval: a node is \
+                 asked or it is read, and the one it is says which rate it has"
             ),
             Problem::InputBoundTwice { node, input } => {
                 format!("two links arrive at \"{node}.{input}\"")
@@ -493,10 +529,44 @@ impl Graph {
                     group: group.clone(),
                 });
             }
-            if node.attributes.contains_key("interval") {
-                problems.push(Problem::IntervalInAGroup {
+            for rate in ["interval", "trigger_interval", "poll_interval"] {
+                if node.attributes.contains_key(rate) {
+                    problems.push(Problem::IntervalInAGroup {
+                        node: node.name.clone(),
+                        group: group.clone(),
+                        attribute: rate,
+                    });
+                }
+            }
+        }
+
+        // How a node is driven, which it says in one of two ways: a trigger,
+        // with how often it goes out and how long the part takes to answer;
+        // or a poll interval, which is how often a node nothing asks is
+        // simply read. The two are exclusive, and each of the attributes that
+        // goes with a trigger means nothing without one.
+        for node in &self.nodes {
+            let said = |name: &str| node.attributes.contains_key(name);
+            let asked = said("trigger");
+
+            if said("trigger_interval") && said("poll_interval") {
+                problems.push(Problem::TwoRates {
                     node: node.name.clone(),
-                    group: group.clone(),
+                });
+            }
+            if said("trigger_interval") && !asked {
+                problems.push(Problem::TriggerIntervalWithoutTrigger {
+                    node: node.name.clone(),
+                });
+            }
+            if said("read_delay") && !asked {
+                problems.push(Problem::ReadDelayWithoutTrigger {
+                    node: node.name.clone(),
+                });
+            }
+            if said("poll_interval") && asked {
+                problems.push(Problem::PollIntervalWithTrigger {
+                    node: node.name.clone(),
                 });
             }
         }
@@ -1116,7 +1186,7 @@ mod tests {
                 ("payload_telemetry.dest_base", "127.0.0.1:6100"),
                 ("payload_command.source_base", "127.0.0.1:4300"),
                 ("payload_command.dest_base", "0.0.0.0:4200"),
-                ("beacon.interval", "5s"),
+                ("beacon.interval", "5 s"),
                 ("beacon.send", "0.0.0.0:5550"),
                 ("beacon.recv", "127.0.0.1:5650"),
                 ("log.directory", "/var/log/tcspecial"),
@@ -1687,6 +1757,63 @@ mod tests {
             .any(|p| matches!(p, Problem::DuplicateNode { .. })));
     }
 
+    /// A node says how it is driven in one way, and the words that go with a
+    /// trigger mean nothing without one.
+    ///
+    /// `trigger_interval` is how often the trigger goes out and `read_delay`
+    /// how long the part takes to answer, so neither says anything about a
+    /// node nothing asks; `poll_interval` is how often a node nothing asks is
+    /// read, so it says nothing about one that is asked. A node with both
+    /// rates has said it is asked and that it is not.
+    #[test]
+    fn a_node_is_asked_or_it_is_polled() {
+        let driven = |pairs: &[(&str, &str)]| {
+            let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
+            for (name, value) in pairs {
+                g.nodes[0].attributes.insert(
+                    (*name).to_string(),
+                    crate::endpoint_config::Scalar::of(*value),
+                );
+            }
+            g.check()
+        };
+
+        // Each of the three on its own, with what it belongs to.
+        assert_eq!(driven(&[("trigger", "55"), ("trigger_interval", "1 s")]), Vec::new());
+        assert_eq!(driven(&[("poll_interval", "1 s")]), Vec::new());
+        assert_eq!(
+            driven(&[("trigger", "55"), ("trigger_interval", "1 s"), ("read_delay", "2 ms")]),
+            Vec::new()
+        );
+
+        // And each of the four ways of saying something that does not hold
+        // together.
+        for (pairs, wanted) in [
+            (
+                vec![("trigger_interval", "1 s")],
+                Problem::TriggerIntervalWithoutTrigger { node: "a".into() },
+            ),
+            (
+                vec![("read_delay", "2 ms")],
+                Problem::ReadDelayWithoutTrigger { node: "a".into() },
+            ),
+            (
+                vec![("trigger", "55"), ("poll_interval", "1 s")],
+                Problem::PollIntervalWithTrigger { node: "a".into() },
+            ),
+            (
+                vec![("trigger", "55"), ("trigger_interval", "1 s"), ("poll_interval", "1 s")],
+                Problem::TwoRates { node: "a".into() },
+            ),
+        ] {
+            let found = driven(&pairs);
+            assert!(
+                found.contains(&wanted),
+                "{pairs:?} should be refused with {wanted:?}: {found:?}"
+            );
+        }
+    }
+
     /// A group must exist, must read on a readable interval, and owns it.
     #[test]
     fn a_group_owns_the_interval_of_everything_in_it() {
@@ -1701,7 +1828,7 @@ mod tests {
 
         g.groups.push(Group {
             name: "temps".to_string(),
-            interval: "3s".to_string(),
+            interval: "3 s".to_string(),
         });
         assert_eq!(g.check(), Vec::new());
 
@@ -1710,11 +1837,38 @@ mod tests {
         // itself.
         g.nodes[0]
             .attributes
-            .insert("interval".to_string(), crate::endpoint_config::Scalar::of("1s"));
+            .insert("interval".to_string(), crate::endpoint_config::Scalar::of("1 s"));
         assert!(g
             .check()
             .iter()
             .any(|p| matches!(p, Problem::IntervalInAGroup { .. })));
+
+        // Nor a rate of either of the other two spellings: a group says
+        // when the nodes in it are read, however they are driven.
+        for rate in ["trigger_interval", "poll_interval"] {
+            let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
+            g.nodes[0].group = Some("temps".to_string());
+            g.groups.push(Group {
+                name: "temps".to_string(),
+                interval: "3 s".to_string(),
+            });
+            g.nodes[0]
+                .attributes
+                .insert(rate.to_string(), crate::endpoint_config::Scalar::of("1 s"));
+            if rate == "trigger_interval" {
+                g.nodes[0]
+                    .attributes
+                    .insert("trigger".to_string(), crate::endpoint_config::Scalar::of("55"));
+            }
+            let found = g.check();
+            assert!(
+                found.iter().any(|p| matches!(
+                    p,
+                    Problem::IntervalInAGroup { attribute, .. } if *attribute == rate
+                )),
+                "{rate} in a group should be refused: {found:?}"
+            );
+        }
 
         // And an interval that cannot be read is said so.
         let mut g = graph(Vec::new(), Vec::new());
@@ -1734,7 +1888,7 @@ mod tests {
         let mut g = graph(vec![node("a", "i2c"), node("b", "moc")], vec![link("a", &["b"])]);
         g.groups.push(Group {
             name: "temps".to_string(),
-            interval: "3s".to_string(),
+            interval: "3 s".to_string(),
         });
         let problems = g.check();
         assert_eq!(
@@ -2470,7 +2624,12 @@ mod tests {
             Problem::IntervalInAGroup {
                 node: "a".into(),
                 group: "g".into(),
+                attribute: "interval",
             },
+            Problem::TriggerIntervalWithoutTrigger { node: "a".into() },
+            Problem::ReadDelayWithoutTrigger { node: "a".into() },
+            Problem::PollIntervalWithTrigger { node: "a".into() },
+            Problem::TwoRates { node: "a".into() },
             Problem::InputBoundTwice {
                 node: "m".into(),
                 input: "in0".into(),

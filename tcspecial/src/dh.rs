@@ -591,7 +591,7 @@ mod tests {
         );
         assert!(
             triggers <= expected * 3,
-            "{triggers} triggers in {window:?}, where an interval of 50ms allows \
+            "{triggers} triggers in {window:?}, where an interval of 50 ms allows \
              about {expected}: there is no interval between them"
         );
 

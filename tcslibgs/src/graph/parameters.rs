@@ -205,7 +205,7 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
 /// argued with.
 pub fn default_of(attribute: &str) -> Option<&'static str> {
     match attribute {
-        "beacon.interval" => Some("1s"),
+        "beacon.interval" => Some("1 s"),
         _ => None,
     }
 }
@@ -219,7 +219,7 @@ pub fn default_of(attribute: &str) -> Option<&'static str> {
 pub fn retired(attribute: &str) -> Option<&'static str> {
     match attribute {
         "beacon.interval_ms" => {
-            Some("say beacon.interval, as a length of time: 5s rather than 5000")
+            Some("say beacon.interval, as a length of time: 5 s rather than 5000")
         }
         _ => None,
     }
@@ -359,7 +359,7 @@ mod tests {
             ("payload_command.dest_base", "0.0.0.0:4200"),
             ("payload_telemetry.source_base", "0.0.0.0:6000"),
             ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-            ("beacon.interval", "5s"),
+            ("beacon.interval", "5 s"),
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
             ("log.directory", "/var/log/tcspecial"),
@@ -376,7 +376,7 @@ mod tests {
         assert_eq!(config.tcs_cmd.send, "127.0.0.1:4100");
         assert_eq!(config.payload_command.source_base, "127.0.0.1:4300");
         assert_eq!(config.payload_command.dest_base, "0.0.0.0:4200");
-        assert_eq!(config.beacon.interval, "5s");
+        assert_eq!(config.beacon.interval, "5 s");
         assert_eq!(config.beacon.send, "0.0.0.0:5550");
         assert_eq!(config.log.directory.as_deref(), Some("/var/log/tcspecial"));
         assert_eq!(config.log.segment_size, 65536);

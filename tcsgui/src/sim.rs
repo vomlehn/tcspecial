@@ -378,7 +378,7 @@ mod tests {
             simulator.description = Some("Simulator settings".to_string());
             simulator.groups.insert(
                 "steady_1hz".to_string(),
-                [("packet_interval", "1s"), ("segment_interval", "250ms")]
+                [("packet_interval", "1 s"), ("segment_interval", "250 ms")]
                     .into_iter()
                     .map(|(name, value)| (name.to_string(), value.to_string()))
                     .collect(),
@@ -440,7 +440,7 @@ mod tests {
         let mut simulator = Simulator::new(&path);
         simulator.groups.insert(
             "steady_1hz".to_string(),
-            [("packet_interval", "1s")]
+            [("packet_interval", "1 s")]
                 .into_iter()
                 .map(|(name, value)| (name.to_string(), value.to_string()))
                 .collect(),

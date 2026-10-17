@@ -175,7 +175,7 @@ pub const TEXT: &str = "text";
 ///   because a window will one day offer to go and find one.
 /// * `whole` -- a whole number, decimal or `0x`, as `whole::whole_u32` reads
 ///   one.
-/// * `interval` -- a length of time with its unit, `500ms` or `15min`, as
+/// * `interval` -- a length of time with its unit, `500 ms` or `15 min`, as
 ///   `graph::parse_interval` reads one.
 /// * `timeout` -- a length of time, or the word `none`: a read that does not
 ///   time out at all. A kind of its own because that word is the whole of the

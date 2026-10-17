@@ -12,8 +12,8 @@
 //! ```yaml
 //! simulated_payload_groups:
 //!   - name: steady_1hz
-//!     packet_interval: 1s
-//!     segment_interval: 1s
+//!     packet_interval: 1 s
+//!     segment_interval: 1 s
 //!
 //! simulated_payloads:
 //!   - name: DH0
@@ -23,7 +23,7 @@
 //!   - name: DH3
 //!     type: network
 //!     protocol: tcp
-//!     packet_interval: 500ms
+//!     packet_interval: 500 ms
 //! ```
 //!
 //! The kind and the transport are the payload configuration's, not this file's:
@@ -764,7 +764,7 @@ pub struct SimSettings {
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub payload_port: Option<u16>,
 
-    /// How long between packets, as a length of time: `1s`, `500ms`.
+    /// How long between packets, as a length of time: `1 s`, `500 ms`.
     ///
     /// Every length of time in a configuration is written this way -- see
     /// `crate::graph::parse_interval` -- and this was `packet_interval_ms`, a
@@ -1491,8 +1491,8 @@ mod tests {
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval: 1s
-    segment_interval: 250ms
+    packet_interval: 1 s
+    segment_interval: 250 ms
 simulated_payloads:
   - name: DH0
     type: network
@@ -1525,14 +1525,14 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval: 1s
-    segment_interval: 1s
+    packet_interval: 1 s
+    segment_interval: 1 s
 simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
     group: steady_1hz
-    packet_interval: 500ms
+    packet_interval: 500 ms
     segment_size: 4
 ",
         );
@@ -1552,7 +1552,7 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 500ms
+    packet_interval: 500 ms
 ",
         );
 
@@ -1570,7 +1570,7 @@ simulated_payloads:
   - name: DH1
     type: network
     protocol: udp
-    packet_interval: 1ms
+    packet_interval: 1 ms
   - name: DH0
     type: network
     protocol: udp
@@ -1718,7 +1718,7 @@ simulated_payloads:
         ] {
             let file = parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: udp\n    packet_interval: 100ms\n    {plain}\n"
+                 protocol: udp\n    packet_interval: 100 ms\n    {plain}\n"
             ));
             let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
             assert!(
@@ -1733,7 +1733,7 @@ simulated_payloads:
 
         // A group is read the same way.
         let file = parse(
-            "simulated_payload_groups:\n  - name: g\n    packet_interval: 100ms\n    \
+            "simulated_payload_groups:\n  - name: g\n    packet_interval: 100 ms\n    \
              port: 5000\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    \
              group: g\n",
@@ -1756,7 +1756,7 @@ simulated_payloads:
         let settled = |extra: &str, dh: &DHConfig| {
             parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: udp\n    packet_interval: 100ms\n{extra}"
+                 protocol: udp\n    packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(dh))
         };
@@ -1809,7 +1809,7 @@ simulated_payloads:
         });
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    \
-             packet_interval: 100ms\n    payload_port: 7000\n",
+             packet_interval: 100 ms\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[stream]).unwrap_err());
         assert!(
@@ -1828,7 +1828,7 @@ simulated_payloads:
         let path = |extra: &str| {
             parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: unix_dgram\n    packet_interval: 100ms\n{extra}"
+                 protocol: unix_dgram\n    packet_interval: 100 ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(&socket))
         };
@@ -1873,10 +1873,10 @@ simulated_payloads:
 
         // One name and one group name, in two files that know nothing of each
         // other, each resolved against its own tcspecial configuration.
-        let first = a_set("1s")
+        let first = a_set("1 s")
             .resolve(&[handler("DH0", 12)])
             .expect("the first set");
-        let second = a_set("250ms")
+        let second = a_set("250 ms")
             .resolve(&[handler("DH0", 8)])
             .expect("the second set");
 
@@ -1897,7 +1897,7 @@ simulated_payloads:
     fn a_word_that_is_not_a_setting_is_refused() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udp\n    packet_interval: 100ms\n    drop_percnt: 10\n",
+             protocol: udp\n    packet_interval: 100 ms\n    drop_percnt: 10\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -1923,7 +1923,7 @@ simulated_payloads:
     /// And the sections of the file itself, for the same reason.
     #[test]
     fn a_section_that_is_not_a_section_is_refused() {
-        let text = "simulated_payload:\n  - name: DH0\n    packet_interval: 100ms\n";
+        let text = "simulated_payload:\n  - name: DH0\n    packet_interval: 100 ms\n";
         let e = crate::ConfigFormat::Yaml
             .parse::<SimConfigFile>(text)
             .expect_err("a file whose one section is misspelled describes nothing");
@@ -1950,7 +1950,7 @@ simulated_payloads:
         // configuration of the stream set.
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udp\n    packet_interval: 1s\n",
+             protocol: udp\n    packet_interval: 1 s\n",
         );
 
         let mut stream = handler("DH0", 4);
@@ -1978,7 +1978,7 @@ simulated_payloads:
     fn the_two_files_cannot_disagree_about_the_kind() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
-             packet_interval: 1s\n",
+             packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -1994,7 +1994,7 @@ simulated_payloads:
     /// it, since that is the one thing an error here always knows.
     #[test]
     fn a_simulated_payload_says_what_it_stands_in_for() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval: 1s\n");
+        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval: 1 s\n");
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("type: network"),
@@ -2005,7 +2005,7 @@ simulated_payloads:
         // the kind alone would not have caught the pairing above.
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             packet_interval: 1s\n",
+             packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -2041,7 +2041,7 @@ simulated_payloads:
     fn a_kind_or_a_transport_that_is_neither_is_refused() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: netwrok\n    \
-             packet_interval: 1s\n",
+             packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -2051,7 +2051,7 @@ simulated_payloads:
 
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udb\n    packet_interval: 1s\n",
+             protocol: udb\n    packet_interval: 1 s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -2066,7 +2066,7 @@ simulated_payloads:
     fn a_group_may_carry_what_its_payloads_stand_in_for() {
         let file = parse(
             "simulated_payload_groups:\n  - name: datagrams\n    type: network\n    \
-             protocol: udp\n    packet_interval: 1s\n\
+             protocol: udp\n    packet_interval: 1 s\n\
              simulated_payloads:\n  - name: DH0\n    group: datagrams\n  \
              - name: DH1\n    group: datagrams\n",
         );
@@ -2081,7 +2081,7 @@ simulated_payloads:
         // A percentage is nought to a hundred. Anything else is a
         // misunderstanding rather than a severe fault.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              drop_percent: 150\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2094,7 +2094,7 @@ simulated_payloads:
         // A payload that sends on its own is never asked for anything, so it
         // has no request to ignore.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              ignore_trigger_percent: 50\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2107,7 +2107,7 @@ simulated_payloads:
         // And hanging up needs a link to hang up. handler() makes a UDP
         // payload, which has none.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n    \
              close_after: 10\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2137,8 +2137,8 @@ simulated_payloads:
         };
 
         let file = parse(
-            "simulated_payload_groups:\n  - name: flaky\n    packet_interval: 100ms\n    \
-             drop_percent: 10\n    jitter: 25ms\n\
+            "simulated_payload_groups:\n  - name: flaky\n    packet_interval: 100 ms\n    \
+             drop_percent: 10\n    jitter: 25 ms\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    group: flaky\n    \
              close_after: 7\n",
         );
@@ -2162,7 +2162,7 @@ simulated_payloads:
     /// existed asked for.
     #[test]
     fn a_file_with_no_faults_asks_for_a_payload_that_works() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n");
+        let file = parse("simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100 ms\n");
         let resolved = file.resolve(&[handler("DH0", 4)]).expect("resolves");
         assert_eq!(resolved[0].faults, Faults::default());
         assert!(!resolved[0].faults.any());
@@ -2194,7 +2194,7 @@ simulated_payloads:
             stale_interval_ms: None,
         };
 
-        for stated in ["packet_interval: 1s", "segment_interval: 1s"] {
+        for stated in ["packet_interval: 1 s", "segment_interval: 1 s"] {
             let named = stated.split(':').next().unwrap();
 
             // Stated by the payload itself.
@@ -2270,7 +2270,7 @@ simulated_payloads:
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    packet_interval: 1s\n",
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    packet_interval: 1 s\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
@@ -2352,7 +2352,7 @@ simulated_payloads:
     /// The one value a length of time cannot be is nought -- every other
     /// reader of one refuses it -- so the exception this file needs is a word
     /// rather than a value that means something here and nowhere else. A file
-    /// that arrives at `0s` by accident asks for the fastest thing the
+    /// that arrives at `0 s` by accident asks for the fastest thing the
     /// simulator does, which is why it is refused and told what to write.
     #[test]
     fn as_fast_as_it_can_be_driven_is_a_word() {
@@ -2375,7 +2375,7 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 1s
+    packet_interval: 1 s
     segment_interval: continuous
 ",
         );
@@ -2386,7 +2386,7 @@ simulated_payloads:
         );
 
         // A nought says nothing this file reads, and is told the word.
-        for nought in ["0s", "0ms", "0.0s"] {
+        for nought in ["0 s", "0 ms", "0.0 s"] {
             let file = parse(&format!(
                 "
 simulated_payloads:
@@ -2412,7 +2412,7 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 1s
+    packet_interval: 1 s
     jitter: continuous
 ",
         );
@@ -2429,7 +2429,7 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval: 1s
+    packet_interval: 1 s
   - name: continuous
     packet_interval: continuous
 simulated_payloads:
@@ -2456,7 +2456,7 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval: 1s
+    packet_interval: 1 s
 simulated_payloads:
   - name: DH0
     type: network
@@ -2480,9 +2480,9 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: g
-    packet_interval: 1ms
+    packet_interval: 1 ms
   - name: g
-    packet_interval: 2ms
+    packet_interval: 2 ms
 simulated_payloads:
   - name: DH0
     type: network
@@ -2504,11 +2504,11 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 1ms
+    packet_interval: 1 ms
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 2ms
+    packet_interval: 2 ms
 ",
         );
         assert_eq!(

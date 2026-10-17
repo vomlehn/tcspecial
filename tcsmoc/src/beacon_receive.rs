@@ -714,7 +714,7 @@ use crate::config::constants::BEACON_INDICATOR; // Adjust path as needed
  * Why this works
  * The "Blink" Logic: By using set_read_timeout with the duration returned by
  * color_and_delay, the loop "wakes up" exactly when it's time to toggle the
- * light (e.g., every 500ms for a blink), even if no network data has arrived.
+ * light (e.g., every 500 ms for a blink), even if no network data has arrived.
  * 
  * The Weak Pointer: We use Weak<MainWindow> so that the background thread
  * doesn't prevent the UI from closing. If the user closes the window,

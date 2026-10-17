@@ -848,6 +848,16 @@ pub struct GpioConfig {
     /// How long a line must be steady before a change counts, in
     /// microseconds, where the file asks for it.
     pub debounce_us: Option<u32>,
+    /// How often the current level of every line is reported, in
+    /// milliseconds, where the file asks for it.
+    ///
+    /// Events say when a line changed; this says what it is now. A ground
+    /// station that connected after the last edge knows nothing about a line
+    /// until it changes again, and the kernel's event queue is finite, so a
+    /// flood can leave the ground holding a value that is simply wrong. A
+    /// report every so often closes both: after one interval at most, what
+    /// the ground has is the truth.
+    pub state_interval_ms: Option<u32>,
 }
 
 /// Configuration for an endpoint that is an rpmsg channel
@@ -1363,6 +1373,9 @@ fn link_terms_of(
         edge: inherited!(edge),
         bias: inherited!(bias),
         debounce_us: inherited!(debounce_us),
+        // Version 1 has no state report: its gpio payloads are watched for
+        // edges and nothing else.
+        state_interval_ms: None,
         direction: inherited!(direction),
         stream: inherited!(stream).map(|s| crate::endpoint_config::StreamTerms {
             max_length: s.max_length,
@@ -2730,7 +2743,7 @@ pub struct TcsCmdJson {
 /// states them for a set that has no section.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BeaconJson {
-    /// How long between beacons, as a length of time: `5s`, `500ms`.
+    /// How long between beacons, as a length of time: `5 s`, `500 ms`.
     ///
     /// One grammar for every length of time a configuration states; see
     /// [`crate::graph::parse_interval`]. It was `interval_ms`, a bare count of
@@ -2940,7 +2953,7 @@ impl CIConfigJson {
         if self.beacon.interval_ms.is_some() {
             return Err(
                 "beacon.interval_ms is beacon.interval now, and is a length of \
-                 time: 5s rather than 5000"
+                 time: 5 s rather than 5000"
                     .to_string(),
             );
         }
@@ -3544,7 +3557,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5s
+    interval: 5 s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -3617,7 +3630,7 @@ tcspecial:
     source_base: 0.0.0.0:65535
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5s
+    interval: 5 s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -3787,7 +3800,7 @@ version: \"1.0\"
 description: a set
 tcspecial:
 {links}  beacon:
-    interval: 5s
+    interval: 5 s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -3862,7 +3875,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5s
+    interval: 5 s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -4129,7 +4142,7 @@ tcspecial:
     source_base: localhost:5000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5s
+    interval: 5 s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -5195,13 +5208,13 @@ payloads:
 
     #[test]
     fn a_stream_rule_must_say_how_long_a_read_may_be() {
-        let said = line_stream("      timeout: 1s\n").expect_err("max_length is required");
+        let said = line_stream("      timeout: 1 s\n").expect_err("max_length is required");
         assert!(said.contains("max_length"), "{said}");
     }
 
     #[test]
     fn a_timeout_alone_ends_a_read() {
-        let stream = line_stream("      max_length: 64\n      timeout: 250ms\n").expect("accepted");
+        let stream = line_stream("      max_length: 64\n      timeout: 250 ms\n").expect("accepted");
         assert_eq!(stream.timeout, Some(Duration::from_millis(250)));
         assert!(stream.terminators.is_empty());
         assert!(!stream.is_fixed_length());
@@ -5219,7 +5232,7 @@ payloads:
     #[test]
     fn a_timeout_and_terminators_may_both_end_a_read() {
         let stream =
-            line_stream("      max_length: 64\n      timeout: 1s\n      terminators: [0x04]\n")
+            line_stream("      max_length: 64\n      timeout: 1 s\n      terminators: [0x04]\n")
                 .expect("accepted");
         assert_eq!(stream.timeout, Some(Duration::from_secs(1)));
         assert_eq!(stream.terminators, vec![0x04]);
@@ -5254,9 +5267,9 @@ payloads:
     #[test]
     fn a_timeouts_units_are_understood() {
         for (text, want) in [
-            ("900us", Duration::from_micros(900)),
-            ("250ms", Duration::from_millis(250)),
-            ("3s", Duration::from_secs(3)),
+            ("900 us", Duration::from_micros(900)),
+            ("250 ms", Duration::from_millis(250)),
+            ("3 s", Duration::from_secs(3)),
         ] {
             let stream = line_stream(&format!("      max_length: 8\n      timeout: {text}\n"))
                 .unwrap_or_else(|e| panic!("{text}: {e}"));
@@ -5264,16 +5277,27 @@ payloads:
         }
     }
 
+    /// A number with no unit after it is refused, and so is one written
+    /// against its unit.
+    ///
+    /// Two halves of the same rule: a length of time is a number, whitespace
+    /// and a unit, so "250" is missing the unit and "250ms" is missing the
+    /// whitespace. Each is told which, rather than both being told that the
+    /// value is not a length of time.
     #[test]
     fn a_timeout_without_a_unit_is_refused() {
         let said =
             line_stream("      max_length: 8\n      timeout: 250\n").expect_err("250 of what");
-        assert!(said.contains("no unit"), "{said}");
+        assert!(said.contains("a number, a space, and a unit"), "{said}");
+
+        let said = line_stream("      max_length: 8\n      timeout: 250ms\n")
+            .expect_err("written together");
+        assert!(said.contains("\"250 ms\""), "{said}");
     }
 
     #[test]
     fn a_zero_timeout_is_refused_in_favour_of_none() {
-        let said = line_stream("      max_length: 8\n      timeout: 0ms\n")
+        let said = line_stream("      max_length: 8\n      timeout: 0 ms\n")
             .expect_err("a read that times out at once reads nothing");
         assert!(
             said.contains("no interval at all") && said.contains("none"),
@@ -5288,10 +5312,10 @@ payloads:
     #[test]
     fn a_timeout_takes_what_an_interval_takes() {
         for (text, want) in [
-            ("1.5s", Duration::from_millis(1_500)),
-            ("5min", Duration::from_secs(300)),
-            ("1h", Duration::from_secs(3_600)),
-            ("2_000ms", Duration::from_secs(2)),
+            ("1.5 s", Duration::from_millis(1_500)),
+            ("5 min", Duration::from_secs(300)),
+            ("1 h", Duration::from_secs(3_600)),
+            ("2_000 ms", Duration::from_secs(2)),
         ] {
             let stream = line_stream(&format!("      max_length: 8\n      timeout: {text}\n"))
                 .unwrap_or_else(|e| panic!("{text}: {e}"));
@@ -5472,7 +5496,7 @@ payloads:
     #[test]
     fn a_bus_reads_its_terms() {
         let i2c = bus(
-            "    ten_bit: false\n    pec: true\n    retries: 3\n    timeout: 50ms\n    \
+            "    ten_bit: false\n    pec: true\n    retries: 3\n    timeout: 50 ms\n    \
              payload_address: 0x48\n",
         )
         .expect("every term of a bus");
@@ -5495,7 +5519,7 @@ payloads:
 
     #[test]
     fn a_bus_timeout_is_rounded_up_to_the_drivers_resolution() {
-        let i2c = bus("    timeout: 25ms\n    payload_address: 8\n").expect("a timeout");
+        let i2c = bus("    timeout: 25 ms\n    payload_address: 8\n").expect("a timeout");
         assert_eq!(i2c.timeout, Some(Duration::from_millis(25)));
         assert_eq!(i2c.effective_timeout(), Some(Duration::from_millis(30)));
     }

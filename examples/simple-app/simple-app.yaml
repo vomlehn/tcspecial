@@ -5,7 +5,7 @@ description: "A payload that is a program, sending a line of text a word at a ti
 
 tcspecial:
   beacon:
-    interval: "5s"
+    interval: "5 s"
     recv: "127.0.0.1:5650"
     send: "0.0.0.0:5550"
   log:

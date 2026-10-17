@@ -100,7 +100,7 @@ payload_telemetry:
 # and one receiver, both written down, can be described to a firewall or a
 # capture filter by somebody reading this file.
 beacon:
-  interval: "5s"
+  interval: "5 s"
   send: "0.0.0.0:5550"
   recv: "127.0.0.1:5650"
 

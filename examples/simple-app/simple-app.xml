@@ -6,7 +6,7 @@
     <description>A payload that is a program, sending a line of text a word at a time</description>
     <tcspecial>
         <beacon>
-            <interval>5s</interval>
+            <interval>5 s</interval>
             <recv>127.0.0.1:5650</recv>
             <send>0.0.0.0:5550</send>
         </beacon>

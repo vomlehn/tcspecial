@@ -53,6 +53,14 @@ pub struct Reach {
     /// version 1 payload triggered and the extra word could only disagree
     /// with it.
     pub trigger: Option<Vec<u8>>,
+    /// How long to wait between asking this node and reading it.
+    ///
+    /// For a node with a trigger, and for no other: it is the time the part
+    /// takes to answer, which its interface document states and nothing here
+    /// can guess. With one, a pass asks, waits, and reads what came back; with
+    /// none, a pass reads what the last ask produced and asks again, so the
+    /// reading is one interval old and nothing waits.
+    pub read_delay: Option<std::time::Duration>,
     /// Where a ground link's data goes: the `moc` node's `ground_base`.
     ///
     /// For a `moc` node, and only for one. What each node linked into the
@@ -80,6 +88,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     let mut stream_stated = false;
     let mut read_size = None;
     let mut trigger = None;
+    let mut read_delay = None;
 
     for (attribute, value) in &node.attributes {
         // The terms of a link go to the rules for the type, whichever type
@@ -105,9 +114,18 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                     ));
                 }
             }
-            // Which group reads it, which is the schedule's business and not
-            // this one's.
-            "group" | "interval" => {}
+            // When it is read, which is the schedule's business and not
+            // this one's: the group it is read with, or the rate it states
+            // for itself -- `trigger_interval` where it is asked and
+            // `poll_interval` where it is simply read.
+            "group" | "interval" | "trigger_interval" | "poll_interval" => {}
+            // How long to wait between asking and reading, which is this
+            // one's: it belongs to the part rather than to the schedule.
+            "read_delay" => {
+                read_delay = Some(crate::graph::parse_interval(value.as_str()).map_err(
+                    |why| format!("\"{what}\": read_delay: {why}"),
+                )?);
+            }
             // Where a ground link's data goes, which only a ground link has:
             // read below.
             "ground_base" if node.node_type == "moc" => {}
@@ -281,6 +299,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         endpoint,
         read_size,
         trigger,
+        read_delay,
         ground,
     })
 }
@@ -535,7 +554,7 @@ fn port_named(
 /// disagree the first time a type gained a term.
 ///
 /// Three terms are lengths of time here and counts there. A version 2
-/// configuration writes `debounce: 50us` and `rs485_delay_before_send: 2ms`,
+/// configuration writes `debounce: 50 us` and `rs485_delay_before_send: 2 ms`,
 /// as it writes every length of time -- see [`crate::graph::parse_interval`]
 /// -- and the rules those reach are the version 1 rules, which count in the
 /// unit their own name ends in. So the value is turned into that count on the
@@ -552,6 +571,7 @@ fn port_named(
 fn timed(attribute: &str) -> Option<(&'static str, u128)> {
     match attribute {
         "debounce" => Some(("debounce_us", 1)),
+        "state_interval" => Some(("state_interval_ms", 1_000)),
         "rs485_delay_before_send" => Some(("rs485_delay_before_send_ms", 1_000)),
         "rs485_delay_after_send" => Some(("rs485_delay_after_send_ms", 1_000)),
         _ => None,
@@ -567,12 +587,12 @@ fn timed(attribute: &str) -> Option<(&'static str, u128)> {
 /// the name is the only thing saying what the number counts.
 pub fn retired_term(attribute: &str) -> Option<&'static str> {
     match attribute {
-        "debounce_us" => Some("say debounce, as a length of time: 50us rather than 50"),
+        "debounce_us" => Some("say debounce, as a length of time: 50 us rather than 50"),
         "rs485_delay_before_send_ms" => {
-            Some("say rs485_delay_before_send, as a length of time: 2ms rather than 2")
+            Some("say rs485_delay_before_send, as a length of time: 2 ms rather than 2")
         }
         "rs485_delay_after_send_ms" => {
-            Some("say rs485_delay_after_send, as a length of time: 2ms rather than 2")
+            Some("say rs485_delay_after_send, as a length of time: 2 ms rather than 2")
         }
         _ => None,
     }
@@ -630,6 +650,7 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
         "edge" => terms.edge = value,
         "bias" => terms.bias = value,
         "debounce_us" => terms.debounce_us = value,
+        "state_interval_ms" => terms.state_interval_ms = value,
         "direction" => terms.direction = value,
         _ => return false,
     }

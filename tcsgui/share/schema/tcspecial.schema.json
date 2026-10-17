@@ -103,7 +103,7 @@
                 "boolean",
                 "null"
               ],
-              "description": "How often a beacon is sent, as a length of time: 5s, 500ms. It was interval_ms, a bare number of milliseconds."
+              "description": "How often a beacon is sent, as a length of time: 5 s, 500 ms. It was interval_ms, a bare number of milliseconds."
             },
             "send": {
               "description": "The socket tcspecial sends beacons from.",
@@ -154,7 +154,7 @@
               "boolean",
               "null"
             ],
-            "description": "A number and a unit, written together: 500ms, 3s, 1.5s, 15min, 6h, 1w. The units are us, ms, s, min, h, d and w, matched longest first, so 500ms is milliseconds. Minutes are min and never m, a single m being one letter from ms and a thousand-fold apart from it; a month and a year are not units here. The number is decimal, whole or a fraction, with underscores allowed among the digits, so 1_000ms, 1.5s and 1500ms are one interval written three ways. There is no hexadecimal: d is a hexadecimal digit, so 0x1d would be a number that is also 0x1 days."
+            "description": "A number, whitespace, and a unit: 500 ms, 3 s, 1.5 s, 15 min, 6 h, 1 w. The whitespace is required and one or more characters of it will do, so 500 ms and 500  ms are the same and 500ms is refused. The units are us, ms, s, min, h, d and w, each a word of its own. Minutes are min and never m, a single m being one letter from ms and a thousand-fold apart from it; a month and a year are not units here. The number is decimal, whole or a fraction, with underscores allowed among the digits, so 1_000 ms, 1.5 s and 1500 ms are one interval written three ways. There is no hexadecimal and none is planned."
           }
         },
         "required": [
@@ -304,6 +304,33 @@
             ]
           },
           "read_size": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "trigger_interval": {
+            "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "poll_interval": {
+            "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_delay": {
+            "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
             "type": [
               "string",
               "number",
@@ -577,6 +604,15 @@
             ]
           },
           "bias": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "state_interval": {
+            "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
             "type": [
               "string",
               "number",
@@ -843,6 +879,33 @@
               "null"
             ]
           },
+          "trigger_interval": {
+            "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "poll_interval": {
+            "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_delay": {
+            "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
           "trigger": {
             "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
@@ -1109,6 +1172,15 @@
             ]
           },
           "bias": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "state_interval": {
+            "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
             "type": [
               "string",
               "number",
@@ -1393,6 +1465,33 @@
               "null"
             ]
           },
+          "trigger_interval": {
+            "description": "How often the trigger goes out, as a length of time: how often this payload is asked. For a payload that states a trigger and is in no group -- a payload in one is asked when its group is read. A payload with no trigger has nothing to send, and states `poll_interval` instead.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "poll_interval": {
+            "description": "The least time between issuing one read of this node and issuing the next, as a length of time: a floor on the reading of a part nothing asks, not a cadence -- there is no telling how soon a descriptor will have anything, and what the interval prevents is reading again immediately for an answer already given. For a node in no group, and never beside a `trigger` -- a node that is asked is read because it was asked, which is `trigger_interval`.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_delay": {
+            "description": "How long to wait between sending the trigger and reading the answer, as a length of time: what the part's interface document says it takes to answer. With one, a pass asks, waits and reads the answer to the question it just asked; with none, a pass reads what the last ask produced and asks again, so the reading is one interval old. Only beside a `trigger`.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
           "trigger": {
             "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
@@ -1659,6 +1758,15 @@
             ]
           },
           "bias": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "state_interval": {
+            "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
             "type": [
               "string",
               "number",

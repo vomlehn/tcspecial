@@ -42,6 +42,7 @@
 
 use std::collections::VecDeque;
 use std::os::fd::BorrowedFd;
+use std::time::Duration;
 use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
@@ -154,6 +155,10 @@ pub struct EndpointPort {
     ///
     /// See [`EndpointPort::triggered_by`].
     trigger: Option<Vec<u8>>,
+    /// How long to wait between asking and reading, where the node says.
+    ///
+    /// See [`EndpointPort::waiting`].
+    read_delay: Option<Duration>,
     /// How many bytes one read asks for, where the node says.
     ///
     /// See [`EndpointPort::reading`].
@@ -201,6 +206,7 @@ impl EndpointPort {
             writer,
             uses,
             trigger: None,
+            read_delay: None,
             read_size: None,
         }
     }
@@ -232,6 +238,9 @@ impl EndpointPort {
         }
         if let Some(trigger) = reach.trigger {
             port = port.triggered_by(trigger);
+        }
+        if let Some(delay) = reach.read_delay {
+            port = port.waiting(delay);
         }
 
         Ok(port)
@@ -266,6 +275,23 @@ impl EndpointPort {
     /// makes every later pass a reading of a known age: one interval.
     pub fn triggered_by(mut self, trigger: Vec<u8>) -> EndpointPort {
         self.trigger = Some(trigger);
+        self
+    }
+
+    /// How long to wait between asking and reading.
+    ///
+    /// What turns read-then-ask into ask-wait-read. With a delay, a pass
+    /// writes the trigger, waits the time the part's interface document says
+    /// it takes to answer, and reads the answer it asked for -- so the
+    /// reading is of this moment rather than of the last interval. Without
+    /// one, the order above stands and nothing waits.
+    ///
+    /// The delay is the part's and not the schedule's, so it belongs to a
+    /// node whatever reads it: a payload in a group that answers in two
+    /// milliseconds answers in two milliseconds however often the group is
+    /// read.
+    pub fn waiting(mut self, read_delay: Duration) -> EndpointPort {
+        self.read_delay = Some(read_delay);
         self
     }
 
@@ -368,6 +394,22 @@ impl Port for EndpointPort {
             .read_size
             .map_or(buffer.len(), |size| size.min(buffer.len()));
 
+        // A node that is asked and says how long it takes to answer is
+        // asked here, before the read, and waited for: the answer the pass
+        // takes is then the answer to the question the pass asked. A node
+        // with no delay is asked after the read instead -- see below -- so
+        // that nothing waits on a part that has not been told how long it
+        // needs.
+        if let Some(delay) = self.read_delay {
+            if let Some(trigger) = self.trigger.take() {
+                let asked = self.write_all(&trigger, "trigger");
+                self.trigger = Some(trigger);
+                asked?;
+                std::thread::sleep(delay);
+            }
+        }
+
+
         // Asked before read, and this is not an optimisation. Some endpoints
         // are opened blocking -- a device file is opened as a file -- so a
         // read of one with nothing in it does not return. A pass that blocked
@@ -391,7 +433,14 @@ impl Port for EndpointPort {
         // wants asking again. The failure to ask is reported even where the
         // read succeeded, because a reading taken now and no question asked
         // is the last reading this node will ever produce.
-        match (got, self.trigger.take()) {
+        //
+        // A node with a read delay was asked above, before the read, so it is
+        // not asked again here: one question per pass either way.
+        let ask = match self.read_delay {
+            Some(_) => None,
+            None => self.trigger.take(),
+        };
+        match (got, ask) {
             (got, None) => got.map(Taken::of),
             (got, Some(trigger)) => {
                 let asked = self.write_all(&trigger, "trigger");
@@ -1585,6 +1634,32 @@ mod tests {
         let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
         assert_eq!(&buffer[..got], b"43");
         assert_eq!(script.lock().expect("the script").written.len(), 2);
+    }
+
+    /// A device that says how long it takes to answer is asked, waited for,
+    /// and read in the one pass.
+    ///
+    /// The other order -- read, then ask -- hands back the answer to the
+    /// previous question, which is a reading one interval old. A part whose
+    /// interface document says how long it needs can be asked and read in the
+    /// same pass, and then the reading is of this moment.
+    #[test]
+    fn a_device_with_a_read_delay_is_asked_before_it_is_read() {
+        let (script, port) = port("temp_bay", Use::Read);
+        let mut port = port
+            .triggered_by(b"R".to_vec())
+            .waiting(Duration::from_millis(1));
+        script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
+
+        let mut buffer = [0u8; 64];
+        let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
+
+        assert_eq!(&buffer[..got], b"42", "the answer to the question just asked");
+        assert_eq!(
+            script.lock().expect("the script").written,
+            vec![b"R".to_vec()],
+            "asked once, before the read rather than after it"
+        );
     }
 
     /// A device that cannot be asked is reported, read or no read.

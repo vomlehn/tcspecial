@@ -338,29 +338,33 @@ Attributes Every Payload Has
    type           network | device | serial | i2c | spi, or one of the
                   experimental can | iio | rpmsg | gpio
    packet_size    bytes in one packet
-   trigger        what to send to make the payload answer: one byte in
-                  hexadecimal, or text as a quoted C string. A payload with
-                  one is asked; a payload with none sends of its own accord
-   packet_interval_ms
-                  milliseconds between the triggers sent to the payloads of
-                  a group. A group's attribute, not a payload's
 
-A payload states **one of ``trigger`` and ``packet_interval_ms``, never
-both**, and that is what says which kind of payload it is. One with a
-``trigger`` is asked: the trigger is the question, and how often it is asked
-is the ``packet_interval_ms`` of the payload group it is in -- which is why
-that figure is a group's and not a payload's. One with neither sends of its
-own accord, and says nothing here about when: how fast a payload produces data
-is a property of the payload and of the simulation standing in for it, so that
-figure is in the simulator configuration.
+How a payload is driven
+^^^^^^^^^^^^^^^^^^^^^^^
 
-There is no ``mode`` attribute. It said in a word what the trigger already
-says, so a file could say ``periodic`` and then give a trigger, and something
-had to decide which half to believe.
+**Exactly one of these two, and never both.** Which one a payload states is
+what says how it is driven; there is no other attribute that says it, and
+nothing decides it for a file that says neither.
 
-A payload that is asked and is in no group has no rate, and is refused saying
-so: the group is where the rate lives, and a trigger with nothing to send it
-at is a payload nothing would ever ask.
+.. code-block:: text
+
+   trigger             what to send to make it answer: one byte in
+                       hexadecimal, or text as a quoted C string. The payload
+                       is asked, and how often it is asked is the interval of
+                       the payload group it is in
+
+   packet_interval_ms  milliseconds between packets. The payload sends of its
+                       own accord, at that rate, and nothing asks it
+
+A payload with a ``trigger`` is asked, so the trigger is the question and the
+group is the clock: a payload that is asked and is in no group has no rate,
+and is refused saying so -- a trigger with nothing to send it at is a payload
+nothing would ever ask.
+
+A payload with a ``packet_interval_ms`` sends on its own, so there is nothing
+to send it and nothing to keep time for it. A simulated one is driven at the
+rate its simulator configuration gives it, which is how fast a stand-in
+produces data rather than how fast the payload would.
 
 ``name`` belongs to a handler and never to a group: it is what tells one
 handler of a group from another, and what every command about a handler names
@@ -462,8 +466,8 @@ YAML one states with the format's own escapes.
 Lengths of Time
 ---------------
 
-Every length of time a configuration states is a number and a unit, written
-together:
+Every length of time a configuration states is a number, whitespace, and a
+unit:
 
 .. table:: The units
    :widths: auto
@@ -471,20 +475,27 @@ together:
    =======  ============  ===============================
    Unit     What it is    Written
    =======  ============  ===============================
-   ``us``   microseconds  ``250us``
-   ``ms``   milliseconds  ``500ms``
-   ``s``    seconds       ``3s``, ``1.5s``
-   ``min``  minutes       ``15min``
-   ``h``    hours         ``6h``
-   ``d``    days          ``1d``, ``0.5d``
-   ``w``    weeks         ``1w``
+   ``us``   microseconds  ``250 us``
+   ``ms``   milliseconds  ``500 ms``
+   ``s``    seconds       ``3 s``, ``1.5 s``
+   ``min``  minutes       ``15 min``
+   ``h``    hours         ``6 h``
+   ``d``    days          ``1 d``, ``0.5 d``
+   ``w``    weeks         ``1 w``
    =======  ============  ===============================
 
+The whitespace is required, and one or more characters of it will do: a tab
+reads as a space does, and ``500  ms`` is ``500 ms``. It is what makes the two
+halves two things rather than one string to be taken apart -- a value is read
+by splitting it, not by knowing every unit there is and looking for one at the
+end -- and it leaves the number free to grow a notation of its own without the
+unit having to be told from the digits.
+
 The number is decimal, whole or a fraction, and underscores among the digits
-mean nothing: ``1_000ms``, ``1.5s`` and ``1500ms`` are one length of time
+mean nothing: ``1_000 ms``, ``1.5 s`` and ``1500 ms`` are one length of time
 written three ways. What is kept is whole microseconds, rounded to the
-nearest. There is no hexadecimal -- ``d`` is a hexadecimal digit, so ``0x1d``
-would be a number that is also "0x1 days" -- and no sign or exponent.
+nearest. There is no hexadecimal and none is planned, and no sign or
+exponent.
 
 Minutes are ``min`` and never ``m``: a single ``m`` is one letter from ``ms``
 and a thousand-fold apart from it, and a slip of a finger would have made a
@@ -493,14 +504,14 @@ so. ``m`` is refused and tells you which of the two to write. So are a month
 and a year -- ``mon``, ``mo``, ``month``, ``y``, ``yr``, ``year`` -- which are
 not lengths of time at all: a month needs a calendar and a timezone that
 nothing aboard carries, and a span of about that size is written exactly, as
-``30d``. ``µs`` is refused in favour of ``us``, this being a grammar of ASCII.
+``30 d``. ``µs`` is refused in favour of ``us``, this being a grammar of ASCII.
 
 Nought is refused in every unit, and so is a fraction that rounds to it: a
 schedule asking to be run every nought seconds is asking to be run again
 before it has finished. Where a configuration does mean "as fast as that
 can be done" it says so in a word: a simulated payload's ``packet_interval``
 and ``segment_interval`` take ``continuous``, and nought is refused there as
-everywhere else. A word rather than ``0s`` because nought is the one value a
+everywhere else. A word rather than ``0 s`` because nought is the one value a
 file arrives at by accident -- an interval worked out to nothing, a field
 cleared to a zero -- and the fastest thing this software does is not something
 to ask for by accident.
@@ -671,19 +682,53 @@ watched for changes, or a set of circuits driven: a heater, a valve, a latch.
    lines          the offsets, separated by commas or spaces, decimal
                   or 0x. Required
    direction      input | output, default input
-   edge           rising | falling | both, default both. Inputs only
+   edge           rising | falling | both | none, default both. Inputs only
    bias           none | pull_up | pull_down, default none. Inputs only
    debounce_us    how long a line must be steady before a change counts.
                   Default none, applied by the kernel, inputs only
+   state_interval how often to report what the lines are. Default none,
+                  inputs only
+
+**How lines are watched.** Two different questions, and a set of lines may ask
+either or both:
+
+.. code-block:: text
+
+   edge             when a line changes, say so
+   state_interval   every so often, say what the lines are
+
+So there are four ways to write it, and each is what it looks like:
+
+.. code-block:: text
+
+   lines: 3, 4                            changes, both edges (the default)
+   lines: 3, 4   edge: rising             changes, one edge
+   lines: 3, 4   state_interval: 5 s      what they are, every five seconds
+   lines: 3, 4   state_interval: 5 s      both: changes as they happen, and
+                                          what they are every five seconds
+
+   lines: 3, 4   edge: none               refused: nothing would be sent
+
+Edges are what a record is made of, so they are the default and a file that
+says nothing about watching gets them. The report exists for two things edges
+cannot do: a line that has not changed since the vehicle started tells the
+ground nothing about itself, and the kernel's queue of events is finite, so a
+burst can leave the ground holding a value that is wrong. A report every so
+often ends both: after one interval at most, what the ground has is what the
+lines are.
+
+Asking for neither takes saying ``edge: none`` with no ``state_interval``, and
+that is refused -- lines watched for no changes and reported at no interval
+would send nothing at all.
 
 The direction is not something a set of lines can be both of: a line
 requested as an input is one the kernel will not write, and one requested as
 an output produces no edges to read. So it is stated, and stating it is what
 lets a file be refused for driving something it said it would watch. The
-three watching terms are refused outright on an output rather than ignored:
-an edge or a debounce on a line nothing reads is a file saying something it
-does not mean, and the usual cause is a set of lines whose direction was
-changed and whose other words were left as they were.
+watching terms are refused outright on an output rather than ignored: an
+edge, a debounce or a report of a line nothing reads is a file saying
+something it does not mean, and the usual cause is a set of lines whose
+direction was changed and whose other words were left as they were.
 
 This is the one type whose payload data is made rather than carried. A line
 has no bytes: it is high or low, and what the ground wants is when it changed.
@@ -691,6 +736,11 @@ So each change becomes a record of sixteen bytes -- eight of time in
 milliseconds since the epoch, four of line offset, four of the value it became
 -- and a ``packet_size`` must be a whole number of those, a packet that was
 part of a record being a reading nobody could use.
+
+A report makes the same record, one per line: this line, this value, this
+time. The ground reads the two alike, which is the point of their being the
+same record; the only difference is that a change carries the time of the
+change and a report carries the time it was looked at.
 
 Two payloads may watch one chip and may not watch one line: the kernel gives a
 line to one request at a time, so the second handler's start would fail.
@@ -966,7 +1016,7 @@ same bus and differ only in which device the master addresses.
    ten_bit        true | false, ten address bits rather than seven
    pec            true | false, an SMBus packet error check on each transfer
    retries        how many times the master tries a transfer
-   timeout        a whole number with a unit: 50ms, 2s. Rounded up to a
+   timeout        a whole number with a unit: 50 ms, 2 s. Rounded up to a
                   multiple of 10 ms by the kernel
 
 With seven-bit addressing the usable addresses are 0x08 through 0x77: the
@@ -1492,7 +1542,7 @@ socket the simulated payload answers from.
        protocol: udp
        payload_address: 127.0.0.1   # the socket this payload answers from,
        payload_port: 7000           # not the one the handler waits at
-       packet_interval: 1s
+       packet_interval: 1 s
 
 Nothing in the link needs it -- a handler learns where its payload is from the
 first packet it gets -- but something outside the simulation may: a rule on a
@@ -1522,7 +1572,7 @@ which is why the shipped ``tcspecial1sim.yaml`` leaves them with the payloads.
 .. code-block:: text
 
    packet_interval        how long between packets, as a length of time --
-                          1s, 500ms, 0.25s -- or ``continuous`` for as fast
+                          1 s, 500 ms, 0.25 s -- or ``continuous`` for as fast
                           as the payload can be driven. Periodic payloads
                           only: a triggered one sends when it is asked, and
                           stating an interval for one is an error
@@ -1582,9 +1632,9 @@ so a run is not left to be guessed at afterwards.
      - name: auto-send
        type: network
        protocol: udp
-       packet_interval: 500ms
+       packet_interval: 500 ms
        drop_percent: 10        # one packet in ten never arrives
-       jitter: 50ms            # and the rest are up to 50ms late
+       jitter: 50 ms            # and the rest are up to 50 ms late
 
 The two files are joined by name. Every data handler needs a simulated payload
 naming it, and a name here that no handler has is an error rather than a line
@@ -1613,7 +1663,7 @@ file that states one is refused, saying this.
 
    simulated_payload_groups:
      - name: steady_1hz
-       packet_interval: 1s
+       packet_interval: 1 s
 
      - name: continuous
        packet_interval: continuous
@@ -1636,7 +1686,7 @@ file that states one is refused, saying this.
      - name: udp-fast
        type: network
        protocol: udp
-       packet_interval: 500ms
+       packet_interval: 500 ms
 
 Running the Programs
 ====================
@@ -1933,7 +1983,7 @@ file:
 
    tcspecial:
      beacon:
-       interval: 5s
+       interval: 5 s
        send: "0.0.0.0:5550"
        recv: "127.0.0.1:5650"
 

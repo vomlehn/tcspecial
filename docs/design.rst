@@ -1784,8 +1784,8 @@ and in a node seventeen millimetres tall the two rows would meet. A node
 placed, a node dragged and a node read from a file all land on one of these
 places; the dividers between the panes sit on the millimetre grid, and a pane's
 edges are taken in to the places just inside them, so a node held against an
-edge is where a node may be as well. The canvas draws a faint line every ten
-millimetres.
+edge is where a node may be as well. The canvas draws a faint line every five
+millimetres, which are the lines the terminals are on.
 
 Each working pane is painted, and every node type has its own colour inside its
 pane's family. The MOC pane is a pale blue, the vehicle pane a pale green and
@@ -1855,9 +1855,13 @@ about the graph; turns before length because two orthogonal routes between one
 pair of points are usually the same length, and of two equal routes the one
 with fewer corners is the one that can be followed. A line keeps six pixels off
 any node it only passes, because a line along a node's edge reads as a line
-that touches it. Where nothing misses everything -- a target walled in on every
-side -- the best available is drawn anyway: a link with no line is a connection
-that does not appear in the drawing at all.
+that touches it. And a route's runs are on the millimetre grid, as the nodes
+are -- every vertical run, and every horizontal one but the two level with its
+own ends, which are where its terminals put it -- with the lanes a line may be
+moved into two millimetres apart, so the lines of a drawing line up with each
+other and with the boxes they run between. Where nothing misses everything -- a
+target walled in on every side -- the best available is drawn anyway: a link
+with no line is a connection that does not appear in the drawing at all.
 
 What is wrong with a node is not drawn on it. The node is painted red -- its
 outline, its label and its terminals, and in the one shape no real type uses,

@@ -5,7 +5,7 @@
 use std::env;
 use std::process;
 
-use log::{error, info, trace, warn};
+use log::{debug, error, trace, warn};
 use tcslibgs::config::{
     load_config_version, load_dh_configs, load_tcspecial_section, payload_path_from_args,
     PAYLOAD_CONFIG_PATH_VAR,
@@ -26,11 +26,15 @@ fn main() {
 
     trace!("main: entered");
 
-    info!("TCSpecial starting...");
+    debug!("starting");
 
     // The same call tcsmoc makes, so the two read one file.
     let config_path = tcspecial_config_path();
-    info!("Loading tcspecial configuration from: {}", config_path);
+    // The startup summary is said on stderr, plainly and one fact a line --
+    // `label: value` -- whether or not anyone set RUST_LOG: it is what
+    // somebody watching a vehicle start compares against the files they
+    // think it is reading. The log is for what happens after.
+    eprintln!("tcspecial configuration: {}", config_path);
 
     // Load configuration
     let mut tcspecial_config = match load_tcspecial_config(&config_path) {
@@ -52,7 +56,7 @@ fn main() {
             process::exit(1);
         }
     };
-    info!("Loading payload configuration from: {}", payload_path);
+    eprintln!("payload configuration: {}", payload_path);
 
     // What tcsverify says about this file, asked before anything else is read
     // from it and said in tcsverify's own words: every problem at once, each
@@ -94,7 +98,6 @@ fn main() {
     // set, so reading them for it would be reading a version 1 file that is
     // not there.
     if graph {
-        info!("{}: a version 2 configuration", payload_path);
         process::exit(runtime::start::run_or_report(&payload_path));
     }
 
@@ -121,18 +124,20 @@ fn main() {
     // On stderr rather than through the log, and before the bind: these are
     // the addresses the ground has to be pointed at, so they are said whether
     // or not anyone set RUST_LOG, and said above whatever a failure to bind
-    // one then says.
+    // one then says. A payload's command addresses are bases, a payload's own
+    // being the base plus its device id.
     eprintln!(
-        "Commands are taken on {}:{} and a payload's on {} counted on by its \
-         id, from {} counted the same way, as {} asked, and beacons go from \
-         {} to {}",
-        tcspecial_config.address,
-        tcspecial_config.port,
+        "commands: {}:{}",
+        tcspecial_config.address, tcspecial_config.port
+    );
+    eprintln!(
+        "payload commands: {} + id, from {} + id",
         tcspecial_config.payload_command_dest_base,
-        tcspecial_config.payload_command_source_base,
-        config_path,
-        beacon.send,
-        beacon.recv
+        tcspecial_config.payload_command_source_base
+    );
+    eprintln!(
+        "{} ms beacon: {} to {}",
+        tcspecial_config.beacon_interval.0, beacon.send, beacon.recv
     );
 
     // Load configuration
@@ -144,7 +149,7 @@ fn main() {
         }
     };
 
-    info!(
+    eprintln!(
         "Loaded {} data handler configurations",
         payload_config.len()
     );
@@ -179,12 +184,12 @@ fn main() {
     };
 
     // The set's version is labelled as a beacon and a CONNECT answer label
-    // it -- config v1.0.0 -- so the three lines a reader compares say the
-    // same thing in the same words.
+    // it -- config v1.0.0 -- and the line says it as tcsmoc says its own, so
+    // the two a reader compares are in the same words. The path is not
+    // repeated: the line above names the file.
     eprintln!(
-        "v{}, configuration {} config v{} md5: {}",
+        "tcspecial v{}, config v{}, md5 {}",
         ConfigVersion::of_this_build(),
-        payload_path,
         config_version,
         digest
     );
@@ -209,7 +214,7 @@ fn main() {
         process::exit(1);
     }
 
-    info!("TCSpecial initialized, entering main loop...");
+    debug!("initialized, entering the main loop");
 
     // Run main loop
     if let Err(e) = ci.run() {
@@ -224,5 +229,5 @@ fn main() {
         process::exit(1);
     }
 
-    info!("TCSpecial shutdown complete");
+    debug!("shut down");
 }

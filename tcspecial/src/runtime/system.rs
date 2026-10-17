@@ -353,8 +353,9 @@ pub fn open(
 /// What each node of a configuration would be opened as, without opening it.
 ///
 /// For a line at startup, and for a ground tool that wants to say what a file
-/// describes: the type and which way the links use it. Nothing is opened, so
-/// this answers for a vehicle that is not there.
+/// describes: the type and which way the links use it -- `i2c, read` -- or the
+/// type alone where it says everything, as a computation's and a log's do.
+/// Nothing is opened, so this answers for a vehicle that is not there.
 pub fn described(graph: &Graph) -> BTreeMap<String, String> {
     let routes = Routes::of(graph);
     graph
@@ -362,16 +363,15 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
         .iter()
         .map(|node| {
             let how = match node.node_type.as_str() {
-                "compute" => "computes".to_string(),
-                "log" => "writes a log".to_string(),
-                "null" => "passes what arrives through".to_string(),
+                "compute" | "log" => String::new(),
+                "null" => "passes through".to_string(),
                 // An app node is a program of its own, and what it does with
                 // what arrives is in that program: nothing here can say more
                 // than which of the two streams it is run with, which its type
                 // already says. See `crate::node::vehicle::app_payload_veh`
                 // and its four neighbours.
                 other if tcslibgs::node::app::Kind::of(other).is_some() => {
-                    "runs a program of its own".to_string()
+                    "a program".to_string()
                 }
                 // A ground link, where nothing the vehicle sends passes
                 // through the node itself: each source has a link of its own
@@ -381,19 +381,24 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
                 // fault that is not there. See `open`, which holds such a
                 // node as a `NullPort` for the same reason.
                 "moc" => match Use::of(&routes, &node.name) {
-                    Ok(Use::Read) => "is read".to_string(),
-                    Ok(Use::Driven) => "is driven".to_string(),
-                    Ok(Use::Both) => "is read and written".to_string(),
-                    Err(_) => "takes to the ground what is drawn into it".to_string(),
+                    Ok(Use::Read) => "read".to_string(),
+                    Ok(Use::Driven) => "driven".to_string(),
+                    Ok(Use::Both) => "read and written".to_string(),
+                    Err(_) => "to the ground".to_string(),
                 },
                 _ => match Use::of(&routes, &node.name) {
-                    Ok(Use::Read) => "is read".to_string(),
-                    Ok(Use::Driven) => "is driven".to_string(),
-                    Ok(Use::Both) => "is read and written".to_string(),
+                    Ok(Use::Read) => "read".to_string(),
+                    Ok(Use::Driven) => "driven".to_string(),
+                    Ok(Use::Both) => "read and written".to_string(),
                     Err(why) => why,
                 },
             };
-            (node.name.clone(), format!("{} that {how}", node.node_type))
+            let said = if how.is_empty() {
+                node.node_type.clone()
+            } else {
+                format!("{}, {how}", node.node_type)
+            };
+            (node.name.clone(), said)
         })
         .collect()
 }
@@ -738,11 +743,11 @@ mod tests {
             Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
 
         let described = described(&graph);
-        assert_eq!(described["temp_fore"], "i2c that is read");
-        assert_eq!(described["heaters"], "gpio that is driven");
-        assert_eq!(described["moc"], "moc that is read");
-        assert_eq!(described["k_fore"], "compute that computes");
-        assert_eq!(described["housekeeping"], "log that writes a log");
+        assert_eq!(described["temp_fore"], "i2c, read");
+        assert_eq!(described["heaters"], "gpio, driven");
+        assert_eq!(described["moc"], "moc, read");
+        assert_eq!(described["k_fore"], "compute");
+        assert_eq!(described["housekeeping"], "log");
     }
 
     /// The loop makes passes until it is told to stop.

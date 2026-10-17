@@ -2357,7 +2357,7 @@ pub fn thermostat_example() -> Document {
         ("payload_command.dest_base", "0.0.0.0:4200"),
         ("payload_telemetry.source_base", "0.0.0.0:6000"),
         ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-        ("beacon.interval", "5s"),
+        ("beacon.interval", "5 s"),
         ("beacon.send", "0.0.0.0:5550"),
         ("beacon.recv", "127.0.0.1:5650"),
         ("log.directory", "/var/log/tcspecial"),
@@ -2373,7 +2373,7 @@ pub fn thermostat_example() -> Document {
     // The group the three sensors share, which is the point of the example:
     // readings that will be averaged are taken as close to together as the
     // hardware allows.
-    document.groups.insert("cabin_temps".to_string(), "3s".to_string());
+    document.groups.insert("cabin_temps".to_string(), "3 s".to_string());
 
     place(&mut document, "temp_fore", "i2c", (34, 34));
     set(&mut document, "temp_fore", "path", "/dev/i2c-1");
@@ -2697,7 +2697,7 @@ mod tests {
             ("payload_command.dest_base", "0.0.0.0:4200"),
             ("payload_telemetry.source_base", "0.0.0.0:6000"),
             ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-            ("beacon.interval", "5s"),
+            ("beacon.interval", "5 s"),
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
         ];
@@ -2975,7 +2975,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
             name: "cabin_temps".into(),
-            interval: "3s".into(),
+            interval: "3 s".into(),
         });
         for (name, node_type, group) in [
             ("temp_fore", "i2c", Some("cabin_temps")),
@@ -3039,7 +3039,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
             name: "cabin_temps".into(),
-            interval: "3s".into(),
+            interval: "3 s".into(),
         });
         document.apply(&add("temp_fore", "i2c"));
         document.apply(&Edit::SetAttribute {
@@ -3054,7 +3054,7 @@ mod tests {
             now: "cabin".into(),
         });
 
-        assert_eq!(document.groups.get("cabin").map(String::as_str), Some("3s"));
+        assert_eq!(document.groups.get("cabin").map(String::as_str), Some("3 s"));
         assert!(!document.groups.contains_key("cabin_temps"));
         assert_eq!(
             document
@@ -3087,7 +3087,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
             name: "cabin_temps".into(),
-            interval: "3s".into(),
+            interval: "3 s".into(),
         });
         for (name, node_type) in [("temp_fore", "i2c"), ("temp_bay", "spi")] {
             document.apply(&add(name, node_type));
@@ -3133,7 +3133,7 @@ mod tests {
         let mut document = Document::new();
         document.apply(&Edit::AddGroup {
             name: "cabin_temps".into(),
-            interval: "3s".into(),
+            interval: "3 s".into(),
         });
         for (name, address) in [("temp_fore", "0x48"), ("temp_aft", "0x49")] {
             document.apply(&add(name, "i2c"));
@@ -3459,7 +3459,7 @@ mod tests {
                 group: "steady_1hz".into(),
                 setting: "packet_interval".into(),
                 was: None,
-                now: Some("1s".into()),
+                now: Some("1 s".into()),
             });
             document.apply(&Edit::SetSimPayload {
                 payload: "a".into(),
@@ -3483,7 +3483,7 @@ mod tests {
             // members trivially round-trips and proves nothing.
             document.apply(&Edit::AddGroup {
                 name: "cabin_temps".into(),
-                interval: "3s".into(),
+                interval: "3 s".into(),
             });
             document.apply(&Edit::SetAttribute {
                 node: "a".into(),
@@ -3573,7 +3573,7 @@ mod tests {
             Edit::SetSimGroup {
                 group: "steady_1hz".into(),
                 setting: "packet_interval".into(),
-                was: Some("1s".into()),
+                was: Some("1 s".into()),
                 now: Some("500".into()),
             },
             Edit::AddSimGroup {
@@ -3581,11 +3581,11 @@ mod tests {
             },
             Edit::RemoveSimGroup {
                 name: "steady_1hz".into(),
-                settings: vec![("packet_interval".into(), "1s".into())],
+                settings: vec![("packet_interval".into(), "1 s".into())],
             },
             Edit::RestoreSimGroup {
                 name: "bay".into(),
-                settings: vec![("packet_interval".into(), "250ms".into())],
+                settings: vec![("packet_interval".into(), "250 ms".into())],
             },
             // And one that clears a parameter, which takes the line out of
             // the file rather than writing it empty.
@@ -3596,16 +3596,16 @@ mod tests {
             },
             Edit::AddGroup {
                 name: "bay".into(),
-                interval: "5s".into(),
+                interval: "5 s".into(),
             },
             Edit::RemoveGroup {
                 name: "cabin_temps".into(),
-                interval: "3s".into(),
+                interval: "3 s".into(),
             },
             Edit::SetGroupInterval {
                 group: "cabin_temps".into(),
-                was: "3s".into(),
-                now: "1s".into(),
+                was: "3 s".into(),
+                now: "1 s".into(),
             },
             Edit::RenameGroup {
                 was: "cabin_temps".into(),

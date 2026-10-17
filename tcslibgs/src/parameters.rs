@@ -159,8 +159,13 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                     crate::LineEdge::Rising => "rising",
                     crate::LineEdge::Falling => "falling",
                     crate::LineEdge::Both => "both",
+                    crate::LineEdge::None => "none, so what they are is reported \
+                                              rather than when they change",
                 }
             );
+            if let Some(ms) = gpio.state_interval_ms {
+                let _ = writeln!(out, "  state_interval   {ms} ms, what every line is");
+            }
             let _ = writeln!(
                 out,
                 "  bias             {}",
@@ -442,7 +447,7 @@ mod tests {
         let dh = udp("DH2");
         let sim = settled(
             "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
-             packet_interval: 500ms\n    segment_size: 5\n    segment_interval: 40ms\n",
+             packet_interval: 500 ms\n    segment_size: 5\n    segment_interval: 40 ms\n",
             &dh,
         );
 
@@ -551,7 +556,7 @@ mod tests {
         let dh = udp("DH2");
         let sim = settled(
             "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
-             packet_interval: 100ms\n    drop_percent: 10\n    jitter: 25ms\n",
+             packet_interval: 100 ms\n    drop_percent: 10\n    jitter: 25 ms\n",
             &dh,
         );
 
@@ -639,7 +644,7 @@ mod tests {
         let dh = udp("DH2");
         let sim = settled(
             "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
-             packet_interval: 100ms\n",
+             packet_interval: 100 ms\n",
             &dh,
         );
         let shown = payload_parameters(&dh, Some(&sim));

@@ -17,7 +17,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
 use tcslibgs::graph::Graph;
 
@@ -50,7 +50,7 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     // What is about to run, before anything is opened: on stderr as the
     // command addresses are, because it is what somebody watching a vehicle
     // start compares against the file they think is flying.
-    eprintln!("{path}: {} nodes", graph.nodes.len());
+    eprintln!("{path}: {}", shape_of(&graph));
     for (name, what) in described(&graph) {
         eprintln!("  {name}: {what}");
     }
@@ -64,23 +64,98 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     let config_version = ConfigVersion::of_text(tcslibgs::graph::VERSION)
         .expect("the language's own version reads");
     eprintln!(
-        "v{}, configuration {path} config v{config_version} md5: {digest}",
+        "tcspecial v{}, config v{config_version}, md5 {digest}",
         ConfigVersion::of_this_build()
     );
 
     let mut system = System::of(&graph, Instant::now())?;
-    info!("{path}: {system:?}");
+    // What was opened, which the line above already says the shape of: for
+    // somebody looking at how the running system is put together.
+    debug!("{path}: {system:?}");
+
+    // What the vehicle sends to the ground, kept where the configuration
+    // says: opened before anything that records into it, so that a log
+    // directory that is not there stops the start rather than losing the
+    // first beacons to it.
+    let telemetry_log = telemetry_log(&graph).map_err(|why| vec![format!("{path}: {why}")])?;
 
     // Beacons, once everything has opened: a vehicle that will not start has
     // nothing to announce. Held until the vehicle stops.
-    let _beacon = beacons(&graph, config_version, digest).map_err(|why| vec![format!("{path}: {why}")])?;
+    let _beacon = beacons(&graph, config_version, digest, telemetry_log.clone())
+        .map_err(|why| vec![format!("{path}: {why}")])?;
 
     listen_for_stop();
 
     system.run(&asked_to_stop, report, pause);
 
+    // What was recorded and not yet written, before the process goes: the
+    // log is the account of what the vehicle sent, and an account missing
+    // its last page is one nobody can rely on.
+    telemetry_log.flush();
+
     info!("{path}: stopped");
     Ok(())
+}
+
+/// What a configuration is, in a line: how many nodes, groups and logs, each
+/// counted in words -- `1 node, no groups, no logs`, `11 nodes, 1 group, 1 log
+/// (housekeeping)` -- and the logs named, a log being where to look for what
+/// the vehicle kept.
+fn shape_of(graph: &Graph) -> String {
+    let counted = |n: usize, one: &str, many: &str| match n {
+        0 => format!("no {many}"),
+        1 => format!("1 {one}"),
+        n => format!("{n} {many}"),
+    };
+    let logs: Vec<&str> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.node_type == "log")
+        .map(|node| node.name.as_str())
+        .collect();
+    let mut said = format!(
+        "{}, {}, {}",
+        counted(graph.nodes.len(), "node", "nodes"),
+        counted(graph.groups.len(), "group", "groups"),
+        counted(logs.len(), "log", "logs")
+    );
+    if !logs.is_empty() {
+        said.push_str(&format!(" ({})", logs.join(", ")));
+    }
+    said
+}
+
+/// The telemetry log the configuration's `tcspecial` section describes.
+///
+/// One log for everything the vehicle sends to the ground, which is what
+/// makes the downlink reconstructable afterwards: the ground has only what
+/// arrived, and this is what was sent. Beacons record into it here, and the
+/// command interpreter's answers will when there is one.
+///
+/// Not the same thing as a `log` node, and not a substitute for one. A log
+/// node records what is delivered to it -- the configuration draws the links
+/// and decides what is kept -- where this records what leaves the vehicle on
+/// a link no graph describes.
+///
+/// A configuration with no `tcspecial` section, or one naming no log
+/// directory, records nothing: see `TelemetryLog::open`.
+fn telemetry_log(graph: &Graph) -> Result<TelemetryLog, String> {
+    let Some(section) = graph.tcspecial.as_ref() else {
+        return Ok(TelemetryLog::disabled());
+    };
+    let ci = tcslibgs::graph::parameters::ci_config_of(&tcslibgs::graph::parameters::flatten(
+        section,
+    ))?
+    .to_ci_config()?;
+    let log = TelemetryLog::open(&ci).map_err(|e| e.to_string())?;
+    if log.is_enabled() {
+        eprintln!(
+            "telemetry log: {}, {}-byte segments",
+            ci.log_dir.as_deref().unwrap_or("?"),
+            ci.log_segment_bytes
+        );
+    }
+    Ok(log)
 }
 
 /// Start sending beacons where the configuration's `tcspecial` section says.
@@ -88,12 +163,13 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 /// From `beacon.send` to `beacon.recv`, every `beacon.interval`, carrying
 /// this build's version, the configuration's and the configuration's digest:
 /// the same beacon a version 1 vehicle sends, by the same code. An interval of
-/// nought sends none, as it does in version 1. Recorded in no telemetry log:
-/// a version 2 vehicle logs through its own log nodes.
+/// nought sends none, as it does in version 1. Recorded in the telemetry
+/// log, which is the vehicle's own account of what it sent.
 fn beacons(
     graph: &Graph,
     config_version: ConfigVersion,
     digest: ConfigDigest,
+    telemetry_log: TelemetryLog,
 ) -> Result<Option<BeaconSend>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
@@ -106,14 +182,14 @@ fn beacons(
         Duration::from_millis(u64::from(ci.beacon_interval.0)),
         ci.beacon_send.clone(),
         ci.beacon_recv.clone(),
-        TelemetryLog::disabled(),
+        telemetry_log,
         ConfigVersion::of_this_build(),
         config_version,
         digest,
     );
     if sending.is_some() {
         eprintln!(
-            "beacons every {} ms from {} to {}",
+            "{} ms beacon: {} to {}",
             ci.beacon_interval.0, ci.beacon_send, ci.beacon_recv
         );
     }

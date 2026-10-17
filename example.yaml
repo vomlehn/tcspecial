@@ -5,11 +5,11 @@ description: "One payload on a UDP link, its telemetry going to the ground"
 
 tcspecial:
   beacon:
-    interval: "1s"
+    interval: "1 s"
 
 payload_groups:
   - name: "every_second"
-    interval: "1s"
+    interval: "1 s"
 
 moc:
   - name: moc-1

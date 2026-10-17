@@ -791,7 +791,7 @@ mod tests {
             let late = lateness(&jittery, &mut rng);
             assert!(
                 late <= Duration::from_millis(20),
-                "{late:?} is later than the 20ms asked for"
+                "{late:?} is later than the 20 ms asked for"
             );
         }
     }
@@ -889,7 +889,7 @@ mod tests {
         }
     }
 
-    /// The wait falls between segments: three of them 40ms apart take 80ms,
+    /// The wait falls between segments: three of them 40 ms apart take 80 ms,
     /// not 120 -- nothing is waited before the first segment or after the
     /// last, because what follows the last is the rest of the packet
     /// interval.
@@ -908,11 +908,11 @@ mod tests {
         assert!(whole);
         assert!(
             took >= Duration::from_millis(80),
-            "three segments 40ms apart took {took:?}, so they were not waited between"
+            "three segments 40 ms apart took {took:?}, so they were not waited between"
         );
         assert!(
             took < Duration::from_millis(110),
-            "three segments 40ms apart took {took:?}, which is a wait too many"
+            "three segments 40 ms apart took {took:?}, which is a wait too many"
         );
     }
 
@@ -956,13 +956,13 @@ mod tests {
             segment_interval: Duration::from_millis(40),
         };
 
-        // 80ms of a 100ms interval already spent on segments.
+        // 80 ms of a 100 ms interval already spent on segments.
         let at = Instant::now();
         wait_out_packet(&pacing, Instant::now() - Duration::from_millis(80), &running);
         let waited = at.elapsed();
         assert!(
             waited >= Duration::from_millis(20) && waited < Duration::from_millis(60),
-            "waited {waited:?} of the 20ms left of the interval"
+            "waited {waited:?} of the 20 ms left of the interval"
         );
 
         // More spent than the interval allows: the packet is late, and no

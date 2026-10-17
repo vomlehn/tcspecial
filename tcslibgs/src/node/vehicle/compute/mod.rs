@@ -400,7 +400,7 @@ mod tests {
             params(&[
                 ("function", "process"),
                 ("executable", "/opt/flight/attitude"),
-                ("timeout", "500ms"),
+                ("timeout", "500 ms"),
             ]),
             Computation::Process(ProcessParams {
                 executable: "/opt/flight/attitude".to_string(),
@@ -508,7 +508,7 @@ mod tests {
                 vec![
                     ("function", "process"),
                     ("executable", "/bin/cat"),
-                    ("timeout", "1s"),
+                    ("timeout", "1 s"),
                     ("restart", "sometimes"),
                 ],
                 "sometimes",
@@ -574,7 +574,7 @@ mod tests {
             process(&[
                 ("function", "process"),
                 ("executable", "/bin/cat"),
-                ("timeout", "1s"),
+                ("timeout", "1 s"),
             ])
             .restart,
             Restart::Never
@@ -583,7 +583,7 @@ mod tests {
             process(&[
                 ("function", "process"),
                 ("executable", "/bin/cat"),
-                ("timeout", "1s"),
+                ("timeout", "1 s"),
                 ("restart", "false"),
             ])
             .restart,
@@ -593,7 +593,7 @@ mod tests {
             process(&[
                 ("function", "process"),
                 ("executable", "/bin/cat"),
-                ("timeout", "1s"),
+                ("timeout", "1 s"),
                 ("restart", "true"),
             ])
             .restart,

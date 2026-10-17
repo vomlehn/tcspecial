@@ -30,7 +30,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Read;
 use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nix::poll::PollFlags;
 use tcslibgs::{
@@ -58,6 +58,11 @@ const GPIO_V2_LINE_FLAG_EDGE_RISING: u64 = 1 << 4;
 const GPIO_V2_LINE_FLAG_EDGE_FALLING: u64 = 1 << 5;
 const GPIO_V2_LINE_FLAG_BIAS_PULL_UP: u64 = 1 << 8;
 const GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN: u64 = 1 << 9;
+
+/// `GPIO_V2_LINE_GET_VALUES_IOCTL`, which is `_IOWR(0xB4, 0x0E, struct
+/// gpio_v2_line_values)` -- the same structure the values are set with, asked
+/// of the request this node already holds rather than of a second one.
+const GPIO_V2_LINE_GET_VALUES_IOCTL: libc::c_ulong = 0xc010_b40e;
 
 /// `GPIO_V2_LINE_SET_VALUES_IOCTL`, which is `_IOWR(0xB4, 0x0F, struct
 /// gpio_v2_line_values)` -- sixteen bytes of two `u64`.
@@ -180,6 +185,71 @@ pub struct GpioEndpoint {
     count: usize,
     /// Where the chip is, for the error that says a write has nowhere to go.
     path: String,
+    /// The offsets of the lines, in the order they were asked for, which is
+    /// the order the kernel reports their values in.
+    offsets: Vec<u32>,
+    /// How often what the lines are is reported, where the configuration asks
+    /// for it.
+    state_interval: Option<Duration>,
+    /// When the next report is due.
+    ///
+    /// From when the last one was due rather than from when it was made, so
+    /// a report that went out late does not push the next one later.
+    next_report: Option<Instant>,
+}
+
+/// What every line of the request is, now.
+///
+/// One ioctl on the descriptor the events are read from: the request is
+/// already open and already names the lines, so nothing is opened and nothing
+/// is asked twice. The kernel answers with a bit per line, in the order the
+/// lines were asked for.
+fn levels_of(what: &str, fd: RawFd, count: usize) -> TcsResult<u64> {
+    let mut values = LineValues {
+        bits: 0,
+        mask: if count >= u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1u64 << count) - 1
+        },
+    };
+
+    // SAFETY: a structure laid out as the kernel's own -- the tests below
+    // hold it to the kernel's size -- living across a call on a descriptor
+    // the caller owns.
+    let result = unsafe {
+        libc::ioctl(
+            fd,
+            GPIO_V2_LINE_GET_VALUES_IOCTL,
+            &mut values as *mut LineValues,
+        )
+    };
+    if result < 0 {
+        return Err(TcsError::Endpoint(format!(
+            "{what}: cannot read what the lines are: {}",
+            std::io::Error::last_os_error()
+        )));
+    }
+    Ok(values.bits)
+}
+
+/// One line's level as the bytes a conduit carries.
+///
+/// The record an event becomes -- the time, the line, the value -- said of a
+/// line that has not changed: what it is now, observed now. Both kinds say
+/// "this line had this value at this time", which is what a ground station
+/// plots; the difference is that an event's time is the kernel's for the edge
+/// and this one's is when the vehicle looked.
+fn level_record(offset: u32, high: bool, now: SystemTime) -> [u8; EVENT_BYTES] {
+    let mut record = [0u8; EVENT_BYTES];
+    let millis = now
+        .duration_since(UNIX_EPOCH)
+        .map(|since| since.as_millis() as u64)
+        .unwrap_or(0);
+    record[..8].copy_from_slice(&millis.to_le_bytes());
+    record[8..12].copy_from_slice(&offset.to_le_bytes());
+    record[12..].copy_from_slice(&u32::from(high).to_le_bytes());
+    record
 }
 
 impl GpioEndpoint {
@@ -199,6 +269,10 @@ impl GpioEndpoint {
         let request = request_for(what, config)?;
         let lines = ask_for_lines(what, chip.as_raw_fd(), request, &config.path)?;
 
+        let state_interval = config
+            .state_interval_ms
+            .map(|ms| Duration::from_millis(u64::from(ms)));
+
         Ok(Self {
             what: what.to_string(),
             _chip: chip,
@@ -206,6 +280,12 @@ impl GpioEndpoint {
             direction: config.direction,
             count: config.lines.len(),
             path: config.path.clone(),
+            offsets: config.lines.clone(),
+            state_interval,
+            // The first report is due at once, so that a ground station
+            // connecting to a vehicle that has just started learns what the
+            // lines are without waiting an interval for it.
+            next_report: state_interval.map(|_| Instant::now()),
         })
     }
 
@@ -222,6 +302,9 @@ impl GpioEndpoint {
             direction: self.direction,
             count: self.count,
             path: self.path.clone(),
+            offsets: self.offsets.clone(),
+            state_interval: self.state_interval,
+            next_report: self.next_report,
         })
     }
 }
@@ -251,6 +334,9 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
         LineEdge::Rising => GPIO_V2_LINE_FLAG_EDGE_RISING,
         LineEdge::Falling => GPIO_V2_LINE_FLAG_EDGE_FALLING,
         LineEdge::Both => GPIO_V2_LINE_FLAG_EDGE_RISING | GPIO_V2_LINE_FLAG_EDGE_FALLING,
+        // Asked for as a plain input: there are no events to read, and what
+        // the lines are is taken when the report is due.
+        LineEdge::None => 0,
     };
     let bias = match config.bias {
         Bias::None => 0,
@@ -429,6 +515,39 @@ impl EndpointReadable for GpioEndpoint {
 
         let mut filled = 0;
 
+        // What the lines are, where the configuration asks for it and the
+        // report is due. Before the events rather than after, so that a
+        // report and the edges that followed it go out in the order they
+        // happened.
+        //
+        // The clock runs from when the report was due: a vehicle busy enough
+        // to be late with one is a vehicle that should not then be late with
+        // every one after it. A report missed by more than an interval --
+        // which a long pause would do -- is not made up for; what the ground
+        // wants is what the lines are now.
+        if let (Some(interval), Some(due)) = (self.state_interval, self.next_report) {
+            let now = Instant::now();
+            if now >= due {
+                let bits = levels_of(&self.what, self.lines.as_raw_fd(), self.count)?;
+                let at = SystemTime::now();
+                for (n, offset) in self.offsets.iter().enumerate() {
+                    if filled + EVENT_BYTES > buffer.len() {
+                        break;
+                    }
+                    let high = bits & (1u64 << n) != 0;
+                    buffer[filled..filled + EVENT_BYTES]
+                        .copy_from_slice(&level_record(*offset, high, at));
+                    filled += EVENT_BYTES;
+                }
+
+                let mut next = due + interval;
+                if next <= now {
+                    next = now + interval;
+                }
+                self.next_report = Some(next);
+            }
+        }
+
         while filled + EVENT_BYTES <= buffer.len() {
             let mut event = LineEvent::default();
             // SAFETY: a buffer of exactly the structure's size, which is what
@@ -552,6 +671,7 @@ mod tests {
             edge: LineEdge::Falling,
             bias: Bias::PullUp,
             debounce_us: Some(5_000),
+            state_interval_ms: None,
         };
 
         let request = request_for("discretes", &config).expect("a request");
@@ -598,6 +718,7 @@ mod tests {
                 edge: LineEdge::Both,
                 bias: Bias::None,
                 debounce_us: None,
+                state_interval_ms: None,
             },
         )
         .expect("a request");
@@ -659,6 +780,7 @@ mod tests {
                 edge: LineEdge::Both,
                 bias: Bias::None,
                 debounce_us: None,
+                state_interval_ms: None,
             },
         ) {
             Err(e) => format!("{e}"),
@@ -688,6 +810,9 @@ mod tests {
             direction: Direction::Input,
             count: 1,
             path: "/dev/gpiochip0".to_string(),
+            offsets: vec![0],
+            state_interval: None,
+            next_report: None,
         };
 
         let said = match endpoint.write(b"1") {
@@ -727,6 +852,9 @@ mod tests {
             direction: Direction::Input,
             count: 1,
             path: "/dev/gpiochip0".to_string(),
+            offsets: vec![0],
+            state_interval: None,
+            next_report: None,
         };
 
         // Two events, as the kernel would write them.
@@ -784,6 +912,7 @@ mod tests {
                 edge: LineEdge::Both,
                 bias: Bias::None,
                 debounce_us: None,
+                state_interval_ms: None,
             },
         )
         .expect("a request");
@@ -857,6 +986,9 @@ mod tests {
             direction: Direction::Output,
             count: 3,
             path: "/dev/gpiochip0".to_string(),
+            offsets: vec![0],
+            state_interval: None,
+            next_report: None,
         };
 
         let said = match endpoint.read(&mut [0u8; 64]) {
@@ -888,6 +1020,9 @@ mod tests {
             direction: Direction::Output,
             count: 3,
             path: "/dev/gpiochip0".to_string(),
+            offsets: vec![0],
+            state_interval: None,
+            next_report: None,
         };
 
         let said = match endpoint.write(b"1") {

@@ -897,6 +897,9 @@ impl NodeType {
                 ("address", true),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
                 ("read_size", false),
                 ("ten_bit", false),
                 ("pec", false),
@@ -909,6 +912,9 @@ impl NodeType {
                 ("spi_mode", true),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
                 ("read_size", false),
                 ("bits_per_word", false),
                 ("bit_order", false),
@@ -922,6 +928,9 @@ impl NodeType {
                 ("parity", false),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
             ],
             // An interface, not a path: see tcslibgs::node::payload::hdlc. The
             // standard and the clock are required because a line carries no
@@ -938,6 +947,9 @@ impl NodeType {
                 ("loopback", false),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
             ],
             NodeType::Can => &[
                 ("interface", true),
@@ -946,17 +958,26 @@ impl NodeType {
                 ("loopback", false),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
             ],
             NodeType::Iio => &[
                 ("path", true),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
             ],
             NodeType::Rpmsg => &[
                 ("path", true),
                 ("service", true),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
             ],
             NodeType::Network => &[
                 ("protocol", true),
@@ -964,12 +985,23 @@ impl NodeType {
                 ("port", true),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
             ],
             NodeType::DeviceFile => &[
                 ("path", true),
                 ("group", false),
                 ("trigger", false),
+                ("trigger_interval", false),
+                ("read_delay", false),
+                ("poll_interval", false),
             ],
+            // A set of discrete lines is neither asked nor polled: it is
+            // watched, by its edges or by a report of what it is, which is
+            // `state_interval`. So none of the words that drive a payload
+            // that is read -- a trigger, the rate it goes out at, the delay
+            // before reading, the floor between reads -- is one of these.
             NodeType::Gpio => &[
                 ("path", true),
                 ("lines", true),
@@ -978,7 +1010,7 @@ impl NodeType {
                 ("bias", false),
                 ("debounce", false),
                 ("group", false),
-                ("trigger", false),
+                ("state_interval", false),
             ],
             // Every term any computation takes, which is what this list is
             // for: the function itself is required of all of them, and each of

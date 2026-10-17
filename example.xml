@@ -6,12 +6,12 @@
     <description>One payload on a UDP link, its telemetry going to the ground</description>
     <tcspecial>
         <beacon>
-            <interval>1s</interval>
+            <interval>1 s</interval>
         </beacon>
     </tcspecial>
     <payload_groups>
         <name>every_second</name>
-        <interval>1s</interval>
+        <interval>1 s</interval>
     </payload_groups>
     <moc>
         <name>moc-1</name>

@@ -270,7 +270,7 @@ mod tests {
         let mut graph = thermostat();
         graph.groups.push(tcslibgs::graph::Group {
             name: "slow".to_string(),
-            interval: "10s".to_string(),
+            interval: "10 s".to_string(),
         });
 
         let start = Instant::now();
@@ -297,7 +297,7 @@ mod tests {
         let mut graph = thermostat();
         graph.groups.push(tcslibgs::graph::Group {
             name: "other".to_string(),
-            interval: "1s".to_string(),
+            interval: "1 s".to_string(),
         });
 
         let start = Instant::now();

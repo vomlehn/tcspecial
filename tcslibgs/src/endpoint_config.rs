@@ -211,6 +211,7 @@ pub(crate) fn endpoint_of(
                 edge: gpio.edge,
                 bias: gpio.bias,
                 debounce_us: gpio.debounce_us,
+                state_interval_ms: gpio.state_interval_ms,
                 direction: gpio.direction,
             })),
             GroupKind::Rpmsg(rpmsg) => Ok(EndpointConfig::Rpmsg(RpmsgConfig {
@@ -433,6 +434,9 @@ pub(crate) struct LinkTerms {
     pub(crate) edge: Option<Scalar>,
     pub(crate) bias: Option<Scalar>,
     pub(crate) debounce_us: Option<Scalar>,
+    /// How often the current level of every line is reported, where the file
+    /// asks for it; see [`crate::node::payload::gpio`].
+    pub(crate) state_interval_ms: Option<Scalar>,
     /// Whether a set of discrete lines is read or driven. See
     /// `node::payload::gpio::Direction`.
     pub(crate) direction: Option<Scalar>,
@@ -944,7 +948,7 @@ pub(crate) fn parse_flag(
 /// -- that being the one grammar for a length of time in a configuration, so
 /// a reader who has learned how a group's interval is written has learned
 /// this. There was a second grammar here, narrower by two units and by the
-/// decimal fraction, and a configuration could say `1.5s` in one place and
+/// decimal fraction, and a configuration could say `1.5 s` in one place and
 /// not the other with nothing to say why.
 ///
 /// And the word `none`, which a length of time cannot say: a read that does

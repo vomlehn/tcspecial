@@ -52,6 +52,13 @@ pub enum Edge {
     /// Both, which is the default: a discrete that is read for its state is
     /// read for both of the states it has.
     Both,
+    /// None: the lines are not watched for changes at all.
+    ///
+    /// For a set of lines read for what they are rather than for when they
+    /// changed, which is `state_interval` and nothing else. The kernel is
+    /// asked for the lines with no edge detection, so there are no events to
+    /// read and the levels are taken when the report is due.
+    None,
 }
 
 /// What holds a line that nothing is driving.
@@ -122,6 +129,13 @@ pub struct GpioParams {
     /// reported each of them would be reporting the switch's bounce as the
     /// payload's state.
     pub debounce_us: Option<u32>,
+    /// How often what the lines are is reported, in milliseconds, where the
+    /// file asks for it.
+    ///
+    /// Edges say when a line changed and this says what it is now: the two
+    /// answer different questions, and a set of lines may ask for either or
+    /// both.
+    pub state_interval_ms: Option<u32>,
 }
 
 /// Read a list of line offsets as a file writes one: `0, 1, 5` or `0 1 5`.
@@ -192,10 +206,11 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             "rising" => Edge::Rising,
             "falling" => Edge::Falling,
             "both" => Edge::Both,
+            "none" => Edge::None,
             other => {
                 return Err(bad(
                     name,
-                    &format!("edge: \"{other}\" is not rising, falling or both"),
+                    &format!("edge: \"{other}\" is not rising, falling, both or none"),
                 ))
             }
         },
@@ -233,6 +248,21 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         None => None,
     };
 
+    let state_interval_ms = match g.state_interval_ms.as_ref() {
+        Some(stated) => {
+            let ms = parse_u32(name, "state_interval_ms", stated)?;
+            if ms == 0 {
+                return Err(bad(
+                    name,
+                    "state_interval must be greater than zero: a report every no \
+                     time at all is a line read as fast as the chip will answer",
+                ));
+            }
+            Some(ms)
+        }
+        None => None,
+    };
+
     let direction = match g.direction.as_ref() {
         Some(stated) => Direction::of(&stated.as_str().to_ascii_lowercase())
             .map_err(|why| bad(name, &why))?,
@@ -249,6 +279,7 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
             ("edge", g.edge.is_some()),
             ("bias", g.bias.is_some()),
             ("debounce_us", g.debounce_us.is_some()),
+            ("state_interval", g.state_interval_ms.is_some()),
         ] {
             if given {
                 return Err(bad(
@@ -263,12 +294,27 @@ pub(crate) fn group_kind_of(name: &str, g: LinkTerms) -> EndpointConfigResult<Gr
         }
     }
 
+    // Lines that are watched are watched somehow. Edges are the default, so
+    // the only way to ask for neither is to say so -- `edge: none` with no
+    // report -- and that is a payload that would send nothing at all: the
+    // configuration asked for the lines and then asked for nothing about
+    // them.
+    if !direction.is_output() && edge == Edge::None && state_interval_ms.is_none() {
+        return Err(bad(
+            name,
+            "these lines are watched for no edges and reported at no interval, \
+             so nothing about them would ever be sent: say an edge, or a \
+             state_interval, or both",
+        ));
+    }
+
     Ok(GroupKind::Gpio(GpioParams {
         lines,
         direction,
         edge,
         bias,
         debounce_us,
+        state_interval_ms,
     }))
 }
 
@@ -285,6 +331,7 @@ mod tests {
                 "edge" => g.edge = value,
                 "bias" => g.bias = value,
                 "debounce_us" => g.debounce_us = value,
+                "state_interval_ms" => g.state_interval_ms = value,
                 "direction" => g.direction = value,
                 "datarate" => g.datarate = value,
                 other => panic!("{other} is not a term this test states"),
@@ -312,8 +359,65 @@ mod tests {
                 edge: Edge::Both,
                 bias: Bias::None,
                 debounce_us: None,
+                state_interval_ms: None,
             }
         );
+    }
+
+    /// A set of lines says how it is watched: by its edges, by a report of
+    /// what it is, or by both.
+    ///
+    /// Edges are the default, so a payload that says nothing gets them and
+    /// every file written before the report existed still means what it
+    /// meant. Asking for neither takes saying so, and is refused: lines
+    /// watched for no edges and reported at no interval would send nothing.
+    #[test]
+    fn lines_are_watched_by_edges_or_by_report_or_by_both() {
+        // The default, unchanged: edges, and no report.
+        let said = params(&[("lines", "0")]);
+        assert_eq!(said.edge, Edge::Both);
+        assert_eq!(said.state_interval_ms, None);
+
+        // A report and no edges, which is a set of lines read for what they
+        // are rather than for when they changed.
+        let said = params(&[("lines", "0"), ("edge", "none"), ("state_interval_ms", "5000")]);
+        assert_eq!(said.edge, Edge::None);
+        assert_eq!(said.state_interval_ms, Some(5_000));
+
+        // And both, which is edges with a refresh behind them.
+        let said = params(&[("lines", "0"), ("state_interval_ms", "1000")]);
+        assert_eq!(said.edge, Edge::Both);
+        assert_eq!(said.state_interval_ms, Some(1_000));
+
+        // Neither is refused, and the complaint says both ways out.
+        let why = group_kind_of(
+            "discretes",
+            terms(&[("lines", "0"), ("edge", "none")]),
+        )
+        .expect_err("lines nobody watches");
+        let why = format!("{why}");
+        assert!(why.contains("state_interval") && why.contains("edge"), "{why}");
+
+        // A report of no time at all is refused, as a debounce of none is.
+        let why = group_kind_of(
+            "discretes",
+            terms(&[("lines", "0"), ("state_interval_ms", "0")]),
+        )
+        .expect_err("a report every no time");
+        assert!(format!("{why}").contains("greater than zero"), "{why}");
+
+        // And a driven line says nothing about reports, as it says nothing
+        // about edges.
+        let why = group_kind_of(
+            "discretes",
+            terms(&[
+                ("lines", "17"),
+                ("direction", "output"),
+                ("state_interval_ms", "1000"),
+            ]),
+        )
+        .expect_err("a report of a line this node drives");
+        assert!(format!("{why}").contains("state_interval"), "{why}");
     }
 
     /// Offsets may be written as a schematic writes them.
@@ -365,7 +469,7 @@ mod tests {
         assert_eq!(said.debounce_us, Some(5000));
 
         for (field, value, expected) in [
-            ("edge", "sideways", "rising, falling or both"),
+            ("edge", "sideways", "rising, falling, both or none"),
             ("bias", "pull_sideways", "none, pull_up or pull_down"),
         ] {
             let said = group_kind_of("discretes", terms(&[("lines", "0"), (field, value)]))
@@ -452,6 +556,7 @@ mod tests {
                 edge: Edge::Both,
                 bias: Bias::None,
                 debounce_us: None,
+                state_interval_ms: None,
             }
         );
     }

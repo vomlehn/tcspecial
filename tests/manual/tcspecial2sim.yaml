@@ -29,7 +29,7 @@ description: Simulator settings for the payloads of tcspecial2.yaml
 simulated_payload_groups:
   # One packet a second, sent whole.
   - name: steady_1hz
-    packet_interval: 1s
+    packet_interval: 1 s
 
 simulated_payloads:
   - name: auto-send

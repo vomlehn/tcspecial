@@ -507,7 +507,7 @@ section a payload set's file holds, which is required of every configuration.
        source_base: 0.0.0.0:6000
        dest_base: 127.0.0.1:6100
      beacon:
-       interval: "5s"
+       interval: "5 s"
        send: "0.0.0.0:5550"
        recv: "127.0.0.1:5650"
      log:
@@ -761,8 +761,8 @@ Requirement
     counting. The second names the limit, since "65536 is not a port" is only
     useful beside "a port is 1 to 65535".
 
-Every length of time in a configuration is a number and a unit, written
-together, and the units are these:
+Every length of time in a configuration is a number, whitespace, and a unit,
+and the units are these:
 
 .. table:: The units of a length of time
    :widths: auto
@@ -770,28 +770,43 @@ together, and the units are these:
    =======  ============  ==================================================
    Unit     What it is    Written
    =======  ============  ==================================================
-   ``us``   microseconds  ``250us``
-   ``ms``   milliseconds  ``500ms``
-   ``s``    seconds       ``3s``, ``1.5s``
-   ``min``  minutes       ``15min``
-   ``h``    hours         ``6h``
-   ``d``    days          ``1d``, ``0.5d``
-   ``w``    weeks         ``1w``
+   ``us``   microseconds  ``250 us``
+   ``ms``   milliseconds  ``500 ms``
+   ``s``    seconds       ``3 s``, ``1.5 s``
+   ``min``  minutes       ``15 min``
+   ``h``    hours         ``6 h``
+   ``d``    days          ``1 d``, ``0.5 d``
+   ``w``    weeks         ``1 w``
    =======  ============  ==================================================
 
 The number is decimal, whole or a fraction, with underscores allowed among
-the digits: ``1_000ms``, ``1.5s`` and ``1500ms`` are one length of time
+the digits: ``1_000 ms``, ``1.5 s`` and ``1500 ms`` are one length of time
 written three ways. The value is kept in whole microseconds, rounded to the
 nearest, so a fraction finer than a microsecond is rounded rather than
-silently truncated. There is no hexadecimal, no sign and no exponent: ``d``
-is a hexadecimal digit, so ``0x1d`` would be a number that is also "0x1
-days", and a length is neither negative nor written for a machine to read.
+silently truncated. There is no hexadecimal and none is planned, and no sign
+and no exponent: a length is neither negative nor written for a machine to
+read.
+
+Requirement
+    One or more whitespace characters stand between the number and the unit.
+    A tab reads as a space does and a run of them reads as one, so ``500 ms``
+    and ``500  ms`` are the same length of time, and ``500ms`` is refused --
+    told to write the space rather than told that ``500ms`` is not a unit,
+    which is a message about the wrong half of the value.
+
+The separator is what makes the two halves two things. A value written
+together has to be taken apart by a reader that knows every unit there is and
+looks for one at the end, which is how the longest match and its surprises
+arrive -- and it is what would stand in the way of the number ever growing a
+notation of its own, hexadecimal being the obvious one. Nothing supports
+hexadecimal today and nothing is planned to; the point is that the grammar no
+longer forecloses it.
 
 Every unit from a microsecond to a week, because a reading taken once a week
-is written ``1w`` and not ``604800s``, and a number nobody can read at a
+is written ``1 w`` and not ``604800 s``, and a number nobody can read at a
 glance is a number nobody can check. The same argument covers the middle of
-the range: ``15min`` and ``6h`` are how a schedule is discussed, and making
-somebody write ``900s`` and ``21600s`` is making them do the arithmetic the
+the range: ``15 min`` and ``6 h`` are how a schedule is discussed, and making
+somebody write ``900 s`` and ``21600 s`` is making them do the arithmetic the
 mistake hides in.
 
 Nothing in the table is ambiguous, and that is the reason minutes are
@@ -806,7 +821,7 @@ and so is anything else that could be read two ways:
 a month or a year -- ``mon``, ``mo``, ``month``, ``y``, ``yr``, ``year``
     Not lengths of time at all. A month needs a calendar, a reference date
     and a timezone, none of which a vehicle carries; a span of about that
-    size is written exactly, as ``30d`` or a number of days. These are
+    size is written exactly, as ``30 d`` or a number of days. These are
     refused so that nobody writes one and is answered by whatever a calendar
     would have said.
 
@@ -830,14 +845,15 @@ Requirement
     computed to nothing, a field cleared to a zero, a setting carried over
     from a reader that counted milliseconds -- and what it would ask for here
     is the fastest thing this software does, which nobody asks for by
-    accident. A file writing ``0s`` is refused and told the word, and the word
+    accident. A file writing ``0 s`` is refused and told the word, and the word
     is read only where it means something: how often a packet is produced, and
     how often the segments of one are. A jitter of ``continuous`` is refused
     for the same reason from the other side, a packet not being able to be
     late continuously.
 
-The suffix is matched longest first, so the ``s`` of ``ms`` is not taken for
-seconds, and ``1w``, ``7d`` and ``168h`` are one interval.
+The unit is a word of its own, so nothing depends on which spelling ends with
+which: ``1 w``, ``7 d`` and ``168 h`` are one interval, and ``ms`` is read as
+``ms`` rather than as an ``m`` that happens to precede an ``s``.
 
 A **timeout** takes everything in the table and one word besides: ``none``,
 which is a read that does not time out at all. That word is the whole of the
@@ -850,7 +866,7 @@ for that reason: a deadline that may be ``none`` is a program that may hang.
 One reader for all of it, ``graph::parse_interval``, with the timeout's word
 in front of it in ``endpoint_config::parse_timeout``. There were two
 grammars, differing by two units and by the fraction, and a configuration
-could say ``1.5s`` in one place and not the other with nothing to say why.
+could say ``1.5 s`` in one place and not the other with nothing to say why.
 
 So a timeout takes every unit in the table, including the ones no read would
 sensibly use. A timeout of hours is a configuration that will look like a
@@ -1012,7 +1028,7 @@ may take, and says whether it may be restarted:
 .. code-block:: yaml
 
    - { name: attitude, type: compute, function: process,
-       executable: /opt/flight/attitude, timeout: 500ms, restart: false }
+       executable: /opt/flight/attitude, timeout: 500 ms, restart: false }
 
 What the program sees is a line per arrival on its standard input and a line
 per answer on its standard output:
@@ -1399,6 +1415,192 @@ Requirement
     command interpreter could stall, which is the thing the separate thread was
     for.
 
+How a node is driven
+~~~~~~~~~~~~~~~~~~~~
+
+Two questions decide it, and between them they make four cases. The first is
+about the interface: does the payload put data there by itself, or is the data
+there only because the vehicle went and read it? The second is about the part:
+does it have to be asked?
+
+A **part that originates nothing** holds a value that the act of reading
+refreshes -- a register on a bus, a device file, a peripheral on a clocked
+link. Nothing arrives at the vehicle unless the vehicle reads, so a periodic
+timer drives the reading:
+
+* with no trigger, the action is the read itself, no oftener than
+  ``poll_interval``;
+* with a trigger, the action is the whole exchange: send the trigger, wait
+  ``read_delay``, read what came back. Every ``trigger_interval``.
+
+A **part that sends** puts data on the interface when it has some -- a socket,
+a line, a channel, a set of discrete lines. The vehicle does not decide when:
+
+* with no trigger, data arrives when it arrives and the vehicle takes it as it
+  becomes readable. There is no rate to state and none to state it with;
+* with a trigger, a periodic timer drives the trigger alone, every
+  ``trigger_interval``, and the answer arrives when it arrives. There is no
+  ``read_delay``, because nothing waits: the answer is taken on the pass it
+  becomes readable on, like any other arrival.
+
+Requirement
+    A periodic timer drives the action, and the timer's period is what the
+    configuration states. The clock runs from when an action was *due* and not
+    from when it finished, so a pass that ran late does not push the next one
+    later: a reading every three seconds stays every three seconds rather than
+    drifting by the cost of the work. That is the rule for a group's interval
+    and for ``trigger_interval``, which are rates somebody chose.
+
+Requirement
+    ``poll_interval`` is a floor and not a rate: the least time between
+    issuing one read and issuing the next. It is not a cadence because the
+    data is not on one -- nothing says how soon a descriptor will have
+    something, so a vehicle that promised a reading every so often would be
+    promising on the part's behalf. What the interval does is keep a
+    descriptor with nothing on it from being read again immediately, which is
+    a pass spent on a question already answered.
+
+Requirement
+    ``poll_interval`` is for a part the vehicle must read and is not asked:
+    a register that sits unchanged until it is read, and a device file, where
+    there is no telling how soon anything will be there. It says nothing
+    about a part that is asked, which is read because it was asked.
+
+Requirement
+    ``read_delay`` is for a part that originates nothing and is asked. It is
+    the time that part takes to answer, which its interface document states;
+    a part that sends answers when it answers, and a vehicle that waited a
+    stated time for it would be guessing at a link's latency.
+
+Requirement
+    ``trigger_interval`` is for any part that is asked, whichever kind of
+    interface it has. What the timer does differs -- an exchange for one, a
+    write for the other -- and how often the question goes out does not.
+
+Requirement
+    A part that sends and is not asked states no rate at all, and a
+    configuration that gives it one is refused. Nothing in the vehicle decides
+    when that data exists, so a number there would describe something nobody
+    controls.
+
+Requirement
+    Which kind of interface a node has is the node's type, and the one table
+    that says which is which is in the library. It is not a thing for a file
+    to state: a payload that said it originated nothing while sitting on a
+    socket would be a file disagreeing with the interface it names.
+
+What each command means
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Ten commands, and version 2 changes what three of them act on rather than what
+they are. Which link each belongs on is ``CommandType::link``, the one table
+both ends read; what follows is what a vehicle made of nodes does with each.
+
+``PING``
+    Answers. It says the interpreter is reading its socket, which is a
+    different fact from the beacon's -- a beacon says the vehicle is alive,
+    and a PING says this link reaches it.
+
+``CONNECT``
+    Answers with this build's version, the version the configuration states
+    and the digest of the configuration being flown. Asked as the link comes
+    up, and what licenses every command that carries a node id: see `How a
+    command names a node`_.
+
+``RESTART_ARM`` and ``RESTART``
+    Unchanged, and the process is what restarts: a vehicle that comes back
+    reads the configuration file again, so a RESTART is how a changed
+    configuration is flown. The arm key is the interlock, and an unarmed
+    RESTART is refused.
+
+``CONFIG``
+    Sets the beacon interval. The beacon thread is retimed where it waits, so
+    the next beacon goes at the new interval rather than after the old one
+    elapses.
+
+``START_DH`` and ``STOP_DH``
+    Enable and disable a node. This is where version 2 differs most: the unit
+    is a node of the graph rather than a data handler, so a computation, a log
+    and a payload are each something the ground can stop.
+
+``QUERY_DH``
+    What that node has moved, from the node's own counters.
+
+``QUERY_DH_SAMPLE``
+    The last datum that node produced, for an operator who wants to see the
+    bytes rather than a count of them.
+
+``CONFIG_DH``
+    Sets an attribute of a node. Version 1 carried a name and nothing to
+    configure with, and refused the command as unimplemented; version 2 has
+    something for it to do, because a graph's ``commands`` section already
+    says which attribute of which node the ground may set, and ``System::set``
+    already applies one.
+
+Requirement
+    Any node may be disabled, whatever its kind. A graph does not divide into
+    payloads and the rest -- a computation that must stop and a sensor that
+    must stop are the same request -- and a rule that admitted only some kinds
+    would be a rule an operator has to remember in the middle of a fault.
+
+Requirement
+    Enabling a node opens what it needs again, and a node that cannot be
+    opened is answered with the failure and left disabled rather than left in
+    a state of its own. Disabling released the endpoint -- see `Disabling a
+    node that is waiting`_ -- so enabling is the same work as starting it at
+    startup, and it can fail the same ways: a device that is gone, an address
+    already taken, a program that will not execute.
+
+Requirement
+    Enabling a node that is enabled, and disabling one that is disabled,
+    answer success. A command that arrives twice, or whose answer was lost, is
+    the ordinary case on a link with latency, and an operator who presses
+    Disable twice has asked for a state, not an action.
+
+Requirement
+    A node comes up enabled. Every node of a checked configuration is opened
+    when the vehicle starts and runs until it is stopped, because what a graph
+    describes is a system that works as a whole: telemetry reaches the ground
+    with no ground station having said anything, which is what a vehicle out
+    of contact has to do. Version 1 came up with its handlers idle and was
+    told which to start, which suited a set of payloads that are separately
+    useful and does not suit a graph whose links describe one machine.
+
+Requirement
+    A ``START_DH`` carries no kind. Version 1's carried the type of handler it
+    expected and refused a mismatch, which was a check against the two ends
+    reading different configurations; the node id and the digest make that
+    check beforehand and for every command, so a kind in the message would be
+    a second answer to a settled question.
+
+Requirement
+    Every node counts what it has moved: bytes taken and bytes given, the
+    operations that produced them, the failures, and when it last moved
+    anything. They are the node's own, and they survive a disable -- a node
+    that was stopped and started again has moved what it moved before, and an
+    operator asking what a payload has done wants the answer for the flight
+    and not for the latest spell of it.
+
+Requirement
+    What a pass reports and what a node counts are different things.
+    ``Moved`` says what one pass did, which is how the loop reports itself;
+    a node's counters say what that node has done since the vehicle started.
+    A ``QUERY_DH`` answered from the pass's figures would answer about the
+    last twenty milliseconds.
+
+Requirement
+    A ``CONFIG_DH`` is refused unless the configuration binds that attribute
+    of that node to the ground. The ``commands`` section is what says a
+    setpoint may be set from the ground, and a vehicle that took any attribute
+    from a command would have no checked configuration at all: a bus address
+    or a set of line numbers is what the file said.
+
+Requirement
+    A command about a disabled node is answered rather than ignored. A
+    ``QUERY_DH`` of a disabled node answers with its counters and says it is
+    disabled; a ``CONFIG_DH`` of one is applied if the attribute is bound,
+    since what it sets is the node's configuration rather than its traffic.
+
 How a command names a node
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1447,6 +1649,95 @@ Requirement
     to its command without the name. The ground shows the name, which it has
     from the configuration it read -- the same file the id is counted from --
     so what an operator sees is a name and what the link carries is a number.
+
+How many links, and what the thread does with one
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    Two links, as version 1 has: one for the spacecraft and one for commands
+    about nodes. The reason is version 1's and has not changed -- what the
+    ground needs in a hurry must never be queued behind what it asked for at
+    leisure, and a ``RESTART`` waiting behind a node's statistics is a vehicle
+    that cannot be rescued while it is busy.
+
+Requirement
+    One link for every node, and not one per node. Version 1 bound a socket
+    per payload, which did two things: it said which payload a command was
+    about, and it kept a command that takes time from delaying a command about
+    another payload. The node id does the first now, and the workers do the
+    second. A graph also has more nodes than a payload set has payloads -- a
+    thermostat of four sensors is eleven nodes -- so a socket apiece would
+    spend ports on computations and logs that nothing addresses from the
+    ground.
+
+Requirement
+    The command interpreter does not do a node's work on its thread. It hands
+    the work over and answers when the work is done, so that a ``START_DH``
+    opening a device does not stop the next command being read. An answer
+    carries the sequence of the command it answers, so answers that overtake
+    one another are still matched to what was asked.
+
+Requirement
+    An answer goes back to the address the command came from, which is what
+    version 1 does: a datagram's sender is the only statement of where the
+    ground is, and a configuration that stated it as well would be a second
+    answer that can disagree.
+
+Requirement
+    A command from anywhere but the address the configuration states is
+    ignored. A command is a command to restart a vehicle or stop a payload;
+    taking one from whoever sent it would be taking the ground's word from a
+    stranger.
+
+The check version 1 made by binding a socket per payload -- a command about
+one payload arriving on another's is one end reading a different
+configuration -- is not lost with the sockets. It is made earlier and for
+every command: the ids two ends use are the same ids exactly when their
+digests agree, and ``CONNECT`` is what establishes that.
+
+The telemetry log
+~~~~~~~~~~~~~~~~~
+
+One log for everything the vehicle sends to the ground, where the
+``tcspecial`` section's ``log.directory`` says and in segments of
+``log.segment_size``. The beacons record into it, and the command
+interpreter's answers will when there is one.
+
+Requirement
+    Every sender records into one log. Beacons go from a thread of their own
+    and answers from the command interpreter's, and a log only one of them
+    could reach would hold part of what went to the ground -- which is the one
+    thing a telemetry log exists to make reconstructable. The handle is shared
+    and a handle on no log records nothing, so no sender has to ask whether
+    logging is on.
+
+Requirement
+    The log is opened before anything records into it, and a directory that is
+    not there stops the start. A vehicle that came up and discovered at the
+    first beacon that it had nowhere to write would have lost the beacons it
+    sent in between.
+
+Requirement
+    What is recorded is flushed when the vehicle stops. The log is the account
+    of what was sent, and an account missing its last page is one nobody can
+    rely on.
+
+Requirement
+    A ``log`` node is not this and this is not a ``log`` node. A log node
+    records what is delivered to it, and the configuration's links decide what
+    that is; this records what leaves the vehicle on the links no graph
+    describes -- beacons go to ``beacon.recv`` and answers to whoever asked,
+    and neither travels a link a node could be drawn into. The two use one
+    library, ``tcslog``, which is why a log node was a generalisation of
+    something the software already did rather than a mechanism of its own.
+
+.. note::
+   **Needs examination.** Filled segment files stay in the log directory until
+   something clears them: there is no path that hands them down to the ground
+   and none that ages them out, so a long flight fills the directory it was
+   given. What a vehicle should do when that directory is full -- stop
+   recording, overwrite the oldest, or refuse to fly without somewhere to put
+   it -- has not been decided, and version 1 did not decide it either.
 
 Disabling a node that is waiting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3464,7 +3755,7 @@ they are asserted.
 
    groups:
      - name: cabin_temps
-       interval: 3s
+       interval: 3 s
 
    nodes:
      - { name: temp_fore, type: i2c, group: cabin_temps,
@@ -4152,7 +4443,7 @@ This is the shipped ``tcspecial/src/tcspecial.yaml``:
      source_base: "0.0.0.0:6000"
      dest_base: "127.0.0.1:6100"
    beacon:
-     interval: "5s"
+     interval: "5 s"
      send: "0.0.0.0:5550"
      recv: "127.0.0.1:5650"
    log:
@@ -5556,10 +5847,72 @@ The rules are in ``tcslibgs::endpoint_config_gpio``, the endpoint in
 
 Requirement
     A GPIO payload states a ``path`` and the ``lines`` it watches, and may
-    state the ``edge``, the ``bias`` and a ``debounce_us``. Offsets are
-    separated by commas or spaces and written in decimal or hexadecimal,
-    because a file written for a board copies them out of a schematic in
-    whichever form the schematic used.
+    state the ``edge``, the ``bias``, a ``debounce_us`` and a
+    ``state_interval``. Offsets are separated by commas or spaces and written
+    in decimal or hexadecimal, because a file written for a board copies them
+    out of a schematic in whichever form the schematic used.
+
+Two ways of watching, and a set of lines may ask for either or both
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``edge`` says *when a line changed*; ``state_interval`` says *what the lines
+are*, every so often. They answer different questions, so a payload may ask
+for one, the other, or both:
+
+.. code-block:: text
+
+   edge: both                         changes, which is the default
+   edge: rising                       changes, one way only
+   state_interval: 5 s                what they are, every five seconds
+   edge: both, state_interval: 5 s    both
+   edge: none                         refused: nothing would be sent
+
+Requirement
+    Edges are the default. A payload that says nothing about watching is
+    watched for both of them, which is what every file written before the
+    report existed asked for and still means.
+
+Requirement
+    A report is made with one ioctl on the line request the payload already
+    holds -- ``GPIO_V2_LINE_GET_VALUES_IOCTL`` -- and not with a second
+    request. The kernel gives a line to one request at a time, so a second
+    request for the same lines is a payload that could not start.
+
+Requirement
+    A report makes the same sixteen-byte record an event does, one per line.
+    The ground reads the two alike, which is the point: both say that this
+    line had this value at this time. The difference is whose time it is --
+    an event carries the moment the line changed, a report the moment the
+    vehicle looked -- and anything measuring how long an edge took to arrive
+    reads the events.
+
+Requirement
+    The report exists for the two things edges cannot do. A line that has not
+    changed since the vehicle started tells the ground nothing about itself;
+    and the kernel's event queue is finite, so a burst can leave the ground
+    holding a value that is wrong with no way to know it. A report every so
+    often ends both: after one interval at most, what the ground has is what
+    the lines are.
+
+Requirement
+    The report's clock runs from when a report was due and not from when it
+    was made, and a report missed by more than an interval is not made up
+    for. What the ground wants is what the lines are now, so a vehicle that
+    was busy sends one report late rather than several together.
+
+Requirement
+    A payload that asks for neither is refused: ``edge: none`` with no
+    ``state_interval`` is a set of lines watched for no changes and reported
+    at no interval, which would send nothing at all. Saying it takes writing
+    ``edge: none``, so it is not a thing a file does by leaving something
+    out.
+
+Requirement
+    ``poll_interval`` is not a GPIO word. It is the least time between reads
+    of a descriptor whose data appears because the vehicle reads -- see
+    `How a node is driven`_ -- and a line request is read when there are
+    events in it. What a set of lines states instead is ``state_interval``,
+    which is a cadence and says so.
 
 Requirement
     A payload names at least one line, names none of them twice, and names no
@@ -6377,7 +6730,7 @@ simulated payloads
 | Attribute           | Type   | Meaning                                     |
 +=====================+========+=============================================+
 | packet_interval     | length | How long between packets, as a length of    |
-|                     | of     | time -- ``1s``, ``500ms`` -- or             |
+|                     | of     | time -- ``1 s``, ``500 ms`` -- or           |
 |                     | time   | ``continuous`` for as fast as the payload   |
 |                     |        | can be driven                               |
 +---------------------+--------+---------------------------------------------+
@@ -6674,7 +7027,7 @@ states its own rate instead.
 
    simulated_payload_groups:
      - name: steady_1hz
-       packet_interval: 1s
+       packet_interval: 1 s
 
      - name: continuous
        packet_interval: continuous
@@ -6697,7 +7050,7 @@ states its own rate instead.
      - name: udp-fast
        type: network
        protocol: udp
-       packet_interval: 500ms
+       packet_interval: 500 ms
 
 Testing
 =======
@@ -7545,7 +7898,7 @@ Requirement
 
 Requirement
     How often is a length of time, like every other length of time in these
-    files: ``5s`` rather than ``5000``. It was ``beacon.interval_ms``, a bare
+    files: ``5 s`` rather than ``5000``. It was ``beacon.interval_ms``, a bare
     count of milliseconds, in every one of the three configurations that
     states the section -- the interpreter's own file, a payload set's section
     and a graph's -- and a file still writing that name is told the name it

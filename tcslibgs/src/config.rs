@@ -400,7 +400,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval: 5s
+    interval: 5 s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -444,14 +444,14 @@ payloads:
         let section = load_tcspecial_section(file.path())
             .expect("it loads")
             .expect("a section");
-        assert_eq!(section.beacon.interval, "5s");
+        assert_eq!(section.beacon.interval, "5 s");
         assert_eq!(section.beacon.send, "0.0.0.0:5550");
         assert_eq!(section.beacon.recv, "127.0.0.1:5650");
 
         // Each of the three in turn: a subsection that leaves any of them out
         // is a section that has not said where its beacons go.
         for missing in [
-            "    interval: 5s\n",
+            "    interval: 5 s\n",
             "    send: 0.0.0.0:5550\n",
             "    recv: 127.0.0.1:5650\n",
         ] {

@@ -35,3 +35,26 @@ attributes:
     about: >
       What to send to make it answer, as hex bytes. A payload with none
       is one the configuration describes as only read.
+  - name: trigger_interval
+    required: false
+    kind: interval
+    about: >
+      How often the trigger goes out, which is how often this payload is
+      asked: 500 ms, 3 s. Said by a payload that has a trigger and is in no
+      group; a payload in one is asked when its group is read.
+  - name: read_delay
+    required: false
+    kind: interval
+    about: >
+      How long to wait between asking and reading, which is what the part
+      takes to answer: 2 ms, 200 us. With one, a pass asks, waits and reads
+      the answer to the question it asked; with none, a pass reads what the
+      last ask produced and asks again. Only beside a trigger.
+  - name: poll_interval
+    required: false
+    kind: interval
+    about: >
+      The least time between one read of it and the next, for a payload
+      nothing asks: 1 s, 500 ms. A floor rather than a rate -- nothing says
+      how soon there will be anything to read -- said by a payload with no
+      trigger that is in no group, and never beside a trigger.

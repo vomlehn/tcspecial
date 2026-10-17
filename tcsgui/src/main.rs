@@ -4506,7 +4506,7 @@ fn fresh_name(document: &Document, node_type: &str, home: &Home) -> String {
 ///
 /// A second: slow enough for anything, fast enough to be obviously a value
 /// somebody should look at rather than a default that happens to work.
-const FIRST_INTERVAL: &str = "1s";
+const FIRST_INTERVAL: &str = "1 s";
 
 /// A name no group in the document has yet.
 ///
@@ -5485,7 +5485,7 @@ mod tests {
         });
         document.apply(&Edit::AddGroup {
             name: "every_second".to_string(),
-            interval: "1s".to_string(),
+            interval: "1 s".to_string(),
         });
 
         let troubles = troubles_of(&document);
@@ -5597,7 +5597,7 @@ mod tests {
         std::fs::write(
             &path,
             "version: \"2.0\"\n\
-             payload_groups:\n  - name: idle\n    interval: 3s\n\
+             payload_groups:\n  - name: idle\n    interval: 3 s\n\
              payloads:\n  - name: a\n    type: i2c\n    payload-out: moc\n\
              moc:\n  - name: moc\n    type: moc\n",
         )
@@ -8318,7 +8318,7 @@ mod tests {
         // Which is nothing, for everything but the beacon's interval: a socket
         // has no value that is right until somebody says so, and "how often
         // does the vehicle say it is alive" has one.
-        assert_eq!(said.get("beacon.interval").map(String::as_str), Some("1s"));
+        assert_eq!(said.get("beacon.interval").map(String::as_str), Some("1 s"));
         // And none of it is a fault: the editor is lazy, and a configuration
         // nobody has filled in yet is one nobody has filled in yet. What it
         // must say before it flies is the ground check's to insist on, with a
@@ -8330,7 +8330,7 @@ mod tests {
         // the file rather than written empty, and a `tcspecial:` with nothing
         // under it would read back as no section at all.
         let written = std::fs::read_to_string(&path).expect("the file");
-        assert!(written.contains("interval: \"1s\""), "{written}");
+        assert!(written.contains("interval: \"1 s\""), "{written}");
         for unanswered in ["tcs_cmd", "payload_telemetry", "log"] {
             assert!(
                 !written.contains(unanswered),
@@ -8713,7 +8713,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -8769,7 +8769,7 @@ mod tests {
             let path = where_.path().join("vehicle.yaml");
             std::fs::write(
                 &path,
-                "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+                "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
             )
             .expect("a configuration with a group nothing is in");
             let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -8836,7 +8836,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -8885,7 +8885,7 @@ mod tests {
         let path = where_.path().join("vehicle.yaml");
         std::fs::write(
             &path,
-            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3s\n",
+            "version: \"2.0\"\npayload_groups:\n  - name: idle\n    interval: 3 s\n",
         )
         .expect("a configuration with a group nothing is in");
         let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
@@ -10427,7 +10427,7 @@ mod tests {
             &where_.path().join("vehicle.yaml"),
             dividers(),
         )));
-        for (name, interval) in [("cabin_temps", "3s"), ("bay", "5s")] {
+        for (name, interval) in [("cabin_temps", "3 s"), ("bay", "5 s")] {
             editor.borrow_mut().edit(Edit::AddGroup {
                 name: name.into(),
                 interval: interval.into(),
@@ -10483,7 +10483,7 @@ mod tests {
         // Choosing another shows that one.
         window.invoke_choose("cabin_temps".into());
         assert_eq!(window.get_group(), "cabin_temps");
-        assert_eq!(window.get_interval(), "3s");
+        assert_eq!(window.get_interval(), "3 s");
 
         // And a new one is made with an interval, because a group without one
         // reads nothing.
@@ -11048,11 +11048,11 @@ mod tests {
         groups.invoke_add();
         assert_eq!(groups.get_chosen(), "group");
         assert_eq!(groups.get_choices().row_count(), 1);
-        groups.invoke_setting_set("packet_interval".into(), "500ms".into());
+        groups.invoke_setting_set("packet_interval".into(), "500 ms".into());
         assert_eq!(
             editor.borrow().document().simulator.as_ref().unwrap().groups["group"]
                 ["packet_interval"],
-            "500ms"
+            "500 ms"
         );
         // And it has no field for a group of its own, a group having none.
         let offered: Vec<String> = (0..groups.get_fields().row_count())
@@ -11076,7 +11076,7 @@ mod tests {
         assert_eq!(
             editor.borrow().document().simulator.as_ref().unwrap().groups["group"]
                 ["packet_interval"],
-            "500ms",
+            "500 ms",
             "the group came back empty"
         );
     }
@@ -11100,7 +11100,7 @@ mod tests {
             let mut editor = editor.borrow_mut();
             editor.edit(Edit::AddGroup {
                 name: "cabin_temps".to_string(),
-                interval: "3s".to_string(),
+                interval: "3 s".to_string(),
             });
             for name in ["temp_fore", "temp_aft"] {
                 editor.edit(Edit::AddNode {
@@ -11157,7 +11157,7 @@ mod tests {
             .upgrade()
             .expect("and still be there");
         assert_eq!(window.get_group(), "cabin_temps");
-        assert_eq!(window.get_interval(), "3s");
+        assert_eq!(window.get_interval(), "3 s");
         assert_eq!(window.get_members_text(), "temp_fore, temp_aft");
 
         // One of the fields they both have, set once.
@@ -11211,10 +11211,10 @@ mod tests {
                 .map(String::as_str),
             Some("cabin")
         );
-        window.invoke_interval_set("500ms".into());
+        window.invoke_interval_set("500 ms".into());
         assert_eq!(
             editor.borrow().document().groups.get("cabin").map(String::as_str),
-            Some("500ms")
+            Some("500 ms")
         );
     }
 

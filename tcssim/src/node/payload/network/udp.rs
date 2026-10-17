@@ -202,7 +202,7 @@ mod tests {
         let apart = datagrams[ended + 2].1 - datagrams[ended + 1].1;
         assert!(
             apart >= Duration::from_millis(40),
-            "two segments of one packet arrived {apart:?} apart, not the 40ms asked for"
+            "two segments of one packet arrived {apart:?} apart, not the 40 ms asked for"
         );
 
         assert!(

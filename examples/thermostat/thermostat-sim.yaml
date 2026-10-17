@@ -12,7 +12,7 @@ simulated_payload_groups:
   # The three sensors are read together, every three seconds, as their
   # payload group in thermostat.yaml says.
   - name: cabin_temps
-    packet_interval: 3s
+    packet_interval: 3 s
 
 simulated_payloads:
   - name: temp_fore

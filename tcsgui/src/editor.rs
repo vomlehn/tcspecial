@@ -855,8 +855,8 @@ tcsgui:
         let twice = where_.path().join("twicesim.yaml");
         std::fs::write(
             &twice,
-            "simulated_payloads:\n  - name: payload\n    packet_interval: 500ms\n  \
-             - name: payload\n    packet_interval: 900ms\n",
+            "simulated_payloads:\n  - name: payload\n    packet_interval: 500 ms\n  \
+             - name: payload\n    packet_interval: 900 ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -889,7 +889,7 @@ tcsgui:
         let good = where_.path().join("goodsim.yaml");
         std::fs::write(
             &good,
-            "simulated_payloads:\n  - name: payload\n    packet_interval: 500ms\n",
+            "simulated_payloads:\n  - name: payload\n    packet_interval: 500 ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -970,12 +970,12 @@ tcsgui:
             payload: "payload".to_string(),
             setting: "packet_interval".to_string(),
             was: None,
-            now: Some("1s".to_string()),
+            now: Some("1 s".to_string()),
         });
 
         let written = std::fs::read_to_string(&sim).expect("the simulator file");
         assert!(
-            written.contains("packet_interval: \"1s\""),
+            written.contains("packet_interval: \"1 s\""),
             "the setting did not reach the file: {written}"
         );
     }
@@ -1108,7 +1108,7 @@ tcsgui:
 
         editor.edit(Edit::AddGroup {
             name: "cabin_temps".into(),
-            interval: "3s".into(),
+            interval: "3 s".into(),
         });
         editor.edit(add("temp_fore", "i2c"));
         for (attribute, value) in [("group", "cabin_temps"), ("path", "/dev/i2c-1"), ("address", "0x48")] {
@@ -1123,12 +1123,12 @@ tcsgui:
 
         let written = std::fs::read_to_string(&path).expect("the file");
         assert!(written.contains("cabin_temps"), "{written}");
-        assert!(written.contains("3s"), "{written}");
+        assert!(written.contains("3 s"), "{written}");
 
         let reopened = Editor::open(&path, crate::pane::default_dividers());
         assert_eq!(
             reopened.document().groups.get("cabin_temps").map(String::as_str),
-            Some("3s"),
+            Some("3 s"),
             "the group did not survive a round trip"
         );
         assert_eq!(reopened.document().payloads_of("cabin_temps").len(), 1);

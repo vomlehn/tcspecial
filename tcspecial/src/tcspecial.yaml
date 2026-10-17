@@ -100,7 +100,7 @@ payload_telemetry:
 # and one receiver, both written down, can be described to a firewall or a
 # capture filter by somebody reading this file.
 beacon:
-  interval_ms: 5000
+  interval: "5s"
   send: "0.0.0.0:5550"
   recv: "127.0.0.1:5650"
 
@@ -109,5 +109,5 @@ beacon:
 # logging runs without one, which is a configuration somebody may mean -- a
 # vehicle with no writable storage.
 log:
-  directory: telemetry
+  directory: /tmp/telemetry
   segment_size: 65536

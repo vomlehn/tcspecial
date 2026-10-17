@@ -562,6 +562,12 @@ socket on each side is that side's base plus the payload's own id, so four
 payloads based at 4300 and 4200 are commanded from 4300 to 4303 and take those
 commands on 4200 to 4203.
 
+Simple payloads -- a device or a socket that tcspecial reads or drives -- do
+not use payload commands. What a simple payload is configured with is in the
+tcspecial configuration file, and it is not changed while tcspecial is
+running. At present only applications, the payloads and vehicle nodes that are
+programs of their own, use the ``payload_command`` values.
+
 One socket per payload rather than one for all of them, which is what
 ``payload_interface`` was. That worked, and left two things undone. Nothing
 said which socket the ground sent from -- the MOC bound whatever port the
@@ -677,6 +683,17 @@ Requirement
     is a datagram link, as the one tcspecial has always had is; a device
     reached over a socket could be any of the four, and guessing which is how a
     stream payload comes to be addressed as datagrams.
+
+Requirement
+    A ``moc`` node over UDP states where the ground station is, as
+    ``ground_address`` and ``ground_port``, beside the ``address`` and
+    ``port`` the vehicle binds. The vehicle sends telemetry there from the
+    first reading. A ground link whose far end was not written down could
+    learn it only from what the ground sent, so it would report nothing until
+    the ground had spoken -- and it could learn it only by being read, which a
+    ground link with nothing linked out of it is not. Both attributes are
+    refused on every other node, and on a ``moc`` node over a stream, whose
+    far end is whoever connected.
 
 Numbers, as a configuration writes them
 ---------------------------------------
@@ -882,9 +899,11 @@ so the arrangement is deliberately strict:
   **refused**: what would have gone into it is dropped, counted, and reported
   in telemetry, so the ground sees a computation stop rather than seeing
   plausible numbers that are stale.
-* restarting is bounded and declared. ``restart: never`` is the default for a
-  node in a control path, because a heater driven by a computation that
-  restarts under load is worse than a heater driven by nothing.
+* restarting is declared, and the answer is yes or no. ``restart: false`` is
+  what a node that says nothing means, because a heater driven by a
+  computation that restarts under load is worse than a heater driven by
+  nothing -- so coming back at all is something a configuration has to ask
+  for, in the word ``true``.
 * a built-in and an external process are interchangeable in the graph, so a
   computation can be proved as a program and later moved into the catalogue
   without the configuration changing shape.
@@ -895,7 +914,7 @@ whether it may be restarted:
 .. code-block:: yaml
 
    - { name: attitude, type: compute, function: process,
-       program: /opt/flight/attitude, timeout: 500ms, restart: never }
+       program: /opt/flight/attitude, timeout: 500ms, restart: false }
 
 What the program sees is a line per arrival on its standard input and a line
 per answer on its standard output:
@@ -927,14 +946,14 @@ Requirement
 
 Requirement
     A datum that went into a program which then failed is refused, including
-    when a restart allowance paid for the program to be started again. It went
-    into a computation that died without answering, and saying otherwise would
-    be inventing a result.
+    when the program was started again. It went into a computation that died
+    without answering, and saying otherwise would be inventing a result.
 
 Requirement
-    A restart is taken at once, in the pass that spent it, rather than at the
-    next datum. A vehicle is better off learning that the program will not
-    start again while something is still watching the pass that killed it.
+    A restart happens at once, in the pass the program died in, rather than at
+    the next datum. A vehicle is better off learning what became of the
+    program -- that it is back, or that it is not coming back -- while
+    something is still watching the pass that killed it.
 
 Requirement
     A program is killed and waited for when its node goes. A child that is
@@ -1062,14 +1081,56 @@ not what its kind is run with -- a socket where it should have none, or none
 where it needs one. Asked of what the descriptor *is* rather than of whether it
 is open, for the reason above.
 
-What a configuration says about one is a program to run and what to do when it
-stops. The program is required and there is no default: an app node is the
-program it names. ``restart`` is the same attribute a ``process`` computation
-takes, read the same way and ``never`` by default, because a part of the
-control system that restarts under load is worse than one that stays stopped
-and says so. It is started when the configuration is loaded rather than at the
-first datum, so a program that cannot be executed is a fault found on the
-ground.
+What a configuration says about one is where the application is, what to tell
+it about each stream it handles, and what to do when it stops. ``program`` is
+required and there is no default: an app node is the program it names. A
+leading ``~`` and ``$HOME`` in it are expanded as a shell would expand them,
+and that happens where the program is run rather than where the file is read
+-- the value is kept as written, so a ground tool is not answering a question
+about its own workstation. Nothing else is expanded: another variable would be
+a configuration that behaved differently on two vehicles, and ``~somebody`` is
+refused rather than guessed at. ``restart`` is the same attribute a ``process``
+computation takes, read in the same one place and ``false`` unless a
+configuration says ``true``, because a part of the control system that restarts
+under load is worse than one that stays stopped and says so. It is started when
+the configuration is loaded rather than at the first datum, so a program that
+cannot be executed is a fault found on the ground.
+
+What it is told on its command line is a short, fixed list. The name of the
+node it is comes first, for every kind: one program may be several nodes of one
+configuration, and three processes that cannot say which of them each is are
+three processes whose complaints an operator cannot act on. Then one argument
+per stream the kind handles -- ``app-payload-arg`` for the kinds that handle
+payload data, ``app-moc-arg`` for the kinds that handle MOC data, payload
+before MOC where a kind has both:
+
+.. code-block:: yaml
+
+   vehicle:
+     - name: through
+       type: app_all_veh
+       program: $HOME/libexec/tcs/through
+       app-payload-arg: --readings
+       app-moc-arg: --commands
+
+   payloads:
+     - name: bay_2
+       type: app_pl
+       program: ~/libexec/tcs/bay-2
+       app-payload-arg: --bay-2
+
+which are run as ``through --readings --commands`` and ``bay_2 --bay-2``, each
+after its program's own path. Both attributes are required of the kinds that
+take them, and refused of the kinds that do not. Required because the order is
+the whole of what makes the list readable from the program end: a list whose
+length depends on which attributes somebody wrote is a list a program has to
+count before it can read, and it would count wrongly on the day a node's type
+changed. Refused because an ``app-moc-arg`` on a kind that handles no MOC data
+is an argument written for a program that will not be given it.
+
+The data never comes that way. What a node was given arrives on an interface,
+and a command line carrying readings would be a node whose work was in neither
+the configuration nor the program.
 
 Where it all lives: ``tcsapp`` is the one statement of the protocol and holds
 both ends of it -- what the program itself holds, and the starting of one with
@@ -3032,7 +3093,8 @@ they are asserted.
      - { name: thermostat, type: compute, function: hysteresis,
          params: { setpoint: 293.15, above: 2.0, below: 2.0 } }
 
-     - { name: moc, type: moc, address: 10.0.0.1, port: 5000 }
+     - { name: moc, type: moc, address: 10.0.0.1, port: 5000,
+         ground_address: 10.0.0.2, ground_port: 5100 }
      - { name: heaters, type: gpio, direction: output,
          path: /dev/gpiochip0, lines: [3, 4, 5] }
 
@@ -7501,7 +7563,39 @@ Requirement
     would eventually disagree with them, and then a passing check would mean
     nothing.
 
-That last one is what the library's ``verify::Problem`` type is for. A loader wants the
+Requirement
+    Every program that reads these files asks tcsverify about them as it
+    starts, before anything else is read from them, and says what it says in
+    its words: tcspecial, tcsmoc, tcssim and tcsgui report the same problems,
+    each with its file and line, as ``tcsverify`` does for the same files.
+    What a program then refuses for its own reasons -- tcssim a payload it has
+    nothing to stand in for, tcsmoc a configuration it does not control -- is
+    said beside them. Where a rule is the simulator's rather than the file's,
+    it is in ``tcslibgs`` all the same (``simulable``), so that tcsverify asks
+    it too.
+
+    Which of them stops a program is the program's business. tcspecial
+    refuses a version 2 configuration with a warning in it, as above; tcsmoc
+    reads the simulator file only to show it, so a problem there is said and
+    costs the panels their simulator half.
+
+Requirement
+    A program with a main window shows what it found as it started in a
+    window of its own, before the main window, and the main window opens only
+    once that one has been closed -- or not at all, where what was found stops
+    the program. tcsmoc and tcssim share the window
+    (``tcsverify/ui/startup.slint``); tcsgui's is the one that offers a fix for
+    each problem, and lists beside its own faults whatever else tcsverify
+    finds, warnings included. Everything is said on stderr as well.
+
+Requirement
+    A version 2 configuration's simulator file is checked by name: that it
+    parses, and that every simulated payload is a payload of the graph, every
+    group it names is declared and every group it declares is used, and every
+    setting is one. A payload with no entry is not a problem: the one a bench
+    has for real is left out on purpose.
+
+That tcsverify states no rule of its own is what the library's ``verify::Problem`` type is for. A loader wants the
 first thing wrong with a file and nothing else -- it cannot run, and which of
 several mistakes it names changes nothing -- where a reader wants all of them.
 So the rules are stated once and collect their answers:

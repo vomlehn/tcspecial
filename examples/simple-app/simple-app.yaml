@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+version: "2.0"
+description: "A payload that is a program, sending a line of text a word at a time"
+
+tcspecial:
+  beacon:
+    interval_ms: "5000"
+    recv: "127.0.0.1:5650"
+    send: "0.0.0.0:5550"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+moc:
+  # The ground link. The vehicle binds address and port, and sends what
+  # arrives at this node to the ground station at ground_address and
+  # ground_port from the first word: where the ground is, is written down, so
+  # the ground does not have to speak first. Run `lorem_moc` to be that ground.
+  - name: moc
+    type: moc
+    ground_base: "127.0.0.1:5100"
+    payload-in: true
+
+payloads:
+  # A payload that is a program rather than a device: it is never asked, and
+  # reports one word of its line at a time, then a packet holding the line
+  # terminator. `app-payload-arg` is which line it sends, counting from one.
+  # 
+  # The program is a Python 3 script beside this file, named relative to the
+  # repository's root because that is where tcspecial is run from: see
+  # examples/Makefile.
+  - name: lorem
+    type: app_pl
+    app-payload-arg: "1"
+    program: "examples/simple-app/lorem_pl.py"
+    payload-out:
+      - target: moc
+
+tcsgui:
+  nodes:
+    - { name: moc, x: 32, y: 104 }
+    - { name: lorem, x: 584, y: 120 }

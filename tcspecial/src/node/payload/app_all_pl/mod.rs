@@ -31,7 +31,6 @@
 //! answers. What it answers arrives on the groundward stream, which is the
 //! other one from what it was given.
 
-use std::path::Path;
 use std::process::ExitStatus;
 
 use tcsapp::parent::{self, Arrived, Running, Supports};
@@ -65,7 +64,7 @@ impl AppAllPl {
             ));
         }
         Ok(AppAllPl {
-            running: parent::start(Path::new(&params.program), Supports::MOC)?,
+            running: parent::start(&params.program_path()?, &params.arguments(), Supports::MOC)?,
         })
     }
 
@@ -136,8 +135,11 @@ mod tests {
     /// What such a node is told, for a program at `program`.
     fn says(program: &std::path::Path) -> AppParams {
         AppParams {
+            name: "bay".to_string(),
             kind: Kind::AllPl,
             program: program.display().to_string(),
+            payload_arg: Some("--bay-2".to_string()),
+            moc_arg: Some("--bay-2-commands".to_string()),
             restart: Restart::Never,
         }
     }
@@ -151,7 +153,7 @@ mod tests {
     fn asked_for_a_reading_it_answers() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = AppAllPl::of(&says(&program)).expect("it starts");
+        let mut node = crate::when_not_busy(|| AppAllPl::of(&says(&program))).expect("it starts");
 
         node.give_moc_data(b"READ").expect("it takes a packet");
         assert_eq!(

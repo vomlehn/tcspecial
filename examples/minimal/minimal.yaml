@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+version: "2.0"
+description: "One payload, its telemetry going to the ground"
+
+tcspecial:
+  # tcspecial sends beacons from the interface the send attribute names, and
+  # the MOC receives them on the address the recv attribute names.
+  beacon:
+    interval_ms: "5000"
+    recv: "127.0.0.1:5650"
+    send: "0.0.0.0:5550"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  # Commands to a payload are sent to tcspecial at dest_base plus the
+  # payload's device id, and the responses are read on the network interface
+  # source_base names.
+  #
+  # Simple payloads, such as this sensor, do not use payload commands: what a
+  # simple payload is configured with is in this file, and it is not changed
+  # while tcspecial is running. At present only applications use the
+  # payload_command values.
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  # tcspecial sends telemetry from the network interface source_base names,
+  # plus the payload's device id, and the MOC receives it on the network
+  # interface dest_base names, plus the payload's device id.
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
+  # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to
+  # tcs_cmd.send.
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+payloads:
+  # Software on this host that sends its readings over UDP.
+  - name: sensor
+    type: network
+    protocol: "udp"
+    address: "127.0.0.1"
+    port: "5001"
+
+tcsgui:
+  nodes:
+    - { name: sensor, x: 40, y: 40 }

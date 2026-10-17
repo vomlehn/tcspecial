@@ -20,11 +20,24 @@ moc-source: false
 attributes:
   - name: program
     required: true
+    kind: path
     about: >
-      The program to run. It is started when the configuration is loaded, so
-      one that cannot be executed is a fault found on the ground.
+      Where the application is. It is started when the configuration is
+      loaded, so one that cannot be executed is a fault found on the ground,
+      and it is run with this node's name as its first argument. A leading `~`
+      and `$HOME` are expanded as a shell would expand them, against the home
+      directory of whatever runs the application: so the value is kept as
+      written and what it stands for is settled aboard.
+  - name: app-payload-arg
+    required: true
+    about: >
+      What the program is told about the payload stream, as the argument after
+      the node's name. Required: the arguments are a fixed list, so a node that
+      said nothing would shift what the rest of the list means.
   - name: restart
     required: false
+    kind: boolean
     about: >
-      What to do when it stops: never, which is the default, or a number of
-      times to start it again.
+      Whether it is started again when it stops: true or false. A node that
+      says nothing is a node left stopped, which is the answer a part of a
+      control path wants.

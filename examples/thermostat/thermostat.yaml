@@ -1,0 +1,154 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+
+version: "2.0"
+
+tcspecial:
+  beacon:
+    interval_ms: "5000"
+    recv: "127.0.0.1:5650"
+    send: "0.0.0.0:5550"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+payload_groups:
+  - name: "cabin_temps"
+    interval: "3s"
+
+moc:
+  - name: moc
+    type: moc
+    address: "127.0.0.1"
+    ground_base: "127.0.0.1:5100"
+    port: "5000"
+    payload-in: true
+
+vehicle:
+  - name: k_fore
+    type: compute
+    format: "i16_be"
+    function: "to_kelvin"
+    offset: "273.15"
+    scale: "0.0625"
+    payload-out:
+      - target: moc
+      - target: mean_temp
+        input: in0
+      - target: housekeeping
+    payload-in: true
+  - name: k_aft
+    type: compute
+    format: "i16_be"
+    function: "to_kelvin"
+    offset: "273.15"
+    scale: "0.0625"
+    payload-out:
+      - target: moc
+      - target: mean_temp
+        input: in1
+      - target: housekeeping
+    payload-in: true
+  - name: k_bay
+    type: compute
+    format: "u24_be"
+    function: "to_kelvin"
+    offset: "255.37"
+    scale: "0.0078"
+    payload-out:
+      - target: moc
+      - target: mean_temp
+        input: in2
+      - target: housekeeping
+    payload-in: true
+  - name: mean_temp
+    type: compute
+    function: "mean"
+    inputs: "in0,in1,in2"
+    payload-out:
+      - target: moc
+      - target: thermostat
+    payload-in: true
+  # setpoint is set from the ground; above and below are the two degrees
+  # either side that the heaters are switched at.
+  - name: thermostat
+    type: compute
+    above: "2.0"
+    below: "2.0"
+    function: "hysteresis"
+    setpoint: "293.15"
+    payload-out:
+      - target: housekeeping
+    # asserted below the setpoint, unasserted above it
+    moc-out:
+      - target: heaters
+    payload-in: true
+  - name: housekeeping
+    type: log
+    directory: "/tmp/telemetry"
+    format: "variable_ts_rc"
+    payload-in: true
+
+payloads:
+  # Forward bulkhead. Two bytes, signed, big endian.
+  - name: temp_fore
+    type: i2c
+    address: "0x48"
+    group: "cabin_temps"
+    path: "/dev/i2c-1"
+    read_size: "2"
+    payload-out:
+      - target: k_fore
+  # Aft bulkhead; same part as temp_fore.
+  - name: temp_aft
+    type: i2c
+    address: "0x49"
+    group: "cabin_temps"
+    path: "/dev/i2c-1"
+    read_size: "2"
+    payload-out:
+      - target: k_aft
+  # Equipment bay. Three bytes, unsigned -- a different part, hence its
+  # own conversion.
+  - name: temp_bay
+    type: spi
+    group: "cabin_temps"
+    max_speed: "1000000"
+    path: "/dev/spidev0.0"
+    read_size: "3"
+    spi_mode: "0"
+    payload-out:
+      - target: k_bay
+  # Three circuits, driven together.
+  - name: heaters
+    type: gpio
+    direction: "output"
+    lines: "3,4,5"
+    path: "/dev/gpiochip0"
+    moc-in: true
+
+commands:
+  # the cabin temperature the heaters are held at, in kelvin
+  - { from: moc, sets: thermostat.setpoint }
+
+tcsgui:
+  nodes:
+    - { name: temp_fore, x: 40, y: 40 }
+    - { name: temp_aft, x: 40, y: 160 }
+    - { name: temp_bay, x: 40, y: 280 }
+    - { name: k_fore, x: 240, y: 40 }
+    - { name: k_aft, x: 240, y: 160 }
+    - { name: k_bay, x: 240, y: 280 }
+    - { name: mean_temp, x: 460, y: 160 }
+    - { name: thermostat, x: 660, y: 240 }
+    - { name: moc, x: 660, y: 40 }
+    - { name: heaters, x: 860, y: 240 }
+    - { name: housekeeping, x: 460, y: 380 }

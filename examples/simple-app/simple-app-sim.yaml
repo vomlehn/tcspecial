@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+
+# How tcssim stands in for the payloads of simple-app.yaml: it does not, and
+# there is nothing here to say so with.
+#
+# The one payload of this example is a program, not a device, so there is
+# nothing at the far end of an interface for the simulator to be. `lorem_pl`
+# *is* the payload, and it is started by tcspecial from the configuration like
+# any other app node. The file is here because an example is a pair and a
+# reader looking for the simulator settings should find this sentence rather
+# than nothing at all.
+description: Simulator settings for simple-app.yaml, whose payload is a program
+
+simulated_payloads: []

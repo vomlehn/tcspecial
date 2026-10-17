@@ -65,6 +65,14 @@ pub struct Editor {
     /// else changes, so silence would leave them wondering whether the menu
     /// item did anything.
     said: Option<String>,
+    /// The simulator file this session was given, whether or not it could be
+    /// opened.
+    ///
+    /// Apart from `document.simulator`, which is what was read from it and is
+    /// nothing when the file was refused: the file is still the one the
+    /// session is about, and it is what `tcsverify` is asked about as the
+    /// editor starts -- see [`Editor::files`].
+    simulator_path: Option<PathBuf>,
 }
 
 impl Editor {
@@ -77,6 +85,7 @@ impl Editor {
             unsaved: false,
             trouble: None,
             said: None,
+            simulator_path: None,
         }
     }
 
@@ -155,6 +164,8 @@ impl Editor {
     /// configuration is: an editor that refused to start on a damaged file
     /// would be an editor that cannot be used to fix one.
     pub fn open_simulator(&mut self, path: &Path) {
+        self.simulator_path = Some(path.to_path_buf());
+
         // A name that is not YAML is refused outright, and nothing is opened
         // for it: the editor writes a simulator configuration as YAML, so
         // adopting such a name would mean writing YAML to a file called
@@ -234,6 +245,12 @@ impl Editor {
 
     pub fn faults(&self) -> Vec<Fault> {
         self.document.faults()
+    }
+
+    /// The configuration's file, and the simulator's where the session was
+    /// given one: the two `tcsverify` would be asked about.
+    pub fn files(&self) -> (&Path, Option<&Path>) {
+        (&self.path, self.simulator_path.as_deref())
     }
 
     /// What the window shows in red, if anything.

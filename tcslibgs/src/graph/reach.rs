@@ -30,7 +30,7 @@ use crate::endpoint_config::{
     StreamTerms,
 };
 use crate::graph::Node;
-use crate::types::{DeviceConfig, EndpointConfig, NetworkConfig};
+use crate::types::{host_port_of, DeviceConfig, EndpointConfig, HostPort, NetworkConfig};
 use crate::{DHType, NetworkProtocol};
 
 /// Everything a node's attributes say about reaching it.
@@ -53,6 +53,14 @@ pub struct Reach {
     /// version 1 payload triggered and the extra word could only disagree
     /// with it.
     pub trigger: Option<Vec<u8>>,
+    /// Where a ground link's data goes: the `moc` node's `ground_base`.
+    ///
+    /// For a `moc` node, and only for one. What each node linked into the
+    /// `moc` node produces is sent to this host, at this port plus that
+    /// node's device id -- see `crate::graph::telemetry` -- so the ground
+    /// tells the nodes apart by the port their data arrives at, and the
+    /// vehicle sends from the first reading without being spoken to.
+    pub ground: Option<HostPort>,
 }
 
 /// What this node reaches, or what is wrong with what it says.
@@ -100,6 +108,17 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
             // Which group reads it, which is the schedule's business and not
             // this one's.
             "group" | "interval" => {}
+            // Where a ground link's data goes, which only a ground link has:
+            // read below.
+            "ground_base" if node.node_type == "moc" => {}
+            "ground_base" => {
+                return Err(format!(
+                    "\"{what}\" is {} {} node, and ground_base says where a ground \
+                     link's data goes: only a moc node has one",
+                    kind.article(),
+                    node.node_type
+                ))
+            }
             "read_size" => {
                 let size = number(what, "read_size", value)?;
                 if size == 0 {
@@ -196,13 +215,34 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 }
             };
 
-            EndpointConfig::Network(NetworkConfig {
-                protocol,
-                address: required(what, node, "address", "a network node", "the host it is at")?
+            // A ground link that states neither address nor port binds
+            // nothing: it only sends, to its ground_base, and the ground has
+            // nowhere aboard to send to. One that receives -- commands, or a
+            // line out of it -- must state both, which `Graph::check` holds it
+            // to, knowing the links. Both or neither, whichever: half an
+            // address is a mistake on any node.
+            let has = |a: &str| node.attributes.contains_key(a);
+            if node.node_type == "moc" && !has("address") && !has("port") {
+                EndpointConfig::Network(NetworkConfig {
+                    protocol,
+                    address: UNBOUND.to_string(),
+                    port: 0,
+                })
+            } else {
+                EndpointConfig::Network(NetworkConfig {
+                    protocol,
+                    address: required(
+                        what,
+                        node,
+                        "address",
+                        "a network node",
+                        "the host it is at",
+                    )?
                     .as_str()
                     .to_string(),
-                port: port_of(what, node)?,
-            })
+                    port: port_of(what, node)?,
+                })
+            }
         }
         // A file, opened: see node::payload::device_file for why that is a type of its
         // own and not every other type as well.
@@ -226,11 +266,49 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
         }
     };
 
+    let ground = ground_of(what, node)?;
+
     Ok(Reach {
         endpoint,
         read_size,
         trigger,
+        ground,
     })
+}
+
+/// What a `moc` node that binds nothing is given as its address: see
+/// [`binds`].
+const UNBOUND: &str = "0.0.0.0";
+
+/// Whether a node's endpoint is bound aboard for the far end to reach.
+///
+/// False only for a `moc` node that states no address and no port, which only
+/// sends. Everything else opens what it describes.
+pub fn binds(node: &Node) -> bool {
+    node.node_type != "moc"
+        || node.attributes.contains_key("address")
+        || node.attributes.contains_key("port")
+}
+
+/// Where a `moc` node's data goes: its `ground_base`, `address:port`.
+///
+/// Required: a ground link with nowhere written down to send would be one
+/// that waits to be spoken to before it can report anything.
+fn ground_of(what: &str, node: &Node) -> Result<Option<HostPort>, String> {
+    if node.node_type != "moc" {
+        return Ok(None);
+    }
+    let stated = required(
+        what,
+        node,
+        "ground_base",
+        "a ground link",
+        "where the ground station is, as address:port -- each node linked into it \
+         sends to that port plus its own device id",
+    )?;
+    host_port_of("ground_base", stated.as_str())
+        .map(Some)
+        .map_err(|why| format!("\"{what}\": {why}"))
 }
 
 /// Every attribute that says where some type of node is.
@@ -409,8 +487,19 @@ fn number(what: &str, attribute: &str, value: &Scalar) -> Result<u32, String> {
 
 /// The port a network node is at.
 fn port_of(what: &str, node: &Node) -> Result<u16, String> {
-    let stated = required(what, node, "port", "a network node", "the port it is at")?;
-    let port = number(what, "port", stated)?;
+    port_named(what, node, "port", "a network node", "the port it is at")
+}
+
+/// A port, under whichever attribute states it.
+fn port_named(
+    what: &str,
+    node: &Node,
+    attribute: &str,
+    is: &str,
+    wants: &str,
+) -> Result<u16, String> {
+    let stated = required(what, node, attribute, is, wants)?;
+    let port = number(what, attribute, stated)?;
 
     // Nought is the one number a socket would accept and a configuration
     // cannot mean: it asks the kernel for whichever port is free, so a
@@ -418,7 +507,7 @@ fn port_of(what: &str, node: &Node) -> Result<u16, String> {
     // told where to find.
     if port == 0 || port > u16::MAX as u32 {
         return Err(format!(
-            "\"{what}\": port {port} is not a port -- a port is 1 to 65535, and 0 \
+            "\"{what}\": {attribute} {port} is not a port -- a port is 1 to 65535, and 0 \
              is \"whichever one is free\", which a configuration cannot mean"
         ));
     }
@@ -506,6 +595,73 @@ mod tests {
                 .map(|(a, v)| (a.to_string(), Scalar::of(*v)))
                 .collect::<BTreeMap<_, _>>(),
         }
+    }
+
+    /// A ground link says where the ground is, as one address and port.
+    #[test]
+    fn a_ground_link_says_where_the_ground_is() {
+        let moc = node(
+            "moc",
+            "moc",
+            &[("ground_base", "127.0.0.1:5100")],
+        );
+        let reach = reach_of(&moc).expect("it reads");
+        let ground = reach.ground.expect("a ground");
+        assert_eq!((ground.address.as_str(), ground.port), ("127.0.0.1", 5100));
+        // And with no address of its own, it binds nothing.
+        assert!(!binds(&moc));
+
+        let mut without = moc.clone();
+        without.attributes.remove("ground_base");
+        let said = reach_of(&without).expect_err("a ground link says where");
+        assert!(said.contains("ground_base"), "{said}");
+
+        let mut portless = moc.clone();
+        portless
+            .attributes
+            .insert("ground_base".to_string(), Scalar::of("127.0.0.1"));
+        let said = reach_of(&portless).expect_err("an address and a port");
+        assert!(said.contains("ground_base"), "{said}");
+    }
+
+    /// A ground link that receives states where, both halves of it.
+    #[test]
+    fn a_ground_link_binds_both_halves_or_neither() {
+        let both = node(
+            "moc",
+            "moc",
+            &[
+                ("address", "127.0.0.1"),
+                ("port", "5000"),
+                ("ground_base", "127.0.0.1:5100"),
+            ],
+        );
+        assert!(binds(&both));
+        assert!(reach_of(&both).is_ok());
+
+        for (missing, said_of) in [("address", "address"), ("port", "port")] {
+            let mut half = both.clone();
+            half.attributes.remove(missing);
+            let said = reach_of(&half).expect_err("half an address");
+            assert!(said.contains(said_of), "{said}");
+        }
+    }
+
+    /// Only a ground link has a ground_base.
+    #[test]
+    fn a_ground_base_is_refused_anywhere_else() {
+        let network = node(
+            "sensor",
+            "network",
+            &[
+                ("protocol", "udp"),
+                ("address", "127.0.0.1"),
+                ("port", "5001"),
+                ("ground_base", "127.0.0.1:5100"),
+            ],
+        );
+        let said = reach_of(&network).expect_err("not a ground link");
+        assert!(said.contains("only a moc node"), "{said}");
     }
 
     /// Every device of the worked example becomes what the flight software

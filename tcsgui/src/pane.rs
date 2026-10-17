@@ -170,31 +170,45 @@ pub fn pane_of(node_type: &str) -> Pane {
     }
 }
 
-/// The strip across the top of the sheet that the panes' own names are
-/// written in.
+/// The band at the top of a pane that the pane's own name is written in.
 ///
-/// `(top, height)` in the coordinates the file holds, spanning every pane: the
-/// three names sit at the same height, four pixels down, in the small italic
-/// -- see the `Text` elements at the top of `Surface` in `main.slint`, which a
-/// test holds these numbers against.
+/// `(top, height)`, and the same for all three: each band sits at the very top
+/// of its own pane and all three are of one depth. How wide one is comes from
+/// the dividers rather than from here -- a band spans the pane it belongs to,
+/// and the panes' edges move -- which is what [`names_bands`] is for.
 ///
-/// Nothing the editor places itself goes here. A node may still be *dragged*
+/// Three bands and not a strip across the sheet. A name belongs to a pane: the
+/// band is painted in that pane's own tint, so the colour that says which pane
+/// a node belongs in is at the head of the pane it belongs to. See `Surface`
+/// in `main.slint`, which draws them, and whose depth is asked of the labels
+/// themselves.
+///
+/// Nothing the editor places itself goes in one. A node may still be *dragged*
 /// over a name -- it is somebody's drawing and the editor does not own the
 /// sheet -- but a node the editor put there would cover a name nobody asked
 /// it to cover, and the name is what a pane has to say when it is empty or
 /// when somebody has lost their bearings.
 ///
-/// Sixteen pixels for a ten-pixel face: the line box of the small type and a
-/// pixel, so that a node's border does not sit on a descender. Minimal in the
-/// sense asked for -- it encompasses the three names and nothing else -- and
-/// across the whole width rather than three strips, because a name belongs to
-/// a pane and the panes' edges move with their dividers.
-pub const NAMES: (i32, i32) = (4, 16);
+/// From the top of the pane rather than four pixels down, because the band is
+/// drawn and not just reserved: a tint that began below the top edge would be
+/// a stripe across the pane rather than its head. Twenty-four pixels deep,
+/// which is the line box of the small type and a pixel with `Space.tight`
+/// above it and below -- the markup asks the labels how deep they are and this
+/// is the generous answer to the same question, so the row the placing keeps
+/// off is never shallower than the row that is drawn.
+pub const NAMES: (i32, i32) = (0, 24);
 
-/// That strip as a rectangle, for the placing to keep off.
-fn names_strip() -> (i32, i32, u32, u32) {
+/// Those bands as rectangles, one per pane, for the placing to keep off.
+///
+/// They abut at the dividers, so what the placing keeps off is the same row
+/// either way; three is what says the row is three panes' heads rather than
+/// one strip laid over them, and it is what the window draws.
+fn names_bands(dividers: Dividers) -> [(i32, i32, u32, u32); 3] {
     let (top, height) = NAMES;
-    (0, top, WORKING_WIDTH as u32, height as u32)
+    [Pane::Moc, Pane::Vehicle, Pane::Payloads].map(|pane| {
+        let (left, right) = edges_of(pane, dividers);
+        (left, top, (right - left).max(0) as u32, height as u32)
+    })
 }
 
 /// Where a node of this type may sit: the leftmost and rightmost x.
@@ -278,12 +292,14 @@ pub fn place_in(
     let right = right.max(left);
     let bottom = WORKING_HEIGHT - height as i32;
 
-    // What is already drawn, and the strip the panes' names are written in:
-    // nothing the editor places itself covers a name. See `NAMES`.
+    // What is already drawn, and the band at the top of each pane that its
+    // name is written in: nothing the editor places itself covers a name. See
+    // `NAMES`.
+    let bands = names_bands(dividers);
     let clear = |x: i32, y: i32| {
         !taken
             .iter()
-            .chain(std::iter::once(&names_strip()))
+            .chain(bands.iter())
             .any(|(theirs, tall, their_width, their_height)| {
                 x < theirs + *their_width as i32
                     && *theirs < x + width as i32
@@ -342,4 +358,75 @@ pub fn size_of(node_type: &str) -> (u32, u32) {
         .find(|t| t.spelling() == node_type)
         .map(|t| t.appearance().size)
         .unwrap_or((104, 40))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A band apiece, each across its own pane, all of one depth.
+    ///
+    /// The arrangement [`NAMES`] is half of: the depth and the top are here,
+    /// the width comes from the dividers, and the window paints each band in
+    /// its own pane's tint. Three bands that did not abut would leave a gap in
+    /// the row where the editor could place a node with a name beside it, and
+    /// three of different depths would read as three panes drawn separately.
+    #[test]
+    fn each_pane_has_a_band_of_its_own_across_it() {
+        let (top, height) = NAMES;
+
+        for dividers in [
+            default_dividers(),
+            dividers_for(10, 20),
+            dividers_for(60, 30),
+        ] {
+            let bands = names_bands(dividers);
+
+            // Each band is its pane's, from its left edge to the next
+            // divider, at the top of the sheet and of the one depth.
+            for (band, pane) in bands.iter().zip([Pane::Moc, Pane::Vehicle, Pane::Payloads]) {
+                let (left, right) = edges_of(pane, dividers);
+                assert_eq!(
+                    *band,
+                    (left, top, (right - left) as u32, height as u32),
+                    "the {} band",
+                    pane.label()
+                );
+            }
+
+            // And the three of them are one row across the sheet: no gap
+            // between them, and nothing left over at either end.
+            assert_eq!(bands[0].0, 0);
+            assert_eq!(bands[0].0 + bands[0].2 as i32, bands[1].0);
+            assert_eq!(bands[1].0 + bands[1].2 as i32, bands[2].0);
+            assert_eq!(bands[2].0 + bands[2].2 as i32, WORKING_WIDTH);
+        }
+    }
+
+    /// A node the editor places keeps off its own pane's band.
+    ///
+    /// Asked of every type in every pane, and of a canvas with nothing else on
+    /// it: the first node placed is the one that would otherwise go in the top
+    /// left corner, which is where the name is.
+    #[test]
+    fn a_placed_node_goes_below_the_band() {
+        let (top, height) = NAMES;
+        let dividers = default_dividers();
+
+        for kind in NodeType::ALL {
+            let at = place_in(&[], kind.spelling(), dividers, (0, 700));
+            assert!(
+                at.1 >= top + height,
+                "{} was placed at {at:?}, over the band at the top of its pane",
+                kind.spelling()
+            );
+            // In its own pane, which is the other half of where a node may be.
+            let (left, right) = edges_of(pane_of(kind.spelling()), dividers);
+            assert!(
+                at.0 >= left && at.0 < right,
+                "{} is in its own pane",
+                kind.spelling()
+            );
+        }
+    }
 }

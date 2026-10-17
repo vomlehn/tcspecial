@@ -31,8 +31,10 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
+use tcslibgs::graph::telemetry::Telemetered;
 use tcslibgs::graph::Graph;
 
+use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
 use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, Use};
@@ -76,10 +78,11 @@ impl System {
     /// list of what is wrong can fix a vehicle in one pass of the hangar,
     /// where one error at a time is one trip each.
     pub fn of(graph: &Graph, now: Instant) -> Result<System, Vec<String>> {
-        System::of_opening(graph, now, open)
+        System::of_opening(graph, now, open, open_ground_link)
     }
 
-    /// Open everything, with `opener` deciding what a node becomes.
+    /// Open everything, with `opener` deciding what a node becomes and
+    /// `ground` what a payload's link to the ground becomes.
     ///
     /// For the tests, which have no bus, no chip and no ground station: the
     /// assembly and the loop are what is worth testing here, and testing them
@@ -88,6 +91,7 @@ impl System {
         graph: &Graph,
         now: Instant,
         mut opener: impl FnMut(&tcslibgs::graph::Node, &Routes) -> Result<Box<dyn Port>, String>,
+        mut ground: impl FnMut(&Telemetered) -> Result<Box<dyn Port>, String>,
     ) -> Result<System, Vec<String>> {
         let routes = Routes::of(graph);
         let mut fabric = Fabric::new(routes.clone(), DATUM_BYTES);
@@ -110,6 +114,17 @@ impl System {
                     }
                     fabric.hold(&node.name, port);
                 }
+                Err(why) => refused.push(why),
+            }
+        }
+
+        // Each payload's link to the ground, which the table delivers to
+        // under a name of its own. Opened with everything else, and refused
+        // with everything else: a payload whose telemetry cannot be sent is a
+        // vehicle reporting nothing about it.
+        for link in routes.ground_links() {
+            match ground(link) {
+                Ok(port) => fabric.hold(&link.name, port),
                 Err(why) => refused.push(why),
             }
         }
@@ -279,6 +294,22 @@ fn is_polled(node: &tcslibgs::graph::Node, routes: &Routes, port: &dyn Port) -> 
         && !matches!(node.node_type.as_str(), "compute" | "log" | "null")
 }
 
+/// One source's link to the ground: bound at tcspecial's end and sending to
+/// the ground's, as `tcslibgs::graph::telemetry` counts them.
+///
+/// Written to and never read. The ground's end is written down, so this sends
+/// there from the first reading rather than waiting to be spoken to.
+pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
+    let what = link.name.as_str();
+    let (reader, writer) = bind_oc_pair(what, &link.vehicle, Some(&link.ground)).map_err(|e| {
+        format!(
+            "{what}: cannot send from {}:{} to the ground at {}:{}: {e}",
+            link.vehicle.address, link.vehicle.port, link.ground.address, link.ground.port
+        )
+    })?;
+    Ok(Box::new(EndpointPort::of(what, reader, writer, Use::Driven)))
+}
+
 /// What a node becomes: a port over whatever it is.
 ///
 /// The three kinds of node there are, which is the one place that mapping is
@@ -298,6 +329,14 @@ pub fn open(
         // A node that carries both streams through and does nothing to what
         // passes. Nothing is opened for it: it is not an interface.
         "null" => Ok(Box::new(NullPort::of(&node.name))),
+        // A ground link is where the ground's commands and lines arrive.
+        // What goes to the ground does not pass through it: each source has
+        // a link of its own to the node's ground_base, opened beside it --
+        // see `open_ground_link`. So one that binds nothing, or that nothing
+        // is read from, is held as a node that is never asked anything.
+        "moc" if !tcslibgs::graph::reach::binds(node) || Use::of(routes, &node.name).is_err() => {
+            Ok(Box::new(NullPort::of(&node.name)))
+        }
         // A node whose work is a program, started here and talked to over the
         // file interfaces `tcsapp` describes. Three of the five kinds are the
         // vehicle's own and two are payloads -- a payload that is a program
@@ -412,6 +451,8 @@ mod tests {
         system: System,
         ground: Rc<RefCell<Vec<Vec<u8>>>>,
         heaters: Rc<RefCell<Vec<Vec<u8>>>>,
+        /// What the sensors sent over their own links to the ground.
+        telemetry: Rc<RefCell<Vec<Vec<u8>>>>,
         log: std::path::PathBuf,
     }
 
@@ -442,8 +483,12 @@ mod tests {
 
         let ground = Rc::new(RefCell::new(Vec::new()));
         let heaters = Rc::new(RefCell::new(Vec::new()));
+        let telemetry = Rc::new(RefCell::new(Vec::new()));
 
-        let system = System::of_opening(&graph, now, |node: &Node, routes: &Routes| {
+        let system = System::of_opening(
+            &graph,
+            now,
+            |node: &Node, routes: &Routes| {
             match node.node_type.as_str() {
                 // The nodes that would touch hardware.
                 "i2c" | "spi" => Ok(Box::new(Sensor {
@@ -461,13 +506,27 @@ mod tests {
                 // are opened for real.
                 _ => open(node, routes),
             }
-        })
+            },
+            // What goes to the ground, watched rather than sent: there is no
+            // ground station here to bind the other end. A line drawn into the
+            // moc node arrives at its source's own link, so those are what the
+            // ground is watched at; an untouched payload's link is watched
+            // apart.
+            |link: &Telemetered| {
+                let got = match link.via {
+                    tcslibgs::graph::telemetry::Via::Moc(_) => Rc::clone(&ground),
+                    tcslibgs::graph::telemetry::Via::PayloadTelemetry => Rc::clone(&telemetry),
+                };
+                Ok(Box::new(Ground { got }) as Box<dyn Port>)
+            },
+        )
         .expect("the example opens");
 
         Vehicle {
             system,
             ground,
             heaters,
+            telemetry,
             log,
         }
     }
@@ -510,6 +569,10 @@ mod tests {
             vec![b"1".to_vec()],
             "a cabin below the band should have its heaters on"
         );
+        assert!(
+            vehicle.telemetry.borrow().is_empty(),
+            "the sensors are drawn into their conversions, and report only through them"
+        );
 
         // And the log holds the pass: one segment file with something in it,
         // flushed by the pass itself rather than by anything this test did.
@@ -522,6 +585,38 @@ mod tests {
             written[0].metadata().expect("its size").len() > 0,
             "the pass should have flushed the log"
         );
+    }
+
+    /// A payload nothing in the drawing touches is read, and what it reads
+    /// goes to the ground over its own link: the minimal example.
+    #[test]
+    fn an_undrawn_payload_reports_over_its_own_link() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph =
+            Graph::load(root.join("examples/minimal/minimal.yaml")).expect("the example reads");
+
+        let sent = Rc::new(RefCell::new(Vec::new()));
+        let mut system = System::of_opening(
+            &graph,
+            Instant::now(),
+            |_node: &Node, _routes: &Routes| {
+                Ok(Box::new(Sensor {
+                    readings: Rc::new(RefCell::new(vec![b"reading 1".to_vec()])),
+                }) as Box<dyn Port>)
+            },
+            |link: &Telemetered| {
+                assert_eq!(link.source, "sensor");
+                Ok(Box::new(Ground {
+                    got: Rc::clone(&sent),
+                }) as Box<dyn Port>)
+            },
+        )
+        .expect("the example opens");
+
+        assert_eq!(system.polled(), ["sensor"], "it is read, being in no group");
+        let moved = system.pass(Instant::now());
+        assert!(moved.all_delivered(), "{:?}", moved.refused);
+        assert_eq!(sent.borrow().clone(), vec![b"reading 1".to_vec()]);
     }
 
     /// The group is read on its interval and not before.
@@ -566,7 +661,12 @@ mod tests {
             vehicle.system.polled()
         );
         assert_eq!(vehicle.system.logs(), ["housekeeping"]);
-        assert_eq!(vehicle.system.holds(), 11, "eleven nodes in the example");
+        assert_eq!(
+            vehicle.system.holds(),
+            15,
+            "eleven nodes in the example, and a link to the ground for each of the four \
+             nodes drawn into its moc node"
+        );
     }
 
     /// A command reaches the computation the configuration says it may.
@@ -605,7 +705,7 @@ mod tests {
                 "spi" | "gpio" | "moc" => Ok(Box::new(Ground::default()) as Box<dyn Port>),
                 _ => open(node, routes),
             }
-        })
+        }, |_link| Ok(Box::new(Ground::default()) as Box<dyn Port>))
         .expect_err("a vehicle whose bus is missing");
 
         assert_eq!(refused.len(), 3, "{refused:?}");
@@ -627,7 +727,7 @@ mod tests {
         let described = described(&graph);
         assert_eq!(described["temp_fore"], "i2c that is read");
         assert_eq!(described["heaters"], "gpio that is driven");
-        assert_eq!(described["moc"], "moc that is read and written");
+        assert_eq!(described["moc"], "moc that is read");
         assert_eq!(described["k_fore"], "compute that computes");
         assert_eq!(described["housekeeping"], "log that writes a log");
     }

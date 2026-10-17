@@ -30,6 +30,42 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
+/// The examples, as paths from the root: every file whose name ends `ending`
+/// in a directory of `examples/`, each example having one of its own.
+/// Discovered, so that an example added there is held against the schemas
+/// without anyone naming it here.
+fn examples(ending: &str) -> Vec<String> {
+    fn names(dir: &Path) -> Vec<String> {
+        std::fs::read_dir(dir)
+            .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+            .map(|entry| entry.expect("a readable directory entry").file_name())
+            .filter_map(|name| name.to_str().map(str::to_string))
+            .collect()
+    }
+    let top = root().join("examples");
+    let mut found: Vec<String> = names(&top)
+        .into_iter()
+        .filter(|example| top.join(example).is_dir())
+        .flat_map(|example| {
+            names(&top.join(&example))
+                .into_iter()
+                .filter(|name| name.ends_with(ending))
+                .map(move |name| format!("examples/{example}/{name}"))
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+/// The examples' tcspecial configurations in YAML, which is every YAML file
+/// there but the simulator's.
+fn example_configurations() -> Vec<String> {
+    examples(".yaml")
+        .into_iter()
+        .filter(|name| !name.ends_with("-sim.yaml"))
+        .collect()
+}
+
 /// One schema, read.
 fn read(name: &str) -> serde_json::Value {
     let path = schema().join(name);
@@ -174,11 +210,12 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
         return;
     }
 
-    let files: &[(&str, &str)] = &[
-        ("tcspecial.xsd", "example.xml"),
-        ("tcspecial.xsd", "tests/manual/thermostat.xml"),
+    let mut files: Vec<(&str, String)> = vec![
+        ("tcspecial.xsd", "example.xml".to_string()),
+        ("tcspecial.xsd", "tests/manual/thermostat.xml".to_string()),
     ];
-    for (schema_name, file) in files {
+    files.extend(examples(".xml").into_iter().map(|file| ("tcspecial.xsd", file)));
+    for (schema_name, file) in &files {
         let output = Command::new("xmllint")
             .arg("--noout")
             .arg("--schema")
@@ -211,7 +248,7 @@ fn every_shipped_xml_file_is_well_formed() {
         return;
     }
 
-    let files = [
+    let mut files: Vec<String> = [
         "example.xml",
         "tests/manual/thermostat.xml",
         "tests/manual/tcspecial1.xml",
@@ -219,8 +256,11 @@ fn every_shipped_xml_file_is_well_formed() {
         "tests/manual/tcspecial3.xml",
         "tests/manual/tcspecial4.xml",
         "tcslibgs/tests/actual/tcspecial.xml",
-    ];
-    for file in files {
+    ]
+    .map(str::to_string)
+    .to_vec();
+    files.extend(examples(".xml"));
+    for file in &files {
         let path = root().join(file);
         assert!(path.is_file(), "{file} is not there any more");
         let output = Command::new("xmllint")
@@ -261,7 +301,7 @@ fn every_shipped_xml_file_is_well_formed() {
 /// that file in YAML and nothing else.
 #[test]
 fn every_shipped_configuration_says_which_schema_describes_it() {
-    for (file, said) in [
+    let mut shipped: Vec<(String, &str)> = [
         (
             "tests/manual/thermostat.xml",
             "../../tcsgui/share/schema/tcspecial.xsd",
@@ -290,7 +330,21 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
             "tests/manual/tcspecial4sim.yaml",
             "../../tcsgui/share/schema/tcspecial-sim.schema.json",
         ),
-    ] {
+    ]
+    .map(|(file, said)| (file.to_string(), said))
+    .to_vec();
+    // Each example is two directories below the root.
+    for file in examples(".xml") {
+        shipped.push((file, "../../tcsgui/share/schema/tcspecial.xsd"));
+    }
+    for file in example_configurations() {
+        shipped.push((file, "../../tcsgui/share/schema/tcspecial.schema.json"));
+    }
+    for file in examples("-sim.yaml") {
+        shipped.push((file, "../../tcsgui/share/schema/tcspecial-sim.schema.json"));
+    }
+    for (file, said) in &shipped {
+        let (file, said) = (file.as_str(), *said);
         let path = root().join(file);
         let text = std::fs::read_to_string(&path).expect("a shipped configuration");
         assert!(
@@ -319,7 +373,13 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
 fn every_key_of_a_shipped_configuration_is_in_the_schema() {
     let schema = read("tcspecial.schema.json");
 
-    for file in ["example.yaml", "tests/manual/thermostat.yaml"] {
+    let mut files = vec![
+        "example.yaml".to_string(),
+        "tests/manual/thermostat.yaml".to_string(),
+    ];
+    files.extend(example_configurations());
+    for file in &files {
+        let file = file.as_str();
         let path = root().join(file);
         let text = std::fs::read_to_string(&path).expect("a shipped configuration");
         let said: serde_norway::Value =
@@ -474,10 +534,11 @@ fn the_two_node_schemas_describe_the_same_node() {
         })
         .collect();
     // `node` is both the document element and the word inside it that names
-    // the type, so it is in the set either way.
+    // the type, so it is in the set either way. An attribute's own words are
+    // not words inside `<node>`: they are compared below.
     let inside: BTreeSet<String> = declared
         .iter()
-        .filter(|name| !matches!(name.as_str(), "name" | "required"))
+        .filter(|name| !matches!(name.as_str(), "name" | "required" | "kind"))
         .cloned()
         .collect();
 
@@ -488,7 +549,7 @@ fn the_two_node_schemas_describe_the_same_node() {
     );
 
     // And an attribute's own words agree as well.
-    let attribute: BTreeSet<String> = ["name", "required", "about"]
+    let attribute: BTreeSet<String> = ["name", "required", "kind", "about"]
         .into_iter()
         .map(str::to_string)
         .collect();

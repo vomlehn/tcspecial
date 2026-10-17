@@ -648,10 +648,26 @@ impl Graph {
         // Either will do. A payload that is only read has a source and no
         // sink; one that is only driven -- a heater, a valve, a latch -- has a
         // sink and no source; and both are configurations somebody means.
+        //
+        // And a payload whose telemetry goes to the ground is joined to the
+        // ground, by a link the `tcspecial` section describes rather than one
+        // drawn: see `crate::graph::telemetry`. A section that does not read
+        // is complained about where the section is checked, and leaves every
+        // payload judged by its drawn links alone.
+        let telemetered: BTreeSet<String> = crate::graph::telemetry::of(self)
+            .map(|links| {
+                links
+                    .into_iter()
+                    .filter(|l| l.via == crate::graph::telemetry::Via::PayloadTelemetry)
+                    .map(|l| l.source)
+                    .collect()
+            })
+            .unwrap_or_default();
         for node in self
             .nodes
             .iter()
             .filter(|node| node.is_payload() || node.node_type == "moc")
+            .filter(|node| !telemetered.contains(&node.name))
         {
             let (sink, source) = linked.get(node.name.as_str()).copied().unwrap_or_default();
             if !sink && !source {
@@ -695,10 +711,66 @@ impl Graph {
             }
         }
 
+        // A payload reporting to the ground is reached by its telemetry link,
+        // as above.
+        for name in &telemetered {
+            if let Some(node) = self.node(name) {
+                touched.insert(node.name.as_str());
+            }
+        }
+
         for node in &self.nodes {
             if !node.name.trim().is_empty() && !touched.contains(node.name.as_str()) {
                 problems.push(Problem::Unconnected {
                     node: node.name.clone(),
+                });
+            }
+        }
+
+        // Every link to the ground has a port of its own that exists: a base
+        // at 65500 and sixty nodes counted from it is a configuration that
+        // reads and sockets that cannot be, and two sources on one port would
+        // arrive interleaved. A section that does not read is complained
+        // about where the section is checked, and not again here.
+        if let Err(refused) = crate::graph::telemetry::of(self) {
+            match refused.node {
+                Some(node) => problems.push(Problem::BadNode {
+                    node,
+                    why: refused.why,
+                }),
+                None if !problems
+                    .iter()
+                    .any(|p| matches!(p, Problem::BadTcspecial { .. })) =>
+                {
+                    problems.push(Problem::BadTcspecial { why: refused.why })
+                }
+                None => {}
+            }
+        }
+
+        // A ground link that receives -- commands, or a line out of it --
+        // says where aboard the ground sends them: both its address and its
+        // port. One that only sends to its ground_base binds nothing.
+        for node in self.nodes.iter().filter(|n| n.node_type == "moc") {
+            let commanded = self.commands.iter().any(|b| b.from == node.name);
+            let feeds = self
+                .links
+                .iter()
+                .any(|l| l.origin().node == node.name);
+            if (commanded || feeds) && !crate::graph::reach::binds(node) {
+                problems.push(Problem::BadNode {
+                    node: node.name.clone(),
+                    why: format!(
+                        "\"{}\" receives from the ground -- {} -- so it needs an \
+                         address and port for the ground to send to: say address \
+                         and port",
+                        node.name,
+                        if commanded {
+                            "a command binding comes from it"
+                        } else {
+                            "a line leaves it"
+                        }
+                    ),
                 });
             }
         }
@@ -1106,12 +1178,22 @@ mod tests {
                 ("address", "127.0.0.1"),
                 ("port", "5100"),
             ],
-            "moc" => &[("address", "10.0.0.1"), ("port", "5000")],
-            // An app node is the program it names, and nothing else it says
-            // is required: see `crate::node::app`.
-            "app_payload_veh" | "app_moc_veh" | "app_all_veh" | "app_pl" | "app_all_pl" => {
-                &[("program", "/bin/cat")]
+            "moc" => &[
+                ("address", "10.0.0.1"),
+                ("port", "5000"),
+                ("ground_base", "10.0.0.2:5100"),
+            ],
+            // An app node is the program it names, and the argument for each
+            // stream its kind handles: see `crate::node::app`.
+            "app_payload_veh" | "app_pl" => {
+                &[("program", "/bin/cat"), ("app-payload-arg", "--readings")]
             }
+            "app_moc_veh" => &[("program", "/bin/cat"), ("app-moc-arg", "--commands")],
+            "app_all_veh" | "app_all_pl" => &[
+                ("program", "/bin/cat"),
+                ("app-payload-arg", "--readings"),
+                ("app-moc-arg", "--commands"),
+            ],
             "compute" => &[
                 ("function", "to_kelvin"),
                 ("format", "i16_be"),
@@ -1670,16 +1752,82 @@ mod tests {
     /// A node nothing links to or from is named.
     ///
     /// More likely a mistake than an intention, and the kind a reader of the
-    /// file would not notice: a sensor placed and never connected produces
-    /// data nobody reads.
+    /// file would not notice: a vehicle node placed and never connected is
+    /// given nothing and gives nothing to anyone.
     #[test]
     fn a_node_with_no_links_is_named() {
-        let g = graph(vec![node("lonely", "i2c")], Vec::new());
+        let g = graph(vec![node("lonely", "null")], Vec::new());
         let problems = g.check();
         assert!(
             problems
                 .iter()
                 .any(|p| matches!(p, Problem::Unconnected { node } if node == "lonely")),
+            "{problems:?}"
+        );
+    }
+
+    /// A payload with no links is not: its telemetry goes to the ground over
+    /// the link the `tcspecial` section describes. See
+    /// `crate::graph::telemetry`.
+    #[test]
+    fn a_payload_with_no_links_reports_to_the_ground() {
+        let g = graph(vec![node("sensor", "i2c")], Vec::new());
+        let problems = g.check();
+        assert!(
+            !problems.iter().any(|p| matches!(
+                p,
+                Problem::Unconnected { .. } | Problem::NodeOnNoLink { .. }
+            )),
+            "{problems:?}"
+        );
+    }
+
+    /// Bases with no room for the payloads counted from them are refused.
+    #[test]
+    fn a_telemetry_base_with_no_room_is_refused() {
+        // Two payloads nothing in the drawing touches, so both report over
+        // the section's links: the second is counted on by one.
+        let mut g = graph(vec![node("a", "i2c"), node("b", "i2c")], Vec::new());
+        let section = g.tcspecial.as_mut().expect("the helper's section");
+        let mut flat = crate::graph::parameters::flatten(section);
+        flat.insert(
+            "payload_telemetry.dest_base".to_string(),
+            Scalar::of("127.0.0.1:65535"),
+        );
+        *section = crate::graph::parameters::nest(&flat);
+        let problems = g.check();
+        assert!(
+            problems
+                .iter()
+                .any(|p| matches!(p, Problem::BadTcspecial { why } if why.contains("65535"))),
+            "{problems:?}"
+        );
+    }
+
+    /// A ground link that only sends needs no address of its own, and one
+    /// that receives does.
+    #[test]
+    fn a_ground_link_that_receives_says_where() {
+        let mut sends = node("moc", "moc");
+        sends.attributes.remove("address");
+        sends.attributes.remove("port");
+        let g = graph(vec![node("a", "i2c"), sends.clone()], vec![link("a", &["moc"])]);
+        assert_eq!(g.check(), Vec::new());
+
+        let mut g = graph(
+            vec![sends, node("thermostat", "compute")],
+            Vec::new(),
+        );
+        g.commands = vec![CommandBinding {
+            from: "moc".to_string(),
+            sets: "thermostat.setpoint".to_string(),
+        }];
+        let problems = g.check();
+        assert!(
+            problems.iter().any(|p| matches!(
+                p,
+                Problem::BadNode { node, why } if node == "moc" && why.contains("address and port")
+            )),
             "{problems:?}"
         );
     }

@@ -24,7 +24,6 @@
 //! the vehicleward stream, which is the other one from what it was given --
 //! the fabric carries the stream with the datum for exactly this reason.
 
-use std::path::Path;
 use std::process::ExitStatus;
 
 use tcsapp::parent::{self, Arrived, Running, Supports};
@@ -58,7 +57,7 @@ impl AppPayloadVeh {
             ));
         }
         Ok(AppPayloadVeh {
-            running: parent::start(Path::new(&params.program), Supports::PAYLOAD)?,
+            running: parent::start(&params.program_path()?, &params.arguments(), Supports::PAYLOAD)?,
         })
     }
 
@@ -132,8 +131,11 @@ mod tests {
     /// What such a node is told, for a program at `program`.
     fn says(program: &std::path::Path) -> AppParams {
         AppParams {
+            name: "fore".to_string(),
             kind: Kind::PayloadVeh,
             program: program.display().to_string(),
+            payload_arg: Some("--readings".to_string()),
+            moc_arg: None,
             restart: Restart::Never,
         }
     }
@@ -147,7 +149,7 @@ mod tests {
     fn packets_reach_the_program_and_come_back() {
         let where_ = tempfile::tempdir().expect("a directory");
         let program = stands_in(where_.path());
-        let mut node = AppPayloadVeh::of(&says(&program)).expect("it starts");
+        let mut node = crate::when_not_busy(|| AppPayloadVeh::of(&says(&program))).expect("it starts");
 
         node.give_payload_data(b"293.15").expect("it takes a packet");
         assert_eq!(

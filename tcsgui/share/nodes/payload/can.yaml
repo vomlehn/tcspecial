@@ -17,12 +17,15 @@ attributes:
       The CAN interface it is reached through: can0.
   - name: can_id
     required: true
+    kind: whole
     about: The identifier its frames carry, as hex.
   - name: can_fd
     required: false
+    kind: boolean
     about: Whether the frames are CAN FD rather than classic.
   - name: loopback
     required: false
+    kind: boolean
     about: >
       Whether the interface is put in loopback, for a bench test with
       nothing on the far end.
@@ -31,6 +34,7 @@ attributes:
     about: The payload group that reads it, where it is in one.
   - name: trigger
     required: false
+    kind: bytes
     about: >
       What to send to make it answer, as hex bytes. A payload with none
       is one the configuration describes as only read.

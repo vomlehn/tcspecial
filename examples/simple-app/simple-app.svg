@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="390" viewBox="0 0 1020 390" role="img" aria-labelledby="title desc">
+  <title id="title">The simple-app example</title>
+  <desc id="desc">One payload that is a program, lorem, an app_pl node that tcspecial starts as the Python 3 program examples/simple-app/lorem_pl.py with the argument 1. It sends the first line of the lorem ipsum text one word per packet to the moc node, bound at 127.0.0.1:5000, which sends each word to the ground station program lorem_moc at the moc node's ground_address and ground_port, 127.0.0.1:5100.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .payload { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
+      .moc { fill: #e9f6ee; stroke: #2e7d4f; stroke-width: 1.6; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .groundward { fill: none; stroke: #2563eb; stroke-width: 2; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <rect width="1020" height="390" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="45" y="44">PAYLOAD</text>
+  <text class="heading" x="770" y="44">GROUND</text>
+
+  <!-- tcspecial, the vehicle -->
+  <rect class="boundary" x="280" y="58" width="420" height="200" rx="16"/>
+  <text class="heading" x="298" y="84">TCSPECIAL (VEHICLE)</text>
+
+  <!-- lorem, the payload that is a program -->
+  <rect class="payload" x="45" y="110" width="200" height="80" rx="10"/>
+  <text class="name" x="61" y="136">lorem</text>
+  <text class="kind" x="61" y="157">app_pl, Python 3</text>
+  <text class="detail" x="61" y="176">lorem_pl.py, line 1</text>
+
+  <!-- The ground link -->
+  <rect class="moc" x="470" y="110" width="190" height="80" rx="10"/>
+  <text class="name" x="486" y="136">moc</text>
+  <text class="kind" x="486" y="157">ground link</text>
+  <text class="detail" x="486" y="176">binds 127.0.0.1:5000</text>
+
+  <!-- The ground station program -->
+  <rect class="ground" x="770" y="110" width="210" height="80" rx="10"/>
+  <text class="name" x="786" y="136">lorem_moc</text>
+  <text class="kind" x="786" y="157">ground station, Rust</text>
+  <text class="detail" x="786" y="176">listens on 127.0.0.1:5100</text>
+
+  <!-- lorem's words to the ground link -->
+  <path class="groundward" d="M245,150 L466,150" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="300" y="140">one word per packet</text>
+
+  <!-- The ground link sends to where the configuration says the ground is -->
+  <path class="groundward" d="M660,150 L766,150" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="706" y="140">words</text>
+
+  <text class="note" x="298" y="214">moc sends to its ground_address and ground_port,</text>
+  <text class="note" x="298" y="230">from the first word.</text>
+
+  <!-- Legend -->
+  <line x1="45" y1="292" x2="980" y2="292" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="groundward" d="M45,324 L95,324" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="105" y="328">data link, toward the ground</text>
+  <rect class="payload" x="45" y="354" width="22" height="16" rx="4"/>
+  <text class="label" x="75" y="367">payload</text>
+  <rect class="moc" x="160" y="354" width="22" height="16" rx="4"/>
+  <text class="label" x="190" y="367">moc node</text>
+  <rect class="ground" x="285" y="354" width="22" height="16" rx="4"/>
+  <text class="label" x="315" y="367">ground program</text>
+</svg>

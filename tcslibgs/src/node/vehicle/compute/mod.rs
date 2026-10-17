@@ -307,15 +307,10 @@ pub fn params_of(
                         .map_err(|why| named(format!("timeout: {why}")))
                 })?;
 
-            let restart = match attributes.get("restart").map(Scalar::as_str) {
-                None | Some("never") => Restart::Never,
-                Some(other) => crate::whole::whole_u32(other).map(Restart::UpTo).map_err(|_| {
-                    named(format!(
-                        "restart: \"{other}\" is neither \"never\" nor a number of \
-                         times"
-                    ))
-                })?,
-            };
+            // The one place the two spellings are read, an app node taking the
+            // same attribute: see `Restart::of`.
+            let restart =
+                Restart::of(attributes.get("restart").map(Scalar::as_str)).map_err(named)?;
 
             Ok(Computation::Process(ProcessParams {
                 program,
@@ -566,7 +561,7 @@ mod tests {
         assert!(said.contains("setpoint"), "{said}");
     }
 
-    /// A restart allowance is never, unless a number says otherwise.
+    /// Restarting is never, unless the configuration says `true`.
     #[test]
     fn restarting_is_never_by_default() {
         let process = |pairs: &[(&str, &str)]| match params(pairs) {
@@ -588,7 +583,7 @@ mod tests {
                 ("function", "process"),
                 ("program", "/bin/cat"),
                 ("timeout", "1s"),
-                ("restart", "never"),
+                ("restart", "false"),
             ])
             .restart,
             Restart::Never
@@ -598,10 +593,10 @@ mod tests {
                 ("function", "process"),
                 ("program", "/bin/cat"),
                 ("timeout", "1s"),
-                ("restart", "3"),
+                ("restart", "true"),
             ])
             .restart,
-            Restart::UpTo(3)
+            Restart::WhenItStops
         );
     }
 }

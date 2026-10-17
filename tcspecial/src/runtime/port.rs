@@ -992,10 +992,11 @@ mod tests {
         assert_eq!(Use::of(&routes, "temp_fore"), Ok(Use::Read));
         // The heaters are the other way round.
         assert_eq!(Use::of(&routes, "heaters"), Ok(Use::Driven));
-        // And the ground link is both: telemetry goes to it, and the
-        // setpoint is commanded through it. The second half of that is the
-        // binding and not a link -- see the commanded case below.
-        assert_eq!(Use::of(&routes, "moc"), Ok(Use::Both));
+        // And the ground link is read: the setpoint is commanded through it,
+        // which is the binding and not a link -- see the commanded case
+        // below. Nothing is delivered to it: what is drawn into it goes to
+        // each source's own link to its ground_base.
+        assert_eq!(Use::of(&routes, "moc"), Ok(Use::Read));
         // A log takes and produces nothing of its own.
         assert_eq!(Use::of(&routes, "housekeeping"), Ok(Use::Driven));
 
@@ -1637,17 +1638,36 @@ mod tests {
         }
 
         /// A node of this type, running that program.
+        ///
+        /// With the argument its kind is run with for each stream it handles,
+        /// those being required of a node: asked of `app::Kind` rather than
+        /// listed per type here, so a kind that gains an argument gains it in
+        /// these tests too.
         fn node(name: &str, node_type: &str, program: &std::path::Path) -> Node {
+            // The whole path, this test module being called `app` itself.
+            let kind = tcslibgs::node::app::Kind::of(node_type).expect("a kind of app");
+            let mut attributes = std::collections::BTreeMap::new();
+            attributes.insert(
+                "program".to_string(),
+                tcslibgs::Scalar::of(program.display().to_string()),
+            );
+            if kind.handles_payload_data() {
+                attributes.insert(
+                    "app-payload-arg".to_string(),
+                    tcslibgs::Scalar::of("--readings"),
+                );
+            }
+            if kind.handles_moc_data() {
+                attributes.insert(
+                    "app-moc-arg".to_string(),
+                    tcslibgs::Scalar::of("--commands"),
+                );
+            }
             Node {
                 name: name.to_string(),
                 node_type: node_type.to_string(),
                 group: None,
-                attributes: [(
-                    "program".to_string(),
-                    tcslibgs::Scalar::of(program.display().to_string()),
-                )]
-                .into_iter()
-                .collect(),
+                attributes,
             }
         }
 
@@ -1678,8 +1698,9 @@ mod tests {
             // Reads payload data at descriptor 0 and writes what it read back
             // to the same descriptor, which is MOC data there.
             let program = stands_in(where_.path(), ">&0");
-            let mut port = AppPort::open(&node("fore", "app_payload_veh", &program))
-                .expect("it starts");
+            let mut port =
+                crate::when_not_busy(|| AppPort::open(&node("fore", "app_payload_veh", &program)))
+                    .expect("it starts");
 
             port.give(Arriving::on(Stream::Groundward), b"293.15")
                 .expect("a reading it takes");
@@ -1703,7 +1724,8 @@ mod tests {
             // alone.
             let program = stands_in(where_.path(), "");
             let mut port =
-                AppPort::open(&node("through", "app_all_veh", &program)).expect("it starts");
+                crate::when_not_busy(|| AppPort::open(&node("through", "app_all_veh", &program)))
+                    .expect("it starts");
 
             port.give(Arriving::on(Stream::Groundward), b"293.15")
                 .expect("a reading it takes");
@@ -1723,8 +1745,9 @@ mod tests {
         fn a_datum_on_the_wrong_stream_is_refused() {
             let where_ = tempfile::tempdir().expect("a directory");
             let program = stands_in(where_.path(), ">&0");
-            let mut port = AppPort::open(&node("fore", "app_payload_veh", &program))
-                .expect("it starts");
+            let mut port =
+                crate::when_not_busy(|| AppPort::open(&node("fore", "app_payload_veh", &program)))
+                    .expect("it starts");
 
             let said = port
                 .give(Arriving::on(Stream::Vehicleward), b"SET 300")
@@ -1746,7 +1769,8 @@ mod tests {
             // data there.
             let program = stands_in(where_.path(), "<&1");
             let mut port =
-                AppPort::open(&node("bay", "app_all_pl", &program)).expect("it starts");
+                crate::when_not_busy(|| AppPort::open(&node("bay", "app_all_pl", &program)))
+                    .expect("it starts");
 
             port.give(Arriving::on(Stream::Vehicleward), b"READ")
                 .expect("what asks it for a reading");
@@ -1785,7 +1809,8 @@ mod tests {
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
                 .expect("a program that can be run");
 
-            let mut port = AppPort::open(&node("bay", "app_pl", &path)).expect("it starts");
+            let mut port = crate::when_not_busy(|| AppPort::open(&node("bay", "app_pl", &path)))
+                .expect("it starts");
 
             let mut buffer = [0u8; 64];
             let taken = taken_soon(&mut port, &mut buffer);

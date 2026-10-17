@@ -16,16 +16,19 @@
     <attributes>
         <name>program</name>
         <required>true</required>
+        <kind>path</kind>
         <about>The program to run.</about>
     </attributes>
     <attributes>
         <name>timeout</name>
         <required>true</required>
+        <kind>interval</kind>
         <about>How long it is given before it is a failure.</about>
     </attributes>
     <attributes>
         <name>restart</name>
         <required>true</required>
-        <about>What to do when it fails: never, always or on_failure.</about>
+        <kind>boolean</kind>
+        <about>Whether it is started again when it stops: true or false.</about>
     </attributes>
 </node>

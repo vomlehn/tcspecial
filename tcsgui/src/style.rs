@@ -969,15 +969,22 @@ impl NodeType {
             NodeType::Null => &[],
             NodeType::Log => &[("directory", true), ("format", true)],
             // Read from the rules rather than repeated, as the terminals are:
-            // what an app node may say is `tcslibgs::node::app`'s,
-            // and a third attribute added there appears in a node's window
+            // what an app node may say is `tcslibgs::node::app`'s, and it
+            // differs by kind -- the argument for a stream is said by the
+            // kinds that handle that stream -- so each of the five asks for
+            // its own and an attribute added there appears in a node's window
             // without this file being touched.
             NodeType::AppPayloadVeh
             | NodeType::AppMocVeh
             | NodeType::AppAllVeh
             | NodeType::AppPl
-            | NodeType::AppAllPl => tcslibgs::node::app::ATTRIBUTES,
-            NodeType::Moc => &[("address", true), ("port", true)],
+            | NodeType::AppAllPl => tcslibgs::node::app::attributes_of(self.spelling())
+                .expect("a type that is one of the app kinds"),
+            NodeType::Moc => &[
+                ("ground_base", true),
+                ("address", false),
+                ("port", false),
+            ],
             NodeType::Subdiagram => &[("file", true)],
         }
     }

@@ -28,6 +28,7 @@ moc:
   - name: moc
     type: moc
     address: "10.0.0.1"
+    ground_base: "10.0.0.2:5100"
     port: "5000"
     payload-in: true
 

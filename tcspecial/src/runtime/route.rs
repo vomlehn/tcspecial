@@ -12,6 +12,14 @@
 //! several inputs has to know which arrival is which, and the configuration
 //! says so by name rather than by order.
 //!
+//! And the links to the ground, which are where what goes to the ground is
+//! actually delivered. A line drawn into a `moc` node is delivered to that
+//! source's own link to the `moc` node's `ground_base`, at the port plus the
+//! source's device id; and a payload nothing touches is delivered to its link
+//! over the `tcspecial` section's `payload_telemetry`. They are in the same
+//! table because they are the same question -- where does this reading go --
+//! and each is named for what it carries: see `tcslibgs::graph::telemetry`.
+//!
 //! Nothing here opens anything or moves any bytes. It is the arithmetic of
 //! the graph, which is worth having on its own: it can be tested against a
 //! configuration without a vehicle, and a fault in it would otherwise look
@@ -19,6 +27,7 @@
 
 use std::collections::BTreeMap;
 
+use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::terminals::{self, Stream};
 use tcslibgs::graph::{Destination, Graph, Link};
 
@@ -123,6 +132,12 @@ pub struct Routes {
     /// whose setpoint comes from the ground has a `commands` entry and no
     /// link out of the ground at all.
     commands: BTreeMap<String, Vec<Commanded>>,
+    /// Every link to the ground, each delivered to under its own name.
+    ///
+    /// The names are not names a configuration can use, so they cannot
+    /// collide with a node: a node's name is a word, and these have spaces in
+    /// them. They are opened from what is here.
+    ground_links: Vec<Telemetered>,
 }
 
 impl Routes {
@@ -135,6 +150,20 @@ impl Routes {
     /// written down here.
     pub fn of(graph: &Graph) -> Routes {
         let mut routes = Routes::default();
+
+        // The links to the ground first, because a line into a moc node is
+        // delivered to one of them. A configuration whose links to the ground
+        // do not work out gives none: `Graph::check` refuses it, saying why,
+        // and this is the table for a checked graph.
+        routes.ground_links = telemetry::of(graph).unwrap_or_default();
+        let to_the_ground: BTreeMap<(String, String), String> = routes
+            .ground_links
+            .iter()
+            .filter_map(|link| match &link.via {
+                Via::Moc(moc) => Some(((link.source.clone(), moc.clone()), link.name.clone())),
+                Via::PayloadTelemetry => None,
+            })
+            .collect();
 
         for link in &graph.links {
             // The node it leaves, whatever terminal it leaves by. The routing
@@ -155,12 +184,19 @@ impl Routes {
                     tcslibgs::graph::terminals::stream_of(named).is_none()
                 });
 
+                // A line into a moc node goes to this source's own link to
+                // that node's ground_base.
+                let to = to_the_ground
+                    .get(&(from.clone(), node.clone()))
+                    .cloned()
+                    .unwrap_or_else(|| node.clone());
+
                 routes
                     .deliveries
                     .entry(from.clone())
                     .or_default()
                     .push(Delivery {
-                        to: node.clone(),
+                        to,
                         input: input.clone(),
                         stream,
                     });
@@ -169,6 +205,25 @@ impl Routes {
                     routes.sources.insert((node, input), from.clone());
                 }
             }
+        }
+
+        // A payload nothing touches, to its link over payload_telemetry.
+        for link in routes
+            .ground_links
+            .iter()
+            .filter(|link| link.via == Via::PayloadTelemetry)
+        {
+            routes
+                .deliveries
+                .entry(link.source.clone())
+                .or_default()
+                .push(Delivery {
+                    to: link.name.clone(),
+                    input: None,
+                    // What a payload reports, and only that: an app payload's
+                    // other stream is what the ground sent it.
+                    stream: Some(Stream::Groundward),
+                });
         }
 
         for binding in &graph.commands {
@@ -218,6 +273,11 @@ impl Routes {
             .filter(|(to, _)| to == node)
             .map(|(_, input)| input.as_str())
             .collect()
+    }
+
+    /// Each payload's link to the ground, for the payloads that send one.
+    pub fn ground_links(&self) -> &[Telemetered] {
+        &self.ground_links
     }
 
     /// How many places take this node's output.
@@ -292,8 +352,10 @@ mod tests {
             "the T should deliver three ways: {from_k_fore:?}"
         );
 
+        // The one to the ground goes to k_fore's own link to the moc node's
+        // ground_base: see `a_line_into_a_moc_node_goes_to_its_own_link`.
         let places: Vec<&str> = from_k_fore.iter().map(|d| d.to.as_str()).collect();
-        assert!(places.contains(&"moc"), "{places:?}");
+        assert!(places.contains(&"k_fore to moc"), "{places:?}");
         assert!(places.contains(&"mean_temp"), "{places:?}");
         assert!(places.contains(&"housekeeping"), "{places:?}");
 
@@ -304,7 +366,7 @@ mod tests {
             .find(|d| d.to == "mean_temp")
             .expect("a delivery into the mean");
         assert_eq!(into_mean.input.as_deref(), Some("in0"));
-        let payload_out = from_k_fore.iter().find(|d| d.to == "moc").unwrap();
+        let payload_out = from_k_fore.iter().find(|d| d.to == "k_fore to moc").unwrap();
         assert_eq!(payload_out.input, None);
     }
 
@@ -396,7 +458,7 @@ mod tests {
         let routes = Routes::of(&thermostat());
 
         let from_sensor = routes.from("temp_fore");
-        assert_eq!(from_sensor.len(), 1);
+        assert_eq!(from_sensor.len(), 1, "{from_sensor:?}");
         assert_eq!(from_sensor[0].to, "k_fore");
         assert_eq!(from_sensor[0].input, None);
         assert_eq!(routes.fan_out("temp_fore"), 1);
@@ -438,7 +500,9 @@ mod tests {
         assert!(routes.from("nobody").is_empty());
     }
 
-    /// Every link of the configuration is in the table, and nothing else is.
+    /// Every link of the configuration is in the table, and nothing else is
+    /// -- bar each payload's link to the ground, which the `tcspecial` section
+    /// describes rather than a line.
     ///
     /// The table is what the running software believes about the graph, so a
     /// link missing from it is a link that silently does not happen.
@@ -447,12 +511,72 @@ mod tests {
         let graph = thermostat();
         let routes = Routes::of(&graph);
 
-        let expected: usize = graph.links.iter().map(|l| l.to.each().len()).sum();
+        let drawn: usize = graph.links.iter().map(|l| l.to.each().len()).sum();
+        let untouched = routes
+            .ground_links()
+            .iter()
+            .filter(|l| l.via == Via::PayloadTelemetry)
+            .count();
+        let expected = drawn + untouched;
         let held: usize = graph
             .nodes
             .iter()
             .map(|n| routes.from(&n.name).len())
             .sum();
         assert_eq!(held, expected, "the table and the file disagree");
+    }
+
+    /// A payload nothing in the drawing touches reports to the ground over
+    /// its own link, and one the drawing does touch goes only where it is
+    /// drawn: see `tcslibgs::graph::telemetry`.
+    #[test]
+    fn only_an_undrawn_payload_reports_over_its_own_link() {
+        let mut graph = thermostat();
+        graph.links.retain(|link| link.origin().node != "temp_aft");
+        let routes = Routes::of(&graph);
+
+        let to: Vec<&str> = routes.from("temp_aft").iter().map(|d| d.to.as_str()).collect();
+        assert_eq!(to, vec![telemetry::payload_link_name("temp_aft").as_str()]);
+        for drawn in ["temp_fore", "temp_bay", "heaters"] {
+            assert!(
+                !routes
+                    .from(drawn)
+                    .iter()
+                    .any(|d| d.to == telemetry::payload_link_name(drawn)),
+                "{drawn} is drawn and should go only where it is drawn"
+            );
+        }
+        let linked: Vec<&str> = routes
+            .ground_links()
+            .iter()
+            .filter(|l| l.via == Via::PayloadTelemetry)
+            .map(|l| l.source.as_str())
+            .collect();
+        assert_eq!(linked, vec!["temp_aft"]);
+    }
+
+    /// A line into a moc node goes to the source's own link to the ground,
+    /// at the moc node's ground_base plus the source's device id -- and
+    /// nothing is delivered to the moc node itself, which only receives.
+    #[test]
+    fn a_line_into_a_moc_node_goes_to_its_own_link() {
+        let routes = Routes::of(&thermostat());
+        assert!(routes.arriving_at("moc").is_empty());
+
+        let mean: Vec<&str> = routes.from("mean_temp").iter().map(|d| d.to.as_str()).collect();
+        assert!(mean.contains(&"mean_temp to moc"), "{mean:?}");
+
+        let link = routes
+            .ground_links()
+            .iter()
+            .find(|l| l.name == "mean_temp to moc")
+            .expect("mean_temp's link to the ground");
+        assert_eq!(link.via, Via::Moc("moc".to_string()));
+        // The thermostat's mean is its fifth node, id 4, and its moc node's
+        // ground_base is 10.0.0.2:5100.
+        assert_eq!(
+            (link.ground.address.as_str(), link.ground.port),
+            ("10.0.0.2", 5104)
+        );
     }
 }

@@ -148,6 +148,13 @@ pub enum SimConfigError {
         name: String,
         given: String,
     },
+    /// A payload the simulator has nothing to stand in for.
+    ///
+    /// A rule about the simulator rather than about either file, and asked
+    /// here all the same: tcssim refuses such a payload as it starts, and a
+    /// pair of files `tcsverify` passed would otherwise be a pair tcssim will
+    /// not run. `why` is the whole sentence, from [`simulable`].
+    CannotSimulate { payload: String, why: String },
 }
 
 impl fmt::Display for SimConfigError {
@@ -318,6 +325,7 @@ impl fmt::Display for SimConfigError {
                  nothing else states",
                 what, name, given
             ),
+            SimConfigError::CannotSimulate { why, .. } => write!(f, "{why}"),
             SimConfigError::IntervalForATriggeredPayload { payload, setting } => write!(
                 f,
                 "simulated payload \"{}\" is triggered, so it sends when tcspecial \
@@ -375,7 +383,8 @@ impl SimConfigError {
             | SimConfigError::ProtocolMismatch { payload, .. }
             | SimConfigError::NotForThisKind { payload, .. }
             | SimConfigError::NoAddressOfItsOwn { payload, .. }
-            | SimConfigError::OneSocketForBothEnds { payload, .. } => {
+            | SimConfigError::OneSocketForBothEnds { payload, .. }
+            | SimConfigError::CannotSimulate { payload, .. } => {
                 About::SimPayload(payload.clone())
             }
         }
@@ -399,6 +408,62 @@ fn a_percentage(
             given,
         }),
     }
+}
+
+/// Whether the simulator has anything to stand in for this payload, and what
+/// to say where it has not.
+///
+/// Here rather than in tcssim, which is the program that cannot do it, so
+/// that the one rule is asked by everything that reads the pair: tcssim as it
+/// starts, and `tcsverify` and tcsmoc through [`SimConfigFile::problems`].
+/// A pair the verifier passed and the simulator refused would be a verifier
+/// nobody could trust.
+pub fn simulable(dh: &DHConfig) -> Result<(), String> {
+    // The one type nothing here can stand in for. Every other has something
+    // in the kernel to be: vcan for a CAN bus, i2c-stub for a bus device,
+    // gpio-sim for discrete lines, a pty for a line or a buffer. A
+    // synchronous line has none -- there is no virtual HDLC interface -- so
+    // what is said is that, rather than a payload that looks simulated and is
+    // not.
+    if let EndpointConfig::Hdlc(hdlc) = &dh.endpoint {
+        return Err(format!(
+            "simulated payload \"{}\" is on a synchronous line ({}), and there \
+             is nothing in the kernel that stands in for one: a card is needed \
+             -- a wanxl, a pci200syn, a pc300too or a FarSync -- and tcspecial \
+             reads it directly. Unlike a CAN bus there is no virtual one",
+            dh.name.0, hdlc.interface
+        ));
+    }
+
+    if u32::try_from(dh.packet_size).is_err() {
+        return Err(format!(
+            "{} has a packet size too large to simulate",
+            dh.name.0
+        ));
+    }
+
+    // A payload that answers requests has to be able to hear one. Two kinds
+    // cannot: tcspecial opens a device and reads it, so there is nothing for
+    // the simulator to be written to, and an I2C master's read is the trigger
+    // itself, which a second master on the bus cannot see. Refused rather
+    // than simulated as a payload that answers nothing, which would look
+    // exactly like a handler whose polling had stopped working.
+    if dh.mode.polling().is_some() {
+        let cannot = match &dh.endpoint {
+            EndpointConfig::Device(_) => Some("a device, which tcspecial reads directly"),
+            EndpointConfig::I2c(_) => Some("a bus, where the master's own read is the trigger"),
+            _ => None,
+        };
+        if let Some(cannot) = cannot {
+            return Err(format!(
+                "{} is triggered, but the simulator cannot stand in for a triggered \
+                 payload on {cannot}",
+                dh.name.0
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// Whether a payload of this kind has a connection it could close.
@@ -945,51 +1010,9 @@ impl SimConfigFile {
     /// The settings are the ones that settled, so a file with a problem still
     /// yields the payloads that have none.
     fn check(&self, handlers: &[DHConfig]) -> (Vec<ResolvedSim>, Vec<SimConfigError>) {
+        let names: Vec<&str> = handlers.iter().map(|dh| dh.name.0.as_str()).collect();
         let mut problems: Vec<SimConfigError> = Vec::new();
-
-        if self.version.is_some() {
-            problems.push(SimConfigError::AVersion);
-        }
-
-        let mut groups: BTreeMap<&str, &SimSettings> = BTreeMap::new();
-        for group in &self.simulated_payload_groups {
-            if let Err(e) = nothing_unknown("simulated payload group", &group.name, &group.unknown)
-            {
-                problems.push(e);
-            }
-            // Kept even when something is wrong with it, so that the payloads
-            // naming it are not also reported as naming a group that is not
-            // there. One mistake, one problem.
-            if groups.insert(group.name.as_str(), &group.settings).is_some() {
-                problems.push(SimConfigError::Duplicate {
-                    what: "simulated payload group",
-                    name: group.name.clone(),
-                });
-            }
-        }
-
-        let mut payloads: BTreeMap<&str, &SimPayload> = BTreeMap::new();
-        for payload in &self.simulated_payloads {
-            if let Err(e) = nothing_unknown("simulated payload", &payload.name, &payload.unknown) {
-                problems.push(e);
-            }
-            if payloads.insert(payload.name.as_str(), payload).is_some() {
-                problems.push(SimConfigError::Duplicate {
-                    what: "simulated payload",
-                    name: payload.name.clone(),
-                });
-            }
-        }
-
-        // A name here that no data handler has would otherwise be a line with
-        // no effect, which is what a misspelled handler name looks like.
-        for name in payloads.keys() {
-            if !handlers.iter().any(|dh| dh.name.0 == *name) {
-                problems.push(SimConfigError::UnknownPayload {
-                    payload: (*name).to_string(),
-                });
-            }
-        }
+        let (groups, payloads) = self.entries(&names, &mut problems);
 
         // One handler at a time, because one payload's settings are its own:
         // a reader is told what is wrong with each rather than what is wrong
@@ -1020,6 +1043,12 @@ impl SimConfigFile {
                 // kind is what tells a simulator file paired with the wrong
                 // tcspecial configuration from one paired with the right one.
                 what_it_is(&payload.name, &settings, &dh.endpoint)?;
+
+                // And whether there is anything to be it at all.
+                simulable(dh).map_err(|why| SimConfigError::CannotSimulate {
+                    payload: payload.name.clone(),
+                    why,
+                })?;
 
                 // Which kind of payload this is was settled by the payload
                 // configuration, and decides whether an interval here means
@@ -1136,11 +1165,105 @@ impl SimConfigFile {
             }
         }
 
-        // A group no payload names has no effect on the simulation, which is
-        // exactly what a group whose name a payload misspelled looks like.
-        // Checked after the payloads, so that a reader following the problems
-        // in order meets the misspelling at the payload's end first, where
-        // the name actually is.
+        self.unused_groups(&mut problems);
+
+        (resolved, problems)
+    }
+
+    /// Everything wrong with this file that can be said from the names of
+    /// the payloads it is joined to.
+    ///
+    /// For a version 2 configuration, whose payloads are nodes of a graph
+    /// rather than data handlers: what a node is settled into aboard is not
+    /// a [`DHConfig`], so the rules that need one -- the kind, the transport,
+    /// the intervals a triggered payload may not have -- have nothing to be
+    /// asked of. What is left is every rule about names, which are the whole
+    /// of how the two files are joined: an entry for a payload the
+    /// configuration does not have, a group nobody declared or nobody uses,
+    /// two entries of one name, a setting that is not one.
+    ///
+    /// A payload with no entry is not one of them. A graph's simulator file
+    /// says which of its payloads are simulated -- the one a bench has for
+    /// real is left out on purpose -- where version 1's simulator stood in
+    /// for every handler or none.
+    pub fn problems_by_name(&self, payloads: &[&str]) -> Vec<SimConfigError> {
+        let mut problems: Vec<SimConfigError> = Vec::new();
+        let (groups, entries) = self.entries(payloads, &mut problems);
+        for payload in entries.values() {
+            if let Some(group) = &payload.group {
+                if !groups.contains_key(group.as_str()) {
+                    problems.push(SimConfigError::UnknownGroup {
+                        payload: payload.name.clone(),
+                        group: group.clone(),
+                    });
+                }
+            }
+        }
+        self.unused_groups(&mut problems);
+        problems
+    }
+
+    /// The groups and the simulated payloads by name, and what is wrong with
+    /// the entries themselves: a version, a setting that is not one, a name
+    /// used twice, and a payload `names` does not hold.
+    fn entries(
+        &self,
+        names: &[&str],
+        problems: &mut Vec<SimConfigError>,
+    ) -> (BTreeMap<&str, &SimSettings>, BTreeMap<&str, &SimPayload>) {
+        if self.version.is_some() {
+            problems.push(SimConfigError::AVersion);
+        }
+
+        let mut groups: BTreeMap<&str, &SimSettings> = BTreeMap::new();
+        for group in &self.simulated_payload_groups {
+            if let Err(e) = nothing_unknown("simulated payload group", &group.name, &group.unknown)
+            {
+                problems.push(e);
+            }
+            // Kept even when something is wrong with it, so that the payloads
+            // naming it are not also reported as naming a group that is not
+            // there. One mistake, one problem.
+            if groups.insert(group.name.as_str(), &group.settings).is_some() {
+                problems.push(SimConfigError::Duplicate {
+                    what: "simulated payload group",
+                    name: group.name.clone(),
+                });
+            }
+        }
+
+        let mut payloads: BTreeMap<&str, &SimPayload> = BTreeMap::new();
+        for payload in &self.simulated_payloads {
+            if let Err(e) = nothing_unknown("simulated payload", &payload.name, &payload.unknown) {
+                problems.push(e);
+            }
+            if payloads.insert(payload.name.as_str(), payload).is_some() {
+                problems.push(SimConfigError::Duplicate {
+                    what: "simulated payload",
+                    name: payload.name.clone(),
+                });
+            }
+        }
+
+        // A name here that no data handler has would otherwise be a line with
+        // no effect, which is what a misspelled handler name looks like.
+        for name in payloads.keys() {
+            if !names.contains(name) {
+                problems.push(SimConfigError::UnknownPayload {
+                    payload: (*name).to_string(),
+                });
+            }
+        }
+
+        (groups, payloads)
+    }
+
+    /// A group no payload names has no effect on the simulation, which is
+    /// exactly what a group whose name a payload misspelled looks like.
+    /// Asked after the payloads, so that a reader following the problems in
+    /// order meets the misspelling at the payload's end first, where the name
+    /// actually is.
+    fn unused_groups(&self, problems: &mut Vec<SimConfigError>) {
         let named: BTreeSet<&str> = self
             .simulated_payloads
             .iter()
@@ -1155,8 +1278,6 @@ impl SimConfigFile {
                 group: unused.name.clone(),
             });
         }
-
-        (resolved, problems)
     }
 }
 
@@ -2000,8 +2121,12 @@ simulated_payloads:
     fn a_triggered_payload_takes_no_interval_here() {
         let triggered = |name: &str| DHConfig {
             name: DHName::new(name),
-            endpoint: EndpointConfig::Device(DeviceConfig {
-                path: "/dev/urandom".to_string(),
+            // A stream, which is a kind the simulator can stand in for a
+            // triggered payload on: see `simulable`.
+            endpoint: EndpointConfig::Network(NetworkConfig {
+                protocol: NetworkProtocol::Tcp,
+                address: "localhost".to_string(),
+                port: 5000,
             }),
             packet_size: 4,
             oc: None,
@@ -2015,7 +2140,7 @@ simulated_payloads:
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval_ms: 1000\n",
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    packet_interval_ms: 1000\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
@@ -2028,7 +2153,7 @@ simulated_payloads:
         // the segment settings still apply, since how a payload divides an
         // answer is its own business.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    segment_size: 2\n",
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    segment_size: 2\n",
         );
         let resolved = file
             .resolve(&[triggered("DH0")])
@@ -2036,6 +2161,36 @@ simulated_payloads:
         assert!(resolved[0].triggered);
         assert_eq!(resolved[0].packet_interval_ms, 0, "it sends when it is asked");
         assert_eq!(resolved[0].segment_size, 2);
+    }
+
+    /// A payload the simulator has nothing to be is refused by the file's own
+    /// rules, so that `tcsverify` says what tcssim will.
+    #[test]
+    fn a_payload_nothing_can_stand_in_for_is_refused() {
+        let device = DHConfig {
+            name: DHName::new("DH0"),
+            endpoint: EndpointConfig::Device(DeviceConfig {
+                path: "/dev/urandom".to_string(),
+            }),
+            packet_size: 4,
+            oc: None,
+            ground: None,
+            mode: DHMode::Triggered {
+                trigger: b"READ".to_vec(),
+                interval_ms: 500,
+            },
+            stale_interval_ms: None,
+        };
+        let file = parse("simulated_payloads:\n  - name: DH0\n    type: device-file\n");
+        let problems = file.problems(&[device]);
+        assert!(
+            matches!(
+                problems.as_slice(),
+                [SimConfigError::CannotSimulate { payload, .. }] if payload == "DH0"
+            ),
+            "{problems:?}"
+        );
+        assert!(format!("{}", problems[0]).contains("triggered"), "{}", problems[0]);
     }
 
     #[test]

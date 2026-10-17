@@ -82,6 +82,24 @@
 //! what it was given is not what its kind is run with, rather than reading a
 //! terminal and waiting.
 //!
+//! # What an app is told, other than data
+//!
+//! A short, fixed list of arguments: the name of the node the program is, and
+//! then the argument the configuration states for each stream the kind handles
+//! -- `app-payload-arg` before `app-moc-arg`. So an `app_all_veh` named
+//! `through` is run as `program through <payload> <moc>`, an `app_moc_veh` as
+//! `program back <moc>`, and an `app_pl` as `program bay <payload>`.
+//!
+//! The order is fixed by the kind and not by what a file happened to state,
+//! which is why both attributes are required of the kinds that take them:
+//! a list a program has to count before it can read is a list it would count
+//! wrongly on the day somebody changed a node's type. Each kind's `inherited`
+//! takes its own arguments and refuses a wrong number.
+//!
+//! Nothing else comes that way. The data is what arrives on the interfaces,
+//! and a command line that carried readings would be a node whose work was
+//! neither in the configuration nor in the program.
+//!
 //! # Packets
 //!
 //! Every interface carries packets rather than a stream of bytes, and

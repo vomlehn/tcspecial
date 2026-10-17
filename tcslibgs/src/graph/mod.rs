@@ -50,6 +50,7 @@ pub mod check;
 pub mod mirror;
 pub mod parameters;
 pub mod reach;
+pub mod telemetry;
 pub mod terminals;
 
 use std::collections::BTreeMap;
@@ -1416,7 +1417,7 @@ tcspecial:
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
 moc:
-  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\" }
+  - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
 ",
         )
         .unwrap();

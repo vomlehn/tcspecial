@@ -24,17 +24,36 @@
   <!-- Whether a node of this type has a terminal of that kind. True, false,
        or left out, which means false: a type that does not mention a terminal
        has not got one. -->
+  <!-- The kinds of value an attribute may take. One word each, and the list
+       is short on purpose: a kind earns its place by changing what the window
+       offers or what it checks, not by naming a rule. -->
+  <xs:simpleType name="kind">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="text"/>
+      <xs:enumeration value="path"/>
+      <xs:enumeration value="whole"/>
+      <xs:enumeration value="interval"/>
+      <xs:enumeration value="bytes"/>
+      <xs:enumeration value="boolean"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <xs:simpleType name="terminal">
     <xs:restriction base="xs:boolean"/>
   </xs:simpleType>
 
   <!-- One attribute a node of this type says for itself: its name, whether it
-       must be stated before the configuration can be flown, and a line about
+       must be stated before the configuration can be flown, what kind of
+       value it takes, and a line about
        it for the editor to show. -->
   <xs:complexType name="attribute">
     <xs:all>
       <xs:element name="name" type="xs:string"/>
       <xs:element name="required" type="xs:boolean" minOccurs="0"/>
+      <!-- What kind of value it takes, which decides what the node's window
+           offers to type it with: `boolean` is a control with two states, and
+           the rest are a box to write in. Absent is `text`. -->
+      <xs:element name="kind" type="kind" minOccurs="0"/>
       <xs:element name="about" type="xs:string" minOccurs="0"/>
     </xs:all>
   </xs:complexType>

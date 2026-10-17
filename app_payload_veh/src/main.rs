@@ -23,7 +23,7 @@ fn main() -> ExitCode {
     // The interfaces first, and nothing else if they are not what this kind of
     // app is run with: see `tcsapp::app::complain` for why the complaint goes
     // where it does.
-    let mut app = match AppPayloadVeh::inherited() {
+    let app = match AppPayloadVeh::inherited() {
         Ok(app) => app,
         Err(why) => {
             complain(&format!("app_payload_veh: {why}"));
@@ -31,13 +31,24 @@ fn main() -> ExitCode {
         }
     };
 
+    // Which node this process is, for every complaint it makes: one program
+    // may be several nodes, and a complaint that does not say which of them it
+    // came from is one an operator cannot act on. See `tcsapp::app`.
+    let AppPayloadVeh {
+        name,
+        payload_arg: _,
+        mut payload,
+        mut errors,
+    } = app;
+
     loop {
-        match app.payload.read_payload() {
+        match payload.read_payload() {
             // Answered with the same bytes, as MOC data.
             Ok(Some(data)) => {
-                if let Err(e) = app.payload.write_moc(&data) {
-                    let _ = app.errors.say(&format!(
-                        "app_payload_veh: {} bytes of MOC data could not be written: {e}",
+                if let Err(e) = payload.write_moc(&data) {
+                    let _ = errors.say(&format!(
+                        "app_payload_veh {name}: {} bytes of MOC data could not \
+                         be written: {e}",
                         data.len()
                     ));
                     return ExitCode::FAILURE;
@@ -47,9 +58,9 @@ fn main() -> ExitCode {
             // nothing more is coming: finished, and not a failure.
             Ok(None) => return ExitCode::SUCCESS,
             Err(e) => {
-                let _ = app
-                    .errors
-                    .say(&format!("app_payload_veh: payload data could not be read: {e}"));
+                let _ = errors.say(&format!(
+                    "app_payload_veh {name}: payload data could not be read: {e}"
+                ));
                 return ExitCode::FAILURE;
             }
         }

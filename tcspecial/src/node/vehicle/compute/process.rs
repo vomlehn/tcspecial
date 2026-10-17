@@ -221,11 +221,16 @@ impl Process {
         self.restart
     }
 
-    /// Whether another restart is allowed.
+    /// Whether it is started again when it stops.
+    ///
+    /// The answer the configuration gave, and the same answer every time: a
+    /// program told to come back comes back however often it stops. What the
+    /// count below is for is the telemetry -- how many times this one has --
+    /// and not a bound on it.
     pub fn may_restart(&self) -> bool {
         match self.restart {
             Restart::Never => false,
-            Restart::UpTo(limit) => self.restarts < limit,
+            Restart::WhenItStops => true,
         }
     }
 
@@ -415,30 +420,44 @@ mod tests {
         })
     }
 
-    /// A restart allowance of never allows none.
+    /// A program told nothing is a program left stopped.
     #[test]
-    fn restarting_is_never_unless_a_number_says_otherwise() {
+    fn restarting_is_never_unless_it_is_asked_for() {
         let p = process("/usr/bin/mean", Duration::from_millis(500), Restart::Never);
         assert_eq!(p.restart(), Restart::Never);
         assert!(!p.may_restart());
 
-        let p = process("/usr/bin/mean", Duration::from_millis(500), Restart::UpTo(3));
-        assert_eq!(p.restart(), Restart::UpTo(3));
+        let p = process(
+            "/usr/bin/mean",
+            Duration::from_millis(500),
+            Restart::WhenItStops,
+        );
+        assert_eq!(p.restart(), Restart::WhenItStops);
         assert!(p.may_restart());
     }
 
-    /// A restart allowance is spent, and then it is gone.
+    /// A program told to come back comes back every time it stops.
+    ///
+    /// The answer the configuration gave, and the same answer however often
+    /// it is asked: `restart` is whether, not how many times. A program that
+    /// stops as fast as it is started is a program somebody has to look at,
+    /// and what says so is the count in the telemetry rather than a bound
+    /// that quietly leaves it stopped.
     #[test]
-    fn restarts_are_bounded() {
-        let mut p = process("/usr/bin/mean", Duration::from_millis(500), Restart::UpTo(2));
+    fn restarting_is_not_bounded() {
+        let mut p = process(
+            "/usr/bin/mean",
+            Duration::from_millis(500),
+            Restart::WhenItStops,
+        );
 
-        assert!(p.stopped("it exited"), "the first restart is allowed");
-        assert!(p.stopped("it exited"), "and the second");
-        assert!(!p.stopped("it exited"), "the third is not");
+        for which in 1..=5 {
+            assert!(p.stopped("it exited"), "restart {which} is allowed");
+        }
         assert_eq!(
             p.why_stopped(),
-            Some("it exited"),
-            "once it is stopped for good, it should say why"
+            None,
+            "it is coming back, so it is not stopped for good"
         );
     }
 
@@ -615,29 +634,32 @@ mod tests {
         assert!(!p.is_running());
     }
 
-    /// A restart allowance buys a restart, and the datum that spent it is
+    /// A restart happens at once, and the datum that died with the program is
     /// still lost.
     #[test]
     fn a_restart_is_taken_and_the_datum_is_still_lost() {
         let (_where, name) = program("read line\nexit 1\n");
-        let mut p = process(&name, Duration::from_secs(2), Restart::UpTo(1));
+        let mut p = process(&name, Duration::from_secs(2), Restart::WhenItStops);
         start_despite_the_race(&mut p);
 
-        // The first datum kills it, and the allowance starts it again. The
-        // datum is refused all the same: it went into a program that died
-        // without answering, and saying otherwise would be inventing a
-        // result.
+        // The first datum kills it, and it is started again. The datum is
+        // refused all the same: it went into a program that died without
+        // answering, and saying otherwise would be inventing a result.
         let said = p.give(None, b"1").expect_err("the program exited");
         assert!(
             said.contains("started again") && said.contains("this datum is lost"),
             "{said}"
         );
-        assert!(p.is_running(), "the allowance should have been spent on it");
+        assert!(p.is_running(), "it should have been started again");
 
-        // The second kills it for good, there being no allowance left.
+        // And the second the same way: a program told to come back comes back
+        // however often it stops, and every datum that died with it is lost.
         let said = p.give(None, b"2").expect_err("the program exited again");
-        assert!(!said.contains("started again"), "{said}");
-        assert!(!p.is_running());
+        assert!(
+            said.contains("started again") && said.contains("this datum is lost"),
+            "{said}"
+        );
+        assert!(p.is_running(), "it should have been started again");
     }
 
     /// Whole lines are taken from what has arrived, and nothing else is.

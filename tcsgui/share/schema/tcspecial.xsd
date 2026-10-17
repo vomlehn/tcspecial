@@ -100,6 +100,9 @@
       <xs:element name="path" type="xs:string"/>
       <xs:element name="address" type="xs:string"/>
       <xs:element name="port" type="xs:string"/>
+      <!-- Where a ground link's data goes: address:port, the port counted on
+           by each source node's device id. -->
+      <xs:element name="ground_base" type="xs:string"/>
       <xs:element name="protocol" type="xs:string"/>
       <xs:element name="interface" type="xs:string"/>
       <xs:element name="can_id" type="xs:string"/>
@@ -153,7 +156,20 @@
       <xs:element name="setpoint" type="xs:string"/>
       <xs:element name="above" type="xs:string"/>
       <xs:element name="below" type="xs:string"/>
+      <!-- A program a node runs: an app node's application, or the program
+           of a `process` computation. An app node's is executed with `~` and
+           `$HOME` expanded as a shell would expand them, and with the node's
+           name as its first argument. -->
       <xs:element name="program" type="xs:string"/>
+      <!-- What an app node's program is told about each stream its kind
+           handles: the payload argument first, then the MOC one.
+           `app-payload-arg` is said by app_payload_veh, app_all_veh, app_pl
+           and app_all_pl, which handle payload data; `app-moc-arg` by
+           app_moc_veh, app_all_veh and app_all_pl, which handle MOC data.
+           Required of those kinds, the list a program is run with being a
+           fixed one. -->
+      <xs:element name="app-payload-arg" type="xs:string"/>
+      <xs:element name="app-moc-arg" type="xs:string"/>
       <xs:element name="restart" type="xs:string"/>
       <!-- A log. -->
       <xs:element name="directory" type="xs:string"/>

@@ -13,10 +13,12 @@ moc-source: false
 attributes:
   - name: path
     required: true
+    kind: path
     about: >
       The SPI device it is reached through: /dev/spidev0.0.
   - name: max_speed
     required: true
+    kind: whole
     about: The fastest clock to drive it at, in hertz.
   - name: spi_mode
     required: true
@@ -27,14 +29,17 @@ attributes:
     about: The payload group that reads it, where it is in one.
   - name: trigger
     required: false
+    kind: bytes
     about: >
       What to send to make it answer, as hex bytes. A payload with none
       is one the configuration describes as only read.
   - name: read_size
     required: false
+    kind: whole
     about: How many bytes a reading is, at most.
   - name: bits_per_word
     required: false
+    kind: whole
     about: How many bits a word is, where it is not eight.
   - name: bit_order
     required: false

@@ -1,5 +1,5 @@
-//! What the program itself holds: the interfaces it was run with, and nothing
-//! else.
+//! What the program itself holds: the interfaces it was run with and what its
+//! command line told it, and nothing else.
 //!
 //! One type per kind of app, each holding a handle for every interface that
 //! kind supports and no handle at all for the ones it does not. So an
@@ -19,6 +19,20 @@
 //! direction -- `read_payload` and `write_moc` rather than `read` and `write`
 //! -- because both happen on the one interface and a reader of an app should
 //! not have to remember which way round descriptor 0 is.
+//!
+//! # What the command line told it
+//!
+//! A short, fixed list, the same for every node of a kind: the name of the
+//! node this program is, and then the argument the configuration states for
+//! each stream the kind handles -- payload before MOC. Each kind's
+//! `inherited` takes its own, so the type says how many there are and a
+//! program run with the wrong number is refused with a sentence rather than
+//! reading somebody else's argument as its own.
+//!
+//! The name is there because a program may be several nodes at once: three
+//! nodes running one program are three processes, and a complaint that does
+//! not say which of them it came from is a complaint an operator cannot act
+//! on.
 //!
 //! # Taking the interfaces
 //!
@@ -144,15 +158,23 @@ impl Errors {
 /// here to reach it with, and nothing else may reach it either.
 #[derive(Debug)]
 pub struct AppPayloadVeh {
+    /// What the node this program is runs under in the configuration.
+    pub name: String,
+    /// What the configuration says about the payload stream, this kind
+    /// handling payload data.
+    pub payload_arg: String,
     pub payload: PayloadInterface,
     pub errors: Errors,
 }
 
 impl AppPayloadVeh {
-    /// Take the interfaces this program was run with.
+    /// Take the interfaces and the arguments this program was run with.
     pub fn inherited() -> Result<AppPayloadVeh, String> {
         taking(&[Interface::Payload, Interface::Errors])?;
+        let [name, payload_arg] = told(["the node's name", "app-payload-arg"])?;
         Ok(AppPayloadVeh {
+            name,
+            payload_arg,
             payload: PayloadInterface(stream(Interface::Payload)),
             errors: Errors(file(Interface::Errors)),
         })
@@ -164,15 +186,23 @@ impl AppPayloadVeh {
 /// The node type `app_moc_veh`. Descriptor 0 is not open.
 #[derive(Debug)]
 pub struct AppMocVeh {
+    /// What the node this program is runs under in the configuration.
+    pub name: String,
+    /// What the configuration says about the MOC stream, this kind handling
+    /// MOC data.
+    pub moc_arg: String,
     pub moc: MocInterface,
     pub errors: Errors,
 }
 
 impl AppMocVeh {
-    /// Take the interfaces this program was run with.
+    /// Take the interfaces and the arguments this program was run with.
     pub fn inherited() -> Result<AppMocVeh, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
+        let [name, moc_arg] = told(["the node's name", "app-moc-arg"])?;
         Ok(AppMocVeh {
+            name,
+            moc_arg,
             moc: MocInterface(stream(Interface::Moc)),
             errors: Errors(file(Interface::Errors)),
         })
@@ -186,16 +216,28 @@ impl AppMocVeh {
 /// interface can be written on as payload data on the other.
 #[derive(Debug)]
 pub struct AppAllVeh {
+    /// What the node this program is runs under in the configuration.
+    pub name: String,
+    /// What the configuration says about the payload stream.
+    pub payload_arg: String,
+    /// And about the MOC stream. It comes second on the command line, this
+    /// kind handling both.
+    pub moc_arg: String,
     pub payload: PayloadInterface,
     pub moc: MocInterface,
     pub errors: Errors,
 }
 
 impl AppAllVeh {
-    /// Take the interfaces this program was run with.
+    /// Take the interfaces and the arguments this program was run with.
     pub fn inherited() -> Result<AppAllVeh, String> {
         taking(&[Interface::Payload, Interface::Moc, Interface::Errors])?;
+        let [name, payload_arg, moc_arg] =
+            told(["the node's name", "app-payload-arg", "app-moc-arg"])?;
         Ok(AppAllVeh {
+            name,
+            payload_arg,
+            moc_arg,
             payload: PayloadInterface(stream(Interface::Payload)),
             moc: MocInterface(stream(Interface::Moc)),
             errors: Errors(file(Interface::Errors)),
@@ -216,15 +258,23 @@ impl AppAllVeh {
 /// something happens, rather than one that answers a trigger.
 #[derive(Debug)]
 pub struct AppPl {
+    /// What the node this program is runs under in the configuration.
+    pub name: String,
+    /// What the configuration says about the payload stream, which is the one
+    /// stream this kind handles.
+    pub payload_arg: String,
     pub payload: PayloadOut,
     pub errors: Errors,
 }
 
 impl AppPl {
-    /// Take the interfaces this program was run with.
+    /// Take the interfaces and the arguments this program was run with.
     pub fn inherited() -> Result<AppPl, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
+        let [name, payload_arg] = told(["the node's name", "app-payload-arg"])?;
         Ok(AppPl {
+            name,
+            payload_arg,
             payload: PayloadOut(stream(Interface::Moc)),
             errors: Errors(file(Interface::Errors)),
         })
@@ -240,19 +290,66 @@ impl AppPl {
 /// other payload behaves: see `tcslibgs::node::app`.
 #[derive(Debug)]
 pub struct AppAllPl {
+    /// What the node this program is runs under in the configuration.
+    pub name: String,
+    /// What the configuration says about the payload stream: the readings this
+    /// payload answers with.
+    pub payload_arg: String,
+    /// And about the MOC stream: what asks it for them. Second on the command
+    /// line, this kind handling both.
+    pub moc_arg: String,
     pub moc: MocInterface,
     pub errors: Errors,
 }
 
 impl AppAllPl {
-    /// Take the interfaces this program was run with.
+    /// Take the interfaces and the arguments this program was run with.
     pub fn inherited() -> Result<AppAllPl, String> {
         taking(&[Interface::Moc, Interface::Errors])?;
+        let [name, payload_arg, moc_arg] =
+            told(["the node's name", "app-payload-arg", "app-moc-arg"])?;
         Ok(AppAllPl {
+            name,
+            payload_arg,
+            moc_arg,
             moc: MocInterface(stream(Interface::Moc)),
             errors: Errors(file(Interface::Errors)),
         })
     }
+}
+
+/// What this program's command line said, for a kind that expects these
+/// arguments.
+///
+/// `expects` is the configuration's own word for each of them, in order, which
+/// is what a wrong count is refused with: a program told "it is run with the
+/// node's name and app-payload-arg" can be looked up in the file that started
+/// it.
+///
+/// Refused and not made good: a program run with the wrong number of arguments
+/// has been started by something that has misunderstood which kind of app it
+/// is, which is the mistake `taking` catches for the interfaces. Reading on
+/// would mean taking one stream's argument for the other's.
+fn told<const N: usize>(expects: [&str; N]) -> Result<[String; N], String> {
+    let mut said: Vec<String> = Vec::with_capacity(N);
+    for (at, argument) in std::env::args_os().enumerate().skip(1) {
+        said.push(argument.into_string().map_err(|_| {
+            format!(
+                "argument {at} is not text: every argument an app is given is a \
+                 word from its configuration, and a configuration is text"
+            )
+        })?);
+    }
+    if said.len() != N {
+        return Err(format!(
+            "this app is run with {N} argument{}, {}, and it was given {}: the \
+             list is fixed by the kind of app it is",
+            if N == 1 { "" } else { "s" },
+            expects.join(" then "),
+            said.len()
+        ));
+    }
+    Ok(said.try_into().expect("a list of the length just counted"))
 }
 
 /// Say what went wrong when there is no app to say it with.

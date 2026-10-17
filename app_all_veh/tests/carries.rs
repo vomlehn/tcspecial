@@ -15,10 +15,20 @@ fn app() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_app_all_veh"))
 }
 
+/// The arguments an `app_all_veh` is run with: its name, then the payload
+/// argument, then the MOC one, this kind handling both streams.
+fn arguments() -> Vec<String> {
+    vec![
+        "through".to_string(),
+        "--readings".to_string(),
+        "--commands".to_string(),
+    ]
+}
+
 /// Each stream comes out of the interface it was going to.
 #[test]
 fn each_stream_is_carried_to_the_other_interface() {
-    let mut running = parent::start(&app(), Supports::ALL).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
 
     // Groundward: payload data written at the first interface, where the app
     // reads payload data, comes out at the second, where it writes it.
@@ -55,7 +65,7 @@ fn each_stream_is_carried_to_the_other_interface() {
 /// apart. So this one waits on the wrong interface and wants nothing.
 #[test]
 fn the_streams_are_not_crossed() {
-    let mut running = parent::start(&app(), Supports::ALL).expect("it starts");
+    let mut running = parent::start(&app(), &arguments(), Supports::ALL).expect("it starts");
     // Short, because what this test wants is for nothing to arrive: the
     // default would have it wait five seconds to find out.
     running.waits(Some(Duration::from_millis(500)));
@@ -78,4 +88,25 @@ fn the_streams_are_not_crossed() {
 
     running.no_more().expect("the interfaces end");
     assert!(running.waited_for().expect("it stops").success());
+}
+
+/// Run with the wrong number of arguments, it refuses and says so.
+///
+/// The list is fixed by the kind of app it is, so a program given a short one
+/// would read the wrong word as its first argument. Refused where the
+/// interfaces are refused, and for the same reason: something that started it
+/// has misunderstood what it is.
+#[test]
+fn run_with_the_wrong_arguments_it_refuses_and_says_why() {
+    let mut running =
+        parent::start(&app(), &["through".to_string()], Supports::ALL).expect("it starts");
+
+    let said = running
+        .read_complaint()
+        .expect("it complains")
+        .expect("a message");
+    assert!(said.contains("app_all_veh"), "{said}");
+    assert!(said.contains("argument"), "{said}");
+
+    assert!(!running.waited_for().expect("it stops").success());
 }

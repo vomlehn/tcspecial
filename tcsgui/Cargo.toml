@@ -7,6 +7,9 @@ build = "build.rs"
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }
+# Asked about the files as the editor starts, so that what it says about them
+# is what tcsverify, tcspecial, tcsmoc and tcssim say: see `settle_problems`.
+tcsverify = { path = "../tcsverify" }
 # 1.18 rather than 1.3: the menu bar is a builtin element and the earlier
 # versions have none. What the editor would otherwise need is a control of its
 # own standing in for a menu, which is a menu that behaves like nothing else on

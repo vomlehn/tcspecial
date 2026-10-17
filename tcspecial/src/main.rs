@@ -5,7 +5,7 @@
 use std::env;
 use std::process;
 
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
 use tcslibgs::config::{
     load_config_version, load_dh_configs, load_tcspecial_section, payload_path_from_args,
     PAYLOAD_CONFIG_PATH_VAR,
@@ -54,6 +54,32 @@ fn main() {
     };
     info!("Loading payload configuration from: {}", payload_path);
 
+    // What tcsverify says about this file, asked before anything else is read
+    // from it and said in tcsverify's own words: every problem at once, each
+    // with its file and line, rather than whichever of them a loader below
+    // happened to meet first. The same lines tcsmoc, tcssim and tcsgui show
+    // as they start.
+    //
+    // A version 2 configuration is refused on a warning as well: a node whose
+    // attributes are not all in is a node that cannot be opened, so aboard it
+    // is not a question of degree -- see `tcslibgs::graph::check::Severity`.
+    let report = tcsverify::verify(std::path::Path::new(&payload_path), None);
+    let graph = runtime::start::is_a_graph(&payload_path);
+    for (error, line) in report.lines() {
+        if error || graph {
+            error!("{}", line);
+        } else {
+            warn!("{}", line);
+        }
+        // On stderr too, because a vehicle that will not start is read by
+        // whoever is standing there and not through RUST_LOG.
+        eprintln!("{}", line);
+    }
+    if report.found_errors() || (graph && report.found_anything()) {
+        error!("{}: not started", payload_path);
+        process::exit(1);
+    }
+
     // Which of the two things this file is decides which of the two runs.
     //
     // No flag and no second program name: a version 2 configuration describes
@@ -67,7 +93,7 @@ fn main() {
     // carries no command interpreter section, no beacon address and no payload
     // set, so reading them for it would be reading a version 1 file that is
     // not there.
-    if runtime::start::is_a_graph(&payload_path) {
+    if graph {
         info!("{}: a version 2 configuration", payload_path);
         process::exit(runtime::start::run_or_report(&payload_path));
     }

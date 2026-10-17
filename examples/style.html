@@ -1,0 +1,17 @@
+<!-- What README.html looks like, over pandoc's own styling.
+
+     Table cells sit at the top of their row. Markdown has no way to say this:
+     a pipe table's colons settle which way a column is aligned across the page
+     and say nothing about the vertical, so it is a property of the page rather
+     than of the text. It is wanted because of the shape of these tables -- one
+     cell is a directory name and the other a paragraph about it, and a name
+     floating level with the middle of somebody else's third line reads as
+     belonging to that line. At the top, it reads as the heading of the
+     paragraph beside it, which is what it is.
+
+     Included in the head by pandoc's -H, so README.html carries it and is one
+     file: a style sheet beside it would be a page that looks different
+     wherever it is copied to without its neighbour. -->
+<style>
+  th, td { vertical-align: top; }
+</style>

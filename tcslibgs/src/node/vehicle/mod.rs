@@ -23,19 +23,50 @@ pub mod log;
 
 use serde::{Deserialize, Serialize};
 
-/// What to do when a program a node runs stops.
+/// Whether a program a node runs is started again when it stops.
 ///
 /// Two of this family's node types run one -- a computation whose function is
 /// `process`, and an app node -- and both are held to the same two spellings:
-/// `never`, or a number of times. Declared here rather than in either of them
-/// because a second statement of it would be a second default, and the default
-/// is the whole of the argument: a part of the control system that restarts
-/// under load is worse than one that stays stopped, the second being obviously
-/// broken.
+/// `true` or `false`. Declared here rather than in either of them because a
+/// second statement of it would be a second default, and the default is the
+/// whole of the argument: a part of the control system that restarts under
+/// load is worse than one that stays stopped, the second being obviously
+/// broken. So a file that says nothing says `Never`, and saying otherwise
+/// takes the word `true`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Restart {
-    /// Leave it stopped and refuse the link. The default.
+    /// Leave it stopped and refuse the link. What `false` says, and what a
+    /// file that says nothing about it means.
     Never,
-    /// Start it again, up to this many times.
-    UpTo(u32),
+    /// Start it again whenever it stops, which is what `true` says.
+    WhenItStops,
+}
+
+impl Restart {
+    /// What a `restart` says, or what is wrong with what it says.
+    ///
+    /// `said` is the attribute as the file wrote it, and `None` is a file
+    /// that did not write it at all. The one place the two spellings are
+    /// read: an app node and a `process` computation take the same attribute,
+    /// and two readings of it would be two answers on the day one of them
+    /// learned a third spelling.
+    ///
+    /// Nothing else is accepted, a number of times included. A bound on the
+    /// restarts is a thing somebody would have to choose, and a configuration
+    /// that chose one would be a configuration saying how long to go on
+    /// failing -- where what is wanted of this attribute is an answer to
+    /// "should it come back at all".
+    ///
+    /// An empty value is a file that says nothing, which is what the editor
+    /// writes when somebody empties the field: a cleared box should leave the
+    /// node as it was before anybody typed in it, not make it faulty.
+    pub fn of(said: Option<&str>) -> Result<Restart, String> {
+        match said.map(str::trim) {
+            None | Some("") | Some("false") => Ok(Restart::Never),
+            Some("true") => Ok(Restart::WhenItStops),
+            Some(other) => Err(format!(
+                "restart: \"{other}\" is neither \"true\" nor \"false\""
+            )),
+        }
+    }
 }

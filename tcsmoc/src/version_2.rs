@@ -216,7 +216,7 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
     let digest = match tcslibgs::config_digest::digest_of_graph(&graph) {
         Ok(digest) => {
             eprintln!(
-                "v{}, configuration {payload_path} config v{} md5: {digest}",
+                "tcsmoc v{}, config v{}, md5 {digest}",
                 tcslibgs::config_digest::ConfigVersion::of_this_build(),
                 tcslibgs::graph::VERSION
             );

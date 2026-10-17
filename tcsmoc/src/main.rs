@@ -856,7 +856,7 @@ fn main() {
             exit(1);
         }
     };
-    eprintln!("Loading payload configuration from: {}", payload_path);
+    eprintln!("payload configuration: {}", payload_path);
 
     // Everything wrong with the payload set, in tcsverify's words: every
     // problem at once, each with its file and line, which is what tcsverify,
@@ -1044,7 +1044,7 @@ fn main() {
 
     let digest = match digest_of_file(&payload_path) {
         Ok(digest) => {
-            eprintln!("v{version}, configuration {payload_path} {config_version} md5: {digest}");
+            eprintln!("tcsmoc v{version}, {config_version}, md5 {digest}");
             Some(digest)
         }
         Err(e) => {

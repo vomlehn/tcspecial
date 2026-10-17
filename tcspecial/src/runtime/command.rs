@@ -67,6 +67,7 @@ use tcslibgs::{
 
 use crate::beacon_send::BeaconSend;
 use crate::runtime::node_state::{NodeStates, Wakeup};
+use crate::runtime::system::{Work, Workbench};
 use crate::telemetry_log::TelemetryLog;
 
 /// The most a command datagram may be.
@@ -148,6 +149,7 @@ impl Commands {
     pub fn start(
         ci: &CIConfig,
         states: Arc<NodeStates>,
+        bench: Workbench,
         flying: Flying,
         beacon: Option<BeaconSend>,
         log: TelemetryLog,
@@ -180,6 +182,7 @@ impl Commands {
 
         let serving = Serving {
             states,
+            bench,
             flying,
             beacon,
             log,
@@ -243,6 +246,9 @@ fn bound(which: &str, at: &HostPort) -> TcsResult<UdpSocket> {
 /// What the thread holds while it serves.
 struct Serving {
     states: Arc<NodeStates>,
+    /// How the work a command causes is handed to the pass: opening a device
+    /// takes time and can fail, and neither belongs on this thread.
+    bench: Workbench,
     flying: Flying,
     /// The beacon sender, so that a CONFIG retimes the one that is running.
     /// `None` for a configuration that sends no beacons.
@@ -469,12 +475,33 @@ impl Serving {
             );
             return CommandStatus::NotFound;
         };
-        if enabled {
-            state.enable();
-        } else {
+        let name = state.name().to_string();
+
+        // Stopping takes effect here and now, before anything is handed over:
+        // a node the ground has disabled must stop, not stop after the
+        // operation it is in the middle of. The flag goes down and the node's
+        // wakeup is poked, so a wait inside an operation ends at once.
+        if !enabled {
             state.disable();
         }
-        CommandStatus::Success
+
+        // And then the work that belongs to the pass: releasing what a
+        // stopped node held, or opening a node again. The answer waits for it,
+        // so a success means the device is free or the node is running --
+        // which is what a ground station about to hand the device to something
+        // else needs to know.
+        let work = if enabled {
+            Work::Enable(name.clone())
+        } else {
+            Work::Disable(name.clone())
+        };
+        match self.bench.ask(work) {
+            Ok(()) => CommandStatus::Success,
+            Err(why) => {
+                error!("\"{name}\" could not be {}: {why}", if enabled { "started" } else { "released" });
+                CommandStatus::Failure
+            }
+        }
     }
 }
 
@@ -561,7 +588,33 @@ mod tests {
         }
     }
 
+    /// Stand in for the pass, doing whatever work the interpreter hands over.
+    ///
+    /// `how` says what each job comes to, so a test can have an opening fail
+    /// with no device to fail on. The work is recorded as well as answered,
+    /// because a test wants to say that a command caused the right work and
+    /// not only that it got the right answer back.
+    fn a_pass_answering(
+        how: impl Fn(&Work) -> Result<(), String> + Send + 'static,
+    ) -> (Workbench, Arc<std::sync::Mutex<Vec<Work>>>) {
+        let (bench, jobs) = Workbench::in_two().expect("a workbench");
+        let done = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let kept = done.clone();
+        std::thread::spawn(move || {
+            while let Ok(job) = jobs.recv() {
+                kept.lock().expect("the record").push(job.work.clone());
+                let _ = job.reply.send(how(&job.work));
+            }
+        });
+        (bench, done)
+    }
+
     fn started(states: Arc<NodeStates>) -> (UdpSocket, Commands) {
+        let (bench, _) = a_pass_answering(|_| Ok(()));
+        started_with(states, bench)
+    }
+
+    fn started_with(states: Arc<NodeStates>, bench: Workbench) -> (UdpSocket, Commands) {
         let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         ground
             .set_read_timeout(Some(Duration::from_secs(5)))
@@ -569,6 +622,7 @@ mod tests {
         let commands = Commands::start(
             &links_for(&ground),
             states,
+            bench,
             flying(),
             None,
             TelemetryLog::disabled(),
@@ -612,11 +666,20 @@ mod tests {
         }
     }
 
-    /// A STOP_NODE disables that node and nothing else, and a START_NODE
-    /// enables it again.
+    /// A STOP_NODE stops that node at once and has the pass release what it
+    /// held; a START_NODE has the pass open it again.
     ///
-    /// By id, which is the node's position: the ground shows the name and the
-    /// link carries the number.
+    /// The two halves of stopping a node are both tested here because they
+    /// happen in different places and the division is the point. The flag goes
+    /// down on this thread, so the node stops without waiting for anything;
+    /// releasing what it held is work for the pass, because a port must not be
+    /// closed under an operation using it. The answer waits for the pass, so a
+    /// success means the device is free -- which is what a ground station
+    /// about to hand that device to something else needs to know.
+    ///
+    /// Enabling is the pass's throughout: the node is let back in only once
+    /// its port is open, since a node marked enabled over a port that is not
+    /// there would be read by the next pass and refused by it.
     #[test]
     fn a_node_is_stopped_and_started_by_its_id() {
         let graph = two_nodes();
@@ -624,8 +687,10 @@ mod tests {
         let ids = tcslibgs::graph::telemetry::ids(&graph);
         let inside = NodeId::of(ids["inside"]);
 
-        let (ground, commands) = started(states.clone());
+        let (bench, done) = a_pass_answering(|_| Ok(()));
+        let (ground, commands) = started_with(states.clone(), bench);
         let at = commands.node_address();
+        let handed_over = || done.lock().expect("the record").clone();
 
         match ask(&ground, at, &Command::StopNode(NodeCommand::stop(1, inside))) {
             Some(Telemetry::StopNode(tm)) => {
@@ -634,8 +699,16 @@ mod tests {
             }
             other => panic!("expected a stop answer, got {other:?}"),
         }
-        assert!(!states.is_enabled("inside"), "the pass must not touch it");
+        assert!(
+            !states.is_enabled("inside"),
+            "it stops where the command arrives, not when the pass gets to it"
+        );
         assert!(states.is_enabled("average"), "and only the one named");
+        assert_eq!(
+            handed_over(),
+            vec![Work::Disable("inside".to_string())],
+            "and the pass is asked to release what it held"
+        );
 
         // Twice is a state and not an action.
         match ask(&ground, at, &Command::StopNode(NodeCommand::stop(2, inside))) {
@@ -652,7 +725,49 @@ mod tests {
             }
             other => panic!("expected a start answer, got {other:?}"),
         }
-        assert!(states.is_enabled("inside"));
+        assert_eq!(
+            handed_over().last(),
+            Some(&Work::Enable("inside".to_string())),
+            "opening a node is the pass's work, and the flag goes up with it"
+        );
+    }
+
+    /// A node that will not open is answered with the failure and left
+    /// stopped.
+    ///
+    /// Enabling a node is the same work as starting it at startup and can fail
+    /// the same ways: a device that is gone, an address already taken, a
+    /// program that will not execute. What must not happen is a node reported
+    /// started that is not running.
+    #[test]
+    fn a_node_that_will_not_open_is_answered_with_the_failure() {
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let ids = tcslibgs::graph::telemetry::ids(&graph);
+        let inside = NodeId::of(ids["inside"]);
+
+        let (bench, _) = a_pass_answering(|work| match work {
+            Work::Enable(_) => Err("/dev/i2c-1 is not there".to_string()),
+            Work::Disable(_) => Ok(()),
+        });
+        let (ground, commands) = started_with(states.clone(), bench);
+        let at = commands.node_address();
+
+        // Stopped first, so that starting it is a real opening.
+        ask(&ground, at, &Command::StopNode(NodeCommand::stop(1, inside)));
+        assert!(!states.is_enabled("inside"));
+
+        match ask(&ground, at, &Command::StartNode(NodeCommand::start(2, inside))) {
+            Some(Telemetry::StartNode(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::Failure);
+                assert_eq!(tm.node, inside);
+            }
+            other => panic!("expected a start answer, got {other:?}"),
+        }
+        assert!(
+            !states.is_enabled("inside"),
+            "a node that would not open stays stopped"
+        );
     }
 
     /// An id the configuration does not have is answered, with the id it

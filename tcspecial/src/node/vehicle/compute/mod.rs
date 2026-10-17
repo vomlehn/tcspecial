@@ -45,6 +45,7 @@ pub mod to_kelvin;
 
 use tcslibgs::graph::Node;
 use tcslibgs::node::vehicle::compute::{self, Computation};
+use crate::runtime::node_state::Abandon;
 
 /// Something a compute node runs.
 ///
@@ -89,7 +90,11 @@ pub trait Function {
 /// `inputs` is what the routing found bound to this node, which a function
 /// over several of them needs: a mean cannot know it is waiting for three
 /// until something tells it how many links arrive.
-pub fn make(node: &Node, inputs: &[&str]) -> Result<Box<dyn Function>, String> {
+pub fn make(
+    node: &Node,
+    inputs: &[&str],
+    abandon: &Abandon,
+) -> Result<Box<dyn Function>, String> {
     // What the node says, by the rules the ground tool checks it against: see
     // tcslibgs::node::vehicle::compute. Every complaint from there already names the
     // node and the computation.
@@ -124,7 +129,10 @@ pub fn make(node: &Node, inputs: &[&str]) -> Result<Box<dyn Function>, String> {
         // cannot be executed is a fault found on the ground rather than three
         // days into a mission. See node::vehicle::compute::process.
         Computation::Process(params) => {
-            let mut program = process::Process::of(params);
+            // The node's own wakeup, so that disabling the node gives up the
+            // wait for an answer rather than waiting out a deadline that may
+            // be seconds long.
+            let mut program = process::Process::of(params).abandoned_for(abandon.clone());
             program
                 .start()
                 .map_err(|why| format!("\"{}\" (process): {why}", node.name))?;
@@ -331,7 +339,7 @@ mod tests {
             group: None,
             attributes: BTreeMap::new(),
         };
-        let said = match make(&node, &[]) {
+        let said = match make(&node, &[], &Abandon::nothing()) {
             Err(said) => said,
             Ok(f) => panic!("a node with no function became {}", f.name()),
         };
@@ -350,7 +358,7 @@ mod tests {
             group: None,
             attributes,
         };
-        let said = match make(&node, &[]) {
+        let said = match make(&node, &[], &Abandon::nothing()) {
             Err(said) => said,
             Ok(f) => panic!("sorcery became {}", f.name()),
         };
@@ -376,7 +384,7 @@ mod tests {
             attributes,
         };
 
-        let said = match make(&node, &[]) {
+        let said = match make(&node, &[], &Abandon::nothing()) {
             Err(said) => said,
             Ok(f) => panic!("a conversion with no scale became {}", f.name()),
         };

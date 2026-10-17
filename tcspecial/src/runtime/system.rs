@@ -29,6 +29,7 @@
 //! visible in the diagram and recorded in the beacon's digest.
 
 use std::collections::BTreeMap;
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use tcslibgs::graph::telemetry::Telemetered;
@@ -39,7 +40,7 @@ use std::sync::Arc;
 use crate::endpoint::bind_oc_pair;
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::fabric::{Fabric, Moved, Port};
-use crate::runtime::node_state::NodeStates;
+use crate::runtime::node_state::{Abandon, Nudge, NodeStates};
 use crate::runtime::port::{AppPort, ComputePort, EndpointPort, LogPort, NullPort, Use};
 use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
@@ -59,6 +60,91 @@ pub const DATUM_BYTES: usize = 4096;
 /// configuration whose nodes are all in groups, which waits for the next group
 /// instead and wakes exactly when it is due.
 pub const POLL_PAUSE: Duration = Duration::from_millis(20);
+
+/// What the command interpreter asks the pass to do.
+///
+/// Opening a device takes time and can fail, so it is not done on the thread
+/// that reads commands: that thread hands the work over and answers when the
+/// work is done, so a START_NODE opening a bus does not stop the next command
+/// being read.
+///
+/// Disabling is here too, although the *stopping* of a node is not: that is a
+/// flag and a poke, done where the command arrives, because a node the ground
+/// has disabled must stop at once and not after the current read finishes.
+/// What is left for the pass is releasing what the node held, which must not
+/// happen while an operation is using it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Work {
+    /// Open this node again and let the pass touch it.
+    Enable(String),
+    /// Release what it held, it having already been told to stop.
+    Disable(String),
+}
+
+/// One piece of work and where its answer goes.
+pub struct Job {
+    pub work: Work,
+    /// Where to say how it went. A send that fails is a caller that stopped
+    /// waiting, which is not a reason to leave the work undone.
+    pub reply: Sender<Result<(), String>>,
+}
+
+/// How the command interpreter hands work to the pass and waits for it.
+///
+/// Cheap to clone and safe to hold: everything in it is a channel or a
+/// descriptor, and nothing the pass owns is reachable through it.
+#[derive(Clone)]
+pub struct Workbench {
+    jobs: Sender<Job>,
+    nudge: Nudge,
+}
+
+/// How long to wait for the pass to do a piece of work.
+///
+/// Generous, because the work may be opening a device: what this is really for
+/// is a pass that has stopped making passes at all, where waiting for ever
+/// would take the command interpreter down with it. A ground station is better
+/// told that the vehicle did not answer than left with a command in flight.
+const WORK_DEADLINE: Duration = Duration::from_secs(10);
+
+impl Workbench {
+    /// A workbench and the jobs handed to it, for a caller that will do the
+    /// work itself.
+    ///
+    /// What [`System`] makes for itself, made on its own: a test of the
+    /// command interpreter wants to see which work a command caused, and a
+    /// program that drives the pass some other way wants the same handover
+    /// without this module's loop.
+    pub fn in_two() -> std::io::Result<(Workbench, Receiver<Job>)> {
+        let (jobs, taken) = std::sync::mpsc::channel();
+        Ok((
+            Workbench {
+                jobs,
+                nudge: Nudge::new()?,
+            },
+            taken,
+        ))
+    }
+
+    /// Ask the pass to do this, and wait until it has.
+    ///
+    /// The nudge is poked after the job is queued, so a pass waiting for the
+    /// next group to come due takes the work now rather than when the group
+    /// is read.
+    pub fn ask(&self, work: Work) -> Result<(), String> {
+        let (reply, answered) = std::sync::mpsc::channel();
+        self.jobs
+            .send(Job { work, reply })
+            .map_err(|_| "the vehicle is no longer making passes".to_string())?;
+        self.nudge.poke();
+        match answered.recv_timeout(WORK_DEADLINE) {
+            Ok(how) => how,
+            Err(_) => Err(format!(
+                "the vehicle did not do it within {WORK_DEADLINE:?}"
+            )),
+        }
+    }
+}
 
 /// Everything a configuration needs in order to run.
 pub struct System {
@@ -80,6 +166,24 @@ pub struct System {
     /// table the command interpreter stores into: see
     /// [`crate::runtime::node_state`].
     states: Arc<NodeStates>,
+    /// The configuration's nodes, by name, so that one can be opened again.
+    ///
+    /// Kept rather than looked up from the graph, which the caller owns and
+    /// need not keep: a node the ground re-enables has to be opened from what
+    /// the file said about it, and the file said it once.
+    nodes: BTreeMap<String, tcslibgs::graph::Node>,
+    /// The routing, which opening a node needs as much as the node does.
+    routes: Routes,
+    /// What a node becomes, kept so that a node can become it again.
+    ///
+    /// The same function that opened everything at startup, because enabling a
+    /// node is the same work as starting it was and must be able to fail the
+    /// same ways.
+    opener: Box<dyn FnMut(&tcslibgs::graph::Node, &Routes, &Abandon) -> Result<Box<dyn Port>, String>>,
+    /// Work the command interpreter has handed over, taken between stages.
+    jobs: Receiver<Job>,
+    /// How the interpreter asks for it, and wakes a pass that is waiting.
+    bench: Workbench,
 }
 
 impl System {
@@ -103,7 +207,8 @@ impl System {
     pub fn of_opening(
         graph: &Graph,
         now: Instant,
-        mut opener: impl FnMut(&tcslibgs::graph::Node, &Routes) -> Result<Box<dyn Port>, String>,
+        mut opener: impl FnMut(&tcslibgs::graph::Node, &Routes, &Abandon) -> Result<Box<dyn Port>, String>
+            + 'static,
         mut ground: impl FnMut(&Telemetered) -> Result<Box<dyn Port>, String>,
     ) -> Result<System, Vec<String>> {
         let routes = Routes::of(graph);
@@ -121,7 +226,12 @@ impl System {
         let mut paced = BTreeMap::new();
 
         for node in &graph.nodes {
-            match opener(node, &routes) {
+            // The node's own wakeup goes into the port, so that a wait inside
+            // one of its operations ends when the ground disables it.
+            let abandon = states
+                .named(&node.name)
+                .map_or_else(Abandon::nothing, |state| state.abandon());
+            match opener(node, &routes, &abandon) {
                 Ok(port) => {
                     // What is polled and what is flushed, worked out while
                     // the node is in hand: a pass that asked these questions
@@ -160,6 +270,9 @@ impl System {
             return Err(refused);
         }
 
+        let (asking, jobs) = std::sync::mpsc::channel();
+        let nudge = Nudge::new().map_err(|e| vec![format!("the loop's own wakeup: {e}")])?;
+
         Ok(System {
             fabric,
             schedule: Schedule::of(graph, now),
@@ -167,6 +280,18 @@ impl System {
             paced,
             logs,
             states,
+            nodes: graph
+                .nodes
+                .iter()
+                .map(|node| (node.name.clone(), node.clone()))
+                .collect(),
+            routes,
+            opener: Box::new(opener),
+            jobs,
+            bench: Workbench {
+                jobs: asking,
+                nudge,
+            },
         })
     }
 
@@ -180,10 +305,15 @@ impl System {
     pub fn pass(&mut self, now: Instant) -> Moved {
         let mut moved = Moved::default();
 
+        // Before the first stage, and between each pair of them: see
+        // `take_the_work`.
+        self.take_the_work();
+
         for due in self.schedule.due(now) {
             let members: Vec<String> = self.schedule.members(&due.group).to_vec();
             moved.add(self.fabric.pump_group(&members));
             self.schedule.read(&due.group, now);
+            self.take_the_work();
         }
 
         // The nodes in no group, which are read as they become readable: a
@@ -218,6 +348,8 @@ impl System {
                 }
             }
         }
+
+        self.take_the_work();
 
         // The logs, once, at the end. A log flushed per record is a write
         // system call per reading; a log flushed per pass is every record of
@@ -308,6 +440,101 @@ impl System {
     /// The logs this system flushes.
     pub fn logs(&self) -> &[String] {
         &self.logs
+    }
+
+    /// How the command interpreter hands this system work.
+    ///
+    /// Handed out rather than reached through, as the node states are: the
+    /// interpreter runs on a thread of its own, and a channel and a descriptor
+    /// are the whole of what it shares with the pass.
+    pub fn workbench(&self) -> Workbench {
+        self.bench.clone()
+    }
+
+    /// What the loop waits on between passes, so work can cut the wait short.
+    pub fn nudge(&self) -> Nudge {
+        self.bench.nudge.clone()
+    }
+
+    /// Do whatever the command interpreter has handed over.
+    ///
+    /// Between stages and never inside one, which is the rule: a node whose
+    /// configuration changed in the middle of an operation would be a node
+    /// doing half of one thing and half of another. Every job queued when this
+    /// is called is done before it returns, so a burst of commands costs one
+    /// gap between stages rather than one each.
+    fn take_the_work(&mut self) {
+        while let Ok(job) = self.jobs.try_recv() {
+            let how = match &job.work {
+                Work::Enable(node) => self.reopen(node),
+                Work::Disable(node) => self.release(node),
+            };
+            // A reply nobody is waiting for is a caller that gave up, which is
+            // not a reason to have left the work undone.
+            let _ = job.reply.send(how);
+        }
+    }
+
+    /// Open a node again and let the pass touch it.
+    ///
+    /// The same work as starting it at startup, by the same function, so it
+    /// can fail the same ways: a device that is gone, an address already
+    /// taken, a program that will not execute. A node that will not open is
+    /// left disabled and the reason is given back, rather than being left
+    /// enabled over a port that is not there.
+    ///
+    /// A node that is already open is success and nothing is done. An
+    /// operator who presses Enable twice has asked for a state.
+    pub fn reopen(&mut self, name: &str) -> Result<(), String> {
+        let Some(node) = self.nodes.get(name).cloned() else {
+            return Err(format!("there is no node called \"{name}\" here"));
+        };
+        if self.fabric.holds(name) {
+            // Held already: the flag is the only thing that may be down, which
+            // is the case of a node disabled before this version released
+            // anything.
+            self.enable(name);
+            return Ok(());
+        }
+
+        let abandon = self
+            .states
+            .named(name)
+            .map_or_else(Abandon::nothing, |state| state.abandon());
+        let port = (self.opener)(&node, &self.routes, &abandon)?;
+        self.fabric.hold(name, port);
+        // Enabled only once it is open, and in that order: a node marked
+        // enabled over a port that is not there would be read by the next
+        // pass and refused by it.
+        self.enable(name);
+        Ok(())
+    }
+
+    /// Release what a node held, the ground having stopped it.
+    ///
+    /// The endpoint is closed and the device, bus address or socket is free. A
+    /// node held open but idle looks from outside like a node that is running,
+    /// and the port it keeps is a port nothing else may take.
+    ///
+    /// The node is expected to be disabled already -- stopping it is a flag
+    /// and a poke where the command arrives, so that it stops at once -- and
+    /// this is what the pass does about it between stages. Releasing a node
+    /// that holds nothing is success: a stop that arrives twice is the
+    /// ordinary case on a link with latency.
+    pub fn release(&mut self, name: &str) -> Result<(), String> {
+        if !self.nodes.contains_key(name) {
+            return Err(format!("there is no node called \"{name}\" here"));
+        }
+        // Dropped, which is what closes it: every port owns what it opened.
+        drop(self.fabric.release(name));
+        Ok(())
+    }
+
+    /// Let the pass touch this node again.
+    fn enable(&self, name: &str) {
+        if let Some(state) = self.states.named(name) {
+            state.enable();
+        }
     }
 
     /// What each node's state is, for whatever reads commands.
@@ -469,11 +696,12 @@ pub fn open_ground_link(link: &Telemetered) -> Result<Box<dyn Port>, String> {
 pub fn open(
     node: &tcslibgs::graph::Node,
     routes: &Routes,
+    abandon: &Abandon,
 ) -> Result<Box<dyn Port>, String> {
     match node.node_type.as_str() {
         "compute" => {
             let inputs = routes.inputs_of(&node.name);
-            Ok(Box::new(ComputePort::make(node, &inputs)?))
+            Ok(Box::new(ComputePort::make(node, &inputs, abandon)?))
         }
         "log" => Ok(Box::new(LogPort::of(LogNode::of(node)?))),
         // A node that carries both streams through and does nothing to what
@@ -496,7 +724,7 @@ pub fn open(
         }
         // Everything else is reached over an interface, and what a node says
         // about reaching it is tcslibgs::graph::reach's business.
-        _ => Ok(Box::new(EndpointPort::open(node, routes)?)),
+        _ => Ok(Box::new(EndpointPort::open(node, routes, abandon)?)),
     }
 }
 
@@ -712,11 +940,15 @@ payloads:
                 )
             })
             .collect();
+        // Cloned into the opener, which the system keeps so that a node can
+        // be opened again: the counters are reference counted, so the test
+        // and the opener watch the same ones.
+        let opening = counts.clone();
         let system = System::of_opening(
             &graph,
             now,
-            |node: &Node, _: &Routes| {
-                let (reads, asks) = &counts[&node.name];
+            move |node: &Node, _: &Routes, _: &Abandon| {
+                let (reads, asks) = &opening[&node.name];
                 Ok(Box::new(Counted {
                     reads: Rc::clone(reads),
                     asks: Rc::clone(asks),
@@ -837,7 +1069,7 @@ payloads:
         let mut system = System::of_opening(
             &graph,
             start,
-            |_: &Node, _: &Routes| {
+            |_: &Node, _: &Routes, _: &Abandon| {
                 Ok(Box::new(Counted {
                     reads: Rc::new(std::cell::Cell::new(0)),
                     asks: Rc::new(std::cell::Cell::new(0)),
@@ -906,7 +1138,7 @@ vehicle:
         let mut system = System::of_opening(
             &graph,
             start,
-            move |node: &Node, _: &Routes| match node.node_type.as_str() {
+            move |node: &Node, _: &Routes, _: &Abandon| match node.node_type.as_str() {
                 "network" => Ok(Box::new(Asked {
                     readings: scripted.clone(),
                     asks: counted.clone(),
@@ -969,6 +1201,145 @@ vehicle:
         assert_eq!(arrived.borrow().len(), 2);
     }
 
+    /// A stopped node gives up what it held, and starting it opens it again.
+    ///
+    /// Through the opener, because that is the claim: releasing a node drops
+    /// the port, and the port is what owns the device, the bus address or the
+    /// socket -- so a node held open but idle, which looks from outside like a
+    /// node that is running, is exactly what this rules out. Opening it again
+    /// is the same work as starting it was, by the same function, so it can
+    /// fail the same ways.
+    #[test]
+    fn a_stopped_node_gives_up_what_it_held() {
+        let start = Instant::now();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("released.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"
+payloads:
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7006\",
+      poll_interval: \"100 ms\", payload-out: average }
+vehicle:
+  - { name: average, type: compute, function: mean, inputs: 1 }
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+
+        // How many times each node has been opened, and whether the next
+        // opening is to fail.
+        let opens = Rc::new(std::cell::Cell::new(0usize));
+        let broken = Rc::new(std::cell::Cell::new(false));
+        let counted = opens.clone();
+        let failing = broken.clone();
+        let mut system = System::of_opening(
+            &graph,
+            start,
+            move |_: &Node, _: &Routes, _: &Abandon| {
+                if failing.get() {
+                    return Err("/dev/nothing is not there".to_string());
+                }
+                counted.set(counted.get() + 1);
+                Ok(Box::new(Ground::default()) as Box<dyn Port>)
+            },
+            |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
+        .expect("it opens");
+
+        assert_eq!(opens.get(), 2, "both nodes were opened at startup");
+        let states = system.states();
+
+        // Stopped, as the command interpreter stops it, and then released as
+        // the pass does between stages.
+        states.named("asked").expect("the node").disable();
+        system.release("asked").expect("it is released");
+        assert_eq!(
+            system.holds(),
+            1,
+            "the node is gone and the computation it fed remains"
+        );
+
+        // Releasing twice is success: a stop that arrives twice is the
+        // ordinary case on a link with latency.
+        system.release("asked").expect("releasing twice is success");
+
+        // A node that will not open is left stopped and the reason given
+        // back, rather than left enabled over a port that is not there.
+        broken.set(true);
+        let why = system.reopen("asked").expect_err("it cannot open");
+        assert!(why.contains("not there"), "{why}");
+        assert!(
+            !states.is_enabled("asked"),
+            "a node that would not open stays stopped"
+        );
+
+        // And opened again, it is opened by the same function and let back in.
+        broken.set(false);
+        system.reopen("asked").expect("it opens again");
+        assert_eq!(opens.get(), 3, "the opener ran again");
+        assert!(states.is_enabled("asked"), "and the flag goes up with it");
+        assert!(states.disabled().is_empty());
+
+        // A name the configuration does not have is refused rather than
+        // quietly doing nothing.
+        assert!(system.reopen("nobody").is_err());
+        assert!(system.release("nobody").is_err());
+    }
+
+    /// Work handed over by the command interpreter is done by the pass, and
+    /// the thread that asked is told how it went.
+    ///
+    /// From another thread, because that is where it comes from: the command
+    /// interpreter has its own, and the whole point of the handover is that
+    /// neither thread does the other's work.
+    #[test]
+    fn work_handed_over_is_done_by_the_pass() {
+        let start = Instant::now();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("handed.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"
+payloads:
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7007\",
+      poll_interval: \"100 ms\", payload-out: average }
+vehicle:
+  - { name: average, type: compute, function: mean, inputs: 1 }
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let mut system = System::of_opening(
+            &graph,
+            start,
+            |_: &Node, _: &Routes, _: &Abandon| {
+                Ok(Box::new(Ground::default()) as Box<dyn Port>)
+            },
+            |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
+        .expect("it opens");
+
+        let states = system.states();
+        let bench = system.workbench();
+        states.named("asked").expect("the node").disable();
+
+        // Asked from another thread, which blocks until a pass takes it.
+        let asking = std::thread::spawn(move || bench.ask(Work::Disable("asked".to_string())));
+
+        // The pass takes the work between its stages and answers it.
+        let waited = Instant::now();
+        while system.holds() == 2 && waited.elapsed() < Duration::from_secs(5) {
+            system.pass(Instant::now());
+        }
+        assert_eq!(system.holds(), 1, "the pass released it");
+        assert_eq!(
+            asking.join().expect("the asking thread"),
+            Ok(()),
+            "and the thread that asked was told"
+        );
+    }
+
     /// The shipped example, with the three sensors scripted and the ground
     /// link and the heaters watched.
     struct Vehicle {
@@ -1009,10 +1380,14 @@ vehicle:
         let heaters = Rc::new(RefCell::new(Vec::new()));
         let telemetry = Rc::new(RefCell::new(Vec::new()));
 
+        // Cloned into the opener for the reason above: what the test watches
+        // and what the opener fills are the same reference-counted places.
+        let opening_heaters = Rc::clone(&heaters);
+        let opening_ground = Rc::clone(&ground);
         let system = System::of_opening(
             &graph,
             now,
-            |node: &Node, routes: &Routes| {
+            move |node: &Node, routes: &Routes, abandon: &Abandon| {
             match node.node_type.as_str() {
                 // The nodes that would touch hardware.
                 "i2c" | "spi" => Ok(Box::new(Sensor {
@@ -1021,14 +1396,14 @@ vehicle:
                     )),
                 }) as Box<dyn Port>),
                 "gpio" => Ok(Box::new(Ground {
-                    got: Rc::clone(&heaters),
+                    got: Rc::clone(&opening_heaters),
                 }) as Box<dyn Port>),
                 "moc" => Ok(Box::new(Ground {
-                    got: Rc::clone(&ground),
+                    got: Rc::clone(&opening_ground),
                 }) as Box<dyn Port>),
                 // And the ones that need nothing but a configuration, which
                 // are opened for real.
-                _ => open(node, routes),
+                _ => open(node, routes, abandon),
             }
             },
             // What goes to the ground, watched rather than sent: there is no
@@ -1123,7 +1498,7 @@ vehicle:
         let mut system = System::of_opening(
             &graph,
             Instant::now(),
-            |_node: &Node, _routes: &Routes| {
+            |_node: &Node, _routes: &Routes, _: &Abandon| {
                 Ok(Box::new(Sensor {
                     readings: Rc::new(RefCell::new(vec![b"reading 1".to_vec()])),
                 }) as Box<dyn Port>)
@@ -1218,7 +1593,7 @@ vehicle:
         let graph =
             Graph::load(root.join("tests/manual/thermostat.yaml")).expect("the example reads");
 
-        let refused = System::of_opening(&graph, Instant::now(), |node, routes| {
+        let refused = System::of_opening(&graph, Instant::now(), |node, routes, abandon| {
             if node.node_type == "i2c" {
                 return Err(format!("{}: /dev/i2c-1 is not there", node.name));
             }
@@ -1227,7 +1602,7 @@ vehicle:
             }
             match node.node_type.as_str() {
                 "spi" | "gpio" | "moc" => Ok(Box::new(Ground::default()) as Box<dyn Port>),
-                _ => open(node, routes),
+                _ => open(node, routes, abandon),
             }
         }, |_link| Ok(Box::new(Ground::default()) as Box<dyn Port>))
         .expect_err("a vehicle whose bus is missing");

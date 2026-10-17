@@ -1707,7 +1707,19 @@ Requirement
 Requirement
     The command interpreter does not do a node's work on its thread. It hands
     the work over and answers when the work is done, so that a ``START_NODE``
-    opening a device does not stop the next command being read. An answer
+    opening a device does not stop the next command being read.
+
+Requirement
+    A pass waiting for the next group to come due is woken when work is handed
+    to it. The wait between passes may be seconds, and a command answered when
+    the next group happened to be read would be a ground station left
+    wondering for most of an interval whether its command arrived.
+
+Requirement
+    A ``STOP_NODE`` is answered after the release, not before it. Stopping the
+    node happens first and at once, so it stops whatever the pass is doing;
+    the answer waits for the release, because a ground station that stopped a
+    node to free a device is about to give that device to something else. An answer
     carries the sequence of the command it answers, so answers that overtake
     one another are still matched to what was asked.
 
@@ -1792,6 +1804,23 @@ Requirement
     which on a part that has stopped answering is exactly when it is wanted.
 
 Requirement
+    An operation abandoned that way produces nothing and reports nothing. The
+    node has been told to stop, so what is on its interface is the answer to a
+    question that is no longer being asked, and a stop the ground asked for is
+    not a fault to be counted.
+
+Requirement
+    The flag goes down before the descriptor is written. A wait woken before
+    the state said disabled would look up, find the node enabled and wait
+    again, and the disable would arrive a timeout later after all.
+
+Requirement
+    Enabling a node clears whatever a previous disable left in its descriptor.
+    Otherwise the first wait the node makes after being started would return
+    at once, and every wait after it, on the strength of a disable that has
+    already been answered.
+
+Requirement
     A disabled node releases what it held: the endpoint is closed and the
     device, bus address or socket is free. A node held open but idle looks from
     outside like a node that is running, and the port it keeps is a port
@@ -1824,14 +1853,22 @@ conduit.
    stopping a node takes effect at once -- it is not read, not asked, and
    deliveries to it are dropped and counted.
 
-   Three things are still the design and not the code. A disabled node does
-   not yet *release* what it held: the endpoint stays open, so a stopped node
-   still holds its device, bus address or socket, and enabling one is a flag
-   rather than an opening that can fail. The wakeup descriptors exist and are
-   poked, but the ports do not yet carry them in their poll sets, so a disable
-   that lands during a ``process`` deadline still waits that deadline out.
-   And there is no worker pool: a stage's node operations run one after
-   another on the one thread.
+   A stopped node releases what it held: the port is dropped, which closes
+   the device, frees the bus address or gives up the socket, and starting it
+   again opens it with the same function that opened it at startup -- so it
+   can fail the same ways, and a node that will not open is answered with the
+   failure and left stopped. That work is the pass's and not the command
+   interpreter's: the interpreter hands it over, the pass does it between
+   stages, and the answer goes out when it is done, so a success means the
+   device really is free.
+
+   Every wait that is part of an operation has the node's wakeup descriptor
+   in it: the delay between a trigger and the read that answers it, and a
+   ``process`` computation's deadline. Disabling the node ends either one
+   where it stands.
+
+   What is still the design and not the code is the worker pool: a stage's
+   node operations run one after another on the one thread.
 
    RESTART_ARM, RESTART, QUERY_DH, QUERY_DH_SAMPLE and CONFIG_DH are refused
    as unimplemented rather than left unanswered. A command the vehicle does

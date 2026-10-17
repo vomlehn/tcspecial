@@ -15,7 +15,7 @@
 //! than a vehicle that will not start.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use log::{debug, error, info, warn};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
@@ -98,6 +98,7 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
     let mut commands = command_links(
         &graph,
         system.states(),
+        system.workbench(),
         flying,
         beacon.clone(),
         telemetry_log.clone(),
@@ -106,7 +107,12 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 
     listen_for_stop();
 
-    system.run(&asked_to_stop, report, pause);
+    // The loop's own wakeup, taken before the loop borrows the system: a pass
+    // waiting for the next group to come due is woken by work the command
+    // interpreter has queued, so a command is acted on between stages rather
+    // than when the group is read.
+    let nudge = system.nudge();
+    system.run(&asked_to_stop, report, move |waiting| nudge.wait(waiting));
 
     // The links closed before the log is flushed, so that nothing records an
     // answer into a log whose last page has already been written.
@@ -238,6 +244,7 @@ fn beacons(
 fn command_links(
     graph: &Graph,
     states: std::sync::Arc<crate::runtime::node_state::NodeStates>,
+    bench: crate::runtime::system::Workbench,
     flying: Flying,
     beacon: Option<BeaconSend>,
     telemetry_log: TelemetryLog,
@@ -250,7 +257,7 @@ fn command_links(
     ))?
     .to_ci_config()?;
 
-    let commands = Commands::start(&ci, states, flying, beacon, telemetry_log)
+    let commands = Commands::start(&ci, states, bench, flying, beacon, telemetry_log)
         .map_err(|e| e.to_string())?;
     // Where they are taken, as the sockets were bound: a configuration may ask
     // for port 0, and then the socket is the only statement of which port that
@@ -285,20 +292,6 @@ fn report(moved: &Moved) {
         } else {
             warn!("{node}: {why}");
         }
-    }
-}
-
-/// Wait, but not past the next pass.
-fn pause(waiting: Duration) {
-    // A nap and not a poll on the descriptors. What that costs is the
-    // staleness of a reading from a node that is polled rather than
-    // scheduled, which `POLL_PAUSE` bounds; what it buys is a loop with no
-    // missed-wakeup failure mode at all, which for the first version of a
-    // flight loop is the right side of that trade. A wait on the descriptors
-    // belongs here when something needs it, and the ports hand out their
-    // descriptors for exactly that.
-    if !waiting.is_zero() {
-        std::thread::sleep(waiting);
     }
 }
 

@@ -40,6 +40,7 @@ use std::collections::BTreeMap;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use tcslibgs::graph::Graph;
 use tcslibgs::NodeId;
@@ -125,6 +126,130 @@ impl Drop for Wakeup {
     }
 }
 
+/// What a port waits on beside its own descriptor, so that a wait inside an
+/// operation can be abandoned.
+///
+/// A node has two kinds of wait in it. The waits for data are not waits at
+/// all -- a descriptor is asked whether it is ready and a silent device reads
+/// as nought bytes -- but an operation can contain a wait of its own: the
+/// delay between a trigger and the read that answers it, and a `process`
+/// computation's deadline. This is what makes those abandonable.
+///
+/// Carried down into the ports and into a computation's own waiting, which is
+/// the convention version 1 set: a conduit hands its endpoints a `cmd_fd` and
+/// they poll it beside the device's. The descriptor is readable exactly while
+/// the node is disabled, and nothing but enabling the node drains it, so a
+/// wait that finds it readable has been told to stop and not merely nudged.
+///
+/// [`Abandon::nothing`] is a port nothing can disable -- a link to the ground,
+/// or a port in a test -- whose waits run to their deadlines as they always
+/// did.
+#[derive(Debug, Clone, Default)]
+pub struct Abandon {
+    /// The node's wakeup, held so the descriptor cannot be closed while a
+    /// wait has it in a poll set.
+    wakeup: Option<Arc<Wakeup>>,
+}
+
+impl Abandon {
+    /// A wait that nothing interrupts.
+    pub fn nothing() -> Abandon {
+        Abandon { wakeup: None }
+    }
+
+    /// Whether the wait should be given up now, without waiting at all.
+    ///
+    /// Asked before an operation starts a wait, so that a disable that
+    /// arrived between stages is not followed by one more delay.
+    pub fn asked(&self) -> bool {
+        self.wait(Duration::ZERO)
+    }
+
+    /// The descriptor to put in a poll set beside the node's own, where there
+    /// is one.
+    pub fn io_fd(&self) -> Option<RawFd> {
+        self.wakeup.as_ref().map(|wakeup| wakeup.io_fd())
+    }
+
+    /// Wait `how_long`, or until the node is disabled, and say which happened.
+    ///
+    /// `true` is "give up": the node has been disabled and the operation stops
+    /// where it stands. A disable that waited out a delay would arrive up to
+    /// that delay late, which on a part that has stopped answering is exactly
+    /// when it is wanted.
+    ///
+    /// A poll that fails is not treated as a disable. The failure is the
+    /// poll's own -- a descriptor this closed, which cannot happen while the
+    /// Arc above is held -- and abandoning the operation over it would stop a
+    /// node nobody asked to stop.
+    pub fn wait(&self, how_long: Duration) -> bool {
+        use nix::poll::{poll, PollFd, PollFlags};
+
+        let Some(wakeup) = self.wakeup.as_ref() else {
+            if !how_long.is_zero() {
+                std::thread::sleep(how_long);
+            }
+            return false;
+        };
+
+        // SAFETY: the descriptor is owned by the Wakeup this holds an Arc of,
+        // which therefore outlives the poll.
+        let borrowed = unsafe { std::os::fd::BorrowedFd::borrow_raw(wakeup.io_fd()) };
+        let mut set = [PollFd::new(&borrowed, PollFlags::POLLIN)];
+        let waiting = how_long.as_millis().min(i32::MAX as u128) as i32;
+        matches!(poll(&mut set, waiting), Ok(n) if n > 0)
+    }
+}
+
+/// What the loop waits on between passes, so that work can interrupt it.
+///
+/// A pass works out how long until the next thing is due and waits that long,
+/// which may be seconds. Something that wants the pass sooner -- a command
+/// that has to be acted on between stages -- pokes this, and the wait ends.
+/// Without it a START_NODE would be answered when the next group came due,
+/// which in a configuration read every ten seconds is nine seconds of a
+/// ground station wondering whether its command arrived.
+///
+/// Drained after each wait, unlike a node's [`Abandon`]: a node stays disabled
+/// until it is enabled, so its descriptor stays readable, where a nudge is one
+/// event and a loop that never cleared it would spin.
+#[derive(Debug, Clone)]
+pub struct Nudge(Arc<Wakeup>);
+
+impl Nudge {
+    pub fn new() -> std::io::Result<Nudge> {
+        Ok(Nudge(Arc::new(Wakeup::new()?)))
+    }
+
+    /// Ask for the wait to end now.
+    pub fn poke(&self) {
+        self.0.poke();
+    }
+
+    /// Wait up to `how_long`, or until something pokes this.
+    ///
+    /// A poll rather than a sleep, which is the whole point, and the pipe is
+    /// drained afterwards whether it was the poke or the clock that ended the
+    /// wait: anything in it has been dealt with by the pass that follows.
+    pub fn wait(&self, how_long: Duration) {
+        use nix::poll::{poll, PollFd, PollFlags};
+
+        if !how_long.is_zero() {
+            // SAFETY: the descriptor is owned by the Wakeup this holds an Arc
+            // of, which therefore outlives the poll.
+            let borrowed = unsafe { std::os::fd::BorrowedFd::borrow_raw(self.0.io_fd()) };
+            let mut set = [PollFd::new(&borrowed, PollFlags::POLLIN)];
+            let waiting = how_long.as_millis().min(i32::MAX as u128) as i32;
+            // A failed poll is waited out instead. The failure is the poll's
+            // own and a loop that treated it as a nudge would spin.
+            if poll(&mut set, waiting).is_err() {
+                std::thread::sleep(how_long);
+            }
+        }
+        self.0.drain();
+    }
+}
+
 /// One node's state.
 ///
 /// Shared between the command interpreter's thread and the pass, which is why
@@ -138,7 +263,11 @@ pub struct NodeState {
     /// Whether the pass may read it, ask it or deliver to it.
     enabled: AtomicBool,
     /// The descriptor a disable wakes it through.
-    wakeup: Wakeup,
+    ///
+    /// Behind an `Arc` because the ports hold it too: a wait inside one of
+    /// this node's operations has it in its poll set, and a descriptor closed
+    /// while a poll held it would be a poll on nothing.
+    wakeup: Arc<Wakeup>,
 }
 
 impl NodeState {
@@ -156,7 +285,7 @@ impl NodeState {
             name: name.to_string(),
             id,
             enabled: AtomicBool::new(true),
-            wakeup: Wakeup::new()?,
+            wakeup: Arc::new(Wakeup::new()?),
         })
     }
 
@@ -198,6 +327,16 @@ impl NodeState {
     /// The descriptor to put in this node's poll sets.
     pub fn io_fd(&self) -> RawFd {
         self.wakeup.io_fd()
+    }
+
+    /// What this node's ports wait on beside their own descriptors.
+    ///
+    /// Given to a port when it is opened, so that a wait inside one of its
+    /// operations ends the moment the node is disabled: see [`Abandon`].
+    pub fn abandon(&self) -> Abandon {
+        Abandon {
+            wakeup: Some(self.wakeup.clone()),
+        }
     }
 }
 

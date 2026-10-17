@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
-    NodeTelemetry,
+    NodeId, NodeTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry, DHName,
     DHSample, DHState, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
     RestartArmTelemetry,
@@ -165,6 +165,55 @@ fn client_to(addr: &str) -> TcsClient {
     );
     client.set_timeout(Duration::from_secs(10));
     client
+}
+
+/// A client for a version 2 graph: the spacecraft's link and the one link
+/// every node is commanded on.
+fn graph_client_to(addr: &str) -> TcsClient {
+    let spacecraft = UdpConnection::new("127.0.0.1:0", addr).expect("connection");
+    let nodes = UdpConnection::new("127.0.0.1:0", addr).expect("the node link");
+    let mut client = TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
+    client.set_timeout(Duration::from_secs(10));
+    client
+}
+
+/// A node is started and stopped by its id, and the answer says which node.
+///
+/// The id as well as the status, because that is what an answer is placed by
+/// when two overtake one another on a link: the sequence pairs the answer
+/// with the command and the id says which node the pair was about.
+#[test]
+fn a_node_is_commanded_by_its_id_and_the_answer_says_which() {
+    let (addr, stub) = stub_spacecraft(2);
+    let mut client = graph_client_to(&addr);
+
+    let (status, node) = client.start_node(NodeId::of(3)).expect("an answer");
+    assert!(status.is_success());
+    assert_eq!(node, NodeId::of(3));
+
+    let (status, node) = client.stop_node(NodeId::of(3)).expect("an answer");
+    assert!(status.is_success());
+    assert_eq!(node, NodeId::of(3));
+
+    stub.join().expect("the stand-in answered both");
+}
+
+/// A client built for a version 1 payload set will not send a node command.
+///
+/// Refused here rather than sent somewhere it would be refused: a graph's
+/// nodes are commanded on a link this client has not got, and what has gone
+/// wrong is the ground's own configuration rather than anything the vehicle
+/// could tell it.
+#[test]
+fn a_version_1_client_has_no_link_for_a_node() {
+    // Nothing is listening: the refusal happens before anything is sent, so
+    // there is nothing for a far end to do.
+    let mut client = client_to("127.0.0.1:1");
+    let said = format!("{}", client.start_node(NodeId::of(0)).expect_err("refused"));
+    assert!(
+        said.contains("version 1") && said.contains("node"),
+        "the refusal should say why: {said}"
+    );
 }
 
 #[test]

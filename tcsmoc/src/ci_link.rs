@@ -59,6 +59,28 @@ pub struct PayloadLink {
     pub to: HostPort,
 }
 
+/// What the second command link is, which is where the two versions differ.
+///
+/// Both versions take commands on two links, for the same reason: what the
+/// ground needs in a hurry must never be queued behind what it asked for at
+/// leisure. What the second one *is* differs. Version 1 binds a socket per
+/// payload, which is how a command says which payload it is about; version 2
+/// puts the node's id in the message and so needs one socket for every node.
+#[derive(Debug, Clone)]
+pub enum Commanded {
+    /// Version 1: one link per payload, each named.
+    Payloads(Vec<PayloadLink>),
+    /// Version 2: one link for every node, at `payload_command.dest_base`
+    /// with nothing added to it.
+    Nodes {
+        /// Where the MOC sends node commands from:
+        /// `payload_command.source_base`, which tcspecial checks against.
+        from: HostPort,
+        /// And where they go, which tcspecial binds.
+        to: HostPort,
+    },
+}
+
 /// What a control says when it is pressed with the link down.
 ///
 /// One wording for all of them, because the reason is the same whichever
@@ -78,12 +100,12 @@ pub struct CiLink {
     /// this sends from is a socket the file names -- which is also what lets
     /// a firewall rule or a capture filter describe the link beforehand.
     from: String,
-    /// One link per payload, both ends of each from the configuration.
+    /// What the second link is: one per payload, or one for every node.
     ///
-    /// Held rather than passed to [`CiLink::connect`]: they are the same for
-    /// the life of the link, as the file states them, and Connect moves only
-    /// the spacecraft link's host.
-    payloads: Vec<PayloadLink>,
+    /// Held rather than passed to [`CiLink::connect`]: it is the same for the
+    /// life of the link, as the file states it, and Connect moves only the
+    /// spacecraft link's host.
+    commanded: Commanded,
     client: Option<TcsClient>,
 }
 
@@ -96,10 +118,17 @@ impl CiLink {
     /// socket, so one link: the MOC has one sender of commands now that the
     /// panel poller is gone.
     pub fn down_from(from: &str, payloads: Vec<PayloadLink>) -> Self {
+        CiLink::down_commanding(from, Commanded::Payloads(payloads))
+    }
+
+    /// And one whose second link is whatever `commanded` says.
+    ///
+    /// What a version 2 configuration uses: see [`Commanded`].
+    pub fn down_commanding(from: &str, commanded: Commanded) -> Self {
         Self {
             address: String::new(),
             from: from.to_string(),
-            payloads,
+            commanded,
             client: None,
         }
     }
@@ -137,23 +166,36 @@ impl CiLink {
         self.address = address.to_string();
 
         let connection = UdpConnection::new(&self.from, address)?;
-        let mut payloads = Vec::with_capacity(self.payloads.len());
-        for link in &self.payloads {
-            let connection =
-                UdpConnection::new(&link.from.to_string(), &link.to.to_string())?;
-            payloads.push((link.name.clone(), Box::new(connection) as _));
-        }
-        self.client = Some(TcsClient::new(Box::new(connection), payloads));
+        self.client = Some(match &self.commanded {
+            Commanded::Payloads(payloads) => {
+                let mut links = Vec::with_capacity(payloads.len());
+                for link in payloads {
+                    let connection =
+                        UdpConnection::new(&link.from.to_string(), &link.to.to_string())?;
+                    links.push((link.name.clone(), Box::new(connection) as _));
+                }
+                TcsClient::new(Box::new(connection), links)
+            }
+            Commanded::Nodes { from, to } => {
+                let nodes = UdpConnection::new(&from.to_string(), &to.to_string())?;
+                TcsClient::of_a_graph(Box::new(connection), Box::new(nodes))
+            }
+        });
         Ok(())
     }
 
-    /// Where this link sends payload commands, as a line for the console.
+    /// Where this link sends its second kind of command, as a line for the
+    /// console.
     ///
-    /// One line for however many payloads there are: they are a base counted
-    /// on by each payload's id, so the base and the count say where all of
-    /// them are.
+    /// One line however many there are: version 1's are a base counted on by
+    /// each payload's id, so the base and the count say where all of them
+    /// are, and version 2's is one socket that says itself.
     pub fn payload_addresses(&self) -> String {
-        match (self.payloads.first(), self.payloads.len()) {
+        let payloads = match &self.commanded {
+            Commanded::Nodes { to, .. } => return format!("{to} for every node"),
+            Commanded::Payloads(payloads) => payloads,
+        };
+        match (payloads.first(), payloads.len()) {
             (None, _) => "no payloads, so no payload links".to_string(),
             (Some(first), 1) => format!("{} for {}", first.to, first.name.0),
             (Some(first), count) => format!(
@@ -323,6 +365,48 @@ mod tests {
         assert!(link.connect("this is not an address").is_err());
         assert!(!link.is_connected());
         assert_eq!(link.address(), "this is not an address");
+    }
+
+    /// A version 2 link commands every node on one socket, and says so.
+    ///
+    /// Not one per node, which is where it differs from version 1: the node's
+    /// id is in the message, so one socket says which node every command is
+    /// about. The line the console shows says the one socket rather than a
+    /// base and a count.
+    #[test]
+    fn a_version_2_link_commands_every_node_on_one_socket() {
+        let here = |port| HostPort {
+            address: "127.0.0.1".to_string(),
+            port,
+        };
+        let mut link = CiLink::down_commanding(
+            LOCAL_BIND_ANY,
+            Commanded::Nodes {
+                from: here(0),
+                to: here(4200),
+            },
+        );
+        assert!(link.payload_addresses().contains("127.0.0.1:4200"));
+        assert!(
+            link.payload_addresses().contains("every node"),
+            "{}",
+            link.payload_addresses()
+        );
+
+        link.connect("127.0.0.1:4000").expect("the link comes up");
+        assert!(link.is_connected());
+        assert!(
+            link.client().is_some(),
+            "and it has a client to send node commands with"
+        );
+
+        // And down and up again, as Connect and Disconnect do it: the node
+        // link is rebuilt from the file each time, so it cannot be left
+        // pointing where an earlier connection pointed.
+        link.disconnect();
+        assert!(!link.is_connected());
+        link.connect("127.0.0.1:4001").expect("it comes up again");
+        assert_eq!(link.address(), "127.0.0.1:4001");
     }
 
     /// Disconnecting a link that is already down is not an error, since the

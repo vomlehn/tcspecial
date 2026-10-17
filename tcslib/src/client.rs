@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, DHName, DHState,
-    DHSample, DHType, Timestamp,
+    DHSample, DHType, NodeCommand, NodeId, Timestamp,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
     ConfigDigest, ConfigVersion, ConnectCommand,
     StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
@@ -44,6 +44,17 @@ pub struct TcsClient {
     /// somewhere it would be refused: the two would mean different things,
     /// and this one is about the ground's own configuration.
     payloads: Vec<(DHName, Box<dyn Connection>)>,
+    /// The one link every node of a version 2 graph is commanded on.
+    ///
+    /// One socket and not one per node: a node command carries the node's id
+    /// -- see [`Command::node_id`] -- so the message says which node, where
+    /// version 1 needed a socket apiece to say it. A graph also has more
+    /// nodes than a payload set has payloads, so a socket each would spend
+    /// ports on computations and logs that nothing addresses from the ground.
+    ///
+    /// `None` for a client built for a version 1 payload set, which has no
+    /// nodes to command.
+    nodes: Option<Box<dyn Connection>>,
     sequence: AtomicU32,
     timeout: Duration,
     /// When the last command went out, and when its answer came back.
@@ -72,6 +83,29 @@ impl TcsClient {
         Self {
             connection,
             payloads,
+            nodes: None,
+            sequence: AtomicU32::new(1),
+            timeout: DEFAULT_TIMEOUT,
+            last_sent: None,
+            last_received: None,
+        }
+    }
+
+    /// A client for a version 2 vehicle: the spacecraft's link and the one
+    /// link every node is commanded on.
+    ///
+    /// The two links are version 1's two, for version 1's reason, and the
+    /// second is where they differ: one socket for every node, at
+    /// `payload_command.dest_base` with nothing added to it.
+    ///
+    /// A client built this way has no payload links and sends no version 1
+    /// payload command, which is as it should be -- a graph has nodes, and a
+    /// vehicle flying one refuses a command naming a data handler.
+    pub fn of_a_graph(connection: Box<dyn Connection>, nodes: Box<dyn Connection>) -> Self {
+        Self {
+            connection,
+            payloads: Vec::new(),
+            nodes: Some(nodes),
             sequence: AtomicU32::new(1),
             timeout: DEFAULT_TIMEOUT,
             last_sent: None,
@@ -110,6 +144,20 @@ impl TcsClient {
     /// link here, that being the one every caller has; [`Self::connect`] asks
     /// the other one as well.
     fn link_for(&mut self, command: &Command) -> TcsResult<&mut Box<dyn Connection>> {
+        // A version 2 node command, which names a node rather than a payload:
+        // one link for all of them, the id in the message saying which. Asked
+        // first because it is the narrower question -- a command either
+        // carries a node id or it does not.
+        if command.node_id().is_some() {
+            return self.nodes.as_mut().ok_or_else(|| {
+                TcsError::Config(format!(
+                    "{:?} is about a node of a version 2 graph and this client has \
+                     no link for one: it was built for a version 1 payload set",
+                    command.cmd_type()
+                ))
+            });
+        }
+
         match (command.link(), command.payload_name()) {
             (CommandLink::Payload, Some(name)) => {
                 let name = name.clone();
@@ -251,6 +299,43 @@ impl TcsClient {
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }
+
+    // -- a version 2 graph's nodes -----------------------------------------
+
+    /// Enable a node: START_NODE.
+    ///
+    /// By its node id, which is the node's position among the
+    /// configuration's nodes -- see [`NodeId`]. What makes the two ends mean
+    /// the same node by one id is the digest, so a ground station whose
+    /// digest does not match the vehicle's does not send these at all; that
+    /// is the caller's rule to keep, CONNECT being where the two digests are
+    /// compared.
+    ///
+    /// The answer carries the id that was sent, so an answer can be placed
+    /// without the name even if two overtake one another.
+    pub fn start_node(&mut self, node: NodeId) -> TcsResult<(CommandStatus, NodeId)> {
+        let seq = self.next_sequence();
+        let cmd = Command::StartNode(NodeCommand::start(seq, node));
+        match self.send_command(cmd)? {
+            Telemetry::StartNode(tm) => Ok((tm.header.status, tm.node)),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+        }
+    }
+
+    /// Disable a node: STOP_NODE.
+    ///
+    /// Answered when the node has stopped *and* given up what it held, so a
+    /// success means its device, bus address or socket is free.
+    pub fn stop_node(&mut self, node: NodeId) -> TcsResult<(CommandStatus, NodeId)> {
+        let seq = self.next_sequence();
+        let cmd = Command::StopNode(NodeCommand::stop(seq, node));
+        match self.send_command(cmd)? {
+            Telemetry::StopNode(tm) => Ok((tm.header.status, tm.node)),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+        }
+    }
+
+    // -- one payload of a version 1 set ------------------------------------
 
     /// Send a QUERY_DH command
     ///

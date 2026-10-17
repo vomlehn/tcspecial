@@ -241,6 +241,15 @@ impl PayloadCommands {
             | Command::RestartArm(_)
             | Command::Restart(_)
             | Command::Config(_)) => refused_on_the_wrong_link(&theirs, CommandLink::Payload),
+            // A version 2 node command, which this vehicle is not flying. It
+            // belongs on this link -- node commands are the payload link's --
+            // so it is not a wrong-link refusal: it is a command for a graph,
+            // sent to a process running a payload set, and the ground is
+            // reading a configuration this end has never seen. Refused as
+            // unimplemented, which is what it is here.
+            theirs @ (Command::StartNode(_) | Command::StopNode(_)) => {
+                answer_to(&theirs, CommandStatus::InvalidCommand)
+            }
         }
     }
 
@@ -804,7 +813,9 @@ impl CommandInterpreter {
             | Command::StopDH(_)
             | Command::QueryDH(_)
             | Command::QueryDHSample(_)
-            | Command::ConfigDH(_)) => {
+            | Command::ConfigDH(_)
+            | Command::StartNode(_)
+            | Command::StopNode(_)) => {
                 refused_on_the_wrong_link(&theirs, CommandLink::Spacecraft)
             }
         }

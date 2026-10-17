@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{CommandStatus, DHName, DHSample, DHState, Statistics, Timestamp};
+use crate::types::{CommandStatus, DHName, DHSample, DHState, NodeId, Statistics, Timestamp};
 
 /// Telemetry message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -59,6 +59,10 @@ pub enum TelemetryType {
     QueryDHSample,
     Config,
     ConfigDH,
+    /// The answer to a START_NODE: see [`NodeTelemetry`].
+    StartNode,
+    /// And to a STOP_NODE.
+    StopNode,
     Beacon,
 }
 
@@ -75,6 +79,8 @@ impl TelemetryType {
             TelemetryType::QueryDHSample => 0x93,
             TelemetryType::Config => 0xA0,
             TelemetryType::ConfigDH => 0xA1,
+            TelemetryType::StartNode => 0x30,
+            TelemetryType::StopNode => 0x31,
             TelemetryType::Beacon => 0xF0,
         }
     }
@@ -91,6 +97,8 @@ impl TelemetryType {
             0x93 => Some(TelemetryType::QueryDHSample),
             0xA0 => Some(TelemetryType::Config),
             0xA1 => Some(TelemetryType::ConfigDH),
+            0x30 => Some(TelemetryType::StartNode),
+            0x31 => Some(TelemetryType::StopNode),
             0xF0 => Some(TelemetryType::Beacon),
             _ => None,
         }
@@ -308,6 +316,46 @@ impl ConfigDHTelemetry {
     }
 }
 
+/// The answer to a START_NODE or a STOP_NODE
+///
+/// The status, and the id the command carried. The id is here so that an
+/// answer can be matched to its command without the name -- answers may
+/// overtake one another on a link, and the sequence number pairs them while
+/// the id says which node the pair was about. The ground shows the name,
+/// which it has from the configuration it read: the same file the id is
+/// counted from.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NodeTelemetry {
+    pub header: TelemetryHeader,
+    /// The node the command named, whether or not the configuration has it:
+    /// an id out of range is answered with the id that was asked about.
+    pub node: NodeId,
+}
+
+impl NodeTelemetry {
+    /// The answer to an enabling.
+    pub fn started(sequence: u32, status: CommandStatus, node: NodeId) -> Self {
+        Self::of(sequence, TelemetryType::StartNode, status, node)
+    }
+
+    /// And to a disabling.
+    pub fn stopped(sequence: u32, status: CommandStatus, node: NodeId) -> Self {
+        Self::of(sequence, TelemetryType::StopNode, status, node)
+    }
+
+    fn of(
+        sequence: u32,
+        tm_type: TelemetryType,
+        status: CommandStatus,
+        node: NodeId,
+    ) -> Self {
+        Self {
+            header: TelemetryHeader::new(sequence, tm_type, status),
+            node,
+        }
+    }
+}
+
 /// BEACON asynchronous telemetry
 ///
 /// It carries what a CONNECT response carries -- the build and the digest of
@@ -412,6 +460,15 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
         )),
         Command::Config(_) => Telemetry::Config(ConfigTelemetry::new(sequence, status)),
         Command::ConfigDH(_) => Telemetry::ConfigDH(ConfigDHTelemetry::new(sequence, status)),
+        // The id the command carried, refused or not: an answer about a node
+        // says which node, and an id out of range is exactly the case where
+        // the ground needs to see which one it sent.
+        Command::StartNode(cmd) => {
+            Telemetry::StartNode(NodeTelemetry::started(sequence, status, cmd.node))
+        }
+        Command::StopNode(cmd) => {
+            Telemetry::StopNode(NodeTelemetry::stopped(sequence, status, cmd.node))
+        }
     }
 }
 
@@ -428,6 +485,8 @@ pub enum Telemetry {
     QueryDHSample(QueryDHSampleTelemetry),
     Config(ConfigTelemetry),
     ConfigDH(ConfigDHTelemetry),
+    StartNode(NodeTelemetry),
+    StopNode(NodeTelemetry),
     Beacon(BeaconTelemetry),
 }
 
@@ -444,6 +503,7 @@ impl Telemetry {
             Telemetry::QueryDHSample(tm) => tm.header.sequence,
             Telemetry::Config(tm) => tm.header.sequence,
             Telemetry::ConfigDH(tm) => tm.header.sequence,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.sequence,
             Telemetry::Beacon(tm) => tm.header.sequence,
         }
     }
@@ -460,6 +520,7 @@ impl Telemetry {
             Telemetry::QueryDHSample(tm) => tm.header.tm_type,
             Telemetry::Config(tm) => tm.header.tm_type,
             Telemetry::ConfigDH(tm) => tm.header.tm_type,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.tm_type,
             Telemetry::Beacon(tm) => tm.header.tm_type,
         }
     }
@@ -476,6 +537,7 @@ impl Telemetry {
             Telemetry::QueryDHSample(tm) => tm.header.status,
             Telemetry::Config(tm) => tm.header.status,
             Telemetry::ConfigDH(tm) => tm.header.status,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.status,
             Telemetry::Beacon(tm) => tm.header.status,
         }
     }
@@ -495,6 +557,7 @@ impl Telemetry {
             Telemetry::QueryDHSample(tm) => tm.header.timestamp,
             Telemetry::Config(tm) => tm.header.timestamp,
             Telemetry::ConfigDH(tm) => tm.header.timestamp,
+            Telemetry::StartNode(tm) | Telemetry::StopNode(tm) => tm.header.timestamp,
             Telemetry::Beacon(tm) => tm.header.timestamp,
         }
     }
@@ -566,7 +629,17 @@ mod tests {
             )),
             Telemetry::Config(ConfigTelemetry::new(9, CommandStatus::Success)),
             Telemetry::ConfigDH(ConfigDHTelemetry::new(10, CommandStatus::Success)),
-            Telemetry::Beacon(BeaconTelemetry::new(11, version, version, digest)),
+            Telemetry::StartNode(NodeTelemetry::started(
+                11,
+                CommandStatus::Success,
+                NodeId::of(0),
+            )),
+            Telemetry::StopNode(NodeTelemetry::stopped(
+                12,
+                CommandStatus::NotFound,
+                NodeId::of(99),
+            )),
+            Telemetry::Beacon(BeaconTelemetry::new(13, version, version, digest)),
         ];
 
         // Every kind there is, which is what makes this a statement about all

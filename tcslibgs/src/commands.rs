@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{ArmKey, BeaconInterval, DHName, DHType};
+use crate::types::{ArmKey, BeaconInterval, DHName, DHType, NodeId};
 
 /// Command message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -34,6 +34,17 @@ pub enum CommandType {
     QueryDHSample,
     Config,
     ConfigDH,
+    /// Enable a node of a version 2 graph: version 1's START_DH, with a node
+    /// in place of a data handler.
+    ///
+    /// A kind of its own rather than a START_DH carrying a different body.
+    /// The two name their subject differently -- a data handler by name, a
+    /// node by id -- and a vehicle running one version has no use for the
+    /// other's, so a single kind would be one message meaning two things and
+    /// each end guessing which from what else it knows.
+    StartNode,
+    /// And disable one: version 1's STOP_DH, the same way.
+    StopNode,
 }
 
 /// Which of the command interpreter's two links a command belongs on.
@@ -91,7 +102,9 @@ impl CommandType {
             | CommandType::StopDH
             | CommandType::QueryDH
             | CommandType::QueryDHSample
-            | CommandType::ConfigDH => CommandLink::Payload,
+            | CommandType::ConfigDH
+            | CommandType::StartNode
+            | CommandType::StopNode => CommandLink::Payload,
         }
     }
 
@@ -118,6 +131,8 @@ impl CommandType {
             CommandType::QueryDHSample => 0x13,
             CommandType::Config => 0x20,
             CommandType::ConfigDH => 0x21,
+            CommandType::StartNode => 0x30,
+            CommandType::StopNode => 0x31,
         }
     }
 
@@ -133,6 +148,8 @@ impl CommandType {
             0x13 => Some(CommandType::QueryDHSample),
             0x20 => Some(CommandType::Config),
             0x21 => Some(CommandType::ConfigDH),
+            0x30 => Some(CommandType::StartNode),
+            0x31 => Some(CommandType::StopNode),
             _ => None,
         }
     }
@@ -217,6 +234,45 @@ impl ConnectCommand {
             },
             version,
             digest,
+        }
+    }
+}
+
+/// START_NODE and STOP_NODE - enable or disable a node of a version 2 graph
+///
+/// One body for both, the two differing only in which they ask for: there is
+/// nothing to say about a node beyond which node it is. Version 1's START_DH
+/// carried the kind of handler it expected as a check that the two ends had
+/// read the same configuration; the id and the digest make that check
+/// beforehand and for every command, so a kind here would be a second answer
+/// to a settled question.
+///
+/// Either of them about a node already in the state asked for answers
+/// success. A command that arrives twice, or whose answer was lost, is the
+/// ordinary case on a link with latency, and an operator who presses Disable
+/// twice has asked for a state and not for an action.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NodeCommand {
+    pub header: CommandHeader,
+    /// Which node, by its node id: see [`NodeId`].
+    pub node: NodeId,
+}
+
+impl NodeCommand {
+    /// Enable that node.
+    pub fn start(sequence: u32, node: NodeId) -> Self {
+        Self::of(sequence, CommandType::StartNode, node)
+    }
+
+    /// Disable it.
+    pub fn stop(sequence: u32, node: NodeId) -> Self {
+        Self::of(sequence, CommandType::StopNode, node)
+    }
+
+    fn of(sequence: u32, cmd_type: CommandType, node: NodeId) -> Self {
+        Self {
+            header: CommandHeader { sequence, cmd_type },
+            node,
         }
     }
 }
@@ -356,6 +412,8 @@ pub enum Command {
     QueryDHSample(QueryDHSampleCommand),
     Config(ConfigCommand),
     ConfigDH(ConfigDHCommand),
+    StartNode(NodeCommand),
+    StopNode(NodeCommand),
 }
 
 impl Command {
@@ -371,6 +429,28 @@ impl Command {
             Command::QueryDHSample(cmd) => cmd.header.sequence,
             Command::Config(cmd) => cmd.header.sequence,
             Command::ConfigDH(cmd) => cmd.header.sequence,
+            Command::StartNode(cmd) | Command::StopNode(cmd) => cmd.header.sequence,
+        }
+    }
+
+    /// Which node this command is about, where it is about one.
+    ///
+    /// What [`Command::payload_name`] is for a version 1 payload set, for a
+    /// version 2 graph: `None` for every command that names no node, so that
+    /// a command added later is placed by someone who had to decide.
+    pub fn node_id(&self) -> Option<NodeId> {
+        match self {
+            Command::StartNode(cmd) | Command::StopNode(cmd) => Some(cmd.node),
+            Command::Ping(_)
+            | Command::Connect(_)
+            | Command::RestartArm(_)
+            | Command::Restart(_)
+            | Command::Config(_)
+            | Command::StartDH(_)
+            | Command::StopDH(_)
+            | Command::QueryDH(_)
+            | Command::QueryDHSample(_)
+            | Command::ConfigDH(_) => None,
         }
     }
 
@@ -401,7 +481,11 @@ impl Command {
             | Command::Connect(_)
             | Command::RestartArm(_)
             | Command::Restart(_)
-            | Command::Config(_) => None,
+            | Command::Config(_)
+            // A version 2 node command names a node, which is not a payload
+            // name: see [`Command::node_id`].
+            | Command::StartNode(_)
+            | Command::StopNode(_) => None,
         }
     }
 
@@ -417,6 +501,7 @@ impl Command {
             Command::QueryDHSample(cmd) => cmd.header.cmd_type,
             Command::Config(cmd) => cmd.header.cmd_type,
             Command::ConfigDH(cmd) => cmd.header.cmd_type,
+            Command::StartNode(cmd) | Command::StopNode(cmd) => cmd.header.cmd_type,
         }
     }
 }
@@ -446,6 +531,11 @@ mod tests {
             CommandType::QueryDH,
             CommandType::QueryDHSample,
             CommandType::ConfigDH,
+            // A version 2 graph's nodes are commanded on this link too, and
+            // for the same reason its payloads were: what the ground needs in
+            // a hurry must not be queued behind what it asked for at leisure.
+            CommandType::StartNode,
+            CommandType::StopNode,
         ];
 
         for kind in spacecraft {

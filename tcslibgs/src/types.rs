@@ -647,6 +647,70 @@ impl DHName {
     }
 }
 
+/// Which node of a version 2 configuration a command is about.
+///
+/// A node's position among the configuration's nodes, counting from nought in
+/// the order the files declare them: the device id
+/// [`crate::graph::telemetry::ids`] gives, and not a number invented for
+/// commands. The id in a command and the port that node's telemetry arrives
+/// on are therefore the same number, worked out in one place.
+///
+/// A number and not a name, because every message carrying a name is a
+/// message whose construction and parsing have a length to get right, where a
+/// number is a field like the sequence and the type beside it. Four bytes,
+/// least significant first, as the sequence number is.
+///
+/// What makes the two ends mean the same node by one id is the digest: it is
+/// computed over the configuration including the order the nodes appear in,
+/// so two ends whose digests agree have read the same nodes in the same
+/// order. Agreeing about the digest is what CONNECT establishes, and a ground
+/// station whose digest does not match the vehicle's does not send commands
+/// about nodes at all.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NodeId(pub u32);
+
+impl NodeId {
+    /// The id a node's position gives it.
+    ///
+    /// A position too large for the field saturates, which is a vehicle of
+    /// four thousand million nodes and so is not a case anything will meet; it
+    /// is written down rather than left to wrap, a wrapped id being a command
+    /// about the wrong node.
+    pub fn of(position: usize) -> Self {
+        Self(u32::try_from(position).unwrap_or(u32::MAX))
+    }
+
+    /// This id as a position in the configuration's nodes.
+    pub fn position(&self) -> usize {
+        self.0 as usize
+    }
+
+    /// This id as it goes on the wire: four bytes, little-endian.
+    ///
+    /// The order a [`Timestamp`] and a [`BeaconInterval`] go in, for the
+    /// reason given on the first of them.
+    pub fn to_le_bytes(&self) -> [u8; 4] {
+        self.0.to_le_bytes()
+    }
+
+    /// An id read off the wire.
+    ///
+    /// Any four bytes are a well-formed id, which is the point of a
+    /// fixed-length field: an id the configuration does not have is a thing to
+    /// answer rather than a thing that fails to parse.
+    pub fn from_le_bytes(bytes: [u8; 4]) -> Self {
+        Self(u32::from_le_bytes(bytes))
+    }
+}
+
+impl std::fmt::Display for NodeId {
+    /// The number, which is what a message carries. The ground shows the
+    /// node's name, which it has from the configuration it read.
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "#{}", self.0)
+    }
+}
+
 /// Arm key for restart commands
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ArmKey(pub u64);

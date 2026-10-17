@@ -42,6 +42,7 @@
 //! every one is counted and named.
 
 use std::collections::{BTreeMap, VecDeque};
+use std::sync::Arc;
 
 use tcslibgs::graph::terminals::Stream;
 
@@ -260,6 +261,14 @@ pub struct Moved {
     /// Every one of them, not a count: an operator asking why a reading is
     /// not reaching the ground wants to know which link refused it.
     pub refused: Vec<(String, String)>,
+    /// How many deliveries were dropped because the node was disabled.
+    ///
+    /// A count and not a list of reasons, which is the difference between this
+    /// and `refused`: a delivery to a node the ground has stopped is the
+    /// configuration working as asked, and naming it every pass would fill a
+    /// log with the news that a payload is off. What it must not be is
+    /// invisible, so it is counted.
+    pub dropped: usize,
 }
 
 impl Moved {
@@ -276,7 +285,36 @@ impl Moved {
     pub fn add(&mut self, other: Moved) {
         self.delivered += other.delivered;
         self.bytes += other.bytes;
+        self.dropped += other.dropped;
         self.refused.extend(other.refused);
+    }
+}
+
+/// Whether the fabric may touch a node at all.
+///
+/// A node the ground has disabled is not read, not asked, and not delivered
+/// to. The state belongs to the node rather than to the fabric -- the command
+/// interpreter sets it from a thread of its own, see
+/// [`crate::runtime::node_state`] -- and this is how the fabric asks, so that
+/// the fabric itself stays a thing that can be tested with no node states and
+/// no command link in sight.
+pub trait Gate {
+    /// Whether this node may be touched. A name this knows nothing about is
+    /// enabled: a link to the ground is not something the ground can stop, and
+    /// the node that feeds it is.
+    fn is_enabled(&self, node: &str) -> bool;
+}
+
+/// The gate a fabric has when nothing has given it one: everything enabled.
+///
+/// What the fabric did before there was a command link, and what its own tests
+/// use. A separate type rather than an `Option<Arc<dyn Gate>>` with a branch
+/// at each call, because a branch per delivery is a branch to get wrong.
+struct AllEnabled;
+
+impl Gate for AllEnabled {
+    fn is_enabled(&self, _node: &str) -> bool {
+        true
     }
 }
 
@@ -286,6 +324,8 @@ pub struct Fabric {
     routes: Routes,
     /// How large a datum may be, which is the buffer a read is given.
     buffer: usize,
+    /// What says whether a node may be touched: see [`Gate`].
+    gate: Arc<dyn Gate>,
 }
 
 impl Fabric {
@@ -294,7 +334,13 @@ impl Fabric {
             nodes: BTreeMap::new(),
             routes,
             buffer,
+            gate: Arc::new(AllEnabled),
         }
+    }
+
+    /// Let something say which nodes are enabled: see [`Gate`].
+    pub fn gated_by(&mut self, gate: Arc<dyn Gate>) {
+        self.gate = gate;
     }
 
     /// Put a node in, under the name the configuration calls it.
@@ -395,6 +441,15 @@ impl Fabric {
                 // them, so the others are not refusals -- they are the rest of
                 // the graph, going about its business.
                 if !carries(&delivery, stream) {
+                    continue;
+                }
+
+                // Dropped and counted, not queued. A queue for a node nobody
+                // has re-enabled is a queue that grows without bound, and a
+                // reading delivered minutes later is a reading that describes
+                // a moment that has passed.
+                if !self.gate.is_enabled(&delivery.to) {
+                    moved.dropped += 1;
                     continue;
                 }
 
@@ -513,6 +568,11 @@ impl Fabric {
     /// Ask a node, and take nothing: see [`Port::ask`]. What went wrong, if
     /// anything did.
     pub fn ask(&mut self, name: &str) -> Option<String> {
+        // A node the ground has stopped is not asked, and that is not a
+        // failure to report: it is what stopping it means.
+        if !self.gate.is_enabled(name) {
+            return None;
+        }
         match self.nodes.get_mut(name) {
             None => Some("there is no such node in this fabric".to_string()),
             Some(node) => node.ask().err(),
@@ -522,6 +582,13 @@ impl Fabric {
     /// Read a node, asking it or not, and deliver what it had.
     fn pump_by(&mut self, name: &str, unasked: bool) -> Moved {
         let mut moved = Moved::default();
+
+        // A node the ground has stopped moves nothing. Nothing is counted
+        // here: a read that was not attempted is not a datum that was
+        // dropped, and the pass has nothing to say about a node that is off.
+        if !self.gate.is_enabled(name) {
+            return moved;
+        }
 
         let mut buffer = vec![0u8; self.buffer];
         let taken = {

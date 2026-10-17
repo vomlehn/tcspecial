@@ -92,6 +92,8 @@ help:
 	@echo "  make runsimguix  - Run tcsgui on the XML configuration and the simulator's"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
+	@echo "  make runcomparexy - Check the payload set's XML and YAML say the same thing"
+	@echo "  make comparespellings - Do that for every shipped configuration"
 	@echo "  make verify      - Check one version 2 configuration"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload needs"
 	@echo "  make mkstubs     - Make every stand-in: I2C, GPIO, IIO and virtual CAN"
@@ -229,6 +231,61 @@ runverifyy:
 .PHONY: runverifyx
 runverifyx:
 	$(call runverify_on,xml)
+
+# Check that the two spellings of a payload set say the same thing.
+#
+# tcsverify's three-file form: the XML and the YAML of one configuration, each
+# checked with the simulator file as runverifyy and runverifyx check them, and
+# then compared -- every section, attribute and value, as the programs read
+# them, so two that pass are two whose digests tcspecial and tcsmoc agree on.
+# The two are written by hand, and an edit made to one and not the other leaves
+# both valid: nothing else notices.
+.PHONY: runcomparexy
+runcomparexy:
+	( \
+		set -eu; \
+		echo "Comparing $(TCSPECIAL_CONFIG_FILE).xml with $(TCSPECIAL_CONFIG_FILE).yaml..."; \
+		cd $(RUST) && cargo run -q --bin tcsverify -- $(TCSPECIAL_CONFIG_FILE).xml $(TCSPECIAL_CONFIG_FILE).yaml $(TCSPECIAL_CONFIG_FILE)sim.yaml \
+	)
+
+# Every configuration shipped in both spellings, with the simulator file each
+# is checked beside: the payload sets, the thermostat fixture, and the
+# examples. A list of stems and simulator files rather than a pattern, because
+# the two directories name their simulator files differently -- tcspecial1sim
+# and minimal-sim -- and the thermostat fixture has none of its own: it is
+# checked beside the example's, which simulates the same payloads.
+SPELLINGS = \
+	tests/manual/tcspecial1:tests/manual/tcspecial1sim.yaml \
+	tests/manual/tcspecial2:tests/manual/tcspecial2sim.yaml \
+	tests/manual/tcspecial3:tests/manual/tcspecial3sim.yaml \
+	tests/manual/tcspecial4:tests/manual/tcspecial4sim.yaml \
+	tests/manual/thermostat:examples/thermostat/thermostat-sim.yaml \
+	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
+	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
+	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml
+
+# Compare the two spellings of every one of them.
+#
+# Every pair is compared before the target fails, so one run says every set
+# that has drifted rather than only the first; the failures are named again
+# at the end, under what was printed for each.
+.PHONY: comparespellings
+comparespellings:
+	( \
+		set -u; \
+		cd $(RUST) && cargo build -q --bin tcsverify || exit 1; \
+		failed=""; \
+		for pair in $(SPELLINGS); do \
+			stem=$${pair%%:*}; sim=$${pair#*:}; \
+			echo "Comparing $$stem.xml with $$stem.yaml..."; \
+			cargo run -q --bin tcsverify -- $$stem.xml $$stem.yaml $$sim || failed="$$failed $$stem"; \
+		done; \
+		if [ -n "$$failed" ]; then \
+			echo "The two spellings differ, or do not verify, for:$$failed"; \
+			exit 1; \
+		fi; \
+		echo "Every configuration says the same thing in both spellings" \
+	)
 
 # Run the simulation application
 .PHONY: runsim

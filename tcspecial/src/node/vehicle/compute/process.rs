@@ -73,7 +73,7 @@ struct Running {
 /// A computation run as a program.
 #[derive(Debug)]
 pub struct Process {
-    program: String,
+    executable: String,
     timeout: Duration,
     restart: Restart,
     /// The program while it is running.
@@ -96,7 +96,7 @@ impl Process {
     /// found here is the machine's answer: see [`Process::start`].
     pub fn of(params: ProcessParams) -> Process {
         Process {
-            program: params.program,
+            executable: params.executable,
             timeout: params.timeout,
             restart: params.restart,
             running: None,
@@ -123,25 +123,25 @@ impl Process {
 
     /// Start the program, whatever happened to the last one.
     fn spawn(&self) -> Result<Running, String> {
-        let mut child = Command::new(&self.program)
+        let mut child = Command::new(&self.executable)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             // Left alone: whatever the program complains about should arrive
             // wherever this program's own complaints do.
             .stderr(Stdio::inherit())
             .spawn()
-            .map_err(|e| format!("\"{}\" cannot be run: {e}", self.program))?;
+            .map_err(|e| format!("\"{}\" cannot be run: {e}", self.executable))?;
 
         // Both pipes are taken out of the child, which is why they were asked
         // for; a child without them is one nothing could be said to.
         let stdin = child
             .stdin
             .take()
-            .ok_or_else(|| format!("\"{}\" has no standard input", self.program))?;
+            .ok_or_else(|| format!("\"{}\" has no standard input", self.executable))?;
         let stdout = child
             .stdout
             .take()
-            .ok_or_else(|| format!("\"{}\" has no standard output", self.program))?;
+            .ok_or_else(|| format!("\"{}\" has no standard output", self.executable))?;
 
         Ok(Running {
             child,
@@ -209,8 +209,8 @@ impl Process {
     }
 
     /// What program this runs.
-    pub fn program(&self) -> &str {
-        &self.program
+    pub fn executable(&self) -> &str {
+        &self.executable
     }
 
     pub fn timeout(&self) -> Duration {
@@ -330,7 +330,7 @@ impl Function for Process {
     /// control loop acting on numbers that stopped changing.
     fn give(&mut self, input: Option<&str>, data: &[u8]) -> Result<Option<Vec<u8>>, String> {
         if let Some(why) = self.why_stopped() {
-            return Err(format!("\"{}\" is not running: {why}", self.program));
+            return Err(format!("\"{}\" is not running: {why}", self.executable));
         }
 
         // Not running and not stopped is a node nobody started, which the
@@ -370,17 +370,17 @@ impl Function for Process {
                         self.stopped(&e);
                         return Err(format!(
                             "\"{}\" {why}, and would not start again: {e}",
-                            self.program
+                            self.executable
                         ));
                     }
                     return Err(format!(
                         "\"{}\" {why}; it has been started again, and this datum is \
                          lost",
-                        self.program
+                        self.executable
                     ));
                 }
 
-                Err(format!("\"{}\" {why}", self.program))
+                Err(format!("\"{}\" {why}", self.executable))
             }
         }
     }
@@ -412,9 +412,9 @@ mod tests {
     /// required, that a restart allowance is a number or "never" -- is
     /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies it.
     /// These tests are about what the supervision does.
-    fn process(program: &str, timeout: Duration, restart: Restart) -> Process {
+    fn process(executable: &str, timeout: Duration, restart: Restart) -> Process {
         Process::of(ProcessParams {
-            program: program.to_string(),
+            executable: executable.to_string(),
             timeout,
             restart,
         })

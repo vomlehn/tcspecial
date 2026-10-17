@@ -100,7 +100,7 @@ pub struct HysteresisParams {
 /// A computation that is a program of its own.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessParams {
-    pub program: String,
+    pub executable: String,
     pub timeout: Duration,
     pub restart: Restart,
 }
@@ -147,7 +147,7 @@ pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
         "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
         "mean" => Some(&["function", "inputs"]),
         "hysteresis" => Some(&["function", "setpoint", "above", "below"]),
-        "process" => Some(&["function", "program", "timeout", "restart"]),
+        "process" => Some(&["function", "executable", "timeout", "restart"]),
         _ => None,
     }
 }
@@ -277,12 +277,12 @@ pub fn params_of(
             }))
         }
         "process" => {
-            let program = attributes
-                .get("program")
+            let executable = attributes
+                .get("executable")
                 .map(|p| p.as_str().to_string())
                 .ok_or_else(|| {
                     named(
-                        "program is not set: a compute node whose function is \
+                        "executable is not set: a compute node whose function is \
                          \"process\" is the program it names"
                             .to_string(),
                     )
@@ -313,7 +313,7 @@ pub fn params_of(
                 Restart::of(attributes.get("restart").map(Scalar::as_str)).map_err(named)?;
 
             Ok(Computation::Process(ProcessParams {
-                program,
+                executable,
                 timeout,
                 restart,
             }))
@@ -399,11 +399,11 @@ mod tests {
         assert_eq!(
             params(&[
                 ("function", "process"),
-                ("program", "/opt/flight/attitude"),
+                ("executable", "/opt/flight/attitude"),
                 ("timeout", "500ms"),
             ]),
             Computation::Process(ProcessParams {
-                program: "/opt/flight/attitude".to_string(),
+                executable: "/opt/flight/attitude".to_string(),
                 timeout: Duration::from_millis(500),
                 restart: Restart::Never,
             })
@@ -444,9 +444,9 @@ mod tests {
                 vec![("function", "hysteresis"), ("setpoint", "293"), ("above", "2")],
                 "below",
             ),
-            (vec![("function", "process")], "program is not set"),
+            (vec![("function", "process")], "executable is not set"),
             (
-                vec![("function", "process"), ("program", "/bin/cat")],
+                vec![("function", "process"), ("executable", "/bin/cat")],
                 "no default for it",
             ),
         ] {
@@ -499,7 +499,7 @@ mod tests {
             (
                 vec![
                     ("function", "process"),
-                    ("program", "/bin/cat"),
+                    ("executable", "/bin/cat"),
                     ("timeout", "soon"),
                 ],
                 "timeout",
@@ -507,7 +507,7 @@ mod tests {
             (
                 vec![
                     ("function", "process"),
-                    ("program", "/bin/cat"),
+                    ("executable", "/bin/cat"),
                     ("timeout", "1s"),
                     ("restart", "sometimes"),
                 ],
@@ -561,6 +561,7 @@ mod tests {
         assert!(said.contains("setpoint"), "{said}");
     }
 
+
     /// Restarting is never, unless the configuration says `true`.
     #[test]
     fn restarting_is_never_by_default() {
@@ -572,7 +573,7 @@ mod tests {
         assert_eq!(
             process(&[
                 ("function", "process"),
-                ("program", "/bin/cat"),
+                ("executable", "/bin/cat"),
                 ("timeout", "1s"),
             ])
             .restart,
@@ -581,7 +582,7 @@ mod tests {
         assert_eq!(
             process(&[
                 ("function", "process"),
-                ("program", "/bin/cat"),
+                ("executable", "/bin/cat"),
                 ("timeout", "1s"),
                 ("restart", "false"),
             ])
@@ -591,7 +592,7 @@ mod tests {
         assert_eq!(
             process(&[
                 ("function", "process"),
-                ("program", "/bin/cat"),
+                ("executable", "/bin/cat"),
                 ("timeout", "1s"),
                 ("restart", "true"),
             ])

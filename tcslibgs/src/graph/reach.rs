@@ -152,6 +152,15 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 stream.terminators = Some(ByteList::of(value.as_str()));
                 stream_stated = true;
             }
+            // One a configuration used to write, told what to say instead:
+            // see `retired_term`, and the note there about why it is not a
+            // misspelling.
+            other if retired_term(other).is_some() => {
+                return Err(format!(
+                    "\"{what}\": \"{other}\" is no longer an attribute: {}",
+                    retired_term(other).expect("just asked")
+                ))
+            }
             other => {
                 return Err(format!(
                     "\"{what}\": there is nothing called \"{other}\" on a \
@@ -524,7 +533,63 @@ fn port_named(
 /// the ones that are not theirs. The alternative -- a list per type here --
 /// would be a second copy of what each type accepts, and the two would
 /// disagree the first time a type gained a term.
+///
+/// Three terms are lengths of time here and counts there. A version 2
+/// configuration writes `debounce: 50us` and `rs485_delay_before_send: 2ms`,
+/// as it writes every length of time -- see [`crate::graph::parse_interval`]
+/// -- and the rules those reach are the version 1 rules, which count in the
+/// unit their own name ends in. So the value is turned into that count on the
+/// way through, and the version 1 spelling of the attribute is refused by
+/// name: see [`timed`] and [`retired_term`].
+/// The terms a version 2 configuration writes as a length of time, each with
+/// the version 1 term it becomes and how many microseconds that term counts
+/// in.
+///
+/// `debounce` is microseconds where version 1 said `debounce_us`, and the two
+/// rs485 delays are milliseconds where it said `_ms`. The unit is in the
+/// version 1 name because the value there is a bare number; here the value
+/// says its own unit and the name does not have to.
+fn timed(attribute: &str) -> Option<(&'static str, u128)> {
+    match attribute {
+        "debounce" => Some(("debounce_us", 1)),
+        "rs485_delay_before_send" => Some(("rs485_delay_before_send_ms", 1_000)),
+        "rs485_delay_after_send" => Some(("rs485_delay_after_send_ms", 1_000)),
+        _ => None,
+    }
+}
+
+/// A term a version 2 configuration used to write, and what to write instead.
+///
+/// The version 1 spellings of the three above. Refused by name rather than as
+/// a term nothing knows, because the value changes with the name: a node that
+/// says `debounce_us: 50` is not a node with a misspelling on it, it is a node
+/// written for the spelling before this one. Version 1 files keep it: there
+/// the name is the only thing saying what the number counts.
+pub fn retired_term(attribute: &str) -> Option<&'static str> {
+    match attribute {
+        "debounce_us" => Some("say debounce, as a length of time: 50us rather than 50"),
+        "rs485_delay_before_send_ms" => {
+            Some("say rs485_delay_before_send, as a length of time: 2ms rather than 2")
+        }
+        "rs485_delay_after_send_ms" => {
+            Some("say rs485_delay_after_send, as a length of time: 2ms rather than 2")
+        }
+        _ => None,
+    }
+}
+
 fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
+    // A length of time, in the unit the rule it is going to counts in. An
+    // unreadable one is left as written for those rules to refuse in their
+    // own words, naming the node as they do.
+    if let Some((term, micros_per)) = timed(attribute) {
+        let said = match crate::graph::parse_interval(value.as_str()) {
+            Ok(interval) => Scalar::of(&(interval.as_micros() / micros_per).to_string()),
+            Err(_) => value.clone(),
+        };
+        return put_term(terms, term, &said);
+    }
+
     let value = Some(value.clone());
     match attribute {
         // A line.
@@ -1037,7 +1102,7 @@ mod tests {
             &[
                 ("path", "/dev/i2c-1"),
                 ("address", "0x48"),
-                ("trigger", "03 0400"),
+                ("trigger", "\"\\x03\\x04\\x00\""),
             ],
         ))
         .expect("a sensor that is asked");

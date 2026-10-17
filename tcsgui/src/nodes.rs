@@ -175,11 +175,25 @@ pub const TEXT: &str = "text";
 ///   because a window will one day offer to go and find one.
 /// * `whole` -- a whole number, decimal or `0x`, as `whole::whole_u32` reads
 ///   one.
-/// * `interval` -- a length of time with its unit, `500ms` or `3s`, as
+/// * `interval` -- a length of time with its unit, `500ms` or `15min`, as
 ///   `graph::parse_interval` reads one.
-/// * `bytes` -- hex bytes, as a trigger is written.
+/// * `timeout` -- a length of time, or the word `none`: a read that does not
+///   time out at all. A kind of its own because that word is the whole of the
+///   difference, and because an attribute called `timeout` is not always one
+///   -- a computation's is an `interval`, a deadline that may be `none` being
+///   a program that may hang.
+/// * `bytes` -- one byte in hexadecimal, or text as a C string, as a trigger
+///   is written.
 /// * `boolean` -- `true` or `false`, and nothing else.
-pub const KINDS: &[&str] = &[TEXT, "path", "whole", "interval", "bytes", "boolean"];
+pub const KINDS: &[&str] = &[
+    TEXT,
+    "path",
+    "whole",
+    "interval",
+    "timeout",
+    "bytes",
+    "boolean",
+];
 
 /// A description as a file writes it.
 ///
@@ -697,7 +711,7 @@ mod tests {
             .iter()
             .map(|a| a.name.as_str())
             .collect();
-        assert_eq!(asked, vec!["program", "timeout", "restart"]);
+        assert_eq!(asked, vec!["executable", "timeout", "restart"]);
         assert!(process.attributes.iter().all(|a| a.required));
 
         // And a node with nothing to be told says nothing.

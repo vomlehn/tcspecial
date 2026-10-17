@@ -8,4 +8,4 @@ simulated_payloads:
   - name: sensor
     type: network
     protocol: udp
-    packet_interval_ms: 1000
+    packet_interval: 1s

@@ -22,7 +22,10 @@ attributes:
       Its address on that bus, as hex: 0x48.
   - name: group
     required: false
-    about: The payload group that reads it, where it is in one.
+    about: >
+      The payload group that reads it, where it is in one. Optional, though a
+      payload that states a trigger needs one: the interval of its group is
+      how often it is asked.
   - name: trigger
     required: false
     kind: bytes
@@ -47,5 +50,6 @@ attributes:
     about: How many times a failed transfer is tried again.
   - name: timeout
     required: false
+    kind: timeout
     about: >
       How long a transfer is given before it is a failure, in milliseconds.

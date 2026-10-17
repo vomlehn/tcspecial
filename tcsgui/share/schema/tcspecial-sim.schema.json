@@ -47,16 +47,16 @@
             ],
             "description": "And the port with it."
           },
-          "packet_interval_ms": {
+          "packet_interval": {
             "type": [
               "string",
               "number",
               "boolean",
               "null"
             ],
-            "description": "How often it sends. Nought is as fast as it can; a triggered payload states none, there being nothing for an interval to mean."
+            "description": "How often it sends, as a length of time: 1s, 500ms. Nought -- 0s -- is as fast as it can. For a payload that sends on its own: one the configuration gives a trigger is asked instead, at the interval of the payload group it is in, so it states none here and there is nothing for an interval to mean."
           },
-          "segment_interval_ms": {
+          "segment_interval": {
             "type": [
               "string",
               "number",
@@ -101,7 +101,7 @@
             ],
             "description": "How often one arrives short."
           },
-          "jitter_ms": {
+          "jitter": {
             "type": [
               "string",
               "number",
@@ -190,7 +190,7 @@
             ],
             "description": "And the port with it."
           },
-          "packet_interval_ms": {
+          "packet_interval": {
             "type": [
               "string",
               "number",
@@ -199,7 +199,7 @@
             ],
             "description": "How often it sends. Nought is as fast as it can; a triggered payload states none, there being nothing for an interval to mean."
           },
-          "segment_interval_ms": {
+          "segment_interval": {
             "type": [
               "string",
               "number",
@@ -244,7 +244,7 @@
             ],
             "description": "How often one arrives short."
           },
-          "jitter_ms": {
+          "jitter": {
             "type": [
               "string",
               "number",

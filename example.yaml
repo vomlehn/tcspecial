@@ -5,7 +5,7 @@ description: "One payload on a UDP link, its telemetry going to the ground"
 
 tcspecial:
   beacon:
-    interval_ms: "1000"
+    interval: "1s"
 
 payload_groups:
   - name: "every_second"

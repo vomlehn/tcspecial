@@ -85,7 +85,7 @@ pub fn run_graph(path: &str) -> Result<(), Vec<String>> {
 
 /// Start sending beacons where the configuration's `tcspecial` section says.
 ///
-/// From `beacon.send` to `beacon.recv`, every `beacon.interval_ms`, carrying
+/// From `beacon.send` to `beacon.recv`, every `beacon.interval`, carrying
 /// this build's version, the configuration's and the configuration's digest:
 /// the same beacon a version 1 vehicle sends, by the same code. An interval of
 /// nought sends none, as it does in version 1. Recorded in no telemetry log:

@@ -926,7 +926,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
 payload_groups:
@@ -1146,11 +1146,11 @@ description: settings
 simulated_payloads:
   - name: DH0
     type: device-file
-    packet_interval_ms: 1000
+    packet_interval: 1s
   - name: DH1
     type: network
     protocol: udp
-    packet_interval_ms: 1000
+    packet_interval: 1s
 ";
 
     #[test]
@@ -1346,10 +1346,10 @@ description: settings
 simulated_payloads:
   - name: DH0
     type: device-file
-    packet_interval_ms: 1000
+    packet_interval: 1s
   - name: nobody
     type: device-file
-    packet_interval_ms: 1000
+    packet_interval: 1s
 ";
         let set = written(".yaml", GOOD, sim);
         let report = verify(&set.payload, Some(&set.sim));

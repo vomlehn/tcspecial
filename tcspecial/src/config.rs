@@ -137,7 +137,7 @@ mod tests {
                         dest_base: 0.0.0.0:4200\n\
                         payload_telemetry:\n  source_base: 0.0.0.0:6000\n  \
                         dest_base: 127.0.0.1:6100\n\
-                        beacon:\n  interval_ms: 5000\n  send: 0.0.0.0:5550\n  \
+                        beacon:\n  interval: 5s\n  send: 0.0.0.0:5550\n  \
                         recv: 127.0.0.1:5650\n";
 
     const XML: &str = "<tcspecial>\
@@ -151,7 +151,7 @@ mod tests {
           <dest_base>127.0.0.1:6100</dest_base>\
         </payload_telemetry>\
         <beacon>\
-          <interval_ms>5000</interval_ms>\
+          <interval>5s</interval>\
           <send>0.0.0.0:5550</send>\
           <recv>127.0.0.1:5650</recv>\
         </beacon>\
@@ -199,7 +199,7 @@ mod tests {
 
         for missing in [
             "  send: 0.0.0.0:5550\n  recv: 127.0.0.1:5650\n",
-            "  interval_ms: 5000\n",
+            "  interval: 5s\n",
         ] {
             let without = YAML.replace(missing, "");
             assert_ne!(without, YAML, "the test removed nothing");
@@ -242,7 +242,8 @@ mod tests {
                 dest_base: "127.0.0.1:6100".to_string(),
             },
             beacon: tcslibgs::BeaconJson {
-                interval_ms: 5000,
+                interval: "5s".to_string(),
+                interval_ms: None,
                 send: beacon.to_string(),
                 recv: "127.0.0.1:5650".to_string(),
             },

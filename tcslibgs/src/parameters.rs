@@ -442,7 +442,7 @@ mod tests {
         let dh = udp("DH2");
         let sim = settled(
             "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
-             packet_interval_ms: 500\n    segment_size: 5\n    segment_interval_ms: 40\n",
+             packet_interval: 500ms\n    segment_size: 5\n    segment_interval: 40ms\n",
             &dh,
         );
 
@@ -528,7 +528,7 @@ mod tests {
         // trigger whose carriage return was shown as a line break would read
         // as two triggers.
         assert!(
-            shown.contains("trigger          52 45 41 44 0D"),
+            shown.contains("trigger          \"READ\\r\""),
             "{shown}"
         );
         // The rate its trigger goes out at, which is this file's to state.
@@ -551,7 +551,7 @@ mod tests {
         let dh = udp("DH2");
         let sim = settled(
             "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
-             packet_interval_ms: 100\n    drop_percent: 10\n    jitter_ms: 25\n",
+             packet_interval: 100ms\n    drop_percent: 10\n    jitter: 25ms\n",
             &dh,
         );
 
@@ -639,7 +639,7 @@ mod tests {
         let dh = udp("DH2");
         let sim = settled(
             "simulated_payloads:\n  - name: DH2\n    type: network\n    protocol: udp\n    \
-             packet_interval_ms: 100\n",
+             packet_interval: 100ms\n",
             &dh,
         );
         let shown = payload_parameters(&dh, Some(&sim));

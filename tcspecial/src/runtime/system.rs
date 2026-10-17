@@ -373,6 +373,19 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
                 other if tcslibgs::node::app::Kind::of(other).is_some() => {
                     "runs a program of its own".to_string()
                 }
+                // A ground link, where nothing the vehicle sends passes
+                // through the node itself: each source has a link of its own
+                // to the node's `ground_base`. So one that nothing is read
+                // from and nothing arrives at is doing its work all the same,
+                // and saying "no link touches it" of one would be reporting a
+                // fault that is not there. See `open`, which holds such a
+                // node as a `NullPort` for the same reason.
+                "moc" => match Use::of(&routes, &node.name) {
+                    Ok(Use::Read) => "is read".to_string(),
+                    Ok(Use::Driven) => "is driven".to_string(),
+                    Ok(Use::Both) => "is read and written".to_string(),
+                    Err(_) => "takes to the ground what is drawn into it".to_string(),
+                },
                 _ => match Use::of(&routes, &node.name) {
                     Ok(Use::Read) => "is read".to_string(),
                     Ok(Use::Driven) => "is driven".to_string(),

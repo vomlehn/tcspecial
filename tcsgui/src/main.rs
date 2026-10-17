@@ -4701,10 +4701,10 @@ fn view_of(
         // this build does not know has none: the shape already says it cannot
         // be placed, and four arrows on it would be four claims about a type
         // nothing here can describe.
-        moc_in: terminal_view("moc-in", terminals, outline, size),
-        moc_out: terminal_view("moc-out", terminals, outline, size),
-        payload_in: terminal_view("payload-in", terminals, outline, size),
-        payload_out: terminal_view("payload-out", terminals, outline, size),
+        moc_in: terminal_view("moc-in", terminals, outline, size, at),
+        moc_out: terminal_view("moc-out", terminals, outline, size, at),
+        payload_in: terminal_view("payload-in", terminals, outline, size, at),
+        payload_out: terminal_view("payload-out", terminals, outline, size, at),
         // The column the name is padded away from, plus whatever the outline
         // is missing at its widest: a slanted shape moves its terminals in,
         // and a name padded by the column alone would be padded into them.
@@ -4727,10 +4727,13 @@ fn terminal_view(
     terminals: style::Terminals,
     outline: Outline,
     size: (u32, u32),
+    // Where the node is, which is what puts each terminal on the grid: see
+    // `style::terminal_at`.
+    at: (i32, i32),
 ) -> TerminalView {
     let corner = style::corner_of(terminal);
     let (x, y) = corner
-        .map(|corner| style::terminal_at(outline, corner, size))
+        .map(|corner| style::terminal_at(outline, corner, size, at))
         .unwrap_or_default();
     TerminalView {
         shown: terminals.has(terminal),
@@ -7653,7 +7656,7 @@ mod tests {
     /// field, which is what decides whether the row is a box to write in or a
     /// control with two states: see `FieldView::kind` in the markup. So this
     /// asks what the window is given -- an app node's `restart` is a true or
-    /// false, its `program` a path, and its argument text -- and that the
+    /// false, its `executable` a path, and its argument text -- and that the
     /// markup offers a two-state control for the one of those that is a true
     /// or false.
     #[test]
@@ -8130,10 +8133,7 @@ mod tests {
         // Which is nothing, for everything but the beacon's interval: a socket
         // has no value that is right until somebody says so, and "how often
         // does the vehicle say it is alive" has one.
-        assert_eq!(
-            said.get("beacon.interval_ms").map(String::as_str),
-            Some("1000")
-        );
+        assert_eq!(said.get("beacon.interval").map(String::as_str), Some("1s"));
         // And none of it is a fault: the editor is lazy, and a configuration
         // nobody has filled in yet is one nobody has filled in yet. What it
         // must say before it flies is the ground check's to insist on, with a
@@ -8145,7 +8145,7 @@ mod tests {
         // the file rather than written empty, and a `tcspecial:` with nothing
         // under it would read back as no section at all.
         let written = std::fs::read_to_string(&path).expect("the file");
-        assert!(written.contains("interval_ms: \"1000\""), "{written}");
+        assert!(written.contains("interval: \"1s\""), "{written}");
         for unanswered in ["tcs_cmd", "payload_telemetry", "log"] {
             assert!(
                 !written.contains(unanswered),
@@ -8394,6 +8394,98 @@ mod tests {
         closing_the_question_ignores_the_rest();
         the_question_offers_a_way_out_of_the_editor();
         closing_the_main_window_closes_what_says_what_is_wrong();
+        an_emptied_field_takes_the_attribute_off();
+    }
+
+    /// A field somebody clears takes the attribute off, and the file loses
+    /// the line.
+    ///
+    /// Absent and empty are not the same thing to a configuration: an
+    /// `app-payload-arg: ""` is a required argument stated as nothing, which
+    /// the program is then run with -- and `lorem_pl.py`, run with an empty
+    /// one, refuses it. An absent one is the file a person would have written.
+    /// So an empty box removes rather than empties, and the writer leaves out
+    /// what it is given empty.
+    ///
+    /// Written because a shipped example turned up with one stated as nothing
+    /// and this window was the suspect. It is not: the path a cleared box
+    /// takes is the one below.
+    fn an_emptied_field_takes_the_attribute_off() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayloads:\n  - name: bay\n    type: app_pl\n    \
+             executable: /bin/true\n    app-payload-arg: \"1\"\n",
+        )
+        .expect("a payload that is a program");
+        let editor = Rc::new(RefCell::new(Editor::open(&path, dividers())));
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+
+        show_node(&editor, &views, "bay");
+        let window = views
+            .borrow()
+            .attributes
+            .get("bay")
+            .map(|window| window.as_weak())
+            .expect("the node's window")
+            .upgrade()
+            .expect("and still there");
+
+        // What it says now, so that clearing it is a change and not a no-op.
+        assert_eq!(
+            editor
+                .borrow()
+                .document()
+                .node("bay")
+                .expect("the node")
+                .attributes
+                .get("app-payload-arg")
+                .map(String::as_str),
+            Some("1")
+        );
+
+        window.invoke_attribute_set("app-payload-arg".into(), "".into());
+
+        assert_eq!(
+            editor
+                .borrow()
+                .document()
+                .node("bay")
+                .expect("the node")
+                .attributes
+                .get("app-payload-arg"),
+            None,
+            "a cleared field left the attribute behind as nothing"
+        );
+        let written = std::fs::read_to_string(&path).expect("the file");
+        assert!(
+            !written.contains("app-payload-arg"),
+            "the file kept a line for an attribute nobody answered: {written}"
+        );
+
+        // And one written empty by hand goes the same way, rather than being
+        // kept as a value: this is the other road to the same file.
+        std::fs::write(
+            &path,
+            "version: \"2.0\"\npayloads:\n  - name: bay\n    type: app_pl\n    \
+             executable: /bin/true\n    app-payload-arg: \"\"\n",
+        )
+        .expect("a payload whose argument is stated as nothing");
+        let mut reopened = Editor::open(&path, dividers());
+        reopened.edit(Edit::MoveNode {
+            node: "bay".to_string(),
+            was: (0, 0),
+            now: (40, 40),
+        });
+        let written = std::fs::read_to_string(&path).expect("the file");
+        assert!(
+            !written.contains("app-payload-arg"),
+            "an attribute stated as nothing survived a save: {written}"
+        );
     }
 
     /// What the editor holds about its windows, for a test that drives one.
@@ -10777,11 +10869,11 @@ mod tests {
         groups.invoke_add();
         assert_eq!(groups.get_chosen(), "group");
         assert_eq!(groups.get_choices().row_count(), 1);
-        groups.invoke_setting_set("packet_interval_ms".into(), "500".into());
+        groups.invoke_setting_set("packet_interval".into(), "500ms".into());
         assert_eq!(
             editor.borrow().document().simulator.as_ref().unwrap().groups["group"]
-                ["packet_interval_ms"],
-            "500"
+                ["packet_interval"],
+            "500ms"
         );
         // And it has no field for a group of its own, a group having none.
         let offered: Vec<String> = (0..groups.get_fields().row_count())
@@ -10804,8 +10896,8 @@ mod tests {
         assert!(editor.borrow_mut().undo());
         assert_eq!(
             editor.borrow().document().simulator.as_ref().unwrap().groups["group"]
-                ["packet_interval_ms"],
-            "500",
+                ["packet_interval"],
+            "500ms",
             "the group came back empty"
         );
     }

@@ -676,7 +676,7 @@ tcsgui:
         editor.edit(add("payload", "network"));
         editor.edit(Edit::SetSimPayload {
             payload: "payload".into(),
-            setting: "packet_interval_ms".into(),
+            setting: "packet_interval".into(),
             was: None,
             now: Some("1000".into()),
         });
@@ -699,7 +699,7 @@ tcsgui:
                 .simulator
                 .as_ref()
                 .expect("the simulator configuration")
-                .payloads["payload"]["packet_interval_ms"],
+                .payloads["payload"]["packet_interval"],
             "1000"
         );
 
@@ -755,8 +755,8 @@ tcsgui:
         let twice = where_.path().join("twicesim.yaml");
         std::fs::write(
             &twice,
-            "simulated_payloads:\n  - name: payload\n    packet_interval_ms: 500\n  \
-             - name: payload\n    packet_interval_ms: 900\n",
+            "simulated_payloads:\n  - name: payload\n    packet_interval: 500ms\n  \
+             - name: payload\n    packet_interval: 900ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -789,7 +789,7 @@ tcsgui:
         let good = where_.path().join("goodsim.yaml");
         std::fs::write(
             &good,
-            "simulated_payloads:\n  - name: payload\n    packet_interval_ms: 500\n",
+            "simulated_payloads:\n  - name: payload\n    packet_interval: 500ms\n",
         )
         .expect("a simulator file");
         let mut editor = Editor::open(&path, crate::pane::default_dividers());
@@ -868,14 +868,14 @@ tcsgui:
 
         editor.edit(Edit::SetSimPayload {
             payload: "payload".to_string(),
-            setting: "packet_interval_ms".to_string(),
+            setting: "packet_interval".to_string(),
             was: None,
-            now: Some("1000".to_string()),
+            now: Some("1s".to_string()),
         });
 
         let written = std::fs::read_to_string(&sim).expect("the simulator file");
         assert!(
-            written.contains("packet_interval_ms: 1000"),
+            written.contains("packet_interval: \"1s\""),
             "the setting did not reach the file: {written}"
         );
     }
@@ -929,7 +929,7 @@ tcsgui:
         // rather than `""`, which would say somebody had typed two quotation
         // marks -- and the two read the same, so the honest spelling is the
         // one a person would have written.
-        for setting in ["group", "packet_interval_ms", "drop_percent", "close_after"] {
+        for setting in ["group", "packet_interval", "drop_percent", "close_after"] {
             assert!(
                 written.contains(&format!("    {setting}:\n")),
                 "{setting}: {written}"

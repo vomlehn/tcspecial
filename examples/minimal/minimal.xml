@@ -9,7 +9,7 @@
              names, and the MOC receives them on the address the recv
              attribute names. -->
         <beacon>
-            <interval_ms>5000</interval_ms>
+            <interval>5s</interval>
             <recv>127.0.0.1:5650</recv>
             <send>0.0.0.0:5550</send>
         </beacon>

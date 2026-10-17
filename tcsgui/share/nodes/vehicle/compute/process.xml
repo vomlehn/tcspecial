@@ -14,7 +14,7 @@
     <moc-sink>true</moc-sink>
     <moc-source>true</moc-source>
     <attributes>
-        <name>program</name>
+        <name>executable</name>
         <required>true</required>
         <kind>path</kind>
         <about>The program to run.</about>

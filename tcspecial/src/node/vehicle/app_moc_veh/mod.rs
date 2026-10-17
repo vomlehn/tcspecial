@@ -121,12 +121,12 @@ mod tests {
         path
     }
 
-    /// What such a node is told, for a program at `program`.
-    fn says(program: &std::path::Path) -> AppParams {
+    /// What such a node is told, for a program at `executable`.
+    fn says(executable: &std::path::Path) -> AppParams {
         AppParams {
             name: "back".to_string(),
             kind: Kind::MocVeh,
-            executable: program.display().to_string(),
+            executable: executable.display().to_string(),
             payload_arg: None,
             moc_arg: Some("--commands".to_string()),
             restart: Restart::Never,

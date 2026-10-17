@@ -507,7 +507,7 @@ section a payload set's file holds, which is required of every configuration.
        source_base: 0.0.0.0:6000
        dest_base: 127.0.0.1:6100
      beacon:
-       interval_ms: 5000
+       interval: "5s"
        send: "0.0.0.0:5550"
        recv: "127.0.0.1:5650"
      log:
@@ -518,7 +518,7 @@ Four of its five entries are subsections, because each of them is one thing
 with more than one attribute to it: the spacecraft command link has two ends,
 a payload's telemetry has two, the beacon has two and a timing, and the log
 has a place and a size. A prefix repeated on two or three flat names --
-``beacon.send``, ``beacon.recv``, ``beacon.interval_ms`` -- is a subsection
+``beacon.send``, ``beacon.recv``, ``beacon.interval`` -- is a subsection
 somebody declined to write, and the names under one are short for the same
 reason: ``beacon.send`` says what ``beacon.send`` said, where the reader is
 already looking at the beacon.
@@ -705,7 +705,7 @@ Requirement
     attributes, the links and the command bindings -- across every included
     file, the same for either spelling, and not the editor's layout or the
     description. A version 2 tcspecial says its digest as it starts and sends
-    it in a beacon every ``beacon.interval_ms``, from ``beacon.send`` to
+    it in a beacon every ``beacon.interval``, from ``beacon.send`` to
     ``beacon.recv``, by the code version 1 beacons with. tcsmoc compares the
     digest in each beacon with the one it computed itself; when they differ
     it says so on the beacon line and the console and asks the operator
@@ -761,37 +761,90 @@ Requirement
     counting. The second names the limit, since "65536 is not a port" is only
     useful beside "a port is 1 to 65535".
 
-A payload group's ``interval`` is one of those numbers followed by a unit:
+Every length of time in a configuration is a number and a unit, written
+together, and the units are these:
 
-.. code-block:: text
+.. table:: The units of a length of time
+   :widths: auto
 
-   us   microseconds        m   minutes        d   days
-   ms   milliseconds        h   hours          w   weeks
-   s    seconds
+   =======  ============  ==================================================
+   Unit     What it is    Written
+   =======  ============  ==================================================
+   ``us``   microseconds  ``250us``
+   ``ms``   milliseconds  ``500ms``
+   ``s``    seconds       ``3s``, ``1.5s``
+   ``min``  minutes       ``15min``
+   ``h``    hours         ``6h``
+   ``d``    days          ``1d``, ``0.5d``
+   ``w``    weeks         ``1w``
+   =======  ============  ==================================================
+
+The number is decimal, whole or a fraction, with underscores allowed among
+the digits: ``1_000ms``, ``1.5s`` and ``1500ms`` are one length of time
+written three ways. The value is kept in whole microseconds, rounded to the
+nearest, so a fraction finer than a microsecond is rounded rather than
+silently truncated. There is no hexadecimal, no sign and no exponent: ``d``
+is a hexadecimal digit, so ``0x1d`` would be a number that is also "0x1
+days", and a length is neither negative nor written for a machine to read.
 
 Every unit from a microsecond to a week, because a reading taken once a week
-is written ``1w`` and not ``604800s``, and a number nobody can read at a glance
-is a number nobody can check. The same argument covers the middle of the
-range: ``15m`` and ``6h`` are how a schedule is discussed, and making somebody
-write ``900s`` and ``21600s`` is making them do the arithmetic the mistake
-hides in.
+is written ``1w`` and not ``604800s``, and a number nobody can read at a
+glance is a number nobody can check. The same argument covers the middle of
+the range: ``15min`` and ``6h`` are how a schedule is discussed, and making
+somebody write ``900s`` and ``21600s`` is making them do the arithmetic the
+mistake hides in.
+
+Nothing in the table is ambiguous, and that is the reason minutes are
+``min``. A single ``m`` is one letter from ``ms`` and a thousand-fold apart
+from it, so a slip of a finger would have made a reading taken sixty thousand
+times less often with nothing in the file to say so. It is refused by name,
+and so is anything else that could be read two ways:
+
+``m``
+    Say ``min`` for minutes or ``ms`` for milliseconds.
+
+a month or a year -- ``mon``, ``mo``, ``month``, ``y``, ``yr``, ``year``
+    Not lengths of time at all. A month needs a calendar, a reference date
+    and a timezone, none of which a vehicle carries; a span of about that
+    size is written exactly, as ``30d`` or a number of days. These are
+    refused so that nobody writes one and is answered by whatever a calendar
+    would have said.
+
+``µs``
+    Say ``us``. This grammar is ASCII.
+
+An interval of nought is refused in every unit -- it is no interval at all,
+and a schedule asking for one is a schedule asking to be run again before it
+has finished -- and so is a fraction that rounds to nought, which is the same
+thing spelled differently. So is a length too long to count: a number that
+overflowed rather than an interval anybody meant.
+
+The one place nought means something is a simulated payload's
+``packet_interval``, where it asks for packets as fast as the payload can be
+driven. That reader takes the refusal and reads it as nought, so the grammar
+stays the one grammar and only the value is exceptional, and the file writes
+it with a unit like any other length of time: ``0s``.
 
 The suffix is matched longest first, so the ``s`` of ``ms`` is not taken for
-seconds and the ``m`` of ``ms`` is not taken for minutes, and ``1w``, ``7d``
-and ``168h`` are one interval. An interval of nought is refused in every unit:
-it is no interval at all, and a schedule asking for one is a schedule asking
-to be run again before it has finished.
+seconds, and ``1w``, ``7d`` and ``168h`` are one interval.
 
-One slip this grammar cannot catch, recorded because it is the price of the
-convenience: ``m`` and ``ms`` are one letter and a thousand-fold apart, so a
-typed ``m`` where ``ms`` was meant is a reading taken sixty thousand times
-less often, and nothing in the file could tell. Written down in
-``parse_interval`` and in its test, so that the next reader finds it stated
-rather than discovers it.
+A **timeout** takes everything in the table and one word besides: ``none``,
+which is a read that does not time out at all. That word is the whole of the
+difference between the two, and it is why an attribute says which of the two
+it takes rather than leaving it to be guessed from the attribute's name --
+see the ``kind`` of an attribute in the node description tree, which is
+``interval`` or ``timeout``. A computation's ``timeout`` is an ``interval``
+for that reason: a deadline that may be ``none`` is a program that may hang.
 
-A timeout, which is version 1's and has the same shape, takes only ``us``,
-``ms`` and ``s``. There is no read anybody waits an hour for, and a timeout
-stated in hours is a configuration that will look like a hang.
+One reader for all of it, ``graph::parse_interval``, with the timeout's word
+in front of it in ``endpoint_config::parse_timeout``. There were two
+grammars, differing by two units and by the fraction, and a configuration
+could say ``1.5s`` in one place and not the other with nothing to say why.
+
+So a timeout takes every unit in the table, including the ones no read would
+sensibly use. A timeout of hours is a configuration that will look like a
+hang, which is a thing to notice in review rather than a thing to spell
+differently from every other length of time in the files.
 
 The logging node
 ----------------
@@ -941,13 +994,14 @@ so the arrangement is deliberately strict:
   computation can be proved as a program and later moved into the catalogue
   without the configuration changing shape.
 
-A node that runs a program names it, says how long it may take, and says
-whether it may be restarted:
+A node that runs a program names it in ``executable`` -- the same word an app
+node names its application with, a program being a program -- says how long it
+may take, and says whether it may be restarted:
 
 .. code-block:: yaml
 
    - { name: attitude, type: compute, function: process,
-       program: /opt/flight/attitude, timeout: 500ms, restart: false }
+       executable: /opt/flight/attitude, timeout: 500ms, restart: false }
 
 What the program sees is a line per arrival on its standard input and a line
 per answer on its standard output:
@@ -1121,10 +1175,10 @@ leading ``~`` in it is the home directory and ``$HOME`` is the value of the
 environment variable ``HOME``, both expanded as a shell would expand them, and
 that happens where the program is run rather than where the file is read --
 the value is kept as written, so a ground tool is not answering a question
-about its own workstation. The attribute was called ``program``, the word a
-``process`` computation uses. Nothing else is expanded: another variable would be
-a configuration that behaved differently on two vehicles, and ``~somebody`` is
-refused rather than guessed at. ``restart`` is the same attribute a ``process``
+about its own workstation. A ``process`` computation names its program with
+``executable`` as well, one program being much like another. Nothing else is
+expanded: another variable would be a configuration that behaved differently on
+two vehicles, and ``~somebody`` is refused rather than guessed at. ``restart`` is the same attribute a ``process``
 computation takes, read in the same one place and ``false`` unless a
 configuration says ``true``, because a part of the control system that restarts
 under load is worse than one that stays stopped and says so. It is started when
@@ -1810,7 +1864,11 @@ travels across the canvas. Two rows, which are the two streams. Along the top,
 left to right, the payload's own data on its way to the ground: it arrives at
 ``payload-in`` and leaves at ``payload-out``. Along the bottom, right to left,
 what the ground sends on its way to a payload: it arrives at ``moc-in`` and
-leaves at ``moc-out``.
+leaves at ``moc-out``. Each box's upper left corner is on the millimetre grid,
+as a node's is, so the terminals of nodes on the grid line up with each other
+and with the grid: worked out from where the node is, a grid point not being a
+whole number of pixels from the last, and rounded inwards so a box never leaves
+its node or crosses its slant.
 
 So the arrows along the top point right and the arrows along the bottom point
 left, because that is the way the canvas itself is laid out -- the payloads
@@ -3275,6 +3333,25 @@ Features
 
 * Straight-forward extensibility for custom payload and uplink/downlink interfaces
 
+* Extensible in any language: a node may be a program of its own, in whatever
+  language the vehicle can execute, which tcspecial starts from the
+  configuration and connects into the graph
+
+  * App nodes: three on the vehicle's side (``app_payload_veh``,
+    ``app_moc_veh``, ``app_all_veh``) and two that are payloads (``app_pl``,
+    ``app_all_pl``), each naming its ``executable``
+
+  * The interface is file descriptors carrying length-prefixed packets, so a
+    program links against nothing of tcspecial's -- ``tcsapp`` speaks it for
+    Rust, and ``examples/simple-app`` has a payload in Python 3 with nothing
+    outside its standard library
+
+  * A ``process`` computation hands what arrives to any program a line at a
+    time and takes back what it writes
+
+  * A capability added this way needs no change to the flight software and no
+    rebuild of it
+
 * Written in Rust:
 
     * Provides a high degree of portability
@@ -3824,7 +3901,7 @@ This is the shipped ``tcspecial/src/tcspecial.yaml``:
      source_base: "0.0.0.0:6000"
      dest_base: "127.0.0.1:6100"
    beacon:
-     interval_ms: 5000
+     interval: "5s"
      send: "0.0.0.0:5550"
      recv: "127.0.0.1:5650"
    log:
@@ -4816,17 +4893,18 @@ Requirement
 +---------------------+--------+---------------------------------------------+
 | oc_port             | number | Port it does so on                          |
 +---------------------+--------+---------------------------------------------+
-| mode                | string | ``periodic`` or ``triggered``. Absent is    |
-|                     |        | periodic                                    |
-+---------------------+--------+---------------------------------------------+
 | trigger             | bytes  | What to send to make the payload answer:    |
-|                     | or     | bytes, as unquoted hexadecimal after        |
-|                     | string | ``0x``, or text, as a quoted C string.      |
-|                     |        | Triggered only                              |
+|                     | or     | one byte, as one or two hexadecimal         |
+|                     | string | digits, or text, as a quoted C string. A    |
+|                     |        | payload with one is asked; a payload with   |
+|                     |        | none sends of its own accord                |
 +---------------------+--------+---------------------------------------------+
-| packet_interval_ms  | number | How often the trigger is sent. Triggered    |
-|                     |        | only: a periodic payload's rate is the      |
-|                     |        | simulator configuration's                   |
+| packet_interval_ms  | number | How often the triggers of a group's         |
+|                     |        | payloads are sent. A group's attribute: a   |
+|                     |        | payload that is asked takes its rate from   |
+|                     |        | its group, and a payload that sends of its  |
+|                     |        | own accord has its rate in the simulator    |
+|                     |        | configuration                               |
 +---------------------+--------+---------------------------------------------+
 
 A group states any of these; a data handler states any of these plus its
@@ -4854,10 +4932,11 @@ Payloads are generally one of two types, and which type a payload is decides
 where the timing of it is written down.
 
 Requirement
-    A payload is periodic or triggered, and says which. A file that says
-    neither describes a periodic payload, which is both the commoner type and
-    what every tcspecial configuration written before there was a mode
-    describes.
+    A payload says which type it is by stating a trigger or by stating none.
+    There is no ``mode`` attribute: it said in a word what the trigger already
+    says, so a file could state ``periodic`` and then give a trigger, and
+    something had to decide which half of it to believe. A file stating one is
+    refused by name and told that the trigger is what says it.
 
 Requirement
     A periodic payload sends of its own accord and tcspecial reads what
@@ -4867,35 +4946,38 @@ Requirement
     configuration file.
 
 Requirement
-    A triggered payload answers a request. It states the trigger to send and
-    the interval it is sent at, both of which are flight behaviour: tcspecial
-    does the sending, and what to send comes from the payload's interface
-    document. Its simulator configuration states no interval at all, packet
-    or segment, and takes none from the group it names: it sends when it is
-    asked, so a rate there would govern nothing and the segments of one answer
-    go as fast as they can.
+    A triggered payload answers a request. It states the trigger to send,
+    which is flight behaviour: tcspecial does the sending, and what to send
+    comes from the payload's interface document. Its simulator configuration
+    states no interval at all, packet or segment, and takes none from the
+    group it names: it sends when it is asked, so a rate there would govern
+    nothing and the segments of one answer go as fast as they can.
 
 Requirement
-    That holds for an interval a triggered payload inherits as much as one it
-    states. A group's settings reach a payload exactly as its own do, so a
-    payload that could inherit a rate it may not state would be governed by a
-    group it joined for the settings it may -- and the file would read as
-    though the rule had been kept.
+    How often a triggered payload is asked is the ``packet_interval_ms`` of
+    the payload group it is in, and no payload states an interval of its own.
+    A rate is a property of a schedule rather than of one payload, and
+    payloads read on one schedule are what a group is -- so a payload with a
+    rate beside its trigger is refused, and told that the rate belongs to its
+    group.
 
 Requirement
-    The interval is ``packet_interval_ms`` in whichever file states it. One
-    name, in the file the payload's type puts it in: the rate a triggered
-    payload is asked at is the rate its packets come back at, so calling it
-    something else in one file would be two names for one thing. It was
-    ``trigger_interval_ms`` in the payload configuration section, and a file
-    still using that name is told the name it has now rather than told the word
+    A triggered payload in no group is refused, saying so. The group is where
+    the rate lives, so a trigger with nothing to send it at is a payload
+    nothing would ever ask, and a handler that never asked would look from the
+    ground exactly like a payload that had stopped answering.
+
+Requirement
+    The rate was ``trigger_interval_ms`` in the payload configuration section
+    and ``packet_interval_ms`` on a payload after that. A file using either on
+    a payload is told where that figure belongs now rather than told the word
     is unknown.
 
-The two sets of attributes are exclusive in both directions, and a file giving
-the wrong one is reported rather than run: either guess about what was meant
-would operate the payload in a way nobody asked for. The exclusion is also
-structural in the Rust the file parses into -- a periodic handler has nowhere
-to put a trigger -- so it cannot be lost downstream of the check.
+The two attributes are exclusive, and a file giving both is reported rather
+than run: either guess about what was meant would operate the payload in a way
+nobody asked for. The exclusion is also structural in the Rust the file parses
+into -- a periodic handler has nowhere to put a trigger -- so it cannot be lost
+downstream of the check.
 
 Requirement
     A datagram payload cannot be triggered. Its handler learns where to send
@@ -4905,40 +4987,40 @@ Requirement
     file asking for it is refused rather than left to fail as silence.
 
 A trigger is bytes rather than text: a payload's interface document asks for
-what it asks for, and that is as likely to be ``55 AA`` as ``"READ\r"``.
+what it asks for, and that is as likely to be ``55`` as ``"READ\r"``.
 
 Requirement
-    A trigger is written as a list of hexadecimal values separated by spaces,
-    or as a string in C's notation. One or two digits is one byte -- ``5`` and
-    ``05`` are the same byte, a datasheet writing either -- and three or four
-    digits is two bytes, most significant first: the order it is written in,
-    and the order every other multi-byte quantity in this project uses. A
-    value of more digits than that is refused, which of its digits pair with
-    which not being something to decide for a file.
+    A trigger of one byte is written as one or two hexadecimal digits, and a
+    trigger of more than one byte as a string in C's notation. ``5`` and ``05``
+    are the same byte, a datasheet writing either, and ``"\x55\xAA"`` is the
+    two bytes nothing else now spells: ``55AA`` was two bytes and ``55 AA`` the
+    same two written another way, which made the length of a value decide how
+    many bytes it meant. A list of values, and a run of digits longer than two,
+    are each refused by name and told what to write instead.
 
 Requirement
-    There is no ``0x`` on a value. A trigger is a list of byte values and
-    nothing else, so a prefix saying "this is hexadecimal" would be saying it
-    once per value for a notation with no alternative. A file written for the
-    older spelling, which had one, is told so by name rather than being
-    refused for the ``x``: an error about a digit says nothing about what to
-    write instead.
+    There is no ``x`` in a trigger that is not in quotes, ``0x`` included. A
+    trigger written without quotes is hexadecimal and nothing else, so a prefix
+    saying "this is hexadecimal" would be saying it for a notation that has no
+    alternative. A file written for the older spelling, which had one, is told
+    so by name rather than being refused for the ``x``: an error about a digit
+    says nothing about what to write instead.
 
 Requirement
     Which notation a value is in follows from its first character and nothing
-    else: a quote opens a C string, and anything else is a list of values.
-    ``52 45`` is a plausible pair of bytes and a plausible pair of digits, so
-    something has to say which, and a file that meant one and got the other
-    would send something nobody asked for.
+    else: a quote opens a C string, and anything else is one byte in
+    hexadecimal. ``52`` is a plausible byte and a plausible pair of digits of
+    something longer, so something has to say which, and a file that meant one
+    and got the other would send something nobody asked for.
 
 Requirement
     The quotes of a C string are part of the value rather than part of the way
     the file is written, since they are the mark that says which notation it
     is. So a YAML file writes them inside its own -- ``'"READ\r"'`` -- and an
     XML one as ``<trigger>&quot;READ\r&quot;</trigger>``. A value whose quotes
-    belong only to the format, such as ``"55 AA"``, arrives as ``55 AA`` and
-    is read as the two bytes it is. A string that opens and does not close is
-    refused rather than taken for a list of values.
+    belong only to the format, such as ``"55"``, arrives as ``55`` and is read
+    as the one byte it is. A string that opens and does not close is refused
+    rather than taken for hexadecimal.
 
 Requirement
     A C string's escapes are C's own -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
@@ -4954,8 +5036,8 @@ Requirement
 
 Requirement
     A trigger's bytes go out as the file wrote them, and are shown as a file
-    could have written them: hexadecimal, with the text beside it where the
-    bytes are text.
+    could have written them: one byte as two hexadecimal digits, and several
+    as a C string, which is the notation that states several bytes.
 
 Requirement
     Tcspecial sends a trigger on the conduit that writes the payload, and
@@ -5082,9 +5164,10 @@ Requirement
     A word that is not an attribute is an error. A misspelled attribute is
     otherwise ignored, which is silence about something the file plainly
     meant: a payload whose ``oc_address`` is misspelled has nowhere to send
-    its data and nothing says so. ``packet_interval_ms`` is the one word this
-    language still knows without accepting: it is named so that a file stating
-    one is told which file it belongs in rather than told the word is unknown.
+    its data and nothing says so. ``packet_interval_ms`` on a payload and
+    ``mode`` are the words this language still knows without accepting: each
+    is named so that a file stating one is told where that figure belongs, or
+    what says what it said, rather than told the word is unknown.
 
 Requirement
     No two data handlers want the same thing. Two at one address cannot both
@@ -6023,8 +6106,11 @@ file's is, so a simulator configuration may be written in YAML or XML.
 
 File Structure
 --------------
-A simulator configuration file has two sections, both optional, and a version
-and description of its own.
+A simulator configuration file has two sections, both optional, and a
+description of its own. It states no version: a configuration says which
+version it is so that it can be checked against the software that will read it
+on the vehicle, and nothing aboard reads this file, so a version here answered
+a question nobody was asking. A file that states one is refused, saying this.
 
 simulated payload groups
     Named groups of settings. A group carries what several simulated payloads
@@ -6039,11 +6125,13 @@ simulated payloads
 +---------------------+--------+---------------------------------------------+
 | Attribute           | Type   | Meaning                                     |
 +=====================+========+=============================================+
-| packet_interval_ms  | number | Milliseconds between packets. 0 is as fast  |
-|                     |        | as the payload can be driven                |
+| packet_interval     | length | How long between packets, as a length of    |
+|                     | of     | time: ``1s``, ``500ms``. Nought -- ``0s``   |
+|                     | time   | -- is as fast as the payload can be driven  |
 +---------------------+--------+---------------------------------------------+
-| segment_interval_ms | number | Milliseconds between the segments of one    |
-|                     |        | packet. Defaults to the packet interval     |
+| segment_interval    | length | How long between the segments of one        |
+|                     | of     | packet. Defaults to the packet interval     |
+|                     | time   |                                             |
 +---------------------+--------+---------------------------------------------+
 | segment_size        | number | Bytes in one segment. Defaults to the whole |
 |                     |        | packet, whose size the payload configuration|
@@ -6092,8 +6180,9 @@ that the two files can be checked against each other.
 | truncate_percent       | number | Packets in a hundred sent short of their |
 |                        |        | size                                     |
 +------------------------+--------+------------------------------------------+
-| jitter_ms              | number | Milliseconds a packet may be late,       |
-|                        |        | chosen afresh for each one               |
+| jitter                 | length | How late a packet may be, as a length    |
+|                        | of     | of time, chosen afresh for each one      |
+|                        | time   |                                          |
 +------------------------+--------+------------------------------------------+
 | silent_after           | number | Packets after which the payload sends no |
 |                        |        | more, the link still open. 0 is never    |
@@ -6329,15 +6418,14 @@ states its own rate instead.
 
 .. code-block:: yaml
 
-   version: "1.0"
    description: Simulator settings for the payloads of tcspecial1.yaml
 
    simulated_payload_groups:
      - name: steady_1hz
-       packet_interval_ms: 1000
+       packet_interval: 1s
 
      - name: continuous
-       packet_interval_ms: 0
+       packet_interval: 0ms
 
    simulated_payloads:
      - name: tcp-stream
@@ -6357,7 +6445,7 @@ states its own rate instead.
      - name: udp-fast
        type: network
        protocol: udp
-       packet_interval_ms: 500
+       packet_interval: 500ms
 
 Testing
 =======
@@ -7187,9 +7275,20 @@ fans the beacons out -- rather than something the network did silently.
 Requirement
     Every command interpreter configuration states where beacons come from,
     where they are received, and how often: ``beacon.send``, ``beacon.recv``
-    and ``beacon.interval_ms``. None has a default and none may be left out,
+    and ``beacon.interval``. None has a default and none may be left out,
     in the command interpreter's own file or in a payload set's ``tcspecial``
     section.
+
+Requirement
+    How often is a length of time, like every other length of time in these
+    files: ``5s`` rather than ``5000``. It was ``beacon.interval_ms``, a bare
+    count of milliseconds, in every one of the three configurations that
+    states the section -- the interpreter's own file, a payload set's section
+    and a graph's -- and a file still writing that name is told the name it
+    has now rather than told the attribute is missing. The protocol still
+    counts milliseconds, the command that changes the interval carrying four
+    bytes of them, so the conversion happens where the file is read and in one
+    place: ``CIConfigJson::to_ci_config``.
 
 Beacons are how the ground knows the spacecraft is alive. A configuration that
 has not been asked where to send them has not answered, and a default is a way

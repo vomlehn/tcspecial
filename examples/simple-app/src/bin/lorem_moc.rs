@@ -27,8 +27,9 @@ use tcslib::moc::Moc;
 /// The configuration, where nobody says otherwise.
 const CONFIGURATION: &str = "examples/simple-app/simple-app.yaml";
 
-/// The `moc` node in it that `lorem`'s words go to.
-const MOC: &str = "moc";
+/// The node in it that `lorem`'s words go to, which the configuration calls
+/// `moc-1`.
+const MOC: &str = "moc-1";
 
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);

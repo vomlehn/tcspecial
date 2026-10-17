@@ -343,7 +343,7 @@ description: settings
 
 simulated_payload_groups:
   - name: steady
-    packet_interval_ms: 1000
+    packet_interval: 1s
 
 simulated_payloads:
   - name: DH0

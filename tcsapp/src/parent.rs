@@ -325,7 +325,7 @@ pub struct Running {
     waits: Option<Duration>,
 }
 
-/// Start `program` as an app supporting `supports`, run with `arguments`.
+/// Start `executable` as an app supporting `supports`, run with `arguments`.
 ///
 /// The environment it is given is the one this process has. The arguments are
 /// a short, fixed list and are the one thing an app is told other than over
@@ -344,11 +344,11 @@ pub struct Running {
 /// the node was given, and a command line that carried readings would be a
 /// node whose work was outside both the configuration and the program.
 pub fn start(
-    program: &Path,
+    executable: &Path,
     arguments: &[String],
     supports: Supports,
 ) -> Result<Running, String> {
-    let named = |what: &str, e: io::Error| format!("{}: {what}: {e}", program.display());
+    let named = |what: &str, e: io::Error| format!("{}: {what}: {e}", executable.display());
 
     let payload = supports
         .payload
@@ -360,7 +360,7 @@ pub fn start(
         .transpose()?;
     let errors = UnixStream::pair().map_err(|e| named("the error interface", e))?;
 
-    let mut command = Command::new(program);
+    let mut command = Command::new(executable);
     command.args(arguments);
     // Each of the three descriptors is set from this end's own pair, or to
     // nothing where the app does not support it -- and the nothing is closed
@@ -400,7 +400,7 @@ pub fn start(
     let child = command.spawn().map_err(|e| {
         format!(
             "{} could not be started: {e}. It is the program an app node is",
-            program.display()
+            executable.display()
         )
     })?;
 

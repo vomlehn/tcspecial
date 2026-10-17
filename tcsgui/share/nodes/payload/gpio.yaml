@@ -32,15 +32,18 @@ attributes:
     about: >
       Which way an input line is biased when nothing drives it: pull_up,
       pull_down or none.
-  - name: debounce_us
+  - name: debounce
     required: false
-    kind: whole
+    kind: interval
     about: >
-      How long a line must hold its level to count as an event, in
-      microseconds.
+      How long a line must hold its level to count as an event, as a length of
+      time: 50us, 2ms.
   - name: group
     required: false
-    about: The payload group that reads it, where it is in one.
+    about: >
+      The payload group that reads it, where it is in one. Optional, though a
+      payload that states a trigger needs one: the interval of its group is
+      how often it is asked.
   - name: trigger
     required: false
     kind: bytes

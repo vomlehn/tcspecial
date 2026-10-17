@@ -125,8 +125,8 @@
       <xs:element name="loopback" type="xs:string"/>
       <xs:element name="rs485" type="xs:string"/>
       <xs:element name="rs485_rts_on_send" type="xs:string"/>
-      <xs:element name="rs485_delay_before_send_ms" type="xs:string"/>
-      <xs:element name="rs485_delay_after_send_ms" type="xs:string"/>
+      <xs:element name="rs485_delay_before_send" type="xs:string"/>
+      <xs:element name="rs485_delay_after_send" type="xs:string"/>
       <!-- A device on a bus, and a peripheral on one. -->
       <xs:element name="ten_bit" type="xs:string"/>
       <xs:element name="pec" type="xs:string"/>
@@ -146,7 +146,7 @@
       <xs:element name="direction" type="xs:string"/>
       <xs:element name="edge" type="xs:string"/>
       <xs:element name="bias" type="xs:string"/>
-      <xs:element name="debounce_us" type="xs:string"/>
+      <xs:element name="debounce" type="xs:string"/>
       <!-- A computation, and what each of them is told. -->
       <xs:element name="function" type="xs:string"/>
       <xs:element name="inputs" type="xs:string"/>
@@ -156,13 +156,12 @@
       <xs:element name="setpoint" type="xs:string"/>
       <xs:element name="above" type="xs:string"/>
       <xs:element name="below" type="xs:string"/>
-      <!-- The program a `process` computation runs. -->
-      <xs:element name="program" type="xs:string"/>
-      <!-- The executable an app node runs: its application. Executed with a
-           leading `~` and `$HOME` expanded as a shell would expand them, to
+      <!-- The program this node runs: an app node's application, or the
+           program a `process` computation runs on what arrives. Executed with
+           a leading `~` and `$HOME` expanded as a shell would expand them, to
            the home directory and to the value of the environment variable
-           HOME of whatever runs it, and with the node's name as its first
-           argument. -->
+           HOME of whatever runs it. An app node's is run with the node's name
+           as its first argument. -->
       <xs:element name="executable" type="xs:string"/>
       <!-- What an app node's program is told about each stream its kind
            handles: the payload argument first, then the MOC one.
@@ -184,13 +183,16 @@
 
   <!-- A set of payloads read on one interval.
 
-       The interval is a whole number and a unit, written together: `500ms`,
-       `3s`, `15m`, `6h`, `1w`. The units are `us`, `ms`, `s`, `m`, `h`, `d`
-       and `w`, matched longest first, so `500ms` is milliseconds and `500m`
-       is minutes. The number is a whole number as every other in these files
-       is, decimal or hexadecimal with an `0x` prefix, underscores allowed
-       among the digits, so `1_000ms` and `0x3e8ms` are the same interval as
-       `1000ms`.
+       The interval is a number and a unit, written together: `500ms`, `3s`,
+       `1.5s`, `15min`, `6h`, `1w`. The units are `us`, `ms`, `s`, `min`, `h`,
+       `d` and `w`, matched longest first, so `500ms` is milliseconds.
+       Minutes are `min` and never `m`, a single `m` being one letter from
+       `ms` and a thousand-fold apart from it; a month and a year are not
+       units here at all. The number is decimal, whole or a fraction, with
+       underscores allowed among the digits, so `1_000ms`, `1.5s` and
+       `1500ms` are the same interval written three ways. There is no
+       hexadecimal: `d` is a hexadecimal digit, and `0x1d` would be a number
+       that is also "0x1 days".
 
        A string and not a pattern. What the software accepts is
        `graph::parse_interval`, and a pattern here would be a second copy of
@@ -259,7 +261,7 @@
       <xs:element name="beacon" minOccurs="0">
         <xs:complexType>
           <xs:all>
-            <xs:element name="interval_ms" type="xs:string" minOccurs="0"/>
+            <xs:element name="interval" type="xs:string" minOccurs="0"/>
             <xs:element name="send" type="socket" minOccurs="0"/>
             <xs:element name="recv" type="socket" minOccurs="0"/>
           </xs:all>

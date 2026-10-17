@@ -187,19 +187,19 @@ impl Kind {
     /// else by this and the editor builds a node's window from it, so an
     /// attribute added here appears in both.
     ///
-    /// Required ones first, which is the order a window asks in: the program,
+    /// Required ones first, which is the order a window asks in: the executable,
     /// then the argument for each stream the kind handles, then what to do
     /// when it stops.
     pub fn attributes(self) -> &'static [(&'static str, bool)] {
         match self {
             Kind::PayloadVeh | Kind::Pl => &[
-                ("program", true),
+                ("executable", true),
                 ("app-payload-arg", true),
                 ("restart", false),
             ],
-            Kind::MocVeh => &[("program", true), ("app-moc-arg", true), ("restart", false)],
+            Kind::MocVeh => &[("executable", true), ("app-moc-arg", true), ("restart", false)],
             Kind::AllVeh | Kind::AllPl => &[
-                ("program", true),
+                ("executable", true),
                 ("app-payload-arg", true),
                 ("app-moc-arg", true),
                 ("restart", false),
@@ -232,9 +232,9 @@ pub struct AppParams {
     ///
     /// Kept as written, `~` and `$HOME` and all: what those stand for is
     /// settled where the program is executed, which is aboard the vehicle --
-    /// see [`AppParams::program_path`]. A ground tool expanding them against
+    /// see [`AppParams::executable_path`]. A ground tool expanding them against
     /// its own home directory would answer a question about a workstation.
-    pub program: String,
+    pub executable: String,
     /// What the program is told about the payload stream, where its kind
     /// handles payload data.
     ///
@@ -257,11 +257,11 @@ impl AppParams {
     ///
     /// The expansion is [`expanded`]'s, which is a shell's for the two forms
     /// it covers and nothing else's.
-    pub fn program_path(&self) -> Result<PathBuf, String> {
+    pub fn executable_path(&self) -> Result<PathBuf, String> {
         let home = std::env::var("HOME").ok();
-        expanded(&self.program, home.as_deref())
+        expanded(&self.executable, home.as_deref())
             .map(PathBuf::from)
-            .map_err(|why| format!("\"{}\": program: {why}", self.name))
+            .map_err(|why| format!("\"{}\": executable: {why}", self.name))
     }
 
     /// The arguments the program is run with, in order.
@@ -285,7 +285,7 @@ impl AppParams {
     }
 }
 
-/// `program` as a path, with `~` and `$HOME` expanded as a shell would.
+/// `executable` as a path, with `~` and `$HOME` expanded as a shell would.
 ///
 /// `home` is what both stand for, which is `HOME` in the environment of
 /// whatever is about to run the program. `None` is an environment that has
@@ -352,7 +352,7 @@ pub fn attributes_of(node_type: &str) -> Option<&'static [(&'static str, bool)]>
 ///
 /// Every attribute is checked, including the ones that are not this kind's:
 /// one that nothing reads is refused rather than ignored, because an app node
-/// whose `progam` was misspelled would be a node with no program at all --
+/// whose `exectuable` was misspelled would be a node with no program at all --
 /// refused for the absence and never for the typo, and a reader comparing the
 /// two words is the only way anybody would find it. An `app-moc-arg` on a kind
 /// that handles no MOC data is the same mistake with a different word: an
@@ -400,12 +400,14 @@ pub fn params_of(
 
     // Required, with no default: an app node is the program it names, and
     // there is no program this software could reasonably run instead.
-    let program = attributes
-        .get("program")
-        .map(|program| program.as_str().trim().to_string())
-        .filter(|program| !program.is_empty())
+    let executable = attributes
+        .get("executable")
+        .map(|executable| executable.as_str().trim().to_string())
+        .filter(|executable| !executable.is_empty())
         .ok_or_else(|| {
-            named("program is not set: an app node is the program it names".to_string())
+            named(
+                "executable is not set: an app node is the program it names".to_string(),
+            )
         })?;
 
     // The argument for each stream the kind handles, which is required of the
@@ -437,7 +439,7 @@ pub fn params_of(
     Ok(AppParams {
         name,
         kind,
-        program,
+        executable,
         payload_arg,
         moc_arg,
         restart,
@@ -512,8 +514,8 @@ mod tests {
             let attributes = kind.attributes();
             let says = |name: &str| attributes.iter().find(|(known, _)| *known == name);
             assert_eq!(
-                says("program"),
-                Some(&("program", true)),
+                says("executable"),
+                Some(&("executable", true)),
                 "{}",
                 kind.node_type()
             );
@@ -559,7 +561,7 @@ mod tests {
                 "through",
                 "app_all_veh",
                 &[
-                    ("program", "/bin/true"),
+                    ("executable", "/bin/true"),
                     ("app-payload-arg", "--readings"),
                     ("app-moc-arg", "--commands"),
                 ]
@@ -573,7 +575,7 @@ mod tests {
             of(
                 "fore",
                 "app_payload_veh",
-                &[("program", "/bin/true"), ("app-payload-arg", "--readings")]
+                &[("executable", "/bin/true"), ("app-payload-arg", "--readings")]
             )
             .expect("a node that states its one"),
             vec!["fore", "--readings"]
@@ -582,7 +584,7 @@ mod tests {
             of(
                 "back",
                 "app_moc_veh",
-                &[("program", "/bin/true"), ("app-moc-arg", "--commands")]
+                &[("executable", "/bin/true"), ("app-moc-arg", "--commands")]
             )
             .expect("a node that states its one"),
             vec!["back", "--commands"]
@@ -594,7 +596,7 @@ mod tests {
             of(
                 "bay",
                 "app_pl",
-                &[("program", "/bin/true"), ("app-payload-arg", "--bay-2")]
+                &[("executable", "/bin/true"), ("app-payload-arg", "--bay-2")]
             )
             .expect("a payload that states its one"),
             vec!["bay", "--bay-2"]
@@ -604,7 +606,7 @@ mod tests {
                 "bay",
                 "app_all_pl",
                 &[
-                    ("program", "/bin/true"),
+                    ("executable", "/bin/true"),
                     ("app-payload-arg", "--bay-2"),
                     ("app-moc-arg", "--bay-2-commands"),
                 ]
@@ -618,7 +620,7 @@ mod tests {
         let params = params_of(
             "fore",
             "app_payload_veh",
-            &said(&[("program", "/bin/true"), ("app-payload-arg", "two words")]),
+            &said(&[("executable", "/bin/true"), ("app-payload-arg", "two words")]),
         )
         .expect("an argument as written");
         assert_eq!(params.arguments(), vec!["fore", "two words"]);
@@ -634,13 +636,13 @@ mod tests {
         let why = params_of(
             "fore",
             "app_payload_veh",
-            &said(&[("program", "/bin/true")]),
+            &said(&[("executable", "/bin/true")]),
         )
         .expect_err("a kind that handles payload data and said nothing");
         assert!(why.contains("app-payload-arg is not set"), "{why}");
         assert!(why.contains("fore"), "{why}");
 
-        let why = params_of("back", "app_moc_veh", &said(&[("program", "/bin/true")]))
+        let why = params_of("back", "app_moc_veh", &said(&[("executable", "/bin/true")]))
             .expect_err("a kind that handles MOC data and said nothing");
         assert!(why.contains("app-moc-arg is not set"), "{why}");
 
@@ -649,7 +651,7 @@ mod tests {
         let why = params_of(
             "through",
             "app_all_veh",
-            &said(&[("program", "/bin/true"), ("app-moc-arg", "--commands")]),
+            &said(&[("executable", "/bin/true"), ("app-moc-arg", "--commands")]),
         )
         .expect_err("a kind that handles both and stated one");
         assert!(why.contains("app-payload-arg is not set"), "{why}");
@@ -719,7 +721,7 @@ mod tests {
     /// A node keeps its program as written and expands it where it is run.
     ///
     /// The two halves of the arrangement: the configuration holds the word
-    /// somebody wrote, and `program_path` answers with what it stands for in
+    /// somebody wrote, and `executable_path` answers with what it stands for in
     /// the environment of whatever is about to run it. A complaint from it
     /// names the node, a report about one of forty app nodes being no use
     /// without that.
@@ -729,7 +731,7 @@ mod tests {
             "bay",
             "app_pl",
             &said(&[
-                ("program", "~/libexec/tcs/bay-2"),
+                ("executable", "~/libexec/tcs/bay-2"),
                 ("app-payload-arg", "--bay-2"),
             ]),
         )
@@ -737,19 +739,19 @@ mod tests {
 
         // Kept as written: a ground tool reading the file sees what the file
         // says, whatever its own home directory is.
-        assert_eq!(params.program, "~/libexec/tcs/bay-2");
+        assert_eq!(params.executable, "~/libexec/tcs/bay-2");
 
         // And expanded against the home of this process, which aboard the
         // vehicle is the one the program will be run from.
         match std::env::var("HOME") {
             Ok(home) if !home.is_empty() => assert_eq!(
-                params.program_path().expect("a home"),
+                params.executable_path().expect("a home"),
                 PathBuf::from(format!("{home}/libexec/tcs/bay-2"))
             ),
             // Run where there is no home: refused, and the complaint says so
             // rather than offering a path made from nothing.
             _ => {
-                let why = params.program_path().expect_err("no home");
+                let why = params.executable_path().expect_err("no home");
                 assert!(why.contains("HOME is not set"), "{why}");
                 assert!(why.contains("bay"), "{why}");
             }
@@ -760,13 +762,13 @@ mod tests {
             "fore",
             "app_payload_veh",
             &said(&[
-                ("program", "/usr/libexec/tcs/fore"),
+                ("executable", "/usr/libexec/tcs/fore"),
                 ("app-payload-arg", "--readings"),
             ]),
         )
         .expect("a node that names a program");
         assert_eq!(
-            params.program_path().expect("nothing to expand"),
+            params.executable_path().expect("nothing to expand"),
             PathBuf::from("/usr/libexec/tcs/fore")
         );
     }
@@ -782,7 +784,7 @@ mod tests {
             "fore",
             "app_payload_veh",
             &said(&[
-                ("program", "/bin/true"),
+                ("executable", "/bin/true"),
                 ("app-payload-arg", "--readings"),
                 ("app-moc-arg", "--commands"),
             ]),
@@ -790,7 +792,7 @@ mod tests {
         .expect_err("an argument this kind is not run with");
         assert!(why.contains("app-moc-arg"), "{why}");
         assert!(why.contains("app_payload_veh"), "{why}");
-        assert!(why.contains("program, app-payload-arg, restart"), "{why}");
+        assert!(why.contains("executable, app-payload-arg, restart"), "{why}");
 
         // The mirror of it: the payload argument on the one vehicle kind that
         // handles no payload data.
@@ -798,7 +800,7 @@ mod tests {
             "back",
             "app_moc_veh",
             &said(&[
-                ("program", "/bin/true"),
+                ("executable", "/bin/true"),
                 ("app-moc-arg", "--commands"),
                 ("app-payload-arg", "--readings"),
             ]),
@@ -811,7 +813,7 @@ mod tests {
             "bay",
             "app_pl",
             &said(&[
-                ("program", "/bin/true"),
+                ("executable", "/bin/true"),
                 ("app-payload-arg", "--bay-2"),
                 ("app-moc-arg", "--commands"),
             ]),
@@ -827,29 +829,29 @@ mod tests {
             "fore",
             "app_payload_veh",
             &said(&[
-                ("program", "/usr/libexec/tcs/fore"),
+                ("executable", "/usr/libexec/tcs/fore"),
                 ("app-payload-arg", "--readings"),
             ]),
         )
         .expect("a node that names a program");
         assert_eq!(params.kind, Kind::PayloadVeh);
-        assert_eq!(params.program, "/usr/libexec/tcs/fore");
+        assert_eq!(params.executable, "/usr/libexec/tcs/fore");
         // Nothing said about restarting is "never", which is the answer that
         // leaves a stopped program stopped.
         assert_eq!(params.restart, Restart::Never);
 
         let why = params_of("fore", "app_payload_veh", &said(&[])).expect_err("no program");
-        assert!(why.contains("program is not set"), "{why}");
+        assert!(why.contains("executable is not set"), "{why}");
         assert!(why.contains("fore"), "{why}");
 
         // And a program named as nothing at all is no program.
         let why = params_of(
             "fore",
             "app_moc_veh",
-            &said(&[("program", "  "), ("app-moc-arg", "--commands")]),
+            &said(&[("executable", "  "), ("app-moc-arg", "--commands")]),
         )
         .expect_err("a program that is blank");
-        assert!(why.contains("program is not set"), "{why}");
+        assert!(why.contains("executable is not set"), "{why}");
 
         // A payload that is a program says the same thing the same way, which
         // is what one module for the five is for.
@@ -857,14 +859,14 @@ mod tests {
             "bay",
             "app_pl",
             &said(&[
-                ("program", "/usr/libexec/tcs/bay"),
+                ("executable", "/usr/libexec/tcs/bay"),
                 ("app-payload-arg", "--bay-2"),
             ]),
         )
         .expect("a payload that names a program");
         assert_eq!(params.kind, Kind::Pl);
         assert!(params.kind.is_payload());
-        assert_eq!(params.program, "/usr/libexec/tcs/bay");
+        assert_eq!(params.executable, "/usr/libexec/tcs/bay");
         assert_eq!(params.name, "bay");
         assert_eq!(params.payload_arg.as_deref(), Some("--bay-2"));
         assert_eq!(params.moc_arg, None);
@@ -878,7 +880,7 @@ mod tests {
                 "fore",
                 "app_all_veh",
                 &said(&[
-                    ("program", "/bin/true"),
+                    ("executable", "/bin/true"),
                     ("app-payload-arg", "--readings"),
                     ("app-moc-arg", "--commands"),
                     ("restart", restart),
@@ -908,7 +910,7 @@ mod tests {
         let params = params_of(
             "fore",
             "app_payload_veh",
-            &said(&[("program", "/bin/true"), ("app-payload-arg", "--readings")]),
+            &said(&[("executable", "/bin/true"), ("app-payload-arg", "--readings")]),
         )
         .expect("a node that says nothing about restarting");
         assert_eq!(params.restart, Restart::Never);
@@ -921,20 +923,20 @@ mod tests {
             "fore",
             "app_payload_veh",
             &said(&[
-                ("program", "/bin/true"),
+                ("executable", "/bin/true"),
                 ("app-payload-arg", "--readings"),
                 ("progam", "/bin/false"),
             ]),
         )
         .expect_err("a misspelled attribute");
         assert!(why.contains("progam"), "{why}");
-        assert!(why.contains("program, app-payload-arg, restart"), "{why}");
+        assert!(why.contains("executable, app-payload-arg, restart"), "{why}");
     }
 
     /// And a type that is not an app's is not read as one.
     #[test]
     fn a_type_that_is_not_an_apps_is_refused() {
-        let why = params_of("k", "compute", &said(&[("program", "/bin/true")]))
+        let why = params_of("k", "compute", &said(&[("executable", "/bin/true")]))
             .expect_err("a type that is not an app");
         assert!(why.contains("not an app node type"), "{why}");
         assert!(

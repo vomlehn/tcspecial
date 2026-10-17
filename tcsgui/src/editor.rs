@@ -551,12 +551,12 @@ tcsgui:
             "the payload opened at {:?}, outside its pane",
             sensor.at
         );
-        // At the same height it was drawn at: the smallest move that obeys
-        // the rule, so a diagram is not rearranged by being opened. Drawn
-        // well below the ground link, which is the tallest node there is: a
-        // node that came home on top of another steps down the grid, and that
-        // is a rule of its own rather than this one.
-        assert_eq!(sensor.at.1, 240);
+        // At the same height it was drawn at, to the grid: the smallest move
+        // that obeys the rule, so a diagram is not rearranged by being opened.
+        // Drawn well below the ground link: a node that came home on top of
+        // another steps down the grid, and that is a rule of its own rather
+        // than this one.
+        assert_eq!(sensor.at.1, crate::pane::on_grid(240));
         // And the ground link, which the file drew in the vehicle's pane: it
         // belongs in the moc pane now, so it comes home at the same height.
         let moc = editor.document().node("moc").expect("the ground link");
@@ -565,7 +565,7 @@ tcsgui:
             "the ground link opened at {:?}, outside its pane",
             moc.at
         );
-        assert_eq!(moc.at.1, 40);
+        assert_eq!(moc.at.1, crate::pane::on_grid(40));
 
         // The file is untouched.
         assert_eq!(

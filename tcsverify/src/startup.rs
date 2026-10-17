@@ -77,6 +77,15 @@ impl Startup {
         &self.lines
     }
 
+    /// What the window's Copy button copies: the heading it is shown under,
+    /// then every line, one to a line -- what a person passing it on would
+    /// otherwise type out again.
+    pub fn copied(&self, heading: &str) -> String {
+        let mut said = vec![heading.to_string()];
+        said.extend(self.lines.iter().map(|(_, line)| line.clone()));
+        said.join("\n")
+    }
+
     /// Say it all on stderr, which is said whether or not there is a window
     /// to say it in: a program started from a terminal is read there, and one
     /// that cannot open a window has nowhere else.
@@ -119,6 +128,18 @@ mod tests {
         wrong.findings.push(finding("a.yaml", Severity::Error));
         startup.report(&wrong, true);
         assert!(startup.fatal());
+    }
+
+    /// What is copied is the heading and every line, in order.
+    #[test]
+    fn what_is_copied_is_the_heading_and_every_line() {
+        let mut startup = Startup::default();
+        startup.warning("a.yaml:1: warning: unfinished");
+        startup.error("cannot listen on 10.0.0.1:5000");
+        assert_eq!(
+            startup.copied("Something is wrong."),
+            "Something is wrong.\na.yaml:1: warning: unfinished\ncannot listen on 10.0.0.1:5000"
+        );
     }
 
     /// An error in the file read loosely is said and does not stop it.

@@ -72,6 +72,18 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             ));
         }
 
+        // A payload that is a program is the program itself: tcspecial runs
+        // it, and there is no device or socket for a simulator to stand in
+        // for.
+        if crate::node::app::Kind::of(&node.node_type).is_some() {
+            return Err(format!(
+                "\"{}\" is an app node, a program tcspecial runs rather than \
+                 something it reaches, so there is nothing for a simulator to \
+                 stand in for: leave it out of the simulator file",
+                node.name
+            ));
+        }
+
         let reach = reach_of(node).map_err(|why| {
             format!("\"{}\" cannot be simulated: {why}", node.name)
         })?;

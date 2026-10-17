@@ -77,7 +77,7 @@ run-thermostat:
 # Both ends are run here. The vehicle goes in the background, and the ground
 # station, lorem_moc, in the foreground: it is what prints the line, and it
 # stops at the end of it. Then the vehicle is stopped. The payload,
-# lorem_pl.py, is the `program` the configuration names, a Python 3 script
+# lorem_pl.py, is the `executable` the configuration names, a Python 3 script
 # beside it, and tcspecial starts it -- so Python 3 is checked for first.
 #
 # The binaries are run directly rather than through `cargo run`, so that $$!

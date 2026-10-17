@@ -57,7 +57,7 @@ impl AppPayloadVeh {
             ));
         }
         Ok(AppPayloadVeh {
-            running: parent::start(&params.program_path()?, &params.arguments(), Supports::PAYLOAD)?,
+            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::PAYLOAD)?,
         })
     }
 
@@ -133,7 +133,7 @@ mod tests {
         AppParams {
             name: "fore".to_string(),
             kind: Kind::PayloadVeh,
-            program: program.display().to_string(),
+            executable: program.display().to_string(),
             payload_arg: Some("--readings".to_string()),
             moc_arg: None,
             restart: Restart::Never,

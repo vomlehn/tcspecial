@@ -308,6 +308,276 @@ pub fn verify(payload_path: &Path, sim_path: Option<&Path>) -> Report {
     report
 }
 
+/// Check two spellings of one configuration -- one XML, one YAML -- each
+/// against the same simulator file, and then that they say the same thing.
+///
+/// Each is verified as [`verify`] verifies one, the first named first. Then
+/// what each is read as is compared: every section, every attribute and every
+/// value, in the form the programs act on -- see
+/// `tcslibgs::config_digest::interpretation_of_file`, which is what a
+/// configuration's digest is taken over. So two files this finds no
+/// difference between are two files every program reads alike, and two whose
+/// digests tcspecial and tcsmoc would agree on.
+///
+/// A difference is reported against the second file, at the line the thing
+/// that differs is written on where it can be found, saying what each file
+/// says. A file that cannot be read at all has nothing to compare, which is
+/// said once and is already among its own findings.
+pub fn verify_pair(first: &Path, second: &Path, sim_path: &Path) -> Report {
+    let mut report = verify(first, Some(sim_path));
+    let then = verify(second, Some(sim_path));
+    report.joined = report.joined && then.joined;
+    for finding in then.findings {
+        if report.halted {
+            break;
+        }
+        report.found(
+            &finding.file,
+            finding.line,
+            finding.message,
+            finding.severity,
+            finding.problem,
+        );
+    }
+    compare(first, second, &mut report);
+    report
+}
+
+/// Whether two files are read as one configuration, every difference found
+/// added to `report`. See [`verify_pair`].
+pub fn compare(first: &Path, second: &Path, report: &mut Report) {
+    use tcslibgs::config_digest::interpretation_of_file;
+
+    let (one, two) = match (
+        interpretation_of_file(first),
+        interpretation_of_file(second),
+    ) {
+        (Ok(one), Ok(two)) => (one, two),
+        (one, two) => {
+            let unread: Vec<String> = [(first, one.is_err()), (second, two.is_err())]
+                .iter()
+                .filter(|(_, failed)| *failed)
+                .map(|(path, _)| path.display().to_string())
+                .collect();
+            report.add(
+                second,
+                THE_FILE_ITSELF,
+                format!(
+                    "the two files are not compared, because {} cannot be read",
+                    unread.join(" and ")
+                ),
+            );
+            return;
+        }
+    };
+
+    let mut differences = Vec::new();
+    differences_between(&one, &two, &mut Vec::new(), &mut differences);
+    let text = std::fs::read_to_string(second).unwrap_or_default();
+    let (first_name, second_name) = (first.display(), second.display());
+    for (path, said) in differences {
+        let line = line_of_path(&text, &path);
+        let message = match said {
+            Said::Both(a, b) => format!(
+                "{}: {first_name} says {a} and {second_name} says {b}",
+                path.join(" / ")
+            ),
+            Said::OnlyFirst(Some(a)) => format!(
+                "{}: {first_name} says {a} and {second_name} says nothing",
+                path.join(" / ")
+            ),
+            Said::OnlyFirst(None) => format!(
+                "{}: {first_name} has this and {second_name} does not",
+                path.join(" / ")
+            ),
+            Said::OnlySecond(Some(b)) => format!(
+                "{}: {first_name} says nothing and {second_name} says {b}",
+                path.join(" / ")
+            ),
+            Said::OnlySecond(None) => format!(
+                "{}: {first_name} does not have this and {second_name} does",
+                path.join(" / ")
+            ),
+            Said::Order(a, b) => format!(
+                "{}: {first_name} gives them in the order {a} and {second_name} \
+                 in the order {b}, and the order is part of what they mean",
+                path.join(" / ")
+            ),
+        };
+        report.add(second, line, message);
+    }
+}
+
+/// What two files say about one thing they differ on.
+enum Said {
+    Both(String, String),
+    /// Said by one file only: what it says, where that is a value, and
+    /// `None` where it is a whole entry -- a node, a section -- which is
+    /// named by the path and would be a page if it were printed.
+    OnlyFirst(Option<String>),
+    OnlySecond(Option<String>),
+    /// The same entries, in a different order.
+    Order(String, String),
+}
+
+/// A value as a reader would write it in a message.
+fn shown(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(text) => format!("\"{text}\""),
+        other => other.to_string(),
+    }
+}
+
+/// A value said by one file only: itself where it is one, nothing where it is
+/// a whole entry.
+fn alone(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::Object(_) | serde_json::Value::Array(_) => None,
+        other => Some(shown(other)),
+    }
+}
+
+/// What tells the entries of a list apart, where something does: a node by
+/// its name, a link by where it leaves from. `None` for a list whose entries
+/// have no such key, or whose keys repeat, which is then compared place by
+/// place.
+fn keys_of(list: &[serde_json::Value]) -> Option<Vec<String>> {
+    for key in ["name", "from"] {
+        let keys: Option<Vec<String>> = list
+            .iter()
+            .map(|entry| entry.get(key).and_then(|k| k.as_str()).map(str::to_string))
+            .collect();
+        if let Some(keys) = keys {
+            let mut unique = keys.clone();
+            unique.sort();
+            unique.dedup();
+            if unique.len() == keys.len() {
+                return Some(keys);
+            }
+        }
+    }
+    None
+}
+
+/// Every place two value trees differ, each with the path to it.
+fn differences_between(
+    one: &serde_json::Value,
+    two: &serde_json::Value,
+    path: &mut Vec<String>,
+    out: &mut Vec<(Vec<String>, Said)>,
+) {
+    use serde_json::Value;
+
+    match (one, two) {
+        (Value::Object(a), Value::Object(b)) => {
+            let mut keys: Vec<&String> = a.keys().chain(b.keys()).collect();
+            keys.sort();
+            keys.dedup();
+            for key in keys {
+                path.push(key.clone());
+                match (a.get(key), b.get(key)) {
+                    (Some(x), Some(y)) => differences_between(x, y, path, out),
+                    (Some(x), None) if !x.is_null() => {
+                        out.push((path.clone(), Said::OnlyFirst(alone(x))))
+                    }
+                    (None, Some(y)) if !y.is_null() => {
+                        out.push((path.clone(), Said::OnlySecond(alone(y))))
+                    }
+                    _ => {}
+                }
+                path.pop();
+            }
+        }
+        (Value::Array(a), Value::Array(b)) => match (keys_of(a), keys_of(b)) {
+            // Entries with names: matched by name, so one entry missing is
+            // one difference rather than every entry after it.
+            (Some(ka), Some(kb)) => {
+                for (key, x) in ka.iter().zip(a) {
+                    path.push(key.clone());
+                    match kb.iter().position(|k| k == key) {
+                        Some(at) => differences_between(x, &b[at], path, out),
+                        None => out.push((path.clone(), Said::OnlyFirst(alone(x)))),
+                    }
+                    path.pop();
+                }
+                for (key, y) in kb.iter().zip(b) {
+                    if !ka.contains(key) {
+                        path.push(key.clone());
+                        out.push((path.clone(), Said::OnlySecond(alone(y))));
+                        path.pop();
+                    }
+                }
+                // And the order, which is part of what they mean: a node's
+                // place is its device id.
+                let common = |keys: &[String], other: &[String]| -> Vec<String> {
+                    keys.iter().filter(|k| other.contains(k)).cloned().collect()
+                };
+                let (oa, ob) = (common(&ka, &kb), common(&kb, &ka));
+                if oa != ob {
+                    out.push((path.clone(), Said::Order(oa.join(", "), ob.join(", "))));
+                }
+            }
+            _ => {
+                for at in 0..a.len().max(b.len()) {
+                    path.push(at.to_string());
+                    match (a.get(at), b.get(at)) {
+                        (Some(x), Some(y)) => differences_between(x, y, path, out),
+                        (Some(x), None) => out.push((path.clone(), Said::OnlyFirst(alone(x)))),
+                        (None, Some(y)) => out.push((path.clone(), Said::OnlySecond(alone(y)))),
+                        (None, None) => {}
+                    }
+                    path.pop();
+                }
+            }
+        },
+        (x, y) if x != y => out.push((path.clone(), Said::Both(shown(x), shown(y)))),
+        _ => {}
+    }
+}
+
+/// The line a path's last named part is written on, searching from where each
+/// part before it was found -- the node, then the attribute under it. The
+/// file's first line where nothing is found.
+///
+/// Only the parts a file writes are searched for: a node's name, an
+/// attribute's, a section's. The comparison's own words for where it is --
+/// `nodes`, `attributes`, a place in a list -- are not in a file, or are in it
+/// somewhere else (the editor's own section has `nodes`), and finding one
+/// would send a reader to the wrong line. A link's `node.terminal` is the node
+/// and then the terminal under it, which is how both formats write it.
+fn line_of_path(text: &str, path: &[String]) -> usize {
+    const NOT_WRITTEN: [&str; 4] = ["nodes", "attributes", "links", "to"];
+    let lines: Vec<&str> = text.lines().collect();
+    let mut from = 0;
+    let mut found = None;
+    let parts = path
+        .iter()
+        .filter(|part| part.parse::<usize>().is_err() && !NOT_WRITTEN.contains(&part.as_str()))
+        .flat_map(|part| part.split('.').map(str::to_string).collect::<Vec<_>>());
+    for part in parts {
+        // A whole name, outside a comment: `heater` is not found in
+        // `heaters`, and a comment saying what an attribute is for is not
+        // where it is set.
+        let names = |line: &&str| {
+            let said = line.trim_start();
+            if said.starts_with('#') || said.starts_with("<!--") {
+                return false;
+            }
+            let in_a_name = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+            line.match_indices(part.as_str()).any(|(at, _)| {
+                let before = line[..at].chars().next_back();
+                let after = line[at + part.len()..].chars().next();
+                !before.is_some_and(in_a_name) && !after.is_some_and(in_a_name)
+            })
+        };
+        if let Some(at) = lines[from..].iter().position(names) {
+            from += at;
+            found = Some(from + 1);
+        }
+    }
+    found.unwrap_or(THE_FILE_ITSELF)
+}
+
 /// Check a version 2 configuration: read it, then ask what is wrong with it.
 ///
 /// The checking is `tcslibgs::graph::Graph::check`, which is the same code
@@ -528,6 +798,86 @@ fn line_of(e: &TcsError) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The thermostat example's two spellings and its simulator file, copied
+    /// to a directory of their own, with `change` made to the XML.
+    fn thermostat_pair(change: impl Fn(String) -> String) -> (tempfile::TempDir, PathBuf, PathBuf, PathBuf) {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/thermostat");
+        let dir = tempfile::tempdir().expect("a directory");
+        let at = |name: &str| dir.path().join(name);
+        for name in ["thermostat.yaml", "thermostat-sim.yaml"] {
+            std::fs::copy(root.join(name), at(name)).expect("copied");
+        }
+        let xml = std::fs::read_to_string(root.join("thermostat.xml")).expect("the XML");
+        std::fs::write(at("thermostat.xml"), change(xml)).expect("written");
+        let (xml, yaml, sim) = (at("thermostat.xml"), at("thermostat.yaml"), at("thermostat-sim.yaml"));
+        (dir, xml, yaml, sim)
+    }
+
+    /// Two spellings of one configuration: each checked, nothing different.
+    #[test]
+    fn two_spellings_of_one_configuration_compare_alike() {
+        let (_dir, xml, yaml, sim) = thermostat_pair(|xml| xml);
+        let report = verify_pair(&xml, &yaml, &sim);
+        assert!(report.findings.is_empty(), "{:?}", report.said());
+        assert!(report.joined, "both were checked with the simulator file");
+        // Either order.
+        assert!(verify_pair(&yaml, &xml, &sim).findings.is_empty());
+    }
+
+    /// A value changed in one spelling is reported: where, and what each
+    /// file says, at the line the second file sets it on.
+    #[test]
+    fn a_value_one_spelling_changes_is_reported() {
+        let (_dir, xml, yaml, sim) =
+            thermostat_pair(|xml| xml.replacen("<setpoint>293.15", "<setpoint>290", 1));
+        let report = verify_pair(&yaml, &xml, &sim);
+        let said = report.said();
+        assert_eq!(report.findings.len(), 1, "{said:?}");
+        let finding = &report.findings[0];
+        assert_eq!(finding.file, xml);
+        assert!(
+            finding.message.contains("nodes / thermostat / attributes / setpoint")
+                && finding.message.contains("says \"293.15\"")
+                && finding.message.contains("says \"290\""),
+            "{said:?}"
+        );
+        let text = std::fs::read_to_string(&xml).expect("the XML");
+        let line = text.lines().nth(finding.line - 1).expect("a line");
+        assert!(line.contains("<setpoint>290"), "line {}: {line}", finding.line);
+        assert_eq!(report.status(), 1);
+    }
+
+    /// A node renamed in one spelling is one node missing from each, and a
+    /// line to it that names it differently -- not a page of differences for
+    /// every node after it.
+    #[test]
+    fn a_node_one_spelling_renames_is_missing_from_the_other() {
+        let (_dir, xml, yaml, sim) = thermostat_pair(|xml| {
+            xml.replace("<name>heaters</name>", "<name>heater</name>")
+                .replace("<target>heaters</target>", "<target>heater</target>")
+        });
+        let mut report = Report::default();
+        compare(&yaml, &xml, &mut report);
+        let said: Vec<&str> = report.findings.iter().map(|f| f.message.as_str()).collect();
+        assert!(said.iter().any(|m| m.contains("nodes / heaters:") && m.contains("does not")), "{said:?}");
+        assert!(said.iter().any(|m| m.contains("nodes / heater:")), "{said:?}");
+        assert!(said.iter().any(|m| m.contains("\"heaters\"") && m.contains("\"heater\"")), "{said:?}");
+        assert!(said.len() <= 4, "{said:?}");
+    }
+
+    /// The order nodes are written in is part of what they mean -- a node's
+    /// place is its device id -- so two spellings that give them in two
+    /// orders differ.
+    #[test]
+    fn nodes_in_another_order_differ() {
+        let one = serde_json::json!({ "nodes": [{ "name": "a" }, { "name": "b" }] });
+        let two = serde_json::json!({ "nodes": [{ "name": "b" }, { "name": "a" }] });
+        let mut out = Vec::new();
+        differences_between(&one, &two, &mut Vec::new(), &mut out);
+        assert_eq!(out.len(), 1);
+        assert!(matches!(&out[0].1, Said::Order(a, b) if a == "a, b" && b == "b, a"));
+    }
 
     /// A file in a temporary directory, so the findings name a real path.
     struct Set {

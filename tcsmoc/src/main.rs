@@ -475,14 +475,13 @@ fn present(startup: &Startup) {
         }
     };
     window.set_program("tcsmoc".into());
-    window.set_heading(
-        if startup.fatal() {
-            "Something is wrong with the configuration."
-        } else {
-            "Something about the configuration is worth knowing."
-        }
-        .into(),
-    );
+    let heading = if startup.fatal() {
+        "Something is wrong with the configuration."
+    } else {
+        "Something about the configuration is worth knowing."
+    };
+    window.set_heading(heading.into());
+    window.set_everything(startup.copied(heading).into());
     window.set_fatal(startup.fatal());
     let lines: Vec<StartupLine> = startup
         .lines()
@@ -934,6 +933,7 @@ fn main() {
     };
 
     let ui = MainWindow::new().unwrap();
+    remember_main_window(&ui);
 
     let _ = Sizes::settle(&ui);
     let ui_weak = ui.as_weak();
@@ -2057,11 +2057,15 @@ fn ask_whether_to_continue(
                 return;
             };
             window.set_message(SharedString::from(why));
+            // The panels take no presses until it is answered: nothing is
+            // commanded behind a question about whether to go on at all.
+            main_window_inert(true);
             // The window holds a handle on itself through this callback, so
             // that it stays up until it is answered rather than until this
             // function returns.
             let held = window.clone_strong();
             window.on_continue_anyway(move || {
+                main_window_inert(false);
                 let _ = held.hide();
             });
             window.on_quit(move || {
@@ -2070,6 +2074,30 @@ fn ask_whether_to_continue(
             let _ = window.show();
         });
     })
+}
+
+thread_local! {
+    /// The main window, for a question asked in a window of its own to make
+    /// it inert while it waits: see `ask_whether_to_continue`. Weak, so the
+    /// window is not kept alive by being remembered. On the event loop's
+    /// thread, which is the only one a window may be touched from.
+    static MAIN_WINDOW: std::cell::RefCell<Option<slint::Weak<MainWindow>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Remember the main window, so a question can make it inert. Called where
+/// each run makes its window.
+fn remember_main_window(ui: &MainWindow) {
+    MAIN_WINDOW.with(|main| *main.borrow_mut() = Some(ui.as_weak()));
+}
+
+/// Make the main window take no presses, or take them again.
+fn main_window_inert(inert: bool) {
+    MAIN_WINDOW.with(|main| {
+        if let Some(ui) = main.borrow().as_ref().and_then(|weak| weak.upgrade()) {
+            ui.set_inert(inert);
+        }
+    });
 }
 
 fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<ProcessManager>>) {
@@ -3040,8 +3068,14 @@ mod tests {
         ui.show().unwrap();
 
         let on_screen = |ui: &MainWindow| -> Vec<String> {
+            // What the popup says is selectable text, whose words are its
+            // accessible value rather than a label: see copy.slint.
             ElementHandle::find_by_element_type_name(ui, "Text")
                 .filter_map(|e| e.accessible_label())
+                .chain(
+                    ElementHandle::find_by_element_type_name(ui, "TextInput")
+                        .filter_map(|e| e.accessible_value()),
+                )
                 .map(|label| label.to_string())
                 .collect()
         };

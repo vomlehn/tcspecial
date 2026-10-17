@@ -19,8 +19,63 @@
 use crate::settings;
 use crate::style::NodeType;
 
-/// The grid nodes sit on, in pixels. See [`snap`].
-pub const GRID: i32 = 8;
+/// How many of the canvas's pixels make a millimetre.
+///
+/// The grid a node's upper left corner sits on is a millimetre, which is a
+/// length a person can name and measure where a pixel count is how this build
+/// happens to draw. A pixel here is the window's logical pixel, ninety-six to
+/// the inch -- which is what the window toolkit means by a millimetre too, so
+/// the grid on the screen is a millimetre on the screen.
+///
+/// Not a whole number of pixels, so the grid's points are each millimetre
+/// rounded to the nearest pixel: three or four pixels apart, never drifting,
+/// because each is worked out from its own count of millimetres rather than
+/// by adding a step to the one before. Positions stay whole pixels, which is
+/// what the file holds.
+pub const PX_PER_MM: f64 = 96.0 / 25.4;
+
+/// The pixel the grid point `mm` millimetres from the edge is at.
+pub fn grid_point(mm: i32) -> i32 {
+    (mm as f64 * PX_PER_MM).round() as i32
+}
+
+/// The grid point nearest `v`.
+pub fn on_grid(v: i32) -> i32 {
+    grid_point((v as f64 / PX_PER_MM).round() as i32)
+}
+
+/// The lowest grid point at or above `v`.
+pub fn grid_ceil(v: i32) -> i32 {
+    let mut mm = (v as f64 / PX_PER_MM).floor() as i32;
+    while grid_point(mm) < v {
+        mm += 1;
+    }
+    grid_point(mm)
+}
+
+/// The highest grid point at or below `v`.
+pub fn grid_floor(v: i32) -> i32 {
+    let mut mm = (v as f64 / PX_PER_MM).ceil() as i32;
+    while grid_point(mm) > v {
+        mm -= 1;
+    }
+    grid_point(mm)
+}
+
+/// The grid point after `v`, which is a step of one millimetre from a point.
+pub fn grid_after(v: i32) -> i32 {
+    grid_ceil(v + 1)
+}
+
+/// And the one before it.
+pub fn grid_before(v: i32) -> i32 {
+    grid_floor(v - 1)
+}
+
+/// Whether `v` is a grid point.
+pub fn is_on_grid(v: i32) -> bool {
+    on_grid(v) == v
+}
 
 /// How wide the whole working area is, in the coordinates the file holds.
 ///
@@ -94,7 +149,7 @@ pub fn default_dividers() -> Dividers {
 
 /// A position in the working pane, snapped to the grid.
 fn at_percent(percent: i32) -> i32 {
-    crate::snap((WORKING_WIDTH * percent / 100, 0)).0
+    on_grid(WORKING_WIDTH * percent / 100)
 }
 
 /// And back: what percentages of the working pane these dividers leave the moc
@@ -219,15 +274,14 @@ fn names_bands(dividers: Dividers) -> [(i32, i32, u32, u32); 3] {
 /// Where a node of this type may sit: the leftmost and rightmost x.
 ///
 /// The right-hand bound allows for the node's own width, so a node confined to
-/// a pane is drawn inside it rather than hanging over its edge.
+/// a pane is drawn inside it rather than hanging over its edge. Both bounds
+/// are grid points, inside the pane: a node held against an edge is on the
+/// grid as well as in its pane.
 pub fn pane_for(node_type: &str, dividers: Dividers) -> (i32, i32) {
     let (width, _) = size_of(node_type);
     let width = width as i32;
-    match pane_of(node_type) {
-        Pane::Payloads => (0, dividers.payloads - width),
-        Pane::Vehicle => (dividers.payloads, dividers.vehicle - width),
-        Pane::Moc => (dividers.vehicle, WORKING_WIDTH - width),
-    }
+    let (left, right) = edges_of(pane_of(node_type), dividers);
+    (grid_ceil(left), grid_floor(right - width))
 }
 
 /// Where a pane begins and ends, in the coordinates the file holds.
@@ -257,7 +311,10 @@ pub fn confine(node_type: &str, dividers: Dividers, (x, y): (i32, i32)) -> (i32,
     // cent rule allows, any pane at its narrowest being 48 pixels --
     // has a right bound to the left of its left one, and a node in it sits at
     // its left edge and overhangs.
-    (x.clamp(left, right.max(left)), y.max(0))
+    //
+    // On the grid: the nearest grid point, which the bounds are as well, so a
+    // node held at an edge is on the grid too.
+    (on_grid(x).clamp(left, right.max(left)), on_grid(y.max(0)))
 }
 
 /// Where a new node of this type goes.
@@ -295,7 +352,7 @@ pub fn place_in(
     let (width, height) = size_of(node_type);
     let (left, right) = pane_for(node_type, dividers);
     let right = right.max(left);
-    let bottom = WORKING_HEIGHT - height as i32;
+    let bottom = grid_floor(WORKING_HEIGHT - height as i32);
 
     // What is already drawn, and the band at the top of each pane that its
     // name is written in: nothing the editor places itself covers a name. See
@@ -312,13 +369,14 @@ pub fn place_in(
                     && *tall < y + height as i32
             })
     };
+    // Every place tried is a grid point, a millimetre apart.
     let across = |y: i32| {
         let mut x = left;
         while x <= right {
             if clear(x, y) {
                 return Some((x, y));
             }
-            x += GRID;
+            x = grid_after(x);
         }
         None
     };
@@ -327,30 +385,30 @@ pub fn place_in(
     // hanging half off the bottom of the window is not in view.
     let (top, how_much) = visible;
     let top = top.max(0);
-    let mut y = top;
+    let mut y = grid_ceil(top);
     while y <= (top + how_much - height as i32).min(bottom) {
         if let Some(at) = across(y) {
             return at;
         }
-        y += GRID;
+        y = grid_after(y);
     }
 
     // Above the view, lowest first: the nearest place is the shortest scroll.
-    let mut y = (top - height as i32).min(bottom);
+    let mut y = grid_floor((top - height as i32).min(bottom));
     while y >= 0 {
         if let Some(at) = across(y) {
             return at;
         }
-        y -= GRID;
+        y = grid_before(y);
     }
 
     // Below it, highest first.
-    let mut y = (top + how_much).max(0);
+    let mut y = grid_ceil((top + how_much).max(0));
     while y <= bottom {
         if let Some(at) = across(y) {
             return at;
         }
-        y += GRID;
+        y = grid_after(y);
     }
 
     (left, 0)

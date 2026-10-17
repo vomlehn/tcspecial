@@ -11,6 +11,7 @@
 // run offers to quit, and one that can offers to go on.
 
 import { Button, ScrollView } from "std-widgets.slint";
+import { Copyable, CopyButton } from "copy.slint";
 
 export struct StartupLine {
     // One line of the report, as tcsverify prints it.
@@ -27,12 +28,18 @@ export component StartupWindow inherits Window {
     min-height: 180px;
     preferred-width: 640px;
     preferred-height: 300px;
+    // In front of everything until it is answered: it is shown before the
+    // main window, and a question nobody can find is one nobody answers.
+    always-on-top: true;
 
     // Which program this is, for the title and the heading.
     in property <string> program: "";
     // What the program read, said once above the lines rather than in each.
     in property <string> heading: "";
     in property <[StartupLine]> lines: [];
+    // All of it as one text, for the Copy button: the heading and then each
+    // line, as it would be pasted. Set from Rust beside the lines.
+    in property <string> everything: "";
     // Whether the program cannot run with what it found, in which case the one
     // button quits.
     in property <bool> fatal: false;
@@ -43,22 +50,20 @@ export component StartupWindow inherits Window {
         padding: 16px;
         spacing: 10px;
 
-        Text {
+        Copyable {
             text: root.heading;
             font-size: 15px;
             font-weight: 700;
-            wrap: word-wrap;
         }
 
         ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                for line in root.lines: Text {
+                for line in root.lines: Copyable {
                     text: line.text;
                     color: line.error ? #c0392b : #8a5a00;
                     font-size: 13px;
-                    wrap: word-wrap;
                 }
             }
         }
@@ -73,6 +78,8 @@ export component StartupWindow inherits Window {
         }
 
         HorizontalLayout {
+            spacing: 8px;
+            CopyButton { said: root.everything; }
             Rectangle { }
             Button {
                 text: root.fatal ? "Quit" : "Continue";

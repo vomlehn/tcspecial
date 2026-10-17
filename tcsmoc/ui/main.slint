@@ -1,4 +1,5 @@
 import { Button, GroupBox, LineEdit, ListView, GridBox, StandardListView, ScrollView } from "std-widgets.slint";
+import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
 export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
@@ -157,6 +158,9 @@ component DHPanel inherits Rectangle {
             y: 4px;
             width: 300px;
             height: 240px;
+            // Closed by a press outside it, not by any press: a press inside
+            // is somebody selecting what it says to copy it.
+            close-policy: close-on-click-outside;
 
             Rectangle {
                 background: white;
@@ -167,10 +171,16 @@ component DHPanel inherits Rectangle {
                     padding: 6px;
                     spacing: 4px;
 
-                    Text {
-                        text: dh-name + " parameters";
-                        font-weight: 700;
-                        font-size: 11px;
+                    HorizontalLayout {
+                        spacing: 4px;
+                        Copyable {
+                            text: dh-name + " parameters";
+                            font-weight: 700;
+                            font-size: 11px;
+                        }
+                        CopyButton {
+                            said: dh-name + " parameters\n" + parameters;
+                        }
                     }
 
                     // Scrolled rather than sized to the text: how many lines
@@ -179,12 +189,14 @@ component DHPanel inherits Rectangle {
                     // tall enough for the longest of them would be taller
                     // than the window.
                     ScrollView {
-                        Text {
+                        Copyable {
                             // The lines are columns of name and value, so
                             // they only line up in a font whose characters
-                            // are one width.
+                            // are one width -- and they are not wrapped, a
+                            // column broken in two being no column.
                             font-family: "monospace";
                             font-size: 10px;
+                            wrap: no-wrap;
                             text: parameters;
                         }
                     }
@@ -281,6 +293,12 @@ export component MainWindow inherits Window {
     // opens at is Rust's to say: see rows_of_room() in main.rs.
     min-height: 549px;
     background: white;
+
+    // Whether this window takes no presses: true while a question in a window
+    // of its own is waiting to be answered -- see DiffersWindow below, and
+    // `ask_whether_to_continue` in main.rs, which sets it. The panels stay
+    // there to be read; nothing can be commanded behind the question.
+    in property <bool> inert: false;
 
     in-out property <string> ci-status: "Disconnected";
     in-out property <string> ci-address: "127.0.0.1:4000";
@@ -695,6 +713,15 @@ export component MainWindow inherits Window {
             }
         }
     }
+
+    // What makes it inert: an area over the whole window that takes presses
+    // and does nothing with them, there only while it is wanted.
+    if root.inert: TouchArea {
+        x: 0;
+        y: 0;
+        width: 100%;
+        height: 100%;
+    }
 }
 
 // Asked when tcspecial announces a configuration other than the one this MOC
@@ -707,6 +734,10 @@ export component DiffersWindow inherits Window {
     background: #fbfbfa;
     min-width: 420px;
     preferred-width: 560px;
+    // In front of the panels until it is answered: the main window takes no
+    // presses while it is up, and a question behind it would leave nothing
+    // anybody could press.
+    always-on-top: true;
 
     // Both digests, and which file this MOC read.
     in property <string> message: "";
@@ -718,25 +749,26 @@ export component DiffersWindow inherits Window {
         padding: 16px;
         spacing: 10px;
 
-        Text {
+        Copyable {
             text: "tcspecial is serving a different configuration";
             font-size: 15px;
             font-weight: 700;
             color: #c0392b;
         }
-        Text {
+        Copyable {
             text: root.message;
             font-size: 13px;
-            wrap: word-wrap;
         }
-        Text {
+        Copyable {
             text: "The panels may show sources where the vehicle does not send them. Continue anyway?";
             font-size: 12px;
             color: #6b7280;
-            wrap: word-wrap;
         }
         HorizontalLayout {
             spacing: 8px;
+            CopyButton {
+                said: "tcspecial is serving a different configuration\n" + root.message;
+            }
             Rectangle { }
             Button {
                 text: "Quit";

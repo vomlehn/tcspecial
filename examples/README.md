@@ -45,7 +45,7 @@ see what an app node is. Two programs, both in `examples/simple-app`:
 
 - `lorem_pl.py` is the payload, a Python 3 program that uses nothing outside
   the standard library. tcspecial starts it from the configuration, as
-  the `program` of the `app_pl` node named `lorem`, and runs it with the
+  the `executable` of the `app_pl` node named `lorem`, and runs it with the
   node's name and `app-payload-arg` -- which for this payload is the line of
   the text to send, counting from one. It sends one word per packet and then a
   packet holding the line terminator.
@@ -71,7 +71,7 @@ cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another
 ```
 
 Run the vehicle from the repository's root, where the configuration's
-`program` path starts. Either order works because the payload waits a couple
+`executable` path starts. Either order works because the payload waits a couple
 of seconds before its first word: the vehicle sends each word to the ground
 station's address as soon as it has it, and a word sent before `lorem_moc` is
 listening is lost.

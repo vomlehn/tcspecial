@@ -1,4 +1,5 @@
 import { Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 
 // The two scales, stated once.
 //
@@ -1474,23 +1475,26 @@ component Surface inherits Rectangle {
                                 payload-heading.preferred-height))
                         + 2 * Space.tight;
 
-                // A faint grid, which the nodes snap to.
+                // A faint grid, every ten of the millimetres the nodes snap to.
                 //
                 // It gives the surface some depth and makes the alignment
                 // visible -- a diagram whose nodes line up looks deliberate,
                 // and a grid is what says they are lined up rather than
-                // nearly. Coarse on purpose: a dot at every snap would be
-                // thousands of elements and a texture rather than a guide.
-                for n in 24: Rectangle {
-                    x: n * 64px;
+                // nearly. Coarse on purpose: a line at every millimetre would
+                // be thousands of elements and a texture rather than a guide.
+                // A millimetre is 96/25.4 of the canvas's pixels, as it is in
+                // tcsgui::pane::PX_PER_MM; the sheet is 254 mm across and 635
+                // down.
+                for n in 26: Rectangle {
+                    x: round(n * 10 * 96 / 25.4) * 1px;
                     y: 0;
                     width: 1px;
                     height: 100%;
                     background: #f3f4f6;
                 }
-                for n in 16: Rectangle {
+                for n in 64: Rectangle {
                     x: 0;
-                    y: n * 64px;
+                    y: round(n * 10 * 96 / 25.4) * 1px;
                     width: 100%;
                     height: 1px;
                     background: #f3f4f6;
@@ -1681,7 +1685,9 @@ export component MainWindow inherits Window {
     // wants to see the diagram it belongs to -- so the window is there to be
     // looked at from the first moment, and nothing in it can be edited behind
     // the window that is asking. Set from Rust, which knows what came up: see
-    // `startup_waiting` and `listen_when_read` in main.rs.
+    // `startup_waiting` and `listen_when_read` in main.rs. Presses are held by
+    // the area over the window, at the end of it; the menu's items are
+    // disabled as well, the keyboard being another way to reach them.
     in property <bool> inert: false;
     // The line a gesture is drawing, as SVG path data in canvas coordinates,
     // and empty when no gesture is running. Dashed, and in pieces because a
@@ -1784,6 +1790,7 @@ export component MainWindow inherits Window {
             // has been taught by every other program to save their work. Both
             // files of a session go together, each written atomically.
             MenuItem {
+                enabled: !root.inert;
                 title: "Save";
                 activated => { root.save-clicked(); }
             }
@@ -1792,6 +1799,7 @@ export component MainWindow inherits Window {
             // of payloads read together, and which payloads those are is
             // written on the nodes rather than drawn between them.
             MenuItem {
+                enabled: !root.inert;
                 title: "Edit payload groups";
                 activated => { root.edit-groups(); }
             }
@@ -1808,11 +1816,12 @@ export component MainWindow inherits Window {
             // says about itself.
             MenuItem {
                 title: "Edit simulated payload groups";
-                enabled: root.has-simulator;
+                enabled: root.has-simulator && !root.inert;
                 activated => { root.edit-simulator-groups(); }
             }
             MenuSeparator { }
             MenuItem {
+                enabled: !root.inert;
                 title: "Exit";
                 activated => { root.exit-requested(); }
             }
@@ -1820,6 +1829,7 @@ export component MainWindow inherits Window {
         Menu {
             title: "Edit";
             MenuItem {
+                enabled: !root.inert;
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
             }
@@ -1829,6 +1839,7 @@ export component MainWindow inherits Window {
             // over more sheet than the window shows, and for a morning's
             // dragging that has left one nobody can read.
             MenuItem {
+                enabled: !root.inert;
                 title: "Arrange the nodes";
                 activated => { root.arrange(); }
             }
@@ -2749,6 +2760,12 @@ export component AlertWindow inherits Window {
     min-height: 140px;
     preferred-width: 460px;
 
+    // In front of the main window while the editor is starting: set from
+    // Rust for as long as the main window takes no presses, so the window
+    // asking is never behind the one waiting for it. See `on_top` in main.rs.
+    in property <bool> on-top: false;
+    always-on-top: root.on-top;
+
     // What went wrong, in the words the thing that failed used: a path, a
     // reason from the operating system, the attribute a rule refused.
     in property <string> trouble: "";
@@ -2768,19 +2785,19 @@ export component AlertWindow inherits Window {
         padding: Space.wide;
         spacing: Space.step;
 
-        Text {
+        Copyable {
             text: root.heading;
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
         }
-        Text {
+        Copyable {
             text: root.trouble;
             color: #c0392b;
             font-size: Type.body;
             wrap: word-wrap;
         }
-        if root.advice != "": Text {
+        if root.advice != "": Copyable {
             // The one thing worth saying beside the reason, because it is the
             // thing a person wants to know first and the answer is usually
             // yes: the editor is still holding the session, so whatever the
@@ -2794,6 +2811,11 @@ export component AlertWindow inherits Window {
         Rectangle { vertical-stretch: 1; }
 
         HorizontalLayout {
+            spacing: Space.step;
+            CopyButton {
+                said: root.heading + "\n" + root.trouble
+                    + (root.advice != "" ? "\n" + root.advice : "");
+            }
             Rectangle { }
             Button {
                 text: "OK";
@@ -2823,6 +2845,9 @@ export component ConcernsWindow inherits Window {
     preferred-height: 320px;
 
     in property <[ConcernRow]> rows: [];
+    // Every row as one text, for the Copy button. Set from Rust beside the
+    // rows, where joining them is a line rather than a loop in markup.
+    in property <string> everything: "";
     // Whether this is the list of what was set aside, which decides what the
     // second button on a row offers.
     in property <bool> aside: false;
@@ -2837,14 +2862,14 @@ export component ConcernsWindow inherits Window {
         padding: Space.wide;
         spacing: Space.step;
 
-        Text {
+        Copyable {
             text: root.aside
                 ? "Set aside"
                 : "Things that might be wrong";
             font-size: Type.strong;
             font-weight: Type.bold;
         }
-        Text {
+        Copyable {
             text: root.aside
                 ? "You decided to leave these. Take one up again to have it "
                     + "counted with the rest."
@@ -2861,7 +2886,7 @@ export component ConcernsWindow inherits Window {
                 spacing: Space.tight;
                 for row[i] in root.rows: HorizontalLayout {
                     spacing: Space.step;
-                    Text {
+                    Copyable {
                         text: row.said;
                         font-size: Type.body;
                         vertical-alignment: center;
@@ -2877,7 +2902,7 @@ export component ConcernsWindow inherits Window {
                         clicked => { root.decided(i); }
                     }
                 }
-                if root.rows.length == 0: Text {
+                if root.rows.length == 0: Copyable {
                     text: root.aside
                         ? "Nothing has been set aside."
                         : "Nothing to look at.";
@@ -2889,6 +2914,8 @@ export component ConcernsWindow inherits Window {
         }
 
         HorizontalLayout {
+            spacing: Space.step;
+            CopyButton { said: root.everything; }
             Rectangle { }
             Button {
                 text: "Close";
@@ -2932,7 +2959,16 @@ export component ProblemsWindow inherits Window {
     preferred-width: 680px;
     preferred-height: 380px;
 
+    // In front of the main window while the editor is starting: set from
+    // Rust for as long as the main window takes no presses, so the window
+    // asking is never behind the one waiting for it. See `on_top` in main.rs.
+    in property <bool> on-top: false;
+    always-on-top: root.on-top;
+
     in property <[ProblemRow]> rows;
+    // Every row as one text, for the Copy button. Set from Rust beside the
+    // rows.
+    in property <string> everything: "";
     // Whether the names as they stand would settle what they are offered for:
     // all different, none empty, none belonging to a third node. Worked out in
     // Rust, where it can be tested: see tcsgui::names_settle.
@@ -2964,13 +3000,13 @@ export component ProblemsWindow inherits Window {
         padding: Space.wide;
         spacing: Space.step;
 
-        Text {
+        Copyable {
             text: "This configuration has problems the vehicle would not fly with";
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
         }
-        Text {
+        Copyable {
             text: "Each one is drawn in red on the node it is about. Put them "
                 + "right here, open a node to edit it, or leave them and look "
                 + "at the drawing first -- every node is on the canvas either "
@@ -2991,7 +3027,7 @@ export component ProblemsWindow inherits Window {
                     VerticalLayout {
                         horizontal-stretch: 1;
                         spacing: 1px;
-                        Text {
+                        Copyable {
                             text: row.said;
                             font-size: Type.body;
                             wrap: word-wrap;
@@ -3023,7 +3059,7 @@ export component ProblemsWindow inherits Window {
                         clicked => { root.acted(i); }
                     }
                 }
-                if root.rows.length == 0: Text {
+                if root.rows.length == 0: Copyable {
                     text: "Nothing is wrong.";
                     font-size: Type.body;
                     font-italic: true;
@@ -3032,7 +3068,7 @@ export component ProblemsWindow inherits Window {
             }
         }
 
-        if root.trouble != "": Text {
+        if root.trouble != "": Copyable {
             text: root.trouble;
             font-size: Type.small;
             color: #c0392b;
@@ -3041,6 +3077,7 @@ export component ProblemsWindow inherits Window {
 
         HorizontalLayout {
             spacing: Space.step;
+            CopyButton { said: root.everything; }
             Rectangle { }
             // Out of the editor altogether, for a file that arrived in a
             // state somebody would rather put right elsewhere: a question
@@ -3094,18 +3131,18 @@ export component DeleteWindow inherits Window {
         padding: Space.wide;
         spacing: Space.step;
 
-        Text {
+        Copyable {
             text: "Delete \"" + root.node + "\"?";
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
         }
-        if root.carries != "": Text {
+        if root.carries != "": Copyable {
             text: root.carries;
             font-size: Type.body;
             wrap: word-wrap;
         }
-        Text {
+        Copyable {
             text: "Undo takes it back, with its attributes and its lines.";
             font-size: Type.small;
             color: #6b7280;
@@ -3119,6 +3156,10 @@ export component DeleteWindow inherits Window {
             Button {
                 text: "Cancel";
                 clicked => { root.cancelled(); }
+            }
+            CopyButton {
+                said: "Delete \"" + root.node + "\"?"
+                    + (root.carries != "" ? "\n" + root.carries : "");
             }
             Rectangle { }
             Button {
@@ -3147,19 +3188,19 @@ export component LeaveWindow inherits Window {
         padding: Space.wide;
         spacing: Space.step;
 
-        Text {
+        Copyable {
             text: "There are changes the files do not have.";
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
         }
-        if root.trouble != "": Text {
+        if root.trouble != "": Copyable {
             text: root.trouble;
             color: #c0392b;
             font-size: Type.body;
             wrap: word-wrap;
         }
-        Text {
+        Copyable {
             text: "Saving writes the configuration and, where this session "
                 + "was given one, the simulator's file beside it.";
             font-size: Type.small;
@@ -3174,6 +3215,10 @@ export component LeaveWindow inherits Window {
             Button {
                 text: "Stay";
                 clicked => { root.stayed(); }
+            }
+            CopyButton {
+                said: "There are changes the files do not have."
+                    + (root.trouble != "" ? "\n" + root.trouble : "");
             }
             Rectangle { }
             Button {

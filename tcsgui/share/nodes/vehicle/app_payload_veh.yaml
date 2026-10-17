@@ -16,7 +16,7 @@ payload-source: false
 moc-sink: false
 moc-source: true
 attributes:
-  - name: program
+  - name: executable
     required: true
     kind: path
     about: >

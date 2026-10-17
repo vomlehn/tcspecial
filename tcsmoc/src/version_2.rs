@@ -165,6 +165,7 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
     }
 
     let ui = MainWindow::new().unwrap();
+    crate::remember_main_window(&ui);
     let _ = Sizes::settle(&ui);
 
     let rows_in_order = panels(&links);

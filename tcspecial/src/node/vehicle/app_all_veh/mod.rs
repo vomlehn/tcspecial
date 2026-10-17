@@ -55,7 +55,7 @@ impl AppAllVeh {
             ));
         }
         Ok(AppAllVeh {
-            running: parent::start(&params.program_path()?, &params.arguments(), Supports::ALL)?,
+            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::ALL)?,
         })
     }
 
@@ -144,7 +144,7 @@ mod tests {
         AppParams {
             name: "through".to_string(),
             kind: Kind::AllVeh,
-            program: program.display().to_string(),
+            executable: program.display().to_string(),
             payload_arg: Some("--readings".to_string()),
             moc_arg: Some("--commands".to_string()),
             restart: Restart::Never,

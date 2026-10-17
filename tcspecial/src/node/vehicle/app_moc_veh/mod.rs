@@ -54,7 +54,7 @@ impl AppMocVeh {
             ));
         }
         Ok(AppMocVeh {
-            running: parent::start(&params.program_path()?, &params.arguments(), Supports::MOC)?,
+            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::MOC)?,
         })
     }
 
@@ -126,7 +126,7 @@ mod tests {
         AppParams {
             name: "back".to_string(),
             kind: Kind::MocVeh,
-            program: program.display().to_string(),
+            executable: program.display().to_string(),
             payload_arg: None,
             moc_arg: Some("--commands".to_string()),
             restart: Restart::Never,

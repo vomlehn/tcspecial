@@ -77,8 +77,8 @@ vehicle:
       - target: moc
       - target: thermostat
     payload-in: true
-  # setpoint is set from the ground; above and below are the two degrees
-  # either side that the heaters are switched at.
+  # setpoint is set from the ground; above and below are the two
+  # degrees either side that the heaters are switched at.
   - name: thermostat
     type: compute
     above: "2.0"
@@ -141,14 +141,14 @@ commands:
 
 tcsgui:
   nodes:
-    - { name: temp_fore, x: 40, y: 40 }
-    - { name: temp_aft, x: 40, y: 160 }
-    - { name: temp_bay, x: 40, y: 280 }
-    - { name: k_fore, x: 240, y: 40 }
-    - { name: k_aft, x: 240, y: 160 }
-    - { name: k_bay, x: 240, y: 280 }
-    - { name: mean_temp, x: 460, y: 160 }
-    - { name: thermostat, x: 616, y: 240 }
-    - { name: moc, x: 792, y: 40 }
-    - { name: heaters, x: 40, y: 400 }
-    - { name: housekeeping, x: 460, y: 380 }
+    - { name: temp_fore, x: 42, y: 42 }
+    - { name: temp_aft, x: 42, y: 159 }
+    - { name: temp_bay, x: 42, y: 280 }
+    - { name: k_fore, x: 238, y: 42 }
+    - { name: k_aft, x: 238, y: 159 }
+    - { name: k_bay, x: 238, y: 280 }
+    - { name: mean_temp, x: 461, y: 159 }
+    - { name: thermostat, x: 612, y: 238 }
+    - { name: moc, x: 794, y: 42 }
+    - { name: heaters, x: 42, y: 401 }
+    - { name: housekeeping, x: 461, y: 382 }

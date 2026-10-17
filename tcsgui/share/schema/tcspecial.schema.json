@@ -663,6 +663,14 @@
               "null"
             ]
           },
+          "executable": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
           "restart": {
             "type": [
               "string",
@@ -1186,7 +1194,16 @@
             ]
           },
           "program": {
-            "description": "The program a node runs: an app node's application, or the program of a `process` computation. An app node's is executed with `~` and `$HOME` expanded as a shell would expand them, and with the node's name as its first argument.",
+            "description": "The program a `process` computation runs. An app node names its application with `executable` instead.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "executable": {
+            "description": "The executable an app node runs: its application. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it -- and with the node's name as its first argument. It was called `program`, which an app node no longer takes.",
             "type": [
               "string",
               "number",
@@ -1735,7 +1752,16 @@
             ]
           },
           "program": {
-            "description": "The program a node runs: an app node's application, or the program of a `process` computation. An app node's is executed with `~` and `$HOME` expanded as a shell would expand them, and with the node's name as its first argument.",
+            "description": "The program a `process` computation runs. An app node names its application with `executable` instead.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "executable": {
+            "description": "The executable an app node runs: its application. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it -- and with the node's name as its first argument. It was called `program`, which an app node no longer takes.",
             "type": [
               "string",
               "number",

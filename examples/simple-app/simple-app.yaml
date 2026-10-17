@@ -22,33 +22,36 @@ tcspecial:
     send: "127.0.0.1:4100"
 
 moc:
-  # The ground's end of the vehicle's data. tcspecial sends what each node
-  # drawn into it produces as UDP datagrams to ground_base's address, at its
-  # port plus that node's device id: lorem is id 1, so its words go to
-  # 127.0.0.1:5101. Ground software gets them from this node with a function
-  # call, tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It
-  # states no address or port of its own, because nothing comes back up.
+  # The ground's end of the vehicle's data. tcspecial sends
+  # what each node drawn into it produces as UDP datagrams to
+  # ground_base's address, at its port plus that node's
+  # device id: lorem is id 1, so its words go to 127.0.0.1:5101. Ground
+  # software gets them from this node with a function call,
+  # tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It
+  # states no address or port of its own, because nothing comes back
+  # up.
   - name: moc
     type: moc
     ground_base: "127.0.0.1:5100"
     payload-in: true
 
 payloads:
-  # A payload that is a program rather than a device: it is never asked, and
-  # reports one word of its line at a time, then a packet holding the line
-  # terminator. `app-payload-arg` is which line it sends, counting from one.
-  # 
-  # The program is a Python 3 script beside this file, named relative to the
-  # repository's root because that is where tcspecial is run from: see
-  # examples/Makefile.
+  # A payload that is a program rather than a device: it is never
+  # asked, and reports one word of its line at a time, then a packet
+  # holding the line terminator. `app-payload-arg` is which line it
+  # sends, counting from one.
+  #
+  # The program is a Python 3 script beside this file, named relative
+  # to the repository's root because that is where tcspecial is
+  # run from: see examples/Makefile.
   - name: lorem
     type: app_pl
     app-payload-arg: "1"
-    program: "examples/simple-app/lorem_pl.py"
+    executable: "examples/simple-app/lorem_pl.py"
     payload-out:
       - target: moc
 
 tcsgui:
   nodes:
-    - { name: moc, x: 792, y: 104 }
-    - { name: lorem, x: 40, y: 120 }
+    - { name: moc, x: 794, y: 106 }
+    - { name: lorem, x: 42, y: 121 }

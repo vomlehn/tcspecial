@@ -408,6 +408,41 @@ impl SimConfigError {
 
 impl std::error::Error for SimConfigError {}
 
+/// What a simulated payload says for "as fast as it can be driven".
+///
+/// A word rather than a length of time, because the length of time it would be
+/// is nought, and nought is no interval at all: every other reader of a length
+/// of time in these files refuses it -- see [`crate::graph::parse_interval`] --
+/// and a value that means "the fastest thing this software does" here and is
+/// refused everywhere else is one a file can arrive at by accident. An
+/// interval computed to nothing, or a field cleared to a zero, then asks for
+/// packets without pause and reads as though somebody chose it.
+///
+/// Said of how often a packet is produced and how often the segments of one
+/// are, those being the two settings where it means anything.
+pub const CONTINUOUS: &str = "continuous";
+
+/// A nought where a length of time may not be one, told what to write.
+///
+/// The grammar's complaint says what is wrong -- nought is no interval -- and
+/// this adds what the file probably meant, which depends on the setting: the
+/// word for a payload driven as fast as it can be, and nothing at all for a
+/// fault that is no fault.
+fn nought_says(e: SimConfigError, instead: &str) -> SimConfigError {
+    match e {
+        SimConfigError::NotAnInterval {
+            payload,
+            setting,
+            why,
+        } if why.contains("no interval at all") => SimConfigError::NotAnInterval {
+            payload,
+            setting,
+            why: format!("{why}: {instead}"),
+        },
+        other => other,
+    }
+}
+
 /// A percentage, or the complaint that it is not one.
 fn a_percentage(
     payload: &str,
@@ -735,10 +770,13 @@ pub struct SimSettings {
     /// `crate::graph::parse_interval` -- and this was `packet_interval_ms`, a
     /// bare number of milliseconds. Kept as written and read where it is
     /// resolved, as the graph's attributes are.
+    ///
+    /// Or [`CONTINUOUS`], for a payload driven as fast as it can be: the one
+    /// thing a length of time cannot say, nought being no interval at all.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub packet_interval: Option<String>,
-    /// How long between the segments of one packet. Defaults to the packet
-    /// interval.
+    /// How long between the segments of one packet, [`CONTINUOUS`] included.
+    /// Defaults to the packet interval.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub segment_interval: Option<String>,
     /// Bytes in one segment. Defaults to the whole packet, which is the packet
@@ -1103,31 +1141,66 @@ impl SimConfigFile {
 
                 // A length of time in the file, milliseconds here: the
                 // simulator counts in those, and the one grammar for a length
-                // of time is `graph::parse_interval`. Nought is
-                // the one value this reads that `parse_interval` refuses, and
-                // it is read because it means something to a simulated
-                // payload: as fast as it can be driven. Written with a unit
-                // like any other length -- `0s` -- so that the grammar is the
-                // same one and only the value is exceptional.
-                let as_millis = |setting: &'static str,
-                                 said: &Option<String>|
-                 -> Result<Option<u32>, SimConfigError> {
-                    let Some(said) = said else { return Ok(None) };
-                    match crate::graph::parse_interval(said) {
-                        Ok(interval) => {
-                            Ok(Some(u32::try_from(interval.as_millis()).unwrap_or(u32::MAX)))
-                        }
-                        Err(why) if why.contains("no interval at all") => Ok(Some(0)),
-                        Err(why) => Err(SimConfigError::NotAnInterval {
+                // of time is `graph::parse_interval`.
+                let milliseconds = |setting: &'static str,
+                                    said: &str|
+                 -> Result<u32, SimConfigError> {
+                    crate::graph::parse_interval(said)
+                        .map(|length| u32::try_from(length.as_millis()).unwrap_or(u32::MAX))
+                        .map_err(|why| SimConfigError::NotAnInterval {
                             payload: payload.name.clone(),
                             setting,
                             why,
-                        }),
+                        })
+                };
+
+                // How often a stand-in produces something: a length of time,
+                // or `CONTINUOUS` for as fast as the payload can be driven.
+                let how_often = |setting: &'static str,
+                                 said: &Option<String>|
+                 -> Result<Option<u32>, SimConfigError> {
+                    let Some(said) = said else { return Ok(None) };
+                    let said = said.trim();
+                    if said == CONTINUOUS {
+                        return Ok(Some(0));
                     }
+                    milliseconds(setting, said).map(Some).map_err(|e| {
+                        nought_says(
+                            e,
+                            &format!(
+                                "a payload driven as fast as it can be is \
+                                 {CONTINUOUS}"
+                            ),
+                        )
+                    })
+                };
+
+                // And how late a packet may be, which is a length of time and
+                // nothing else: a payload cannot be late continuously, and a
+                // jitter of nought is no jitter -- which is what leaving the
+                // setting out says.
+                let how_late = |setting: &'static str,
+                                said: &Option<String>|
+                 -> Result<Option<u32>, SimConfigError> {
+                    let Some(said) = said else { return Ok(None) };
+                    let said = said.trim();
+                    if said == CONTINUOUS {
+                        return Err(SimConfigError::NotAnInterval {
+                            payload: payload.name.clone(),
+                            setting,
+                            why: format!(
+                                "\"{CONTINUOUS}\" is how often a payload sends and not \
+                                 how late a packet may be: leave this out for no jitter"
+                            ),
+                        });
+                    }
+                    milliseconds(setting, said)
+                        .map(Some)
+                        .map_err(|e| nought_says(e, "no jitter is this setting left out"))
                 };
 
                 let packet_interval_ms =
-                    match (triggered, as_millis("packet_interval", &settings.packet_interval)?) {
+                    match (triggered, how_often("packet_interval", &settings.packet_interval)?) {
                         (true, Some(_)) => {
                             return Err(SimConfigError::IntervalForATriggeredPayload {
                                 payload: payload.name.clone(),
@@ -1160,7 +1233,7 @@ impl SimConfigFile {
                         settings.corrupt_percent)?,
                     truncate_percent: a_percentage(&payload.name, "truncate_percent",
                         settings.truncate_percent)?,
-                    jitter_ms: as_millis("jitter", &settings.jitter)?.unwrap_or(0),
+                    jitter_ms: how_late("jitter", &settings.jitter)?.unwrap_or(0),
                     silent_after: settings.silent_after.unwrap_or(0),
                     close_after: settings.close_after.unwrap_or(0),
                     ignore_trigger_percent: a_percentage(
@@ -1200,7 +1273,7 @@ impl SimConfigFile {
                     payload_address: settings.payload_address.clone(),
                     payload_port: settings.payload_port,
                     packet_interval_ms,
-                    segment_interval_ms: as_millis(
+                    segment_interval_ms: how_often(
                         "segment_interval",
                         &settings.segment_interval,
                     )?
@@ -1501,7 +1574,7 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 0ms
+    packet_interval: continuous
 ",
         );
 
@@ -1521,7 +1594,7 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 0ms
+    packet_interval: continuous
 ",
         );
 
@@ -1541,11 +1614,11 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval: 0ms
+    packet_interval: continuous
   - name: DH7
     type: network
     protocol: udp
-    packet_interval: 0ms
+    packet_interval: continuous
 ",
         );
 
@@ -1774,7 +1847,7 @@ simulated_payloads:
         // A device has no address at all.
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
-             packet_interval: 0ms\n    payload_port: 7000\n",
+             packet_interval: continuous\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
         assert!(said.contains("device") && said.contains("network"), "{said}");
@@ -1946,7 +2019,7 @@ simulated_payloads:
     fn only_a_network_payload_has_a_transport() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
-             protocol: udp\n    packet_interval: 0ms\n",
+             protocol: udp\n    packet_interval: continuous\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
         assert!(
@@ -1957,7 +2030,7 @@ simulated_payloads:
         // And a device that states none resolves, which is the whole of what
         // a device has to say about how it is reached.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval: 0ms\n",
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval: continuous\n",
         );
         file.resolve(&[device("DH0")]).expect("a device needs no transport");
     }
@@ -2273,6 +2346,83 @@ simulated_payloads:
         );
     }
 
+    /// As fast as the payload can be driven is a word, and a nought is told
+    /// that word.
+    ///
+    /// The one value a length of time cannot be is nought -- every other
+    /// reader of one refuses it -- so the exception this file needs is a word
+    /// rather than a value that means something here and nowhere else. A file
+    /// that arrives at `0s` by accident asks for the fastest thing the
+    /// simulator does, which is why it is refused and told what to write.
+    #[test]
+    fn as_fast_as_it_can_be_driven_is_a_word() {
+        let file = parse(
+            "
+simulated_payloads:
+  - name: DH0
+    type: network
+    protocol: udp
+    packet_interval: continuous
+",
+        );
+        let resolved = file.resolve(&[handler("DH0", 8)]).expect("the word is read");
+        assert_eq!(resolved[0].packet_interval_ms, 0);
+        // And the segments of one packet, which is the other setting it means
+        // anything in.
+        let file = parse(
+            "
+simulated_payloads:
+  - name: DH0
+    type: network
+    protocol: udp
+    packet_interval: 1s
+    segment_interval: continuous
+",
+        );
+        let resolved = file.resolve(&[handler("DH0", 8)]).expect("the word is read");
+        assert_eq!(
+            (resolved[0].packet_interval_ms, resolved[0].segment_interval_ms),
+            (1000, 0)
+        );
+
+        // A nought says nothing this file reads, and is told the word.
+        for nought in ["0s", "0ms", "0.0s"] {
+            let file = parse(&format!(
+                "
+simulated_payloads:
+  - name: DH0
+    type: network
+    protocol: udp
+    packet_interval: {nought}
+"
+            ));
+            let why = file
+                .resolve(&[handler("DH0", 8)])
+                .expect_err(&format!("{nought} should be refused"))
+                .to_string();
+            assert!(why.contains("packet_interval"), "{why}");
+            assert!(why.contains(CONTINUOUS), "{nought}: {why}");
+        }
+
+        // And the word is only for how often something is produced: a packet
+        // cannot be late continuously, and no jitter is the setting left out.
+        let file = parse(
+            "
+simulated_payloads:
+  - name: DH0
+    type: network
+    protocol: udp
+    packet_interval: 1s
+    jitter: continuous
+",
+        );
+        let why = file
+            .resolve(&[handler("DH0", 8)])
+            .expect_err("jitter is a length of time")
+            .to_string();
+        assert!(why.contains("jitter") && why.contains("no jitter"), "{why}");
+    }
+
     #[test]
     fn a_group_no_payload_names_is_an_error() {
         let file = parse(
@@ -2281,7 +2431,7 @@ simulated_payload_groups:
   - name: steady_1hz
     packet_interval: 1s
   - name: continuous
-    packet_interval: 0ms
+    packet_interval: continuous
 simulated_payloads:
   - name: DH0
     type: network
@@ -2377,7 +2527,7 @@ simulated_payloads:
 simulated_payloads:
   - name: DEV
     type: device-file
-    packet_interval: 0ms
+    packet_interval: continuous
 ",
         );
 

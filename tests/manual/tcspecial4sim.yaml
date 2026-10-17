@@ -50,7 +50,7 @@ simulated_payloads:
   # pace: /dev/urandom is never not ready, so there is nothing to wait for.
   - name: random-device
     type: device-file
-    packet_interval: 0ms
+    packet_interval: continuous
 
   # Twice a second, whole. A simulated bus is a register rather than a
   # stream -- every master reads the same bank and bytes do not queue -- so a

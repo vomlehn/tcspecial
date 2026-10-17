@@ -54,7 +54,7 @@
               "boolean",
               "null"
             ],
-            "description": "How often it sends, as a length of time: 1s, 500ms. Nought -- 0s -- is as fast as it can. For a payload that sends on its own: one the configuration gives a trigger is asked instead, at the interval of the payload group it is in, so it states none here and there is nothing for an interval to mean."
+            "description": "How often it sends, as a length of time -- 1s, 500ms -- or the word `continuous` for as fast as the payload can be driven. Nought is no length of time and is refused, being the one value a file arrives at by accident. For a payload that sends on its own: one the configuration gives a trigger is asked instead, at the interval of the payload group it is in, so it states none here and there is nothing for an interval to mean."
           },
           "segment_interval": {
             "type": [
@@ -63,7 +63,7 @@
               "boolean",
               "null"
             ],
-            "description": "How often a segment of a packet goes."
+            "description": "How often a segment of a packet goes, as a length of time or the word `continuous`; defaults to the packet interval."
           },
           "segment_size": {
             "type": [
@@ -108,7 +108,7 @@
               "boolean",
               "null"
             ],
-            "description": "How much the interval wanders."
+            "description": "How late a packet may be, as a length of time, chosen afresh for each one and waited out inside the interval. A length of time and nothing else: leave it out for no jitter."
           },
           "silent_after": {
             "type": [
@@ -197,7 +197,7 @@
               "boolean",
               "null"
             ],
-            "description": "How often it sends. Nought is as fast as it can; a triggered payload states none, there being nothing for an interval to mean."
+            "description": "How often it sends, as a length of time or the word `continuous` for as fast as the payload can be driven; a triggered payload states none, there being nothing for an interval to mean."
           },
           "segment_interval": {
             "type": [
@@ -206,7 +206,7 @@
               "boolean",
               "null"
             ],
-            "description": "How often a segment of a packet goes."
+            "description": "How often a segment of a packet goes, as a length of time or the word `continuous`; defaults to the packet interval."
           },
           "segment_size": {
             "type": [
@@ -251,7 +251,7 @@
               "boolean",
               "null"
             ],
-            "description": "How much the interval wanders."
+            "description": "How late a packet may be, as a length of time, chosen afresh for each one and waited out inside the interval. A length of time and nothing else: leave it out for no jitter."
           },
           "silent_after": {
             "type": [

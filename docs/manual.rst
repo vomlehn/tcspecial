@@ -497,10 +497,13 @@ nothing aboard carries, and a span of about that size is written exactly, as
 
 Nought is refused in every unit, and so is a fraction that rounds to it: a
 schedule asking to be run every nought seconds is asking to be run again
-before it has finished. The one exception is a simulated payload's
-``packet_interval``, where nought means something -- as fast as the payload
-can be driven -- and is written with a unit like any other length of time:
-``0s``.
+before it has finished. Where a configuration does mean "as fast as that
+can be done" it says so in a word: a simulated payload's ``packet_interval``
+and ``segment_interval`` take ``continuous``, and nought is refused there as
+everywhere else. A word rather than ``0s`` because nought is the one value a
+file arrives at by accident -- an interval worked out to nothing, a field
+cleared to a zero -- and the fastest thing this software does is not something
+to ask for by accident.
 
 A **timeout** takes all of that and one word besides -- ``none``, a read that
 does not time out at all -- and that word is the whole of the difference
@@ -1518,13 +1521,14 @@ which is why the shipped ``tcspecial1sim.yaml`` leaves them with the payloads.
 
 .. code-block:: text
 
-   packet_interval        how long between packets, as a length of time:
-                          1s, 500ms, 0.25s. Nought -- ``0s`` -- is as fast as
-                          the payload can be driven. Periodic payloads only:
-                          a triggered one sends when it is asked, and stating
-                          an interval for one is an error
+   packet_interval        how long between packets, as a length of time --
+                          1s, 500ms, 0.25s -- or ``continuous`` for as fast
+                          as the payload can be driven. Periodic payloads
+                          only: a triggered one sends when it is asked, and
+                          stating an interval for one is an error
    segment_interval       how long between the segments of one packet,
-                          likewise; defaults to the packet interval
+                          likewise, ``continuous`` included; defaults to the
+                          packet interval
    segment_size           bytes in one segment; defaults to the whole packet,
                           whose size the tcspecial configuration gives
 
@@ -1551,7 +1555,9 @@ configuration written before these existed asks for.
    jitter                 how late a packet may be, as a length of time,
                           chosen afresh for each one. Waited out inside the
                           interval rather than added to it, so the rate is
-                          unchanged and the packet arrives late within it
+                          unchanged and the packet arrives late within it. A
+                          length of time and nothing else: leave it out for
+                          no jitter
    silent_after           packets after which the payload sends no more,
                           leaving its link open; 0 is never. What a wedged
                           instrument looks like from the handler's end
@@ -1610,7 +1616,7 @@ file that states one is refused, saying this.
        packet_interval: 1s
 
      - name: continuous
-       packet_interval: 0ms
+       packet_interval: continuous
 
    simulated_payloads:
      - name: tcp-stream

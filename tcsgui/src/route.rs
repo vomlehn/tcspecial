@@ -262,18 +262,9 @@ type Weighed = (Cost, Vec<(f32, f32)>);
 /// as many more turns as it takes to miss what is in the way. Where the two
 /// ends are at the same height and nothing is between them the route is one
 /// straight line, which is the common case and wants no corners at all.
+#[cfg(test)]
 pub fn route(ends: Ends, around: &[Obstacle]) -> String {
     drawn(&way(ends, around, &[]))
-}
-
-/// The same, laid clear of the routes already laid.
-///
-/// `taken` is every route already drawn on this canvas, in the order they were
-/// drawn. A link is routed against them so that no two lines run along the
-/// same track -- see [`shared`] -- and the caller keeps what comes back to
-/// pass in for the next one: see [`lay`], which is what gives it the points.
-pub fn route_among(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -> String {
-    drawn(&way(ends, around, taken))
 }
 
 /// The points a link's line visits, laid clear of the routes already laid.
@@ -283,6 +274,10 @@ pub fn route_among(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -
 /// -- its path, its arrowhead, its marker, where its label sits -- is derived
 /// from the points rather than worked out again, so the five of them cannot
 /// disagree about where the line went.
+///
+/// `taken` is every route already drawn on this canvas, in the order they were
+/// drawn. A link is routed against them so that no two lines run along the
+/// same track -- see [`shared`].
 pub fn lay(ends: Ends, around: &[Obstacle], taken: &[Vec<(f32, f32)>]) -> Vec<(f32, f32)> {
     way(ends, around, taken)
 }
@@ -326,12 +321,14 @@ pub fn arrow(ends: Ends) -> String {
 /// most room to is the segment with room for this. A route whose longest run
 /// has no room for one gets none -- see [`ROOM`] -- which is a short link,
 /// where the head at the end is already next to everything else about it.
+#[cfg(test)]
 pub fn marker(ends: Ends, around: &[Obstacle]) -> String {
-    marker_on(ends, &way(ends, around, &[]))
+    marker_on(&way(ends, around, &[]))
 }
 
-/// The same, on a route already laid: see [`lay`].
-pub fn marker_on(ends: Ends, points: &[(f32, f32)]) -> String {
+/// The same, on a route already laid: see [`lay`]. Which way it points is the
+/// run's own direction, so the route's ends are not asked.
+pub fn marker_on(points: &[(f32, f32)]) -> String {
     let (from, to) = match longest(points) {
         Some(run) => run,
         None => return String::new(),
@@ -365,6 +362,7 @@ pub fn marker_on(ends: Ends, points: &[(f32, f32)]) -> String {
 /// used to be. A route that detours around a node has a middle nowhere near
 /// the straight line between its ends, and a label sitting there is a label
 /// beside a different link -- or beside nothing at all.
+#[cfg(test)]
 pub fn label_at(ends: Ends, around: &[Obstacle]) -> (f32, f32) {
     label_on(ends, &way(ends, around, &[]))
 }

@@ -75,6 +75,7 @@ pub fn grid_before(v: i32) -> i32 {
 }
 
 /// Whether `v` is a grid point.
+#[cfg(test)]
 pub fn is_on_grid(v: i32) -> bool {
     on_grid(v) == v
 }
@@ -167,11 +168,13 @@ pub fn line_floor(v: i32) -> i32 {
 }
 
 /// Whether `v` is on one of those lines.
+#[cfg(test)]
 pub fn is_on_line(v: i32) -> bool {
     line_ceil(v) == v
 }
 
 /// Whether `v` is a place a node may be.
+#[cfg(test)]
 pub fn is_on_node_grid(v: i32) -> bool {
     is_on_grid(v) && is_node_mm(mm_of(v))
 }

@@ -69,15 +69,6 @@ use style::{Edge, Face, NodeType, Outline, Weight, ERROR_TINT};
 
 slint::include_modules!();
 
-/// Where the first node placed goes, and how far each one after it is offset.
-///
-/// A diagram read from a file brings its own positions; a node just placed has
-/// to go somewhere. Somewhere visible, and not on top of the last one -- a
-/// stack of nodes at one spot looks like one node, and the person who placed
-/// three would think two presses had been missed.
-const FIRST_PLACE: (i32, i32) = (240, 40);
-const PLACE_OFFSET: i32 = 32;
-
 /// How far one divider may be dragged, given what is already on the canvas.
 ///
 /// Two rules, and the narrower of the two wins. No pane may be squeezed below
@@ -3769,7 +3760,7 @@ fn views_of(
             // the line went.
             let points = route::lay(ends, &obstacles, &taken);
             let drawn = route::drawn_route(&points);
-            let marker = route::marker_on(ends, &points);
+            let marker = route::marker_on(&points);
             // The label goes at the middle of the route's longest run, which
             // is on the line wherever the line had to go.
             let (label_x, label_y) = route::label_on(ends, &points);
@@ -4912,6 +4903,10 @@ fn ramp_order(pane: Pane) -> Vec<&'static str> {
 /// the test below says 60 degrees at least -- because two families a reader
 /// cannot tell apart are two families that say nothing about where a node
 /// belongs.
+///
+/// For the tests, which hold the palette to these hues: the colours
+/// themselves are written down, in `tint_of` and `ground_of`.
+#[cfg(test)]
 fn family_hue(pane: Pane) -> f64 {
     match pane {
         Pane::Moc => 265.0,
@@ -5542,7 +5537,7 @@ mod tests {
             let rows = rows_from(pane, descriptions());
             let mut heading = String::new();
             let mut under: Vec<String> = Vec::new();
-            let mut check = |heading: &str, under: &mut Vec<String>| {
+            let check = |heading: &str, under: &mut Vec<String>| {
                 let mut sorted = under.clone();
                 sorted.sort_by_key(|name| name.to_lowercase());
                 assert_eq!(
@@ -8241,12 +8236,6 @@ mod tests {
             "version: \"2.0\"\nnodes: [[[\n",
             "a damaged configuration was written over"
         );
-    }
-
-    /// The place a first node is put is on the canvas.
-    #[test]
-    fn a_new_node_is_placed_where_it_can_be_seen() {
-        assert!(FIRST_PLACE.0 > 0 && FIRST_PLACE.1 > 0);
     }
 
     /// No line in the worked example is drawn through a node.

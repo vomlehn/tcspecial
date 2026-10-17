@@ -209,6 +209,10 @@ pub enum Ground {
 }
 
 /// Which ground a pane is painted.
+///
+/// For the tests, which ask it of every pane; the window paints each pane's
+/// ground directly.
+#[cfg(test)]
 pub fn ground_of(pane: crate::pane::Pane) -> Ground {
     match pane {
         crate::pane::Pane::Moc => Ground::Moc,

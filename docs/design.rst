@@ -819,11 +819,22 @@ has finished -- and so is a fraction that rounds to nought, which is the same
 thing spelled differently. So is a length too long to count: a number that
 overflowed rather than an interval anybody meant.
 
-The one place nought means something is a simulated payload's
-``packet_interval``, where it asks for packets as fast as the payload can be
-driven. That reader takes the refusal and reads it as nought, so the grammar
-stays the one grammar and only the value is exceptional, and the file writes
-it with a unit like any other length of time: ``0s``.
+Where a configuration does mean "as fast as that can be done" it says so in
+a word rather than in a length of time: a simulated payload's
+``packet_interval`` and ``segment_interval`` take ``continuous``, and nought
+is refused there as it is everywhere else.
+
+Requirement
+    A value that means "as fast as it can be driven" is a word and not
+    nought. Nought is what a file arrives at by accident -- an interval
+    computed to nothing, a field cleared to a zero, a setting carried over
+    from a reader that counted milliseconds -- and what it would ask for here
+    is the fastest thing this software does, which nobody asks for by
+    accident. A file writing ``0s`` is refused and told the word, and the word
+    is read only where it means something: how often a packet is produced, and
+    how often the segments of one are. A jitter of ``continuous`` is refused
+    for the same reason from the other side, a packet not being able to be
+    late continuously.
 
 The suffix is matched longest first, so the ``s`` of ``ms`` is not taken for
 seconds, and ``1w``, ``7d`` and ``168h`` are one interval.
@@ -6142,12 +6153,13 @@ simulated payloads
 | Attribute           | Type   | Meaning                                     |
 +=====================+========+=============================================+
 | packet_interval     | length | How long between packets, as a length of    |
-|                     | of     | time: ``1s``, ``500ms``. Nought -- ``0s``   |
-|                     | time   | -- is as fast as the payload can be driven  |
+|                     | of     | time -- ``1s``, ``500ms`` -- or             |
+|                     | time   | ``continuous`` for as fast as the payload   |
+|                     |        | can be driven                               |
 +---------------------+--------+---------------------------------------------+
 | segment_interval    | length | How long between the segments of one        |
-|                     | of     | packet. Defaults to the packet interval     |
-|                     | time   |                                             |
+|                     | of     | packet, ``continuous`` included. Defaults   |
+|                     | time   | to the packet interval                      |
 +---------------------+--------+---------------------------------------------+
 | segment_size        | number | Bytes in one segment. Defaults to the whole |
 |                     |        | packet, whose size the payload configuration|
@@ -6441,7 +6453,7 @@ states its own rate instead.
        packet_interval: 1s
 
      - name: continuous
-       packet_interval: 0ms
+       packet_interval: continuous
 
    simulated_payloads:
      - name: tcp-stream

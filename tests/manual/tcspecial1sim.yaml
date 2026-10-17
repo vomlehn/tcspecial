@@ -33,7 +33,7 @@ simulated_payload_groups:
   # As fast as the payload can be read, which is what a device like
   # /dev/urandom does.
   - name: continuous
-    packet_interval: 0ms
+    packet_interval: continuous
 
 simulated_payloads:
   # tcp-stream and udp-steady are driven alike and so share a group, but they

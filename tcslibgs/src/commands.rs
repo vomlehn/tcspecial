@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{ArmKey, BeaconTime, DHName, DHType};
+use crate::types::{ArmKey, BeaconInterval, DHName, DHType};
 
 /// Command message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -308,11 +308,11 @@ impl QueryDHSampleCommand {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigCommand {
     pub header: CommandHeader,
-    pub beacon_interval: BeaconTime,
+    pub beacon_interval: BeaconInterval,
 }
 
 impl ConfigCommand {
-    pub fn new(sequence: u32, beacon_interval: BeaconTime) -> Self {
+    pub fn new(sequence: u32, beacon_interval: BeaconInterval) -> Self {
         Self {
             header: CommandHeader {
                 sequence,

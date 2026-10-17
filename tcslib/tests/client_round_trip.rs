@@ -15,7 +15,7 @@ use std::thread;
 use std::time::Duration;
 
 use tcslibgs::{
-    ArmKey, BeaconTime, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
+    ArmKey, BeaconInterval, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry, DHName,
     DHSample, DHState, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
     RestartArmTelemetry,
@@ -198,7 +198,9 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
     assert_eq!(received.data(), &[0x20, 0x21, 0x22]);
 
     assert_eq!(
-        client.configure(BeaconTime(1000)).unwrap(),
+        client
+            .configure(BeaconInterval::of(Duration::from_secs(1)))
+            .unwrap(),
         CommandStatus::Success
     );
 

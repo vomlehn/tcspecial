@@ -38,6 +38,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
+use std::time::Duration;
 
 use serde::de::IgnoredAny;
 use serde::Deserialize;
@@ -345,7 +346,7 @@ impl fmt::Display for SimConfigError {
                 "simulated payload \"{}\" is triggered, so it sends when tcspecial \
                  asks and has no timing of its own: {} belongs to a payload that \
                  sends on its own, and the rate a triggered one is asked at is \
-                 packet_interval_ms in the payload configuration",
+                 trigger_interval in the payload configuration",
                 payload, setting
             ),
         }
@@ -994,8 +995,8 @@ pub struct ResolvedSim {
     /// rate of its own: there is nothing for an interval to mean, which is
     /// why stating one in this file for such a payload is an error rather
     /// than a setting that happens not to be used.
-    pub packet_interval_ms: u32,
-    pub segment_interval_ms: u32,
+    pub packet_interval: Duration,
+    pub segment_interval: Duration,
     pub segment_size: u32,
     /// Whether this payload answers requests rather than sending on its own,
     /// which the payload configuration decides and this file may not.
@@ -1021,7 +1022,7 @@ pub struct Faults {
     pub drop_percent: u32,
     pub corrupt_percent: u32,
     pub truncate_percent: u32,
-    pub jitter_ms: u32,
+    pub jitter: Duration,
     pub silent_after: u64,
     pub close_after: u64,
     pub ignore_trigger_percent: u32,
@@ -1139,14 +1140,13 @@ impl SimConfigFile {
                     }
                 }
 
-                // A length of time in the file, milliseconds here: the
-                // simulator counts in those, and the one grammar for a length
-                // of time is `graph::parse_interval`.
-                let milliseconds = |setting: &'static str,
-                                    said: &str|
-                 -> Result<u32, SimConfigError> {
+                // A length of time, kept as one: what the simulator does
+                // with these is wait, and the one grammar for a length of
+                // time is `graph::parse_interval`.
+                let length_of_time = |setting: &'static str,
+                                      said: &str|
+                 -> Result<Duration, SimConfigError> {
                     crate::graph::parse_interval(said)
-                        .map(|length| u32::try_from(length.as_millis()).unwrap_or(u32::MAX))
                         .map_err(|why| SimConfigError::NotAnInterval {
                             payload: payload.name.clone(),
                             setting,
@@ -1158,13 +1158,13 @@ impl SimConfigFile {
                 // or `CONTINUOUS` for as fast as the payload can be driven.
                 let how_often = |setting: &'static str,
                                  said: &Option<String>|
-                 -> Result<Option<u32>, SimConfigError> {
+                 -> Result<Option<Duration>, SimConfigError> {
                     let Some(said) = said else { return Ok(None) };
                     let said = said.trim();
                     if said == CONTINUOUS {
-                        return Ok(Some(0));
+                        return Ok(Some(Duration::ZERO));
                     }
-                    milliseconds(setting, said).map(Some).map_err(|e| {
+                    length_of_time(setting, said).map(Some).map_err(|e| {
                         nought_says(
                             e,
                             &format!(
@@ -1181,7 +1181,7 @@ impl SimConfigFile {
                 // setting out says.
                 let how_late = |setting: &'static str,
                                 said: &Option<String>|
-                 -> Result<Option<u32>, SimConfigError> {
+                 -> Result<Option<Duration>, SimConfigError> {
                     let Some(said) = said else { return Ok(None) };
                     let said = said.trim();
                     if said == CONTINUOUS {
@@ -1194,12 +1194,12 @@ impl SimConfigFile {
                             ),
                         });
                     }
-                    milliseconds(setting, said)
+                    length_of_time(setting, said)
                         .map(Some)
                         .map_err(|e| nought_says(e, "no jitter is this setting left out"))
                 };
 
-                let packet_interval_ms =
+                let packet_interval =
                     match (triggered, how_often("packet_interval", &settings.packet_interval)?) {
                         (true, Some(_)) => {
                             return Err(SimConfigError::IntervalForATriggeredPayload {
@@ -1207,7 +1207,7 @@ impl SimConfigFile {
                                 setting: "packet_interval",
                             })
                         }
-                        (true, None) => 0,
+                        (true, None) => Duration::ZERO,
                         (false, Some(interval)) => interval,
                         (false, None) => {
                             return Err(SimConfigError::NoPacketInterval {
@@ -1233,7 +1233,7 @@ impl SimConfigFile {
                         settings.corrupt_percent)?,
                     truncate_percent: a_percentage(&payload.name, "truncate_percent",
                         settings.truncate_percent)?,
-                    jitter_ms: how_late("jitter", &settings.jitter)?.unwrap_or(0),
+                    jitter: how_late("jitter", &settings.jitter)?.unwrap_or_default(),
                     silent_after: settings.silent_after.unwrap_or(0),
                     close_after: settings.close_after.unwrap_or(0),
                     ignore_trigger_percent: a_percentage(
@@ -1272,12 +1272,12 @@ impl SimConfigFile {
                 Ok(ResolvedSim {
                     payload_address: settings.payload_address.clone(),
                     payload_port: settings.payload_port,
-                    packet_interval_ms,
-                    segment_interval_ms: how_often(
+                    packet_interval,
+                    segment_interval: how_often(
                         "segment_interval",
                         &settings.segment_interval,
                     )?
-                    .unwrap_or(packet_interval_ms),
+                    .unwrap_or(packet_interval),
                     segment_size,
                     triggered,
                     faults,
@@ -1427,7 +1427,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         }
     }
 
@@ -1505,8 +1505,8 @@ simulated_payloads:
         assert_eq!(
             resolved[0],
             ResolvedSim {
-                packet_interval_ms: 1000,
-                segment_interval_ms: 250,
+                packet_interval: Duration::from_millis(1000),
+                segment_interval: Duration::from_millis(250),
                 // Unstated, so a packet is one segment.
                 segment_size: 12,
                 triggered: false,
@@ -1538,10 +1538,10 @@ simulated_payloads:
         );
 
         let resolved = file.resolve(&[handler("DH0", 12)]).unwrap();
-        assert_eq!(resolved[0].packet_interval_ms, 500);
+        assert_eq!(resolved[0].packet_interval, Duration::from_millis(500));
         assert_eq!(resolved[0].segment_size, 4);
         // Not overridden, so still the group's.
-        assert_eq!(resolved[0].segment_interval_ms, 1000);
+        assert_eq!(resolved[0].segment_interval, Duration::from_millis(1000));
     }
 
     #[test]
@@ -1558,7 +1558,7 @@ simulated_payloads:
 
         let resolved = file.resolve(&[handler("DH0", 8)]).unwrap();
         // The segment interval follows the packet interval when unstated.
-        assert_eq!(resolved[0].segment_interval_ms, 500);
+        assert_eq!(resolved[0].segment_interval, Duration::from_millis(500));
         assert_eq!(resolved[0].segment_size, 8);
     }
 
@@ -1582,8 +1582,8 @@ simulated_payloads:
             .resolve(&[handler("DH0", 1), handler("DH1", 2)])
             .unwrap();
         // Resolved in handler order, with each handler's own settings.
-        assert_eq!(resolved[0].packet_interval_ms, 0);
-        assert_eq!(resolved[1].packet_interval_ms, 1);
+        assert_eq!(resolved[0].packet_interval, Duration::from_millis(0));
+        assert_eq!(resolved[1].packet_interval, Duration::from_millis(1));
     }
 
     #[test]
@@ -1880,9 +1880,10 @@ simulated_payloads:
             .resolve(&[handler("DH0", 8)])
             .expect("the second set");
 
-        assert_eq!(first[0].packet_interval_ms, 1000);
+        assert_eq!(first[0].packet_interval, Duration::from_secs(1));
         assert_eq!(
-            second[0].packet_interval_ms, 250,
+            second[0].packet_interval,
+            Duration::from_millis(250),
             "the two sets simulate different payloads under the one name"
         );
     }
@@ -2133,7 +2134,7 @@ simulated_payloads:
             oc: None,
             ground: None,
             mode: DHMode::Periodic,
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let file = parse(
@@ -2148,7 +2149,7 @@ simulated_payloads:
             resolved[0].faults,
             Faults {
                 drop_percent: 10,
-                jitter_ms: 25,
+                jitter: Duration::from_millis(25),
                 close_after: 7,
                 ..Faults::default()
             },
@@ -2189,9 +2190,9 @@ simulated_payloads:
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         for stated in ["packet_interval: 1 s", "segment_interval: 1 s"] {
@@ -2204,7 +2205,7 @@ simulated_payloads:
             ));
             let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
             assert!(
-                said.contains(named) && said.contains("packet_interval_ms in the payload"),
+                said.contains(named) && said.contains("trigger_interval in the payload"),
                 "{stated}: {said}"
             );
 
@@ -2219,7 +2220,7 @@ simulated_payloads:
             ));
             let said = format!("{}", file.resolve(&[triggered("DH0")]).unwrap_err());
             assert!(
-                said.contains(named) && said.contains("packet_interval_ms in the payload"),
+                said.contains(named) && said.contains("trigger_interval in the payload"),
                 "{stated}, inherited: {said}"
             );
         }
@@ -2234,8 +2235,16 @@ simulated_payloads:
             .resolve(&[triggered("DH0")])
             .expect("a segment size is not a rate");
         assert_eq!(resolved[0].segment_size, 2);
-        assert_eq!(resolved[0].packet_interval_ms, 0, "it sends when it is asked");
-        assert_eq!(resolved[0].segment_interval_ms, 0, "and its segments as fast as they can");
+        assert_eq!(
+            resolved[0].packet_interval,
+            Duration::ZERO,
+            "it sends when it is asked"
+        );
+        assert_eq!(
+            resolved[0].segment_interval,
+            Duration::ZERO,
+            "and its segments as fast as they can"
+        );
     }
 
     /// A triggered payload takes no interval here, and a periodic one must
@@ -2263,9 +2272,9 @@ simulated_payloads:
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         // Stated, and refused in terms of where it belongs.
@@ -2289,7 +2298,11 @@ simulated_payloads:
             .resolve(&[triggered("DH0")])
             .expect("a triggered payload needs no interval");
         assert!(resolved[0].triggered);
-        assert_eq!(resolved[0].packet_interval_ms, 0, "it sends when it is asked");
+        assert_eq!(
+            resolved[0].packet_interval,
+            Duration::ZERO,
+            "it sends when it is asked"
+        );
         assert_eq!(resolved[0].segment_size, 2);
     }
 
@@ -2307,9 +2320,9 @@ simulated_payloads:
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
         let file = parse("simulated_payloads:\n  - name: DH0\n    type: device-file\n");
         let problems = file.problems(&[device]);
@@ -2366,7 +2379,7 @@ simulated_payloads:
 ",
         );
         let resolved = file.resolve(&[handler("DH0", 8)]).expect("the word is read");
-        assert_eq!(resolved[0].packet_interval_ms, 0);
+        assert_eq!(resolved[0].packet_interval, Duration::from_millis(0));
         // And the segments of one packet, which is the other setting it means
         // anything in.
         let file = parse(
@@ -2381,8 +2394,8 @@ simulated_payloads:
         );
         let resolved = file.resolve(&[handler("DH0", 8)]).expect("the word is read");
         assert_eq!(
-            (resolved[0].packet_interval_ms, resolved[0].segment_interval_ms),
-            (1000, 0)
+            (resolved[0].packet_interval, resolved[0].segment_interval),
+            (Duration::from_secs(1), Duration::ZERO)
         );
 
         // A nought says nothing this file reads, and is told the word.

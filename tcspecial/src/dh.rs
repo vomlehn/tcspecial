@@ -5,7 +5,6 @@
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use log::info;
 use tcslibgs::{DHConfig, DHName, DHState, Statistics, TcsError, TcsResult};
 
@@ -227,9 +226,9 @@ impl DataHandler {
         // for a payload of the kind that answers requests rather than sending
         // on its own. It goes to the conduit that writes the payload, which is
         // the one that already has somewhere to put it.
-        let polling = self.config.mode.polling().map(|(trigger, interval_ms)| Polling {
+        let polling = self.config.mode.polling().map(|(trigger, interval)| Polling {
             trigger: trigger.to_vec(),
-            interval: Duration::from_millis(interval_ms as u64),
+            interval,
         });
         if let Some(polling) = &polling {
             info!(
@@ -414,7 +413,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -538,9 +537,9 @@ mod tests {
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
-                interval_ms: 50,
+                interval: Duration::from_millis(50),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -682,9 +681,9 @@ mod tests {
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
-                interval_ms: 20,
+                interval: Duration::from_millis(20),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -764,7 +763,7 @@ mod tests {
             }),
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).unwrap();
@@ -866,7 +865,7 @@ mod tests {
             }),
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let mut dh = DataHandler::new(config.clone()).expect("the handler is made");
@@ -948,7 +947,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let dh = DataHandler::new(config);

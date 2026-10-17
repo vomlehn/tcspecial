@@ -93,16 +93,13 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             Some(trigger) => {
                 // How often it is asked is how often its group is read; a
                 // triggered node in no group is asked as it is polled.
-                let interval_ms = node
+                let interval = node
                     .group
                     .as_deref()
                     .and_then(|g| graph.group(g))
                     .and_then(|g| parse_interval(&g.interval).ok())
-                    .map_or(0, |d| u32::try_from(d.as_millis()).unwrap_or(u32::MAX));
-                DHMode::Triggered {
-                    trigger,
-                    interval_ms,
-                }
+                    .unwrap_or_default();
+                DHMode::Triggered { trigger, interval }
             }
         };
 
@@ -115,7 +112,7 @@ pub fn handlers(graph: &Graph, sim_file: &SimConfigFile) -> Result<Vec<DHConfig>
             oc: None,
             ground: None,
             mode,
-            stale_interval_ms: None,
+            stale_interval: None,
         });
     }
     Ok(handlers)

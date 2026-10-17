@@ -353,15 +353,16 @@ nothing decides it for a file that says neither.
                        is asked, and how often it is asked is the interval of
                        the payload group it is in
 
-   packet_interval_ms  milliseconds between packets. The payload sends of its
-                       own accord, at that rate, and nothing asks it
+   packet_interval     how long between packets, as a length of time. The
+                       payload sends of its own accord, at that rate, and
+                       nothing asks it
 
 A payload with a ``trigger`` is asked, so the trigger is the question and the
 group is the clock: a payload that is asked and is in no group has no rate,
 and is refused saying so -- a trigger with nothing to send it at is a payload
 nothing would ever ask.
 
-A payload with a ``packet_interval_ms`` sends on its own, so there is nothing
+A payload with a ``packet_interval`` sends on its own, so there is nothing
 to send it and nothing to keep time for it. A simulated one is driven at the
 rate its simulator configuration gives it, which is how fast a stand-in
 produces data rather than how fast the payload would.
@@ -395,18 +396,17 @@ figure is in the simulator configuration.
 **triggered** -- tcspecial sends a request and the payload answers. It states
 the ``trigger`` to send, because tcspecial does the sending and what to send
 comes from the payload's interface document, and how often the trigger goes
-out is the ``packet_interval_ms`` of the payload group it is in -- so a
+out is the ``packet_interval`` of the payload group it is in -- so a
 triggered payload in no group is refused. Its entry in the simulator
 configuration states no interval at all, packet or segment: such a payload
 sends when it is asked, so a rate there would govern nothing.
 
 So each type states its timing in one place and the other type's place is
 empty, which is what lets a file be read without deciding anything: the rate a
-payload is asked at is its group's ``packet_interval_ms``, and the rate a
-payload sends at is the simulator configuration's ``packet_interval``. It was
-``trigger_interval_ms`` here, and a file still using that name is told the name
-it has now. A version 2 configuration spells the group's rate ``interval`` and
-states it as a length of time: see `Lengths of Time`_.
+payload is asked at is its group's ``packet_interval``, and the rate a
+payload sends at is the simulator configuration's ``packet_interval``. A
+version 2 configuration spells the group's rate ``interval``; every one of
+them is a length of time, as `Lengths of Time`_ says.
 
 In a graph, a ``trigger`` is also what allows anything to be sent to a payload
 at all. What is written to a payload that is read is the question it answers,
@@ -723,7 +723,7 @@ attribute, in the node description tree, as its ``kind``: ``interval`` or
 
    payload_groups:
      - name: every_half_second
-       packet_interval_ms: 500
+       packet_interval: "500 ms"
 
    payloads:
      # Sends on its own: nothing here about timing.
@@ -881,8 +881,9 @@ watched for changes, or a set of circuits driven: a heater, a valve, a latch.
    direction      input | output, default input
    edge           rising | falling | both | none, default both. Inputs only
    bias           none | pull_up | pull_down, default none. Inputs only
-   debounce_us    how long a line must be steady before a change counts.
-                  Default none, applied by the kernel, inputs only
+   debounce       how long a line must be steady before a change counts,
+                  as a length of time: 50 us. Default none, applied by the
+                  kernel, inputs only
    state_interval how often to report what the lines are. Default none,
                   inputs only
 
@@ -930,7 +931,7 @@ direction was changed and whose other words were left as they were.
 This is the one type whose payload data is made rather than carried. A line
 has no bytes: it is high or low, and what the ground wants is when it changed.
 So each change becomes a record of sixteen bytes -- eight of time in
-milliseconds since the epoch, four of line offset, four of the value it became
+microseconds since the epoch, four of line offset, four of the value it became
 -- and a ``packet_size`` must be a whole number of those, a packet that was
 part of a record being a reading nobody could use.
 
@@ -1146,11 +1147,11 @@ the UART driver and is told through an ioctl.
    rs485             true | false, default false -- asynchronous lines only
    rs485_rts_on_send true | false -- the level of RTS while sending.
                      Required of a line that states rs485: true
-   rs485_delay_before_send_ms
-                     milliseconds to hold the bus before the first bit,
-                     default 0
-   rs485_delay_after_send_ms
-                     and after the last, default 0
+   rs485_delay_before_send
+                     how long to hold the bus before the first bit, as a
+                     length of time: 2 ms. Default none
+   rs485_delay_after_send
+                     and after the last
 
 Which level of RTS drives the transceiver is a property of the board rather
 than of the protocol -- the signal commonly reaches the transceiver's enable
@@ -2463,7 +2464,7 @@ what the ground can say about that payload's data:
 
 grey
   Nothing to judge by: as far as the ground knows the payload is not enabled,
-  or the payload states no ``stale_interval_ms``.
+  or the payload states no ``stale_interval``.
 
 green
   Data has arrived from that payload within its interval.
@@ -2487,7 +2488,7 @@ How long to wait is the payload's own to say, in its entry or its group:
        protocol: udp
        payload_interface: localhost:5000
        packet_size: 12
-       stale_interval_ms: 3000
+       stale_interval: "3000 ms"
 
 The figure is read by the ground and by nothing aboard. A payload that states
 none is never judged -- its dot stays grey -- because a figure nobody chose

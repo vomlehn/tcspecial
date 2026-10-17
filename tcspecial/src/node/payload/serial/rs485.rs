@@ -64,8 +64,8 @@ fn flags_of(terms: &Rs485Params) -> u32 {
 fn asked_for(terms: &Rs485Params) -> SerialRs485 {
     SerialRs485 {
         flags: flags_of(terms),
-        delay_rts_before_send: terms.delay_before_send_ms,
-        delay_rts_after_send: terms.delay_after_send_ms,
+        delay_rts_before_send: terms.delay_before_send.as_millis() as u32,
+        delay_rts_after_send: terms.delay_after_send.as_millis() as u32,
         padding: [0; 5],
     }
 }
@@ -137,6 +137,7 @@ pub(crate) fn apply(fd: RawFd, what: &str, terms: &Rs485Params) -> TcsResult<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     /// The structure is the size the kernel's own is.
     ///
@@ -160,8 +161,8 @@ mod tests {
     fn the_level_while_sending_is_one_flag_or_the_other() {
         let high = flags_of(&Rs485Params {
             rts_on_send: true,
-            delay_before_send_ms: 0,
-            delay_after_send_ms: 0,
+            delay_before_send: Duration::from_millis(0),
+            delay_after_send: Duration::from_millis(0),
         });
         assert_eq!(high & SER_RS485_ENABLED, SER_RS485_ENABLED, "the mode is on");
         assert_eq!(high & SER_RS485_RTS_ON_SEND, SER_RS485_RTS_ON_SEND);
@@ -169,8 +170,8 @@ mod tests {
 
         let low = flags_of(&Rs485Params {
             rts_on_send: false,
-            delay_before_send_ms: 0,
-            delay_after_send_ms: 0,
+            delay_before_send: Duration::from_millis(0),
+            delay_after_send: Duration::from_millis(0),
         });
         assert_eq!(low & SER_RS485_ENABLED, SER_RS485_ENABLED);
         assert_eq!(low & SER_RS485_RTS_ON_SEND, 0);
@@ -183,8 +184,8 @@ mod tests {
     fn the_turnaround_is_carried_as_the_kernel_takes_it() {
         let asked = asked_for(&Rs485Params {
             rts_on_send: true,
-            delay_before_send_ms: 2,
-            delay_after_send_ms: 3,
+            delay_before_send: Duration::from_millis(2),
+            delay_after_send: Duration::from_millis(3),
         });
         assert_eq!(asked.delay_rts_before_send, 2);
         assert_eq!(asked.delay_rts_after_send, 3);
@@ -197,8 +198,8 @@ mod tests {
     fn a_port_that_did_not_take_it_is_not_mistaken_for_one_that_did() {
         let terms = Rs485Params {
             rts_on_send: true,
-            delay_before_send_ms: 1,
-            delay_after_send_ms: 1,
+            delay_before_send: Duration::from_millis(1),
+            delay_after_send: Duration::from_millis(1),
         };
         let asked = asked_for(&terms);
 
@@ -256,8 +257,8 @@ mod tests {
             "line",
             &Rs485Params {
                 rts_on_send: true,
-                delay_before_send_ms: 0,
-                delay_after_send_ms: 0,
+                delay_before_send: Duration::from_millis(0),
+                delay_after_send: Duration::from_millis(0),
             },
         )
         .expect_err("a pty cannot be an RS-485 bus");

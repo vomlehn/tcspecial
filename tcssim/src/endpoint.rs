@@ -152,8 +152,8 @@ pub fn payload_config_from(dh: &DHConfig, sim: &ResolvedSim) -> Result<PayloadCo
         port,
         packet_size: Arc::new(AtomicU32::new(packet_size)),
         segment_size: Arc::new(AtomicU32::new(sim.segment_size)),
-        packet_interval_ms: Arc::new(AtomicU32::new(sim.packet_interval_ms)),
-        segment_interval_ms: Arc::new(AtomicU32::new(sim.segment_interval_ms)),
+        packet_interval_ms: Arc::new(AtomicU32::new(sim.packet_interval.as_millis() as u32)),
+        segment_interval_ms: Arc::new(AtomicU32::new(sim.segment_interval.as_millis() as u32)),
     })
 }
 
@@ -200,6 +200,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
     use super::*;
     use tcslibgs::ResolvedSim;
     use std::sync::atomic::Ordering;
@@ -210,8 +211,8 @@ mod tests {
 
     fn sim(packet_interval_ms: u32, segment_interval_ms: u32, segment_size: u32) -> ResolvedSim {
         ResolvedSim {
-            packet_interval_ms,
-            segment_interval_ms,
+            packet_interval: Duration::from_millis(u64::from(packet_interval_ms)),
+            segment_interval: Duration::from_millis(u64::from(segment_interval_ms)),
             segment_size,
             triggered: false,
             faults: Default::default(),
@@ -231,7 +232,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).unwrap();
@@ -264,9 +265,9 @@ mod tests {
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let deaf = [
@@ -317,9 +318,9 @@ mod tests {
             ground: None,
             mode: DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let config = payload_config_from(&dh, &sim(0, 100, 2)).expect("a stream can be asked");
@@ -354,7 +355,7 @@ mod tests {
                 oc: None,
                 ground: None,
                             mode: Default::default(),
-                            stale_interval_ms: None,
+                            stale_interval: None,
             };
 
             let config =
@@ -385,7 +386,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a line is simulable");
@@ -420,7 +421,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let config = payload_config_from(&dh, &sim(250, 100, 2)).expect("a bus is simulable");
@@ -454,7 +455,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let config =

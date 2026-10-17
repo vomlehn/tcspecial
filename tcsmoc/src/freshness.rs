@@ -26,6 +26,8 @@
 
 use std::time::Duration;
 
+use tcslibgs::Timestamp;
+
 /// What a payload's data indicator says.
 ///
 /// No red state, deliberately. A payload whose data has stopped may be a
@@ -44,22 +46,28 @@ pub enum Freshness {
     Stale,
 }
 
-/// What a payload's indicator should say, in milliseconds since the epoch.
+/// What a payload's indicator should say.
 ///
 /// `enabled` is whether the ground believes the payload is running. `since` is
 /// the later of when its last datagram arrived and when it was enabled, which
 /// is what makes a payload just switched on current rather than late: it has
 /// its interval to produce something. `interval` is the payload's own
-/// `stale_interval_ms`, and `now` is the clock.
+/// `stale_interval`, and `now` is the clock.
 ///
-/// A `since` in the future is a clock that moved, and is not a reason to claim
-/// the data is current: it reads as stale, the conservative of the two, as the
-/// beacon indicator goes back to grey rather than claiming contact.
+/// The two times are timestamps and the interval is a duration, so nothing
+/// here converts a unit: the subtraction is
+/// [`Timestamp::since`](tcslibgs::Timestamp::since), which is also where the
+/// two unanswerable cases are refused.
+///
+/// A `since` in the future is a clock that moved, and so is a clock the
+/// ground could not read at all; neither is a reason to claim the data is
+/// current. Both read as stale, the conservative of the two, as the beacon
+/// indicator goes back to grey rather than claiming contact.
 pub fn freshness_of(
     enabled: bool,
-    since: Option<u64>,
+    since: Option<Timestamp>,
     interval: Option<Duration>,
-    now: u64,
+    now: Timestamp,
 ) -> Freshness {
     if !enabled {
         return Freshness::Unjudged;
@@ -71,8 +79,8 @@ pub fn freshness_of(
         return Freshness::Stale;
     };
 
-    match now.checked_sub(since) {
-        Some(elapsed) if elapsed <= interval.as_millis() as u64 => Freshness::Current,
+    match now.since(since) {
+        Some(elapsed) if elapsed <= interval => Freshness::Current,
         _ => Freshness::Stale,
     }
 }
@@ -83,6 +91,14 @@ mod tests {
 
     const INTERVAL: Option<Duration> = Some(Duration::from_millis(3000));
 
+    /// A time, written here as the milliseconds since the epoch these tests
+    /// were first written in.
+    fn at(millis: u64) -> Timestamp {
+        Timestamp {
+            micros: millis * 1_000,
+        }
+    }
+
     /// A payload nobody has enabled says nothing about its data.
     ///
     /// Grey rather than stale: data that is not expected cannot be late, and
@@ -91,7 +107,7 @@ mod tests {
     #[test]
     fn a_payload_that_is_not_enabled_is_not_judged() {
         assert_eq!(
-            freshness_of(false, Some(1_000), INTERVAL, 100_000),
+            freshness_of(false, Some(at(1_000)), INTERVAL, at(100_000)),
             Freshness::Unjudged
         );
     }
@@ -103,7 +119,7 @@ mod tests {
     #[test]
     fn a_payload_with_no_interval_is_not_judged() {
         assert_eq!(
-            freshness_of(true, Some(1_000), None, 100_000),
+            freshness_of(true, Some(at(1_000)), None, at(100_000)),
             Freshness::Unjudged
         );
     }
@@ -113,18 +129,18 @@ mod tests {
     #[test]
     fn data_within_the_interval_is_current() {
         assert_eq!(
-            freshness_of(true, Some(10_000), INTERVAL, 11_000),
+            freshness_of(true, Some(at(10_000)), INTERVAL, at(11_000)),
             Freshness::Current
         );
         // Exactly the interval: still current. A payload that sends every
         // 3000 ms against an interval of 3000 ms would otherwise be stale at
         // the moment its next datagram is due, which is every time.
         assert_eq!(
-            freshness_of(true, Some(10_000), INTERVAL, 13_000),
+            freshness_of(true, Some(at(10_000)), INTERVAL, at(13_000)),
             Freshness::Current
         );
         assert_eq!(
-            freshness_of(true, Some(10_000), INTERVAL, 13_001),
+            freshness_of(true, Some(at(10_000)), INTERVAL, at(13_001)),
             Freshness::Stale
         );
     }
@@ -136,14 +152,32 @@ mod tests {
     /// show for it is exactly what this indicator is for.
     #[test]
     fn an_enabled_payload_with_nothing_at_all_is_stale() {
-        assert_eq!(freshness_of(true, None, INTERVAL, 100_000), Freshness::Stale);
+        assert_eq!(freshness_of(true, None, INTERVAL, at(100_000)), Freshness::Stale);
     }
 
     /// A time in the future is a clock that moved, and reads as stale.
     #[test]
     fn a_reading_from_the_future_is_not_called_current() {
         assert_eq!(
-            freshness_of(true, Some(200_000), INTERVAL, 100_000),
+            freshness_of(true, Some(at(200_000)), INTERVAL, at(100_000)),
+            Freshness::Stale
+        );
+    }
+
+    /// And so does a clock the spacecraft could not read.
+    ///
+    /// Either end of the subtraction: the arrival carries the time the
+    /// spacecraft put on it, and the ground's own clock can fail too. Neither
+    /// is an elapsed time, and a payload whose age cannot be worked out is
+    /// not a payload whose data is known to be current.
+    #[test]
+    fn a_clock_that_could_not_be_read_is_not_called_current() {
+        assert_eq!(
+            freshness_of(true, Some(Timestamp::CLOCK_FAULT), INTERVAL, at(100_000)),
+            Freshness::Stale
+        );
+        assert_eq!(
+            freshness_of(true, Some(at(99_000)), INTERVAL, Timestamp::CLOCK_FAULT),
             Freshness::Stale
         );
     }

@@ -10,9 +10,10 @@
 //! edge detection, and each event the kernel reports becomes a record of
 //! [`EVENT_BYTES`] bytes: when it happened, which line, and what it became.
 //!
-//! The time is milliseconds since the UNIX epoch, which is the unit every
-//! other time in this project is in, so a line's change and a telemetry
-//! response can be read against each other. The kernel's own timestamp is
+//! The time is a [`Timestamp`] -- microseconds since the UNIX epoch, eight
+//! bytes, least significant first -- which is what every other time in this
+//! project is, so a line's change and a telemetry response can be read
+//! against each other. The kernel's own timestamp is
 //! nanoseconds on a monotonic clock, which says nothing to a ground station;
 //! it is converted here, once, where the event is made.
 //!
@@ -30,12 +31,12 @@ use std::fs::{File, OpenOptions};
 use std::io::Read;
 use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime};
 
 use nix::poll::PollFlags;
 use tcslibgs::{
     node::payload::gpio::{Direction, EVENT_BYTES},
-    Bias, GpioConfig, LineEdge, TcsError, TcsResult,
+    Bias, GpioConfig, LineEdge, TcsError, TcsResult, Timestamp,
 };
 
 use crate::endpoint::{
@@ -242,11 +243,7 @@ fn levels_of(what: &str, fd: RawFd, count: usize) -> TcsResult<u64> {
 /// and this one's is when the vehicle looked.
 fn level_record(offset: u32, high: bool, now: SystemTime) -> [u8; EVENT_BYTES] {
     let mut record = [0u8; EVENT_BYTES];
-    let millis = now
-        .duration_since(UNIX_EPOCH)
-        .map(|since| since.as_millis() as u64)
-        .unwrap_or(0);
-    record[..8].copy_from_slice(&millis.to_le_bytes());
+    record[..8].copy_from_slice(&Timestamp::at(now).to_le_bytes());
     record[8..12].copy_from_slice(&offset.to_le_bytes());
     record[12..].copy_from_slice(&u32::from(high).to_le_bytes());
     record
@@ -269,9 +266,7 @@ impl GpioEndpoint {
         let request = request_for(what, config)?;
         let lines = ask_for_lines(what, chip.as_raw_fd(), request, &config.path)?;
 
-        let state_interval = config
-            .state_interval_ms
-            .map(|ms| Duration::from_millis(u64::from(ms)));
+        let state_interval = config.state_interval;
 
         Ok(Self {
             what: what.to_string(),
@@ -355,7 +350,7 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
 
     // The debounce the kernel does, where the file asked for one, applied to
     // every line of the request: a mask with a bit per line.
-    if let Some(us) = config.debounce_us {
+    if let Some(steady) = config.debounce {
         let mask = if config.lines.len() as u32 >= u64::BITS {
             u64::MAX
         } else {
@@ -365,7 +360,9 @@ fn request_for(what: &str, config: &GpioConfig) -> TcsResult<LineRequest> {
             attr: LineAttribute {
                 id: GPIO_V2_LINE_ATTR_ID_DEBOUNCE,
                 padding: 0,
-                value: us as u64,
+                // The kernel's own attribute counts microseconds, which
+                // is where a length of time becomes a number.
+                value: steady.as_micros() as u64,
             },
             mask,
         };
@@ -463,21 +460,19 @@ fn values_for(count: usize, wanted: bool) -> LineValues {
 ///
 /// Little-endian, because the two ends of this link are the same machine --
 /// the handler makes these and the ground reads them, and a device set that
-/// crossed architectures would have said so somewhere.
+/// crossed architectures would have said so somewhere. That is also the
+/// order a [`Timestamp`] goes on the wire in, so the eight bytes of time
+/// here are the eight bytes of time in a telemetry response.
 fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
     let mut record = [0u8; EVENT_BYTES];
 
     // The kernel's timestamp is nanoseconds on a monotonic clock, which says
-    // nothing to a ground station: what goes out is milliseconds since the
-    // epoch, which is what every other time in this project is.
-    let millis = now
-        .duration_since(UNIX_EPOCH)
-        .map(|since| since.as_millis() as u64)
-        .unwrap_or(0);
-
+    // nothing to a ground station: what goes out is a Timestamp, which is
+    // what every other time in this project is, so a line's change and a
+    // telemetry response can be read against each other.
     let value: u32 = if event.id == GPIO_V2_LINE_EVENT_RISING_EDGE { 1 } else { 0 };
 
-    record[..8].copy_from_slice(&millis.to_le_bytes());
+    record[..8].copy_from_slice(&Timestamp::at(now).to_le_bytes());
     record[8..12].copy_from_slice(&event.offset.to_le_bytes());
     record[12..].copy_from_slice(&value.to_le_bytes());
     record
@@ -638,6 +633,7 @@ impl EndpointWritable for GpioEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::UNIX_EPOCH;
 
     /// Every structure is the size the kernel's own is.
     ///
@@ -670,8 +666,8 @@ mod tests {
             lines: vec![3, 7, 11],
             edge: LineEdge::Falling,
             bias: Bias::PullUp,
-            debounce_us: Some(5_000),
-            state_interval_ms: None,
+            debounce: Some(Duration::from_micros(5_000)),
+            state_interval: None,
         };
 
         let request = request_for("discretes", &config).expect("a request");
@@ -717,8 +713,8 @@ mod tests {
                 lines: vec![0],
                 edge: LineEdge::Both,
                 bias: Bias::None,
-                debounce_us: None,
-                state_interval_ms: None,
+                debounce: None,
+                state_interval: None,
             },
         )
         .expect("a request");
@@ -732,8 +728,8 @@ mod tests {
         assert_eq!(request.config.num_attrs, 0);
     }
 
-    /// An event becomes a record a ground station can read: a time in
-    /// milliseconds, the line, and what it became.
+    /// An event becomes a record a ground station can read: a time, the
+    /// line, and what it became.
     #[test]
     fn an_event_becomes_a_record() {
         let rising = LineEvent {
@@ -747,9 +743,9 @@ mod tests {
         let record = record_of(&rising, at);
         assert_eq!(record.len(), EVENT_BYTES);
         assert_eq!(
-            u64::from_le_bytes(record[..8].try_into().unwrap()),
-            1_700_000_000_123,
-            "the time is milliseconds since the epoch, not the kernel's own clock"
+            Timestamp::from_le_bytes(record[..8].try_into().unwrap()),
+            Timestamp { micros: 1_700_000_000_123_000 },
+            "the time is a Timestamp, not the kernel's own clock"
         );
         assert_eq!(u32::from_le_bytes(record[8..12].try_into().unwrap()), 7);
         assert_eq!(
@@ -779,8 +775,8 @@ mod tests {
                 lines: vec![0],
                 edge: LineEdge::Both,
                 bias: Bias::None,
-                debounce_us: None,
-                state_interval_ms: None,
+                debounce: None,
+                state_interval: None,
             },
         ) {
             Err(e) => format!("{e}"),
@@ -911,8 +907,8 @@ mod tests {
                 // what must not reach the request.
                 edge: LineEdge::Both,
                 bias: Bias::None,
-                debounce_us: None,
-                state_interval_ms: None,
+                debounce: None,
+                state_interval: None,
             },
         )
         .expect("a request");

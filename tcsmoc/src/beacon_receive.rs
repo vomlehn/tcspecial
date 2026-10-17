@@ -1105,10 +1105,15 @@ mod tests {
         let at = std::time::UNIX_EPOCH + Duration::from_secs(3661);
         assert_eq!(beacon_last_received(Some(at)), "01:01:01");
 
-        // A clock reading before the epoch cannot be formatted and must not
-        // panic: a window that fell over because the system clock was being
-        // set would be a worse fault than a wrong time.
+        // A clock reading before the epoch is a clock that could not be
+        // read, and shows the same placeholder as no beacon at all: the one
+        // thing it must not do is panic, because a window that fell over
+        // because the system clock was being set would be a worse fault than
+        // a time it cannot show. Nor may it show the epoch, which it used to
+        // -- a line reading 00:00:00 is a time the operator would believe,
+        // and whether beacons are arriving is said by the indicator beside
+        // it rather than by this line.
         let before = std::time::UNIX_EPOCH - Duration::from_secs(1);
-        assert_eq!(beacon_last_received(Some(before)), "00:00:00");
+        assert_eq!(beacon_last_received(Some(before)), NO_TRANSFER_TIME);
     }
 }

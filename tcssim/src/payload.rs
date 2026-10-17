@@ -91,6 +91,13 @@ pub struct PayloadConfig {
     pub own_port: Option<u16>,
     pub packet_size: Arc<AtomicU32>,
     pub segment_size: Arc<AtomicU32>,
+    /// How often a packet goes, and how often the segments of one do, in
+    /// milliseconds.
+    ///
+    /// Counts rather than lengths of time because they are shared and
+    /// changed while the simulator runs -- a panel may retime a payload --
+    /// and an atomic holds a number. They become lengths of time in one
+    /// place, [`Pacing::read`], which is what the waiting is done with.
     pub packet_interval_ms: Arc<AtomicU32>,
     pub segment_interval_ms: Arc<AtomicU32>,
 }
@@ -527,10 +534,11 @@ fn happens(percent: u32, rng: &mut impl Rng) -> bool {
 /// early, because early would be the simulator sending before the interval
 /// its own configuration asked for.
 pub(crate) fn lateness(config: &PayloadConfig, rng: &mut impl Rng) -> Duration {
-    match config.faults.jitter_ms {
-        0 => Duration::ZERO,
-        jitter => Duration::from_millis(rng.gen_range(0..=jitter) as u64),
+    let jitter = config.faults.jitter;
+    if jitter.is_zero() {
+        return Duration::ZERO;
     }
+    Duration::from_micros(rng.gen_range(0..=jitter.as_micros() as u64))
 }
 
 /// Whether this request goes unanswered.
@@ -784,7 +792,7 @@ mod tests {
         assert_eq!(lateness(&none, &mut rng), Duration::ZERO);
 
         let jittery = with(Faults {
-            jitter_ms: 20,
+            jitter: Duration::from_millis(20),
             ..Faults::default()
         });
         for _ in 0..200 {

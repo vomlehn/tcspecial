@@ -42,7 +42,7 @@
         <protocol>udp</protocol>
         <payload_interface>localhost:5000</payload_interface>
         <packet_size>12</packet_size>
-        <stale_interval_ms>3000</stale_interval_ms>
+        <stale_interval>3000 ms</stale_interval>
     </payloads>
     <payloads>
         <name>triggered-send</name>
@@ -52,7 +52,7 @@
         <packet_size>12</packet_size>
         <mode>triggered</mode>
         <trigger>&quot;go\n&quot;</trigger>
-        <packet_interval_ms>1000</packet_interval_ms>
-        <stale_interval_ms>3000</stale_interval_ms>
+        <packet_interval>1000 ms</packet_interval>
+        <stale_interval>3000 ms</stale_interval>
     </payloads>
 </payload>

@@ -47,27 +47,27 @@
         <protocol>tcp</protocol>
         <payload_interface>localhost:5000</payload_interface>
         <packet_size>12</packet_size>
-        <stale_interval_ms>3000</stale_interval_ms>
+        <stale_interval>3000 ms</stale_interval>
     </payloads>
     <payloads>
         <name>udp-steady</name>
         <group>udp_localhost</group>
         <payload_interface>localhost:5001</payload_interface>
         <packet_size>11</packet_size>
-        <stale_interval_ms>3000</stale_interval_ms>
+        <stale_interval>3000 ms</stale_interval>
     </payloads>
     <payloads>
         <name>random-device</name>
         <type>device-file</type>
         <path>/dev/urandom</path>
         <packet_size>1</packet_size>
-        <stale_interval_ms>1000</stale_interval_ms>
+        <stale_interval>1000 ms</stale_interval>
     </payloads>
     <payloads>
         <name>udp-fast</name>
         <group>udp_localhost</group>
         <payload_interface>localhost:5003</payload_interface>
         <packet_size>15</packet_size>
-        <stale_interval_ms>2000</stale_interval_ms>
+        <stale_interval>2000 ms</stale_interval>
     </payloads>
 </payload>

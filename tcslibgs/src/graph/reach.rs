@@ -553,38 +553,13 @@ fn port_named(
 /// would be a second copy of what each type accepts, and the two would
 /// disagree the first time a type gained a term.
 ///
-/// Three terms are lengths of time here and counts there. A version 2
-/// configuration writes `debounce: 50 us` and `rs485_delay_before_send: 2 ms`,
-/// as it writes every length of time -- see [`crate::graph::parse_interval`]
-/// -- and the rules those reach are the version 1 rules, which count in the
-/// unit their own name ends in. So the value is turned into that count on the
-/// way through, and the version 1 spelling of the attribute is refused by
-/// name: see [`timed`] and [`retired_term`].
-/// The terms a version 2 configuration writes as a length of time, each with
-/// the version 1 term it becomes and how many microseconds that term counts
-/// in.
-///
-/// `debounce` is microseconds where version 1 said `debounce_us`, and the two
-/// rs485 delays are milliseconds where it said `_ms`. The unit is in the
-/// version 1 name because the value there is a bare number; here the value
-/// says its own unit and the name does not have to.
-fn timed(attribute: &str) -> Option<(&'static str, u128)> {
-    match attribute {
-        "debounce" => Some(("debounce_us", 1)),
-        "state_interval" => Some(("state_interval_ms", 1_000)),
-        "rs485_delay_before_send" => Some(("rs485_delay_before_send_ms", 1_000)),
-        "rs485_delay_after_send" => Some(("rs485_delay_after_send_ms", 1_000)),
-        _ => None,
-    }
-}
-
-/// A term a version 2 configuration used to write, and what to write instead.
+/// A term a configuration used to write, and what to write instead.
 ///
 /// The version 1 spellings of the three above. Refused by name rather than as
 /// a term nothing knows, because the value changes with the name: a node that
 /// says `debounce_us: 50` is not a node with a misspelling on it, it is a node
-/// written for the spelling before this one. Version 1 files keep it: there
-/// the name is the only thing saying what the number counts.
+/// written for the spelling before this one. Version 1 files were renamed
+/// with these, so the old spelling is nobody's now.
 pub fn retired_term(attribute: &str) -> Option<&'static str> {
     match attribute {
         "debounce_us" => Some("say debounce, as a length of time: 50 us rather than 50"),
@@ -599,17 +574,6 @@ pub fn retired_term(attribute: &str) -> Option<&'static str> {
 }
 
 fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
-    // A length of time, in the unit the rule it is going to counts in. An
-    // unreadable one is left as written for those rules to refuse in their
-    // own words, naming the node as they do.
-    if let Some((term, micros_per)) = timed(attribute) {
-        let said = match crate::graph::parse_interval(value.as_str()) {
-            Ok(interval) => Scalar::of(&(interval.as_micros() / micros_per).to_string()),
-            Err(_) => value.clone(),
-        };
-        return put_term(terms, term, &said);
-    }
-
     let value = Some(value.clone());
     match attribute {
         // A line.
@@ -638,8 +602,8 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
         // A half-duplex RS-485 line.
         "rs485" => terms.rs485 = value,
         "rs485_rts_on_send" => terms.rs485_rts_on_send = value,
-        "rs485_delay_before_send_ms" => terms.rs485_delay_before_send_ms = value,
-        "rs485_delay_after_send_ms" => terms.rs485_delay_after_send_ms = value,
+        "rs485_delay_before_send" => terms.rs485_delay_before_send = value,
+        "rs485_delay_after_send" => terms.rs485_delay_after_send = value,
         // A CAN bus.
         "can_fd" => terms.can_fd = value,
         // A channel to another core.
@@ -649,8 +613,8 @@ fn put_term(terms: &mut LinkTerms, attribute: &str, value: &Scalar) -> bool {
         "lines" => terms.lines = value,
         "edge" => terms.edge = value,
         "bias" => terms.bias = value,
-        "debounce_us" => terms.debounce_us = value,
-        "state_interval_ms" => terms.state_interval_ms = value,
+        "debounce" => terms.debounce = value,
+        "state_interval" => terms.state_interval = value,
         "direction" => terms.direction = value,
         _ => return false,
     }
@@ -803,7 +767,7 @@ mod tests {
                 assert_eq!(gpio.path, "/dev/gpiochip0");
                 assert_eq!(gpio.lines, vec![3, 4, 5]);
                 assert_eq!(gpio.direction, Direction::Output);
-                assert_eq!(gpio.debounce_us, None);
+                assert_eq!(gpio.debounce, None);
             }
             other => panic!("the heaters should be discrete lines: {other:?}"),
         }

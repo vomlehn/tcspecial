@@ -206,7 +206,7 @@ mod tests {
                 port: addr.port(),
             }),
             mode: DHMode::Periodic,
-            stale_interval_ms: None,
+            stale_interval: None,
         }
     }
 

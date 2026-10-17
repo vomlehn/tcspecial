@@ -622,14 +622,14 @@ fn note_triggered_if_new(dh: &DHConfig, what: String, said: &mut Option<String>)
 /// of those and none of the rest, so a session where the MOC and tcspecial
 /// disagreed about a payload had nothing on the console to compare.
 fn triggered_startup(dh: &DHConfig, status: &str) -> Option<String> {
-    let (trigger, interval_ms) = dh.mode.polling()?;
+    let (trigger, interval) = dh.mode.polling()?;
     triggered_note(
         dh,
         &format!(
             "{}, trigger {} every {} ms, OC {}, status {}",
             endpoint_description(&dh.endpoint),
             trigger_as_written(trigger),
-            interval_ms,
+            interval.as_millis(),
             oc_of(dh),
             status
         ),
@@ -1470,7 +1470,7 @@ const PANEL_REFRESH_INTERVAL: Duration = Duration::from_millis(1000);
 ///
 /// A timer on the event loop. Each pass shows what arrived on each payload's
 /// own telemetry socket, works out each payload's data indicator from that and
-/// its `stale_interval_ms`, blanks the statuses when the beacons stop, and
+/// its `stale_interval`, blanks the statuses when the beacons stop, and
 /// shows what the command link has been doing. No command goes out.
 ///
 /// This replaced a poller that asked every payload what it was doing once a
@@ -1499,7 +1499,7 @@ fn refresh_panels(
     // When the ground came to believe each payload was running, so a payload
     // just enabled has its interval to produce something rather than being
     // late the moment it is switched on.
-    let mut enabled_at: Vec<Option<u64>> = vec![None; dh_configs.len()];
+    let mut enabled_at: Vec<Option<Timestamp>> = vec![None; dh_configs.len()];
     // What an asking done off the event loop left for the panels.
     let gathered: Arc<Mutex<Vec<PanelUpdate>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -1557,7 +1557,7 @@ fn refresh_panels(
                 &dh_configs,
                 &arrivals,
                 &mut enabled_at,
-                Timestamp::now().millis,
+                Timestamp::now(),
             );
 
             // And what the command link has been doing, under Last Response.
@@ -1652,13 +1652,13 @@ fn show_freshness(
     dh_model: &Rc<VecModel<DHInfo>>,
     dh_configs: &[DHConfig],
     arrivals: &Arrivals,
-    enabled_at: &mut [Option<u64>],
-    now: u64,
+    enabled_at: &mut [Option<Timestamp>],
+    now: Timestamp,
 ) {
-    let last: Vec<Option<u64>> = match arrivals.lock() {
+    let last: Vec<Option<Timestamp>> = match arrivals.lock() {
         Ok(slots) => slots
             .iter()
-            .map(|arrival| arrival.as_ref().map(|arrival| arrival.at.millis))
+            .map(|arrival| arrival.as_ref().map(|arrival| arrival.at))
             .collect(),
         // Nothing can be said about arrivals this pass, and the indicators
         // keep what they showed: the next pass is a second away.
@@ -1686,8 +1686,7 @@ fn show_freshness(
         let showing = constants::freshness_color(freshness_of(
             enabled,
             since,
-            dh.stale_interval_ms
-                .map(|ms| Duration::from_millis(u64::from(ms))),
+            dh.stale_interval,
             now,
         ));
         update_row(dh_model, row, |info| info.data_color = showing);
@@ -2138,7 +2137,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         }
     }
 
@@ -2257,7 +2256,7 @@ mod tests {
         triggered.name = DHName::new("triggered-send");
         triggered.mode = tcslibgs::DHMode::Triggered {
             trigger: b"go".to_vec(),
-            interval_ms: 1000,
+            interval: Duration::from_millis(1000),
         };
 
         for (what, dhs) in [
@@ -2698,7 +2697,7 @@ mod tests {
 
         dh.mode = tcslibgs::DHMode::Triggered {
             trigger: b"go".to_vec(),
-            interval_ms: 1000,
+            interval: Duration::from_millis(1000),
         };
         let said = triggered_note(&dh, "START_DH answered Success")
             .expect("a triggered payload is talked about");
@@ -2722,7 +2721,7 @@ mod tests {
         let mut dh = a_dh();
         dh.mode = tcslibgs::DHMode::Triggered {
             trigger: b"go".to_vec(),
-            interval_ms: 1000,
+            interval: Duration::from_millis(1000),
         };
 
         let mut said = None;
@@ -2789,9 +2788,9 @@ mod tests {
             ground: None,
             mode: tcslibgs::DHMode::Triggered {
                 trigger: b"go".to_vec(),
-                interval_ms: 1000,
+                interval: Duration::from_millis(1000),
             },
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let said = triggered_startup(&dh, STOPPED_STATUS).expect("a triggered payload");
@@ -2915,7 +2914,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: tcslibgs::DHMode::Periodic,
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         for kind in ["sends on its own", "answers requests"] {
@@ -2973,7 +2972,7 @@ mod tests {
 
             dh.mode = tcslibgs::DHMode::Triggered {
                 trigger: b"READ\r".to_vec(),
-                interval_ms: 500,
+                interval: Duration::from_millis(500),
             };
         }
     }
@@ -3414,7 +3413,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: stale,
+            stale_interval: stale.map(|ms: u32| Duration::from_millis(u64::from(ms))),
         };
         // Enabled and current, enabled and quiet, and one nobody has enabled.
         let configs = vec![dh(Some(3_000)), dh(Some(3_000)), dh(Some(3_000))];
@@ -3431,7 +3430,7 @@ mod tests {
             });
         }
 
-        let at = |millis: u64| {
+        let arrived = |millis: u64| {
             let mut data = DHSample::new();
             data.record(&[0x01]);
             Arrival {
@@ -3446,9 +3445,15 @@ mod tests {
         // has nothing at all, the second nothing for a minute.
         let arrivals: Arrivals = Arc::new(Mutex::new(vec![
             None,
-            Some(at(40_000)),
-            Some(at(99_000)),
+            Some(arrived(40_000)),
+            Some(arrived(99_000)),
         ]));
+
+        // The clock the test reads the panel against, written as the
+        // milliseconds since the epoch the arrivals above are written in.
+        let clock = |millis: u64| {
+            Timestamp::at(std::time::SystemTime::UNIX_EPOCH + Duration::from_millis(millis))
+        };
 
         let colour = |row| model.row_data(row).unwrap().data_color;
         let unjudged = constants::freshness_color(crate::freshness::Freshness::Unjudged);
@@ -3459,7 +3464,7 @@ mod tests {
         // running, and a payload just enabled has its interval to produce
         // something rather than being late the moment it is switched on.
         let mut enabled_at = vec![None; configs.len()];
-        show_freshness(&model, &configs, &arrivals, &mut enabled_at, 100_000);
+        show_freshness(&model, &configs, &arrivals, &mut enabled_at, clock(100_000));
         assert_eq!(colour(0), current, "a payload just enabled is given its interval");
         assert_eq!(colour(1), current, "and so is this one");
         assert_eq!(
@@ -3467,7 +3472,11 @@ mod tests {
             unjudged,
             "a payload nobody has enabled is not judged, whatever has arrived"
         );
-        assert_eq!(enabled_at[0], Some(100_000), "when the ground came to believe it");
+        assert_eq!(
+            enabled_at[0],
+            Some(clock(100_000)),
+            "when the ground came to believe it"
+        );
         // And the one nobody enabled is not remembered as enabled, which is
         // what would otherwise make it stale the moment it was switched on.
         assert_eq!(enabled_at[2], None);
@@ -3476,9 +3485,9 @@ mod tests {
         // not sent anything at all, and the interval it was given has run
         // out.
         if let Ok(mut slots) = arrivals.lock() {
-            slots[0] = Some(at(159_000));
+            slots[0] = Some(arrived(159_000));
         }
-        show_freshness(&model, &configs, &arrivals, &mut enabled_at, 160_000);
+        show_freshness(&model, &configs, &arrivals, &mut enabled_at, clock(160_000));
         assert_eq!(colour(0), current, "data a second old is current");
         assert_eq!(
             colour(1),
@@ -3514,7 +3523,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         };
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
             dh_info_from(0, &dh, None),
@@ -3563,7 +3572,7 @@ mod tests {
             oc: None,
             ground: None,
                     mode: Default::default(),
-                    stale_interval_ms: None,
+                    stale_interval: None,
         };
 
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(vec![
@@ -3617,7 +3626,7 @@ mod tests {
             oc: None,
             ground: None,
             mode: Default::default(),
-            stale_interval_ms: None,
+            stale_interval: None,
         };
 
         let info = dh_info_from(0, &dh, None);
@@ -3790,7 +3799,7 @@ mod tests {
                 oc: None,
                 ground: None,
                             mode: Default::default(),
-                            stale_interval_ms: None,
+                            stale_interval: None,
             },
             DHConfig {
                 name: DHName::new("DH9"),
@@ -3803,7 +3812,7 @@ mod tests {
                 oc: None,
                 ground: None,
                             mode: Default::default(),
-                            stale_interval_ms: None,
+                            stale_interval: None,
             },
         ];
 

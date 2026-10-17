@@ -304,37 +304,37 @@ impl AppParams {
 /// `~somebody`, there being no way to tell which was meant; and no other
 /// variable is looked up, a configuration that wanted one being a
 /// configuration that would behave differently on two vehicles.
-pub fn expanded(program: &str, home: Option<&str>) -> Result<String, String> {
-    let wants_home = program == "~"
-        || program.starts_with("~/")
-        || program.contains("$HOME")
-        || program.contains("${HOME}");
+pub fn expanded(executable: &str, home: Option<&str>) -> Result<String, String> {
+    let wants_home = executable == "~"
+        || executable.starts_with("~/")
+        || executable.contains("$HOME")
+        || executable.contains("${HOME}");
 
-    if program.starts_with('~') && !(program == "~" || program.starts_with("~/")) {
+    if executable.starts_with('~') && !(executable == "~" || executable.starts_with("~/")) {
         return Err(format!(
-            "\"{program}\" starts with \"~\" and a name. A home directory other \
+            "\"{executable}\" starts with \"~\" and a name. A home directory other \
              than this vehicle's is not expanded here: write the path out"
         ));
     }
 
     let home = match (wants_home, home) {
-        (false, _) => return Ok(program.to_string()),
+        (false, _) => return Ok(executable.to_string()),
         (true, Some(home)) if !home.is_empty() => home,
         (true, _) => {
             return Err(format!(
-                "\"{program}\" needs HOME, and HOME is not set where the program \
+                "\"{executable}\" needs HOME, and HOME is not set where the program \
                  would be run: a path made from an empty home is a path to \
                  somewhere else"
             ))
         }
     };
 
-    let said = if program == "~" {
+    let said = if executable == "~" {
         home.to_string()
-    } else if let Some(rest) = program.strip_prefix("~/") {
+    } else if let Some(rest) = executable.strip_prefix("~/") {
         format!("{home}/{rest}")
     } else {
-        program.to_string()
+        executable.to_string()
     };
     Ok(said.replace("${HOME}", home).replace("$HOME", home))
 }

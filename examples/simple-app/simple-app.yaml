@@ -5,7 +5,7 @@ description: "A payload that is a program, sending a line of text a word at a ti
 
 tcspecial:
   beacon:
-    interval_ms: "5000"
+    interval: "5s"
     recv: "127.0.0.1:5650"
     send: "0.0.0.0:5550"
   log:
@@ -30,7 +30,7 @@ moc:
   # tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It
   # states no address or port of its own, because nothing comes back
   # up.
-  - name: moc
+  - name: moc-1
     type: moc
     ground_base: "127.0.0.1:5100"
     payload-in: true
@@ -40,7 +40,7 @@ payloads:
   # asked, and reports one word of its line at a time, then a packet
   # holding the line terminator. `app-payload-arg` is which line it
   # sends, counting from one.
-  #
+  # 
   # The program is a Python 3 script beside this file, named relative
   # to the repository's root because that is where tcspecial is
   # run from: see examples/Makefile.
@@ -49,9 +49,9 @@ payloads:
     app-payload-arg: "1"
     executable: "examples/simple-app/lorem_pl.py"
     payload-out:
-      - target: moc
+      - target: moc-1
 
 tcsgui:
   nodes:
-    - { name: moc, x: 794, y: 106 }
-    - { name: lorem, x: 42, y: 121 }
+    - { name: moc-1, x: 597, y: 72 }
+    - { name: lorem, x: 42, y: 76 }

@@ -1133,83 +1133,171 @@ fn beside(top: &Path, name: &str) -> PathBuf {
     path
 }
 
-/// A whole number with a unit: `us`, `ms`, `s`, `d` or `w`.
+/// A length of time: a number and a unit, written together.
 ///
-/// Microseconds, milliseconds, seconds, minutes, hours, days and weeks. The
-/// number in front of the unit is a whole number like every other in these
-/// files -- decimal, or hexadecimal with an `0x` prefix, underscores allowed
-/// among the digits -- so `1_000ms`, `0x3e8ms` and `1000ms` are one interval
-/// written three ways. See [`crate::whole`].
+/// `500ms`, `1.5s`, `15min`, `6h`, `1w`. The units are the whole table, and
+/// nothing else is one:
 ///
-/// The same shape version 1 uses for a timeout -- a number and a unit, the
-/// number read by the same grammar -- so that a reader who has learned one
-/// has learned the other. A timeout takes only `us`, `ms` and `s` of these
-/// units: there is no read anybody waits an hour for, and a timeout stated in
-/// hours is a configuration that will look like a hang.
+/// | unit  | what it is   |
+/// |-------|--------------|
+/// | `us`  | microseconds |
+/// | `ms`  | milliseconds |
+/// | `s`   | seconds      |
+/// | `min` | minutes      |
+/// | `h`   | hours        |
+/// | `d`   | days         |
+/// | `w`   | weeks        |
 ///
 /// Every unit from a microsecond to a week, because a housekeeping reading
 /// taken once a week is written `1w` and not `604800s`, and a number nobody
 /// can read at a glance is a number nobody can check. The same argument
-/// covers the middle of the range: `15m` and `6h` are how a schedule is
-/// discussed, and making somebody write `900s` and `21600s` is making them
-/// do the arithmetic that the mistake hides in.
+/// covers the middle of the range: `15min` and `6h` are how a schedule is
+/// discussed, and making somebody write `900s` and `21600s` is making them do
+/// the arithmetic that the mistake hides in.
 ///
-/// `m` is minutes and `ms` is milliseconds, which are a thousand-fold apart
-/// and one letter apart. The suffixes are matched longest first, so `500ms`
-/// is five hundred milliseconds and never five hundred metres of anything --
-/// but a typed `m` where `ms` was meant is a reading taken sixty thousand
-/// times less often, and nothing in the file could tell. It is the one place
-/// this grammar lets a slip of a finger past, and it is the price of writing
-/// a quarter of an hour as `15m`.
+/// # Nothing ambiguous
+///
+/// Minutes are `min` and never `m`. A single `m` is one letter from `ms` and a
+/// thousand-fold apart from it, so a slip of a finger would have made a
+/// reading taken sixty thousand times less often with nothing in the file to
+/// say so. It is refused by name, as is anything else that could be read two
+/// ways:
+///
+/// * `m` -- say `min` for minutes or `ms` for milliseconds;
+/// * a month or a year -- `mon`, `mo`, `month`, `y`, `yr`, `year` -- which are
+///   not lengths of time at all: a month is a calendar's business, needing a
+///   reference date and a timezone that nothing aboard a vehicle carries. A
+///   span of about that size is written exactly: `30d`, or a number of days or
+///   seconds;
+/// * `µs` -- say `us`, this being a grammar of ASCII.
+///
+/// The units are lowercase and the number is decimal. There is no hexadecimal
+/// interval, and that is deliberate: `d` is a hexadecimal digit, so `0x1d`
+/// would be a number that is also "0x1 days" and a reader could not tell which
+/// was meant. Underscores among the digits mean nothing, as everywhere else in
+/// these files, so `1_000ms` and `1000ms` are one interval written twice.
+///
+/// # The number
+///
+/// A whole number or a decimal fraction: `1500ms` and `1.5s` are the same
+/// interval, and `0.5d` is twelve hours. A fraction is for the times when the
+/// unit a person thinks in is not the unit the value divides into -- half a
+/// day, a second and a half -- and it is read exactly: the value is kept in
+/// whole microseconds, rounded to the nearest, so `1.0000004s` is a second and
+/// nought point four of a microsecond rounded away rather than silently
+/// truncated.
+///
+/// No sign and no exponent. An interval is a length and not a direction, and
+/// `1e3s` is a number written for a machine to read rather than a person.
 ///
 /// Nought is refused -- a group read every nought seconds is a group read as
 /// fast as the bus will go, which is a thing to ask for in words rather than
 /// by writing zero -- and so is an interval too long to hold, which is the
-/// other end of the same mistake.
+/// other end of the same mistake. A fraction that rounds to nothing is nought
+/// by another spelling and is refused with it.
+///
+/// This is the one reader of a length of time in a configuration, a payload's
+/// `timeout` included: see `crate::endpoint_config::parse_timeout`, which is
+/// this with the units it may use narrowed.
 pub fn parse_interval(text: &str) -> Result<Duration, String> {
-    const SECOND: u64 = 1_000_000;
-    const UNITS: [(&str, u64); 7] = [
-        // Longest first, so that the `s` of `ms` is not taken for seconds and
-        // the `m` of `ms` is not taken for minutes.
-        ("us", 1),
-        ("ms", 1_000),
+    const SECOND: f64 = 1_000_000.0;
+    // Longest first, so the `s` of `ms` is not taken for seconds. `min` is
+    // first of all, there being no shorter unit it could be read as.
+    const UNITS: [(&str, f64); 7] = [
+        ("min", 60.0 * SECOND),
+        ("us", 1.0),
+        ("ms", 1_000.0),
         ("s", SECOND),
-        ("m", 60 * SECOND),
-        ("h", 3_600 * SECOND),
-        ("d", 24 * 3_600 * SECOND),
-        ("w", 7 * 24 * 3_600 * SECOND),
+        ("h", 3_600.0 * SECOND),
+        ("d", 24.0 * 3_600.0 * SECOND),
+        ("w", 7.0 * 24.0 * 3_600.0 * SECOND),
     ];
 
-    let lower = text.trim().to_ascii_lowercase();
+    // What a reader might write and this will not take, each with the thing
+    // to write instead: said by name, because a unit refused as "no unit at
+    // all" sends somebody looking for a typing mistake they did not make.
+    const REFUSED: [(&str, &str); 8] = [
+        ("m", "say min for minutes or ms for milliseconds"),
+        ("mon", "a month is not a length of time: say 30d, or a number of days"),
+        ("mo", "a month is not a length of time: say 30d, or a number of days"),
+        (
+            "month",
+            "a month is not a length of time: say 30d, or a number of days",
+        ),
+        ("y", "a year is not a length of time: say 365d, or a number of days"),
+        ("yr", "a year is not a length of time: say 365d, or a number of days"),
+        (
+            "year",
+            "a year is not a length of time: say 365d, or a number of days",
+        ),
+        ("\u{b5}s", "say us"),
+    ];
+
+    let said = text.trim();
+    let digits_of = |unit: &str| said.strip_suffix(unit);
+
+    // Refused by name first, so that `15m` is told what to say rather than
+    // being read as fifteen of something else.
+    for (unit, instead) in REFUSED {
+        if let Some(digits) = digits_of(unit) {
+            if !digits.is_empty() && !UNITS.iter().any(|(known, _)| digits.ends_with(known)) {
+                return Err(format!("\"{text}\": {instead}"));
+            }
+        }
+    }
+
     let (digits, unit, micros) = UNITS
         .iter()
-        .find_map(|(unit, micros)| {
-            lower
-                .strip_suffix(unit)
-                .map(|digits| (digits, *unit, *micros))
-        })
+        .find_map(|(unit, micros)| digits_of(unit).map(|digits| (digits, *unit, *micros)))
         .ok_or_else(|| {
             format!(
-                "\"{text}\" has no unit: a number followed by us, ms, s, m, h, \
+                "\"{text}\" has no unit: a number followed by us, ms, s, min, h, \
                  d or w"
             )
         })?;
 
-    let n = crate::whole::whole(digits)
-        .map_err(|_| format!("\"{text}\" is not a whole number of {unit}"))?;
-
-    // In microseconds throughout, so that a week and a microsecond are the
-    // same arithmetic -- and checked, because seven hundred thousand weeks
-    // overflows the count rather than being an interval anybody meant.
-    let total = n.checked_mul(micros).ok_or_else(|| {
-        format!("\"{text}\" is longer than anything this can keep track of")
-    })?;
-
+    let total = whole_micros(text, digits, unit, micros)?;
     let interval = Duration::from_micros(total);
     if interval.is_zero() {
         return Err(format!("\"{text}\" is no interval at all"));
     }
     Ok(interval)
+}
+
+/// `digits` of `unit`, in whole microseconds.
+///
+/// A whole number or a decimal fraction, underscores ignored, read exactly and
+/// rounded to the nearest microsecond. In microseconds throughout, so that a
+/// week and a microsecond are the same arithmetic -- and checked, because
+/// seven hundred thousand weeks overflows the count rather than being an
+/// interval anybody meant.
+fn whole_micros(text: &str, digits: &str, unit: &str, micros: f64) -> Result<u64, String> {
+    let bare: String = digits.chars().filter(|c| *c != '_').collect();
+    let bare = bare.trim();
+    let bad = || format!("\"{text}\" is not a number of {unit}");
+
+    // Decimal only, and no sign, exponent or anything else a float parser
+    // would otherwise take: the grammar is digits, at most one point, digits.
+    let mut parts = bare.split('.');
+    let before = parts.next().unwrap_or("");
+    let after = parts.next().unwrap_or("");
+    if parts.next().is_some()
+        || bare.is_empty()
+        || (before.is_empty() && after.is_empty())
+        || !before.chars().all(|c| c.is_ascii_digit())
+        || !after.chars().all(|c| c.is_ascii_digit())
+    {
+        return Err(bad());
+    }
+
+    let n: f64 = bare.parse().map_err(|_| bad())?;
+    let total = (n * micros).round();
+    if !total.is_finite() || total < 0.0 || total > u64::MAX as f64 {
+        return Err(format!(
+            "\"{text}\" is longer than anything this can keep track of"
+        ));
+    }
+    Ok(total as u64)
 }
 
 #[cfg(test)]
@@ -1254,18 +1342,18 @@ mod tests {
         // The seven units, the long ones in the terms somebody would check
         // them in: a minute of seconds, an hour of minutes, a day of hours
         // and a week of days.
-        assert_eq!(parse_interval("1m").unwrap(), Duration::from_secs(60));
-        assert_eq!(parse_interval("15m").unwrap(), Duration::from_secs(900));
+        assert_eq!(parse_interval("1min").unwrap(), Duration::from_secs(60));
+        assert_eq!(parse_interval("15min").unwrap(), Duration::from_secs(900));
         assert_eq!(parse_interval("1h").unwrap(), Duration::from_secs(3_600));
         assert_eq!(parse_interval("6h").unwrap(), Duration::from_secs(21_600));
         assert_eq!(parse_interval("1d").unwrap(), Duration::from_secs(86_400));
         assert_eq!(parse_interval("2w").unwrap(), Duration::from_secs(14 * 86_400));
         for (long, short) in [
-            ("1h", "60m"),
+            ("1h", "60min"),
             ("1d", "24h"),
             ("1w", "7d"),
-            ("1m", "60s"),
-            ("1m", "60000ms"),
+            ("1min", "60s"),
+            ("1min", "60000ms"),
         ] {
             assert_eq!(
                 parse_interval(long).unwrap(),
@@ -1274,16 +1362,22 @@ mod tests {
             );
         }
 
-        // The one slip this grammar cannot catch, stated so that a reader of
-        // the test knows it is deliberate: `m` and `ms` differ by a letter
-        // and by a thousand, and the longer suffix wins.
-        assert_eq!(parse_interval("500ms").unwrap(), Duration::from_millis(500));
-        assert_eq!(parse_interval("500m").unwrap(), Duration::from_secs(30_000));
+        // A number or a decimal fraction, and the two ways of writing one
+        // interval are one interval. Rounded to the nearest microsecond,
+        // which is the smallest thing this counts in.
+        assert_eq!(parse_interval("1.5s").unwrap(), Duration::from_millis(1_500));
+        assert_eq!(parse_interval("0.5d").unwrap(), Duration::from_secs(12 * 3_600));
+        assert_eq!(parse_interval("1.5ms").unwrap(), Duration::from_micros(1_500));
+        assert_eq!(
+            parse_interval("1.0000004s").unwrap(),
+            Duration::from_micros(1_000_000),
+            "a fraction of a microsecond is rounded to the nearest"
+        );
+        assert_eq!(parse_interval("1.6us").unwrap(), Duration::from_micros(2));
 
-        // The number in front of the unit is a whole number like any other:
-        // decimal, hexadecimal, or grouped with underscores. See
-        // crate::whole.
-        for said in ["1000ms", "1_000ms", "0x3e8ms", "0X3E8MS", "1_0_0_0ms"] {
+        // Underscores group the digits and mean nothing, as everywhere else
+        // in these files.
+        for said in ["1000ms", "1_000ms", "1_0_0_0ms", "1.000s", "1.0_00s"] {
             assert_eq!(
                 parse_interval(said).unwrap(),
                 Duration::from_millis(1000),
@@ -1291,20 +1385,43 @@ mod tests {
             );
         }
 
+        // Nothing ambiguous. `m` is refused by name rather than read as
+        // either of the two things it could be, and a month or a year is
+        // refused for not being a length of time at all.
+        for (said, instead) in [
+            ("15m", "say min"),
+            ("500m", "say min"),
+            ("6mon", "not a length of time"),
+            ("6mo", "not a length of time"),
+            ("6month", "not a length of time"),
+            ("1y", "not a length of time"),
+            ("1yr", "not a length of time"),
+            ("1year", "not a length of time"),
+            ("250\u{b5}s", "say us"),
+        ] {
+            let why = parse_interval(said).expect_err("an ambiguous unit");
+            assert!(why.contains(instead), "{said}: {why}");
+        }
+
+        // No hexadecimal, `d` being a hexadecimal digit: `0x1d` would be a
+        // number that is also "0x1 days".
         for bad in [
-            "3", "fast", "", "s", "3 seconds", "-1s", "1.5s", "1y", "1min", "0b11s",
+            "3", "fast", "", "s", "3 seconds", "-1s", "0b11s", "0x3e8ms", "1e3s",
+            "1.2.3s", ".s", "1..5s", "+1s", "1,5s",
         ] {
             assert!(parse_interval(bad).is_err(), "{bad:?} was accepted");
         }
-        // Nought is refused rather than taken for "as fast as possible".
-        for zero in ["0s", "0ms", "0us", "0m", "0h", "0d", "0w", "0x0s"] {
+
+        // Nought is refused rather than taken for "as fast as possible", and
+        // so is a fraction that rounds to it.
+        for zero in ["0s", "0ms", "0us", "0min", "0h", "0d", "0w", "0.0s", "0.4us"] {
             let said = parse_interval(zero).expect_err("nought should be refused");
-            assert!(said.contains("no interval at all"), "{said}");
+            assert!(said.contains("no interval at all"), "{zero}: {said}");
         }
         // And so is an interval too long to count, which is the same mistake
         // from the other end: a number that overflowed rather than an
         // interval anybody meant.
-        let said = parse_interval("0xffffffffffffffffw")
+        let said = parse_interval("100000000000000000w")
             .expect_err("a number of weeks past counting should be refused");
         assert!(said.contains("keep track"), "{said}");
     }
@@ -1423,7 +1540,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
 moc:

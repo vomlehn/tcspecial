@@ -28,13 +28,13 @@
       <xs:element name="protocol" type="xs:string"/>
       <xs:element name="payload_address" type="xs:string"/>
       <xs:element name="payload_port" type="xs:string"/>
-      <xs:element name="packet_interval_ms" type="xs:string"/>
-      <xs:element name="segment_interval_ms" type="xs:string"/>
+      <xs:element name="packet_interval" type="xs:string"/>
+      <xs:element name="segment_interval" type="xs:string"/>
       <xs:element name="segment_size" type="xs:string"/>
       <xs:element name="drop_percent" type="xs:string"/>
       <xs:element name="corrupt_percent" type="xs:string"/>
       <xs:element name="truncate_percent" type="xs:string"/>
-      <xs:element name="jitter_ms" type="xs:string"/>
+      <xs:element name="jitter" type="xs:string"/>
       <xs:element name="silent_after" type="xs:string"/>
       <xs:element name="close_after" type="xs:string"/>
       <xs:element name="ignore_trigger_percent" type="xs:string"/>

@@ -28,12 +28,12 @@ description: Simulator settings for the payloads of tcspecial1.yaml
 simulated_payload_groups:
   # One packet a second, sent whole.
   - name: steady_1hz
-    packet_interval_ms: 1000
+    packet_interval: 1s
 
   # As fast as the payload can be read, which is what a device like
   # /dev/urandom does.
   - name: continuous
-    packet_interval_ms: 0
+    packet_interval: 0ms
 
 simulated_payloads:
   # tcp-stream and udp-steady are driven alike and so share a group, but they
@@ -61,4 +61,4 @@ simulated_payloads:
   - name: udp-fast
     type: network
     protocol: udp
-    packet_interval_ms: 500
+    packet_interval: 500ms

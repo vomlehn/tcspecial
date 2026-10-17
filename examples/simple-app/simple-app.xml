@@ -6,7 +6,7 @@
     <description>A payload that is a program, sending a line of text a word at a time</description>
     <tcspecial>
         <beacon>
-            <interval_ms>5000</interval_ms>
+            <interval>5s</interval>
             <recv>127.0.0.1:5650</recv>
             <send>0.0.0.0:5550</send>
         </beacon>
@@ -36,7 +36,7 @@
     <!-- states no address or port of its own, because nothing comes back -->
     <!-- up. -->
     <moc>
-        <name>moc</name>
+        <name>moc-1</name>
         <type>moc</type>
         <ground_base>127.0.0.1:5100</ground_base>
         <payload-in>true</payload-in>
@@ -54,10 +54,10 @@
         <type>app_pl</type>
         <app-payload-arg>1</app-payload-arg>
         <executable>examples/simple-app/lorem_pl.py</executable>
-        <payload-out><target>moc</target></payload-out>
+        <payload-out><target>moc-1</target></payload-out>
     </payloads>
     <tcsgui>
-        <nodes><name>moc</name><x>794</x><y>106</y></nodes>
-        <nodes><name>lorem</name><x>42</x><y>121</y></nodes>
+        <nodes><name>moc-1</name><x>597</x><y>72</y></nodes>
+        <nodes><name>lorem</name><x>42</x><y>76</y></nodes>
     </tcsgui>
 </configuration>

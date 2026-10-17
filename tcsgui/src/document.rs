@@ -2357,7 +2357,7 @@ pub fn thermostat_example() -> Document {
         ("payload_command.dest_base", "0.0.0.0:4200"),
         ("payload_telemetry.source_base", "0.0.0.0:6000"),
         ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-        ("beacon.interval_ms", "5000"),
+        ("beacon.interval", "5s"),
         ("beacon.send", "0.0.0.0:5550"),
         ("beacon.recv", "127.0.0.1:5650"),
         ("log.directory", "/var/log/tcspecial"),
@@ -2697,7 +2697,7 @@ mod tests {
             ("payload_command.dest_base", "0.0.0.0:4200"),
             ("payload_telemetry.source_base", "0.0.0.0:6000"),
             ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-            ("beacon.interval_ms", "5000"),
+            ("beacon.interval", "5s"),
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
         ];
@@ -3457,9 +3457,9 @@ mod tests {
             });
             document.apply(&Edit::SetSimGroup {
                 group: "steady_1hz".into(),
-                setting: "packet_interval_ms".into(),
+                setting: "packet_interval".into(),
                 was: None,
-                now: Some("1000".into()),
+                now: Some("1s".into()),
             });
             document.apply(&Edit::SetSimPayload {
                 payload: "a".into(),
@@ -3572,8 +3572,8 @@ mod tests {
             },
             Edit::SetSimGroup {
                 group: "steady_1hz".into(),
-                setting: "packet_interval_ms".into(),
-                was: Some("1000".into()),
+                setting: "packet_interval".into(),
+                was: Some("1s".into()),
                 now: Some("500".into()),
             },
             Edit::AddSimGroup {
@@ -3581,11 +3581,11 @@ mod tests {
             },
             Edit::RemoveSimGroup {
                 name: "steady_1hz".into(),
-                settings: vec![("packet_interval_ms".into(), "1000".into())],
+                settings: vec![("packet_interval".into(), "1s".into())],
             },
             Edit::RestoreSimGroup {
                 name: "bay".into(),
-                settings: vec![("packet_interval_ms".into(), "250".into())],
+                settings: vec![("packet_interval".into(), "250ms".into())],
             },
             // And one that clears a parameter, which takes the line out of
             // the file rather than writing it empty.

@@ -139,12 +139,12 @@ mod tests {
         path
     }
 
-    /// What such a node is told, for a program at `program`.
-    fn says(program: &std::path::Path) -> AppParams {
+    /// What such a node is told, for a program at `executable`.
+    fn says(executable: &std::path::Path) -> AppParams {
         AppParams {
             name: "through".to_string(),
             kind: Kind::AllVeh,
-            executable: program.display().to_string(),
+            executable: executable.display().to_string(),
             payload_arg: Some("--readings".to_string()),
             moc_arg: Some("--commands".to_string()),
             restart: Restart::Never,

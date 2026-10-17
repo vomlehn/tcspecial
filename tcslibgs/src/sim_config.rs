@@ -12,8 +12,8 @@
 //! ```yaml
 //! simulated_payload_groups:
 //!   - name: steady_1hz
-//!     packet_interval_ms: 1000
-//!     segment_interval_ms: 1000
+//!     packet_interval: 1s
+//!     segment_interval: 1s
 //!
 //! simulated_payloads:
 //!   - name: DH0
@@ -23,7 +23,7 @@
 //!   - name: DH3
 //!     type: network
 //!     protocol: tcp
-//!     packet_interval_ms: 500
+//!     packet_interval: 500ms
 //! ```
 //!
 //! The kind and the transport are the payload configuration's, not this file's:
@@ -75,6 +75,12 @@ pub enum SimConfigError {
     IntervalForATriggeredPayload {
         payload: String,
         setting: &'static str,
+    },
+    /// A setting that is a length of time and does not read as one.
+    NotAnInterval {
+        payload: String,
+        setting: &'static str,
+        why: String,
     },
     /// A percentage outside nought to a hundred.
     NotAPercentage {
@@ -185,6 +191,14 @@ impl fmt::Display for SimConfigError {
                 "simulated payload group \"{}\" is named by no simulated payload: \
                  name it from one, or remove the group",
                 group
+            ),
+            SimConfigError::NotAnInterval {
+                payload,
+                setting,
+                why,
+            } => write!(
+                f,
+                "simulated payload \"{payload}\": {setting}: {why}"
             ),
             SimConfigError::NoPacketInterval { payload } => write!(
                 f,
@@ -372,6 +386,7 @@ impl SimConfigError {
             SimConfigError::UnknownGroup { payload, .. }
             | SimConfigError::UnknownPayload { payload }
             | SimConfigError::NoPacketInterval { payload }
+            | SimConfigError::NotAnInterval { payload, .. }
             | SimConfigError::IntervalForATriggeredPayload { payload, .. }
             | SimConfigError::NotAPercentage { payload, .. }
             | SimConfigError::FaultForTheWrongPayload { payload, .. }
@@ -714,13 +729,18 @@ pub struct SimSettings {
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub payload_port: Option<u16>,
 
-    /// Milliseconds between packets. 0 is as fast as the payload can be driven.
+    /// How long between packets, as a length of time: `1s`, `500ms`.
+    ///
+    /// Every length of time in a configuration is written this way -- see
+    /// `crate::graph::parse_interval` -- and this was `packet_interval_ms`, a
+    /// bare number of milliseconds. Kept as written and read where it is
+    /// resolved, as the graph's attributes are.
     #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub packet_interval_ms: Option<u32>,
-    /// Milliseconds between the segments of one packet. Defaults to the packet
+    pub packet_interval: Option<String>,
+    /// How long between the segments of one packet. Defaults to the packet
     /// interval.
     #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub segment_interval_ms: Option<u32>,
+    pub segment_interval: Option<String>,
     /// Bytes in one segment. Defaults to the whole packet, which is the packet
     /// size the payload configuration gives the data handler.
     #[serde(default, deserialize_with = "blank_is_unstated")]
@@ -741,14 +761,14 @@ pub struct SimSettings {
     /// Packets in a hundred that go out short of their packet size.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub truncate_percent: Option<u32>,
-    /// How much later than it should a packet may be, in milliseconds.
+    /// How much later than it should a packet may be, as a length of time.
     ///
     /// Late and never early: a packet sent before the interval the file asked
     /// for would be the simulator disobeying its own configuration. For a
     /// payload that answers requests this is the delay before an answer
     /// rather than an addition to an interval, there being no interval.
     #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub jitter_ms: Option<u32>,
+    pub jitter: Option<String>,
     /// Packets after which the payload stops sending, while staying
     /// connected.
     ///
@@ -819,13 +839,13 @@ pub const SETTINGS: &[&str] = &[
     "protocol",
     "payload_address",
     "payload_port",
-    "packet_interval_ms",
-    "segment_interval_ms",
+    "packet_interval",
+    "segment_interval",
     "segment_size",
     "drop_percent",
     "corrupt_percent",
     "truncate_percent",
-    "jitter_ms",
+    "jitter",
     "silent_after",
     "close_after",
     "ignore_trigger_percent",
@@ -843,13 +863,19 @@ impl SimSettings {
                 .clone()
                 .or_else(|| base.payload_address.clone()),
             payload_port: self.payload_port.or(base.payload_port),
-            packet_interval_ms: self.packet_interval_ms.or(base.packet_interval_ms),
-            segment_interval_ms: self.segment_interval_ms.or(base.segment_interval_ms),
+            packet_interval: self
+                .packet_interval
+                .clone()
+                .or_else(|| base.packet_interval.clone()),
+            segment_interval: self
+                .segment_interval
+                .clone()
+                .or_else(|| base.segment_interval.clone()),
             segment_size: self.segment_size.or(base.segment_size),
             drop_percent: self.drop_percent.or(base.drop_percent),
             corrupt_percent: self.corrupt_percent.or(base.corrupt_percent),
             truncate_percent: self.truncate_percent.or(base.truncate_percent),
-            jitter_ms: self.jitter_ms.or(base.jitter_ms),
+            jitter: self.jitter.clone().or_else(|| base.jitter.clone()),
             silent_after: self.silent_after.or(base.silent_after),
             close_after: self.close_after.or(base.close_after),
             ignore_trigger_percent: self
@@ -1063,8 +1089,8 @@ impl SimConfigFile {
                 // as they can.
                 if triggered {
                     for (setting, stated) in [
-                        ("packet_interval_ms", settings.packet_interval_ms.is_some()),
-                        ("segment_interval_ms", settings.segment_interval_ms.is_some()),
+                        ("packet_interval", settings.packet_interval.is_some()),
+                        ("segment_interval", settings.segment_interval.is_some()),
                     ] {
                         if stated {
                             return Err(SimConfigError::IntervalForATriggeredPayload {
@@ -1075,21 +1101,47 @@ impl SimConfigFile {
                     }
                 }
 
-                let packet_interval_ms = match (triggered, settings.packet_interval_ms) {
-                    (true, Some(_)) => {
-                        return Err(SimConfigError::IntervalForATriggeredPayload {
+                // A length of time in the file, milliseconds here: the
+                // simulator counts in those, and the one grammar for a length
+                // of time is `graph::parse_interval`. Nought is
+                // the one value this reads that `parse_interval` refuses, and
+                // it is read because it means something to a simulated
+                // payload: as fast as it can be driven. Written with a unit
+                // like any other length -- `0s` -- so that the grammar is the
+                // same one and only the value is exceptional.
+                let as_millis = |setting: &'static str,
+                                 said: &Option<String>|
+                 -> Result<Option<u32>, SimConfigError> {
+                    let Some(said) = said else { return Ok(None) };
+                    match crate::graph::parse_interval(said) {
+                        Ok(interval) => {
+                            Ok(Some(u32::try_from(interval.as_millis()).unwrap_or(u32::MAX)))
+                        }
+                        Err(why) if why.contains("no interval at all") => Ok(Some(0)),
+                        Err(why) => Err(SimConfigError::NotAnInterval {
                             payload: payload.name.clone(),
-                            setting: "packet_interval_ms",
-                        })
-                    }
-                    (true, None) => 0,
-                    (false, Some(interval)) => interval,
-                    (false, None) => {
-                        return Err(SimConfigError::NoPacketInterval {
-                            payload: payload.name.clone(),
-                        })
+                            setting,
+                            why,
+                        }),
                     }
                 };
+
+                let packet_interval_ms =
+                    match (triggered, as_millis("packet_interval", &settings.packet_interval)?) {
+                        (true, Some(_)) => {
+                            return Err(SimConfigError::IntervalForATriggeredPayload {
+                                payload: payload.name.clone(),
+                                setting: "packet_interval",
+                            })
+                        }
+                        (true, None) => 0,
+                        (false, Some(interval)) => interval,
+                        (false, None) => {
+                            return Err(SimConfigError::NoPacketInterval {
+                                payload: payload.name.clone(),
+                            })
+                        }
+                    };
 
                 // A packet is one segment unless the file divides it, and
                 // segments arrive at the packet rate unless it says otherwise.
@@ -1108,7 +1160,7 @@ impl SimConfigFile {
                         settings.corrupt_percent)?,
                     truncate_percent: a_percentage(&payload.name, "truncate_percent",
                         settings.truncate_percent)?,
-                    jitter_ms: settings.jitter_ms.unwrap_or(0),
+                    jitter_ms: as_millis("jitter", &settings.jitter)?.unwrap_or(0),
                     silent_after: settings.silent_after.unwrap_or(0),
                     close_after: settings.close_after.unwrap_or(0),
                     ignore_trigger_percent: a_percentage(
@@ -1148,9 +1200,11 @@ impl SimConfigFile {
                     payload_address: settings.payload_address.clone(),
                     payload_port: settings.payload_port,
                     packet_interval_ms,
-                    segment_interval_ms: settings
-                        .segment_interval_ms
-                        .unwrap_or(packet_interval_ms),
+                    segment_interval_ms: as_millis(
+                        "segment_interval",
+                        &settings.segment_interval,
+                    )?
+                    .unwrap_or(packet_interval_ms),
                     segment_size,
                     triggered,
                     faults,
@@ -1364,8 +1418,8 @@ mod tests {
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval_ms: 1000
-    segment_interval_ms: 250
+    packet_interval: 1s
+    segment_interval: 250ms
 simulated_payloads:
   - name: DH0
     type: network
@@ -1398,14 +1452,14 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval_ms: 1000
-    segment_interval_ms: 1000
+    packet_interval: 1s
+    segment_interval: 1s
 simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
     group: steady_1hz
-    packet_interval_ms: 500
+    packet_interval: 500ms
     segment_size: 4
 ",
         );
@@ -1425,7 +1479,7 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval_ms: 500
+    packet_interval: 500ms
 ",
         );
 
@@ -1443,11 +1497,11 @@ simulated_payloads:
   - name: DH1
     type: network
     protocol: udp
-    packet_interval_ms: 1
+    packet_interval: 1ms
   - name: DH0
     type: network
     protocol: udp
-    packet_interval_ms: 0
+    packet_interval: 0ms
 ",
         );
 
@@ -1467,7 +1521,7 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval_ms: 0
+    packet_interval: 0ms
 ",
         );
 
@@ -1487,11 +1541,11 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval_ms: 0
+    packet_interval: 0ms
   - name: DH7
     type: network
     protocol: udp
-    packet_interval_ms: 0
+    packet_interval: 0ms
 ",
         );
 
@@ -1544,28 +1598,31 @@ simulated_payloads:
     fn a_setting_written_empty_is_a_setting_not_stated() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: \"\"\n    \
-             protocol: \"\"\n    packet_interval_ms: \"\"\n    \
+             protocol: \"\"\n    packet_interval: \"\"\n    \
              drop_percent: \"\"\n    silent_after: \"\"\n",
         );
         let said = &file.simulated_payloads[0].settings;
         assert_eq!(said.dh_type, None, "an empty kind is no kind");
         assert_eq!(said.protocol, None);
-        assert_eq!(said.packet_interval_ms, None);
+        assert_eq!(said.packet_interval, None);
         assert_eq!(said.drop_percent, None);
         assert_eq!(said.silent_after, None);
 
         // And a value that is there and wrong is still refused, which is the
-        // half of this that must not have moved.
+        // half of this that must not have moved. A length of time is kept as
+        // written and read where it is resolved -- as a graph's attributes are
+        // -- so the refusal is there and names the value and the setting.
         let said = format!(
             "{}",
-            crate::ConfigFormat::Yaml
-                .parse::<SimConfigFile>(
-                    "simulated_payloads:\n  - name: DH0\n    \
-                     packet_interval_ms: often\n"
-                )
-                .expect_err("\"often\" is not a number of milliseconds")
+            parse(
+                "simulated_payloads:\n  - name: DH0\n    type: network\n    \
+                 protocol: udp\n    packet_interval: often\n"
+            )
+            .resolve(&[handler("DH0", 12)])
+            .expect_err("\"often\" is not a length of time")
         );
         assert!(said.contains("often"), "{said}");
+        assert!(said.contains("packet_interval"), "{said}");
     }
 
     /// The payload configuration's `address` and `port`, written here, are
@@ -1588,7 +1645,7 @@ simulated_payloads:
         ] {
             let file = parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: udp\n    packet_interval_ms: 100\n    {plain}\n"
+                 protocol: udp\n    packet_interval: 100ms\n    {plain}\n"
             ));
             let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
             assert!(
@@ -1603,7 +1660,7 @@ simulated_payloads:
 
         // A group is read the same way.
         let file = parse(
-            "simulated_payload_groups:\n  - name: g\n    packet_interval_ms: 100\n    \
+            "simulated_payload_groups:\n  - name: g\n    packet_interval: 100ms\n    \
              port: 5000\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    \
              group: g\n",
@@ -1626,7 +1683,7 @@ simulated_payloads:
         let settled = |extra: &str, dh: &DHConfig| {
             parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: udp\n    packet_interval_ms: 100\n{extra}"
+                 protocol: udp\n    packet_interval: 100ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(dh))
         };
@@ -1679,7 +1736,7 @@ simulated_payloads:
         });
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    \
-             packet_interval_ms: 100\n    payload_port: 7000\n",
+             packet_interval: 100ms\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[stream]).unwrap_err());
         assert!(
@@ -1698,7 +1755,7 @@ simulated_payloads:
         let path = |extra: &str| {
             parse(&format!(
                 "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-                 protocol: unix_dgram\n    packet_interval_ms: 100\n{extra}"
+                 protocol: unix_dgram\n    packet_interval: 100ms\n{extra}"
             ))
             .resolve(std::slice::from_ref(&socket))
         };
@@ -1717,7 +1774,7 @@ simulated_payloads:
         // A device has no address at all.
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
-             packet_interval_ms: 0\n    payload_port: 7000\n",
+             packet_interval: 0ms\n    payload_port: 7000\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
         assert!(said.contains("device") && said.contains("network"), "{said}");
@@ -1732,10 +1789,10 @@ simulated_payloads:
     /// and the shipped sets rely on it.
     #[test]
     fn two_simulator_files_may_name_their_payloads_alike() {
-        let a_set = |interval: u32| {
+        let a_set = |interval: &str| {
             parse(&format!(
                 "simulated_payload_groups:\n  - name: steady\n    \
-                 packet_interval_ms: {interval}\n\
+                 packet_interval: {interval}\n\
                  simulated_payloads:\n  - name: DH0\n    type: network\n    \
                  protocol: udp\n    group: steady\n"
             ))
@@ -1743,10 +1800,10 @@ simulated_payloads:
 
         // One name and one group name, in two files that know nothing of each
         // other, each resolved against its own tcspecial configuration.
-        let first = a_set(1000)
+        let first = a_set("1s")
             .resolve(&[handler("DH0", 12)])
             .expect("the first set");
-        let second = a_set(250)
+        let second = a_set("250ms")
             .resolve(&[handler("DH0", 8)])
             .expect("the second set");
 
@@ -1767,7 +1824,7 @@ simulated_payloads:
     fn a_word_that_is_not_a_setting_is_refused() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udp\n    packet_interval_ms: 100\n    drop_percnt: 10\n",
+             protocol: udp\n    packet_interval: 100ms\n    drop_percnt: 10\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -1793,7 +1850,7 @@ simulated_payloads:
     /// And the sections of the file itself, for the same reason.
     #[test]
     fn a_section_that_is_not_a_section_is_refused() {
-        let text = "simulated_payload:\n  - name: DH0\n    packet_interval_ms: 100\n";
+        let text = "simulated_payload:\n  - name: DH0\n    packet_interval: 100ms\n";
         let e = crate::ConfigFormat::Yaml
             .parse::<SimConfigFile>(text)
             .expect_err("a file whose one section is misspelled describes nothing");
@@ -1820,7 +1877,7 @@ simulated_payloads:
         // configuration of the stream set.
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udp\n    packet_interval_ms: 1000\n",
+             protocol: udp\n    packet_interval: 1s\n",
         );
 
         let mut stream = handler("DH0", 4);
@@ -1848,7 +1905,7 @@ simulated_payloads:
     fn the_two_files_cannot_disagree_about_the_kind() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
-             packet_interval_ms: 1000\n",
+             packet_interval: 1s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -1864,7 +1921,7 @@ simulated_payloads:
     /// it, since that is the one thing an error here always knows.
     #[test]
     fn a_simulated_payload_says_what_it_stands_in_for() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval_ms: 1000\n");
+        let file = parse("simulated_payloads:\n  - name: DH0\n    packet_interval: 1s\n");
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
             said.contains("type: network"),
@@ -1875,7 +1932,7 @@ simulated_payloads:
         // the kind alone would not have caught the pairing above.
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             packet_interval_ms: 1000\n",
+             packet_interval: 1s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -1889,7 +1946,7 @@ simulated_payloads:
     fn only_a_network_payload_has_a_transport() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: device-file\n    \
-             protocol: udp\n    packet_interval_ms: 0\n",
+             protocol: udp\n    packet_interval: 0ms\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());
         assert!(
@@ -1900,7 +1957,7 @@ simulated_payloads:
         // And a device that states none resolves, which is the whole of what
         // a device has to say about how it is reached.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval_ms: 0\n",
+            "simulated_payloads:\n  - name: DH0\n    type: device-file\n    packet_interval: 0ms\n",
         );
         file.resolve(&[device("DH0")]).expect("a device needs no transport");
     }
@@ -1911,7 +1968,7 @@ simulated_payloads:
     fn a_kind_or_a_transport_that_is_neither_is_refused() {
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: netwrok\n    \
-             packet_interval_ms: 1000\n",
+             packet_interval: 1s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -1921,7 +1978,7 @@ simulated_payloads:
 
         let file = parse(
             "simulated_payloads:\n  - name: DH0\n    type: network\n    \
-             protocol: udb\n    packet_interval_ms: 1000\n",
+             protocol: udb\n    packet_interval: 1s\n",
         );
         let said = format!("{}", file.resolve(&[handler("DH0", 4)]).unwrap_err());
         assert!(
@@ -1936,7 +1993,7 @@ simulated_payloads:
     fn a_group_may_carry_what_its_payloads_stand_in_for() {
         let file = parse(
             "simulated_payload_groups:\n  - name: datagrams\n    type: network\n    \
-             protocol: udp\n    packet_interval_ms: 1000\n\
+             protocol: udp\n    packet_interval: 1s\n\
              simulated_payloads:\n  - name: DH0\n    group: datagrams\n  \
              - name: DH1\n    group: datagrams\n",
         );
@@ -1951,7 +2008,7 @@ simulated_payloads:
         // A percentage is nought to a hundred. Anything else is a
         // misunderstanding rather than a severe fault.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n    \
              drop_percent: 150\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -1964,7 +2021,7 @@ simulated_payloads:
         // A payload that sends on its own is never asked for anything, so it
         // has no request to ignore.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n    \
              ignore_trigger_percent: 50\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -1977,7 +2034,7 @@ simulated_payloads:
         // And hanging up needs a link to hang up. handler() makes a UDP
         // payload, which has none.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n    \
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n    \
              close_after: 10\n",
         );
         let e = file.resolve(&[handler("DH0", 4)]).unwrap_err();
@@ -2007,8 +2064,8 @@ simulated_payloads:
         };
 
         let file = parse(
-            "simulated_payload_groups:\n  - name: flaky\n    packet_interval_ms: 100\n    \
-             drop_percent: 10\n    jitter_ms: 25\n\
+            "simulated_payload_groups:\n  - name: flaky\n    packet_interval: 100ms\n    \
+             drop_percent: 10\n    jitter: 25ms\n\
              simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    group: flaky\n    \
              close_after: 7\n",
         );
@@ -2032,7 +2089,7 @@ simulated_payloads:
     /// existed asked for.
     #[test]
     fn a_file_with_no_faults_asks_for_a_payload_that_works() {
-        let file = parse("simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval_ms: 100\n");
+        let file = parse("simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: udp\n    packet_interval: 100ms\n");
         let resolved = file.resolve(&[handler("DH0", 4)]).expect("resolves");
         assert_eq!(resolved[0].faults, Faults::default());
         assert!(!resolved[0].faults.any());
@@ -2064,7 +2121,7 @@ simulated_payloads:
             stale_interval_ms: None,
         };
 
-        for stated in ["packet_interval_ms: 1000", "segment_interval_ms: 1000"] {
+        for stated in ["packet_interval: 1s", "segment_interval: 1s"] {
             let named = stated.split(':').next().unwrap();
 
             // Stated by the payload itself.
@@ -2140,7 +2197,7 @@ simulated_payloads:
 
         // Stated, and refused in terms of where it belongs.
         let file = parse(
-            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    packet_interval_ms: 1000\n",
+            "simulated_payloads:\n  - name: DH0\n    type: network\n    protocol: tcp\n    packet_interval: 1s\n",
         );
         let e = file.resolve(&[triggered("DH0")]).unwrap_err();
         let said = format!("{e}");
@@ -2222,9 +2279,9 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval_ms: 1000
+    packet_interval: 1s
   - name: continuous
-    packet_interval_ms: 0
+    packet_interval: 0ms
 simulated_payloads:
   - name: DH0
     type: network
@@ -2249,7 +2306,7 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: steady_1hz
-    packet_interval_ms: 1000
+    packet_interval: 1s
 simulated_payloads:
   - name: DH0
     type: network
@@ -2273,9 +2330,9 @@ simulated_payloads:
             "
 simulated_payload_groups:
   - name: g
-    packet_interval_ms: 1
+    packet_interval: 1ms
   - name: g
-    packet_interval_ms: 2
+    packet_interval: 2ms
 simulated_payloads:
   - name: DH0
     type: network
@@ -2297,11 +2354,11 @@ simulated_payloads:
   - name: DH0
     type: network
     protocol: udp
-    packet_interval_ms: 1
+    packet_interval: 1ms
   - name: DH0
     type: network
     protocol: udp
-    packet_interval_ms: 2
+    packet_interval: 2ms
 ",
         );
         assert_eq!(
@@ -2320,7 +2377,7 @@ simulated_payloads:
 simulated_payloads:
   - name: DEV
     type: device-file
-    packet_interval_ms: 0
+    packet_interval: 0ms
 ",
         );
 

@@ -96,14 +96,14 @@
         "beacon": {
           "type": "object",
           "properties": {
-            "interval_ms": {
+            "interval": {
               "type": [
                 "string",
                 "number",
                 "boolean",
                 "null"
               ],
-              "description": "How often a beacon is sent."
+              "description": "How often a beacon is sent, as a length of time: 5s, 500ms. It was interval_ms, a bare number of milliseconds."
             },
             "send": {
               "description": "The socket tcspecial sends beacons from.",
@@ -154,7 +154,7 @@
               "boolean",
               "null"
             ],
-            "description": "A whole number and a unit, written together: 500ms, 3s, 15m, 6h, 1w. The units are us, ms, s, m, h, d and w, matched longest first, so 500ms is milliseconds and 500m is minutes. The number may be decimal or hexadecimal with an 0x prefix, with underscores among the digits: 1_000ms and 0x3e8ms are 1000ms."
+            "description": "A number and a unit, written together: 500ms, 3s, 1.5s, 15min, 6h, 1w. The units are us, ms, s, min, h, d and w, matched longest first, so 500ms is milliseconds. Minutes are min and never m, a single m being one letter from ms and a thousand-fold apart from it; a month and a year are not units here. The number is decimal, whole or a fraction, with underscores allowed among the digits, so 1_000ms, 1.5s and 1500ms are one interval written three ways. There is no hexadecimal: d is a hexadecimal digit, so 0x1d would be a number that is also 0x1 days."
           }
         },
         "required": [
@@ -179,7 +179,7 @@
             "type": "string"
           },
           "group": {
-            "description": "The payload group that reads it, where it is in one.",
+            "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
             "type": "string"
           },
           "payload-out": {
@@ -312,6 +312,7 @@
             ]
           },
           "trigger": {
+            "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
               "string",
               "number",
@@ -439,7 +440,7 @@
               "null"
             ]
           },
-          "rs485_delay_before_send_ms": {
+          "rs485_delay_before_send": {
             "type": [
               "string",
               "number",
@@ -447,7 +448,7 @@
               "null"
             ]
           },
-          "rs485_delay_after_send_ms": {
+          "rs485_delay_after_send": {
             "type": [
               "string",
               "number",
@@ -583,7 +584,7 @@
               "null"
             ]
           },
-          "debounce_us": {
+          "debounce": {
             "type": [
               "string",
               "number",
@@ -655,15 +656,8 @@
               "null"
             ]
           },
-          "program": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
           "executable": {
+            "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
             "type": [
               "string",
               "number",
@@ -726,7 +720,7 @@
             "type": "string"
           },
           "group": {
-            "description": "The payload group that reads it, where it is in one.",
+            "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
             "type": "string"
           },
           "payload-out": {
@@ -850,6 +844,7 @@
             ]
           },
           "trigger": {
+            "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
               "string",
               "number",
@@ -977,7 +972,7 @@
               "null"
             ]
           },
-          "rs485_delay_before_send_ms": {
+          "rs485_delay_before_send": {
             "type": [
               "string",
               "number",
@@ -985,7 +980,7 @@
               "null"
             ]
           },
-          "rs485_delay_after_send_ms": {
+          "rs485_delay_after_send": {
             "type": [
               "string",
               "number",
@@ -1121,7 +1116,7 @@
               "null"
             ]
           },
-          "debounce_us": {
+          "debounce": {
             "type": [
               "string",
               "number",
@@ -1193,17 +1188,8 @@
               "null"
             ]
           },
-          "program": {
-            "description": "The program a `process` computation runs. An app node names its application with `executable` instead.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
           "executable": {
-            "description": "The executable an app node runs: its application. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it -- and with the node's name as its first argument. It was called `program`, which an app node no longer takes.",
+            "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
             "type": [
               "string",
               "number",
@@ -1284,7 +1270,7 @@
             "type": "string"
           },
           "group": {
-            "description": "The payload group that reads it, where it is in one.",
+            "description": "The payload group that reads it, where it is in one. Optional, though a payload that states a trigger needs one: the interval of its group is how often it is asked.",
             "type": "string"
           },
           "payload-out": {
@@ -1408,6 +1394,7 @@
             ]
           },
           "trigger": {
+            "description": "What to write to make this payload answer, as one byte in hexadecimal (55) or text as a C string ('\"READ\\r\"'). A payload that states one is asked and is read at the interval of the payload group it is in; one that states none is only read, and a line delivering into it is refused. A payload says what asks it or that it sends on its own, never both, and there is no mode attribute: which it is follows from whether it has a trigger.",
             "type": [
               "string",
               "number",
@@ -1535,7 +1522,7 @@
               "null"
             ]
           },
-          "rs485_delay_before_send_ms": {
+          "rs485_delay_before_send": {
             "type": [
               "string",
               "number",
@@ -1543,7 +1530,7 @@
               "null"
             ]
           },
-          "rs485_delay_after_send_ms": {
+          "rs485_delay_after_send": {
             "type": [
               "string",
               "number",
@@ -1679,7 +1666,7 @@
               "null"
             ]
           },
-          "debounce_us": {
+          "debounce": {
             "type": [
               "string",
               "number",
@@ -1751,17 +1738,8 @@
               "null"
             ]
           },
-          "program": {
-            "description": "The program a `process` computation runs. An app node names its application with `executable` instead.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
-          },
           "executable": {
-            "description": "The executable an app node runs: its application. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it -- and with the node's name as its first argument. It was called `program`, which an app node no longer takes.",
+            "description": "The program this node runs: an app node's application, or the program a `process` computation runs on what arrives. Executed with a leading `~` and `$HOME` expanded as a shell would expand them -- to the home directory and to the value of the environment variable HOME, of whatever runs it. An app node's is run with the node's name as its first argument.",
             "type": [
               "string",
               "number",

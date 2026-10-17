@@ -132,12 +132,12 @@ mod tests {
         path
     }
 
-    /// What such a node is told, for a program at `program`.
-    fn says(program: &std::path::Path) -> AppParams {
+    /// What such a node is told, for a program at `executable`.
+    fn says(executable: &std::path::Path) -> AppParams {
         AppParams {
             name: "bay".to_string(),
             kind: Kind::AllPl,
-            executable: program.display().to_string(),
+            executable: executable.display().to_string(),
             payload_arg: Some("--bay-2".to_string()),
             moc_arg: Some("--bay-2-commands".to_string()),
             restart: Restart::Never,

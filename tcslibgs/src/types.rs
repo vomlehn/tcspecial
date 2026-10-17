@@ -2730,8 +2730,20 @@ pub struct TcsCmdJson {
 /// states them for a set that has no section.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BeaconJson {
-    /// How long between beacons, in milliseconds.
-    pub interval_ms: u32,
+    /// How long between beacons, as a length of time: `5s`, `500ms`.
+    ///
+    /// One grammar for every length of time a configuration states; see
+    /// [`crate::graph::parse_interval`]. It was `interval_ms`, a bare count of
+    /// milliseconds, and [`BeaconJson::interval_ms`] is named below so that a
+    /// file still writing it is told the name this has now.
+    pub interval: String,
+    /// Named here only to be refused: see [`BeaconJson::interval`].
+    ///
+    /// A file written before the rename would otherwise be told that
+    /// `interval` is missing, and left to notice that the word it wrote says
+    /// the same thing.
+    #[serde(default)]
+    pub interval_ms: Option<u32>,
     /// Where beacons originate, as `address:port`.
     ///
     /// tcspecial makes the socket it sends beacons on out of this: it is the
@@ -2924,6 +2936,27 @@ impl CIConfigJson {
         let beacon_send = host_port_of("beacon.send", &self.beacon.send)?;
         let beacon_recv = host_port_of("beacon.recv", &self.beacon.recv)?;
 
+        // The attribute's old name, said by name rather than by its absence.
+        if self.beacon.interval_ms.is_some() {
+            return Err(
+                "beacon.interval_ms is beacon.interval now, and is a length of \
+                 time: 5s rather than 5000"
+                    .to_string(),
+            );
+        }
+        // Milliseconds here, which is what a beacon's timing is counted in
+        // and what the command that changes it carries.
+        let beacon_interval = crate::graph::parse_interval(&self.beacon.interval)
+            .map_err(|why| format!("beacon.interval: {why}"))
+            .and_then(|interval| {
+                u32::try_from(interval.as_millis()).map_err(|_| {
+                    "beacon.interval: longer than the protocol can carry, which \
+                     counts milliseconds in four bytes"
+                        .to_string()
+                })
+            })
+            .map(BeaconTime)?;
+
         // One socket cannot be two links. A file that gave both the same port
         // would describe a split it has not made, and the half of it that
         // bound second would fail at startup with the other half's address.
@@ -2957,7 +2990,7 @@ impl CIConfigJson {
             moc_cmd_send,
             payload_source_base,
             payload_dest_base,
-            beacon_interval: BeaconTime(self.beacon.interval_ms),
+            beacon_interval,
             beacon_send,
             beacon_recv,
             log_dir: self.log.directory.clone(),
@@ -3128,7 +3161,7 @@ mod tests {
             .to_dh_config()
             .unwrap_err();
         assert!(e.contains("states the trigger"), "{e}");
-        let e = bare(Some("triggered"), Some("52 45 41 44"), None)
+        let e = bare(Some("triggered"), Some("\"READ\""), None)
             .to_dh_config()
             .unwrap_err();
         assert!(e.contains("how often"), "{e}");
@@ -3157,7 +3190,7 @@ mod tests {
                 path: None,
                 packet_size: Some(8),
                 mode: Some("triggered".to_string()),
-                trigger: Some("52 45 41 44".to_string()),
+                trigger: Some("\"READ\"".to_string()),
                 trigger_interval_ms: None,
                 packet_interval_ms: Some(500),
                 ..Default::default()
@@ -3511,7 +3544,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -3584,7 +3617,7 @@ tcspecial:
     source_base: 0.0.0.0:65535
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -3754,7 +3787,7 @@ version: \"1.0\"
 description: a set
 tcspecial:
 {links}  beacon:
-    interval_ms: 5000
+    interval: 5s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -3829,7 +3862,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -4096,7 +4129,7 @@ tcspecial:
     source_base: localhost:5000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 payloads:
@@ -4397,26 +4430,27 @@ payloads:
             })
         };
 
-        // A list of byte values, which is what a series of bytes is.
-        assert_eq!(with("55 AA").unwrap(), vec![0x55, 0xAA]);
-        assert_eq!(with("55AA").unwrap(), vec![0x55, 0xAA]);
-        assert_eq!(
-            with("0D 0A").unwrap(),
-            vec![0x0D, 0x0A],
-            "a leading zero is a zero and not a notation"
-        );
-        assert_eq!(with("55 AA 0F").unwrap(), vec![0x55, 0xAA, 0x0F]);
+        // Several bytes, which is a C string: single-quoted in the YAML so
+        // that its own quotes and escapes reach the trigger reader as
+        // written.
+        assert_eq!(with("'\"\\x55\\xAA\"'").unwrap(), vec![0x55, 0xAA]);
+        // One byte, however it was padded: a leading zero is a zero and not a
+        // notation.
+        assert_eq!(with("0D").unwrap(), vec![0x0D]);
+        assert_eq!(with("d").unwrap(), vec![0x0D]);
 
-        // The format's own quotes make no difference to a list of values:
-        // they are gone before this sees it, which is why the mark for a C
-        // string has to be a quote inside the value.
-        assert_eq!(with("\"55 AA\"").unwrap(), with("55 AA").unwrap());
+        // Several bytes are a C string and nothing else: the list of values
+        // this took is gone, a value's length no longer deciding how many
+        // bytes it meant.
+        for several in ["0D 0A", "55 AA 0F", "55AA"] {
+            assert!(with(several).is_err(), "{several} is not one byte");
+        }
 
         // And a trigger of text, which is a C string: the quotes are part of
         // the value, so a YAML file writes them inside its own.
         assert_eq!(with("'\"READ\\r\"'").unwrap(), b"READ\r".to_vec());
         assert_eq!(
-            with("52 45 41 44 0D").unwrap(),
+            with("'\"\\x52\\x45\\x41\\x44\\r\"'").unwrap(),
             with("'\"READ\\r\"'").unwrap()
         );
 
@@ -4850,7 +4884,7 @@ payloads:
         let said = link(
             "gpio",
             "    path: /dev/gpiochip0\n    lines: 0\n    packet_size: 16\n    \
-             mode: triggered\n    trigger: 52 45 41 44\n    packet_interval_ms: 100\n",
+             mode: triggered\n    trigger: '\"READ\"'\n    packet_interval_ms: 100\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -4927,7 +4961,7 @@ payloads:
         let asked = link(
             "rpmsg",
             "    path: /dev/rpmsg0\n    service: payload\n    packet_size: 8\n    \
-             mode: triggered\n    trigger: 52 45 41 44\n    packet_interval_ms: 100\n",
+             mode: triggered\n    trigger: '\"READ\"'\n    packet_interval_ms: 100\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -4984,7 +5018,7 @@ payloads:
         let said = link(
             "iio",
             "    path: /dev/iio:device0\n    packet_size: 4\n    mode: triggered\n    \
-             trigger: 52 45 41 44\n    packet_interval_ms: 100\n",
+             trigger: '\"READ\"'\n    packet_interval_ms: 100\n",
         )
         .expect("it parses")
         .to_dh_configs()
@@ -5241,7 +5275,36 @@ payloads:
     fn a_zero_timeout_is_refused_in_favour_of_none() {
         let said = line_stream("      max_length: 8\n      timeout: 0ms\n")
             .expect_err("a read that times out at once reads nothing");
-        assert!(said.contains("say none"), "{said}");
+        assert!(
+            said.contains("no interval at all") && said.contains("none"),
+            "{said}"
+        );
+    }
+
+    /// A timeout takes every unit and every number an interval takes.
+    ///
+    /// One grammar for a length of time: see `graph::parse_interval`, which
+    /// this reads through. What a timeout has of its own is the word `none`.
+    #[test]
+    fn a_timeout_takes_what_an_interval_takes() {
+        for (text, want) in [
+            ("1.5s", Duration::from_millis(1_500)),
+            ("5min", Duration::from_secs(300)),
+            ("1h", Duration::from_secs(3_600)),
+            ("2_000ms", Duration::from_secs(2)),
+        ] {
+            let stream = line_stream(&format!("      max_length: 8\n      timeout: {text}\n"))
+                .unwrap_or_else(|e| panic!("{text}: {e}"));
+            assert_eq!(stream.timeout, Some(want), "for {text}");
+        }
+
+        // And what neither takes: an ambiguous unit, by the name the one
+        // grammar refuses it with.
+        for text in ["5m", "1y", "6mon", "0x8ms"] {
+            let said = line_stream(&format!("      max_length: 8\n      timeout: {text}\n"))
+                .expect_err("not a length of time");
+            assert!(said.contains("timeout"), "{text}: {said}");
+        }
     }
 
     #[test]

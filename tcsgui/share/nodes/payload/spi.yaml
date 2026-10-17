@@ -26,7 +26,10 @@ attributes:
       Which of the four clock polarity and phase modes it wants: 0 to 3.
   - name: group
     required: false
-    about: The payload group that reads it, where it is in one.
+    about: >
+      The payload group that reads it, where it is in one. Optional, though a
+      payload that states a trigger needs one: the interval of its group is
+      how often it is asked.
   - name: trigger
     required: false
     kind: bytes

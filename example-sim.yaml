@@ -7,13 +7,13 @@ simulated_payloads:
     protocol:
     payload_address:
     payload_port:
-    packet_interval_ms:
-    segment_interval_ms:
+    packet_interval:
+    segment_interval:
     segment_size:
     drop_percent:
     corrupt_percent:
     truncate_percent:
-    jitter_ms:
+    jitter:
     silent_after:
     close_after:
     ignore_trigger_percent:
@@ -23,13 +23,13 @@ simulated_payloads:
     protocol:
     payload_address:
     payload_port:
-    packet_interval_ms:
-    segment_interval_ms:
+    packet_interval:
+    segment_interval:
     segment_size:
     drop_percent:
     corrupt_percent:
     truncate_percent:
-    jitter_ms:
+    jitter:
     silent_after:
     close_after:
     ignore_trigger_percent:
@@ -39,13 +39,13 @@ simulated_payloads:
     protocol:
     payload_address:
     payload_port:
-    packet_interval_ms:
-    segment_interval_ms:
+    packet_interval:
+    segment_interval:
     segment_size:
     drop_percent:
     corrupt_percent:
     truncate_percent:
-    jitter_ms:
+    jitter:
     silent_after:
     close_after:
     ignore_trigger_percent:

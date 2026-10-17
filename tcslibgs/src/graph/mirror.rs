@@ -197,7 +197,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: \"0.0.0.0:5550\"
     recv: \"127.0.0.1:5650\"
 moc:

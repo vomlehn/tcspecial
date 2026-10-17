@@ -4,7 +4,7 @@ version: "2.0"
 
 tcspecial:
   beacon:
-    interval_ms: "5000"
+    interval: "5s"
     recv: "127.0.0.1:5650"
     send: "0.0.0.0:5550"
   log:

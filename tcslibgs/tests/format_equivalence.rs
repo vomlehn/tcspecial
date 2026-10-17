@@ -72,7 +72,7 @@ fn the_actual_file_has_expected_contents() {
     // The two bases the per-payload data links are counted from.
     assert_eq!(ci.payload_telemetry.source_base, "0.0.0.0:6000");
     assert_eq!(ci.payload_telemetry.dest_base, "127.0.0.1:6100");
-    assert_eq!(ci.beacon.interval_ms, 5000);
+    assert_eq!(ci.beacon.interval, "5s");
     assert_eq!(ci.log.directory.as_deref(), Some("/var/log/tcspecial"));
     assert_eq!(ci.log.segment_size, 65_536);
 
@@ -253,7 +253,7 @@ tcspecial:
     source_base: 0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   beacon:
-    interval_ms: 5000
+    interval: 5s
     send: 0.0.0.0:5550
     recv: 127.0.0.1:5650
 ",

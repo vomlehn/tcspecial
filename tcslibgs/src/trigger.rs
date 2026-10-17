@@ -1,17 +1,17 @@
 //! The bytes that make a triggered payload answer, as a file writes them.
 //!
 //! A trigger is bytes, not text: a payload's interface document asks for what
-//! it asks for, and that is as likely to be `55 AA` as it is to be `"READ\r"`.
-//! So a file may write it either way -- a list of values, or a string in C's
-//! notation -- and both arrive here as the bytes to send.
+//! it asks for, and that is as likely to be `55` as it is to be `"READ\r"`.
+//! So a file may write it either way -- one byte in hexadecimal, or a string
+//! in C's notation -- and both arrive here as the bytes to send.
 //!
 //! Which notation a value is in is decided by its first character and nothing
-//! else: a quote opens a C string, and anything else is a list of values.
-//! Guessing would be worse: `52 45` is a plausible pair of bytes and a
-//! plausible pair of digits, and a file that meant one and got the other would
-//! send something nobody asked for. The quote is the mark, so it is part of the
-//! value and not of the way the file happens to be written -- in YAML a C
-//! string is `trigger: '"READ\r"'`, and in XML
+//! else: a quote opens a C string, and anything else is one byte in
+//! hexadecimal. Guessing would be worse: `52` is a plausible byte and a
+//! plausible pair of digits of something longer, and a file that meant one and
+//! got the other would send something nobody asked for. The quote is the mark,
+//! so it is part of the value and not of the way the file happens to be
+//! written -- in YAML a C string is `trigger: '"READ\r"'`, and in XML
 //! `<trigger>"READ\r"</trigger>`.
 
 /// A node that is asked for its data, and what asks it.
@@ -27,7 +27,7 @@
 /// here rather than in the generated file -- the code that does the asking is
 /// not generated, and it has to be able to name what it is asking.
 ///
-/// Bytes and not text: [`trigger_bytes`] is where a file's `55 AA` or
+/// Bytes and not text: [`trigger_bytes`] is where a file's `55` or
 /// `"READ\r"` becomes what this answers with.
 pub trait Triggered {
     /// What to write to make it answer, or `None` for a node that is only
@@ -46,6 +46,11 @@ pub trait Triggered {
 
 /// The bytes a file's trigger names, or what is wrong with it.
 ///
+/// Two notations, and the first character says which: a trigger that opens
+/// with a quote is text in C's notation, escapes and all, and anything else is
+/// one byte in hexadecimal. So `"READ\r"` is five bytes and `55` is one, and
+/// nothing has to be guessed from the length of what was written.
+///
 /// Empty is refused: a payload that answers requests has to be asked
 /// something, and nought bytes asks nothing. The error is the sentence shown
 /// to whoever wrote the file, so it says which notation was being read.
@@ -62,7 +67,7 @@ pub fn trigger_bytes(written: &str) -> Result<Vec<u8>, String> {
             })?;
             c_string_bytes(text)?
         }
-        None => value_bytes(written)?,
+        None => one_byte(written)?,
     };
 
     if bytes.is_empty() {
@@ -75,67 +80,58 @@ pub fn trigger_bytes(written: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// A list of values, separated by spaces.
+/// One byte, as one or two hexadecimal digits.
 ///
-/// Each value is hexadecimal -- that being how an interface document writes
-/// what it wants -- and is one byte where it has one or two digits, or two
-/// bytes where it has three or four. A two-byte value goes out most
-/// significant byte first, which is the order it is written in and the order
-/// every other multi-byte quantity in this project uses.
+/// Hexadecimal because that is how an interface document writes what it wants,
+/// and one byte because a trigger of several is text: `"\x55\xAA"` says two
+/// bytes and says which notation it is in, where `55AA` was a value whose
+/// length decided how many bytes it meant. One digit is the same byte as two,
+/// a datasheet writing `5` where it means `05`.
 ///
-/// No `0x`, on any of them. A trigger is a list of byte values and nothing
-/// else, so a prefix saying "this is hexadecimal" would be saying it once per
-/// value for a notation that has no alternative -- and a file that writes one
-/// is told so rather than having `0x55` read as something.
-fn value_bytes(written: &str) -> Result<Vec<u8>, String> {
-    // The spelling this replaced, caught by name: a file written for the
-    // older rule says 0x and would otherwise be refused for the x alone,
-    // which says nothing about what to do instead.
+/// No `x` anywhere, `0x` included. A trigger written without quotes is
+/// hexadecimal and nothing else, so a prefix saying so would be saying it for
+/// a notation that has no alternative -- and a file that writes one is told
+/// what to write instead rather than having `0x55` read as something.
+fn one_byte(written: &str) -> Result<Vec<u8>, String> {
+    // The spellings this replaced, each caught by name: a file written for an
+    // older rule is told what to say rather than being refused for a
+    // character it was right to write.
     if written.starts_with("0x") || written.starts_with("0X") {
         return Err(format!(
             "the trigger {written:?} is written after 0x, and a trigger is no longer: \
-             the values stand on their own, as in 55 AA 0F"
+             a byte stands on its own, as in 55"
+        ));
+    }
+    if written.split_whitespace().count() > 1 {
+        return Err(format!(
+            "the trigger {written:?} is more than one value: a trigger is one byte in \
+             hexadecimal, as in 55, or text as a C string -- a trigger of several \
+             bytes is written \"\\x55\\xAA\""
         ));
     }
 
-    let mut bytes = Vec::new();
-
-    for value in written.split_whitespace() {
-        if let Some(bad) = value.chars().find(|c| !c.is_ascii_hexdigit()) {
-            return Err(format!(
-                "{bad:?} in {value:?} is not a hexadecimal digit: a trigger is a list \
-                 of values in 0-9, a-f or A-F, separated by spaces -- or a C string \
-                 in quotes"
-            ));
-        }
-
-        match value.len() {
-            // One byte, however it was padded: 5 and 05 are the same byte.
-            1 | 2 => bytes.push(u8::from_str_radix(value, 16).expect("checked digits")),
-            // Two bytes, most significant first.
-            3 | 4 => {
-                let whole = u16::from_str_radix(value, 16).expect("checked digits");
-                bytes.extend_from_slice(&whole.to_be_bytes());
-            }
-            length => {
-                return Err(format!(
-                    "{value:?} is {length} digits, which is neither one byte nor two: \
-                     a value is one or two digits for a byte, or three or four for two \
-                     bytes. Separate them with spaces"
-                ))
-            }
-        }
+    if let Some(bad) = written.chars().find(|c| !c.is_ascii_hexdigit()) {
+        return Err(format!(
+            "{bad:?} in {written:?} is not a hexadecimal digit: a trigger is one byte \
+             in 0-9, a-f or A-F -- or a C string in quotes"
+        ));
     }
 
-    if bytes.is_empty() {
-        return Err(
-            "a trigger names at least one value: a payload that answers requests has \
-             to be asked something"
+    match written.len() {
+        // One digit is the same byte as two: 5 and 05 are one byte.
+        1 | 2 => Ok(vec![
+            u8::from_str_radix(written, 16).expect("checked digits")
+        ]),
+        0 => Err(
+            "a trigger names a byte: a payload that answers requests has to be asked \
+             something"
                 .to_string(),
-        );
+        ),
+        length => Err(format!(
+            "{written:?} is {length} digits, which is more than one byte: a trigger of \
+             several bytes is text, as in \"\\x55\\xAA\""
+        )),
     }
-
-    Ok(bytes)
 }
 
 /// A string in C's notation: its characters, with C's escapes.
@@ -207,23 +203,38 @@ fn c_string_bytes(written: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// Bytes as a file could have written them, for a window or a log to show.
+/// Bytes as a file could write them.
 ///
-/// Hexadecimal, because that is the notation every trigger can be written in:
-/// text that is mostly printable is readable enough beside it, and a trigger
-/// that is not text at all has nothing else to be shown as.
+/// The notation a file would use for these bytes, so that what is shown can be
+/// copied back into one: a single byte as its two hexadecimal digits, and
+/// anything longer as the C string it would have to be written as -- there
+/// being one notation for more than one byte. See [`trigger_bytes`], which
+/// reads what this writes.
+///
+/// A printable byte is shown as itself inside the string, which is what makes
+/// a trigger from an interface document readable: `"READ\r"` rather than four
+/// escapes and a fifth. The rest are `\xNN`, and the two characters a C string
+/// cannot hold plainly -- the quote and the backslash -- are escaped as C
+/// escapes them.
 pub fn trigger_as_written(bytes: &[u8]) -> String {
-    let hex: Vec<String> = bytes.iter().map(|b| format!("{b:02X}")).collect();
-    let mut shown = hex.join(" ");
-
-    // And the text beside it where the bytes are text, since a trigger from
-    // an interface document is commonly a word.
-    if let Ok(text) = std::str::from_utf8(bytes) {
-        if text.chars().all(|c| !c.is_control()) {
-            shown.push_str(&format!(" ({text:?})"));
-        }
+    if let [byte] = bytes {
+        return format!("{byte:02X}");
     }
 
+    let mut shown = String::from("\"");
+    for byte in bytes {
+        match byte {
+            b'"' => shown.push_str("\\\""),
+            b'\\' => shown.push_str("\\\\"),
+            b'\r' => shown.push_str("\\r"),
+            b'\n' => shown.push_str("\\n"),
+            b'\t' => shown.push_str("\\t"),
+            // Printable ASCII, which is what a word of a trigger is.
+            0x20..=0x7e => shown.push(*byte as char),
+            other => shown.push_str(&format!("\\x{other:02X}")),
+        }
+    }
+    shown.push('"');
     shown
 }
 
@@ -231,79 +242,66 @@ pub fn trigger_as_written(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    /// A list of values, in either case, one or two digits to a byte.
+    /// One byte, in either case, one or two digits.
     #[test]
-    fn a_list_of_values_is_read_as_bytes() {
-        assert_eq!(trigger_bytes("55 AA 0F").unwrap(), vec![0x55, 0xAA, 0x0F]);
-        assert_eq!(trigger_bytes("55 aa 0f").unwrap(), vec![0x55, 0xAA, 0x0F]);
-        assert_eq!(trigger_bytes("55 Aa 0F").unwrap(), vec![0x55, 0xAA, 0x0F]);
+    fn a_byte_is_read_as_the_byte_it_is() {
+        assert_eq!(trigger_bytes("55").unwrap(), vec![0x55]);
+        assert_eq!(trigger_bytes("aa").unwrap(), vec![0xAA]);
+        assert_eq!(trigger_bytes("Aa").unwrap(), vec![0xAA]);
 
         // One digit is the same byte as two: a datasheet writes 5 where it
         // means 05, and counting zeroes is not what a configuration is for.
-        assert_eq!(trigger_bytes("5 a f").unwrap(), vec![0x05, 0x0A, 0x0F]);
-        assert_eq!(trigger_bytes("05 0a 0f").unwrap(), trigger_bytes("5 a f").unwrap());
+        assert_eq!(trigger_bytes("5").unwrap(), vec![0x05]);
+        assert_eq!(trigger_bytes("05").unwrap(), trigger_bytes("5").unwrap());
 
-        // One value, and the byte a payload most often wants.
+        // The byte a payload most often wants, and whatever space somebody
+        // left around it.
         assert_eq!(trigger_bytes("0D").unwrap(), vec![0x0D]);
-
-        // However much space somebody left between them.
-        assert_eq!(trigger_bytes("  55   AA  ").unwrap(), vec![0x55, 0xAA]);
+        assert_eq!(trigger_bytes("  0d  ").unwrap(), vec![0x0D]);
     }
 
-    /// A value of three or four digits is two bytes, most significant first.
+    /// More than one byte is text, and a file that writes a longer value is
+    /// told so.
     ///
-    /// Which is the order it is written in, and the order every other
-    /// multi-byte quantity in this project uses: a register address copied
-    /// out of a datasheet as 0400 goes out as 04 then 00.
+    /// The notation was a list whose values meant one byte or two by their
+    /// length, which made `55AA` two bytes and `55 AA` the same two written
+    /// another way. A trigger of several bytes is a C string now -- one
+    /// notation for "more than one byte", and the quote at the front says
+    /// which notation is being read before anything is counted.
     #[test]
-    fn a_longer_value_is_two_bytes_in_the_order_it_is_written() {
-        assert_eq!(trigger_bytes("0400").unwrap(), vec![0x04, 0x00]);
-        assert_eq!(trigger_bytes("400").unwrap(), vec![0x04, 0x00]);
-        assert_eq!(trigger_bytes("55AA").unwrap(), vec![0x55, 0xAA]);
-        assert_eq!(trigger_bytes("55AA").unwrap(), trigger_bytes("55 AA").unwrap());
+    fn more_than_one_byte_is_a_c_string() {
+        assert_eq!(trigger_bytes("\"\\x55\\xAA\"").unwrap(), vec![0x55, 0xAA]);
 
-        // And the two sizes in one trigger, which is what an interface
-        // document that asks for a command and a register looks like.
-        assert_eq!(trigger_bytes("03 0400").unwrap(), vec![0x03, 0x04, 0x00]);
+        for written in ["55 AA", "55AA", "0400", "03 0400", "5 a f"] {
+            let said = trigger_bytes(written).expect_err("not one byte");
+            assert!(
+                said.contains("one byte") || said.contains("more than one"),
+                "{written}: {said}"
+            );
+        }
     }
 
-    /// What is not a list of values is said not to be, rather than read as
-    /// something else.
+    /// What is not a byte is said not to be, rather than read as something
+    /// else.
     #[test]
-    fn a_value_that_is_not_one_is_refused() {
+    fn a_value_that_is_not_a_byte_is_refused() {
         // A word, which is what a C string looks like without its quotes:
         // the quotes are the mark, so this is not one.
-        let said = trigger_bytes("READ").unwrap_err();
-        assert!(
-            said.contains("hexadecimal digit") && said.contains("C string in quotes"),
-            "{said}"
-        );
-
-        let said = trigger_bytes("55 GG").unwrap_err();
+        let said = trigger_bytes("READ").expect_err("a word is not hexadecimal");
         assert!(said.contains("hexadecimal digit"), "{said}");
 
-        // Five digits is neither one byte nor two, and which of the five was
-        // meant to pair with which is not something to decide for a file.
-        let said = trigger_bytes("55AA0F").unwrap_err();
-        assert!(
-            said.contains("neither one byte nor two") && said.contains("spaces"),
-            "{said}"
-        );
+        // And a digit string with something in it that is not a digit.
+        let said = trigger_bytes("5g").expect_err("g is not a digit");
+        assert!(said.contains("hexadecimal digit"), "{said}");
     }
 
-    /// The spelling this replaced is caught by name.
-    ///
-    /// A file written for the older rule says 0x, and would otherwise be
-    /// refused for the x alone -- which says nothing about what to do
-    /// instead.
+    /// The spelling this replaced is named rather than puzzled over.
     #[test]
     fn the_older_spelling_is_named_rather_than_puzzled_over() {
-        for written in ["0x55AA", "0X55 AA", "0x0D"] {
-            let said = trigger_bytes(written).unwrap_err();
-            assert!(
-                said.contains("no longer") && said.contains("55 AA 0F"),
-                "{written:?}: {said}"
-            );
+        for written in ["0x55", "0X55"] {
+            let said = trigger_bytes(written).expect_err("0x is no longer written");
+            assert!(said.contains("0x"), "{said}");
+            assert!(said.contains("stands on its own"), "{said}");
         }
     }
 
@@ -366,38 +364,55 @@ mod tests {
         for written in ["", "   ", "\"\""] {
             let said = trigger_bytes(written).unwrap_err();
             assert!(
-                said.contains("no bytes") || said.contains("at least one value"),
+                said.contains("no bytes") || said.contains("names a byte"),
                 "{written:?}: {said}"
             );
         }
     }
 
     /// The two notations can write the same trigger, and do.
+    ///
+    /// One byte is where they meet: beyond that there is one notation, a C
+    /// string, and the hexadecimal form is the byte on its own.
     #[test]
     fn the_two_notations_meet() {
-        assert_eq!(
-            trigger_bytes("52 45 41 44 0D").unwrap(),
-            trigger_bytes("\"READ\\r\"").unwrap()
-        );
+        assert_eq!(trigger_bytes("0D").unwrap(), trigger_bytes("\"\\r\"").unwrap());
+        assert_eq!(trigger_bytes("41").unwrap(), trigger_bytes("\"A\"").unwrap());
     }
 
     /// Bytes read back as a file could have written them.
     #[test]
     fn bytes_are_shown_as_a_file_could_write_them() {
-        assert_eq!(trigger_as_written(&[0x55, 0xAA]), "55 AA");
-        // Text beside the bytes, where the bytes are text: a trigger from an
-        // interface document is commonly a word.
-        assert_eq!(trigger_as_written(b"READ"), "52 45 41 44 (\"READ\")");
-        // And no text where a byte is not printable, the quoted form of a
-        // control character being less readable than the hex already shown.
-        assert_eq!(trigger_as_written(b"READ\r"), "52 45 41 44 0D");
+        // One byte is the hexadecimal form, which is what a file writes for
+        // one byte.
+        assert_eq!(trigger_as_written(&[0x55]), "55");
+        assert_eq!(trigger_as_written(&[0x00]), "00");
+
+        // More than one is the notation that can hold more than one, with a
+        // word shown as a word: a trigger from an interface document is
+        // commonly one.
+        assert_eq!(trigger_as_written(b"READ"), "\"READ\"");
+        assert_eq!(trigger_as_written(b"READ\r"), "\"READ\\r\"");
+        assert_eq!(trigger_as_written(&[0x55, 0xAA]), "\"U\\xAA\"");
+        assert_eq!(trigger_as_written(b"a\"b"), "\"a\\\"b\"");
 
         // What is shown is read back as the bytes it was shown for, which is
         // what makes it a spelling rather than a decoration.
-        for bytes in [&[0x55u8, 0xAA][..], b"READ\r", &[0x00]] {
+        for bytes in [
+            &[0x55u8, 0xAA][..],
+            b"READ\r",
+            &[0x00],
+            &[0x55],
+            b"a\"b",
+            b"a\\b",
+            &[0x00, 0x09, 0x0a],
+        ] {
             let shown = trigger_as_written(bytes);
-            let hex = shown.split(" (").next().expect("the bytes");
-            assert_eq!(trigger_bytes(hex).unwrap(), bytes.to_vec(), "{shown}");
+            assert_eq!(
+                trigger_bytes(&shown).unwrap(),
+                bytes.to_vec(),
+                "{shown} should read back as what it was shown for"
+            );
         }
     }
 }

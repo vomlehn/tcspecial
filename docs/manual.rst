@@ -332,16 +332,35 @@ Attributes Every Payload Has
 
    name           the handler's name, which commands address it by and the
                   panels show
-   group          the group to take unstated attributes from, if any
+   group          the group to take unstated attributes from, if any.
+                  Optional, though a payload that is asked needs one: the
+                  group is where the rate it is asked at lives
    type           network | device | serial | i2c | spi, or one of the
                   experimental can | iio | rpmsg | gpio
    packet_size    bytes in one packet
-   mode           periodic | triggered; absent is periodic
-   trigger        what to send to make the payload answer:    triggered only
-                  bytes, as unquoted hexadecimal after 0x,
-                  or text, as a quoted C string
+   trigger        what to send to make the payload answer: one byte in
+                  hexadecimal, or text as a quoted C string. A payload with
+                  one is asked; a payload with none sends of its own accord
    packet_interval_ms
-                  how often the trigger is sent               triggered only
+                  milliseconds between the triggers sent to the payloads of
+                  a group. A group's attribute, not a payload's
+
+A payload states **one of ``trigger`` and ``packet_interval_ms``, never
+both**, and that is what says which kind of payload it is. One with a
+``trigger`` is asked: the trigger is the question, and how often it is asked
+is the ``packet_interval_ms`` of the payload group it is in -- which is why
+that figure is a group's and not a payload's. One with neither sends of its
+own accord, and says nothing here about when: how fast a payload produces data
+is a property of the payload and of the simulation standing in for it, so that
+figure is in the simulator configuration.
+
+There is no ``mode`` attribute. It said in a word what the trigger already
+says, so a file could say ``periodic`` and then give a trigger, and something
+had to decide which half to believe.
+
+A payload that is asked and is in no group has no rate, and is refused saying
+so: the group is where the rate lives, and a trigger with nothing to send it
+at is a payload nothing would ever ask.
 
 ``name`` belongs to a handler and never to a group: it is what tells one
 handler of a group from another, and what every command about a handler names
@@ -352,28 +371,38 @@ needs them before it can be started.
 
 The two types of payload
 ------------------------
+.. note::
+   **What runs today.** The rule below is what a payload states; the version 1
+   reader has not caught up with it in three ways. It still accepts a ``mode``,
+   and takes it for the word that says which type a payload is; it takes a
+   triggered payload's rate from the payload itself as readily as from the
+   payload's group; and it is satisfied by a triggered payload in no group, so
+   long as that payload states a rate. A file written to the rule below is the
+   file to write.
+
 A payload either sends of its own accord or answers a request, and which it is
 decides where its timing is written down.
 
-**periodic** -- the payload sends and tcspecial reads. Nothing here says when:
-how fast a simulated one produces data is a property of the simulation, so the
-intervals are in the simulator configuration. A periodic payload takes no
-``trigger`` and no ``packet_interval_ms`` here.
+**periodic** -- the payload sends and tcspecial reads. It states no
+``trigger`` and no interval of its own. Nothing here says when it sends: how
+fast a simulated one produces data is a property of the simulation, so that
+figure is in the simulator configuration.
 
-**triggered** -- tcspecial sends a request and the payload answers. Both the
-request and how often it goes out are here, because tcspecial does the sending
-and what to send comes from the payload's interface document. Its entry in the
-simulator configuration states no interval at all, packet or segment, and
-takes none from the group it names: such a payload sends when it is asked, so
-a rate there would govern nothing. A group's settings reach a payload exactly
-as its own do, so an inherited interval is refused as a stated one is -- a
-triggered payload may share a group for the settings it can use, but not one
-that states a rate.
+**triggered** -- tcspecial sends a request and the payload answers. It states
+the ``trigger`` to send, because tcspecial does the sending and what to send
+comes from the payload's interface document, and how often the trigger goes
+out is the ``packet_interval_ms`` of the payload group it is in -- so a
+triggered payload in no group is refused. Its entry in the simulator
+configuration states no interval at all, packet or segment: such a payload
+sends when it is asked, so a rate there would govern nothing.
 
-The interval is ``packet_interval_ms`` in whichever configuration states it --
-one name, in the place the payload's type puts it. It was
-``trigger_interval_ms`` here; a file still using that name is told the name it
-has now.
+So each type states its timing in one place and the other type's place is
+empty, which is what lets a file be read without deciding anything: the rate a
+payload is asked at is its group's ``packet_interval_ms``, and the rate a
+payload sends at is the simulator configuration's ``packet_interval``. It was
+``trigger_interval_ms`` here, and a file still using that name is told the name
+it has now. A version 2 configuration spells the group's rate ``interval`` and
+states it as a length of time: see `Lengths of Time`_.
 
 In a graph, a ``trigger`` is also what allows anything to be sent to a payload
 at all. What is written to a payload that is read is the question it answers,
@@ -386,20 +415,24 @@ valve or a latch is driven rather than asked, and a trigger on one would be
 bytes written before a read that never happens.
 
 **The trigger itself** is bytes, not text, since an interface document asks
-for what it asks for. A series of bytes is written as a list of values
-separated by spaces, in hexadecimal, in either case. One or two digits is one
-byte -- ``5`` and ``05`` are the same byte -- and three or four digits is two
-bytes, most significant first, which is both the order it is written in and
-the order every other multi-byte quantity in this project uses::
+for what it asks for. One byte is written as one or two hexadecimal digits, in
+either case -- ``5`` and ``05`` are the same byte::
 
-   trigger: 55 AA 0F
-   trigger: 0D 0A
-   trigger: 03 0400
+   trigger: 55
+   trigger: 0D
+   trigger: d
 
-There is no ``0x`` on any of them. A trigger is a list of byte values and
-nothing else, so a prefix saying "this is hexadecimal" would be saying it once
-per value for a notation that has no alternative. A file that writes one is
-told so by name rather than having ``0x55`` read as something.
+There is no ``x`` anywhere in it, ``0x`` included. A trigger written without
+quotes is hexadecimal and nothing else, so a prefix saying "this is
+hexadecimal" would be saying it for a notation that has no alternative. A file
+that writes one is told what to write instead rather than having ``0x55`` read
+as something.
+
+A trigger of **more than one byte** is text, below: there is one notation for
+several bytes, and the quote at the front of it says which notation is being
+read before anything is counted. ``55AA`` was two bytes and ``55 AA`` was the
+same two written another way, which made a value's length decide how many
+bytes it meant; ``'"\x55\xAA"'`` says it once.
 
 A trigger that is text is written as a string in C's notation, **quotes and
 all**, which is what its escapes need -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
@@ -409,16 +442,16 @@ all**, which is what its escapes need -- ``\\`` ``\"`` ``\'`` ``\n`` ``\r``
    trigger: '"\x02ARM\x03"'
 
 Which of the two a value is in follows from its first character and nothing
-else: a quote opens a C string, and anything else is a list of values.
-``52 45`` is a plausible pair of bytes and a plausible pair of digits, so
-something has to say which, and the quote is it.
+else: a quote opens a C string, and anything else is one byte in hexadecimal.
+``52`` is a plausible byte and a plausible pair of digits, so something has to
+say which, and the quote is it.
 
 The quotes are therefore part of the **value** rather than part of the way the
 file is written, which is why a YAML trigger of text is written inside the
 format's own quotes -- ``'"READ\r"'`` -- and an XML one as
 ``<trigger>&quot;READ\r&quot;</trigger>``. A value whose quotes belong to the
-format alone, such as ``"55 AA"``, arrives here as ``55 AA`` and is read as
-the two bytes it is.
+format alone, such as ``"55"``, arrives here as ``55`` and is read as the one
+byte it is.
 
 An escape C does not have is refused rather than passed through, a string that
 opens and does not close is refused, and a trigger of no bytes at all is
@@ -426,7 +459,60 @@ refused: a payload that answers requests has to be asked something. Writing
 the escapes yourself is also how an XML configuration states a trigger that a
 YAML one states with the format's own escapes.
 
+Lengths of Time
+---------------
+
+Every length of time a configuration states is a number and a unit, written
+together:
+
+.. table:: The units
+   :widths: auto
+
+   =======  ============  ===============================
+   Unit     What it is    Written
+   =======  ============  ===============================
+   ``us``   microseconds  ``250us``
+   ``ms``   milliseconds  ``500ms``
+   ``s``    seconds       ``3s``, ``1.5s``
+   ``min``  minutes       ``15min``
+   ``h``    hours         ``6h``
+   ``d``    days          ``1d``, ``0.5d``
+   ``w``    weeks         ``1w``
+   =======  ============  ===============================
+
+The number is decimal, whole or a fraction, and underscores among the digits
+mean nothing: ``1_000ms``, ``1.5s`` and ``1500ms`` are one length of time
+written three ways. What is kept is whole microseconds, rounded to the
+nearest. There is no hexadecimal -- ``d`` is a hexadecimal digit, so ``0x1d``
+would be a number that is also "0x1 days" -- and no sign or exponent.
+
+Minutes are ``min`` and never ``m``: a single ``m`` is one letter from ``ms``
+and a thousand-fold apart from it, and a slip of a finger would have made a
+reading taken sixty thousand times less often with nothing in the file to say
+so. ``m`` is refused and tells you which of the two to write. So are a month
+and a year -- ``mon``, ``mo``, ``month``, ``y``, ``yr``, ``year`` -- which are
+not lengths of time at all: a month needs a calendar and a timezone that
+nothing aboard carries, and a span of about that size is written exactly, as
+``30d``. ``µs`` is refused in favour of ``us``, this being a grammar of ASCII.
+
+Nought is refused in every unit, and so is a fraction that rounds to it: a
+schedule asking to be run every nought seconds is asking to be run again
+before it has finished. The one exception is a simulated payload's
+``packet_interval``, where nought means something -- as fast as the payload
+can be driven -- and is written with a unit like any other length of time:
+``0s``.
+
+A **timeout** takes all of that and one word besides -- ``none``, a read that
+does not time out at all -- and that word is the whole of the difference
+between the two. Which an attribute takes is written down beside the
+attribute, in the node description tree, as its ``kind``: ``interval`` or
+``timeout``.
+
 .. code-block:: yaml
+
+   payload_groups:
+     - name: every_half_second
+       packet_interval_ms: 500
 
    payloads:
      # Sends on its own: nothing here about timing.
@@ -436,21 +522,21 @@ YAML one states with the format's own escapes.
        payload_interface: localhost:5000
        packet_size: 12
 
-     # Answers a request: both halves of the request are here, and the rate
-     # is the rate the trigger goes out at.
+     # Answers a request: the trigger is the question, and the group it is in
+     # is how often the question is asked.
      - name: triggered-send
        type: network
        protocol: tcp
        payload_interface: localhost:5001
        packet_size: 12
-       mode: triggered
-       trigger: '"READ\r"'      # or 52 45 41 44 0D, the same bytes
-       packet_interval_ms: 500
+       group: every_half_second
+       trigger: '"READ\r"'      # five bytes, so a C string
 
-A file that mixes the two is refused rather than run, in either direction: a
-periodic payload carrying a trigger or an interval, or a triggered one with no
-interval, has not said which type of payload it describes, and either guess
-would operate it in a way nobody asked for.
+A file that states both is refused rather than run: a payload carrying a
+trigger and an interval of its own has not said whether it answers or sends,
+and either guess would operate it in a way nobody asked for. So is a payload
+with a trigger and no group -- a question nothing sends is a payload nothing
+would ever ask.
 
 A datagram payload -- ``udp`` or ``unix_dgram`` -- cannot be triggered. Its
 handler learns where to send from the payload's first packet, so there is
@@ -922,9 +1008,9 @@ Keyword ``type: spi``. A peripheral on a clocked, full-duplex link.
                   together
 
    max_speed      the greatest clock rate the peripheral accepts, in Hz
-   spi_mode       0 | 1 | 2 | 3, the clock polarity and phase. Named so
-                  because a payload's own mode says whether it sends of
-                  its own accord or on a trigger
+   spi_mode       0 | 1 | 2 | 3, the clock polarity and phase. Named for
+                  the bus, because ``mode`` on its own says nothing about
+                  which of a payload's modes is meant
    bits_per_word  commonly 8, though a controller may support other widths
    bit_order      msb | lsb
    cs_active      low | high
@@ -968,14 +1054,16 @@ otherwise produces a payload that looks configured and is not:
 * A **misspelled section**, for the same reason: ``payload`` is not
   ``payloads``, and a file whose only section is misspelled describes no
   payloads at all.
-* A **packet interval** on a periodic payload. How fast a payload sends is a
-  property of the simulation, so the interval belongs in the simulator
-  configuration and the error says so. This was ignored for a while, which was
-  the same silence the two modes exist to prevent -- a file stating an
-  interval has said something about the payload's timing, and reading it as
-  though it had not is reading a different file than the one that was written.
-  An interval a payload takes from its group is refused as one it states
-  itself is.
+* **A trigger and a packet interval on one payload**. A payload says how it
+  is driven by stating one or the other, so one with both has said that it is
+  asked and that it sends on its own, and either guess would run something
+  nobody asked for. The interval belongs to the payload group -- that is where
+  the rate a payload is asked at is kept -- and the error says so, as it does
+  for a payload that sends on its own and whose rate belongs in the simulator
+  configuration. This was ignored for a while, which was the silence the rule
+  exists to prevent: a file stating an interval has said something about the
+  payload's timing, and reading it as though it had not is reading a different
+  file than the one that was written.
 * **Two payloads wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
@@ -1301,8 +1389,8 @@ The simple-app example
 ----------------------
 .. figure:: ../examples/simple-app/simple-app.svg
    :alt: The simple-app example: a payload that is a program, lorem, sending
-         a line of text one word per packet through the moc node to the ground
-         station program lorem_moc.
+         a line of text one word per packet through the moc node moc-1 to the
+         ground station program lorem_moc.
    :width: 100%
 
    ``examples/simple-app``: a payload that is a program, and a ground station
@@ -1315,12 +1403,12 @@ configuration with the argument
 the first line of the lorem ipsum text one word per packet, then a packet
 holding the line terminator.
 
-tcspecial sends the words to the ``moc`` node on the ground, at its
+tcspecial sends the words to the ``moc`` node on the ground, ``moc-1``, at its
 ``ground_base``, ``127.0.0.1:5100``, plus ``lorem``'s device id, 1: port 5101.
 The ground is ``lorem_moc``, the example's second program. It gets the words
-from the ``moc`` node with ``tcslib::moc::Moc::receive``, prints each with one
-space between them, and stops at the end of the line. The ``moc`` node states
-no ``address`` or ``port``, because nothing goes back up to the vehicle.
+from ``moc-1`` with ``tcslib::moc::Moc::receive``, prints each with one space
+between them, and stops at the end of the line. ``moc-1`` states no
+``address`` or ``port``, because nothing goes back up to the vehicle.
 
 Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.
@@ -1337,7 +1425,7 @@ acts on it; tcsmoc reads it too, to show what the tcssim it started is
 simulating, and does without it if it is not there.
 
 Every setting is optional, and **a setting written empty is a setting not
-stated**: ``packet_interval_ms: ""`` and no ``packet_interval_ms`` at all mean
+stated**: ``packet_interval: ""`` and no ``packet_interval`` at all mean
 the same thing. That is what lets tcsgui write one of these files as a form --
 every payload of the configuration, every setting of a payload, blank until
 somebody fills one in -- and have the file load all the same. A value that is
@@ -1401,7 +1489,7 @@ socket the simulated payload answers from.
        protocol: udp
        payload_address: 127.0.0.1   # the socket this payload answers from,
        payload_port: 7000           # not the one the handler waits at
-       packet_interval_ms: 1000
+       packet_interval: 1s
 
 Nothing in the link needs it -- a handler learns where its payload is from the
 first packet it gets -- but something outside the simulation may: a rule on a
@@ -1430,12 +1518,13 @@ which is why the shipped ``tcspecial1sim.yaml`` leaves them with the payloads.
 
 .. code-block:: text
 
-   packet_interval_ms     milliseconds between packets; 0 is as fast as the
-                          payload can be driven. Periodic payloads only: a
-                          triggered one sends when it is asked, and stating
+   packet_interval        how long between packets, as a length of time:
+                          1s, 500ms, 0.25s. Nought -- ``0s`` -- is as fast as
+                          the payload can be driven. Periodic payloads only:
+                          a triggered one sends when it is asked, and stating
                           an interval for one is an error
-   segment_interval_ms    milliseconds between the segments of one packet;
-                          defaults to the packet interval
+   segment_interval       how long between the segments of one packet,
+                          likewise; defaults to the packet interval
    segment_size           bytes in one segment; defaults to the whole packet,
                           whose size the tcspecial configuration gives
 
@@ -1459,10 +1548,10 @@ configuration written before these existed asks for.
    truncate_percent       packets in a hundred sent short. Always shorter than
                           the packet size and never empty; a packet of one
                           byte cannot be shortened and goes whole
-   jitter_ms              milliseconds a packet may be late, chosen afresh for
-                          each one. Waited out inside the interval rather than
-                          added to it, so the rate is unchanged and the packet
-                          arrives late within it
+   jitter                 how late a packet may be, as a length of time,
+                          chosen afresh for each one. Waited out inside the
+                          interval rather than added to it, so the rate is
+                          unchanged and the packet arrives late within it
    silent_after           packets after which the payload sends no more,
                           leaving its link open; 0 is never. What a wedged
                           instrument looks like from the handler's end
@@ -1487,9 +1576,9 @@ so a run is not left to be guessed at afterwards.
      - name: auto-send
        type: network
        protocol: udp
-       packet_interval_ms: 500
+       packet_interval: 500ms
        drop_percent: 10        # one packet in ten never arrives
-       jitter_ms: 50           # and the rest are up to 50ms late
+       jitter: 50ms            # and the rest are up to 50ms late
 
 The two files are joined by name. Every data handler needs a simulated payload
 naming it, and a name here that no handler has is an error rather than a line
@@ -1518,10 +1607,10 @@ file that states one is refused, saying this.
 
    simulated_payload_groups:
      - name: steady_1hz
-       packet_interval_ms: 1000
+       packet_interval: 1s
 
      - name: continuous
-       packet_interval_ms: 0
+       packet_interval: 0ms
 
    simulated_payloads:
      - name: tcp-stream
@@ -1541,7 +1630,7 @@ file that states one is refused, saying this.
      - name: udp-fast
        type: network
        protocol: udp
-       packet_interval_ms: 500
+       packet_interval: 500ms
 
 Running the Programs
 ====================
@@ -1836,7 +1925,7 @@ file:
 
    tcspecial:
      beacon:
-       interval_ms: 5000
+       interval: 5s
        send: "0.0.0.0:5550"
        recv: "127.0.0.1:5650"
 

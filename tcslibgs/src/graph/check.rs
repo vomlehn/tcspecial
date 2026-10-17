@@ -1116,7 +1116,7 @@ mod tests {
                 ("payload_telemetry.dest_base", "127.0.0.1:6100"),
                 ("payload_command.source_base", "127.0.0.1:4300"),
                 ("payload_command.dest_base", "0.0.0.0:4200"),
-                ("beacon.interval_ms", "5000"),
+                ("beacon.interval", "5s"),
                 ("beacon.send", "0.0.0.0:5550"),
                 ("beacon.recv", "127.0.0.1:5650"),
                 ("log.directory", "/var/log/tcspecial"),
@@ -1942,7 +1942,7 @@ mod tests {
         );
 
         // A program with no deadline.
-        let problems = computation(&[("function", "process"), ("program", "/bin/cat")]);
+        let problems = computation(&[("function", "process"), ("executable", "/bin/cat")]);
         assert!(
             problems.iter().any(|p| matches!(
                 p,

@@ -183,7 +183,7 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
     ("payload_command.dest_base", true),
     ("payload_telemetry.source_base", true),
     ("payload_telemetry.dest_base", true),
-    ("beacon.interval_ms", true),
+    ("beacon.interval", true),
     ("beacon.send", true),
     ("beacon.recv", true),
     ("log.directory", false),
@@ -205,7 +205,22 @@ pub const ATTRIBUTES: &[(&str, bool)] = &[
 /// argued with.
 pub fn default_of(attribute: &str) -> Option<&'static str> {
     match attribute {
-        "beacon.interval_ms" => Some("1000"),
+        "beacon.interval" => Some("1s"),
+        _ => None,
+    }
+}
+
+/// An attribute this section used to have, and what to write instead.
+///
+/// `None` for a name that was never one. Said by name rather than refused as
+/// a word nothing knows, because the value has to change with the name: a
+/// file that says `interval_ms: 5000` is not a file with a misspelling in it,
+/// it is a file written for the spelling before this one.
+pub fn retired(attribute: &str) -> Option<&'static str> {
+    match attribute {
+        "beacon.interval_ms" => {
+            Some("say beacon.interval, as a length of time: 5s rather than 5000")
+        }
         _ => None,
     }
 }
@@ -225,6 +240,12 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
     // telemetry would ever mention it.
     for name in said.keys() {
         if !ATTRIBUTES.iter().any(|(known, _)| known == name) {
+            // One this section used to have is told what to say instead: see
+            // `retired`, and the note there about why it is not a
+            // misspelling.
+            if let Some(instead) = retired(name) {
+                return Err(format!("\"{name}\" is no longer an attribute: {instead}"));
+            }
             return Err(format!(
                 "there is no tcspecial attribute called \"{name}\". They are {}",
                 ATTRIBUTES
@@ -269,7 +290,22 @@ pub fn ci_config_of(said: &BTreeMap<String, Scalar>) -> Result<CIConfigJson, Str
             dest_base: text("payload_telemetry.dest_base")?,
         },
         beacon: BeaconJson {
-            interval_ms: number("beacon.interval_ms")?,
+            // Kept as the file wrote it, a length of time, and turned into
+            // the milliseconds the protocol counts where that is needed --
+            // `CIConfigJson::to_ci_config`, which does it for either kind of
+            // configuration. Read here all the same, so a length of time that
+            // is not one is refused where the section is rather than at
+            // whatever later moment something asks how often beacons go.
+            interval: {
+                let said = text("beacon.interval")?;
+                crate::graph::parse_interval(&said)
+                    .map_err(|why| format!("beacon.interval: {why}"))?;
+                said
+            },
+            // The name `interval` used to have, which a graph never writes:
+            // this section's words are checked against `ATTRIBUTES`, which
+            // names the retired one there.
+            interval_ms: None,
             send: text("beacon.send")?,
             recv: text("beacon.recv")?,
         },
@@ -323,7 +359,7 @@ mod tests {
             ("payload_command.dest_base", "0.0.0.0:4200"),
             ("payload_telemetry.source_base", "0.0.0.0:6000"),
             ("payload_telemetry.dest_base", "127.0.0.1:6100"),
-            ("beacon.interval_ms", "5000"),
+            ("beacon.interval", "5s"),
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
             ("log.directory", "/var/log/tcspecial"),
@@ -340,7 +376,7 @@ mod tests {
         assert_eq!(config.tcs_cmd.send, "127.0.0.1:4100");
         assert_eq!(config.payload_command.source_base, "127.0.0.1:4300");
         assert_eq!(config.payload_command.dest_base, "0.0.0.0:4200");
-        assert_eq!(config.beacon.interval_ms, 5000);
+        assert_eq!(config.beacon.interval, "5s");
         assert_eq!(config.beacon.send, "0.0.0.0:5550");
         assert_eq!(config.log.directory.as_deref(), Some("/var/log/tcspecial"));
         assert_eq!(config.log.segment_size, 65536);
@@ -447,8 +483,8 @@ mod tests {
         // and a port are parsed where the rest of their rules are -- see
         // CIConfigJson::to_ci_config -- so they are asked below.
         for (name, value) in [
-            ("beacon.interval_ms", "often"),
-            ("beacon.interval_ms", "-1"),
+            ("beacon.interval", "often"),
+            ("beacon.interval", "-1"),
             ("log.segment_size", "a few"),
         ] {
             let mut wrong = whole();

@@ -938,59 +938,32 @@ pub(crate) fn parse_flag(
     }
 }
 
-/// Parse a timeout: the word `none`, or a whole number with a unit suffix of
-/// `us`, `ms`, or `s`.
+/// Parse a timeout: a length of time, or the word `none`.
 ///
-/// `Ok(None)` is the word `none`: a read that does not time out.
+/// Every value [`crate::graph::parse_interval`] takes, in every unit it takes
+/// -- that being the one grammar for a length of time in a configuration, so
+/// a reader who has learned how a group's interval is written has learned
+/// this. There was a second grammar here, narrower by two units and by the
+/// decimal fraction, and a configuration could say `1.5s` in one place and
+/// not the other with nothing to say why.
+///
+/// And the word `none`, which a length of time cannot say: a read that does
+/// not time out at all. `Ok(None)` is that word. It is the difference between
+/// a timeout and an interval, and the reason the two are different kinds of
+/// value rather than one -- see `tcsgui::nodes::KINDS`, where an attribute
+/// says which it takes.
+///
+/// Nought is refused, as it is of any interval: a read that times out at once
+/// reads nothing, and `none` is the way to ask for a read that is waited out.
 pub(crate) fn parse_timeout(group: &str, s: &Scalar) -> EndpointConfigResult<Option<Duration>> {
     let text = s.as_str();
-    let lower = text.to_ascii_lowercase();
-
-    if lower == "none" {
+    if text.trim().eq_ignore_ascii_case("none") {
         return Ok(None);
     }
 
-    let (digits, unit) = match lower.strip_suffix("us") {
-        Some(d) => (d, "us"),
-        None => match lower.strip_suffix("ms") {
-            Some(d) => (d, "ms"),
-            None => match lower.strip_suffix('s') {
-                Some(d) => (d, "s"),
-                None => {
-                    return Err(bad(
-                        group,
-                        &format!(
-                            "timeout: \"{text}\" has no unit: expected a number followed by \
-                             us, ms, or s, or the word none"
-                        ),
-                    ))
-                }
-            },
-        },
-    };
-
-    let n: u64 = digits.trim().parse().map_err(|_| {
-        bad(
-            group,
-            &format!("timeout: \"{text}\" is not a whole number of {unit}"),
-        )
-    })?;
-
-    let d = match unit {
-        "us" => Duration::from_micros(n),
-        "ms" => Duration::from_millis(n),
-        _ => Duration::from_secs(n),
-    };
-
-    if d.is_zero() {
-        return Err(bad(
-            group,
-            "timeout: a zero timeout is not a timeout; say none to mean a read that does not \
-             time out",
-        ));
-    }
-
-    Ok(Some(d))
+    crate::graph::parse_interval(text.trim())
+        .map(Some)
+        .map_err(|why| bad(group, &format!("timeout: {why}, or the word none")))
 }
 
 // ---------------------------------------------------------------------------

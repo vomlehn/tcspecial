@@ -636,25 +636,46 @@ pub const TERMINAL: (u32, u32) = (36, 14);
 /// the box a link arrives at are the same box.
 pub const TERMINAL_INSET: u32 = 3;
 
-/// Where a terminal is drawn on a node of this size, relative to the node.
+/// Where a terminal is drawn on a node of this size at `at`, relative to the
+/// node.
 ///
 /// Here rather than in the markup for the reason the link routes are here:
 /// geometry is arithmetic, and arithmetic in a layout language cannot be
 /// tested. The test below is what says the four of them land in four
 /// different corners and clear each other.
-pub fn terminal_at(outline: Outline, corner: Corner, (width, height): (u32, u32)) -> (i32, i32) {
+///
+/// On the grid: the box's upper left corner is a grid point, as a node's is
+/// -- see `pane::PX_PER_MM` -- so the terminals of nodes on the grid line up
+/// with each other and with the grid, and a line between two of them runs
+/// along it. Which is why the node's place is asked: a grid point is not a
+/// whole number of pixels from the last, so the same corner of two nodes is
+/// not the same number of pixels in from each. Rounded inwards -- down and
+/// right at the top and the left, up and left at the bottom and the right --
+/// so a terminal is never pushed out of its node or across its slant, and
+/// keeps at least its inset on every side.
+pub fn terminal_at(
+    outline: Outline,
+    corner: Corner,
+    (width, height): (u32, u32),
+    at: (i32, i32),
+) -> (i32, i32) {
+    use crate::pane::{grid_ceil, grid_floor};
+
     let inset = TERMINAL_INSET as i32;
     let far = |whole: u32, box_: u32| whole as i32 - box_ as i32 - inset;
     // In by whatever the outline is missing at this row: see `room_at`.
     let room = room_at(outline, (width, height), corner);
-    (
-        if corner.left {
-            inset + room
-        } else {
-            far(width, TERMINAL.0) - room
-        },
-        if corner.top { inset } else { far(height, TERMINAL.1) },
-    )
+    let x = if corner.left {
+        grid_ceil(at.0 + inset + room)
+    } else {
+        grid_floor(at.0 + far(width, TERMINAL.0) - room)
+    };
+    let y = if corner.top {
+        grid_ceil(at.1 + inset)
+    } else {
+        grid_floor(at.1 + far(height, TERMINAL.1))
+    };
+    (x - at.0, y - at.1)
 }
 
 /// Which terminal a link end means on a node of this type, for the drawing.
@@ -717,7 +738,7 @@ pub fn attachment(
     let corner = corner_of(terminal)?;
     let drawn = found.appearance();
     let (width, height) = drawn.size;
-    let (_, y) = terminal_at(drawn.outline, corner, (width, height));
+    let (_, y) = terminal_at(drawn.outline, corner, (width, height), at);
 
     // In from the side by whatever the outline is missing at this row, so a
     // line meets a slanted node where the node is rather than where its box
@@ -754,7 +775,7 @@ pub fn terminal_box(
     let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type)?;
     let corner = corner_of(terminal)?;
     let drawn = found.appearance();
-    let (x, y) = terminal_at(drawn.outline, corner, drawn.size);
+    let (x, y) = terminal_at(drawn.outline, corner, drawn.size, at);
     Some((
         (at.0 + x) as f32,
         (at.1 + y) as f32,
@@ -967,7 +988,7 @@ impl NodeType {
                 ("direction", false),
                 ("edge", false),
                 ("bias", false),
-                ("debounce_us", false),
+                ("debounce", false),
                 ("group", false),
                 ("trigger", false),
             ],
@@ -994,7 +1015,7 @@ impl NodeType {
                 ("above", false),
                 ("below", false),
                 // process
-                ("program", false),
+                ("executable", false),
                 ("timeout", false),
                 ("restart", false),
             ],
@@ -1599,7 +1620,7 @@ mod tests {
                 .chain(kind.terminals().sources)
             {
                 let corner = corner_of(terminal).expect("a terminal of a known type");
-                let (x, y) = terminal_at(drawn.outline, corner, drawn.size);
+                let (x, y) = terminal_at(drawn.outline, corner, drawn.size, (0, 0));
                 let (wide, tall) = (TERMINAL.0 as i32, TERMINAL.1 as i32);
                 for spot in [
                     (x, y),
@@ -1798,12 +1819,24 @@ mod tests {
         let inset = TERMINAL_INSET as i32;
         let (box_width, box_height) = (TERMINAL.0 as i32, TERMINAL.1 as i32);
 
-        for t in NodeType::ALL {
+        // Wherever the node is: a terminal's place in it depends on where the
+        // grid falls, so every place a grid point can be from a node's corner
+        // is tried -- a few millimetres' worth of positions covers them all.
+        for (t, node) in NodeType::ALL
+            .iter()
+            .flat_map(|t| (0..40).map(move |n| (t, (n * 7, n * 5 + 3))))
+        {
             let (width, height) = t.appearance().size;
             let mut boxes: Vec<(i32, i32)> = Vec::new();
             for terminal in t.terminals().each() {
                 let corner = corner_of(terminal).expect("a corner");
-                let at = terminal_at(t.appearance().outline, corner, (width, height));
+                let at = terminal_at(t.appearance().outline, corner, (width, height), node);
+                // On the grid, where the node is.
+                assert!(
+                    crate::pane::is_on_grid(node.0 + at.0) && crate::pane::is_on_grid(node.1 + at.1),
+                    "{}: {terminal} at {at:?} in a node at {node:?} is off the grid",
+                    t.spelling()
+                );
                 // Inside the node, with its inset on every side.
                 assert!(at.0 >= inset && at.1 >= inset, "{terminal}: {at:?}");
                 assert!(

@@ -35,22 +35,22 @@ simulated_payloads:
   # the segments are where a handler's reading is exercised.
   - name: serial-line
     type: serial
-    packet_interval_ms: 500
+    packet_interval: 500ms
     segment_size: 4
-    segment_interval_ms: 100
+    segment_interval: 100ms
 
   # Once a second, whole. A datagram is delivered entire or not at all, so
   # segments would describe something a socket does not do.
   - name: udp-steady
     type: network
     protocol: udp
-    packet_interval_ms: 1000
+    packet_interval: 1s
 
   # As fast as it will go, which for a device file means the handler sets the
   # pace: /dev/urandom is never not ready, so there is nothing to wait for.
   - name: random-device
     type: device-file
-    packet_interval_ms: 0
+    packet_interval: 0ms
 
   # Twice a second, whole. A simulated bus is a register rather than a
   # stream -- every master reads the same bank and bytes do not queue -- so a
@@ -58,13 +58,13 @@ simulated_payloads:
   # read, which is a property of the bus and not something to exercise here.
   - name: bus-device
     type: i2c
-    packet_interval_ms: 500
+    packet_interval: 500ms
 
   # Twice a second, in four-byte pieces, as the line is: a clocked link
   # carries bytes, so a packet arriving in pieces is a thing a handler on one
   # has to put back together.
   - name: clocked-peripheral
     type: spi
-    packet_interval_ms: 500
+    packet_interval: 500ms
     segment_size: 4
-    segment_interval_ms: 100
+    segment_interval: 100ms

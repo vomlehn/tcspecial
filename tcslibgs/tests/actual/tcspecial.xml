@@ -25,7 +25,7 @@
             <dest_base>127.0.0.1:6100</dest_base>
         </payload_telemetry>
         <beacon>
-            <interval_ms>5000</interval_ms>
+            <interval>5s</interval>
             <send>0.0.0.0:6550</send>
             <recv>127.0.0.1:6650</recv>
         </beacon>

@@ -338,7 +338,8 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[String]) -> String {
 /// reader at the other end. A graph's attributes are read as `Scalar`, which
 /// takes a value however the file spelled it, so that writer quotes everything
 /// and a round trip cannot change what a file means. The simulator's settings
-/// are read into the types it wants -- `packet_interval_ms` is a `u32` -- and
+/// are read into the types it wants -- `packet_interval` is a length of time
+/// and `segment_size` a number -- and
 /// a quoted 1000 is refused as "invalid type: string".
 ///
 /// So a value that is a whole number goes out as one and everything else is
@@ -377,7 +378,7 @@ mod tests {
             simulator.description = Some("Simulator settings".to_string());
             simulator.groups.insert(
                 "steady_1hz".to_string(),
-                [("packet_interval_ms", "1000"), ("segment_interval_ms", "250")]
+                [("packet_interval", "1s"), ("segment_interval", "250ms")]
                     .into_iter()
                     .map(|(name, value)| (name.to_string(), value.to_string()))
                     .collect(),
@@ -390,7 +391,7 @@ mod tests {
                     ("group", "steady_1hz"),
                     ("drop_percent", "10"),
                     // Cleared, so it should not come back.
-                    ("jitter_ms", ""),
+                    ("jitter", ""),
                 ]
                 .into_iter()
                 .map(|(name, value)| (name.to_string(), value.to_string()))
@@ -418,7 +419,7 @@ mod tests {
             // Including the one that was cleared, which comes back empty: the
             // simulator's own reader takes a setting written empty as a
             // setting not stated, so a blank in the form is not a value.
-            assert_eq!(back.get("jitter_ms").map(String::as_str), Some(""));
+            assert_eq!(back.get("jitter").map(String::as_str), Some(""));
             assert!(
                 back.contains_key("segment_size"),
                 "{extension}: every setting is offered, filled in or not"
@@ -439,7 +440,7 @@ mod tests {
         let mut simulator = Simulator::new(&path);
         simulator.groups.insert(
             "steady_1hz".to_string(),
-            [("packet_interval_ms", "1000")]
+            [("packet_interval", "1s")]
                 .into_iter()
                 .map(|(name, value)| (name.to_string(), value.to_string()))
                 .collect(),

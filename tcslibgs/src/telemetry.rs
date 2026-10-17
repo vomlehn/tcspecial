@@ -169,6 +169,19 @@ impl ConnectTelemetry {
             digest,
         }
     }
+
+    /// The same answer, with a status other than success.
+    ///
+    /// For a CONNECT that is refused rather than answered -- one that arrived
+    /// on a payload's link, which is not what a connection to the vehicle is
+    /// asked on. The three facts are this end's all the same, so the ground
+    /// is told what it asked as well as that it asked in the wrong place.
+    pub fn refused(self, status: CommandStatus) -> Self {
+        Self {
+            header: TelemetryHeader::new(self.header.sequence, TelemetryType::Connect, status),
+            ..self
+        }
+    }
 }
 
 /// START_DH telemetry
@@ -364,12 +377,19 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
     let sequence = command.sequence();
     match command {
         Command::Ping(_) => Telemetry::Ping(PingTelemetry::new(sequence, status)),
-        Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
-            sequence,
-            ConfigVersion::of_this_build(),
-            ConfigVersion::of_this_build(),
-            ConfigDigest([0u8; 16]),
-        )),
+        // A CONNECT is answered where it belongs -- see the command
+        // interpreter -- so the one that comes through here is a refused one,
+        // and the status is the whole of what it says. The three facts are
+        // this build's, which is all a refusal knows.
+        Command::Connect(_) => Telemetry::Connect(
+            ConnectTelemetry::new(
+                sequence,
+                ConfigVersion::of_this_build(),
+                ConfigVersion::of_this_build(),
+                ConfigDigest([0u8; 16]),
+            )
+            .refused(status),
+        ),
         Command::RestartArm(_) => {
             Telemetry::RestartArm(RestartArmTelemetry::new(sequence, status))
         }

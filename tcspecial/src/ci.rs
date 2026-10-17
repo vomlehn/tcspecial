@@ -28,10 +28,11 @@ use crate::telemetry_log::TelemetryLog;
 ///
 /// Everything a command about a payload needs and nothing a command about the
 /// spacecraft does: the handlers, the payloads as the file described them,
-/// the telemetry log, and the three facts a CONNECT is answered with. No
-/// command here touches the arming or the beacon, which is what lets this run
-/// in a thread of its own -- and the reason for the split is that it must, so
-/// that a payload command that takes its time cannot delay a RESTART.
+/// and the telemetry log. No command here touches the arming, the beacon or
+/// what this end read -- a CONNECT is the spacecraft's link's -- which is what
+/// lets this run in a thread of its own, and the reason for the split is that
+/// it must, so that a payload command that takes its time cannot delay a
+/// RESTART.
 ///
 /// Clonable, and every clone is the same interpreter: the handler map and the
 /// log are shared handles, and the rest is read-only.
@@ -40,9 +41,6 @@ pub struct PayloadCommands {
     data_handlers: Arc<Mutex<BTreeMap<DHName, DataHandler>>>,
     payload_config: Arc<Vec<DHConfig>>,
     telemetry_log: TelemetryLog,
-    version: ConfigVersion,
-    config_version: ConfigVersion,
-    digest: ConfigDigest,
 }
 
 /// How often the payload link looks up from its socket to see whether the
@@ -59,23 +57,6 @@ impl PayloadCommands {
     pub fn process(&self, command: Command) -> Telemetry {
         trace!("payload link: {:?}", command);
         match command {
-            Command::Connect(cmd) => {
-                // Said rather than judged. The ground is the end that knows
-                // what it put on the screen, so it compares; this end answers
-                // with what it read and logs the disagreement it can see.
-                if cmd.version != self.version || cmd.digest != self.digest {
-                    error!(
-                        "CONNECT from a ground reading {} {} -- this tcspecial has {} {}",
-                        cmd.version, cmd.digest, self.version, self.digest
-                    );
-                }
-                Telemetry::Connect(ConnectTelemetry::new(
-                    cmd.header.sequence,
-                    self.version,
-                    self.config_version,
-                    self.digest,
-                ))
-            }
             Command::StartDH(cmd) => {
                 let status = {
                     let mut handlers = match self.data_handlers.lock() {
@@ -256,6 +237,7 @@ impl PayloadCommands {
             // command on the wrong one is one end not reading the
             // configuration the other is.
             theirs @ (Command::Ping(_)
+            | Command::Connect(_)
             | Command::RestartArm(_)
             | Command::Restart(_)
             | Command::Config(_)) => refused_on_the_wrong_link(&theirs, CommandLink::Payload),
@@ -685,9 +667,6 @@ impl CommandInterpreter {
             data_handlers: data_handlers.clone(),
             payload_config: payload_config.clone(),
             telemetry_log: telemetry_log.clone(),
-            version,
-            config_version,
-            digest,
         };
 
         Ok(Self {
@@ -783,9 +762,28 @@ impl CommandInterpreter {
                 };
                 Telemetry::Restart(RestartTelemetry::new(cmd.header.sequence, status))
             }
-            // Answered on either link, by the one piece of code that
-            // answers it: see CommandType::link.
-            connect @ Command::Connect(_) => self.payload.process(connect),
+            // What this end read, asked as the link comes up. On this link
+            // and no other: a CONNECT is about having a connection to the
+            // vehicle, and a ground station with none has nothing to ask a
+            // payload. See CommandType::link.
+            //
+            // Said rather than judged. The ground is the end that knows what
+            // it put on the screen, so it compares; this end answers with
+            // what it read and logs the disagreement it can see.
+            Command::Connect(cmd) => {
+                if cmd.version != self.version || cmd.digest != self.digest {
+                    error!(
+                        "CONNECT from a ground reading {} {} -- this tcspecial has {} {}",
+                        cmd.version, cmd.digest, self.version, self.digest
+                    );
+                }
+                Telemetry::Connect(ConnectTelemetry::new(
+                    cmd.header.sequence,
+                    self.version,
+                    self.config_version,
+                    self.digest,
+                ))
+            }
             Command::Config(cmd) => {
                 self.beacon_interval = cmd.beacon_interval;
                 // Retime the running sender too, or the new interval would
@@ -2032,13 +2030,15 @@ mod tests {
         }
     }
 
-    /// What each end read is answered on either link.
+    /// What each end read is answered on the spacecraft's link, and refused
+    /// on a payload's.
     ///
-    /// The holder of either link wants it of the link it holds, and both
-    /// answers come from the one piece of code that answers it, so they
-    /// cannot come to differ.
+    /// A CONNECT asks whether there is a connection to the vehicle, which is
+    /// what that link is; a payload's link carries what is asked of a
+    /// payload, and a ground station with no connection has nothing to ask
+    /// one.
     #[test]
-    fn a_connect_is_answered_on_either_link() {
+    fn a_connect_is_answered_on_the_spacecrafts_link_alone() {
         let mut ci = interpreter();
         let ask = || {
             Command::Connect(ConnectCommand::new(
@@ -2048,22 +2048,25 @@ mod tests {
             ))
         };
 
-        let (spacecraft, payload) = (ci.process_command(ask()), ci.payload.process(ask()));
-        match (spacecraft, payload) {
-            (Telemetry::Connect(one), Telemetry::Connect(two)) => {
-                // The three facts a CONNECT answers with, rather than the
-                // whole answer: the two were made a moment apart and every
-                // response carries the time it was made, so two identical
-                // answers do differ there.
-                assert_eq!(
-                    (one.version, one.config_version, one.digest),
-                    (two.version, two.config_version, two.digest),
-                    "the two links said different things"
-                );
-                assert_eq!(one.digest, a_digest());
-                assert_eq!(one.config_version, a_config_version());
+        match ci.process_command(ask()) {
+            Telemetry::Connect(answer) => {
+                assert_eq!(answer.header.sequence, 3, "the answer is to that command");
+                assert_eq!(answer.digest, a_digest());
+                assert_eq!(answer.config_version, a_config_version());
             }
-            other => panic!("expected CONNECT telemetry on both, got {other:?}"),
+            other => panic!("expected CONNECT telemetry, got {other:?}"),
+        }
+
+        // And on a payload's link it is refused, as a command that belongs on
+        // the other one: the two ends are not reading the same configuration,
+        // and serving it would hide that.
+        match ci.payload.process(ask()) {
+            Telemetry::Connect(answer) => assert_eq!(
+                answer.header.status,
+                CommandStatus::InvalidCommand,
+                "a CONNECT on a payload's link should be refused"
+            ),
+            other => panic!("expected a refusal, got {other:?}"),
         }
     }
 

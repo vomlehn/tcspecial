@@ -853,7 +853,8 @@ mod tests {
     /// every node after it.
     #[test]
     fn a_node_one_spelling_renames_is_missing_from_the_other() {
-        let (_dir, xml, yaml, sim) = thermostat_pair(|xml| {
+        // Compared and not verified, so the simulator file is not wanted.
+        let (_dir, xml, yaml, _) = thermostat_pair(|xml| {
             xml.replace("<name>heaters</name>", "<name>heater</name>")
                 .replace("<target>heaters</target>", "<target>heater</target>")
         });

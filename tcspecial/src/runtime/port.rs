@@ -317,6 +317,28 @@ impl EndpointPort {
     /// descriptor that cannot be asked is a node that cannot be read, and
     /// quietly reporting no bytes would make a broken endpoint look like an
     /// idle one.
+    /// Read what is there, and nothing if nothing is: never waiting.
+    ///
+    /// Asked before read, and this is not an optimisation. Some endpoints
+    /// are opened blocking -- a device file is opened as a file -- so a read
+    /// of one with nothing in it does not return. A pass that blocked there
+    /// would be a pass that never ends: the group that was due is never
+    /// finished, every other group starves, and a stop is not noticed because
+    /// a stop is noticed between passes. So the descriptor is asked whether
+    /// there is anything, with no waiting at all, and a node with nothing to
+    /// say is a read of no bytes -- which is the ordinary answer from a device
+    /// that is not due.
+    fn read_what_is_there(&mut self, buffer: &mut [u8]) -> Result<usize, String> {
+        match self.ready_to_read() {
+            Ok(true) => self
+                .reader
+                .read(buffer)
+                .map_err(|e| format!("{}: the read failed: {}", self.what, self.plainly(e))),
+            Ok(false) => Ok(0),
+            Err(why) => Err(why),
+        }
+    }
+
     fn ready_to_read(&self) -> Result<bool, String> {
         // SAFETY: a descriptor the reader owns, borrowed for the call and not
         // kept.
@@ -410,23 +432,7 @@ impl Port for EndpointPort {
         }
 
 
-        // Asked before read, and this is not an optimisation. Some endpoints
-        // are opened blocking -- a device file is opened as a file -- so a
-        // read of one with nothing in it does not return. A pass that blocked
-        // there would be a pass that never ends: the group that was due is
-        // never finished, every other group starves, and a stop is not
-        // noticed because a stop is noticed between passes. So the descriptor
-        // is asked whether there is anything, with no waiting at all, and a
-        // node with nothing to say is a read of no bytes -- which is the
-        // ordinary answer from a device that is not due.
-        let got = match self.ready_to_read() {
-            Ok(true) => self
-                .reader
-                .read(&mut buffer[..want])
-                .map_err(|e| format!("{}: the read failed: {}", self.what, self.plainly(e))),
-            Ok(false) => Ok(0),
-            Err(why) => Err(why),
-        };
+        let got = self.read_what_is_there(&mut buffer[..want]);
 
         // Asked after being read, and asked whether or not the read found
         // anything: a device that answered nothing is a device that most
@@ -452,6 +458,27 @@ impl Port for EndpointPort {
                     // the one an operator is looking for.
                     (Err(why), _) => Err(why),
                 }
+            }
+        }
+    }
+
+    fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        if !self.uses.produces() {
+            return self.take(buffer);
+        }
+        let want = self
+            .read_size
+            .map_or(buffer.len(), |size| size.min(buffer.len()));
+        self.read_what_is_there(&mut buffer[..want]).map(Taken::of)
+    }
+
+    fn ask(&mut self) -> Result<(), String> {
+        match self.trigger.take() {
+            None => Ok(()),
+            Some(trigger) => {
+                let asked = self.write_all(&trigger, "trigger");
+                self.trigger = Some(trigger);
+                asked
             }
         }
     }
@@ -1634,6 +1661,42 @@ mod tests {
         let got = port.take(&mut buffer).map(|taken| taken.bytes).expect("a pass");
         assert_eq!(&buffer[..got], b"43");
         assert_eq!(script.lock().expect("the script").written.len(), 2);
+    }
+
+    /// A device asked on a timer of its own is read without being asked, and
+    /// asked without being read.
+    ///
+    /// For a part that sends: its answers are taken on whatever pass they
+    /// arrive on, and the question goes out when the timer says, so the two
+    /// halves of a pass that `take` joins are apart here.
+    #[test]
+    fn a_device_can_be_read_without_asking_and_asked_without_reading() {
+        let (script, opened) = port("temp_bay", Use::Read);
+        let mut asked = opened.triggered_by(b"R".to_vec());
+        script.lock().expect("the script").to_read = vec![Ok(b"42".to_vec())];
+
+        let mut buffer = [0u8; 64];
+        let got = asked
+            .take_unasked(&mut buffer)
+            .map(|taken| taken.bytes)
+            .expect("a read");
+        assert_eq!(&buffer[..got], b"42");
+        assert!(
+            script.lock().expect("the script").written.is_empty(),
+            "a read without asking asked"
+        );
+
+        assert_eq!(asked.ask(), Ok(()));
+        assert_eq!(script.lock().expect("the script").written, vec![b"R".to_vec()]);
+        assert!(
+            script.lock().expect("the script").to_read.is_empty(),
+            "nothing more was read"
+        );
+
+        // And a device with no trigger is asked nothing.
+        let (script, mut unasked) = port("temp_fore", Use::Read);
+        assert_eq!(unasked.ask(), Ok(()));
+        assert!(script.lock().expect("the script").written.is_empty());
     }
 
     /// A device that says how long it takes to answer is asked, waited for,

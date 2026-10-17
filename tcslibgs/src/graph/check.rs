@@ -117,6 +117,14 @@ pub enum Problem {
     ReadDelayWithoutTrigger { node: String },
     /// A node that is asked and says how often it is simply read.
     PollIntervalWithTrigger { node: String },
+    /// A payload that sends of its own accord, is not asked, and states a
+    /// rate anyway.
+    ///
+    /// Nothing in the vehicle decides when such a part's data exists -- a
+    /// socket, a line, a bus of peers -- so a rate there would describe
+    /// something nobody controls: its data is taken as it arrives. Which types
+    /// send is `crate::graph::interface::sends`.
+    RateOnASender { node: String, node_type: String },
     /// A node that says both how often it is asked and how often it is read.
     TwoRates { node: String },
     /// Two links arriving at one input of one node.
@@ -245,6 +253,7 @@ impl Problem {
             | Problem::ReadDelayWithoutTrigger { node }
             | Problem::PollIntervalWithTrigger { node }
             | Problem::TwoRates { node } => About::Node(node.clone()),
+            Problem::RateOnASender { node, .. } => About::Node(node.clone()),
             Problem::InputBoundTwice { node, .. } => About::Node(node.clone()),
             // And so is a terminal's problem, and a crossed link's.
             Problem::BadTerminal { from, .. } => About::Node(from.clone()),
@@ -342,6 +351,11 @@ impl Problem {
             Problem::PollIntervalWithTrigger { node } => format!(
                 "\"{node}\" states poll_interval and a trigger: a node that is asked \
                  is read when it has been asked, so say trigger_interval"
+            ),
+            Problem::RateOnASender { node, node_type } => format!(
+                "\"{node}\" states poll_interval, and a {node_type} payload sends when \
+                 it has something: nothing aboard decides when its data exists, so \
+                 it is read as the data arrives and states no rate"
             ),
             Problem::TwoRates { node } => format!(
                 "\"{node}\" states both trigger_interval and poll_interval: a node is \
@@ -567,6 +581,19 @@ impl Graph {
             if said("poll_interval") && asked {
                 problems.push(Problem::PollIntervalWithTrigger {
                     node: node.name.clone(),
+                });
+            }
+            // And a part that sends, not being asked, has no rate to state.
+            // One that is asked has `trigger_interval`, which times the
+            // asking; a `poll_interval` beside a trigger is refused above.
+            if said("poll_interval")
+                && !asked
+                && node.is_payload()
+                && crate::graph::interface::sends(&node.node_type)
+            {
+                problems.push(Problem::RateOnASender {
+                    node: node.name.clone(),
+                    node_type: node.node_type.clone(),
                 });
             }
         }
@@ -1757,6 +1784,50 @@ mod tests {
             .any(|p| matches!(p, Problem::DuplicateNode { .. })));
     }
 
+    /// A part that sends and is not asked states no rate: a `poll_interval`
+    /// on one is refused, naming the type. The same on a part that
+    /// originates nothing is a floor and is taken, and a part that sends and
+    /// is asked times its asking with `trigger_interval`, which is taken too.
+    #[test]
+    fn a_part_that_sends_states_no_rate() {
+        let paced = |node_type: &str, pairs: &[(&str, &str)]| {
+            let mut g = graph(
+                vec![node("a", node_type), node("b", "moc")],
+                vec![link("a", &["b"])],
+            );
+            for (name, value) in pairs {
+                g.nodes[0].attributes.insert(
+                    (*name).to_string(),
+                    crate::endpoint_config::Scalar::of(*value),
+                );
+            }
+            g.check()
+        };
+        let refused = |found: &[Problem]| {
+            found
+                .iter()
+                .any(|p| matches!(p, Problem::RateOnASender { node, .. } if node == "a"))
+        };
+
+        for sender in ["network", "serial", "hdlc", "can", "rpmsg", "iio", "gpio"] {
+            let found = paced(sender, &[("poll_interval", "1 s")]);
+            assert!(refused(&found), "{sender}: {found:?}");
+            let said = found
+                .iter()
+                .find(|p| matches!(p, Problem::RateOnASender { .. }))
+                .expect("the refusal")
+                .describe();
+            assert!(said.contains(sender) && said.contains("poll_interval"), "{said}");
+
+            // Asked on a timer of its own, it is not refused for that.
+            let found = paced(sender, &[("trigger", "55"), ("trigger_interval", "1 s")]);
+            assert!(!refused(&found), "{sender} asked: {found:?}");
+        }
+        for quiet in ["i2c", "spi", "device-file"] {
+            assert!(!refused(&paced(quiet, &[("poll_interval", "1 s")])), "{quiet}");
+        }
+    }
+
     /// A node says how it is driven in one way, and the words that go with a
     /// trigger mean nothing without one.
     ///
@@ -2629,6 +2700,10 @@ mod tests {
             Problem::TriggerIntervalWithoutTrigger { node: "a".into() },
             Problem::ReadDelayWithoutTrigger { node: "a".into() },
             Problem::PollIntervalWithTrigger { node: "a".into() },
+            Problem::RateOnASender {
+                node: "a".into(),
+                node_type: "network".into(),
+            },
             Problem::TwoRates { node: "a".into() },
             Problem::InputBoundTwice {
                 node: "m".into(),

@@ -65,6 +65,10 @@ pub struct System {
     schedule: Schedule,
     /// The nodes that are in no group and produce something, which are polled.
     polled: Vec<String>,
+    /// Those of them that state how often, each with how its rate applies and
+    /// when it is next due: see [`Pace`]. A polled node not here is read on
+    /// every pass.
+    paced: BTreeMap<String, (Pace, Instant)>,
     /// The logs, which are flushed at the end of a pass.
     logs: Vec<String>,
 }
@@ -98,6 +102,7 @@ impl System {
         let mut refused = Vec::new();
         let mut logs = Vec::new();
         let mut polled = Vec::new();
+        let mut paced = BTreeMap::new();
 
         for node in &graph.nodes {
             match opener(node, &routes) {
@@ -108,6 +113,12 @@ impl System {
                     // times an hour for an answer that cannot change.
                     if is_polled(node, &routes, port.as_ref()) {
                         polled.push(node.name.clone());
+                        if let Some(pace) = pace_of(node) {
+                            // Due at once, as a group is: a vehicle that has
+                            // just started reads everything before settling
+                            // into its intervals.
+                            paced.insert(node.name.clone(), (pace, now));
+                        }
                     }
                     if node.node_type == "log" {
                         logs.push(node.name.clone());
@@ -137,6 +148,7 @@ impl System {
             fabric,
             schedule: Schedule::of(graph, now),
             polled,
+            paced,
             logs,
         })
     }
@@ -159,9 +171,35 @@ impl System {
 
         // The nodes in no group, which are read as they become readable: a
         // read of no bytes is the ordinary answer and costs a system call.
+        // One that states how often is read, or asked, as its `Pace` says.
         let polled: Vec<String> = self.polled.clone();
         for node in polled {
-            moved.add(self.fabric.pump(&node));
+            let Some((pace, due)) = self.paced.get(&node).copied() else {
+                moved.add(self.fabric.pump(&node));
+                continue;
+            };
+            let is_due = now >= due;
+            if is_due {
+                self.paced.insert(node.clone(), (pace, pace.next(due, now)));
+            }
+            match pace {
+                // Read, and asked if it is asked, only when due.
+                Pace::Exchange(_) | Pace::Floor(_) => {
+                    if is_due {
+                        moved.add(self.fabric.pump(&node));
+                    }
+                }
+                // Read on every pass, taking what has arrived; asked only
+                // when due.
+                Pace::Ask(_) => {
+                    moved.add(self.fabric.pump_unasked(&node));
+                    if is_due {
+                        if let Some(why) = self.fabric.ask(&node) {
+                            moved.refused.push((node.clone(), why));
+                        }
+                    }
+                }
+            }
         }
 
         // The logs, once, at the end. A log flushed per record is a write
@@ -178,23 +216,41 @@ impl System {
 
     /// How long until the next pass is worth making.
     ///
-    /// The next group's due time, or the polling pause where anything is
-    /// polled -- whichever is sooner. A configuration whose nodes are all in
-    /// groups waits exactly until the next one is due and wakes for nothing
-    /// else.
+    /// The next group's due time, the next paced node's, or the polling pause
+    /// where a node is polled on every pass -- whichever is sooner. A
+    /// configuration whose nodes are all in groups, or all state their
+    /// intervals, waits exactly until the next one is due and wakes for
+    /// nothing else.
     pub fn until_next_pass(&self, now: Instant) -> Duration {
-        let due = self.schedule.until_next(now);
-        match (due, self.polled.is_empty()) {
-            (Some(due), false) => due.min(POLL_PAUSE),
-            (Some(due), true) => due,
-            // Nothing scheduled at all: a configuration of ungrouped nodes,
-            // which is every version 1 payload set's shape.
-            (None, false) => POLL_PAUSE,
+        let groups = self.schedule.until_next(now);
+        let paced = self
+            .paced
+            .values()
+            .map(|(_, due)| due.saturating_duration_since(now))
+            .min();
+        let due = match (groups, paced) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+        // Only a node read on every pass needs the pause.
+        let every_pass = self.polled.iter().any(|node| {
+            !matches!(
+                self.paced.get(node),
+                Some((Pace::Exchange(_) | Pace::Floor(_), _))
+            )
+        });
+        match (due, every_pass) {
+            (Some(due), true) => due.min(POLL_PAUSE),
+            (Some(due), false) => due,
+            // Nothing scheduled at all: a configuration of ungrouped nodes
+            // that state no interval, which is every version 1 payload set's
+            // shape.
+            (None, true) => POLL_PAUSE,
             // Nothing scheduled and nothing polled, which a checked
             // configuration does not have -- every node is on a link, and a
             // node that produces is read somehow. Waited out rather than spun
             // on.
-            (None, true) => POLL_PAUSE,
+            (None, false) => POLL_PAUSE,
         }
     }
 
@@ -263,6 +319,73 @@ impl std::fmt::Debug for System {
             self.logs
         )
     }
+}
+
+/// How a node in no group that states how often is read.
+///
+/// Three, because what the timer drives depends on the interface -- see
+/// `tcslibgs::graph::interface` -- and on whether the node is asked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pace {
+    /// A `trigger_interval` on a part that originates nothing: the whole
+    /// exchange -- ask, wait the `read_delay`, read -- every interval, counted
+    /// from when it was due so that it does not drift.
+    Exchange(Duration),
+    /// A `trigger_interval` on a part that sends: the trigger alone every
+    /// interval, counted from when it was due. Its answers arrive when they
+    /// arrive and are taken on the pass they do, so the node is read on every
+    /// pass without being asked.
+    Ask(Duration),
+    /// A `poll_interval`: a floor and not a rate, the least time between one
+    /// read and the next. Counted from the read, since nothing says how soon
+    /// there will be anything to read and a read that came late has still
+    /// just looked.
+    Floor(Duration),
+}
+
+impl Pace {
+    /// When a node read or asked at `now`, having been due at `due`, is next
+    /// due.
+    ///
+    /// A rate from when it was due, so it does not drift -- and one so far
+    /// behind that the next time is already past is put an interval from now
+    /// rather than left due for ever. A floor from now.
+    fn next(self, due: Instant, now: Instant) -> Instant {
+        match self {
+            Pace::Exchange(interval) | Pace::Ask(interval) => {
+                let then = due + interval;
+                if then <= now {
+                    now + interval
+                } else {
+                    then
+                }
+            }
+            Pace::Floor(interval) => now + interval,
+        }
+    }
+}
+
+/// How a polled node is paced, where it says how often: see [`Pace`]. `None`
+/// is a node read on every pass.
+///
+/// The graph is checked before this -- `Graph::check` refuses both intervals
+/// on one node, either in a group, and a value that is not a length of time
+/// -- so a value that will not read here is a node read on every pass rather
+/// than a vehicle that stops.
+fn pace_of(node: &tcslibgs::graph::Node) -> Option<Pace> {
+    let read = |name: &str| {
+        node.attributes
+            .get(name)
+            .and_then(|said| tcslibgs::graph::parse_interval(said.as_str().trim()).ok())
+    };
+    if let Some(interval) = read("trigger_interval") {
+        return Some(if tcslibgs::graph::interface::sends(&node.node_type) {
+            Pace::Ask(interval)
+        } else {
+            Pace::Exchange(interval)
+        });
+    }
+    read("poll_interval").map(Pace::Floor)
 }
 
 /// Whether this node is read by being asked on every pass.
@@ -461,6 +584,222 @@ mod tests {
             self.got.borrow_mut().push(data.to_vec());
             Ok(())
         }
+    }
+
+    /// A node that counts how often it is read and how often it is asked, and
+    /// has nothing to say.
+    struct Counted {
+        reads: Rc<std::cell::Cell<usize>>,
+        asks: Rc<std::cell::Cell<usize>>,
+    }
+
+    impl Port for Counted {
+        fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
+            self.reads.set(self.reads.get() + 1);
+            Ok(Taken::NOTHING)
+        }
+
+        fn ask(&mut self) -> Result<(), String> {
+            self.asks.set(self.asks.get() + 1);
+            Ok(())
+        }
+
+        fn give(&mut self, _arriving: Arriving<'_>, _data: &[u8]) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    /// Reads and asks, by node.
+    type Counts = BTreeMap<String, (Rc<std::cell::Cell<usize>>, Rc<std::cell::Cell<usize>>)>;
+
+    /// Payloads in no group, each sending to the ground and each paced every
+    /// 100 ms in one of the three ways -- `exchanged`, an I2C part that is
+    /// asked; `asked`, a socket that is asked; `floored`, a socket with a poll
+    /// interval -- and, where `every_pass`, `always`, which states no interval.
+    fn paced(now: Instant, every_pass: bool) -> (System, Counts) {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("paced.yaml");
+        let mut text = String::from(
+            "version: \"2.0\"
+moc:
+  - { name: ground, type: moc, ground_base: \"127.0.0.1:5100\" }
+payloads:
+  - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
+      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7002\",
+      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
+  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\",
+      poll_interval: \"100 ms\", payload-out: ground }
+",
+        );
+        if every_pass {
+            text.push_str(
+                "  - { name: always, type: network, protocol: udp, address: \"127.0.0.1\", \
+                 port: \"7003\", payload-out: ground }\n",
+            );
+        }
+        std::fs::write(&path, text).expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+
+        let counts: Counts = graph
+            .nodes
+            .iter()
+            .map(|node| {
+                (
+                    node.name.clone(),
+                    (Rc::new(std::cell::Cell::new(0)), Rc::new(std::cell::Cell::new(0))),
+                )
+            })
+            .collect();
+        let system = System::of_opening(
+            &graph,
+            now,
+            |node: &Node, _: &Routes| {
+                let (reads, asks) = &counts[&node.name];
+                Ok(Box::new(Counted {
+                    reads: Rc::clone(reads),
+                    asks: Rc::clone(asks),
+                }) as Box<dyn Port>)
+            },
+            |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
+        .expect("it opens");
+        (system, counts)
+    }
+
+    /// A part that originates nothing and is asked has the whole exchange
+    /// every `trigger_interval`, counted from when it was due.
+    #[test]
+    fn a_quiet_part_is_asked_and_read_every_trigger_interval() {
+        let start = Instant::now();
+        let (mut system, counts) = paced(start, false);
+        let reads = || counts["exchanged"].0.get();
+
+        system.pass(start);
+        assert_eq!(reads(), 1, "everything is due as the vehicle starts");
+        system.pass(start + Duration::from_millis(50));
+        assert_eq!(reads(), 1);
+        // Late, and the next time still counted from when it was due.
+        system.pass(start + Duration::from_millis(130));
+        assert_eq!(reads(), 2);
+        system.pass(start + Duration::from_millis(199));
+        assert_eq!(reads(), 2);
+        system.pass(start + Duration::from_millis(200));
+        assert_eq!(reads(), 3);
+        // So far behind that the next time has passed: once, and an interval
+        // on, rather than every pass to catch up.
+        let late = start + Duration::from_secs(1);
+        system.pass(late);
+        system.pass(late + Duration::from_millis(10));
+        assert_eq!(reads(), 4);
+        system.pass(late + Duration::from_millis(100));
+        assert_eq!(reads(), 5);
+    }
+
+    /// A part that sends and is asked has its trigger alone every
+    /// `trigger_interval`, and is read on every pass, its answers being
+    /// taken as they arrive.
+    #[test]
+    fn a_sending_part_is_asked_on_its_timer_and_read_on_every_pass() {
+        let start = Instant::now();
+        let (mut system, counts) = paced(start, false);
+        let (reads, asks) = (&counts["asked"].0, &counts["asked"].1);
+
+        system.pass(start);
+        assert_eq!((reads.get(), asks.get()), (1, 1));
+        system.pass(start + Duration::from_millis(20));
+        system.pass(start + Duration::from_millis(40));
+        assert_eq!((reads.get(), asks.get()), (3, 1), "read every pass, asked once");
+        system.pass(start + Duration::from_millis(100));
+        assert_eq!((reads.get(), asks.get()), (4, 2));
+    }
+
+    /// A `poll_interval` is a floor: the least time between one read and the
+    /// next, counted from the read.
+    #[test]
+    fn a_poll_interval_is_the_least_time_between_reads() {
+        let start = Instant::now();
+        let (mut system, counts) = paced(start, false);
+        let reads = || counts["floored"].0.get();
+
+        system.pass(start);
+        system.pass(start + Duration::from_millis(99));
+        assert_eq!(reads(), 1);
+        // Read late, at 130: the next is a whole interval after that, where a
+        // rate would have made it 200.
+        system.pass(start + Duration::from_millis(130));
+        assert_eq!(reads(), 2);
+        system.pass(start + Duration::from_millis(200));
+        assert_eq!(reads(), 2);
+        system.pass(start + Duration::from_millis(230));
+        assert_eq!(reads(), 3);
+        // Never asked: it has no trigger.
+        assert_eq!(counts["floored"].1.get(), 0);
+    }
+
+    /// A node that states no interval is read on every pass.
+    #[test]
+    fn a_node_with_no_interval_is_read_on_every_pass() {
+        let start = Instant::now();
+        let (mut system, counts) = paced(start, true);
+        for n in 0..5 {
+            system.pass(start + Duration::from_millis(n * 20));
+        }
+        assert_eq!(counts["always"].0.get(), 5);
+    }
+
+    /// The loop waits until the next node is due, and wakes no sooner unless
+    /// something is read on every pass -- which a part that sends and is
+    /// asked on a timer is.
+    #[test]
+    fn the_loop_waits_for_the_next_node_that_is_due() {
+        let start = Instant::now();
+
+        // A configuration of only a quiet part on a timer and a floored one:
+        // the wait is until the next is due.
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("quiet.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"
+moc:
+  - { name: ground, type: moc, ground_base: \"127.0.0.1:5100\" }
+payloads:
+  - { name: exchanged, type: i2c, path: \"/dev/i2c-1\", address: \"0x48\",
+      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: ground }
+  - { name: floored, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7001\",
+      poll_interval: \"300 ms\", payload-out: ground }
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let mut system = System::of_opening(
+            &graph,
+            start,
+            |_: &Node, _: &Routes| {
+                Ok(Box::new(Counted {
+                    reads: Rc::new(std::cell::Cell::new(0)),
+                    asks: Rc::new(std::cell::Cell::new(0)),
+                }) as Box<dyn Port>)
+            },
+            |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
+        .expect("it opens");
+        assert_eq!(system.until_next_pass(start), Duration::ZERO);
+        system.pass(start);
+        assert_eq!(
+            system.until_next_pass(start + Duration::from_millis(30)),
+            Duration::from_millis(70)
+        );
+
+        // With a part asked on a timer that is read on every pass, no longer
+        // than the pause.
+        let (mut system, _) = paced(start, false);
+        system.pass(start);
+        assert_eq!(
+            system.until_next_pass(start + Duration::from_millis(30)),
+            POLL_PAUSE
+        );
     }
 
     /// The shipped example, with the three sensors scripted and the ground

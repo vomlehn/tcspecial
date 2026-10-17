@@ -152,6 +152,24 @@ pub trait Port {
     /// should have had something.
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String>;
 
+    /// Take what has arrived at this node, without asking it anything.
+    ///
+    /// For a payload that sends on its own and is asked on a timer of its own:
+    /// its answers are taken on whatever pass they arrive on, and the asking is
+    /// [`Port::ask`]'s, when the timer says. The same as [`Port::take`] for
+    /// every node that is never asked, which is what the default is.
+    fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        self.take(buffer)
+    }
+
+    /// Ask this node for a reading, and take nothing: send its trigger.
+    ///
+    /// Nothing for a node that has no trigger, which is every node but a
+    /// payload that is asked.
+    fn ask(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+
     /// Hand this node something, saying where it arrived.
     fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String>;
 
@@ -483,6 +501,26 @@ impl Fabric {
     /// Nothing to say is not a failure and not a delivery: a device that is
     /// not due returns no bytes, which is the ordinary case on most passes.
     pub fn pump(&mut self, name: &str) -> Moved {
+        self.pump_by(name, false)
+    }
+
+    /// Read a node without asking it, and deliver what it had: see
+    /// [`Port::take_unasked`].
+    pub fn pump_unasked(&mut self, name: &str) -> Moved {
+        self.pump_by(name, true)
+    }
+
+    /// Ask a node, and take nothing: see [`Port::ask`]. What went wrong, if
+    /// anything did.
+    pub fn ask(&mut self, name: &str) -> Option<String> {
+        match self.nodes.get_mut(name) {
+            None => Some("there is no such node in this fabric".to_string()),
+            Some(node) => node.ask().err(),
+        }
+    }
+
+    /// Read a node, asking it or not, and deliver what it had.
+    fn pump_by(&mut self, name: &str, unasked: bool) -> Moved {
         let mut moved = Moved::default();
 
         let mut buffer = vec![0u8; self.buffer];
@@ -497,7 +535,11 @@ impl Fabric {
             if !node.produces() {
                 return moved;
             }
-            node.take(&mut buffer)
+            if unasked {
+                node.take_unasked(&mut buffer)
+            } else {
+                node.take(&mut buffer)
+            }
         };
 
         match taken {

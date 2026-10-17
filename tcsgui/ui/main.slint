@@ -1445,7 +1445,8 @@ component Surface inherits Rectangle {
                                 payload-heading.preferred-height))
                         + 2 * Space.tight;
 
-                // A faint grid, every ten of the millimetres the nodes snap to.
+                // A faint grid, every five millimetres: the lines a node's
+                // terminals are on, which is what lines up across a drawing.
                 //
                 // It gives the surface some depth and makes the alignment
                 // visible -- a diagram whose nodes line up looks deliberate,
@@ -1454,17 +1455,17 @@ component Surface inherits Rectangle {
                 // be thousands of elements and a texture rather than a guide.
                 // A millimetre is 96/25.4 of the canvas's pixels, as it is in
                 // tcsgui::pane::PX_PER_MM; the sheet is 254 mm across and 635
-                // down.
-                for n in 26: Rectangle {
-                    x: round(n * 10 * 96 / 25.4) * 1px;
+                // down, so 51 lines across and 127 down.
+                for n in 51: Rectangle {
+                    x: round(n * 5 * 96 / 25.4) * 1px;
                     y: 0;
                     width: 1px;
                     height: 100%;
                     background: #f3f4f6;
                 }
-                for n in 64: Rectangle {
+                for n in 127: Rectangle {
                     x: 0;
-                    y: round(n * 10 * 96 / 25.4) * 1px;
+                    y: round(n * 5 * 96 / 25.4) * 1px;
                     width: 100%;
                     height: 1px;
                     background: #f3f4f6;

@@ -81,13 +81,38 @@ const ROOM: f32 = 28.0;
 /// How far apart two lines have to be to read as two lines, in pixels.
 ///
 /// A line is drawn five pixels wide, so two tracks less than that apart are
-/// one track with a thick line on it. Seven: the width and a little, which is
-/// a visible gap at the sizes here without spreading a bundle of links across
-/// half a pane.
+/// one track with a thick line on it. Two millimetres, seven and a half
+/// pixels: the width and a little, which is a visible gap at the sizes here
+/// without spreading a bundle of links across half a pane -- and a whole
+/// number of millimetres, so a lane moved off a run on the grid is on the grid
+/// too. See [`on_mm`].
 ///
 /// It is both the spacing of the lanes a route may be moved into and the
 /// tolerance for calling two runs the same run.
-const LANE: f32 = 7.0;
+const LANE: f32 = (2.0 * crate::pane::PX_PER_MM) as f32;
+
+/// The nearest millimetre to `v`, which is where a run of a route goes.
+///
+/// A route's runs are on the millimetre grid, as the nodes are, so the lines
+/// of a drawing line up with each other and with the boxes they run between:
+/// every vertical run, and every horizontal one but the two level with the
+/// line's own ends, which are where its terminals put them. See
+/// `pane::PX_PER_MM`.
+fn on_mm(v: f32) -> f32 {
+    crate::pane::on_grid(v.round() as i32) as f32
+}
+
+/// The millimetre at or beyond `v` going the way `sign` says: out from a node,
+/// so a run moved onto the grid is never moved nearer to the node it is
+/// keeping clear of.
+fn mm_out(v: f32, sign: f32) -> f32 {
+    let at = v.round() as i32;
+    if sign > 0.0 {
+        crate::pane::grid_ceil(at) as f32
+    } else {
+        crate::pane::grid_floor(at) as f32
+    }
+}
 
 /// How much two runs have to share before it counts as an overlap.
 ///
@@ -514,8 +539,11 @@ fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
     let lanes = |v: f32, sign: f32| -> Vec<f32> {
         // The stub itself first, then lanes out from it on the grid: the stub
         // is where the line leaves the node, and moving it is only worth it to
-        // get off another line's track.
-        (0..4).map(|n| v + sign * n as f32 * LANE).collect()
+        // get off another line's track. Each a millimetre, the stub's taken
+        // outward to the next one so it is still a stub's length from its
+        // node.
+        let stub = mm_out(v, sign);
+        (0..4).map(|n| on_mm(stub + sign * n as f32 * LANE)).collect()
     };
     for band in rows(y1, y2, around) {
         for left in lanes(out, outward) {
@@ -537,16 +565,18 @@ fn shapes(ends: Ends, around: &[Obstacle]) -> Vec<Vec<(f32, f32)>> {
 
 /// Where a vertical run might go: down the middle, and beside each node.
 fn columns(out: f32, in_: f32, around: &[Obstacle]) -> Vec<f32> {
-    let mut xs = vec![(out + in_) / 2.0];
+    // On the millimetre grid, each beside a node taken out from it so it
+    // keeps its clearance: see `on_mm`.
+    let mut xs = vec![on_mm((out + in_) / 2.0)];
     for b in around {
-        xs.push(b.x - CLEAR);
-        xs.push(b.x + b.width + CLEAR);
+        xs.push(mm_out(b.x - CLEAR, -1.0));
+        xs.push(mm_out(b.x + b.width + CLEAR, 1.0));
     }
     // And a lane either side of each, and a second one beyond that, so two
     // links that would run down the same column have somewhere else to go.
     // After the columns themselves, because the shapes are tried in the order
     // they are offered and a clear middle is still the route to prefer.
-    xs = laned(xs);
+    xs = laned(xs).into_iter().map(on_mm).collect();
     // Only between the two stubs: a vertical run outside them would double
     // back through the node it just left. Either order, because a leftward
     // link's stubs run the other way about.
@@ -558,10 +588,13 @@ fn columns(out: f32, in_: f32, around: &[Obstacle]) -> Vec<f32> {
 /// Where a horizontal run might go: between the two ends, level with either
 /// of them, beside each node, and clear above and below everything.
 fn rows(y1: f32, y2: f32, around: &[Obstacle]) -> Vec<f32> {
-    let mut ys = vec![(y1 + y2) / 2.0, y2, y1];
+    // On the millimetre grid, as the columns are, but for the two rows level
+    // with the line's own ends: those are where its terminals are, and a run
+    // along one of them is the line leaving or arriving.
+    let mut ys = vec![on_mm((y1 + y2) / 2.0), y2, y1];
     for b in around {
-        ys.push(b.y - CLEAR);
-        ys.push(b.y + b.height + CLEAR);
+        ys.push(mm_out(b.y - CLEAR, -1.0));
+        ys.push(mm_out(b.y + b.height + CLEAR, 1.0));
     }
     let top = around.iter().map(|b| b.y).fold(f32::MAX, f32::min);
     let bottom = around
@@ -569,11 +602,15 @@ fn rows(y1: f32, y2: f32, around: &[Obstacle]) -> Vec<f32> {
         .map(|b| b.y + b.height)
         .fold(f32::MIN, f32::max);
     if top < f32::MAX {
-        ys.push(top - ROOM);
-        ys.push(bottom + ROOM);
+        ys.push(mm_out(top - ROOM, -1.0));
+        ys.push(mm_out(bottom + ROOM, 1.0));
     }
-    // Lanes either side of each, as the columns have: see `laned`.
-    ys = laned(ys);
+    // Lanes either side of each, as the columns have: see `laned`. The two
+    // ends' own rows are kept as they are; every lane is on the grid.
+    ys = laned(ys)
+        .into_iter()
+        .map(|y| if y == y1 || y == y2 { y } else { on_mm(y) })
+        .collect();
     // Nothing above the top of the canvas: a run off the edge is a run
     // nobody can see, and the clipping makes it look like a line that stops.
     ys.retain(|y| *y >= CLEAR);
@@ -674,7 +711,7 @@ fn holds(b: &Obstacle, (x, y): (f32, f32)) -> bool {
 /// The tracks themselves first, so a route still prefers the middle of the gap
 /// or the side of a node; the lanes after, in the order a route should try
 /// them -- one lane out either way, then two, and so on to four. Four a side
-/// is twenty-eight pixels, which is as far as a line can be moved and still
+/// is eight millimetres, thirty pixels, which is as far as a line can be moved and still
 /// read as the line between those two nodes; a ninth line through one gap is a
 /// diagram with something else wrong with it.
 fn laned(tracks: Vec<f32>) -> Vec<f32> {
@@ -1205,9 +1242,38 @@ mod tests {
         let route_ = way(Ends::forward(192.0, 68.0, 600.0, 328.0), &[], &[]);
         assert_eq!(route_.len(), 4, "{route_:?}");
         // Down the middle, so that two links between the same pair of columns
-        // do not lie on top of each other.
+        // do not lie on top of each other -- the millimetre nearest it, every
+        // run of a route being on the grid.
         let middle = (192.0 + 16.0 + 600.0 - 16.0) / 2.0;
-        assert!((route_[1].0 - middle).abs() < 0.5, "{route_:?}");
+        assert_eq!(route_[1].0, on_mm(middle), "{route_:?}");
+        assert!(crate::pane::is_on_grid(route_[1].0 as i32), "{route_:?}");
+    }
+
+    /// Every run of a route is on the millimetre grid but the two level with
+    /// its ends, which are where its terminals put them.
+    #[test]
+    fn a_routes_runs_are_on_the_millimetre_grid() {
+        let on_grid = |v: f32| crate::pane::is_on_grid(v as i32) && v.fract() == 0.0;
+        let around = [node(300.0, 120.0), node(300.0, 200.0)];
+        for ends in [
+            Ends::forward(192.0, 68.0, 600.0, 328.0),
+            // Backwards, which goes around: two vertical runs and a row.
+            Ends::forward(600.0, 100.0, 150.0, 260.0),
+            Ends::new((500.0, 90.0), (120.0, 140.0), false, false),
+        ] {
+            let route_ = way(ends, &around, &[]);
+            for pair in route_.windows(2) {
+                let ((x1, y1), (x2, y2)) = (pair[0], pair[1]);
+                let at_an_end = |p: (f32, f32)| p == ends.from || p == ends.to;
+                if (x1 - x2).abs() < 0.5 && !at_an_end(pair[0]) && !at_an_end(pair[1]) {
+                    assert!(on_grid(x1), "a vertical run at {x1}: {route_:?}");
+                }
+                let level_with_an_end = (y1 - ends.from.1).abs() < 0.5 || (y1 - ends.to.1).abs() < 0.5;
+                if (y1 - y2).abs() < 0.5 && !level_with_an_end {
+                    assert!(on_grid(y1), "a horizontal run at {y1}: {route_:?}");
+                }
+            }
+        }
     }
 
     /// The arrowhead points along the line and sits at its end.

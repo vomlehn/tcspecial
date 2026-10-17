@@ -22,19 +22,19 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make README.html     - Build README.html from README.md"
-	@echo "  make run-simple      - Run tcspecial on the minimal example"
-	@echo "  make run-thermostat  - Run tcspecial on the thermostat example"
+	@echo "  make run-simple      - Run tcsmoc on the minimal example"
+	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
 	@echo "  make run-simple-app  - Run the simple-app example, printing its line"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's payload needs"
 
-# Running tcspecial on one of the examples.
+# Running tcsmoc on one of the examples.
 #
-# $(1) is the example's directory, whose configuration is named for it.
-# tcspecial alone: an example is a version 2 configuration, and tcsmoc and
-# tcssim run version 1 payload sets only, so there is no simulator to start
-# beside it yet. A payload on a device -- the thermostat's I2C, SPI and GPIO --
-# needs that device, which `make mkstubs` in the top-level directory provides
-# where there is no hardware.
+# $(1) is the example's directory, whose configuration is named for it. tcsmoc
+# starts tcspecial on the same file, and tcssim where the simulator file
+# beside it -- $(1)-sim.yaml, found by name -- simulates anything; its panels
+# show what each source sends to the ground. A payload on a device -- the
+# thermostat's I2C, SPI and GPIO -- needs that device, which `make mkstubs` in
+# the top-level directory provides where there is no hardware.
 #
 # The examples log to $(TELEMETRY), which is deleted before each run so that
 # what is in it afterwards is that run's alone. It is made again because a log
@@ -43,16 +43,17 @@ help:
 define runexample_on
 	( \
 		set -eu; \
-		echo "Running $(PROJECT_NAME) on examples/$(1)/$(1).yaml..."; \
+		echo "Running tcsmoc on examples/$(1)/$(1).yaml..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcspecial -- examples/$(1)/$(1).yaml \
+		cargo build -q --bin tcspecial --bin tcssim --bin tcsmoc; \
+		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcsmoc -- examples/$(1)/$(1).yaml \
 	)
 endef
 
-# Run tcspecial on the minimal example: one payload, its telemetry going to
-# the ground.
+# Run tcsmoc on the minimal example: one payload, simulated by tcssim, its
+# telemetry going to the ground.
 .PHONY: run-simple
 run-simple: docs
 	$(call runexample_on,minimal)
@@ -65,7 +66,7 @@ docs: README.html
 README.html: README.md style.html
 	pandoc --standalone --metadata pagetitle=Examples -H style.html README.md -o README.html
 
-# Run tcspecial on the thermostat example.
+# Run tcsmoc on the thermostat example.
 .PHONY: run-thermostat
 run-thermostat:
 	$(call runexample_on,thermostat)

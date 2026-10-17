@@ -119,6 +119,11 @@ const END_OF_ENTRY: u8 = 0x1d;
 /// it parses into, so the format cannot show through.
 pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
     let path = path.as_ref();
+    // A version 2 configuration is a graph, possibly across several files:
+    // see digest_of_graph.
+    if crate::graph::is_version_2(path) {
+        return digest_of_graph(&crate::graph::Graph::load(path)?);
+    }
     let text = std::fs::read_to_string(path)?;
     digest_of_text(&text, ConfigFormat::of_file(path)?)
 }
@@ -150,6 +155,74 @@ pub fn digest_of_payload_config(config: &PayloadConfig) -> TcsResult<ConfigDiges
     let mut ordered = config.clone();
     ordered.payloads.sort_by_key(|payload| payload.sequence);
     digest_of_value(&ordered)
+}
+
+/// The digest of a version 2 configuration: everything the vehicle and the
+/// ground act on, across every file it was read from.
+///
+/// Taken over the configuration as loaded rather than over a file's text, so
+/// that its included files are in it and so that the YAML and the XML
+/// spellings of one configuration digest alike. In it: the `tcspecial`
+/// section, the payload groups, the nodes in the order the files declare them
+/// -- which is what a node's device id is, and so which port its data reaches
+/// the ground on -- with their attributes, the links, and the command
+/// bindings. Not in it: the editor's own section, where the nodes are drawn,
+/// and the description, neither of which changes what anything does.
+pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
+    use serde_json::{json, Map, Value};
+
+    let text = |scalar: &crate::Scalar| Value::String(scalar.as_str().to_string());
+    let tcspecial: Map<String, Value> = graph
+        .tcspecial
+        .as_ref()
+        .map(|section| {
+            crate::graph::parameters::flatten(section)
+                .iter()
+                .map(|(name, value)| (name.clone(), text(value)))
+                .collect()
+        })
+        .unwrap_or_default();
+    let nodes: Vec<Value> = graph
+        .nodes
+        .iter()
+        .map(|node| {
+            let attributes: Map<String, Value> = node
+                .attributes
+                .iter()
+                .map(|(name, value)| (name.clone(), text(value)))
+                .collect();
+            json!({
+                "name": node.name,
+                "type": node.node_type,
+                "group": node.group,
+                "attributes": attributes,
+            })
+        })
+        .collect();
+    let links: Vec<Value> = graph
+        .links
+        .iter()
+        .map(|link| json!({ "from": link.from, "to": link.to.each() }))
+        .collect();
+    let groups: Vec<Value> = graph
+        .groups
+        .iter()
+        .map(|group| json!({ "name": group.name, "interval": group.interval }))
+        .collect();
+    let commands: Vec<Value> = graph
+        .commands
+        .iter()
+        .map(|binding| json!({ "from": binding.from, "sets": binding.sets }))
+        .collect();
+
+    digest_of_value(&json!({
+        "version": crate::graph::VERSION,
+        "tcspecial": tcspecial,
+        "payload_groups": groups,
+        "nodes": nodes,
+        "links": links,
+        "commands": commands,
+    }))
 }
 
 /// The digest of any document that can be written out as a value tree.
@@ -249,6 +322,64 @@ mod tests {
     }
 
     use super::*;
+
+    fn example_graph(name: &str, ext: &str) -> crate::graph::Graph {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        crate::graph::Graph::load(root.join(format!("examples/{name}/{name}.{ext}")))
+            .expect("the example reads")
+    }
+
+    /// A version 2 configuration digests alike in either spelling, and
+    /// through the file as through the graph.
+    #[test]
+    fn a_graph_digests_alike_in_both_spellings() {
+        for name in ["minimal", "thermostat", "simple-app"] {
+            let yaml = digest_of_graph(&example_graph(name, "yaml")).expect("it digests");
+            let xml = digest_of_graph(&example_graph(name, "xml")).expect("it digests");
+            assert_eq!(yaml, xml, "{name}");
+            let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+            let file = digest_of_file(root.join(format!("examples/{name}/{name}.yaml")))
+                .expect("the file digests");
+            assert_eq!(file, yaml, "{name}");
+        }
+    }
+
+    /// Where the editor draws a node is not the configuration; a node's
+    /// attributes and its place in the order are.
+    #[test]
+    fn a_graph_digest_follows_what_the_vehicle_acts_on() {
+        let graph = example_graph("thermostat", "yaml");
+        let digest = digest_of_graph(&graph).expect("it digests");
+
+        let mut moved = graph.clone();
+        moved.placed.clear();
+        moved.description = Some("another description".to_string());
+        assert_eq!(digest_of_graph(&moved).expect("it digests"), digest);
+
+        let mut retuned = graph.clone();
+        let node = retuned
+            .nodes
+            .iter_mut()
+            .find(|n| n.name == "thermostat")
+            .expect("the thermostat");
+        node.attributes
+            .insert("setpoint".to_string(), crate::Scalar::of("300.0"));
+        assert_ne!(digest_of_graph(&retuned).expect("it digests"), digest);
+
+        // Two nodes swapped are two device ids swapped, and two ports.
+        let mut reordered = graph.clone();
+        reordered.nodes.swap(1, 2);
+        assert_ne!(digest_of_graph(&reordered).expect("it digests"), digest);
+    }
+
+    /// A version 2 configuration's version is the language's.
+    #[test]
+    fn a_graph_states_version_2() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let version = crate::config::load_config_version(root.join("examples/minimal/minimal.yaml"))
+            .expect("it states one");
+        assert_eq!((version.major, version.minor, version.patch), (2, 0, 0));
+    }
 
     const YAML: &str = "\
 version: \"1.0\"

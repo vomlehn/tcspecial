@@ -696,3 +696,56 @@ export component MainWindow inherits Window {
         }
     }
 }
+
+// Asked when tcspecial announces a configuration other than the one this MOC
+// read: the digest in its beacons, computed from the files it read, is not the
+// digest this MOC computed from the files it read. Then the panels may say a
+// source's data arrives where the vehicle does not send it, so the operator
+// decides whether to go on.
+export component DiffersWindow inherits Window {
+    title: "tcsmoc: configurations differ";
+    background: #fbfbfa;
+    min-width: 420px;
+    preferred-width: 560px;
+
+    // Both digests, and which file this MOC read.
+    in property <string> message: "";
+
+    callback continue-anyway();
+    callback quit();
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+
+        Text {
+            text: "tcspecial is serving a different configuration";
+            font-size: 15px;
+            font-weight: 700;
+            color: #c0392b;
+        }
+        Text {
+            text: root.message;
+            font-size: 13px;
+            wrap: word-wrap;
+        }
+        Text {
+            text: "The panels may show sources where the vehicle does not send them. Continue anyway?";
+            font-size: 12px;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            Rectangle { }
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
+            Button {
+                text: "Continue anyway";
+                clicked => { root.continue-anyway(); }
+            }
+        }
+    }
+}

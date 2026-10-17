@@ -19,8 +19,11 @@ use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::time::Duration;
 
-use tcslibgs::graph::telemetry::{self, Via};
+use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::Graph;
+
+/// What the ground's end of the `payload_telemetry` links is called.
+pub const PAYLOAD_TELEMETRY: &str = "payload_telemetry";
 
 /// The largest datum one receive returns: room for a whole datagram.
 const DATUM_BYTES: usize = 65_536;
@@ -73,29 +76,53 @@ impl Moc {
         }
 
         let links = telemetry::of(graph).map_err(|refused| refused.why)?;
-        let mut ports = Vec::new();
-        for link in links
+        let ours: Vec<Telemetered> = links
             .into_iter()
             .filter(|l| l.via == Via::Moc(moc.to_string()))
-        {
-            let at = format!("{}:{}", link.ground.address, link.ground.port);
-            let socket = UdpSocket::bind(&at).map_err(|e| {
-                format!(
-                    "\"{moc}\": cannot listen for \"{}\" on {at}: {e}",
-                    link.source
-                )
-            })?;
-            ports.push((link.source, socket));
-        }
-        if ports.is_empty() {
+            .collect();
+        if ours.is_empty() {
             return Err(format!(
                 "\"{moc}\" has nothing drawn into it, so nothing would ever arrive \
                  at it"
             ));
         }
+        Moc::binding(moc, ours)
+    }
 
+    /// Open the ground's end of every payload that reports over the
+    /// `tcspecial` section's `payload_telemetry`: the payloads nothing in the
+    /// drawing touches, each at `dest_base` plus its device id.
+    ///
+    /// Gathered as one, named for the section, because it is the same thing to
+    /// a caller: data, and which node it came from. `None` where no payload
+    /// reports that way.
+    pub fn open_payload_telemetry(graph: &Graph) -> Result<Option<Moc>, String> {
+        let links = telemetry::of(graph).map_err(|refused| refused.why)?;
+        let ours: Vec<Telemetered> = links
+            .into_iter()
+            .filter(|l| l.via == Via::PayloadTelemetry)
+            .collect();
+        if ours.is_empty() {
+            return Ok(None);
+        }
+        Moc::binding(PAYLOAD_TELEMETRY, ours).map(Some)
+    }
+
+    /// Bind each link's ground end.
+    fn binding(name: &str, links: Vec<Telemetered>) -> Result<Moc, String> {
+        let mut ports = Vec::new();
+        for link in links {
+            let at = format!("{}:{}", link.ground.address, link.ground.port);
+            let socket = UdpSocket::bind(&at).map_err(|e| {
+                format!(
+                    "\"{name}\": cannot listen for \"{}\" on {at}: {e}",
+                    link.source
+                )
+            })?;
+            ports.push((link.source, socket));
+        }
         Ok(Moc {
-            name: moc.to_string(),
+            name: name.to_string(),
             ports,
             next: 0,
         })
@@ -242,6 +269,37 @@ payloads:
     fn a_wait_that_runs_out_is_nothing() {
         let mut moc = Moc::open(&graph(a_free_port()), "ground").expect("it opens");
         assert_eq!(moc.receive(Some(Duration::from_millis(50))), Ok(None));
+    }
+
+    /// The payloads nothing touches are received too, named for the section.
+    #[test]
+    fn untouched_payloads_are_received_over_payload_telemetry() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut graph = Graph::load(root.join("examples/minimal/minimal.yaml")).expect("it reads");
+        // Somewhere free instead of the example's 6100.
+        let port = a_free_port();
+        let section = graph.tcspecial.as_mut().expect("a section");
+        let mut flat = tcslibgs::graph::parameters::flatten(section);
+        flat.insert(
+            "payload_telemetry.dest_base".to_string(),
+            tcslibgs::Scalar::of(format!("127.0.0.1:{port}")),
+        );
+        *section = tcslibgs::graph::parameters::nest(&flat);
+
+        let mut ground = Moc::open_payload_telemetry(&graph)
+            .expect("it opens")
+            .expect("the sensor reports that way");
+        assert_eq!(ground.name(), PAYLOAD_TELEMETRY);
+        assert_eq!(ground.sources(), vec!["sensor"]);
+
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        vehicle.send_to(b"reading", ("127.0.0.1", port)).expect("sent");
+        let received = ground
+            .receive(Some(Duration::from_secs(5)))
+            .expect("it reads")
+            .expect("something arrived");
+        assert_eq!(received.source, "sensor");
+        assert_eq!(received.data, b"reading".to_vec());
     }
 
     /// Only a moc node can be opened, and only one something is drawn into.

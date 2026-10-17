@@ -5,7 +5,10 @@ edition = "2021"
 description = "The ground end of the simple-app example, which prints the line its payload sends; the payload itself is lorem_pl.py"
 
 [dependencies]
+# How the ground gets the payload's words from the moc node.
+tcslib = { path = "../../tcslib" }
 
 # The payload's tests run lorem_pl.py the way tcspecial does.
 [dev-dependencies]
 tcsapp = { path = "../../tcsapp" }
+tempfile = "3"

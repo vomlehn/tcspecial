@@ -27,10 +27,12 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The ground link. The vehicle binds address and port, and sends what -->
-    <!-- arrives at this node to the ground station at ground_address and -->
-    <!-- ground_port from the first word: where the ground is, is written down, so -->
-    <!-- the ground does not have to speak first. Run `lorem_moc` to be that ground. -->
+    <!-- The ground's end of the vehicle's data. tcspecial sends what each node -->
+    <!-- drawn into it produces as UDP datagrams to ground_base's address, at its -->
+    <!-- port plus that node's device id: lorem is id 1, so its words go to -->
+    <!-- 127.0.0.1:5101. Ground software gets them from this node with a function -->
+    <!-- call, tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It -->
+    <!-- states no address or port of its own, because nothing comes back up. -->
     <moc>
         <name>moc</name>
         <type>moc</type>

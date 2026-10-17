@@ -64,7 +64,7 @@ impl AppAllPl {
             ));
         }
         Ok(AppAllPl {
-            running: parent::start(&params.program_path()?, &params.arguments(), Supports::MOC)?,
+            running: parent::start(&params.executable_path()?, &params.arguments(), Supports::MOC)?,
         })
     }
 
@@ -137,7 +137,7 @@ mod tests {
         AppParams {
             name: "bay".to_string(),
             kind: Kind::AllPl,
-            program: program.display().to_string(),
+            executable: program.display().to_string(),
             payload_arg: Some("--bay-2".to_string()),
             moc_arg: Some("--bay-2-commands".to_string()),
             restart: Restart::Never,

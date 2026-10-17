@@ -266,6 +266,20 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
             .collect(),
     };
 
+    // An app node -- two of the kinds are payloads -- is reached by running
+    // it, not over an interface, so what it is held to is what an app node
+    // must say: its executable and the arguments its kind is run with. The
+    // same rule tcspecial reads it by, so what this says is what is missing
+    // rather than that an app has no address, which no app has.
+    if tcslibgs::node::app::Kind::of(&theirs.node_type).is_some() {
+        return tcslibgs::node::app::params_of(
+            &theirs.name,
+            &theirs.node_type,
+            &theirs.attributes,
+        )
+        .map(|_| ());
+    }
+
     // Only the nodes that are opened. A computation and a log have rules of
     // their own, and this would tell them they are not interfaces.
     if !theirs.is_payload() && theirs.node_type != "moc" {
@@ -494,6 +508,10 @@ impl Document {
     /// actually edited, at which point these positions are written with
     /// everything else, because every edit rewrites the whole file.
     ///
+    /// And on the grid: a node whose upper left corner is not on a grid point
+    /// is moved to the nearest one, which is the rule a drag obeys as well --
+    /// see `pane::confine`, which does both.
+    ///
     /// A node that has to move keeps its height and takes the near edge of its
     /// own pane, which is the smallest move that obeys the rule. Where that
     /// lands it on top of another node it steps down the grid until it is
@@ -531,7 +549,7 @@ impl Document {
                 if !clashes {
                     break;
                 }
-                want.1 += crate::pane::GRID * 4;
+                want.1 = crate::pane::grid_ceil(want.1 + 32);
             }
 
             self.nodes[at].at = want;
@@ -1631,10 +1649,10 @@ impl Document {
                 .filter(|node| section_of(&node.node_type) == section)
             {
                 if let Some(comment) = &node.comment {
-                    for line in comment.lines() {
+                    for line in comment_lines(comment, 4) {
                         out.push_str(&format!(
                             "    <!-- {} -->\n",
-                            escape(&comment_safe(line))
+                            escape(&comment_safe(&line))
                         ));
                     }
                 }
@@ -1657,10 +1675,10 @@ impl Document {
                 }
                 for (terminal, destinations, comment) in self.leaving(node, home) {
                     if let Some(comment) = &comment {
-                        for line in comment.lines() {
+                        for line in comment_lines(comment, 8) {
                             out.push_str(&format!(
                                 "        <!-- {} -->\n",
-                                escape(&comment_safe(line))
+                                escape(&comment_safe(&line))
                             ));
                         }
                     }
@@ -1694,10 +1712,10 @@ impl Document {
         if home.is_none() {
             for command in &self.commands {
                 if let Some(comment) = &command.comment {
-                    for line in comment.lines() {
+                    for line in comment_lines(comment, 4) {
                         out.push_str(&format!(
                             "    <!-- {} -->\n",
-                            escape(&comment_safe(line))
+                            escape(&comment_safe(&line))
                         ));
                     }
                 }
@@ -1859,8 +1877,10 @@ impl Document {
                 // Above the entry it belongs to, as a comment and not as a
                 // field: this is what a person hand-editing the file expects
                 // to find, and it is what they would have written themselves.
+                // Broken where the XML writer breaks it, so the two spellings
+                // carry the same comment: see `comment_lines`.
                 if let Some(comment) = &node.comment {
-                    for line in comment.lines() {
+                    for line in comment_lines(comment, 4) {
                         out.push_str(&format!("  # {line}\n"));
                     }
                 }
@@ -1894,7 +1914,7 @@ impl Document {
                 // as a list, which is what a reader of either would write.
                 for (terminal, destinations, comment) in self.leaving(node, home) {
                     if let Some(comment) = &comment {
-                        for line in comment.lines() {
+                        for line in comment_lines(comment, 8) {
                             out.push_str(&format!("    # {line}\n"));
                         }
                     }
@@ -1919,7 +1939,7 @@ impl Document {
             out.push_str("\ncommands:\n");
             for command in &self.commands {
                 if let Some(comment) = &command.comment {
-                    for line in comment.lines() {
+                    for line in comment_lines(comment, 4) {
                         out.push_str(&format!("  # {line}\n"));
                     }
                 }
@@ -2239,6 +2259,56 @@ pub(crate) fn comment_safe(line: &str) -> String {
     out.trim_end_matches('-').trim_end().to_string()
 }
 
+/// The longest a comment's line may be in a written file, marks and indent
+/// included.
+pub(crate) const COMMENT_LINE: usize = 80;
+
+/// How much of a line the marks around a comment take, in the format that
+/// takes more of them: the XML one, `<!-- ` and ` -->` after the indent, where
+/// YAML takes only `# ` after the same indent.
+fn comment_room(indent: usize) -> usize {
+    COMMENT_LINE.saturating_sub(indent + "<!-- ".len() + " -->".len())
+}
+
+/// A comment, as the lines it is written in at this indent: each of its own
+/// lines, and any that would run past [`COMMENT_LINE`] broken between words.
+///
+/// One set of lines for both formats, measured against the one that takes
+/// more room, so a configuration carries the same comment whichever spelling
+/// it is written in -- and measured as XML writes it, escapes and all, so the
+/// XML file is held to the limit and not only the text. Broken at spaces and
+/// nowhere else, so a word longer than a line is a long line rather than a
+/// word cut in two. A line's own indent is carried on to the lines it is
+/// broken into, so an indented list in a comment stays one.
+pub(crate) fn comment_lines(comment: &str, indent: usize) -> Vec<String> {
+    let room = comment_room(indent);
+    let width = |text: &str| escape(&comment_safe(text)).chars().count();
+    let mut out = Vec::new();
+    for line in comment.lines() {
+        if width(line) <= room {
+            out.push(line.to_string());
+            continue;
+        }
+        let lead: String = line.chars().take_while(|c| *c == ' ').collect();
+        let mut now = lead.clone();
+        for word in line.split(' ').filter(|word| !word.is_empty()) {
+            let joined = if now.trim().is_empty() {
+                format!("{lead}{word}")
+            } else {
+                format!("{now} {word}")
+            };
+            if width(&joined) <= room || now.trim().is_empty() {
+                now = joined;
+            } else {
+                out.push(now);
+                now = format!("{lead}{word}");
+            }
+        }
+        out.push(now);
+    }
+    out
+}
+
 /// The worked example from `design.rst`: a cabin thermostat.
 ///
 /// Built here rather than written out by hand in two formats, so that the
@@ -2305,7 +2375,7 @@ pub fn thermostat_example() -> Document {
     // hardware allows.
     document.groups.insert("cabin_temps".to_string(), "3s".to_string());
 
-    place(&mut document, "temp_fore", "i2c", (40, 40));
+    place(&mut document, "temp_fore", "i2c", (42, 42));
     set(&mut document, "temp_fore", "path", "/dev/i2c-1");
     set(&mut document, "temp_fore", "address", "0x48");
     set(&mut document, "temp_fore", "group", "cabin_temps");
@@ -2316,14 +2386,14 @@ pub fn thermostat_example() -> Document {
         "Forward bulkhead. Two bytes, signed, big endian.",
     );
 
-    place(&mut document, "temp_aft", "i2c", (40, 160));
+    place(&mut document, "temp_aft", "i2c", (42, 159));
     set(&mut document, "temp_aft", "path", "/dev/i2c-1");
     set(&mut document, "temp_aft", "address", "0x49");
     set(&mut document, "temp_aft", "group", "cabin_temps");
     set(&mut document, "temp_aft", "read_size", "2");
     note(&mut document, "temp_aft", "Aft bulkhead; same part as temp_fore.");
 
-    place(&mut document, "temp_bay", "spi", (40, 280));
+    place(&mut document, "temp_bay", "spi", (42, 280));
     set(&mut document, "temp_bay", "path", "/dev/spidev0.0");
     set(&mut document, "temp_bay", "max_speed", "1000000");
     set(&mut document, "temp_bay", "spi_mode", "0");
@@ -2336,9 +2406,9 @@ pub fn thermostat_example() -> Document {
     );
 
     for (name, at, format, scale, offset) in [
-        ("k_fore", (240, 40), "i16_be", "0.0625", "273.15"),
-        ("k_aft", (240, 160), "i16_be", "0.0625", "273.15"),
-        ("k_bay", (240, 280), "u24_be", "0.0078", "255.37"),
+        ("k_fore", (238, 42), "i16_be", "0.0625", "273.15"),
+        ("k_aft", (238, 159), "i16_be", "0.0625", "273.15"),
+        ("k_bay", (238, 280), "u24_be", "0.0078", "255.37"),
     ] {
         place(&mut document, name, "compute", at);
         set(&mut document, name, "function", "to_kelvin");
@@ -2347,11 +2417,11 @@ pub fn thermostat_example() -> Document {
         set(&mut document, name, "offset", offset);
     }
 
-    place(&mut document, "mean_temp", "compute", (460, 160));
+    place(&mut document, "mean_temp", "compute", (461, 159));
     set(&mut document, "mean_temp", "function", "mean");
     set(&mut document, "mean_temp", "inputs", "in0,in1,in2");
 
-    place(&mut document, "thermostat", "compute", (616, 240));
+    place(&mut document, "thermostat", "compute", (612, 238));
     set(&mut document, "thermostat", "function", "hysteresis");
     set(&mut document, "thermostat", "setpoint", "293.15");
     set(&mut document, "thermostat", "above", "2.0");
@@ -2359,23 +2429,23 @@ pub fn thermostat_example() -> Document {
     note(
         &mut document,
         "thermostat",
-        "setpoint is set from the ground; above and below are the two degrees\neither side that the heaters are switched at.",
+        "setpoint is set from the ground; above and below are the two\ndegrees either side that the heaters are switched at.",
     );
 
-    place(&mut document, "moc", "moc", (792, 40));
+    place(&mut document, "moc", "moc", (794, 42));
     set(&mut document, "moc", "address", "10.0.0.1");
     set(&mut document, "moc", "port", "5000");
     // Where the ground station is: each node linked into this one sends to
     // this port plus its own device id, from the start.
     set(&mut document, "moc", "ground_base", "10.0.0.2:5100");
 
-    place(&mut document, "heaters", "gpio", (40, 400));
+    place(&mut document, "heaters", "gpio", (42, 401));
     set(&mut document, "heaters", "path", "/dev/gpiochip0");
     set(&mut document, "heaters", "direction", "output");
     set(&mut document, "heaters", "lines", "3,4,5");
     note(&mut document, "heaters", "Three circuits, driven together.");
 
-    place(&mut document, "housekeeping", "log", (460, 380));
+    place(&mut document, "housekeeping", "log", (461, 382));
     set(&mut document, "housekeeping", "directory", "/var/log/tcspecial");
     set(&mut document, "housekeeping", "format", "variable_ts_rc");
 
@@ -2744,13 +2814,15 @@ mod tests {
         let divider = dividers.payloads;
         let mut document = Document::new();
 
+        use crate::pane::{grid_floor, on_grid};
+
         // A payload on the wrong side, a vehicle node on the wrong side, and
-        // one of each where it belongs.
+        // one of each where it belongs, on the grid.
         for (name, node_type, at) in [
-            ("stray_sensor", "i2c", (divider + 40, 120)),
-            ("stray_compute", "compute", (40, 200)),
-            ("good_sensor", "i2c", (16, 320)),
-            ("good_compute", "compute", (divider + 240, 40)),
+            ("stray_sensor", "i2c", (divider + 40, on_grid(120))),
+            ("stray_compute", "compute", (on_grid(40), on_grid(200))),
+            ("good_sensor", "i2c", (on_grid(16), on_grid(320))),
+            ("good_compute", "compute", (on_grid(divider + 240), on_grid(40))),
         ] {
             document.apply(&add(name, node_type));
             document.apply(&Edit::MoveNode {
@@ -2768,18 +2840,82 @@ mod tests {
 
         // The payload is in its own pane now, at the near edge of it: the
         // smallest move that obeys the rule, which is its own width short of
-        // the divider.
-        assert_eq!(at("stray_sensor"), (divider - width, 120));
+        // the divider, taken back to the grid.
+        assert_eq!(at("stray_sensor"), (grid_floor(divider - width), on_grid(120)));
         // And the computation is out of it, against the divider.
-        assert_eq!(at("stray_compute"), (divider, 200));
+        assert_eq!(at("stray_compute"), (divider, on_grid(200)));
         // The two that were already right are untouched, which matters: a
         // reader who arranged a diagram should find it as they left it.
-        assert_eq!(at("good_sensor"), (16, 320));
-        assert_eq!(at("good_compute"), (divider + 240, 40));
+        assert_eq!(at("good_sensor"), (on_grid(16), on_grid(320)));
+        assert_eq!(at("good_compute"), (on_grid(divider + 240), on_grid(40)));
 
         // Settling twice changes nothing, which is what makes it safe to do
         // on every open.
         assert_eq!(document.settle(dividers), 0);
+
+        // And a node in its own pane but off the grid is brought to the
+        // nearest grid point.
+        document.apply(&add("off_grid", "i2c"));
+        document.apply(&Edit::MoveNode {
+            node: "off_grid".into(),
+            was: (0, 0),
+            now: (17, 500),
+        });
+        assert_eq!(document.settle(dividers), 1);
+        assert_eq!(at_now(&document, "off_grid"), (on_grid(17), on_grid(500)));
+    }
+
+    fn at_now(document: &Document, name: &str) -> (i32, i32) {
+        document.node(name).unwrap().at
+    }
+
+    /// A payload that is a program is held to what an app node must say, and
+    /// not asked for an address it has no use for.
+    ///
+    /// It was: the editor asked every payload how it is reached, and an app
+    /// is reached by running it, so every `app_pl` came up as a problem
+    /// saying so -- with nothing in the file that could be changed to put it
+    /// right. What is said now is what an app node is missing, in the words
+    /// tcspecial would refuse it with.
+    #[test]
+    fn a_payload_that_is_a_program_is_held_to_the_app_rules() {
+        let mut document = Document::new();
+        document.apply(&add("lorem", "app_pl"));
+        for (attribute, value) in [
+            ("executable", "examples/simple-app/lorem_pl.py"),
+            ("app-payload-arg", "1"),
+        ] {
+            document.apply(&Edit::SetAttribute {
+                node: "lorem".into(),
+                attribute: attribute.into(),
+                was: None,
+                now: Some(value.into()),
+            });
+        }
+        let about_lorem = |document: &Document| -> Vec<String> {
+            document
+                .faults()
+                .iter()
+                .map(|fault| fault.describe())
+                .filter(|said| said.contains("lorem"))
+                .collect()
+        };
+        assert_eq!(about_lorem(&document), Vec::<String>::new());
+
+        // And one that says something an app does not take is told which
+        // word, and what an app does take, in tcspecial's words.
+        document.apply(&Edit::SetAttribute {
+            node: "lorem".into(),
+            attribute: "program".into(),
+            was: None,
+            now: Some("examples/simple-app/lorem_pl.py".into()),
+        });
+        let said = about_lorem(&document);
+        assert!(
+            said.iter().any(|s| s.contains("nothing called \"program\"")
+                && s.contains("It takes executable")),
+            "{said:?}"
+        );
     }
 
     /// Nodes settled into one pane do not land on top of each other.
@@ -3611,6 +3747,62 @@ mod tests {
         let yaml = document.to_yaml();
         assert!(yaml.contains("  # two things:"), "{yaml}");
         assert!(yaml.contains("  # the second one"), "{yaml}");
+    }
+
+    /// No line of a comment is written longer than eighty characters, in
+    /// either format, and the two formats break it in the same places.
+    ///
+    /// On a node, on a link and on a command binding, which are written at
+    /// three indents; with a word in the comment longer than any line, which
+    /// is a long line rather than a word cut in two; and with markup in it,
+    /// which XML writes longer than it is.
+    #[test]
+    fn a_long_comment_is_broken_to_fit_eighty_characters() {
+        let long = "the second of the two sensors on the forward bulkhead, which \
+                    was moved there after the rework & is read at its own address \
+                    <see ECR-114> now that the first one shares the bus";
+        let mut document = Document::new();
+        document.apply(&add("a", "i2c"));
+        document.apply(&add("b", "compute"));
+        document.apply(&Edit::SetNodeComment {
+            node: "a".into(),
+            was: None,
+            now: Some(format!("{long}\nshort\n  an indented line that goes on \
+                               and on and on well past where a line should stop")),
+        });
+        let mut link = Link::new("a", "b", None);
+        link.comment = Some(long.to_string());
+        document.apply(&Edit::AddLink { link });
+
+        let lines = comment_lines(long, 8);
+        assert!(lines.len() > 1, "{lines:?}");
+        assert_eq!(lines.join(" "), long, "only the line breaks change");
+
+        for (format, text) in [("yaml", document.to_yaml()), ("xml", document.to_xml())] {
+            for line in text.lines() {
+                let comment = line.trim_start().starts_with('#') || line.contains("<!--");
+                if comment && !line.contains("yaml-language-server") {
+                    assert!(
+                        line.chars().count() <= COMMENT_LINE,
+                        "{format}: {} characters: {line:?}",
+                        line.chars().count()
+                    );
+                }
+            }
+        }
+
+        // The indented line keeps its indent on the lines it is broken into.
+        let indented = comment_lines(
+            "  an indented line that goes on and on and on well past where a \
+             line should stop",
+            4,
+        );
+        assert!(indented.len() > 1, "{indented:?}");
+        assert!(indented.iter().all(|line| line.starts_with("  ")), "{indented:?}");
+
+        // And a word longer than a line is left whole.
+        let word = "x".repeat(100);
+        assert_eq!(comment_lines(&word, 4), vec![word.clone()]);
     }
 
     /// The format follows the file's name.

@@ -369,8 +369,10 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         // pair of sockets held by this process rather than an interface
         // reached by address: see `crate::node::app` and `tcsapp`.
         other if crate::node::app::Kind::of(other).is_some() => Err(format!(
-            "\"{}\" is an app node: it is a program of its own, and what it is \
-             reached over is made when it is started rather than named here",
+            "\"{}\" is an app node: a program tcspecial runs, which is reached \
+             over what tcspecial makes for it when it starts it, so it takes no \
+             address, port or path -- it names its executable, and the \
+             arguments its kind is run with",
             node.name
         )),
         other => Err(format!(

@@ -1186,11 +1186,11 @@ mod tests {
             // An app node is the program it names, and the argument for each
             // stream its kind handles: see `crate::node::app`.
             "app_payload_veh" | "app_pl" => {
-                &[("program", "/bin/cat"), ("app-payload-arg", "--readings")]
+                &[("executable", "/bin/cat"), ("app-payload-arg", "--readings")]
             }
-            "app_moc_veh" => &[("program", "/bin/cat"), ("app-moc-arg", "--commands")],
+            "app_moc_veh" => &[("executable", "/bin/cat"), ("app-moc-arg", "--commands")],
             "app_all_veh" | "app_all_pl" => &[
-                ("program", "/bin/cat"),
+                ("executable", "/bin/cat"),
                 ("app-payload-arg", "--readings"),
                 ("app-moc-arg", "--commands"),
             ],
@@ -1384,7 +1384,7 @@ mod tests {
                 _ => None,
             })
             .expect("a node with no program");
-        assert!(said.contains("program is not set"), "{said}");
+        assert!(said.contains("executable is not set"), "{said}");
         assert!(said.contains("app_payload_veh"), "{said}");
     }
 

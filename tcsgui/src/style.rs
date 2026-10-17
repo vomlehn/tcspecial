@@ -123,6 +123,11 @@ pub enum Edge {
     Dashed,
     /// Two broken lines, which is the two facts at once.
     DashedDouble,
+    /// One line of dots: broken, and broken finely enough that it does not
+    /// read as the dashed one. A fifth edge because one height for every node
+    /// took away the channel that told nine payload types apart, and four
+    /// edges by two weights is eight -- see `HEIGHT`.
+    Dotted,
 }
 
 impl Edge {
@@ -133,7 +138,16 @@ impl Edge {
 
     /// Whether the line is broken.
     pub fn broken(self) -> bool {
-        matches!(self, Edge::Dashed | Edge::DashedDouble)
+        matches!(self, Edge::Dashed | Edge::DashedDouble | Edge::Dotted)
+    }
+
+    /// The pattern a broken line is drawn in: how long a piece of it is, and
+    /// the gap after it.
+    fn pattern(self) -> (f32, f32) {
+        match self {
+            Edge::Dotted => (DOT, DOT_GAP),
+            _ => (DASH, GAP),
+        }
     }
 }
 
@@ -230,6 +244,23 @@ pub fn ground_of(pane: crate::pane::Pane) -> Ground {
 /// what sets the floor: a label that elides is a label that has stopped being
 /// a channel.
 pub const WIDTH: u32 = 152;
+
+/// How tall every node is drawn, in pixels.
+///
+/// One height for all of them, for the reason there is one width: the
+/// terminals are drawn a fixed inset from the top and bottom edges, so one
+/// height is what puts every node's two rows of terminals the same distance
+/// apart. Two nodes level on the grid then have their terminals level too, and
+/// a line between them runs straight across rather than stepping by the
+/// difference between two heights.
+///
+/// It was a channel that told two types apart. The outline, the edge, the
+/// weight and the colour still do -- see the accessibility tests below -- and
+/// a diagram whose lines run straight is worth the channel.
+///
+/// Room for the three lines of a label -- the name, the type and a summary --
+/// between the two rows of terminals.
+pub const HEIGHT: u32 = 64;
 
 /// The one red in the program, and the only thing it is used for.
 ///
@@ -440,6 +471,11 @@ const DOUBLE: u32 = 4;
 const DASH: f32 = 8.0;
 const GAP: f32 = 5.0;
 
+/// And a dotted line's: short enough to be a dot and not a dash, and the
+/// gaps no wider than the dashed line's so it still reads as one outline.
+const DOT: f32 = 2.0;
+const DOT_GAP: f32 = 4.0;
+
 /// One polygon as a line, dashed or whole.
 fn line_of(points: &[(f32, f32)], outline: Outline, edge: Edge) -> String {
     if points.is_empty() {
@@ -452,7 +488,7 @@ fn line_of(points: &[(f32, f32)], outline: Outline, edge: Edge) -> String {
         }
         return out;
     }
-    dashes_of(points, closes(outline))
+    dashes_of(points, closes(outline), edge.pattern())
 }
 
 /// A polygon's points as one move and a line to each of the rest.
@@ -475,7 +511,7 @@ fn run_of(points: &[(f32, f32)]) -> String {
 /// no dash pattern, so a broken line is drawn as the pieces that are there --
 /// which is what `route.rs` does for the line being dragged, and for the same
 /// reason.
-fn dashes_of(points: &[(f32, f32)], closes: bool) -> String {
+fn dashes_of(points: &[(f32, f32)], closes: bool, (dash, gap): (f32, f32)) -> String {
     let mut sides: Vec<((f32, f32), (f32, f32))> = points
         .windows(2)
         .map(|pair| (pair[0], pair[1]))
@@ -504,7 +540,7 @@ fn dashes_of(points: &[(f32, f32)], closes: bool) -> String {
         let mut along = -into;
         while along < span {
             let start = along.max(0.0);
-            let end = (along + DASH).min(span);
+            let end = (along + dash).min(span);
             if end > start {
                 let (sx, sy) = at(start);
                 let (ex, ey) = at(end);
@@ -513,10 +549,10 @@ fn dashes_of(points: &[(f32, f32)], closes: bool) -> String {
                 }
                 out.push_str(&format!("M {sx:.1} {sy:.1} L {ex:.1} {ey:.1}"));
             }
-            along += DASH + GAP;
+            along += dash + gap;
         }
         // Whatever of the pattern this side ended partway through.
-        into = (into + span) % (DASH + GAP);
+        into = (into + span) % (dash + gap);
     }
     out
 }
@@ -1171,15 +1207,18 @@ impl NodeType {
     /// two shapes nothing else uses -- a pill where it stops on board, a
     /// store where it is kept, and the ground is the plain rectangle of
     /// something outside the system altogether. Within a shape the types
-    /// differ by
-    /// the edge, the weight and the size.
+    /// differ by the edge, the weight and the way the label is set -- not the
+    /// size, every node being one size: see `HEIGHT`.
     pub fn appearance(self) -> Appearance {
         use Outline::*;
         use Edge::*;
         use Weight::*;
         match self {
             // Buses and the rest of the payloads: the data symbol, and told
-            // apart from each other by the line around them and by size.
+            // apart from each other by the line around them, its weight and
+            // the label. Nine of them, which is more than four edges by two
+            // weights: so the label differs for every one, and so does the
+            // line, a dotted one among them.
             NodeType::I2c => Appearance {
                 face: Face::Mono,
                 label_size: 12,
@@ -1188,7 +1227,7 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: Single,
                 weight: Narrow,
-                size: (WIDTH, 48),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::Spi => Appearance {
                 face: Face::Mono,
@@ -1198,7 +1237,7 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: Double,
                 weight: Narrow,
-                size: (WIDTH, 56),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::Serial => Appearance {
                 face: Face::Mono,
@@ -1208,7 +1247,7 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: Dashed,
                 weight: Narrow,
-                size: (WIDTH, 48),
+                size: (WIDTH, HEIGHT),
             },
             // Wide, double-outlined and in the sand tint, with a plain face
             // at the largest label size: a square outline because it is
@@ -1221,7 +1260,7 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: Double,
                 weight: Wide,
-                size: (WIDTH, 56),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::Can => Appearance {
                 face: Face::Mono,
@@ -1229,9 +1268,9 @@ impl NodeType {
                 label_weight: 700,
                 label_italic: false,
                 outline: Parallelogram,
-                edge: Double,
+                edge: DashedDouble,
                 weight: Narrow,
-                size: (WIDTH, 64),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::Iio => Appearance {
                 face: Face::Plain,
@@ -1241,7 +1280,7 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: DashedDouble,
                 weight: Wide,
-                size: (WIDTH, 56),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::Rpmsg => Appearance {
                 face: Face::Mono,
@@ -1251,7 +1290,7 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: Single,
                 weight: Wide,
-                size: (WIDTH, 48),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::Network => Appearance {
                 face: Face::Plain,
@@ -1261,7 +1300,7 @@ impl NodeType {
                 outline: Parallelogram,
                 edge: Dashed,
                 weight: Wide,
-                size: (WIDTH, 56),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::DeviceFile => Appearance {
                 face: Face::Mono,
@@ -1269,9 +1308,9 @@ impl NodeType {
                 label_weight: 400,
                 label_italic: false,
                 outline: Parallelogram,
-                edge: Double,
+                edge: Dotted,
                 weight: Wide,
-                size: (WIDTH, 64),
+                size: (WIDTH, HEIGHT),
             },
             // Driven rather than read, and shaped to say so.
             NodeType::Gpio => Appearance {
@@ -1282,14 +1321,14 @@ impl NodeType {
                 outline: Keyed,
                 edge: Single,
                 weight: Wide,
-                size: (WIDTH, 72),
+                size: (WIDTH, HEIGHT),
             },
             // Software aboard.
             // The one node that does nothing to what passes: rounded, because
-            // it is software aboard, and then open, narrow and the shortest
-            // thing on the canvas. A shape with the least in it for the node
-            // with the least in it -- and a height nothing else uses, which is
-            // what tells it from the other two rounded shapes without colour.
+            // it is software aboard, and then open, narrow and set in the
+            // smallest type. A shape with the least in it for the node with
+            // the least in it -- and the narrow line and the small label are
+            // what tell it from the computation without colour.
             NodeType::Null => Appearance {
                 face: Face::Plain,
                 label_size: 10,
@@ -1298,7 +1337,7 @@ impl NodeType {
                 outline: Rounded,
                 edge: Single,
                 weight: Narrow,
-                size: (WIDTH, 40),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::Compute => Appearance {
                 face: Face::Plain,
@@ -1308,7 +1347,7 @@ impl NodeType {
                 outline: Rounded,
                 edge: Single,
                 weight: Wide,
-                size: (WIDTH, 64),
+                size: (WIDTH, HEIGHT),
             },
             // A program of its own: the barred rectangle, which is a step
             // whose insides are written down somewhere else. That is exactly
@@ -1319,15 +1358,15 @@ impl NodeType {
             // The same shape a page of its own wears, which is the one place
             // this grammar doubles up, and for a reason that holds: a page and
             // an app are both a step written down elsewhere, and the two are
-            // told apart by height and by the weight of the label, the page
-            // being the tallest thing on the canvas and bold with it. The
+            // told apart by the line and by the label, the page's being the
+            // larger and bold. The
             // three apps are one shape among themselves, as the nine devices
             // are: which of the two streams each carries is what its terminals
             // say, and terminals are drawn.
             // One shape for the three, as the nine devices wear one shape,
-            // and told apart from each other by the line and the height: the
-            // one with both interfaces is the tallest and doubled, the two
-            // with one apiece are the shorter pair. Which stream each carries
+            // and told apart from each other by the line and the label: the
+            // one with both interfaces is doubled and bold, the one the ground
+            // drives is dashed and italic, and the payload's is plain. Which stream each carries
             // is said by its terminals, that being what terminals are for.
             NodeType::AppPayloadVeh => Appearance {
                 face: Face::Plain,
@@ -1337,27 +1376,27 @@ impl NodeType {
                 outline: Barred,
                 edge: Single,
                 weight: Wide,
-                size: (WIDTH, 72),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::AppMocVeh => Appearance {
                 face: Face::Plain,
                 label_size: 12,
                 label_weight: 400,
-                label_italic: false,
+                label_italic: true,
                 outline: Barred,
                 edge: Dashed,
                 weight: Wide,
-                size: (WIDTH, 64),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::AppAllVeh => Appearance {
                 face: Face::Plain,
                 label_size: 12,
-                label_weight: 400,
+                label_weight: 700,
                 label_italic: false,
                 outline: Barred,
                 edge: Double,
                 weight: Wide,
-                size: (WIDTH, 80),
+                size: (WIDTH, HEIGHT),
             },
             // The two payloads that are programs: barred, because what they
             // do is written down somewhere else as every app's is, and narrow,
@@ -1365,30 +1404,30 @@ impl NodeType {
             // narrow. So the shape says "a program" and the weight says "what
             // the vehicle carries", which is what each of them is.
             //
-            // Told apart from each other by the line and the height, as the
+            // Told apart from each other by the line and the label, as the
             // other three are. The broken line doubled is the one nothing
             // arrives at: a payload with no data sink is the odd thing about
             // it, and a line that is twice broken is the line that says least
             // is coming.
             NodeType::AppPl => Appearance {
                 face: Face::Plain,
-                label_size: 12,
+                label_size: 10,
                 label_weight: 400,
                 label_italic: false,
                 outline: Barred,
                 edge: DashedDouble,
                 weight: Narrow,
-                size: (WIDTH, 48),
+                size: (WIDTH, HEIGHT),
             },
             NodeType::AppAllPl => Appearance {
                 face: Face::Plain,
-                label_size: 12,
+                label_size: 14,
                 label_weight: 400,
                 label_italic: false,
                 outline: Barred,
                 edge: Double,
                 weight: Narrow,
-                size: (WIDTH, 56),
+                size: (WIDTH, HEIGHT),
             },
             // A diagram of its own: a step whose insides are written down
             // somewhere else, which is a predefined process -- a rectangle
@@ -1397,9 +1436,9 @@ impl NodeType {
             // remove.
             //
             // Open now rather than doubled, because the bars are the second
-            // thing inside the shape and two of those is a busy node. Still
-            // the tallest thing on the canvas bar the log, because it stands
-            // for a page rather than a device.
+            // thing inside the shape and two of those is a busy node. Narrow,
+            // which with its large bold label is what tells it from the apps
+            // that share its shape.
             NodeType::Subdiagram => Appearance {
                 face: Face::Plain,
                 label_size: 14,
@@ -1407,8 +1446,8 @@ impl NodeType {
                 label_italic: false,
                 outline: Barred,
                 edge: Single,
-                weight: Wide,
-                size: (WIDTH, 88),
+                weight: Narrow,
+                size: (WIDTH, HEIGHT),
             },
             // Where the data is kept, which is a store and not an end: a
             // flowchart's rounded end is a terminator, where control enters or
@@ -1422,7 +1461,7 @@ impl NodeType {
                 outline: Store,
                 edge: Single,
                 weight: Narrow,
-                size: (WIDTH, 96),
+                size: (WIDTH, HEIGHT),
             },
             // The ground station: a plain rectangle with square corners,
             // which is the external entity of a data-flow diagram -- the thing
@@ -1435,8 +1474,8 @@ impl NodeType {
             // "not like the others" by being unlike anything, where the
             // rectangle says it by being the one shape a reader of these
             // notations already knows the meaning of. Wide, solid, azure and
-            // the tallest of the ordinary band still, so it is the one that
-            // catches the eye without being the one shaped oddly.
+            // set in the largest italic, so it is the one that catches the eye
+            // without being the one shaped oddly.
             NodeType::Moc => Appearance {
                 face: Face::Plain,
                 label_size: 16,
@@ -1445,7 +1484,7 @@ impl NodeType {
                 outline: Square,
                 edge: Single,
                 weight: Wide,
-                size: (WIDTH, 72),
+                size: (WIDTH, HEIGHT),
             },
         }
     }

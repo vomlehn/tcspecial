@@ -1,0 +1,49 @@
+// What a popup says, in a form a person can copy.
+//
+// A message in a window is often the thing somebody has to pass on -- to a
+// colleague, into a ticket, into a search -- and a message that can only be
+// read has to be typed out again, wrongly. So every popup of tcsgui, tcsmoc
+// and tcssim says what it says in `Copyable` rather than in `Text`, and has a
+// `CopyButton` for all of it at once.
+//
+// Here, beside the startup window, because all three programs import from
+// this directory already and one definition is one way of doing it.
+
+import { Button } from "std-widgets.slint";
+
+// Text that can be selected and copied: read-only, wrapped at words.
+//
+// Drag across it to select some of it, or Ctrl+A for all of it, and Ctrl+C
+// copies what is selected. Drawn like the text it replaces -- no box, no
+// cursor until it is pressed -- so a window reads the same as it did.
+export component Copyable inherits TextInput {
+    read-only: true;
+    single-line: false;
+    wrap: word-wrap;
+}
+
+// A button that copies everything a window says, in one press.
+//
+// `said` is the whole of it, as it would be pasted: a heading, the lines, the
+// advice, one to a line. Copied through a text input of no size that holds
+// it, which is the toolkit's own way to the clipboard -- the one Ctrl+C in a
+// `Copyable` takes -- so the two put the same thing in the same place.
+export component CopyButton inherits HorizontalLayout {
+    in property <string> said;
+
+    all := TextInput {
+        width: 0px;
+        height: 0px;
+        read-only: true;
+        single-line: false;
+        text: root.said;
+    }
+    Button {
+        text: "Copy";
+        clicked => {
+            all.select-all();
+            all.copy();
+            all.clear-selection();
+        }
+    }
+}

@@ -156,11 +156,14 @@
       <xs:element name="setpoint" type="xs:string"/>
       <xs:element name="above" type="xs:string"/>
       <xs:element name="below" type="xs:string"/>
-      <!-- A program a node runs: an app node's application, or the program
-           of a `process` computation. An app node's is executed with `~` and
-           `$HOME` expanded as a shell would expand them, and with the node's
-           name as its first argument. -->
+      <!-- The program a `process` computation runs. -->
       <xs:element name="program" type="xs:string"/>
+      <!-- The executable an app node runs: its application. Executed with a
+           leading `~` and `$HOME` expanded as a shell would expand them, to
+           the home directory and to the value of the environment variable
+           HOME of whatever runs it, and with the node's name as its first
+           argument. -->
+      <xs:element name="executable" type="xs:string"/>
       <!-- What an app node's program is told about each stream its kind
            handles: the payload argument first, then the MOC one.
            `app-payload-arg` is said by app_payload_veh, app_all_veh, app_pl

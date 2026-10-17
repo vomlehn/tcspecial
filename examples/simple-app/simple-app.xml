@@ -27,34 +27,37 @@
             <send>127.0.0.1:4100</send>
         </tcs_cmd>
     </tcspecial>
-    <!-- The ground's end of the vehicle's data. tcspecial sends what each node -->
-    <!-- drawn into it produces as UDP datagrams to ground_base's address, at its -->
-    <!-- port plus that node's device id: lorem is id 1, so its words go to -->
-    <!-- 127.0.0.1:5101. Ground software gets them from this node with a function -->
-    <!-- call, tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It -->
-    <!-- states no address or port of its own, because nothing comes back up. -->
+    <!-- The ground&apos;s end of the vehicle&apos;s data. tcspecial sends -->
+    <!-- what each node drawn into it produces as UDP datagrams to -->
+    <!-- ground_base&apos;s address, at its port plus that node&apos;s -->
+    <!-- device id: lorem is id 1, so its words go to 127.0.0.1:5101. Ground -->
+    <!-- software gets them from this node with a function call, -->
+    <!-- tcslib::moc::Moc::receive: run `lorem_moc` to be that ground. It -->
+    <!-- states no address or port of its own, because nothing comes back -->
+    <!-- up. -->
     <moc>
         <name>moc</name>
         <type>moc</type>
         <ground_base>127.0.0.1:5100</ground_base>
         <payload-in>true</payload-in>
     </moc>
-    <!-- A payload that is a program rather than a device: it is never asked, and -->
-    <!-- reports one word of its line at a time, then a packet holding the line -->
-    <!-- terminator. `app-payload-arg` is which line it sends, counting from one. -->
+    <!-- A payload that is a program rather than a device: it is never -->
+    <!-- asked, and reports one word of its line at a time, then a packet -->
+    <!-- holding the line terminator. `app-payload-arg` is which line it -->
+    <!-- sends, counting from one. -->
     <!--  -->
-    <!-- The program is a Python 3 script beside this file, named relative to -->
-    <!-- the repository&apos;s root because that is where tcspecial is run from: see -->
-    <!-- examples/Makefile. -->
+    <!-- The program is a Python 3 script beside this file, named relative -->
+    <!-- to the repository&apos;s root because that is where tcspecial is -->
+    <!-- run from: see examples/Makefile. -->
     <payloads>
         <name>lorem</name>
         <type>app_pl</type>
         <app-payload-arg>1</app-payload-arg>
-        <program>examples/simple-app/lorem_pl.py</program>
+        <executable>examples/simple-app/lorem_pl.py</executable>
         <payload-out><target>moc</target></payload-out>
     </payloads>
     <tcsgui>
-        <nodes><name>moc</name><x>792</x><y>104</y></nodes>
-        <nodes><name>lorem</name><x>40</x><y>120</y></nodes>
+        <nodes><name>moc</name><x>794</x><y>106</y></nodes>
+        <nodes><name>lorem</name><x>42</x><y>121</y></nodes>
     </tcsgui>
 </configuration>

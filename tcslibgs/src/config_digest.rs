@@ -169,6 +169,35 @@ pub fn digest_of_payload_config(config: &PayloadConfig) -> TcsResult<ConfigDiges
 /// bindings. Not in it: the editor's own section, where the nodes are drawn,
 /// and the description, neither of which changes what anything does.
 pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
+    digest_of_value(&interpretation_of_graph(graph))
+}
+
+/// What a configuration file is read as, as a value tree: the thing its
+/// digest is taken over.
+///
+/// Two files with the same interpretation are one configuration, whichever
+/// format each is written in -- their digests are the same, and every program
+/// that reads them acts on the same thing. Two whose interpretations differ
+/// differ where the trees do, which is what a program comparing two spellings
+/// of one configuration needs to say: see `tcsverify`.
+pub fn interpretation_of_file<P: AsRef<Path>>(path: P) -> TcsResult<serde_json::Value> {
+    let path = path.as_ref();
+    if crate::graph::is_version_2(path) {
+        return Ok(interpretation_of_graph(&crate::graph::Graph::load(path)?));
+    }
+    let text = std::fs::read_to_string(path)?;
+    let format = ConfigFormat::of_file(path)?;
+    describes_payloads_text(&text, format)?;
+    let mut ordered: PayloadConfig = format.parse(&text)?;
+    // In the order the file gave them: see digest_of_payload_config.
+    ordered.payloads.sort_by_key(|payload| payload.sequence);
+    serde_json::to_value(&ordered)
+        .map_err(|e| TcsError::Config(format!("cannot read the configuration as a value: {e}")))
+}
+
+/// What a version 2 configuration is read as: see [`digest_of_graph`], which
+/// says what is in it and what is not.
+pub fn interpretation_of_graph(graph: &crate::graph::Graph) -> serde_json::Value {
     use serde_json::{json, Map, Value};
 
     let text = |scalar: &crate::Scalar| Value::String(scalar.as_str().to_string());
@@ -215,14 +244,14 @@ pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
         .map(|binding| json!({ "from": binding.from, "sets": binding.sets }))
         .collect();
 
-    digest_of_value(&json!({
+    json!({
         "version": crate::graph::VERSION,
         "tcspecial": tcspecial,
         "payload_groups": groups,
         "nodes": nodes,
         "links": links,
         "commands": commands,
-    }))
+    })
 }
 
 /// The digest of any document that can be written out as a value tree.

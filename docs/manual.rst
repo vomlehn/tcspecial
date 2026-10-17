@@ -1641,8 +1641,8 @@ spellings the same way.
 Checking a set without running it
 ---------------------------------
 ``tcsverify`` reads a payload set and says what is wrong with it, without
-opening a socket or a device node. It takes one file or two, the tcspecial
-configuration first:
+opening a socket or a device node. It takes one file, two or three, the
+tcspecial configuration first, and ``-h`` or ``--help`` prints how:
 
 .. code-block:: console
 
@@ -1653,6 +1653,28 @@ configuration first:
 Either spelling of the configuration will do -- the last line reads the XML of
 the same set -- and the simulator configuration is named in full rather than
 worked out from the first file's name.
+
+Three files are both spellings of one configuration and its simulator file:
+an XML file and a YAML file, in either order, and then the simulator file.
+
+.. code-block:: console
+
+   $ cargo run --bin tcsverify -- examples/thermostat/thermostat.xml \
+       examples/thermostat/thermostat.yaml examples/thermostat/thermostat-sim.yaml
+
+Each spelling is checked with the simulator file, the first named first, and
+then the two are compared: every section, every attribute and every value, as
+the programs read them -- which is what a configuration's digest is taken over,
+so two spellings this finds no difference between are two that tcspecial and
+tcsmoc agree on. A difference is reported at the line of the second file it is
+on, saying what each file says:
+
+.. code-block:: console
+
+   examples/thermostat/thermostat.yaml:87: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xml says "290" and examples/thermostat/thermostat.yaml says "293.15"
+
+The order nodes are written in is compared too, a node's place in the file
+being its device id. A file that cannot be read is not compared, and says so.
 
 A good set prints nothing. A bad one prints a line per problem, each naming
 the file, the line and what is wrong there:
@@ -1669,9 +1691,11 @@ A **warning** is one that has not finished saying it: a node whose attributes
 are not all in yet, a node nothing is linked to. That is the state every
 configuration is in while it is being drawn, so warnings do not fail the run.
 
-It exits 0 when it found no errors, 1 when it found one, and 2 when the command
-line is neither of those two shapes -- which a script can tell apart from a
-bad file. A configuration with warnings and no errors exits 0, and the vehicle
+It exits 0 when it found no errors, 1 when it found one -- a difference between
+two spellings is one -- and 2 when the command line is none of those shapes,
+including three files that are not one XML and one YAML configuration and a
+simulator file -- which a script can tell apart from a bad file. ``--help``
+exits 0. A configuration with warnings and no errors exits 0, and the vehicle
 will still refuse it: the flight software requires every attribute a node
 needs, and so does tcsgui before it will generate code from one.
 

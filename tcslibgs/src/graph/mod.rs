@@ -1373,7 +1373,7 @@ mod tests {
         // vehicle carries, and this says where somebody put the box.
         assert_eq!(
             yaml.placed.get("temp_fore").map(|at| (at.x, at.y)),
-            Some((40, 40))
+            Some((42, 42))
         );
     }
 

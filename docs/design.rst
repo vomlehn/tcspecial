@@ -1115,12 +1115,14 @@ where it needs one. Asked of what the descriptor *is* rather than of whether it
 is open, for the reason above.
 
 What a configuration says about one is where the application is, what to tell
-it about each stream it handles, and what to do when it stops. ``program`` is
-required and there is no default: an app node is the program it names. A
-leading ``~`` and ``$HOME`` in it are expanded as a shell would expand them,
-and that happens where the program is run rather than where the file is read
--- the value is kept as written, so a ground tool is not answering a question
-about its own workstation. Nothing else is expanded: another variable would be
+it about each stream it handles, and what to do when it stops. ``executable``
+is required and there is no default: an app node is the program it names. A
+leading ``~`` in it is the home directory and ``$HOME`` is the value of the
+environment variable ``HOME``, both expanded as a shell would expand them, and
+that happens where the program is run rather than where the file is read --
+the value is kept as written, so a ground tool is not answering a question
+about its own workstation. The attribute was called ``program``, the word a
+``process`` computation uses. Nothing else is expanded: another variable would be
 a configuration that behaved differently on two vehicles, and ``~somebody`` is
 refused rather than guessed at. ``restart`` is the same attribute a ``process``
 computation takes, read in the same one place and ``false`` unless a
@@ -1142,14 +1144,14 @@ before MOC where a kind has both:
    vehicle:
      - name: through
        type: app_all_veh
-       program: $HOME/libexec/tcs/through
+       executable: $HOME/libexec/tcs/through
        app-payload-arg: --readings
        app-moc-arg: --commands
 
    payloads:
      - name: bay_2
        type: app_pl
-       program: ~/libexec/tcs/bay-2
+       executable: ~/libexec/tcs/bay-2
        app-payload-arg: --bay-2
 
 which are run as ``through --readings --commands`` and ``bay_2 --bay-2``, each
@@ -1685,7 +1687,8 @@ written before the canvas was divided at all. A node that has to move keeps its
 height and takes the near edge of its own pane, which is the smallest move that
 obeys the rule, and steps down the grid from there if that would land it on top
 of another -- a file with its payloads in a row would otherwise come up as one
-payload with the rest hidden behind it.
+payload with the rest hidden behind it. A node off the grid is brought to the
+nearest grid point in the same way.
 
 That is a change to the document, so it is worth saying what it is not. It is
 not an edit: nothing goes into the history, because undoing it would put a node
@@ -1698,8 +1701,29 @@ pointed at it would be an editor nobody could point at anything.
 
 Every node is drawn the same width. Nodes of four widths in a column have no
 edge to line up on, and a diagram built from them looks approximate however
-carefully each node was placed; height is still per type, because it is one of
-the channels that tells two types apart.
+carefully each node was placed.
+
+And every node is drawn the same height, 64 pixels, for the reason that follows
+from the terminals: they are drawn a fixed inset from the top and the bottom of
+a node, so one height is what puts every node's two rows of terminals the same
+distance apart. Two nodes level on the grid have their terminals level too, and
+a line between them runs straight across rather than stepping by the
+difference between two heights. Height used to be one of the channels that
+told two types apart, running from 40 to 96 pixels; without it, four edges by
+two weights could no longer keep the nine payload types two channels apart,
+so there is a fifth edge, a dotted line, and the types that leaned on height
+were given an edge, a weight or a typeface of their own instead. The rule that
+no two types differ by colour alone is unchanged, and the test that holds it
+is unchanged.
+
+A node's upper left corner sits on a grid of one millimetre -- 96/25.4 of the
+canvas's pixels, which is what the window toolkit means by a millimetre -- each
+grid point rounded to the nearest whole pixel, so positions in the file stay
+whole numbers and the grid never drifts. A node placed, a node dragged and a
+node read from a file all land on it; the dividers between the panes sit on it
+too, and a pane's edges are taken in to the grid points just inside them, so a
+node held against an edge is on the grid as well. The canvas draws a faint line
+every ten millimetres.
 
 Each working pane is painted, and every node type has its own colour inside its
 pane's family. The MOC pane is a pale blue, the vehicle pane a pale green and
@@ -1799,14 +1823,14 @@ The boxes were 24 by 10 -- wide enough for an arrow and no wider -- and that is
 a strip to aim at. A press has to land on a terminal exactly, the terminal being
 what says which stream the line carries, where the release only has to land on
 a node; so the box is now twice the area and bigger in both directions, the
-hand being short in whichever one it is short. What bounds them is the ``null``
-node, 40 pixels tall and the one type with all four: two rows and their insets
-have to fit inside that height with daylight between them, and two columns
-inside a node's 152. A name never collides with them however they grow, being
+hand being short in whichever one it is short. What bounds them is a node's
+size, 152 by 64, the ``null`` node being the one type with all four: two rows
+and their insets have to fit inside that height with daylight between them,
+and two columns inside the width. A name never collides with them however they grow, being
 padded away from whichever side carries terminals.
 
 Only the terminals the type actually has. A payload carries its two on its
-left, a MOC link its two on its right, a ``null`` node all four, a log the one
+right, a MOC link its two on its left, a ``null`` node all four, a log the one
 it receives on, and a page of its own none -- what a page has is what the nodes
 inside it have, and nothing outside it knows that. A drawing that showed four
 on every node would say nothing about what may be linked to what, which is the
@@ -2115,10 +2139,9 @@ The ground station has worn a pill and a five-sided point before this. Both
 said "not like the others" by being unlike anything; the rectangle says it by
 being the one shape a reader of these notations already knows the meaning of,
 and it is free to say it now that the payloads wear the data symbol. It is the
-same proportion as everything else -- 152 by 72, where the rest of the canvas
-runs 40 to 96 tall at the same width -- and it is still wide, solid, azure and
-the tallest of the ordinary band, so it catches the eye without being the node
-shaped oddly.
+same size as everything else, 152 by 64, and it is wide, solid, azure and
+set in the largest italic, so it catches the eye without being the node shaped
+oddly.
 
 A side left out and a side that leans are not corner radii, so those shapes
 arrive as path data from ``style::shape_of`` and the markup draws them with a
@@ -2382,6 +2405,27 @@ used to open on a file with problems -- one that offered something and one that
 offered nothing -- so what the file came with is counted as said before either
 is shown. What the alert is for afterwards is what goes wrong *while somebody
 works*, which is news.
+
+**Whatever comes up as the editor starts is in front of the main window, and
+the main window takes nothing until it has been answered.** The main window is
+shown first and these after it, which puts them on top by the usual rule; but
+the rule is the window manager's, and one that gives the front to the larger
+window or the one that finished drawing last would put the question behind the
+drawing waiting for it. So while the main window waits, the question and the
+alert are asked to stay on top, and let go once it takes presses again. While
+it waits it takes no presses -- an area over the whole window holds them --
+and its menu items are disabled, the keyboard being another way to them. tcsmoc
+does the same for the question it asks when tcspecial serves a different
+configuration, and tcsmoc and tcssim show what they found at startup in a
+window that stays on top and is closed before their main windows open.
+
+**Everything a popup says can be copied.** A message is often the thing
+somebody has to pass on, and one that can only be read has to be typed out
+again, wrongly. So popups say what they say in text that can be selected --
+drag across it for some of it, Ctrl+A for all of it, Ctrl+C to copy -- and each
+has a Copy button for the whole of it at once, heading and lines one to a
+line. The small popups on tcsmoc's and tcssim's panels close on a press outside
+them rather than on any press, a press inside being somebody selecting.
 
 Renaming one of two nodes that share a name is done **by position**, which is
 the one thing ``Edit::RenameNode`` cannot express: a name is how an edit says

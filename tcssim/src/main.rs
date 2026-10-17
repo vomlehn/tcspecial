@@ -311,14 +311,13 @@ fn present(startup: &Startup) {
         }
     };
     window.set_program("tcssim".into());
-    window.set_heading(
-        if startup.fatal() {
-            "Something is wrong with the configuration."
-        } else {
-            "Something about the configuration is worth knowing."
-        }
-        .into(),
-    );
+    let heading = if startup.fatal() {
+        "Something is wrong with the configuration."
+    } else {
+        "Something about the configuration is worth knowing."
+    };
+    window.set_heading(heading.into());
+    window.set_everything(startup.copied(heading).into());
     window.set_fatal(startup.fatal());
     let lines: Vec<StartupLine> = startup
         .lines()
@@ -679,9 +678,15 @@ mod tests {
                 .next()
                 .and_then(|b| b.accessible_enabled())
         };
+        // What the popup says is selectable text, whose words are its
+        // accessible value rather than a label: see copy.slint.
         let said = |ui: &MainWindow| -> Vec<String> {
             ElementHandle::find_by_element_type_name(ui, "Text")
                 .filter_map(|e| e.accessible_label())
+                .chain(
+                    ElementHandle::find_by_element_type_name(ui, "TextInput")
+                        .filter_map(|e| e.accessible_value()),
+                )
                 .map(|label| label.to_string())
                 .filter(|line| line.contains("cannot be"))
                 .collect()
@@ -1663,8 +1668,14 @@ mod tests {
 
         // Every line of text the window has laid out.
         let on_screen = |ui: &MainWindow| -> Vec<String> {
+            // What the popup says is selectable text, whose words are its
+            // accessible value rather than a label: see copy.slint.
             ElementHandle::find_by_element_type_name(ui, "Text")
                 .filter_map(|e| e.accessible_label())
+                .chain(
+                    ElementHandle::find_by_element_type_name(ui, "TextInput")
+                        .filter_map(|e| e.accessible_value()),
+                )
                 .map(|label| label.to_string())
                 .collect()
         };

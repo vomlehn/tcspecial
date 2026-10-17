@@ -6,6 +6,7 @@ description = "Checks a tcspecial configuration file, and the simulator file bes
 
 [dependencies]
 tcslibgs = { path = "../tcslibgs" }
+serde_json = "1.0"
 
 [dev-dependencies]
 tempfile = "3"

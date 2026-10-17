@@ -1648,7 +1648,7 @@ mod tests {
             let kind = tcslibgs::node::app::Kind::of(node_type).expect("a kind of app");
             let mut attributes = std::collections::BTreeMap::new();
             attributes.insert(
-                "program".to_string(),
+                "executable".to_string(),
                 tcslibgs::Scalar::of(program.display().to_string()),
             );
             if kind.handles_payload_data() {

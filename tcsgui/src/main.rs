@@ -61,7 +61,7 @@ use tcslibgs::graph::check::Problem;
 use editor::Editor;
 use pane::{
     confine, dividers_for, edges_of, is_payload, pane_of, percents_for, size_of, Dividers,
-    Pane, GRID, WORKING_WIDTH,
+    Pane, WORKING_WIDTH,
 };
 use journal::{Edit, Link};
 use subdiagram::{Home, Qualified};
@@ -137,8 +137,10 @@ fn divider_range(document: &Document, dividers: Dividers, which: Pane) -> (i32, 
 /// Where the ground station goes in a configuration that is new.
 ///
 /// The upper right of the moc working pane, clear of the pane's own label: the
-/// moc pane being the rightmost, the node is held off its right edge.
-const MOC_PLACE: (i32, i32) = (WORKING_WIDTH - style::WIDTH as i32 - 24, 40);
+/// moc pane being the rightmost, the node is held off its right edge. On the
+/// grid, at 207 millimetres across and 11 down -- see `pane::PX_PER_MM` and the
+/// test below, which holds it there.
+const MOC_PLACE: (i32, i32) = (782, 42);
 // Clear of the strip the panes' names are written in, as everything the
 // editor places is: see `pane::NAMES`, which the test below holds this to.
 const _: () = assert!(MOC_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
@@ -685,7 +687,12 @@ fn main() -> Result<(), slint::PlatformError> {
     // what the question is about -- and nothing in it can be edited behind a
     // window asking about the state the file arrived in. Each of those
     // windows gives the presses back as it goes: see `listen_when_read`.
-    ui.set_inert(startup_waiting(&views, None));
+    let waiting = startup_waiting(&views, None);
+    ui.set_inert(waiting);
+    // And those windows in front of it for as long as it waits for them,
+    // whatever the window manager would have done with a window shown after
+    // another: see `on_top`.
+    on_top(&views, waiting);
     let outcome = slint::run_event_loop();
     let _ = ui.hide();
 
@@ -1484,7 +1491,10 @@ fn drag_divider(
         } else {
             was.vehicle
         };
-        let now = snap((from + dx.round() as i32, 0)).0.clamp(low, high);
+        // On the grid, and inside what stops it: a node's edge is not always
+        // a grid point, so the bounds are taken in to the nearest ones.
+        let (low, high) = (pane::grid_ceil(low), pane::grid_floor(high));
+        let now = snap((from + dx.round() as i32, 0)).0.clamp(low, high.max(low));
         if now == from {
             // It did not move, or it was already against what stops it.
             // Nothing to redraw and nothing to write: a settings file
@@ -1706,8 +1716,12 @@ fn list_concerns(editor: &Editor, views: &Rc<RefCell<Views>>, aside: bool) {
         })
         .collect();
 
+    // What the Copy button copies: every row, one to a line.
+    let everything: Vec<String> = rows.iter().map(|row| row.said.to_string()).collect();
+
     if let Some(window) = views.borrow().concerns.as_ref() {
         window.set_aside(aside);
+        window.set_everything(everything.join("\n").into());
         window.set_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
     }
 }
@@ -2502,6 +2516,12 @@ fn say_problems(
             })
             .collect();
         window.set_any_nameable(rows.iter().any(|row| row.nameable));
+        // What the Copy button copies: the window's heading, then every
+        // problem, one to a line.
+        let mut everything =
+            vec!["This configuration has problems the vehicle would not fly with".to_string()];
+        everything.extend(rows.iter().map(|row| row.said.to_string()));
+        window.set_everything(everything.join("\n").into());
         window.set_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
     }
 
@@ -2669,6 +2689,27 @@ fn listen_when_read(views: &Rc<RefCell<Views>>, going: Option<Startup>) {
     let top = views.borrow().top.clone();
     if let Some(top) = top.upgrade() {
         top.set_inert(false);
+    }
+    on_top(views, false);
+}
+
+/// Keep the windows that came up as the editor started in front of the main
+/// window, or let them go.
+///
+/// Shown after the main window, which puts them on top by the usual rule --
+/// but the rule is the window manager's, and one that gives the focus to the
+/// larger window or the one that finished drawing last puts a question behind
+/// the drawing that is waiting for it, where nobody can find it and nothing
+/// in front of them takes a press. So for as long as the main window waits,
+/// they are asked to stay on top; once it takes presses again they are
+/// ordinary windows, the alert coming back later as one among the others.
+fn on_top(views: &Rc<RefCell<Views>>, wanted: bool) {
+    let views = views.borrow();
+    if let Some(window) = views.names.as_ref() {
+        window.set_on_top(wanted);
+    }
+    if let Some(window) = views.alert.as_ref() {
+        window.set_on_top(wanted);
     }
 }
 
@@ -4410,15 +4451,14 @@ fn next_place(
 
 /// The nearest point on the grid.
 ///
-/// Nodes sit on an eight-pixel grid. Three things come of it and none is
-/// merely decorative: a diagram stops looking approximate, nodes line up
-/// without anybody nudging them, and the positions written to the file are
-/// round numbers, so a file edited by hand and a file written by the editor
-/// differ in what was meant rather than in a pixel.
+/// A node's upper left corner sits on a one-millimetre grid -- see
+/// `pane::PX_PER_MM`. Three things come of it and none is merely decorative: a
+/// diagram stops looking approximate, nodes line up without anybody nudging
+/// them, and the positions written to the file are points a person can name,
+/// so a file edited by hand and a file written by the editor differ in what
+/// was meant rather than in a pixel.
 fn snap((x, y): (i32, i32)) -> (i32, i32) {
-    let to = GRID;
-    let round = |v: i32| ((v as f32 / to as f32).round() as i32) * to;
-    (round(x), round(y))
+    (pane::on_grid(x), pane::on_grid(y))
 }
 
 /// One of every node type on one side of the canvas, under its family's
@@ -5153,6 +5193,46 @@ mod tests {
                 "the {} list opens {got:.0} pixels tall and its first node \
                  wants {wanted:.0}",
                 pane.label()
+            );
+        }
+    }
+
+    /// Every popup says what it says in text that can be copied, and has a
+    /// button that copies all of it.
+    ///
+    /// Asked of the markup, as the other rules about the window are: a
+    /// `Text` in one of these is a message somebody would have to type out
+    /// again to pass it on. And the two that can come up as the editor starts
+    /// can be held in front of the main window while it waits for them.
+    #[test]
+    fn every_popup_can_be_copied_from() {
+        let markup = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint"),
+        )
+        .expect("the markup");
+        let window = |name: &str| -> &str {
+            let start = markup
+                .find(&format!("export component {name} inherits Window {{"))
+                .unwrap_or_else(|| panic!("there is no {name}"));
+            let rest = &markup[start..];
+            &rest[..rest.find("\n}\n").expect("the end of it")]
+        };
+        for name in [
+            "AlertWindow",
+            "ConcernsWindow",
+            "ProblemsWindow",
+            "DeleteWindow",
+            "LeaveWindow",
+        ] {
+            let said = window(name);
+            assert!(!said.contains("Text {"), "{name} says something that cannot be copied");
+            assert!(said.contains("Copyable {"), "{name} says nothing");
+            assert!(said.contains("CopyButton {"), "{name} has no Copy button");
+        }
+        for name in ["AlertWindow", "ProblemsWindow"] {
+            assert!(
+                window(name).contains("always-on-top: root.on-top;"),
+                "{name} cannot be held in front of the main window"
             );
         }
     }
@@ -6325,21 +6405,40 @@ mod tests {
     }
 
     /// A node lands on the grid, wherever it was dragged to.
+    ///
+    /// A millimetre grid: 96/25.4 pixels a step, each point rounded to the
+    /// nearest pixel -- 0, 4, 8, 11, 15, 19, 23, 26 and on.
     #[test]
     fn a_node_lands_on_the_grid() {
         for (dragged, expected) in [
             ((0, 0), (0, 0)),
-            ((3, 5), (0, 8)),
-            ((4, 4), (8, 8)),
-            ((12, 20), (16, 24)),
-            ((-3, -5), (0, -8)),
+            ((3, 5), (4, 4)),
+            ((4, 4), (4, 4)),
+            ((12, 20), (11, 19)),
+            ((-3, -5), (-4, -4)),
         ] {
             assert_eq!(snap(dragged), expected, "{dragged:?}");
         }
         // And everything the grid produces is on it.
         for x in -40..40 {
-            assert_eq!(snap((x, x)).0 % GRID, 0, "{x}");
+            assert!(pane::is_on_grid(snap((x, x)).0), "{x}");
         }
+        // Every point is its own count of millimetres from the edge, to
+        // within the half pixel it is rounded by, however far across the
+        // sheet: a grid built by adding a rounded step would drift.
+        for mm in 0..=635 {
+            let at = pane::grid_point(mm);
+            assert!(
+                (at as f64 - mm as f64 * pane::PX_PER_MM).abs() <= 0.5,
+                "{mm} mm is at {at}"
+            );
+            assert_eq!(pane::on_grid(at), at, "{mm} mm");
+            assert_eq!(pane::grid_after(at), pane::grid_point(mm + 1), "{mm} mm");
+            assert_eq!(pane::grid_before(at), pane::grid_point(mm - 1), "{mm} mm");
+        }
+        // The ground station a new configuration starts with is on it too.
+        assert!(pane::is_on_grid(MOC_PLACE.0) && pane::is_on_grid(MOC_PLACE.1));
+        assert!(MOC_PLACE.0 + style::WIDTH as i32 <= WORKING_WIDTH);
     }
 
     /// Drawing links into a node that names its inputs fills them in order.
@@ -7331,7 +7430,7 @@ mod tests {
         for pane in [Pane::Moc, Pane::Vehicle, Pane::Payloads] {
             let (left, right) = edges_of(pane, dividers);
             assert!(
-                right - left >= width + GRID * 2,
+                right - left >= width + 16,
                 "the {} working pane is {}px wide and a node is {width}px",
                 pane.label(),
                 right - left
@@ -7348,8 +7447,8 @@ mod tests {
         );
 
         // On the grid, so that a node held against a divider is on it too.
-        assert_eq!(dividers.payloads % GRID, 0);
-        assert_eq!(dividers.vehicle % GRID, 0);
+        assert!(pane::is_on_grid(dividers.payloads));
+        assert!(pane::is_on_grid(dividers.vehicle));
     }
 
     /// A node is held in the pane its type belongs to.
@@ -7363,34 +7462,36 @@ mod tests {
         let width = style::WIDTH as i32;
         let d = dividers();
         let (payloads, vehicle) = (d.payloads, d.vehicle);
+        // Every answer is on the grid as well as in the pane: the edges are
+        // the grid points just inside them.
+        let y = pane::on_grid(100);
+        let payload_right = pane::grid_floor(payloads - width);
 
         // A payload: the leftmost pane, and nowhere right of its own divider.
-        assert_eq!(confine("i2c", d, (0, 100)), (0, 100));
-        assert_eq!(confine("i2c", d, (-40, 100)), (0, 100));
-        assert_eq!(confine("i2c", d, (8, 100)), (8, 100));
+        assert_eq!(confine("i2c", d, (0, 100)), (0, y));
+        assert_eq!(confine("i2c", d, (-40, 100)), (0, y));
+        assert_eq!(confine("i2c", d, (8, 100)), (8, y));
         assert_eq!(
-            confine("i2c", d, (payloads - width + 1, 100)),
-            (payloads - width, 100)
+            confine("i2c", d, (payload_right + 1, 100)),
+            (payload_right, y)
         );
-        assert_eq!(
-            confine("i2c", d, (WORKING_WIDTH, 100)),
-            (payloads - width, 100)
-        );
+        assert_eq!(confine("i2c", d, (WORKING_WIDTH, 100)), (payload_right, y));
+        assert!(payload_right + width <= payloads);
 
         // The ground link: left to the vehicle divider, right to the far edge.
-        assert_eq!(confine("moc", d, (0, 100)), (vehicle, 100));
-        assert_eq!(confine("moc", d, (vehicle - 1, 100)), (vehicle, 100));
+        assert_eq!(confine("moc", d, (0, 100)), (vehicle, y));
+        assert_eq!(confine("moc", d, (vehicle - 1, 100)), (vehicle, y));
         assert_eq!(
             confine("moc", d, (WORKING_WIDTH, 100)),
-            (WORKING_WIDTH - width, 100)
+            (pane::grid_floor(WORKING_WIDTH - width), y)
         );
 
         // And the vehicle's own graph, between the two.
-        assert_eq!(confine("compute", d, (0, 100)), (payloads, 100));
-        assert_eq!(confine("compute", d, (-40, 100)), (payloads, 100));
+        assert_eq!(confine("compute", d, (0, 100)), (payloads, y));
+        assert_eq!(confine("compute", d, (-40, 100)), (payloads, y));
         assert_eq!(
             confine("compute", d, (WORKING_WIDTH, 100)),
-            (vehicle - width, 100)
+            (pane::grid_floor(vehicle - width), y)
         );
 
         // A node is never dragged off the top, whichever pane it is in: a
@@ -7562,7 +7663,7 @@ mod tests {
         std::fs::write(
             &path,
             "version: \"2.0\"\npayloads:\n  - name: bay\n    type: app_pl\n    \
-             program: /bin/true\n    app-payload-arg: \"--bay\"\n",
+             executable: /bin/true\n    app-payload-arg: \"--bay\"\n",
         )
         .expect("a payload that is a program");
         let editor = Editor::open(&path, dividers());
@@ -7576,7 +7677,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("the window offers {name}"))
         };
         assert_eq!(kind("restart"), "boolean");
-        assert_eq!(kind("program"), "path");
+        assert_eq!(kind("executable"), "path");
         assert_eq!(kind("app-payload-arg"), "text");
 
         // And what a boolean is offered with. The markup is read because the
@@ -7785,7 +7886,7 @@ mod tests {
         let scrolled = (600, 400);
         assert_eq!(
             pane::place_in(&[], "i2c", d, scrolled),
-            (left, 600),
+            (left, pane::grid_ceil(600)),
             "a new node goes at the top of what is on the screen"
         );
 
@@ -7809,9 +7910,9 @@ mod tests {
             let mut x = left;
             while x <= pane::pane_for("i2c", d).1 {
                 packed.push((x, y, width, height));
-                x += GRID;
+                x = pane::grid_after(x);
             }
-            y += GRID;
+            y = pane::grid_after(y);
         }
         let above = pane::place_in(&packed, "i2c", d, scrolled);
         assert!(
@@ -7826,9 +7927,9 @@ mod tests {
             let mut x = left;
             while x <= pane::pane_for("i2c", d).1 {
                 walled.push((x, y, width, height));
-                x += GRID;
+                x = pane::grid_after(x);
             }
-            y += GRID;
+            y = pane::grid_after(y);
         }
         let below = pane::place_in(&walled, "i2c", d, scrolled);
         assert!(
@@ -7851,19 +7952,19 @@ mod tests {
             for vehicle in [settings::LEAST, 25, settings::DEFAULT_VEHICLE] {
                 let (moc, vehicle) = settings::shares(moc, vehicle);
                 let dividers = dividers_for(moc, vehicle);
-                assert_eq!(dividers.payloads % GRID, 0, "{vehicle}% is off the grid");
-                assert_eq!(dividers.vehicle % GRID, 0, "{moc}% is off the grid");
+                assert!(pane::is_on_grid(dividers.payloads), "{vehicle}% is off the grid");
+                assert!(pane::is_on_grid(dividers.vehicle), "{moc}% is off the grid");
                 // And a percentage means what it says: that much of the
                 // working pane, within the grid step it is snapped to, counted
                 // from the right where the moc pane is.
                 assert!(
-                    (dividers.vehicle - WORKING_WIDTH * (100 - moc) / 100).abs() <= GRID / 2,
+                    (dividers.vehicle - WORKING_WIDTH * (100 - moc) / 100).abs() <= 2,
                     "a moc pane of {moc}% left the divider at {} of {WORKING_WIDTH}",
                     dividers.vehicle
                 );
                 assert!(
                     (dividers.payloads - WORKING_WIDTH * (100 - moc - vehicle) / 100).abs()
-                        <= GRID / 2,
+                        <= 2,
                     "a vehicle pane of {vehicle}% left the divider at {} of \
                      {WORKING_WIDTH}",
                     dividers.payloads
@@ -9779,7 +9880,7 @@ mod tests {
             .at;
         assert_eq!(
             now,
-            (was.0 + by.0 as i32, was.1 + by.1 as i32),
+            snap((was.0 + by.0 as i32, was.1 + by.1 as i32)),
             "a node dragged by {by:?} from {was:?} is at {now:?}"
         );
     }
@@ -9884,8 +9985,8 @@ mod tests {
         assert_eq!(
             now,
             (
-                dividers().payloads - style::WIDTH as i32,
-                was.1 + by.1 as i32
+                pane::grid_floor(dividers().payloads - style::WIDTH as i32),
+                pane::on_grid(was.1 + by.1 as i32)
             ),
             "a payload dragged {by:?} from {was:?} left its pane and is at {now:?}"
         );

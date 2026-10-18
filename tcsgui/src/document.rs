@@ -370,8 +370,14 @@ impl Fault {
             // written to be read on their own.
             Fault::BadNode { why, .. } => why.clone(),
             Fault::BadTcspecial { why } => format!("tcspecial: {why}"),
-            Fault::UntriggeredInput { from, .. } => {
-                format!("nothing is written to this: \"{from}\" has nowhere to go")
+            // The payload first, it being the one that has to change: the
+            // sender is named only as what is being sent, so that nobody goes
+            // looking at the ground link for the trouble.
+            Fault::UntriggeredInput { node, from } => {
+                format!(
+                    "\"{node}\" states no trigger, so what \"{from}\" sends it \
+                     has nowhere to go"
+                )
             }
             Fault::NoSuchGroup { group, .. } => {
                 format!("there is no group \"{group}\"")
@@ -2551,6 +2557,12 @@ mod tests {
             .find(|f| matches!(f, Fault::UntriggeredInput { .. }))
             .unwrap();
         assert_eq!(said.node(), Some("sensor"));
+        // And says so of the payload, which is where the trouble is, and not
+        // of the node sending to it.
+        assert_eq!(
+            said.describe(),
+            "\"sensor\" states no trigger, so what \"k\" sends it has nowhere to go"
+        );
 
         // A trigger clears it.
         document.apply(&Edit::SetAttribute {

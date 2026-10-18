@@ -16,38 +16,8 @@
     <moc>
         <name>moc-1</name>
         <type>moc</type>
-        <moc-out><target>can-1</target></moc-out>
-        <payload-in>true</payload-in>
     </moc>
-    <vehicle>
-        <name>hysteresis-1</name>
-        <type>compute</type>
-        <function>hysteresis</function>
-    </vehicle>
-    <payloads>
-        <name>can-1</name>
-        <type>can</type>
-        <payload-out><target>moc-1</target></payload-out>
-        <moc-in>true</moc-in>
-    </payloads>
-    <payloads>
-        <name>can-2</name>
-        <type>can</type>
-    </payloads>
-    <payloads>
-        <name>can-3</name>
-        <type>can</type>
-    </payloads>
-    <payloads>
-        <name>rpmsg-1</name>
-        <type>rpmsg</type>
-    </payloads>
     <tcsgui>
-        <nodes><name>moc-1</name><x>0</x><y>192</y></nodes>
-        <nodes><name>hysteresis-1</name><x>208</x><y>136</y></nodes>
-        <nodes><name>can-1</name><x>672</x><y>96</y></nodes>
-        <nodes><name>can-2</name><x>672</x><y>208</y></nodes>
-        <nodes><name>can-3</name><x>664</x><y>328</y></nodes>
-        <nodes><name>rpmsg-1</name><x>640</x><y>472</y></nodes>
+        <nodes><name>moc-1</name><x>469</x><y>34</y></nodes>
     </tcsgui>
 </configuration>

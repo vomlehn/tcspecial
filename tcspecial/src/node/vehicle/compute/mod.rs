@@ -51,7 +51,7 @@ use crate::runtime::node_state::Abandon;
 ///
 /// Given what arrived and told which input it arrived at; hands back what to
 /// send on, if anything is ready to send.
-pub trait Function {
+pub trait Function: Send {
     /// Take one arrival.
     ///
     /// `Ok(None)` means "nothing to send yet", which is the ordinary answer

@@ -42,7 +42,7 @@
 //! every one is counted and named.
 
 use std::collections::{BTreeMap, VecDeque};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tcslibgs::graph::terminals::Stream;
 
@@ -146,7 +146,13 @@ impl<'a> Arriving<'a> {
 /// by what it returns -- [`Port::accepts`] and [`Port::produces`] -- rather
 /// than by implementing one of two traits, because the fabric holds them all
 /// in one table and a table of two kinds would be two tables.
-pub trait Port {
+///
+/// `Send`, because a node operation is to run on a thread of its own: see the
+/// lock each port is held behind in [`Fabric`]. Every port here is a thing
+/// with a descriptor, a child process or a file, all of which move between
+/// threads; what the bound rules out is a port holding something that cannot,
+/// which a stand-in in a test is the likeliest thing to be.
+pub trait Port: Send {
     /// Take what this node has produced, if anything.
     ///
     /// Nought bytes is "nothing to say", which is the ordinary answer from a
@@ -358,8 +364,20 @@ impl Watch for Unwatched {
 }
 
 /// The nodes, and the table saying how they are joined.
+///
+/// Each port is behind a lock of its own, and the methods take `&self`. A
+/// node is a thing with a descriptor, a position in a stream and a buffer, so
+/// two threads inside one port would be two readers of one socket -- and one
+/// lock over the whole table would be one node operation at a time, which is
+/// the thing a thread per operation exists to stop. A lock apiece gives each
+/// operation the node it is about and nothing else.
+///
+/// Nothing holds one of these locks across a wave of deliveries. That is what
+/// keeps a cascade from deadlocking on itself: a delivery takes its
+/// destination's lock, gives it the bytes, takes whatever result came of it,
+/// and puts the lock down before the next wave starts.
 pub struct Fabric {
-    nodes: BTreeMap<String, Box<dyn Port>>,
+    nodes: BTreeMap<String, Mutex<Box<dyn Port>>>,
     routes: Routes,
     /// How large a datum may be, which is the buffer a read is given.
     buffer: usize,
@@ -386,11 +404,28 @@ impl Fabric {
 
     /// Put a node in, under the name the configuration calls it.
     pub fn hold(&mut self, name: &str, port: Box<dyn Port>) {
-        self.nodes.insert(name.to_string(), port);
+        self.nodes.insert(name.to_string(), Mutex::new(port));
     }
 
     pub fn holds(&self, name: &str) -> bool {
         self.nodes.contains_key(name)
+    }
+
+    /// The port this node is, for one operation.
+    ///
+    /// `None` is a node this fabric does not hold, which a checked
+    /// configuration has no link to and which a node the ground released is
+    /// until it is enabled again.
+    ///
+    /// A poisoned lock is taken anyway. It means a thread panicked while it
+    /// held this port, which is a fault to find in a log rather than a reason
+    /// to stop reading a sensor for the rest of the flight: the port is in
+    /// whatever state that operation left it, and the next operation on it is
+    /// the one thing that might get it out of there.
+    fn port(&self, name: &str) -> Option<std::sync::MutexGuard<'_, Box<dyn Port>>> {
+        self.nodes
+            .get(name)
+            .map(|held| held.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
     /// Take a node out, and with it whatever it had open.
@@ -403,7 +438,12 @@ impl Fabric {
     /// Nothing else changes. The routing still names the node, and a delivery
     /// to it is dropped by the gate before it gets this far: see [`Gate`].
     pub fn release(&mut self, name: &str) -> Option<Box<dyn Port>> {
-        self.nodes.remove(name)
+        self.nodes
+            .remove(name)
+            // A lock whose holder panicked still has the port in it, and this
+            // is where the port is being dropped: a node being released is
+            // not a reason to carry a poisoned lock any further.
+            .map(|held| held.into_inner().unwrap_or_else(|e| e.into_inner()))
     }
 
     /// How many nodes are held.
@@ -427,8 +467,8 @@ impl Fabric {
         if !self.watch.is_enabled(name) {
             return None;
         }
-        match self.nodes.get_mut(name) {
-            Some(node) => node.flush().err(),
+        match self.port(name) {
+            Some(mut node) => node.flush().err(),
             None => Some("there is no such node in this fabric".to_string()),
         }
     }
@@ -513,7 +553,7 @@ impl Fabric {
                     continue;
                 }
 
-                let Some(node) = self.nodes.get_mut(&delivery.to) else {
+                let Some(mut node) = self.port(&delivery.to) else {
                     // A checked configuration has no such link. Counted
                     // rather than ignored, because the alternative is
                     // telemetry going quietly nowhere.
@@ -616,7 +656,7 @@ impl Fabric {
             ));
         }
 
-        let Some(port) = self.nodes.get_mut(node) else {
+        let Some(mut port) = self.port(node) else {
             return Err(format!("there is no node called \"{node}\" in this fabric"));
         };
 
@@ -645,9 +685,9 @@ impl Fabric {
         if !self.watch.is_enabled(name) {
             return None;
         }
-        let how = match self.nodes.get_mut(name) {
+        let how = match self.port(name) {
             None => return Some("there is no such node in this fabric".to_string()),
-            Some(node) => node.ask(),
+            Some(mut node) => node.ask(),
         };
         match how {
             // A trigger that went out, which is counted on its own: see
@@ -676,7 +716,7 @@ impl Fabric {
 
         let mut buffer = vec![0u8; self.buffer];
         let taken = {
-            let Some(node) = self.nodes.get_mut(name) else {
+            let Some(mut node) = self.port(name) else {
                 moved.refused.push((
                     name.to_string(),
                     "there is no such node in this fabric".to_string(),
@@ -734,8 +774,8 @@ impl Fabric {
 mod tests {
     use super::*;
     use crate::runtime::node_state::Abandon;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+
+    use std::sync::Mutex as TestLock;
     use std::path::Path;
     use tcslibgs::graph::Graph;
 
@@ -755,11 +795,11 @@ mod tests {
     }
 
     /// A node that records what it is handed and says what it was told to.
-    struct Recorder(Rc<RefCell<Record>>);
+    struct Recorder(Arc<TestLock<Record>>);
 
     impl Port for Recorder {
         fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
-            let mut record = self.0.borrow_mut();
+            let mut record = self.0.lock().expect("the record");
             if record.to_say.is_empty() {
                 return Ok(Taken::NOTHING);
             }
@@ -772,7 +812,7 @@ mod tests {
         }
 
         fn give(&mut self, arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
-            let mut record = self.0.borrow_mut();
+            let mut record = self.0.lock().expect("the record");
             if let Some(why) = record.refuse.clone() {
                 return Err(why);
             }
@@ -785,16 +825,16 @@ mod tests {
         }
 
         fn accepts(&self) -> bool {
-            self.0.borrow().accepts
+            self.0.lock().expect("the record").accepts
         }
 
         fn produces(&self) -> bool {
-            self.0.borrow().produces
+            self.0.lock().expect("the record").produces
         }
     }
 
-    fn recorder() -> (Rc<RefCell<Record>>, Box<dyn Port>) {
-        let record = Rc::new(RefCell::new(Record {
+    fn recorder() -> (Arc<TestLock<Record>>, Box<dyn Port>) {
+        let record = Arc::new(TestLock::new(Record {
             accepts: true,
             produces: true,
             ..Record::default()
@@ -848,15 +888,15 @@ mod tests {
 
         let groundward = Some(Stream::Groundward);
         assert_eq!(
-            moc.borrow().given,
+            moc.lock().expect("the record").given,
             vec![(None, groundward, vec![1, 2, 3, 4])]
         );
         assert_eq!(
-            log.borrow().given,
+            log.lock().expect("the record").given,
             vec![(None, groundward, vec![1, 2, 3, 4])]
         );
         assert_eq!(
-            mean.borrow().given,
+            mean.lock().expect("the record").given,
             vec![(Some("in0".to_string()), groundward, vec![1, 2, 3, 4])],
             "the mean should be told which input this is"
         );
@@ -877,7 +917,7 @@ mod tests {
         fabric.deliver("k_aft", &[2]);
         fabric.deliver("k_bay", &[3]);
 
-        let given = mean.borrow();
+        let given = mean.lock().expect("the record");
         assert_eq!(
             given.given,
             vec![
@@ -889,8 +929,8 @@ mod tests {
         // And the ground and the log got all three as well, which are the
         // other two legs: a fan-in on one destination does not take anything
         // away from the fan-out that feeds it.
-        assert_eq!(moc.borrow().given.len(), 3);
-        assert_eq!(log.borrow().given.len(), 3);
+        assert_eq!(moc.lock().expect("the record").given.len(), 3);
+        assert_eq!(log.lock().expect("the record").given.len(), 3);
     }
 
     /// The worked example, computed end to end from three raw readings.
@@ -939,7 +979,7 @@ mod tests {
 
         // What the ground saw: three temperatures and the average.
         let payload_out: Vec<String> = moc
-            .borrow()
+            .lock().expect("the record")
             .given
             .iter()
             .map(|(_, _, datum)| String::from_utf8_lossy(datum).to_string())
@@ -952,11 +992,11 @@ mod tests {
 
         // The log saw the same three and the decision, which is the other
         // leg of each "T".
-        assert_eq!(log.borrow().given.len(), 4, "{:?}", log.borrow().given);
+        assert_eq!(log.lock().expect("the record").given.len(), 4, "{:?}", log.lock().expect("the record").given);
 
         // And the heaters were asserted, from the one pass.
         let to_heaters: Vec<Vec<u8>> = heaters
-            .borrow()
+            .lock().expect("the record")
             .given
             .iter()
             .map(|(_, _, datum)| datum.clone())
@@ -1006,7 +1046,7 @@ mod tests {
         }
 
         assert_eq!(
-            heaters.borrow().given.len(),
+            heaters.lock().expect("the record").given.len(),
             1,
             "the heaters should have been commanded once, not once a pass"
         );
@@ -1046,7 +1086,7 @@ mod tests {
         );
         // Nothing reached the ground along that branch, and nothing was lost
         // quietly: the refusal is in hand.
-        assert!(moc.borrow().given.is_empty());
+        assert!(moc.lock().expect("the record").given.is_empty());
     }
 
     /// A command from the ground changes what the thermostat decides.
@@ -1081,7 +1121,7 @@ mod tests {
         let moved = fabric.deliver("mean_temp", b"294.0");
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert!(
-            heaters.borrow().given.is_empty(),
+            heaters.lock().expect("the record").given.is_empty(),
             "a cabin inside the band should not have been acted on"
         );
 
@@ -1089,13 +1129,13 @@ mod tests {
         // the strength of the number -- the next reading decides -- so the
         // heaters are still untouched.
         assert_eq!(fabric.set("thermostat", "setpoint", b"300.0"), Ok(()));
-        assert!(heaters.borrow().given.is_empty());
+        assert!(heaters.lock().expect("the record").given.is_empty());
 
         // And the same reading now calls for heat.
         let moved = fabric.deliver("mean_temp", b"294.0");
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(
-            heaters.borrow().given,
+            heaters.lock().expect("the record").given,
             // Vehicleward: what a thermostat sends a heater is a command, and
             // the link it goes down is the one leaving the computation's
             // `moc-out`.
@@ -1237,7 +1277,7 @@ mod tests {
         let (moc, moc_port) = recorder();
         let (mean, mean_port) = recorder();
         let (log, log_port) = recorder();
-        log.borrow_mut().refuse = Some("the device is full".to_string());
+        log.lock().expect("the record").refuse = Some("the device is full".to_string());
         fabric.hold("moc", moc_port);
         fabric.hold("mean_temp", mean_port);
         fabric.hold("housekeeping", log_port);
@@ -1251,8 +1291,8 @@ mod tests {
             vec![("housekeeping".to_string(), "the device is full".to_string())],
             "the refusal should name the node and say why"
         );
-        assert_eq!(moc.borrow().given.len(), 1);
-        assert_eq!(mean.borrow().given.len(), 1);
+        assert_eq!(moc.lock().expect("the record").given.len(), 1);
+        assert_eq!(mean.lock().expect("the record").given.len(), 1);
     }
 
     /// A node that is not there is counted, not ignored.
@@ -1268,7 +1308,7 @@ mod tests {
         assert_eq!(moved.delivered, 1);
         assert_eq!(moved.refused.len(), 2, "{:?}", moved.refused);
         assert!(moved.refused.iter().all(|(_, why)| why.contains("no such node")));
-        assert_eq!(moc.borrow().given.len(), 1);
+        assert_eq!(moc.lock().expect("the record").given.len(), 1);
     }
 
     /// A node that is only written is not read, and is not an error.
@@ -1276,7 +1316,7 @@ mod tests {
     fn a_driven_node_is_not_read() {
         let mut fabric = Fabric::new(thermostat(), 64);
         let (heaters, heaters_port) = recorder();
-        heaters.borrow_mut().produces = false;
+        heaters.lock().expect("the record").produces = false;
         fabric.hold("heaters", heaters_port);
 
         let moved = fabric.pump("heaters");
@@ -1303,7 +1343,7 @@ mod tests {
         let mut fabric = Fabric::new(thermostat(), 64);
         let (sensor, sensor_port) = recorder();
         let (k, k_port) = recorder();
-        sensor.borrow_mut().to_say = vec![vec![0x01, 0x90]];
+        sensor.lock().expect("the record").to_say = vec![vec![0x01, 0x90]];
         fabric.hold("temp_fore", sensor_port);
         fabric.hold("k_fore", k_port);
 
@@ -1312,7 +1352,7 @@ mod tests {
         assert_eq!(moved.delivered, 1);
         assert_eq!(moved.bytes, 2);
         assert_eq!(
-            k.borrow().given,
+            k.lock().expect("the record").given,
             vec![(None, Some(Stream::Groundward), vec![0x01, 0x90])]
         );
     }
@@ -1329,7 +1369,7 @@ mod tests {
             ("temp_bay", "k_bay"),
         ] {
             let (record, port) = recorder();
-            record.borrow_mut().to_say = vec![vec![sensors.len() as u8]];
+            record.lock().expect("the record").to_say = vec![vec![sensors.len() as u8]];
             fabric.hold(sensor, port);
             let (got, got_port) = recorder();
             fabric.hold(converter, got_port);
@@ -1345,7 +1385,7 @@ mod tests {
         assert_eq!(moved.delivered, 3, "{:?}", moved.refused);
         for (n, got) in sensors.iter().enumerate() {
             assert_eq!(
-                got.borrow().given,
+                got.lock().expect("the record").given,
                 vec![(None, Some(Stream::Groundward), vec![n as u8])],
                 "converter {n} got the wrong reading"
             );

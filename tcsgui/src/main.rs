@@ -892,32 +892,35 @@ macro_rules! wiring {
                             views.borrow().divider.get(),
                             visible,
                         );
-                        // Two edits: a node exists, and then it is somewhere.
-                        // Separate so that undoing a drag leaves the node
-                        // rather than removing it.
-                        editor.edit(Edit::AddNode {
+                        // A node exists, and then it is somewhere: two edits,
+                        // recorded as one group so that one Undo takes the
+                        // node away and one Redo puts it back where it was
+                        // placed. A drag afterwards is a move of its own, so
+                        // undoing that still leaves the node.
+                        let mut edits = vec![Edit::AddNode {
                             name: name.clone(),
                             node_type: node_type.to_string(),
                             home: home.clone(),
-                        });
+                        }];
                         // What the description answers for it, before it is
                         // placed: a compute node from the `mean` entry is a
                         // mean from the moment it exists, so the panel asks
                         // for a mean's attributes and the checking holds it to
                         // a mean's rules.
                         for (attribute, value) in stated(&sets) {
-                            editor.edit(Edit::SetAttribute {
+                            edits.push(Edit::SetAttribute {
                                 node: Qualified::of(&name, &home).absolute(),
                                 attribute,
                                 was: None,
                                 now: Some(value),
                             });
                         }
-                        editor.edit(Edit::MoveNode {
+                        edits.push(Edit::MoveNode {
                             node: Qualified::of(&name, &home).absolute(),
                             was: (0, 0),
                             now: at,
                         });
+                        editor.edit(Edit::Group { edits });
                         at
                     };
                     views.borrow().refresh(&editor.borrow());
@@ -4447,6 +4450,11 @@ fn seed(editor: &mut Editor) {
     // schema itself refuses: a configuration that was silently given an answer
     // looks as answered as one somebody thought about. So the fields are there
     // to be filled, empty, and marked until they are.
+    //
+    // One group with the ground link below, so that the new configuration is
+    // one Undo deep rather than one per parameter: what was seeded was one
+    // thing, and nobody asked for it a field at a time.
+    let mut edits = Vec::new();
     for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
         // Empty, with one exception the schema itself names: the beacon's
         // interval has an answer that is right until somebody has a reason,
@@ -4454,7 +4462,7 @@ fn seed(editor: &mut Editor) {
         let now = tcslibgs::graph::parameters::default_of(attribute)
             .unwrap_or_default()
             .to_string();
-        editor.edit(Edit::SetTcspecial {
+        edits.push(Edit::SetTcspecial {
             attribute: (*attribute).to_string(),
             was: None,
             now: Some(now),
@@ -4464,18 +4472,23 @@ fn seed(editor: &mut Editor) {
     // Two edits, as placing one by hand is: a node exists, and then it is
     // somewhere. And named as one placed by hand is -- `moc-1`, from
     // `fresh_name` -- because a name the editor chose should look the same
-    // whichever of its hands chose it.
+    // whichever of its hands chose it. First in the group, so that the
+    // group is described by it: see `Edit::describe`.
     let name = fresh_name(editor.document(), "moc", &None);
-    editor.edit(Edit::AddNode {
-        name: name.clone(),
-        node_type: "moc".to_string(),
-        home: None,
-    });
-    editor.edit(Edit::MoveNode {
-        node: name,
-        was: (0, 0),
-        now: MOC_PLACE,
-    });
+    let placed = [
+        Edit::AddNode {
+            name: name.clone(),
+            node_type: "moc".to_string(),
+            home: None,
+        },
+        Edit::MoveNode {
+            node: name,
+            was: (0, 0),
+            now: MOC_PLACE,
+        },
+    ];
+    edits.splice(0..0, placed);
+    editor.edit(Edit::Group { edits });
 }
 
 /// A name no node in the document has yet.
@@ -9740,21 +9753,71 @@ mod tests {
             .collect();
         assert_eq!(asked, vec!["function".to_string(), "inputs".to_string()]);
 
-        // Undoable in one step per edit, as everything is: the attribute the
-        // description answered is an edit of its own, so taking it back leaves
-        // a compute node with nothing answered rather than no node at all.
+        // Placed in one step, so undone in one: the node, the function its
+        // entry answered and the place it was put all go with one Undo, and
+        // all come back with one Redo.
+        let at = placed.at;
         editor.borrow_mut().undo();
-        assert_eq!(
-            editor
-                .borrow()
-                .document()
-                .node("mean-1")
-                .expect("still there")
-                .attributes
-                .get("function"),
-            Some(&"mean".to_string()),
-            "the first undo takes back the placing and not the function"
+        assert!(
+            editor.borrow().document().node("mean-1").is_none(),
+            "one undo takes the placed node away"
         );
+        editor.borrow_mut().redo();
+        let back = editor
+            .borrow()
+            .document()
+            .node("mean-1")
+            .cloned()
+            .expect("one redo puts it back");
+        assert_eq!(back.at, at, "where it was placed, not the corner");
+        assert_eq!(
+            back.attributes.get("function").map(String::as_str),
+            Some("mean"),
+            "and still a mean"
+        );
+
+        // And so for every entry the palette offers, in every pane: whatever
+        // a type's entry answers, it is one Undo away from not being there
+        // and one Redo from being back where it was put.
+        for pane in [Pane::Payloads, Pane::Vehicle, Pane::Moc] {
+            for row in rows_of(pane) {
+                let before: Vec<String> = editor
+                    .borrow()
+                    .document()
+                    .nodes
+                    .iter()
+                    .map(|node| node.name.clone())
+                    .collect();
+                ui.invoke_place_node(
+                    row.node.name.clone(),
+                    row.node.node_type.clone(),
+                    row.sets.clone(),
+                );
+                let placed = editor
+                    .borrow()
+                    .document()
+                    .nodes
+                    .iter()
+                    .find(|node| !before.contains(&node.name))
+                    .cloned()
+                    .unwrap_or_else(|| panic!("{} placed nothing", row.node.name));
+
+                editor.borrow_mut().undo();
+                assert!(
+                    editor.borrow().document().node(&placed.name).is_none(),
+                    "one undo should take {} away",
+                    placed.name
+                );
+                editor.borrow_mut().redo();
+                let back = editor
+                    .borrow()
+                    .document()
+                    .node(&placed.name)
+                    .cloned()
+                    .unwrap_or_else(|| panic!("one redo should put {} back", placed.name));
+                assert_eq!(back, placed, "{} came back other than it was", placed.name);
+            }
+        }
     }
 
     /// Dragging from one terminal to another makes the link.

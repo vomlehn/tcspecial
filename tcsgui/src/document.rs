@@ -1122,6 +1122,12 @@ impl Document {
                     }
                 }
             }
+            // Each in turn, as if each had been made: see `Edit::Group`.
+            Edit::Group { edits } => {
+                for edit in edits {
+                    self.apply(edit);
+                }
+            }
             Edit::SetTcspecial {
                 attribute, now, ..
             } => match now {
@@ -3411,6 +3417,7 @@ mod tests {
                 Edit::SetLinkComment { .. } => (),
                 Edit::MoveNode { .. } => (),
                 Edit::Arrange { .. } => (),
+                Edit::Group { .. } => (),
                 Edit::SetAside { .. } => (),
                 Edit::SetTcspecial { .. } => (),
                 Edit::SetSimPayload { .. } => (),
@@ -3626,6 +3633,24 @@ mod tests {
                 attribute: "path".into(),
                 was: None,
                 now: vec![("a".into(), Some("/dev/i2c-1".into()))],
+            },
+            // A node placed, as the palette places one: added, given what its
+            // entry answers, and moved to where it fits.
+            Edit::Group {
+                edits: vec![
+                    add("e", "i2c"),
+                    Edit::SetAttribute {
+                        node: "e".into(),
+                        attribute: "address".into(),
+                        was: None,
+                        now: Some("0x4a".into()),
+                    },
+                    Edit::MoveNode {
+                        node: "e".into(),
+                        was: (0, 0),
+                        now: (40, 120),
+                    },
+                ],
             },
         ];
 

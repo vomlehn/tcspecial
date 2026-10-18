@@ -241,6 +241,15 @@ pub enum Edit {
         was: Vec<(String, (i32, i32))>,
         now: Vec<(String, (i32, i32))>,
     },
+    /// Several edits that one gesture made, undone and redone as one.
+    ///
+    /// Placing a node is a node added, the attributes its palette entry
+    /// answers, and a move to where it fits. Each is its own edit, so that
+    /// each is applied the one way edits are applied; recorded singly they
+    /// were three presses of Undo for one press of the palette, the first of
+    /// them leaving the node in the corner it was added at. Applied in order,
+    /// and undone in the reverse order.
+    Group { edits: Vec<Edit> },
 }
 
 /// One connection, from a node to a named input of another.
@@ -392,6 +401,9 @@ impl Edit {
             Edit::Arrange { was, now } => Edit::Arrange {
                 was: now.clone(),
                 now: was.clone(),
+            },
+            Edit::Group { edits } => Edit::Group {
+                edits: edits.iter().rev().map(Edit::inverse).collect(),
             },
             Edit::SetNodeComment { node, was, now } => Edit::SetNodeComment {
                 node: node.clone(),
@@ -549,6 +561,14 @@ impl Edit {
                 1 => "arrange 1 node".to_string(),
                 many => format!("arrange {many} nodes"),
             },
+            // Named by what it began with, which is what the gesture was: a
+            // node placed is "add i2c "i2c-1"" however many edits followed.
+            // The inverse of a group begins with the inverse of its last edit,
+            // so this is asked only of a group as it was made.
+            Edit::Group { edits } => edits
+                .first()
+                .map(Edit::describe)
+                .unwrap_or_else(|| "nothing".to_string()),
             Edit::SetTcspecial { attribute, .. } => {
                 format!("set tcspecial {attribute}")
             }

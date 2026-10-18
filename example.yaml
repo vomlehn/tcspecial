@@ -7,10 +7,6 @@ tcspecial:
   beacon:
     interval: "1 s"
 
-payload_groups:
-  - name: "every_second"
-    interval: "1 s"
-
 moc:
   - name: moc-1
     type: moc

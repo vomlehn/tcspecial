@@ -9,10 +9,6 @@
             <interval>1 s</interval>
         </beacon>
     </tcspecial>
-    <payload_groups>
-        <name>every_second</name>
-        <interval>1 s</interval>
-    </payload_groups>
     <moc>
         <name>moc-1</name>
         <type>moc</type>

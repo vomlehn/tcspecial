@@ -140,6 +140,11 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                     CommandStatus::Success,
                     cmd.node,
                 )),
+                Command::SetNode(cmd) => Telemetry::SetNode(NodeTelemetry::set(
+                    seq,
+                    CommandStatus::Success,
+                    cmd.node,
+                )),
             };
 
             let data = serde_json::to_vec(&answer).expect("serialise");
@@ -175,6 +180,21 @@ fn graph_client_to(addr: &str) -> TcsClient {
     let mut client = TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
     client.set_timeout(Duration::from_secs(10));
     client
+}
+
+/// A node's attribute is set by the node's id and the attribute's name.
+#[test]
+fn a_nodes_attribute_is_set_by_id_and_name() {
+    let (addr, stub) = stub_spacecraft(1);
+    let mut client = graph_client_to(&addr);
+
+    let (status, node) = client
+        .set_node(NodeId::of(4), "setpoint", b"295.0")
+        .expect("an answer");
+    assert!(status.is_success());
+    assert_eq!(node, NodeId::of(4));
+
+    stub.join().expect("the stand-in answered");
 }
 
 /// A node is started and stopped by its id, and the answer says which node.

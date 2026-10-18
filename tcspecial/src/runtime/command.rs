@@ -423,6 +423,11 @@ impl Serving {
                 Telemetry::StopNode(NodeTelemetry::stopped(sequence, status, cmd.node))
             }
 
+            Command::SetNode(cmd) => {
+                let status = self.set_attribute(cmd.node, &cmd.attribute, &cmd.value);
+                Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node))
+            }
+
             // Not answered yet, and refused rather than left unanswered. A
             // command the vehicle does not implement is a thing the ground can
             // see and work around; a command that goes quiet is a link the
@@ -434,10 +439,9 @@ impl Serving {
             // module.
             //
             // The five DH commands are version 1's, naming a data handler by
-            // name. A graph has nodes, and the ones that answer for a node are
-            // START_NODE and STOP_NODE above; QUERY, QUERY_SAMPLE and CONFIG
-            // for a node want per-node counters and the pass's hand in the
-            // work, neither of which is here yet.
+            // name. A graph has nodes, and the ones that answer for a node
+            // are START_NODE, STOP_NODE and SET_NODE above; the two queries
+            // want per-node counters, which are not kept yet.
             Command::RestartArm(_)
             | Command::Restart(_)
             | Command::StartDH(_)
@@ -466,6 +470,52 @@ impl Serving {
     /// arrives twice, or whose answer was lost, is the ordinary case on a link
     /// with latency, and an operator who presses Disable twice has asked for a
     /// state and not for an action.
+    /// Set an attribute of the node with that id, and say how it went.
+    ///
+    /// The work is the pass's, as enabling and releasing are: what this
+    /// changes is the node's configuration, and a node whose setpoint moved
+    /// in the middle of a computation would be a node doing half of one thing
+    /// and half of another. The answer waits for it, so a success means the
+    /// node is running on the new value.
+    ///
+    /// Applied whether or not the node is disabled: what it sets is the
+    /// node's configuration rather than its traffic, so a payload the ground
+    /// stopped can be reconfigured before it is started again.
+    ///
+    /// `InvalidParameter` for an attribute no binding mentions and for a
+    /// value the node will not take. The two are told apart in the log and
+    /// not on the wire: both are the ground asking for something the
+    /// configuration does not allow, and the status an operator acts on is
+    /// the same.
+    fn set_attribute(
+        &self,
+        node: tcslibgs::NodeId,
+        attribute: &str,
+        value: &[u8],
+    ) -> CommandStatus {
+        let Some(state) = self.states.at(node) else {
+            error!(
+                "there is no node {node} in this configuration, which has {}: the \
+                 ground is reading a configuration this vehicle is not flying",
+                self.states.len()
+            );
+            return CommandStatus::NotFound;
+        };
+        let name = state.name().to_string();
+
+        match self.bench.ask(Work::Set {
+            node: name.clone(),
+            attribute: attribute.to_string(),
+            value: value.to_vec(),
+        }) {
+            Ok(()) => CommandStatus::Success,
+            Err(why) => {
+                error!("\"{name}\".{attribute} could not be set: {why}");
+                CommandStatus::InvalidParameter
+            }
+        }
+    }
+
     fn set_state(&self, node: tcslibgs::NodeId, enabled: bool) -> CommandStatus {
         let Some(state) = self.states.at(node) else {
             error!(
@@ -732,6 +782,94 @@ mod tests {
         );
     }
 
+    /// An attribute the configuration binds is set, and one it does not is
+    /// refused.
+    ///
+    /// The work goes to the pass, as enabling and releasing do: what a
+    /// SET_NODE changes is a node's configuration, and a node whose setpoint
+    /// moved in the middle of a computation would be doing half of one thing
+    /// and half of another. The answer waits for it, so a success means the
+    /// node is running on the new value.
+    ///
+    /// Both ways of being refused come back as `InvalidParameter` -- an
+    /// attribute no binding mentions and a value the node will not take --
+    /// because from the ground's side they are the same thing: the
+    /// configuration does not allow what was asked. The log tells them apart.
+    #[test]
+    fn an_attribute_the_configuration_binds_is_set() {
+        use tcslibgs::SetNodeCommand;
+
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let ids = tcslibgs::graph::telemetry::ids(&graph);
+        let average = NodeId::of(ids["average"]);
+
+        // The pass stands in, and refuses what a fabric would refuse: an
+        // attribute no binding mentions.
+        let (bench, done) = a_pass_answering(|work| match work {
+            Work::Set { attribute, .. } if attribute == "setpoint" => Ok(()),
+            Work::Set { node, attribute, .. } => Err(format!(
+                "no command binding says the ground may set \"{node}.{attribute}\""
+            )),
+            _ => Ok(()),
+        });
+        let (ground, commands) = started_with(states, bench);
+        let at = commands.node_address();
+
+        let set = |sequence, attribute: &str, value: &[u8]| {
+            Command::SetNode(SetNodeCommand::new(sequence, average, attribute, value))
+        };
+
+        match ask(&ground, at, &set(1, "setpoint", b"295.0")) {
+            Some(Telemetry::SetNode(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::Success);
+                assert_eq!(tm.node, average, "the answer says which node");
+            }
+            other => panic!("expected a set answer, got {other:?}"),
+        }
+        assert_eq!(
+            done.lock().expect("the record").last(),
+            Some(&Work::Set {
+                node: "average".to_string(),
+                attribute: "setpoint".to_string(),
+                value: b"295.0".to_vec(),
+            }),
+            "the pass is asked to set it, and told what to"
+        );
+
+        match ask(&ground, at, &set(2, "address", b"0x49")) {
+            Some(Telemetry::SetNode(tm)) => {
+                assert_eq!(
+                    tm.header.status,
+                    CommandStatus::InvalidParameter,
+                    "an attribute no binding mentions"
+                );
+                assert_eq!(tm.node, average);
+            }
+            other => panic!("expected a set answer, got {other:?}"),
+        }
+
+        // And an id the configuration does not have, which is answered
+        // before any work is handed over.
+        let nowhere = NodeId::of(99);
+        match ask(
+            &ground,
+            at,
+            &Command::SetNode(SetNodeCommand::new(3, nowhere, "setpoint", b"295.0")),
+        ) {
+            Some(Telemetry::SetNode(tm)) => {
+                assert_eq!(tm.header.status, CommandStatus::NotFound);
+                assert_eq!(tm.node, nowhere, "the id the command carried");
+            }
+            other => panic!("expected a set answer, got {other:?}"),
+        }
+        assert_eq!(
+            done.lock().expect("the record").len(),
+            2,
+            "nothing is handed over for a node that is not there"
+        );
+    }
+
     /// A node that will not open is answered with the failure and left
     /// stopped.
     ///
@@ -748,7 +886,7 @@ mod tests {
 
         let (bench, _) = a_pass_answering(|work| match work {
             Work::Enable(_) => Err("/dev/i2c-1 is not there".to_string()),
-            Work::Disable(_) => Ok(()),
+            _ => Ok(()),
         });
         let (ground, commands) = started_with(states.clone(), bench);
         let at = commands.node_address();

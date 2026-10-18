@@ -204,8 +204,9 @@ command binding
    be a device or a MOC link, and the links the software builds are the pair
    that joins one device to one MOC link in each direction. Compute elements,
    links with several destinations, groups with a shared interval, discrete
-   lines driven as outputs, and command bindings are specified in
-   ``design.rst`` and are being implemented in that order. Where this manual
+   lines driven as outputs are specified in ``design.rst`` and are being
+   implemented in that order. Command bindings run: the ground sets a bound
+   attribute of a node with a ``SET_NODE``. Where this manual
    describes something not yet running it says so in a note like this one, and
    the rule this project has always followed applies: the description stands,
    and a note records what is so today.
@@ -1646,8 +1647,11 @@ sensors' readings reach the ground through their conversions, and the heaters
 are driven and never read.
 
 The command binding on the ``moc`` node says the ground may set the
-thermostat's setpoint. The configuration is checked for it, but the running
-vehicle does not yet apply commands from the ground.
+thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
+naming that node and that attribute is taken on the node command link, the
+value reaches the thermostat between stages of a pass, and the next pass
+decides by it. An attribute no binding mentions is refused, which is the
+point of writing the bindings down.
 
 The sensors and heaters are hardware, so ``make -C examples run-thermostat``
 needs ``/dev/i2c-1``, ``/dev/spidev0.0`` and ``/dev/gpiochip0``; ``make

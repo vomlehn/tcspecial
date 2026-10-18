@@ -247,7 +247,7 @@ impl PayloadCommands {
             // sent to a process running a payload set, and the ground is
             // reading a configuration this end has never seen. Refused as
             // unimplemented, which is what it is here.
-            theirs @ (Command::StartNode(_) | Command::StopNode(_)) => {
+            theirs @ (Command::StartNode(_) | Command::StopNode(_) | Command::SetNode(_)) => {
                 answer_to(&theirs, CommandStatus::InvalidCommand)
             }
         }
@@ -815,7 +815,8 @@ impl CommandInterpreter {
             | Command::QueryDHSample(_)
             | Command::ConfigDH(_)
             | Command::StartNode(_)
-            | Command::StopNode(_)) => {
+            | Command::StopNode(_)
+            | Command::SetNode(_)) => {
                 refused_on_the_wrong_link(&theirs, CommandLink::Spacecraft)
             }
         }

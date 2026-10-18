@@ -45,6 +45,14 @@ pub enum CommandType {
     StartNode,
     /// And disable one: version 1's STOP_DH, the same way.
     StopNode,
+    /// Set an attribute of a node: version 1's CONFIG_DH, with something for
+    /// it to do.
+    ///
+    /// Version 1's carried a name and nothing to configure with, and was
+    /// refused as unimplemented. A graph's `commands` section already says
+    /// which attribute of which node the ground may set, so this is the
+    /// command that section was written for.
+    SetNode,
 }
 
 /// Which of the command interpreter's two links a command belongs on.
@@ -104,7 +112,8 @@ impl CommandType {
             | CommandType::QueryDHSample
             | CommandType::ConfigDH
             | CommandType::StartNode
-            | CommandType::StopNode => CommandLink::Payload,
+            | CommandType::StopNode
+            | CommandType::SetNode => CommandLink::Payload,
         }
     }
 
@@ -133,6 +142,7 @@ impl CommandType {
             CommandType::ConfigDH => 0x21,
             CommandType::StartNode => 0x30,
             CommandType::StopNode => 0x31,
+            CommandType::SetNode => 0x32,
         }
     }
 
@@ -150,6 +160,7 @@ impl CommandType {
             0x21 => Some(CommandType::ConfigDH),
             0x30 => Some(CommandType::StartNode),
             0x31 => Some(CommandType::StopNode),
+            0x32 => Some(CommandType::SetNode),
             _ => None,
         }
     }
@@ -273,6 +284,53 @@ impl NodeCommand {
         Self {
             header: CommandHeader { sequence, cmd_type },
             node,
+        }
+    }
+}
+
+/// SET_NODE - set an attribute of a node of a version 2 graph
+///
+/// Which node, which of its attributes, and what to set it to. The
+/// configuration's `commands` section says which attribute of which node the
+/// ground may set -- `{ from: moc, sets: thermostat.setpoint }` -- and a
+/// command naming an attribute no binding mentions is refused. That is what
+/// makes what the ground may change in flight something written down and
+/// checkable rather than whatever a computation happens to accept: a bus
+/// address or a set of line numbers is what the file said.
+///
+/// The attribute is text, where the node is a number. A node id can be a
+/// fixed-length field because a node has a position in the configuration and
+/// the digest covers that order; an attribute has no such number of its own.
+/// A binding's position in the `commands` section would be one -- and would
+/// carry the node with it -- but the value here is text of no fixed length
+/// anyway, so a message of fixed length was never on offer, and a command
+/// that says `setpoint` is one a log reads back.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SetNodeCommand {
+    pub header: CommandHeader,
+    /// Which node, by its node id: see [`NodeId`].
+    pub node: NodeId,
+    /// Which of its attributes, as the `commands` section spells it.
+    pub attribute: String,
+    /// What to set it to, as the bytes the node reads it from.
+    ///
+    /// Bytes and not a number, because what an attribute takes is the node's
+    /// business: a setpoint is a temperature, a band is a width, and a node
+    /// that wanted a word would want a word. The node refuses what it cannot
+    /// use, which is where a setpoint that is not a number is caught.
+    pub value: Vec<u8>,
+}
+
+impl SetNodeCommand {
+    pub fn new(sequence: u32, node: NodeId, attribute: &str, value: &[u8]) -> Self {
+        Self {
+            header: CommandHeader {
+                sequence,
+                cmd_type: CommandType::SetNode,
+            },
+            node,
+            attribute: attribute.to_string(),
+            value: value.to_vec(),
         }
     }
 }
@@ -414,6 +472,7 @@ pub enum Command {
     ConfigDH(ConfigDHCommand),
     StartNode(NodeCommand),
     StopNode(NodeCommand),
+    SetNode(SetNodeCommand),
 }
 
 impl Command {
@@ -430,6 +489,7 @@ impl Command {
             Command::Config(cmd) => cmd.header.sequence,
             Command::ConfigDH(cmd) => cmd.header.sequence,
             Command::StartNode(cmd) | Command::StopNode(cmd) => cmd.header.sequence,
+            Command::SetNode(cmd) => cmd.header.sequence,
         }
     }
 
@@ -441,6 +501,7 @@ impl Command {
     pub fn node_id(&self) -> Option<NodeId> {
         match self {
             Command::StartNode(cmd) | Command::StopNode(cmd) => Some(cmd.node),
+            Command::SetNode(cmd) => Some(cmd.node),
             Command::Ping(_)
             | Command::Connect(_)
             | Command::RestartArm(_)
@@ -485,7 +546,8 @@ impl Command {
             // A version 2 node command names a node, which is not a payload
             // name: see [`Command::node_id`].
             | Command::StartNode(_)
-            | Command::StopNode(_) => None,
+            | Command::StopNode(_)
+            | Command::SetNode(_) => None,
         }
     }
 
@@ -502,6 +564,7 @@ impl Command {
             Command::Config(cmd) => cmd.header.cmd_type,
             Command::ConfigDH(cmd) => cmd.header.cmd_type,
             Command::StartNode(cmd) | Command::StopNode(cmd) => cmd.header.cmd_type,
+            Command::SetNode(cmd) => cmd.header.cmd_type,
         }
     }
 }
@@ -536,6 +599,7 @@ mod tests {
             // a hurry must not be queued behind what it asked for at leisure.
             CommandType::StartNode,
             CommandType::StopNode,
+            CommandType::SetNode,
         ];
 
         for kind in spacecraft {

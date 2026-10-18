@@ -305,6 +305,142 @@ fn command_a_node(
     ui.set_last_response(SharedString::from(said));
 }
 
+/// Wire every control that sends a command.
+///
+/// Apart from `run` so that it can be driven in a test: a button is pressed
+/// through Slint's testing backend, and what is being checked is that the
+/// press reaches the vehicle and the window says what came back. Everything
+/// here asks the link for a client as it goes rather than holding one, so
+/// that a disconnect leaves nothing talking to a socket that is closed: see
+/// [`crate::ci_link`].
+///
+/// `digest` is this end's, or `None` for a configuration that could not be
+/// digested -- which leaves nothing to check the vehicle's answer against,
+/// and so nothing that may be commanded by id.
+pub(crate) fn command_buttons(
+    ui: &MainWindow,
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    digest: Option<tcslibgs::ConfigDigest>,
+    model: &Rc<VecModel<DHInfo>>,
+) {
+    // Connect and Disconnect, the one button whose meaning follows the
+    // status. Connecting sends a CONNECT at once, because that is what makes
+    // a node id mean anything -- see `Agreed`.
+    {
+        let weak = ui.as_weak();
+        let link = link.clone();
+        let agreed = agreed.clone();
+        let ours = tcslibgs::config_digest::ConfigVersion::of_this_build();
+        ui.on_link_clicked(move || {
+            let ui = weak.unwrap();
+
+            if ui.get_ci_status() == CONNECTED_STATUS {
+                // Said in terms of where the link was, not of what the
+                // address box says, which may have been edited since.
+                let address = {
+                    let mut guard = link.lock().unwrap();
+                    let address = guard.address().to_string();
+                    guard.disconnect();
+                    address
+                };
+                // What was agreed was agreed with that vehicle, over that
+                // link: a reconnect asks again.
+                if let Ok(mut held) = agreed.lock() {
+                    *held = None;
+                }
+                eprintln!("Disconnected from {address}");
+                ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
+                ui.set_last_response(SharedString::from(format!(
+                    "Disconnected from {address}"
+                )));
+                return;
+            }
+
+            // Where the address box points now, rather than where the link
+            // last went: typing an address and pressing Connect is how this
+            // window is told to talk to a different vehicle.
+            let address = ui.get_ci_address().to_string();
+            if let Err(e) = link.lock().unwrap().connect(&address) {
+                eprintln!("Failed to connect to {address}: {e}");
+                ui.set_ci_status(SharedString::from(ERROR_STATUS));
+                ui.set_last_response(SharedString::from(format!(
+                    "Connection to {address} failed: {e}"
+                )));
+                return;
+            }
+            eprintln!("Connected to {address}");
+            ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
+
+            match digest {
+                Some(digest) => {
+                    hear_what_the_vehicle_read(&ui, &link, &agreed, ours, digest)
+                }
+                // Nothing to compare with, so nothing may be commanded by id:
+                // the warning at startup said why.
+                None => ui.set_last_response(SharedString::from(
+                    "Connected, and this configuration could not be digested, so \
+                     there is nothing to check the vehicle's answer against: \
+                     Enable and Disable will not send a node id",
+                )),
+            }
+        });
+    }
+
+    // Ping, which says this link reaches the vehicle -- a different fact from
+    // the beacon's, which says the vehicle is alive.
+    {
+        let weak = ui.as_weak();
+        let link = link.clone();
+        ui.on_ping_clicked(move || {
+            let ui = weak.unwrap();
+            let answer = link.lock().unwrap().client().map(|client| client.ping());
+            let said = match answer {
+                Some(Ok(tm)) => {
+                    format!("PING OK at {}", tm.header.timestamp.time_of_day())
+                }
+                Some(Err(e)) => format!("PING failed: {e}"),
+                None => crate::ci_link::NOT_CONNECTED.to_string(),
+            };
+            ui.set_last_response(SharedString::from(said));
+        });
+    }
+
+    // Query All has nothing to ask yet: a node's counters are not kept.
+    {
+        let weak = ui.as_weak();
+        ui.on_query_all_clicked(move || {
+            if let Some(ui) = weak.upgrade() {
+                ui.set_last_response(SharedString::from(NOT_QUERIED));
+            }
+        });
+    }
+
+    // And each panel's two, about the node that panel is for.
+    {
+        let weak = ui.as_weak();
+        let link = link.clone();
+        let agreed = agreed.clone();
+        let model = model.clone();
+        ui.on_enable_dh(move |row| {
+            if let Some(ui) = weak.upgrade() {
+                command_a_node(&ui, &link, &agreed, &model, row as usize, true);
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let link = link.clone();
+        let agreed = agreed.clone();
+        let model = model.clone();
+        ui.on_disable_dh(move |row| {
+            if let Some(ui) = weak.upgrade() {
+                command_a_node(&ui, &link, &agreed, &model, row as usize, false);
+            }
+        });
+    }
+}
+
 /// Say, from every control, that this configuration names no command link.
 ///
 /// A configuration with no `tcspecial` section states no ports, so there is
@@ -574,12 +710,8 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
         });
     }
 
-    // The buttons. Each asks the link for a client as it goes rather than
-    // holding one, so that a disconnect leaves nothing talking to a socket
-    // that is closed: see `crate::ci_link`.
-    //
-    // A configuration with no command link gets handlers that say so, rather
-    // than buttons that do nothing when pressed.
+    // The buttons. A configuration with no command link gets handlers that
+    // say so, rather than buttons that do nothing when pressed.
     let Some(link) = link else {
         no_command_link(&ui);
         handle_quit(&ui, pm_tcssim.clone(), Some(pm_tcspecial.clone()));
@@ -592,121 +724,7 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
         std::process::exit(0);
     };
 
-    // Connect and Disconnect, the one button whose meaning follows the
-    // status. Connecting sends a CONNECT at once, because that is what makes
-    // a node id mean anything -- see `Agreed`.
-    {
-        let weak = ui.as_weak();
-        let link = link.clone();
-        let agreed = agreed.clone();
-        let ours = tcslibgs::config_digest::ConfigVersion::of_this_build();
-        ui.on_link_clicked(move || {
-            let ui = weak.unwrap();
-
-            if ui.get_ci_status() == CONNECTED_STATUS {
-                // Said in terms of where the link was, not of what the
-                // address box says, which may have been edited since.
-                let address = {
-                    let mut guard = link.lock().unwrap();
-                    let address = guard.address().to_string();
-                    guard.disconnect();
-                    address
-                };
-                // What was agreed was agreed with that vehicle, over that
-                // link: a reconnect asks again.
-                if let Ok(mut held) = agreed.lock() {
-                    *held = None;
-                }
-                eprintln!("Disconnected from {address}");
-                ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
-                ui.set_last_response(SharedString::from(format!(
-                    "Disconnected from {address}"
-                )));
-                return;
-            }
-
-            // Where the address box points now, rather than where the link
-            // last went: typing an address and pressing Connect is how this
-            // window is told to talk to a different vehicle.
-            let address = ui.get_ci_address().to_string();
-            if let Err(e) = link.lock().unwrap().connect(&address) {
-                eprintln!("Failed to connect to {address}: {e}");
-                ui.set_ci_status(SharedString::from(ERROR_STATUS));
-                ui.set_last_response(SharedString::from(format!(
-                    "Connection to {address} failed: {e}"
-                )));
-                return;
-            }
-            eprintln!("Connected to {address}");
-            ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
-
-            match digest {
-                Some(digest) => {
-                    hear_what_the_vehicle_read(&ui, &link, &agreed, ours, digest)
-                }
-                // Nothing to compare with, so nothing may be commanded by id:
-                // the warning at startup said why.
-                None => ui.set_last_response(SharedString::from(
-                    "Connected, and this configuration could not be digested, so \
-                     there is nothing to check the vehicle's answer against: \
-                     Enable and Disable will not send a node id",
-                )),
-            }
-        });
-    }
-
-    // Ping, which says this link reaches the vehicle -- a different fact from
-    // the beacon's, which says the vehicle is alive.
-    {
-        let weak = ui.as_weak();
-        let link = link.clone();
-        ui.on_ping_clicked(move || {
-            let ui = weak.unwrap();
-            let answer = link.lock().unwrap().client().map(|client| client.ping());
-            let said = match answer {
-                Some(Ok(tm)) => {
-                    format!("PING OK at {}", tm.header.timestamp.time_of_day())
-                }
-                Some(Err(e)) => format!("PING failed: {e}"),
-                None => crate::ci_link::NOT_CONNECTED.to_string(),
-            };
-            ui.set_last_response(SharedString::from(said));
-        });
-    }
-
-    // Query All has nothing to ask yet: a node's counters are not kept.
-    {
-        let weak = ui.as_weak();
-        ui.on_query_all_clicked(move || {
-            if let Some(ui) = weak.upgrade() {
-                ui.set_last_response(SharedString::from(NOT_QUERIED));
-            }
-        });
-    }
-
-    // And each panel's two, about the node that panel is for.
-    {
-        let weak = ui.as_weak();
-        let link = link.clone();
-        let agreed = agreed.clone();
-        let model = model.clone();
-        ui.on_enable_dh(move |row| {
-            if let Some(ui) = weak.upgrade() {
-                command_a_node(&ui, &link, &agreed, &model, row as usize, true);
-            }
-        });
-    }
-    {
-        let weak = ui.as_weak();
-        let link = link.clone();
-        let agreed = agreed.clone();
-        let model = model.clone();
-        ui.on_disable_dh(move |row| {
-            if let Some(ui) = weak.upgrade() {
-                command_a_node(&ui, &link, &agreed, &model, row as usize, false);
-            }
-        });
-    }
+    command_buttons(&ui, &link, &agreed, digest, &model);
 
     handle_quit(&ui, pm_tcssim.clone(), Some(pm_tcspecial.clone()));
     handle_close(&ui, pm_tcssim, Some(pm_tcspecial));
@@ -720,7 +738,7 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::path::Path;
 
@@ -813,6 +831,149 @@ mod tests {
 
         *agreed.lock().unwrap() = Some(true);
         assert!(may_command_nodes(&agreed));
+    }
+
+    /// Connect, and then a panel's Enable, reach the vehicle and say what came
+    /// back.
+    ///
+    /// Through the window, by pressing the buttons: everything below the
+    /// handlers is tested on its own, and what this adds is the wiring -- that
+    /// the press reaches the handler, the handler reaches the vehicle, and
+    /// what the vehicle answered lands in Last Response. That was the one part
+    /// of the command half nothing could check.
+    ///
+    /// The vehicle is a stand-in on a loopback port, answering a CONNECT with
+    /// the digest this window read and a STOP_NODE with success. It answers
+    /// the real messages, by the same serialisation tcspecial uses, so the
+    /// client is exercised rather than mocked.
+    ///
+    /// Not a test of its own: one test per binary may start the testing
+    /// backend, and its windows belong to the thread that made them. Called
+    /// from `crate::tests::every_panels_data_is_inside_the_window`.
+    pub(crate) fn pressing_connect_and_enable_commands_the_vehicle() {
+        use i_slint_backend_testing::ElementHandle;
+        use std::net::UdpSocket;
+        use tcslibgs::{
+            Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort, NodeTelemetry,
+            Telemetry,
+        };
+
+        let ours = ConfigDigest([0x5Au8; 16]);
+
+        // A stand-in vehicle: one socket for both links, since what is being
+        // tested is that a press gets an answer back and not which socket it
+        // went out on. Two commands, then it stops.
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
+        let at = vehicle.local_addr().expect("where it is").to_string();
+        let answering = std::thread::spawn(move || {
+            let mut buffer = [0u8; 65535];
+            let mut seen = Vec::new();
+            for _ in 0..2 {
+                let (size, from) = match vehicle.recv_from(&mut buffer) {
+                    Ok(got) => got,
+                    Err(_) => return seen,
+                };
+                let command: Command =
+                    serde_json::from_slice(&buffer[..size]).expect("a command");
+                let seq = command.sequence();
+                seen.push(command.cmd_type());
+                let answer = match &command {
+                    Command::Connect(_) => Telemetry::Connect(ConnectTelemetry::new(
+                        seq,
+                        ConfigVersion::of_this_build(),
+                        ConfigVersion::of_text("2.0").expect("a version"),
+                        // The same digest the window read: a vehicle flying
+                        // the configuration this window is showing.
+                        ConfigDigest([0x5Au8; 16]),
+                    )),
+                    Command::StopNode(cmd) => Telemetry::StopNode(NodeTelemetry::stopped(
+                        seq,
+                        tcslibgs::CommandStatus::Success,
+                        cmd.node,
+                    )),
+                    other => panic!("the window sent {:?}", other.cmd_type()),
+                };
+                let data = serde_json::to_vec(&answer).expect("telemetry");
+                vehicle.send_to(&data, from).expect("an answer");
+            }
+            seen
+        });
+
+        let ui = MainWindow::new().expect("a window");
+        let _ = Sizes::settle(&ui);
+
+        // One panel, for a node whose id is 1, as the example's is.
+        let model: Rc<VecModel<DHInfo>> =
+            Rc::new(VecModel::from(panels(&telemetry::of(&example("simple-app"))
+                .expect("its links"))));
+        ui.set_dh_model(ModelRc::from(model.clone()));
+        ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
+        ui.set_ci_address(SharedString::from(at.clone()));
+
+        let link = Arc::new(Mutex::new(CiLink::down_commanding(
+            "127.0.0.1:0",
+            Commanded::Nodes {
+                from: HostPort {
+                    address: "127.0.0.1".to_string(),
+                    port: 0,
+                },
+                to: at.parse::<std::net::SocketAddr>().map(|a| HostPort {
+                    address: a.ip().to_string(),
+                    port: a.port(),
+                }).expect("an address"),
+            },
+        )));
+        let agreed: Agreed = Arc::new(Mutex::new(None));
+        command_buttons(&ui, &link, &agreed, Some(ours), &model);
+
+        let press = |label: &str| {
+            let found: Vec<ElementHandle> =
+                ElementHandle::find_by_accessible_label(&ui, label).collect();
+            assert_eq!(found.len(), 1, "one {label} button, found {}", found.len());
+            found[0].invoke_accessible_default_action();
+        };
+
+        // Before anything is pressed, a node command is refused: the two ends
+        // have not agreed what they read.
+        press("Enable");
+        assert_eq!(
+            ui.get_last_response().as_str(),
+            NOT_AGREED,
+            "a node id must not go out before CONNECT has agreed"
+        );
+
+        // Connect, which brings the link up and sends a CONNECT.
+        press("Connect");
+        assert_eq!(ui.get_ci_status().as_str(), CONNECTED_STATUS);
+        assert!(
+            ui.get_last_response().as_str().contains("agrees"),
+            "the window should say the vehicle agreed: {}",
+            ui.get_last_response()
+        );
+        assert!(may_command_nodes(&agreed), "and remember that it did");
+
+        // And now a panel's Disable reaches the vehicle, which answers about
+        // the node the panel is for.
+        press("Disable");
+        let said = ui.get_last_response().to_string();
+        assert!(
+            said.contains("STOP_NODE") && said.contains("Success"),
+            "the answer should be shown: {said}"
+        );
+        assert!(
+            said.contains("lorem"),
+            "and say which node it was about: {said}"
+        );
+
+        let sent = answering.join().expect("the stand-in answered");
+        assert_eq!(
+            sent,
+            vec![
+                tcslibgs::CommandType::Connect,
+                tcslibgs::CommandType::StopNode
+            ],
+            "the two commands the presses should have sent"
+        );
     }
 
     /// tcssim is started only for a configuration it has something to simulate.

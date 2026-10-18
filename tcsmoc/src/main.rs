@@ -2677,6 +2677,7 @@ mod tests {
         every_panel_shows_what_arrived_from_its_payload();
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
+        crate::version_2::tests::pressing_connect_and_enable_commands_the_vehicle();
     }
 
     /// Only a payload that has to be asked is talked about on the console.

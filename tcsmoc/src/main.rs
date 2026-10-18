@@ -374,6 +374,11 @@ fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
 /// simulator's own file and tcssim is what shows it.
 fn dh_info_from(dev_id: usize, dh: &DHConfig, sim: Option<&ResolvedSim>) -> DHInfo {
     DHInfo {
+        // Version 1 has no command bindings. Its CONFIG_DH carries a name and
+        // nothing to configure with, and the spacecraft refuses it as
+        // unimplemented, so there is nothing a panel could offer to set.
+        settable: SharedString::new(),
+        setting: SharedString::new(),
         name: SharedString::from(dh.name.0.clone()),
         // Its place in the payload configuration, which is the only number a
         // payload has: nothing in the file states one, and the order the file

@@ -172,9 +172,12 @@ pub fn panels(links: &[Telemetered], settable: &BTreeMap<String, Vec<String>>) -
 
 /// Whether the simulator file names any payload to simulate, so that tcssim
 /// is started only when it has something to be.
-fn anything_simulated(graph: &Graph, sim_path: &str) -> bool {
-    SimConfigFile::load(sim_path)
-        .ok()
+///
+/// `None` is a payload set with no simulator file beside it, which simulates
+/// nothing: there is no file to read, and no simulator to start.
+fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
+    sim_path
+        .and_then(|path| SimConfigFile::load(path).ok())
         .and_then(|sim| tcslibgs::graph::simulated::handlers(graph, &sim).ok())
         .is_some_and(|handlers| !handlers.is_empty())
 }
@@ -809,7 +812,7 @@ fn serve(mut moc: Moc, rows: Arc<BTreeMap<String, usize>>, arrivals: Arrivals) {
 }
 
 /// Run the MOC on a version 2 configuration. Does not return.
-pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
+pub fn run(payload_path: &str, sim_path: Option<&str>, mut startup: Startup) -> ! {
     let graph = match Graph::load(payload_path) {
         Ok(graph) => graph,
         Err(e) => {
@@ -902,7 +905,14 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
     if anything_simulated(&graph, sim_path) {
         pm_tcssim.start_child(tcssim, payload_path);
     } else {
-        eprintln!("{sim_path}: nothing to simulate, so tcssim is not started");
+        match sim_path {
+            Some(path) => {
+                eprintln!("{path}: nothing to simulate, so tcssim is not started")
+            }
+            None => eprintln!(
+                "{payload_path}: no simulator file beside it, so tcssim is not started"
+            ),
+        }
     }
 
     // Whether the vehicle is serving the configuration this MOC read. This
@@ -989,12 +999,17 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
         thread::spawn(move || serve(moc, rows, arrivals));
     }
 
-    // The panels, kept current.
+    // The panels, kept current -- and the one thing that keeps running on the
+    // event loop whatever else the window is doing, which is where a signal
+    // asking the MOC to stop is noticed: see `crate::stop_if_asked`.
+    crate::listen_for_stop();
     let timer = slint::Timer::default();
     {
         let model = model.clone();
         let arrivals = arrivals.clone();
+        let stopping = (pm_tcssim.clone(), Some(pm_tcspecial.clone()));
         timer.start(slint::TimerMode::Repeated, PANEL_REFRESH_INTERVAL, move || {
+            crate::stop_if_asked(&stopping.0, stopping.1.as_ref());
             show_arrivals(&model, &arrivals);
         });
     }
@@ -1430,7 +1445,15 @@ pub(crate) mod tests {
                 .expect("a path")
                 .to_string()
         };
-        assert!(anything_simulated(&example("minimal"), &sim("minimal")));
-        assert!(!anything_simulated(&example("simple-app"), &sim("simple-app")));
+        assert!(anything_simulated(&example("minimal"), Some(&sim("minimal"))));
+        assert!(!anything_simulated(
+            &example("simple-app"),
+            Some(&sim("simple-app"))
+        ));
+
+        // And a set with no simulator file beside it simulates nothing: it
+        // used to be read against another set's file, which complained about
+        // handlers it had never heard of.
+        assert!(!anything_simulated(&example("minimal"), None));
     }
 }

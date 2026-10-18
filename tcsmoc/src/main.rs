@@ -125,14 +125,17 @@ fn tcspecial_already_running(address: &str) -> bool {
 /// about which one is right.
 const CHILDREN: [&str; 2] = ["tcspecial", "tcssim"];
 
-/// Which environment variable names the simulator configuration, and what is
-/// read when the variable is unset and no file is beside the tcspecial
-/// configuration.
+/// Which environment variable names the simulator configuration.
 ///
 /// The same variable tcssim reads, which is the point: the MOC shows what the
 /// tcssim it starts is simulating, so the two have to be looking at one file.
+///
+/// There was a default beside this, read when the variable was unset and no
+/// file was beside the tcspecial configuration -- and it named another
+/// payload set's simulator file, so a set with no simulator of its own was
+/// read against one describing payloads it had never heard of. A set with no
+/// simulator file simulates nothing: see [`sim_path_for`].
 const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
-const DEFAULT_SIM_CONFIG_PATH: &str = "tests/manual/tcspecial1sim.yaml";
 
 /// What one column of the grid takes, and the height of everything above and
 /// below the grid.
@@ -421,7 +424,13 @@ fn simulator_settings(
     dh_configs: &[DHConfig],
     startup: &mut Startup,
 ) -> Option<Vec<ResolvedSim>> {
-    let sim_path = sim_path_for(payload_path);
+    let Some(sim_path) = sim_path_for(payload_path) else {
+        // Nothing to read, which is not something to warn about: a payload
+        // set with no simulator file beside it is a set with nothing
+        // simulated, and the panels say so where the parameters are shown.
+        eprintln!("{payload_path}: no simulator file beside it, so nothing is simulated");
+        return None;
+    };
 
     let file = match SimConfigFile::load(&sim_path) {
         Ok(file) => file,
@@ -449,17 +458,24 @@ fn simulator_settings(
     }
 }
 
-/// Which simulator file goes with this payload set.
+/// Which simulator file goes with this payload set, if it has one.
 ///
 /// The one `PAYLOAD_SIM_YAML` names, and otherwise the one beside the
 /// tcspecial configuration and named for it -- see
 /// `tcslibgs::config::sim_path_beside`, which tcssim asks as well -- which is
 /// the convention the whole payload set mechanism rests on.
-fn sim_path_for(payload_path: &str) -> String {
-    env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
-        tcslibgs::config::sim_path_beside(payload_path)
-            .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
-    })
+///
+/// `None` for a set with no simulator file beside it, which is a set with
+/// nothing simulated. It used to fall back to one named here, which was
+/// another payload set's: a configuration of its own was then read against
+/// payloads it had never heard of, and the window opened complaining about
+/// four handlers nobody had mentioned. A set that simulates nothing says so
+/// and starts no simulator.
+fn sim_path_for(payload_path: &str) -> Option<String> {
+    match env::var(SIM_CONFIG_PATH_VAR) {
+        Ok(named) => Some(named),
+        Err(_) => tcslibgs::config::sim_path_beside(payload_path),
+    }
 }
 
 /// Say what was found as tcsmoc started, in a window of its own, and wait for
@@ -875,15 +891,21 @@ fn main() {
     let sim_path = sim_path_for(&payload_path);
     let mut startup = Startup::default();
     startup.report_loosely(
-        &tcsverify::verify(Path::new(&payload_path), Some(Path::new(&sim_path))),
-        Path::new(&sim_path),
+        &tcsverify::verify(
+            Path::new(&payload_path),
+            sim_path.as_deref().map(Path::new),
+        ),
+        // Where a set has no simulator file, the configuration itself is what
+        // every problem is reported against: there is no second file for one
+        // to belong to.
+        Path::new(sim_path.as_deref().unwrap_or(&payload_path)),
     );
     present_and_stop_if_fatal(&startup);
 
     // A version 2 configuration is a graph whose ground end is data, not a
     // command interpreter: see version_2, which runs the window for it.
     if tcslibgs::graph::is_version_2(Path::new(&payload_path)) {
-        version_2::run(&payload_path, &sim_path, startup);
+        version_2::run(&payload_path, sim_path.as_deref(), startup);
     }
 
     let dh_configs: Arc<Vec<DHConfig>> = match load_dh_configs(&payload_path) {
@@ -1150,6 +1172,10 @@ fn main() {
         arrivals,
         contact.clone(),
         declined.clone(),
+        (
+            process_manager_tcssim.clone(),
+            process_manager_tcspecial.clone(),
+        ),
     );
     handle_transfer_buttons(
         &ui,
@@ -1219,6 +1245,10 @@ fn main() {
         });
     }
 */
+
+    // A signal asking the MOC to stop, which Quit and the close box already
+    // answer: see `listen_for_stop`.
+    listen_for_stop();
 
     handle_quit(&ui, process_manager_tcssim.clone(), process_manager_tcspecial.clone());
     // Quit button handler
@@ -1496,6 +1526,7 @@ fn refresh_panels(
     arrivals: Arrivals,
     contact: Arc<Mutex<Contact>>,
     declined: Declined,
+    stopping: (Arc<ProcessManager>, Option<Arc<ProcessManager>>),
 ) {
     // What the pass before this one found, so a pass can tell a change from a
     // state of affairs. Starts lost: a MOC that has heard nothing knows
@@ -1513,6 +1544,11 @@ fn refresh_panels(
         slint::TimerMode::Repeated,
         PANEL_REFRESH_INTERVAL,
         move || {
+            // A signal asking the MOC to stop, which is noticed here because
+            // this is what runs on the event loop regardless: see
+            // `stop_if_asked`.
+            stop_if_asked(&stopping.0, stopping.1.as_ref());
+
             // The beacons stopping makes every status unknown. A status is
             // the answer to a command and is worth exactly as much as the
             // ground's hearing from the spacecraft: a handler could have
@@ -2110,6 +2146,58 @@ fn kill_and_exit_all(pm_tcssim: &Arc<ProcessManager>, pm_tcspecial: Option<&Arc<
         pm_tcspecial.kill();
     }
     exit(0);
+}
+
+/// Whether something has asked this MOC to stop.
+static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Ask the kernel to tell us about an interrupt and a termination.
+///
+/// Quit and the close box stop what the MOC started; a signal did not, so a
+/// MOC killed from a terminal or by a service manager left its tcspecial and
+/// its tcssim running -- holding the command ports, the beacon socket and
+/// every payload's telemetry port, which is what the next MOC on that
+/// configuration then fails to bind.
+///
+/// Both signals, because the two ways a program is stopped are a person at a
+/// console and a service manager: one that answered only one of them would be
+/// killed outright by the other.
+pub(crate) fn listen_for_stop() {
+    // SAFETY: the handler does one thing -- an atomic store -- which is
+    // async-signal-safe. `libc::signal` is used rather than `sigaction`
+    // because that is all this needs and it is what tcspecial uses.
+    unsafe {
+        let handler = note_the_stop as *const () as libc::sighandler_t;
+        libc::signal(libc::SIGINT, handler);
+        libc::signal(libc::SIGTERM, handler);
+    }
+}
+
+/// What a signal does: sets a flag and returns.
+///
+/// Nothing else, which is the rule for a signal handler. Killing the children
+/// and exiting are not things to do here -- `exit` runs whatever the process
+/// registered to run at exit, and a window's event loop is not a thing to
+/// unwind from a handler -- so the timer that repaints the panels notices
+/// within a second and does it from the event loop.
+extern "C" fn note_the_stop(_signal: libc::c_int) {
+    STOPPING.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Stop what the MOC started, if a signal has asked for it.
+///
+/// Called from the timer that repaints the panels, which is the one thing
+/// that keeps running on the event loop whatever else the window is doing. A
+/// second is late enough to be unnoticed by a person and soon enough that
+/// nothing else is waiting on the ports.
+pub(crate) fn stop_if_asked(
+    pm_tcssim: &Arc<ProcessManager>,
+    pm_tcspecial: Option<&Arc<ProcessManager>>,
+) {
+    if STOPPING.load(std::sync::atomic::Ordering::Relaxed) {
+        eprintln!("Stopping, and stopping what was started with it");
+        kill_and_exit_all(pm_tcssim, pm_tcspecial);
+    }
 }
 
 #[cfg(test)]

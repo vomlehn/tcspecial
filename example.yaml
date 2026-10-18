@@ -14,33 +14,7 @@ payload_groups:
 moc:
   - name: moc-1
     type: moc
-    moc-out:
-      - target: can-1
-    payload-in: true
-
-vehicle:
-  - name: hysteresis-1
-    type: compute
-    function: "hysteresis"
-
-payloads:
-  - name: can-1
-    type: can
-    payload-out:
-      - target: moc-1
-    moc-in: true
-  - name: can-2
-    type: can
-  - name: can-3
-    type: can
-  - name: rpmsg-1
-    type: rpmsg
 
 tcsgui:
   nodes:
-    - { name: moc-1, x: 0, y: 192 }
-    - { name: can-1, x: 672, y: 96 }
-    - { name: can-2, x: 672, y: 208 }
-    - { name: can-3, x: 664, y: 328 }
-    - { name: rpmsg-1, x: 640, y: 472 }
-    - { name: hysteresis-1, x: 208, y: 136 }
+    - { name: moc-1, x: 469, y: 34 }

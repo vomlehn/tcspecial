@@ -774,6 +774,69 @@ impl BeaconInterval {
     }
 }
 
+/// What one node of a version 2 graph has moved.
+///
+/// Since the vehicle started, and not since the node was last enabled: a node
+/// that was stopped and started again has moved what it moved before, and an
+/// operator asking what a payload has done wants the answer for the flight
+/// rather than for the latest spell of it.
+///
+/// Not the same thing as what a pass reports. `Moved` says what one pass did,
+/// which is how the loop reports itself; this says what this node has done
+/// since the vehicle came up. A query answered from a pass's figures would
+/// answer about the last twenty milliseconds.
+///
+/// Named for what a node does rather than for what a data handler did. A
+/// handler had two conduits and talked about what it received from the ground
+/// and sent back; a node has one interface and two directions -- what the
+/// vehicle takes from it and what the vehicle gives it -- so those are the
+/// words. See [`Statistics`] for version 1's.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NodeCounts {
+    /// Bytes the vehicle has taken from this node.
+    pub taken_bytes: u64,
+    /// Reads that produced them.
+    ///
+    /// A read of nought bytes is not counted: it is the ordinary answer from
+    /// a device with nothing to say, and counting it would make a silent
+    /// payload the busiest thing in the telemetry.
+    pub reads: u64,
+    /// Reads that failed.
+    pub reads_failed: u64,
+    /// Bytes the vehicle has given this node.
+    pub given_bytes: u64,
+    /// Deliveries that carried them.
+    pub writes: u64,
+    /// Deliveries this node refused.
+    pub writes_failed: u64,
+    /// Deliveries dropped because the node was disabled.
+    ///
+    /// Apart from `writes_failed`, because they are different news: a refused
+    /// delivery is a node that would not take what it was given, and a
+    /// dropped one is the configuration working as the ground asked.
+    pub dropped: u64,
+    /// Triggers sent to a node that has to be asked.
+    ///
+    /// Counted on its own because nothing else counts it: a trigger is a
+    /// write with no read behind it, so without this it would appear in no
+    /// count at all, and a payload that had stopped answering would look
+    /// exactly like a vehicle that had stopped asking.
+    pub asks: u64,
+    /// Triggers the node would not take.
+    ///
+    /// Apart from `asks` because the two say different things: a payload that
+    /// is answering, one that has gone away, and a vehicle that has given up
+    /// asking are three states, and one count of attempts could not tell them
+    /// apart.
+    pub asks_failed: u64,
+    /// When this node last moved anything, either way.
+    ///
+    /// `None` for a node that has moved nothing, which is not the same as a
+    /// node that moved something a long time ago: the first has never
+    /// spoken, and the second has gone quiet.
+    pub last_moved: Option<Timestamp>,
+}
+
 /// Statistics for data handler operations
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Statistics {

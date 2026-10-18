@@ -5,7 +5,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::types::{CommandStatus, DHName, DHSample, DHState, NodeId, Statistics, Timestamp};
+use crate::types::{
+    CommandStatus, DHName, DHSample, DHState, NodeCounts, NodeId, Statistics, Timestamp,
+};
 
 /// Telemetry message header
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -65,6 +67,10 @@ pub enum TelemetryType {
     StopNode,
     /// And to a SET_NODE.
     SetNode,
+    /// The answer to a QUERY_NODE: see [`QueryNodeTelemetry`].
+    QueryNode,
+    /// And to a QUERY_NODE_SAMPLE: see [`QueryNodeSampleTelemetry`].
+    QueryNodeSample,
     Beacon,
 }
 
@@ -84,6 +90,8 @@ impl TelemetryType {
             TelemetryType::StartNode => 0x30,
             TelemetryType::StopNode => 0x31,
             TelemetryType::SetNode => 0x32,
+            TelemetryType::QueryNode => 0x33,
+            TelemetryType::QueryNodeSample => 0x34,
             TelemetryType::Beacon => 0xF0,
         }
     }
@@ -103,6 +111,8 @@ impl TelemetryType {
             0x30 => Some(TelemetryType::StartNode),
             0x31 => Some(TelemetryType::StopNode),
             0x32 => Some(TelemetryType::SetNode),
+            0x33 => Some(TelemetryType::QueryNode),
+            0x34 => Some(TelemetryType::QueryNodeSample),
             0xF0 => Some(TelemetryType::Beacon),
             _ => None,
         }
@@ -369,6 +379,87 @@ impl NodeTelemetry {
     }
 }
 
+/// The answer to a QUERY_NODE: what that node has moved, and whether it is
+/// running
+///
+/// Both, because they are read together: counts that have stopped going up
+/// mean one thing for a node the ground disabled and another for one that is
+/// running, and an operator who had to ask twice to tell them apart would be
+/// asking twice every time.
+///
+/// A command about a disabled node is answered rather than ignored, so this
+/// is what a disabled node answers: its counters, which survive a disable,
+/// and `false`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QueryNodeTelemetry {
+    pub header: TelemetryHeader,
+    /// The node the command named.
+    pub node: NodeId,
+    /// Whether the pass may touch it.
+    pub enabled: bool,
+    /// What it has moved since the vehicle started.
+    pub counts: NodeCounts,
+}
+
+impl QueryNodeTelemetry {
+    pub fn new(
+        sequence: u32,
+        status: CommandStatus,
+        node: NodeId,
+        enabled: bool,
+        counts: NodeCounts,
+    ) -> Self {
+        Self {
+            header: TelemetryHeader::new(sequence, TelemetryType::QueryNode, status),
+            node,
+            enabled,
+            counts,
+        }
+    }
+
+    /// The answer to a query about a node this configuration has not got.
+    ///
+    /// The id that was asked about, no counts, and not enabled: a node that
+    /// does not exist is not running, and an answer that said it was would be
+    /// worse than the refusal beside it.
+    pub fn refused(sequence: u32, status: CommandStatus, node: NodeId) -> Self {
+        Self::new(sequence, status, node, false, NodeCounts::default())
+    }
+}
+
+/// The answer to a QUERY_NODE_SAMPLE: the last datum that node moved each way
+///
+/// For an operator who wants to see the bytes rather than a count of them. A
+/// direction that has carried nothing has no time, which is not the same as
+/// one that carried a transfer of no bytes: see [`DHSample`].
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct QueryNodeSampleTelemetry {
+    pub header: TelemetryHeader,
+    /// The node the command named.
+    pub node: NodeId,
+    /// The last datum the vehicle took from it.
+    pub taken: DHSample,
+    /// And the last it gave it.
+    pub given: DHSample,
+}
+
+impl QueryNodeSampleTelemetry {
+    pub fn new(
+        sequence: u32,
+        status: CommandStatus,
+        node: NodeId,
+        taken: DHSample,
+        given: DHSample,
+    ) -> Self {
+        Self {
+            header: TelemetryHeader::new(sequence, TelemetryType::QueryNodeSample, status),
+            node,
+            taken,
+            given,
+        }
+    }
+}
+
 /// BEACON asynchronous telemetry
 ///
 /// It carries what a CONNECT response carries -- the build and the digest of
@@ -485,6 +576,20 @@ pub fn answer_to(command: &crate::commands::Command, status: CommandStatus) -> T
         Command::SetNode(cmd) => {
             Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node))
         }
+        // A refused query measured nothing, so it carries no counts and no
+        // samples: the status is the whole of what it says.
+        Command::QueryNode(cmd) => Telemetry::QueryNode(QueryNodeTelemetry::refused(
+            sequence, status, cmd.node,
+        )),
+        Command::QueryNodeSample(cmd) => {
+            Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                sequence,
+                status,
+                cmd.node,
+                DHSample::new(),
+                DHSample::new(),
+            ))
+        }
     }
 }
 
@@ -504,6 +609,8 @@ pub enum Telemetry {
     StartNode(NodeTelemetry),
     StopNode(NodeTelemetry),
     SetNode(NodeTelemetry),
+    QueryNode(QueryNodeTelemetry),
+    QueryNodeSample(QueryNodeSampleTelemetry),
     Beacon(BeaconTelemetry),
 }
 
@@ -523,6 +630,8 @@ impl Telemetry {
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.sequence
             }
+            Telemetry::QueryNode(tm) => tm.header.sequence,
+            Telemetry::QueryNodeSample(tm) => tm.header.sequence,
             Telemetry::Beacon(tm) => tm.header.sequence,
         }
     }
@@ -542,6 +651,8 @@ impl Telemetry {
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.tm_type
             }
+            Telemetry::QueryNode(tm) => tm.header.tm_type,
+            Telemetry::QueryNodeSample(tm) => tm.header.tm_type,
             Telemetry::Beacon(tm) => tm.header.tm_type,
         }
     }
@@ -561,6 +672,8 @@ impl Telemetry {
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.status
             }
+            Telemetry::QueryNode(tm) => tm.header.status,
+            Telemetry::QueryNodeSample(tm) => tm.header.status,
             Telemetry::Beacon(tm) => tm.header.status,
         }
     }
@@ -583,6 +696,8 @@ impl Telemetry {
             Telemetry::StartNode(tm) | Telemetry::StopNode(tm) | Telemetry::SetNode(tm) => {
                 tm.header.timestamp
             }
+            Telemetry::QueryNode(tm) => tm.header.timestamp,
+            Telemetry::QueryNodeSample(tm) => tm.header.timestamp,
             Telemetry::Beacon(tm) => tm.header.timestamp,
         }
     }
@@ -669,7 +784,21 @@ mod tests {
                 CommandStatus::Success,
                 NodeId::of(4),
             )),
-            Telemetry::Beacon(BeaconTelemetry::new(14, version, version, digest)),
+            Telemetry::QueryNode(QueryNodeTelemetry::new(
+                14,
+                CommandStatus::Success,
+                NodeId::of(1),
+                true,
+                NodeCounts::default(),
+            )),
+            Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                15,
+                CommandStatus::Success,
+                NodeId::of(1),
+                DHSample::new(),
+                DHSample::new(),
+            )),
+            Telemetry::Beacon(BeaconTelemetry::new(16, version, version, digest)),
         ];
 
         // Every kind there is, which is what makes this a statement about all

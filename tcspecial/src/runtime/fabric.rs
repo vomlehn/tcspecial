@@ -46,6 +46,7 @@ use std::sync::Arc;
 
 use tcslibgs::graph::terminals::Stream;
 
+use super::node_state::Outcome;
 use super::route::{Delivery, Routes};
 
 /// What a node handed over.
@@ -290,29 +291,67 @@ impl Moved {
     }
 }
 
-/// Whether the fabric may touch a node at all.
+/// What the fabric asks about a node, and tells about it.
 ///
-/// A node the ground has disabled is not read, not asked, and not delivered
-/// to. The state belongs to the node rather than to the fabric -- the command
-/// interpreter sets it from a thread of its own, see
-/// [`crate::runtime::node_state`] -- and this is how the fabric asks, so that
-/// the fabric itself stays a thing that can be tested with no node states and
-/// no command link in sight.
-pub trait Gate {
+/// Two things, and they belong together because both are the node's own
+/// rather than the fabric's. Whether a node may be touched is set by the
+/// command interpreter from a thread of its own, and what a node has moved is
+/// read by that interpreter while the pass is writing it: see
+/// [`crate::runtime::node_state`]. Behind a trait so that the fabric itself
+/// stays a thing that can be tested with no node states and no command link
+/// in sight.
+///
+/// It was called `Gate` when it only answered the first question. A gate that
+/// also counts is a gate in name only.
+pub trait Watch {
     /// Whether this node may be touched. A name this knows nothing about is
     /// enabled: a link to the ground is not something the ground can stop, and
     /// the node that feeds it is.
     fn is_enabled(&self, node: &str) -> bool;
+
+    /// What the vehicle took from this node.
+    ///
+    /// Nothing by default, so a fabric nobody is watching counts nothing and
+    /// costs nothing: the counts exist to be asked for, and nothing in a pass
+    /// decides anything by them.
+    fn took(&self, node: &str, how: Outcome) {
+        let _ = (node, how);
+    }
+
+    /// What it gave it.
+    fn gave(&self, node: &str, how: Outcome) {
+        let _ = (node, how);
+    }
+
+    /// A delivery dropped because the node is disabled.
+    fn dropped(&self, node: &str) {
+        let _ = node;
+    }
+
+    /// A trigger sent to it, or one it would not take.
+    fn asked(&self, node: &str, how: Outcome) {
+        let _ = (node, how);
+    }
+
+    /// The last datum taken from it, kept for an operator who wants the bytes.
+    fn sample_taken(&self, node: &str, data: &[u8]) {
+        let _ = (node, data);
+    }
+
+    /// And the last given it.
+    fn sample_given(&self, node: &str, data: &[u8]) {
+        let _ = (node, data);
+    }
 }
 
-/// The gate a fabric has when nothing has given it one: everything enabled.
+/// What a fabric nobody is watching has: everything enabled, nothing counted.
 ///
 /// What the fabric did before there was a command link, and what its own tests
-/// use. A separate type rather than an `Option<Arc<dyn Gate>>` with a branch
+/// use. A separate type rather than an `Option<Arc<dyn Watch>>` with a branch
 /// at each call, because a branch per delivery is a branch to get wrong.
-struct AllEnabled;
+struct Unwatched;
 
-impl Gate for AllEnabled {
+impl Watch for Unwatched {
     fn is_enabled(&self, _node: &str) -> bool {
         true
     }
@@ -324,8 +363,9 @@ pub struct Fabric {
     routes: Routes,
     /// How large a datum may be, which is the buffer a read is given.
     buffer: usize,
-    /// What says whether a node may be touched: see [`Gate`].
-    gate: Arc<dyn Gate>,
+    /// What says whether a node may be touched, and is told what it moved:
+    /// see [`Watch`].
+    watch: Arc<dyn Watch>,
 }
 
 impl Fabric {
@@ -334,13 +374,14 @@ impl Fabric {
             nodes: BTreeMap::new(),
             routes,
             buffer,
-            gate: Arc::new(AllEnabled),
+            watch: Arc::new(Unwatched),
         }
     }
 
-    /// Let something say which nodes are enabled: see [`Gate`].
-    pub fn gated_by(&mut self, gate: Arc<dyn Gate>) {
-        self.gate = gate;
+    /// Let something say which nodes are enabled, and be told what they move:
+    /// see [`Watch`].
+    pub fn watched_by(&mut self, watch: Arc<dyn Watch>) {
+        self.watch = watch;
     }
 
     /// Put a node in, under the name the configuration calls it.
@@ -383,7 +424,7 @@ impl Fabric {
     pub fn flush(&mut self, name: &str) -> Option<String> {
         // A node the ground has stopped holds nothing to flush, and may hold
         // no port at all: nothing has been delivered to it since it stopped.
-        if !self.gate.is_enabled(name) {
+        if !self.watch.is_enabled(name) {
             return None;
         }
         match self.nodes.get_mut(name) {
@@ -466,7 +507,8 @@ impl Fabric {
                 // has re-enabled is a queue that grows without bound, and a
                 // reading delivered minutes later is a reading that describes
                 // a moment that has passed.
-                if !self.gate.is_enabled(&delivery.to) {
+                if !self.watch.is_enabled(&delivery.to) {
+                    self.watch.dropped(&delivery.to);
                     moved.dropped += 1;
                     continue;
                 }
@@ -494,12 +536,16 @@ impl Fabric {
                     input: delivery.input.as_deref(),
                     stream: delivery.stream,
                 };
-                match node.give(arriving, &data) {
+                let given = node.give(arriving, &data);
+                match given {
                     Ok(()) => {
+                        self.watch.gave(&delivery.to, Outcome::Moved(data.len()));
+                        self.watch.sample_given(&delivery.to, &data);
                         moved.delivered += 1;
                         moved.bytes += data.len();
                     }
                     Err(why) => {
+                        self.watch.gave(&delivery.to, Outcome::Failed);
                         moved.refused.push((delivery.to.clone(), why));
                         continue;
                     }
@@ -524,6 +570,11 @@ impl Fabric {
                     Ok(taken) if taken.bytes == 0 => {}
                     Ok(taken) => {
                         buffer.truncate(taken.bytes);
+                        // A result is something the vehicle took from this
+                        // node, however it came about: an operator asking
+                        // what a computation has produced is asking for this.
+                        self.watch.took(&delivery.to, Outcome::Moved(buffer.len()));
+                        self.watch.sample_taken(&delivery.to, &buffer);
                         work.push_back((
                             delivery.to.clone(),
                             buffer,
@@ -533,7 +584,10 @@ impl Fabric {
                     }
                     // A node that said it had a result and then did not give
                     // one up. Counted, because the result is gone either way.
-                    Err(why) => moved.refused.push((delivery.to.clone(), why)),
+                    Err(why) => {
+                        self.watch.took(&delivery.to, Outcome::Failed);
+                        moved.refused.push((delivery.to.clone(), why));
+                    }
                 }
             }
         }
@@ -588,12 +642,24 @@ impl Fabric {
     pub fn ask(&mut self, name: &str) -> Option<String> {
         // A node the ground has stopped is not asked, and that is not a
         // failure to report: it is what stopping it means.
-        if !self.gate.is_enabled(name) {
+        if !self.watch.is_enabled(name) {
             return None;
         }
-        match self.nodes.get_mut(name) {
-            None => Some("there is no such node in this fabric".to_string()),
-            Some(node) => node.ask().err(),
+        let how = match self.nodes.get_mut(name) {
+            None => return Some("there is no such node in this fabric".to_string()),
+            Some(node) => node.ask(),
+        };
+        match how {
+            // A trigger that went out, which is counted on its own: see
+            // `NodeCounts::asks`.
+            Ok(()) => {
+                self.watch.asked(name, Outcome::Moved(0));
+                None
+            }
+            Err(why) => {
+                self.watch.asked(name, Outcome::Failed);
+                Some(why)
+            }
         }
     }
 
@@ -604,7 +670,7 @@ impl Fabric {
         // A node the ground has stopped moves nothing. Nothing is counted
         // here: a read that was not attempted is not a datum that was
         // dropped, and the pass has nothing to say about a node that is off.
-        if !self.gate.is_enabled(name) {
+        if !self.watch.is_enabled(name) {
             return moved;
         }
 
@@ -628,13 +694,20 @@ impl Fabric {
         };
 
         match taken {
+            // Nought bytes is "nothing to say", which is the ordinary answer
+            // from a device that is not due: counted as neither a read nor a
+            // failure, or a silent payload would be the busiest thing in the
+            // telemetry.
             Ok(taken) if taken.bytes == 0 => moved,
             Ok(taken) => {
                 let data = buffer[..taken.bytes].to_vec();
+                self.watch.took(name, Outcome::Moved(data.len()));
+                self.watch.sample_taken(name, &data);
                 moved.add(self.deliver_on(name, &data, taken.stream));
                 moved
             }
             Err(why) => {
+                self.watch.took(name, Outcome::Failed);
                 moved.refused.push((name.to_string(), why));
                 moved
             }

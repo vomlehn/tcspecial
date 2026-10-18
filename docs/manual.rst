@@ -1566,13 +1566,27 @@ each something to stop as much as a sensor is -- and a Disable is answered
 once the node has stopped and given up what it held, so its device, bus
 address or socket is free.
 
+Each panel's Configuration popup says what the configuration lets the ground
+set on that node, with a field to set it with: the attribute comes filled in
+from the binding, so the ordinary case of one binding needs nothing typed but
+the value. A node no binding names says so rather than offering a field.
+
+Query, on the Command menu, asks every node what it has moved. Each panel
+then says whether its node is running -- which is what the query is for, and
+the one thing the panels cannot know from what arrives -- and the counts go
+in that panel's Configuration popup beside the rest of what is known about
+it: bytes taken and given, the reads and deliveries behind them, the
+failures, the triggers sent, the deliveries dropped because the node was
+stopped, and when it last moved anything. They are what the node has moved
+since the vehicle started, not since it was last enabled, so a payload
+stopped and started again has moved what it moved before.
+
 A command names a node by the device id its panel shows, which is the node's
 position in the configuration. That is why nothing is sent until ``CONNECT``
 has agreed: the same id means a different node in a different configuration,
 and a command sent under that misunderstanding would stop something nobody
-chose. Until then, and for a vehicle whose answer disagreed, the buttons say
-so rather than sending. Query All says nothing is asked yet -- a node's
-counters are not kept -- rather than sending a command the vehicle refuses.
+chose. Until then, and for a vehicle whose answer disagreed, the controls say
+so rather than sending.
 
 A payload that nothing in the configuration touches -- no line to it or from
 it, and no command binding naming it -- reports over the ``tcspecial``

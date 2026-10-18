@@ -45,6 +45,10 @@ pub enum CommandType {
     StartNode,
     /// And disable one: version 1's STOP_DH, the same way.
     StopNode,
+    /// What a node has moved: version 1's QUERY_DH, about a node.
+    QueryNode,
+    /// The last datum a node moved each way: version 1's QUERY_DH_SAMPLE.
+    QueryNodeSample,
     /// Set an attribute of a node: version 1's CONFIG_DH, with something for
     /// it to do.
     ///
@@ -113,7 +117,9 @@ impl CommandType {
             | CommandType::ConfigDH
             | CommandType::StartNode
             | CommandType::StopNode
-            | CommandType::SetNode => CommandLink::Payload,
+            | CommandType::SetNode
+            | CommandType::QueryNode
+            | CommandType::QueryNodeSample => CommandLink::Payload,
         }
     }
 
@@ -143,6 +149,8 @@ impl CommandType {
             CommandType::StartNode => 0x30,
             CommandType::StopNode => 0x31,
             CommandType::SetNode => 0x32,
+            CommandType::QueryNode => 0x33,
+            CommandType::QueryNodeSample => 0x34,
         }
     }
 
@@ -161,6 +169,8 @@ impl CommandType {
             0x30 => Some(CommandType::StartNode),
             0x31 => Some(CommandType::StopNode),
             0x32 => Some(CommandType::SetNode),
+            0x33 => Some(CommandType::QueryNode),
+            0x34 => Some(CommandType::QueryNodeSample),
             _ => None,
         }
     }
@@ -249,10 +259,12 @@ impl ConnectCommand {
     }
 }
 
-/// START_NODE and STOP_NODE - enable or disable a node of a version 2 graph
+/// The commands that carry a node id and nothing else
 ///
-/// One body for both, the two differing only in which they ask for: there is
-/// nothing to say about a node beyond which node it is. Version 1's START_DH
+/// START_NODE, STOP_NODE, QUERY_NODE and QUERY_NODE_SAMPLE. One body for the
+/// four, because there is nothing to say about a node beyond which node it
+/// is: enabling it, disabling it, asking what it has moved and asking what it
+/// last moved all name a node and ask for one thing. Version 1's START_DH
 /// carried the kind of handler it expected as a check that the two ends had
 /// read the same configuration; the id and the digest make that check
 /// beforehand and for every command, so a kind here would be a second answer
@@ -278,6 +290,16 @@ impl NodeCommand {
     /// Disable it.
     pub fn stop(sequence: u32, node: NodeId) -> Self {
         Self::of(sequence, CommandType::StopNode, node)
+    }
+
+    /// Ask what it has moved.
+    pub fn query(sequence: u32, node: NodeId) -> Self {
+        Self::of(sequence, CommandType::QueryNode, node)
+    }
+
+    /// Ask for the last datum it moved each way.
+    pub fn query_sample(sequence: u32, node: NodeId) -> Self {
+        Self::of(sequence, CommandType::QueryNodeSample, node)
     }
 
     fn of(sequence: u32, cmd_type: CommandType, node: NodeId) -> Self {
@@ -473,6 +495,8 @@ pub enum Command {
     StartNode(NodeCommand),
     StopNode(NodeCommand),
     SetNode(SetNodeCommand),
+    QueryNode(NodeCommand),
+    QueryNodeSample(NodeCommand),
 }
 
 impl Command {
@@ -488,7 +512,10 @@ impl Command {
             Command::QueryDHSample(cmd) => cmd.header.sequence,
             Command::Config(cmd) => cmd.header.sequence,
             Command::ConfigDH(cmd) => cmd.header.sequence,
-            Command::StartNode(cmd) | Command::StopNode(cmd) => cmd.header.sequence,
+            Command::StartNode(cmd)
+            | Command::StopNode(cmd)
+            | Command::QueryNode(cmd)
+            | Command::QueryNodeSample(cmd) => cmd.header.sequence,
             Command::SetNode(cmd) => cmd.header.sequence,
         }
     }
@@ -500,7 +527,10 @@ impl Command {
     /// a command added later is placed by someone who had to decide.
     pub fn node_id(&self) -> Option<NodeId> {
         match self {
-            Command::StartNode(cmd) | Command::StopNode(cmd) => Some(cmd.node),
+            Command::StartNode(cmd)
+            | Command::StopNode(cmd)
+            | Command::QueryNode(cmd)
+            | Command::QueryNodeSample(cmd) => Some(cmd.node),
             Command::SetNode(cmd) => Some(cmd.node),
             Command::Ping(_)
             | Command::Connect(_)
@@ -547,7 +577,9 @@ impl Command {
             // name: see [`Command::node_id`].
             | Command::StartNode(_)
             | Command::StopNode(_)
-            | Command::SetNode(_) => None,
+            | Command::SetNode(_)
+            | Command::QueryNode(_)
+            | Command::QueryNodeSample(_) => None,
         }
     }
 
@@ -563,7 +595,10 @@ impl Command {
             Command::QueryDHSample(cmd) => cmd.header.cmd_type,
             Command::Config(cmd) => cmd.header.cmd_type,
             Command::ConfigDH(cmd) => cmd.header.cmd_type,
-            Command::StartNode(cmd) | Command::StopNode(cmd) => cmd.header.cmd_type,
+            Command::StartNode(cmd)
+            | Command::StopNode(cmd)
+            | Command::QueryNode(cmd)
+            | Command::QueryNodeSample(cmd) => cmd.header.cmd_type,
             Command::SetNode(cmd) => cmd.header.cmd_type,
         }
     }
@@ -600,6 +635,8 @@ mod tests {
             CommandType::StartNode,
             CommandType::StopNode,
             CommandType::SetNode,
+            CommandType::QueryNode,
+            CommandType::QueryNodeSample,
         ];
 
         for kind in spacecraft {

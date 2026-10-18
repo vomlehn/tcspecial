@@ -56,20 +56,20 @@ use crate::ci_link::{CiLink, Commanded};
 use crate::oc_link::{Arrival, Arrivals};
 use crate::{
     ask_for_the_edge, grid_shape, handle_close, handle_quit, present, show_arrivals, stop,
-    window_size, DHInfo, Edge, MainWindow, ProcessManager, Sizes, CHILDREN, CONNECTED_STATUS,
-    DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME, PANEL_REFRESH_INTERVAL,
+    window_size, DHInfo, Edge, MainWindow, MenuAction, ProcessManager, Sizes, CHILDREN,
+    CONNECTED_STATUS, DISCONNECTED_STATUS, ERROR_STATUS, NO_TRANSFER_TIME,
+    PANEL_REFRESH_INTERVAL,
 };
 
 /// What a panel's status says: a source the ground receives from.
 pub const RECEIVING_STATUS: &str = "Receiving";
 
-/// What Query All says, there being nothing yet for it to ask.
+/// What a panel's status says of a node the ground has stopped.
 ///
-/// A version 2 vehicle refuses QUERY_DH as unimplemented: the counters it
-/// would answer with are a node's own, and nothing counts them yet. Said here
-/// rather than sent, so that the operator is told why rather than shown a
-/// refusal.
-pub const NOT_QUERIED: &str = "A version 2 vehicle does not answer QUERY_DH yet: a node's      counters are not kept. The panels show what each source sends to the      ground, and Enable and Disable start and stop a node.";
+/// Beside [`RECEIVING_STATUS`], which is what a panel says before anything
+/// has been asked: a panel is a source the ground receives from, and a query
+/// is what turns that into a statement about the node itself.
+pub const STOPPED_STATUS: &str = "Stopped";
 
 /// What a node command says when the two ends have not agreed what they read.
 pub const NOT_AGREED: &str = "The vehicle has not agreed which configuration it is flying, so      a node id means nothing yet: press Connect, which sends CONNECT and      compares the digests.";
@@ -286,6 +286,110 @@ fn hear_what_the_vehicle_read(
             ui.set_last_response(SharedString::from(format!("CONNECT failed: {e}")));
         }
     }
+}
+
+/// Ask every panel's node what it has moved, and show it.
+///
+/// One command per panel rather than one for all of them: a query names a
+/// node, and a vehicle that answered for every node at once would be sending
+/// the ground counts for nodes nobody asked about. The whole set is asked
+/// here because that is what the button means, and what an operator does with
+/// it is compare them.
+///
+/// Each panel takes its node's status from the answer -- running or stopped,
+/// which is what the query is for and what the panels cannot otherwise know
+/// -- and the counts go in the panel's Configuration popup, beside the rest
+/// of what is known about that node.
+fn query_every_node(
+    ui: &MainWindow,
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    model: &Rc<VecModel<DHInfo>>,
+) {
+    if !may_command_nodes(agreed) {
+        ui.set_last_response(SharedString::from(NOT_AGREED));
+        return;
+    }
+
+    let mut said = Vec::new();
+    for row in 0..model.row_count() {
+        let Some(mut info) = model.row_data(row) else {
+            continue;
+        };
+        let node = tcslibgs::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
+        let answer = {
+            let mut guard = link.lock().unwrap();
+            match guard.client() {
+                Some(client) => client.query_node(node),
+                None => {
+                    ui.set_last_response(SharedString::from(crate::ci_link::NOT_CONNECTED));
+                    return;
+                }
+            }
+        };
+
+        match answer {
+            Ok((status, enabled, counts)) if status.is_success() => {
+                info.status = SharedString::from(if enabled {
+                    RECEIVING_STATUS
+                } else {
+                    STOPPED_STATUS
+                });
+                info.parameters = SharedString::from(format!(
+                    "{}\n\nwhat it has moved since the vehicle started\n{}",
+                    describes(&info),
+                    counted(&counts)
+                ));
+                said.push(format!("{}: {}", info.name, info.status));
+                model.set_row_data(row, info);
+            }
+            Ok((status, _, _)) => said.push(format!("{}: {status:?}", info.name)),
+            Err(e) => said.push(format!("{}: no answer ({e})", info.name)),
+        }
+    }
+
+    ui.set_last_response(SharedString::from(said.join("; ")));
+}
+
+/// What a panel says about its node before any query: where its data goes.
+///
+/// Kept apart from the counts so that a query adds to what the popup said
+/// rather than replacing it: both are about the same node, and an operator
+/// reading one wants the other beside it.
+fn describes(info: &DHInfo) -> String {
+    format!("{} (device id {})\n{}", info.name, info.dev_id, info.config)
+}
+
+/// What a node has moved, as the popup shows it.
+///
+/// A column of name and value, in a font of one width, as every other
+/// parameter line in this popup is: the lines only line up that way, and what
+/// they are read for is the comparison between them.
+fn counted(counts: &tcslibgs::NodeCounts) -> String {
+    let moved = match counts.last_moved {
+        Some(at) => at.time_of_day(),
+        // Never, which is not the same as a long time ago: the first has not
+        // spoken and the second has gone quiet.
+        None => NO_TRANSFER_TIME.to_string(),
+    };
+    format!(
+        "taken          {} bytes in {} reads\n\
+         reads failed   {}\n\
+         given          {} bytes in {} deliveries\n\
+         refused        {}\n\
+         dropped        {} (it was stopped)\n\
+         asked          {} triggers, {} refused\n\
+         last moved     {moved}",
+        counts.taken_bytes,
+        counts.reads,
+        counts.reads_failed,
+        counts.given_bytes,
+        counts.writes,
+        counts.writes_failed,
+        counts.dropped,
+        counts.asks,
+        counts.asks_failed,
+    )
 }
 
 /// Set an attribute of the node a panel is for, and say how it went.
@@ -519,12 +623,53 @@ pub(crate) fn command_buttons(
         });
     }
 
-    // Query All has nothing to ask yet: a node's counters are not kept.
+    // Query, which asks every node what it has moved. Both the callback the
+    // window declares for it and the menu item that is the only way to reach
+    // it: `query-all-clicked` is declared and nothing in the window invokes
+    // it, so the menu is where an operator presses this.
     {
         let weak = ui.as_weak();
+        let link = link.clone();
+        let agreed = agreed.clone();
+        let model = model.clone();
         ui.on_query_all_clicked(move || {
             if let Some(ui) = weak.upgrade() {
-                ui.set_last_response(SharedString::from(NOT_QUERIED));
+                query_every_node(&ui, &link, &agreed, &model);
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let link = link.clone();
+        let agreed = agreed.clone();
+        let model = model.clone();
+        ui.on_menu_action(move |action| {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            match action {
+                // The two the menu can do something about. Each is the same
+                // command the button beside it sends, by the same function:
+                // one place decides what a press means.
+                MenuAction::Query => query_every_node(&ui, &link, &agreed, &model),
+                MenuAction::Ping => {
+                    let answer = link.lock().unwrap().client().map(|client| client.ping());
+                    ui.set_last_response(SharedString::from(match answer {
+                        Some(Ok(tm)) => {
+                            format!("PING OK at {}", tm.header.timestamp.time_of_day())
+                        }
+                        Some(Err(e)) => format!("PING failed: {e}"),
+                        None => crate::ci_link::NOT_CONNECTED.to_string(),
+                    }));
+                }
+                // The rest are version 1's. A restart is not answered by a
+                // version 2 vehicle yet, and the three DH items name a data
+                // handler where a graph has nodes -- which the panels'
+                // buttons command.
+                other => ui.set_last_response(SharedString::from(format!(
+                    "{other:?} is not answered by a version 2 vehicle: a graph has \
+                     nodes, which each panel's buttons start, stop and set"
+                ))),
             }
         });
     }
@@ -619,6 +764,12 @@ fn no_command_link(ui: &MainWindow) {
     });
     let weak = ui.as_weak();
     ui.on_set_dh(move |_, _, _| {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_last_response(SharedString::from(NO_LINK));
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_menu_action(move |_| {
         if let Some(ui) = weak.upgrade() {
             ui.set_last_response(SharedString::from(NO_LINK));
         }
@@ -1055,7 +1206,7 @@ pub(crate) mod tests {
         let answering = std::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
             let mut seen = Vec::new();
-            for _ in 0..3 {
+            for _ in 0..4 {
                 let (size, from) = match vehicle.recv_from(&mut buffer) {
                     Ok(got) => got,
                     Err(_) => return seen,
@@ -1085,6 +1236,22 @@ pub(crate) mod tests {
                             seq,
                             tcslibgs::CommandStatus::Success,
                             cmd.node,
+                        ))
+                    }
+                    Command::QueryNode(cmd) => {
+                        Telemetry::QueryNode(tcslibgs::QueryNodeTelemetry::new(
+                            seq,
+                            tcslibgs::CommandStatus::Success,
+                            cmd.node,
+                            // Stopped, so the panel has something to show that
+                            // it could not have known without asking.
+                            false,
+                            tcslibgs::NodeCounts {
+                                taken_bytes: 480,
+                                reads: 40,
+                                asks: 40,
+                                ..Default::default()
+                            },
                         ))
                     }
                     other => panic!("the window sent {:?}", other.cmd_type()),
@@ -1217,15 +1384,39 @@ pub(crate) mod tests {
             "what was typed is what went out"
         );
 
+        // And Query All, which is the one control whose answer the panels
+        // take something from: a node that is running and one the ground
+        // stopped cannot be told apart from what arrives, which is why the
+        // query exists.
+        // Through the menu, which is where the Query control is: the window
+        // declares a query-all callback and nothing in it invokes one.
+        press("Command");
+        press("Query");
+        assert_eq!(
+            model.row_data(0).expect("the panel").status.as_str(),
+            STOPPED_STATUS,
+            "the panel should say what the query answered"
+        );
+        let shown = model.row_data(0).expect("the panel").parameters.to_string();
+        assert!(
+            shown.contains("480 bytes in 40 reads") && shown.contains("40 triggers"),
+            "and the counts should be in the popup: {shown}"
+        );
+        assert!(
+            shown.contains("device id"),
+            "beside what the popup said already: {shown}"
+        );
+
         let sent = answering.join().expect("the stand-in answered");
         assert_eq!(
             sent,
             vec![
                 tcslibgs::CommandType::Connect,
                 tcslibgs::CommandType::StopNode,
-                tcslibgs::CommandType::SetNode
+                tcslibgs::CommandType::SetNode,
+                tcslibgs::CommandType::QueryNode
             ],
-            "the three commands the presses should have sent"
+            "the four commands the presses should have sent"
         );
     }
 

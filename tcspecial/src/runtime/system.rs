@@ -230,7 +230,7 @@ impl System {
                 .map_err(|e| vec![format!("a node's wakeup descriptor: {e}")])?,
         );
         let mut fabric = Fabric::new(routes.clone(), DATUM_BYTES);
-        fabric.gated_by(states.clone());
+        fabric.watched_by(states.clone());
         let mut refused = Vec::new();
         let mut logs = Vec::new();
         let mut polled = Vec::new();
@@ -1215,6 +1215,113 @@ vehicle:
         assert_eq!(moved.delivered, 1, "{moved:?}");
         assert_eq!(moved.dropped, 0);
         assert_eq!(arrived.borrow().len(), 2);
+    }
+
+    /// Every node counts what it has moved, and the counts survive a stop.
+    ///
+    /// What a node has done since the vehicle started, which is a different
+    /// claim from what a pass did: a query answered from a pass's figures
+    /// would answer about the last twenty milliseconds. So the counts are the
+    /// node's own, they go on where a disable left them, and a node that was
+    /// stopped and started again has moved what it moved before -- an
+    /// operator asking what a payload has done wants the answer for the
+    /// flight.
+    #[test]
+    fn a_node_counts_what_it_has_moved_and_keeps_it_through_a_stop() {
+        let start = Instant::now();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("counted.yaml");
+        std::fs::write(
+            &path,
+            "version: \"2.0\"
+payloads:
+  - { name: asked, type: network, protocol: udp, address: \"127.0.0.1\", port: \"7009\",
+      trigger: \"55\", trigger_interval: \"100 ms\", payload-out: average }
+vehicle:
+  - { name: average, type: compute, function: mean, inputs: 1 }
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+
+        let readings = Rc::new(RefCell::new(Vec::new()));
+        let asks = Rc::new(std::cell::Cell::new(0usize));
+        let scripted = readings.clone();
+        let counted = asks.clone();
+        let mut system = System::of_opening(
+            &graph,
+            start,
+            move |node: &Node, _: &Routes, _: &Abandon| match node.node_type.as_str() {
+                "network" => Ok(Box::new(Asked {
+                    readings: scripted.clone(),
+                    asks: counted.clone(),
+                }) as Box<dyn Port>),
+                _ => Ok(Box::new(Ground::default()) as Box<dyn Port>),
+            },
+            |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
+        )
+        .expect("it opens");
+
+        let states = system.states();
+        let counts = |node: &str| states.named(node).expect("the node").counts();
+
+        // Nothing has moved, and nothing has a time: a node that has never
+        // spoken is not a node that went quiet.
+        assert_eq!(counts("asked").taken_bytes, 0);
+        assert_eq!(counts("asked").last_moved, None);
+
+        // A pass with nothing to read: the trigger goes out and is counted,
+        // and a read of nought bytes is counted as neither a read nor a
+        // failure -- a silent payload would otherwise be the busiest thing in
+        // the telemetry.
+        system.pass(start);
+        assert_eq!(counts("asked").asks, 1, "the trigger went out");
+        assert_eq!(counts("asked").reads, 0, "nothing was there to read");
+        assert_eq!(counts("asked").last_moved, None);
+
+        // And one with a reading, which the computation is given.
+        readings.borrow_mut().push(b"warm".to_vec());
+        system.pass(start + Duration::from_millis(100));
+        let taken = counts("asked");
+        assert_eq!((taken.reads, taken.taken_bytes), (1, 4));
+        assert!(taken.last_moved.is_some(), "and when it last moved");
+        let given = counts("average");
+        assert_eq!(
+            (given.writes, given.given_bytes),
+            (1, 4),
+            "the computation was given it"
+        );
+
+        // The sample is the bytes themselves, for an operator who wants to see
+        // them rather than count them.
+        let samples = states.named("asked").expect("the node").samples();
+        assert_eq!(samples.taken.data(), b"warm");
+        assert_eq!(
+            states.named("average").expect("the node").samples().given.data(),
+            b"warm"
+        );
+
+        // Stopped: a delivery to it is dropped and counted apart from the
+        // refusals, a dropped delivery being the configuration working as the
+        // ground asked rather than a node that would not take what it was
+        // given.
+        states.named("average").expect("the node").disable();
+        readings.borrow_mut().push(b"cold".to_vec());
+        system.pass(start + Duration::from_millis(200));
+        assert_eq!(counts("average").dropped, 1);
+        assert_eq!(counts("average").writes, 1, "and no second delivery");
+
+        // Started again, the counts go on from where they were.
+        states.named("average").expect("the node").enable();
+        readings.borrow_mut().push(b"warm".to_vec());
+        system.pass(start + Duration::from_millis(300));
+        let given = counts("average");
+        assert_eq!(
+            (given.writes, given.given_bytes),
+            (2, 8),
+            "a node stopped and started again has moved what it moved before"
+        );
+        assert_eq!(given.dropped, 1, "and the drop is still counted");
     }
 
     /// A stopped node gives up what it held, and starting it opens it again.

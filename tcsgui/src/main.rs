@@ -4935,8 +4935,8 @@ pub const MOC_LINE: &str = "#0292e4";
 /// scheme are held apart by.
 ///
 /// The ramp stops at thirteen of lightness, which is where the three families
-/// stop being told apart: below it a dark blue, a dark green and a dark blush
-/// converge, and at twelve they are 11.6 apart under deuteranopia. A panel
+/// stop being told apart: below it a dark blue, a dark green and a dark teal
+/// converge under deuteranopia. A panel
 /// with more nodes than its ramp has rungs starts again at the top, so two
 /// nodes of one panel may share a colour -- which is allowed here because
 /// colour is the redundant channel: every pair of types differs in two of
@@ -4976,27 +4976,44 @@ const MOC_RUNGS: &[&str] = &["#0073b5"];
 const VEHICLE_RUNGS: &[&str] = &["#547800", "#4b7000", "#446600", "#3d5d00"];
 
 /// And what it carries, which is the longest ramp: ten rungs from 46.2 of
-/// lightness down to 14.9, three and a half units apart, which is as far as
+/// lightness down to 15.0, three and a half units apart, which is as far as
 /// the floor allows.
 const PAYLOAD_RUNGS: &[&str] = &[
-    "#c7316c", "#bc2564", "#b2165b", "#a70053", "#99004b", "#8a0043", "#7b003b",
-    "#6d0033", "#5f002c", "#510025",
+    "#007a7d", "#007173", "#00676a", "#005e61", "#005557", "#004c4e", "#004446",
+    "#003b3d", "#003335", "#002b2c",
 ];
 
-/// Each panel's own node types, alphabetically: the order the ramp is walked
-/// in, and the order the panel lists them in under its headings.
+/// Each panel's own node types in the order the ramp is walked: the types the
+/// rungs were chosen for first, alphabetically, and then the apps,
+/// alphabetically.
 ///
-/// Worked out from the type table rather than written here, so that a type
-/// added to one panel takes its place in that panel's ramp and shifts the
-/// ones below it -- which is what a ramp down a list means.
+/// The apps came later than the rungs, and a type that comes later takes the
+/// colours from the top of the ramp again rather than its place in the
+/// alphabet: sorted in with the rest, app_all_pl and app_pl took the first two
+/// payload rungs and moved every device a rung or two down, so that a can
+/// node was no longer the colour a can node had been. Wrapping is allowed --
+/// see `tint_of` -- and moving a colour that is already in use is not.
 fn ramp_order(pane: Pane) -> Vec<&'static str> {
-    let mut names: Vec<&'static str> = NodeType::ALL
+    let mut types: Vec<NodeType> = NodeType::ALL
         .iter()
+        .copied()
         .filter(|t| pane_of(t.spelling()) == pane)
-        .map(|t| t.spelling())
         .collect();
-    names.sort();
-    names
+    types.sort_by_key(|t| (is_app(*t), t.spelling()));
+    types.iter().map(|t| t.spelling()).collect()
+}
+
+/// Whether a type is one of the five apps, which take their colours after the
+/// rest of their panel's: see `ramp_order`.
+fn is_app(node_type: NodeType) -> bool {
+    matches!(
+        node_type,
+        NodeType::AppPayloadVeh
+            | NodeType::AppMocVeh
+            | NodeType::AppAllVeh
+            | NodeType::AppPl
+            | NodeType::AppAllPl
+    )
 }
 
 /// The hue each family of colours is built around, in degrees of the CIE
@@ -5010,7 +5027,7 @@ fn ramp_order(pane: Pane) -> Vec<&'static str> {
 /// the bodies and the line of a family are held to it.
 ///
 /// The blue the ground station is drawn in, the green of the vehicle's own
-/// graph, and the blush of what it carries. Kept far apart from each other --
+/// graph, and the teal of what it carries. Kept far apart from each other --
 /// the test below says 60 degrees at least -- because two families a reader
 /// cannot tell apart are two families that say nothing about where a node
 /// belongs.
@@ -5022,7 +5039,7 @@ fn family_hue(pane: Pane) -> f64 {
     match pane {
         Pane::Moc => 265.0,
         Pane::Vehicle => 118.0,
-        Pane::Payloads => 2.0,
+        Pane::Payloads => 200.0,
     }
 }
 
@@ -5948,6 +5965,21 @@ mod tests {
         }
     }
 
+    /// The apps take the payload colours again from the top, and the devices
+    /// keep the colours they had before there were apps.
+    #[test]
+    fn the_apps_reuse_the_payload_colours_in_order() {
+        let devices = [
+            "can", "device-file", "gpio", "hdlc", "i2c", "iio", "network", "rpmsg",
+            "serial", "spi",
+        ];
+        for (rung, name) in devices.iter().enumerate() {
+            assert_eq!(tint_of(name), PAYLOAD_RUNGS[rung], "{name}");
+        }
+        assert_eq!(tint_of("app_all_pl"), PAYLOAD_RUNGS[0]);
+        assert_eq!(tint_of("app_pl"), PAYLOAD_RUNGS[1]);
+    }
+
     /// Every tint is a colour, and no two types share one closely enough to
     /// be mistaken.
     ///
@@ -6125,10 +6157,10 @@ mod tests {
                 pane.label()
             );
 
-            // Alphabetical, which is the order the ramp is walked in and the
-            // order the panel lists its entries under each heading.
+            // Alphabetical, the rest and then the apps, which is the order
+            // the ramp is walked in: see ramp_order.
             let mut sorted = order.clone();
-            sorted.sort();
+            sorted.sort_by_key(|name| (name.starts_with("app_"), *name));
             assert_eq!(order, sorted, "the {} panel is out of order", pane.label());
 
             // The first rung is darker than the line, by the eight the tiers
@@ -6204,7 +6236,9 @@ mod tests {
             // has seven types since the three apps joined the computation, the
             // pass-through and the log, and four rungs; the payloads have
             // twelve since the two payloads that are programs joined the ten
-            // devices, and ten rungs. Allowed because colour is the fourth
+            // devices, and ten rungs. The apps are the ones that wrap, taking
+            // the top of the ramp again, so the types that were there first
+            // keep the colours they had. Allowed because colour is the fourth
             // channel in this scheme and not the first -- every pair of types
             // differs in two things that are not colour, which
             // `style::tests::every_pair_of_types_differs_in_two_things_that_are_not_colour`
@@ -6325,8 +6359,8 @@ mod tests {
     /// a question about the pair: three to one is the threshold for something
     /// that is not text, and it is asked of the node against its own pane.
     ///
-    /// And the hue says where the node belongs. A payload is a plum or a
-    /// maroon on pale blush, a vehicle node a green on pale green, the ground
+    /// And the hue says where the node belongs. A payload is a dark teal on
+    /// pale teal, a vehicle node a green on pale green, the ground
     /// link an azure on pale blue -- so somebody who has learned one pane's
     /// colour can tell at a glance when a node is drawn in the wrong one.
     #[test]

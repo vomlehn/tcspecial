@@ -2909,8 +2909,8 @@ These three sit at 90, 90 and 82 with chromas of 13.5, 13.5 and 8.6, and their
 closest pair is 14.5 against the 15.2 of the three that came before. Half a
 unit, for a canvas that holds together.
 
-The payload pane being a teal while what it holds is drawn in blush is not an
-oversight: a pane no longer carries its family's hue. Which pane a node
+A pane no longer carries its family's hue; the payload pane and what it
+holds happen to share one, teal, and the other two need not. Which pane a node
 belongs in is said by the family's own hue -- ``family_hue`` -- and a pane's
 job is to be a quiet ground that the other two are not. What a pane is still
 held to is the rest of it: above 82 of lightness, under a chroma of 14, 8
@@ -2925,7 +2925,7 @@ pane it belongs in, and that was checked against the *pane's* hue; a pane with
 a chroma of 1.8 has no hue worth measuring against, its number being
 arithmetic on a rounding error. Each family's hue is declared instead --
 ``family_hue``: the blue of the ground link at 265 degrees, the green of the
-vehicle's own graph at 118, the blush of what it carries at 2 -- and the three
+vehicle's own graph at 118, the teal of what it carries at 200 -- and the three
 are held 60 degrees apart, because a family spans 40 either side of its centre
 and two families that overlap say nothing about where a node belongs.
 
@@ -2934,7 +2934,9 @@ it starts twelve CIE units below the line that carries that panel's data --
 the vehicle panel below both lines, having none of its own -- and steps three
 and a half units darker for each node, taking the panel's nodes in
 alphabetical order. The ground station takes one rung, the vehicle's four, and
-what the vehicle carries ten, from 46.2 of lightness down to 14.9. A reader
+what the vehicle carries ten, from 46.2 of lightness down to 15.0 -- the first
+twelve below the payload line, which is the same family's hue, so that the
+lightest payload body is a darker teal than the line and plainly not it. A reader
 finds a node in a panel by how dark it is, and a panel reads as one family
 instead of as a set of unrelated colours.
 
@@ -2942,12 +2944,13 @@ The first step is twelve rather than the eight the tiers ask, because the
 ground station's line and its bodies are the same hue: at one hue a step in
 lightness *is* the difference between two colours, and twelve is this scheme's
 floor. The ramp stops at thirteen of lightness, which is where the three
-families stop being told apart -- at twelve a dark blue, a dark green and a
-dark blush are 11.8 apart under deuteranopia. A panel with more nodes than its
+families stop being told apart -- below it a dark blue, a dark green and a
+dark teal converge under deuteranopia. A panel with more nodes than its
 ramp has rungs starts again at its first colour, so two of its nodes share
-one; nothing wraps today, the longest panel having ten nodes and ten rungs,
-and a test says so, so that an eleventh payload kind makes the wrap visible
-rather than two identical swatches.
+one. The apps are the ones that wrap: a panel's other types are walked first
+and the apps after them, so the two payload apps take the first two payload
+colours again and the three vehicle apps the first three vehicle colours,
+and no type that had a colour before the apps came lost it.
 
 What this gives up is the twelve units between *neighbours* in one panel. Ten
 steps of twelve would want a hundred and twenty units of lightness out of the

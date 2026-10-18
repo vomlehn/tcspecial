@@ -62,7 +62,8 @@ use std::os::fd::BorrowedFd;
 use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
 use tcslibgs::{
     answer_to, came_from, CIConfig, Command, CommandLink, CommandStatus, ConfigTelemetry,
-    ConnectTelemetry, HostPort, NodeTelemetry, PingTelemetry, TcsError, TcsResult, Telemetry,
+    ConnectTelemetry, HostPort, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
+    QueryNodeTelemetry, TcsError, TcsResult, Telemetry,
 };
 
 use crate::beacon_send::BeaconSend;
@@ -428,6 +429,52 @@ impl Serving {
                 Telemetry::SetNode(NodeTelemetry::set(sequence, status, cmd.node))
             }
 
+            // The two queries are answered on this thread and hand nothing
+            // over. What they ask for is the node's own -- atomics it writes
+            // as it moves data, and a sample behind a lock this takes only if
+            // it is free -- so neither waits for a pass, and a query cannot
+            // be what stalls the loop.
+            Command::QueryNode(cmd) => match self.states.at(cmd.node) {
+                Some(state) => Telemetry::QueryNode(QueryNodeTelemetry::new(
+                    sequence,
+                    CommandStatus::Success,
+                    cmd.node,
+                    state.is_enabled(),
+                    state.counts(),
+                )),
+                None => {
+                    self.no_such_node(cmd.node);
+                    Telemetry::QueryNode(QueryNodeTelemetry::refused(
+                        sequence,
+                        CommandStatus::NotFound,
+                        cmd.node,
+                    ))
+                }
+            },
+
+            Command::QueryNodeSample(cmd) => match self.states.at(cmd.node) {
+                Some(state) => {
+                    let samples = state.samples();
+                    Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                        sequence,
+                        CommandStatus::Success,
+                        cmd.node,
+                        samples.taken,
+                        samples.given,
+                    ))
+                }
+                None => {
+                    self.no_such_node(cmd.node);
+                    Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                        sequence,
+                        CommandStatus::NotFound,
+                        cmd.node,
+                        tcslibgs::DHSample::new(),
+                        tcslibgs::DHSample::new(),
+                    ))
+                }
+            }
+
             // Not answered yet, and refused rather than left unanswered. A
             // command the vehicle does not implement is a thing the ground can
             // see and work around; a command that goes quiet is a link the
@@ -439,9 +486,8 @@ impl Serving {
             // module.
             //
             // The five DH commands are version 1's, naming a data handler by
-            // name. A graph has nodes, and the ones that answer for a node
-            // are START_NODE, STOP_NODE and SET_NODE above; the two queries
-            // want per-node counters, which are not kept yet.
+            // name. A graph has nodes, and the commands that answer for one
+            // are the five NODE commands above.
             Command::RestartArm(_)
             | Command::Restart(_)
             | Command::StartDH(_)
@@ -458,6 +504,19 @@ impl Serving {
         }
     }
 
+    /// Say that the ground named a node this configuration has not got.
+    ///
+    /// One wording, because the news is the same whichever command carried
+    /// the id: the ground is reading a configuration this vehicle is not
+    /// flying, and the id it sent means a node of that one.
+    fn no_such_node(&self, node: tcslibgs::NodeId) {
+        error!(
+            "there is no node {node} in this configuration, which has {}: the \
+             ground is reading a configuration this vehicle is not flying",
+            self.states.len()
+        );
+    }
+
     /// Enable or disable the node with that id, and say how it went.
     ///
     /// An id the configuration does not have is `NotFound` and says which id
@@ -470,59 +529,9 @@ impl Serving {
     /// arrives twice, or whose answer was lost, is the ordinary case on a link
     /// with latency, and an operator who presses Disable twice has asked for a
     /// state and not for an action.
-    /// Set an attribute of the node with that id, and say how it went.
-    ///
-    /// The work is the pass's, as enabling and releasing are: what this
-    /// changes is the node's configuration, and a node whose setpoint moved
-    /// in the middle of a computation would be a node doing half of one thing
-    /// and half of another. The answer waits for it, so a success means the
-    /// node is running on the new value.
-    ///
-    /// Applied whether or not the node is disabled: what it sets is the
-    /// node's configuration rather than its traffic, so a payload the ground
-    /// stopped can be reconfigured before it is started again.
-    ///
-    /// `InvalidParameter` for an attribute no binding mentions and for a
-    /// value the node will not take. The two are told apart in the log and
-    /// not on the wire: both are the ground asking for something the
-    /// configuration does not allow, and the status an operator acts on is
-    /// the same.
-    fn set_attribute(
-        &self,
-        node: tcslibgs::NodeId,
-        attribute: &str,
-        value: &[u8],
-    ) -> CommandStatus {
-        let Some(state) = self.states.at(node) else {
-            error!(
-                "there is no node {node} in this configuration, which has {}: the \
-                 ground is reading a configuration this vehicle is not flying",
-                self.states.len()
-            );
-            return CommandStatus::NotFound;
-        };
-        let name = state.name().to_string();
-
-        match self.bench.ask(Work::Set {
-            node: name.clone(),
-            attribute: attribute.to_string(),
-            value: value.to_vec(),
-        }) {
-            Ok(()) => CommandStatus::Success,
-            Err(why) => {
-                error!("\"{name}\".{attribute} could not be set: {why}");
-                CommandStatus::InvalidParameter
-            }
-        }
-    }
-
     fn set_state(&self, node: tcslibgs::NodeId, enabled: bool) -> CommandStatus {
         let Some(state) = self.states.at(node) else {
-            error!(
-                "there is no node {node} in this configuration, which has {}: the \
-                 ground is reading a configuration this vehicle is not flying",
-                self.states.len()
-            );
+            self.no_such_node(node);
             return CommandStatus::NotFound;
         };
         let name = state.name().to_string();
@@ -548,8 +557,53 @@ impl Serving {
         match self.bench.ask(work) {
             Ok(()) => CommandStatus::Success,
             Err(why) => {
-                error!("\"{name}\" could not be {}: {why}", if enabled { "started" } else { "released" });
+                error!(
+                    "\"{name}\" could not be {}: {why}",
+                    if enabled { "started" } else { "released" }
+                );
                 CommandStatus::Failure
+            }
+        }
+    }
+
+    /// Set an attribute of the node with that id, and say how it went.
+    ///
+    /// The work is the pass's, as enabling and releasing are: what this
+    /// changes is the node's configuration, and a node whose setpoint moved
+    /// in the middle of a computation would be a node doing half of one thing
+    /// and half of another. The answer waits for it, so a success means the
+    /// node is running on the new value.
+    ///
+    /// Applied whether or not the node is disabled: what it sets is the
+    /// node's configuration rather than its traffic, so a payload the ground
+    /// stopped can be reconfigured before it is started again.
+    ///
+    /// `InvalidParameter` for an attribute no binding mentions and for a
+    /// value the node will not take. The two are told apart in the log and
+    /// not on the wire: both are the ground asking for something the
+    /// configuration does not allow, and the status an operator acts on is
+    /// the same.
+    fn set_attribute(
+        &self,
+        node: tcslibgs::NodeId,
+        attribute: &str,
+        value: &[u8],
+    ) -> CommandStatus {
+        let Some(state) = self.states.at(node) else {
+            self.no_such_node(node);
+            return CommandStatus::NotFound;
+        };
+        let name = state.name().to_string();
+
+        match self.bench.ask(Work::Set {
+            node: name.clone(),
+            attribute: attribute.to_string(),
+            value: value.to_vec(),
+        }) {
+            Ok(()) => CommandStatus::Success,
+            Err(why) => {
+                error!("\"{name}\".{attribute} could not be set: {why}");
+                CommandStatus::InvalidParameter
             }
         }
     }

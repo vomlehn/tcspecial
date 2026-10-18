@@ -1553,12 +1553,16 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     version 1's the same way: either is the ground reading a configuration
     that end has never seen.
 
-``QUERY_DH``
-    What that node has moved, from the node's own counters.
+``QUERY_NODE``
+    What that node has moved, from the node's own counters, and whether it is
+    running. Both, because they are read together: counts that have stopped
+    going up mean one thing for a node the ground disabled and another for one
+    that is running, and an operator who had to ask twice to tell those apart
+    would be asking twice every time.
 
-``QUERY_DH_SAMPLE``
-    The last datum that node produced, for an operator who wants to see the
-    bytes rather than a count of them.
+``QUERY_NODE_SAMPLE``
+    The last datum that node moved each way, for an operator who wants to see
+    the bytes rather than a count of them.
 
 ``SET_NODE``
     Sets an attribute of a node: version 1's ``CONFIG_DH``, with something for
@@ -1626,10 +1630,47 @@ Requirement
     and not for the latest spell of it.
 
 Requirement
+    A read of nought bytes is counted as neither a read nor a failure. It is
+    the ordinary answer from a device that is not due, and counting it would
+    make a silent payload the busiest thing in the telemetry.
+
+Requirement
+    Triggers are counted apart from the deliveries, and the triggers that
+    would not go apart from the ones that did. A trigger is a write with no
+    read behind it, so without a count of its own it would appear in none at
+    all -- and a payload that has stopped answering, one that has gone away,
+    and a vehicle that has stopped asking are three states that one count
+    could not tell apart.
+
+Requirement
+    Deliveries dropped because a node is disabled are counted apart from the
+    ones it refused. They are different news: a refused delivery is a node
+    that would not take what it was given, and a dropped one is the
+    configuration working as the ground asked.
+
+Requirement
+    The counts are read without the pass stopping to be read. They are
+    atomics the pass writes as it moves data and the command interpreter
+    reads from its own thread, so a query is answered while a pass is running
+    and neither waits for the other. A query that had to take something the
+    pass holds would be a query that could stall the vehicle.
+
+Requirement
+    A node's samples are kept best effort. The path that moves payload data
+    does not wait for a reader of the samples to finish: a lost sample costs
+    one stale line on a display, where a blocked pass costs data.
+
+Requirement
+    A node that has moved nothing has no time, which is not the same as one
+    that moved something long ago. The first has never spoken and the second
+    has gone quiet, and a display that showed them alike would hide the
+    difference an operator is looking for.
+
+Requirement
     What a pass reports and what a node counts are different things.
     ``Moved`` says what one pass did, which is how the loop reports itself;
     a node's counters say what that node has done since the vehicle started.
-    A ``QUERY_DH`` answered from the pass's figures would answer about the
+    A ``QUERY_NODE`` answered from the pass's figures would answer about the
     last twenty milliseconds.
 
 Requirement
@@ -1660,8 +1701,8 @@ Requirement
 
 Requirement
     A command about a disabled node is answered rather than ignored. A
-    ``QUERY_DH`` of a disabled node answers with its counters and says it is
-    disabled; a ``SET_NODE`` of one is applied if the attribute is bound,
+    ``QUERY_NODE`` of a disabled node answers with its counters and says it
+    is disabled; a ``SET_NODE`` of one is applied if the attribute is bound,
     since what it sets is the node's configuration rather than its traffic --
     so a payload the ground stopped can be reconfigured before it is started
     again.
@@ -1898,8 +1939,8 @@ conduit.
    computation's deadline.
 
    The command interpreter is there: two links, each taking commands only from
-   the address the configuration states, answering PING, CONNECT, CONFIG,
-   START_NODE, STOP_NODE and SET_NODE, and recording every answer in the log
+   the address the configuration states, answering PING, CONNECT, CONFIG and
+   the five NODE commands, and recording every answer in the log
    beside the beacons. Each node has a state and a wakeup descriptor, and
    stopping a node takes effect at once -- it is not read, not asked, and
    deliveries to it are dropped and counted.
@@ -1926,11 +1967,17 @@ conduit.
    something: a setpoint set from the ground reaches the node between stages,
    and the next pass decides by it.
 
-   RESTART_ARM, RESTART, QUERY_DH and QUERY_DH_SAMPLE are refused as
-   unimplemented rather than left unanswered. A command the vehicle does not
-   implement is something the ground can see and work around; a command that
-   goes quiet is a link the ground cannot tell from a dead one. The two
-   queries want per-node counters, which are not kept.
+   Every node counts what it has moved, and QUERY_NODE and QUERY_NODE_SAMPLE
+   answer with those counts and with the last datum each way. They are
+   answered on the interpreter's own thread and hand nothing over: the counts
+   are atomics and the samples are taken only if the lock is free.
+
+   RESTART_ARM and RESTART are refused as unimplemented rather than left
+   unanswered. A command the vehicle does not implement is something the
+   ground can see and work around; a command that goes quiet is a link the
+   ground cannot tell from a dead one. What a version 2 restart should do --
+   end the process and leave it to whatever supervises it -- is a decision
+   about how a vehicle is run and not only about the command.
 
 Running a graph
 ---------------

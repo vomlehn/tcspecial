@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandStatus, ConfigDHTelemetry, ConfigTelemetry,
-    NodeId, NodeTelemetry,
+    NodeCounts, NodeId, NodeTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
     ConfigDigest, ConfigVersion, ConnectTelemetry, DHName,
     DHSample, DHState, DHType, PingTelemetry, QueryDHSampleTelemetry, QueryDHTelemetry,
     RestartArmTelemetry,
@@ -145,6 +145,22 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                     CommandStatus::Success,
                     cmd.node,
                 )),
+                Command::QueryNode(cmd) => Telemetry::QueryNode(QueryNodeTelemetry::new(
+                    seq,
+                    CommandStatus::Success,
+                    cmd.node,
+                    true,
+                    stub_counts(),
+                )),
+                Command::QueryNodeSample(cmd) => {
+                    Telemetry::QueryNodeSample(QueryNodeSampleTelemetry::new(
+                        seq,
+                        CommandStatus::Success,
+                        cmd.node,
+                        stub_sample(0x30),
+                        stub_sample(0x40),
+                    ))
+                }
             };
 
             let data = serde_json::to_vec(&answer).expect("serialise");
@@ -180,6 +196,45 @@ fn graph_client_to(addr: &str) -> TcsClient {
     let mut client = TcsClient::of_a_graph(Box::new(spacecraft), Box::new(nodes));
     client.set_timeout(Duration::from_secs(10));
     client
+}
+
+/// What a stand-in vehicle says a node has moved.
+fn stub_counts() -> NodeCounts {
+    NodeCounts {
+        taken_bytes: 480,
+        reads: 40,
+        reads_failed: 1,
+        given_bytes: 96,
+        writes: 8,
+        writes_failed: 0,
+        dropped: 2,
+        asks: 40,
+        asks_failed: 3,
+        last_moved: Some(tcslibgs::Timestamp { micros: 1_700_000_000_000_000 }),
+    }
+}
+
+/// What a node has moved comes back whole, and so does what it last moved.
+#[test]
+fn what_a_node_has_moved_comes_back() {
+    let (addr, stub) = stub_spacecraft(2);
+    let mut client = graph_client_to(&addr);
+
+    let (status, enabled, counts) = client.query_node(NodeId::of(2)).expect("an answer");
+    assert!(status.is_success());
+    assert!(enabled, "and whether it is running, which is read with them");
+    assert_eq!(counts, stub_counts(), "every count, not some of them");
+
+    // And the bytes, which are a separate command: asking for them every
+    // poll would spend downlink on data nobody reads.
+    let (status, taken, given) = client
+        .query_node_sample(NodeId::of(2))
+        .expect("an answer");
+    assert!(status.is_success());
+    assert_eq!(taken.data(), stub_sample(0x30).data());
+    assert_eq!(given.data(), stub_sample(0x40).data());
+
+    stub.join().expect("the stand-in answered both");
 }
 
 /// A node's attribute is set by the node's id and the attribute's name.

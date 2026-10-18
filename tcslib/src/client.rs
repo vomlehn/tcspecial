@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, DHName, DHState,
-    DHSample, DHType, NodeCommand, NodeId, SetNodeCommand, Timestamp,
+    DHSample, DHType, NodeCommand, NodeCounts, NodeId, SetNodeCommand, Timestamp,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
     ConfigDigest, ConfigVersion, ConnectCommand,
     StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
@@ -356,6 +356,43 @@ impl TcsClient {
         let cmd = Command::SetNode(SetNodeCommand::new(seq, node, attribute, value));
         match self.send_command(cmd)? {
             Telemetry::SetNode(tm) => Ok((tm.header.status, tm.node)),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+        }
+    }
+
+    /// What a node has moved, and whether it is running: QUERY_NODE.
+    ///
+    /// Both, because they are read together: counts that have stopped going
+    /// up mean one thing for a node the ground disabled and another for one
+    /// that is running. A disabled node answers with its counters all the
+    /// same -- they say what it has done since the vehicle started, not since
+    /// it was last enabled.
+    pub fn query_node(
+        &mut self,
+        node: NodeId,
+    ) -> TcsResult<(CommandStatus, bool, NodeCounts)> {
+        let seq = self.next_sequence();
+        let cmd = Command::QueryNode(NodeCommand::query(seq, node));
+        match self.send_command(cmd)? {
+            Telemetry::QueryNode(tm) => Ok((tm.header.status, tm.enabled, tm.counts)),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+        }
+    }
+
+    /// The last datum a node moved each way: QUERY_NODE_SAMPLE.
+    ///
+    /// Taken first and given second, which is the order the answer carries
+    /// them. For an operator who wants to see the bytes rather than a count
+    /// of them; the counts are [`TcsClient::query_node`]'s, and asking for
+    /// both every poll would spend downlink on data nobody reads.
+    pub fn query_node_sample(
+        &mut self,
+        node: NodeId,
+    ) -> TcsResult<(CommandStatus, DHSample, DHSample)> {
+        let seq = self.next_sequence();
+        let cmd = Command::QueryNodeSample(NodeCommand::query_sample(seq, node));
+        match self.send_command(cmd)? {
+            Telemetry::QueryNodeSample(tm) => Ok((tm.header.status, tm.taken, tm.given)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }

@@ -38,12 +38,12 @@
 
 use std::collections::BTreeMap;
 use std::os::unix::io::RawFd;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tcslibgs::graph::Graph;
-use tcslibgs::NodeId;
+use tcslibgs::{DHSample, NodeCounts, NodeId, Timestamp};
 
 /// A descriptor a wait can be woken through.
 ///
@@ -250,6 +250,90 @@ impl Nudge {
     }
 }
 
+/// How an operation went, for the count it belongs in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Outcome {
+    /// It happened, carrying this many bytes.
+    Moved(usize),
+    /// It was attempted and failed.
+    Failed,
+}
+
+/// What a node has moved, counted as it moves.
+///
+/// Atomics, for the reason the enabled flag is one: the command interpreter
+/// reads these from a thread of its own while the pass is writing them, and a
+/// pass that had to take a lock the interpreter also takes would be a pass the
+/// interpreter could stall.
+///
+/// Relaxed ordering throughout. These are counts an operator reads, not a
+/// handshake: nothing decides anything by them, and a reader that saw the
+/// bytes of a transfer before its count would be reading a number that is
+/// about to be right. What matters is that none is lost, which the atomic
+/// addition gives on its own.
+///
+/// They survive a disable, because what they say is what this node has done
+/// since the vehicle started: see [`tcslibgs::NodeCounts`].
+#[derive(Debug, Default)]
+pub struct Counters {
+    taken_bytes: AtomicU64,
+    reads: AtomicU64,
+    reads_failed: AtomicU64,
+    given_bytes: AtomicU64,
+    writes: AtomicU64,
+    writes_failed: AtomicU64,
+    dropped: AtomicU64,
+    asks: AtomicU64,
+    asks_failed: AtomicU64,
+    /// Microseconds since the epoch, or nought for a node that has moved
+    /// nothing. Nought and not a sentinel: the epoch is not a time anything
+    /// here will move something at, and `None` is what it becomes on the way
+    /// out.
+    last_moved: AtomicU64,
+}
+
+impl Counters {
+    fn moved(&self, at: Timestamp) {
+        self.last_moved.store(at.micros(), Ordering::Relaxed);
+    }
+
+    /// What they say, as the ground is told it.
+    pub fn counts(&self) -> NodeCounts {
+        let read = |counter: &AtomicU64| counter.load(Ordering::Relaxed);
+        NodeCounts {
+            taken_bytes: read(&self.taken_bytes),
+            reads: read(&self.reads),
+            reads_failed: read(&self.reads_failed),
+            given_bytes: read(&self.given_bytes),
+            writes: read(&self.writes),
+            writes_failed: read(&self.writes_failed),
+            dropped: read(&self.dropped),
+            asks: read(&self.asks),
+            asks_failed: read(&self.asks_failed),
+            last_moved: match read(&self.last_moved) {
+                0 => None,
+                micros => Some(Timestamp { micros }),
+            },
+        }
+    }
+}
+
+/// The last datum each way, for an operator who wants the bytes rather than a
+/// count of them.
+///
+/// Behind a mutex rather than an atomic, a sample being forty-odd bytes. Taken
+/// with `try_lock` where it is recorded: keeping a sample is best effort, and
+/// the path that moves payload data does not wait for a reader of the samples
+/// to finish. A lost sample costs one stale line on a display, where a blocked
+/// pass costs data.
+#[derive(Debug, Default)]
+pub struct Samples {
+    /// The last thing the vehicle took from this node.
+    pub taken: DHSample,
+    /// And the last thing it gave it.
+    pub given: DHSample,
+}
+
 /// One node's state.
 ///
 /// Shared between the command interpreter's thread and the pass, which is why
@@ -268,6 +352,10 @@ pub struct NodeState {
     /// this node's operations has it in its poll set, and a descriptor closed
     /// while a poll held it would be a poll on nothing.
     wakeup: Arc<Wakeup>,
+    /// What it has moved since the vehicle started.
+    counters: Counters,
+    /// The last datum each way.
+    samples: Mutex<Samples>,
 }
 
 impl NodeState {
@@ -286,6 +374,8 @@ impl NodeState {
             id,
             enabled: AtomicBool::new(true),
             wakeup: Arc::new(Wakeup::new()?),
+            counters: Counters::default(),
+            samples: Mutex::new(Samples::default()),
         })
     }
 
@@ -327,6 +417,85 @@ impl NodeState {
     /// The descriptor to put in this node's poll sets.
     pub fn io_fd(&self) -> RawFd {
         self.wakeup.io_fd()
+    }
+
+    /// What this node has moved, as the ground is told it.
+    pub fn counts(&self) -> NodeCounts {
+        self.counters.counts()
+    }
+
+    /// The last datum each way, for an operator who wants the bytes.
+    ///
+    /// A lock that cannot be had gives nothing rather than waiting: the
+    /// samples are best effort, and a reader is not a reason to hold up the
+    /// pass that is writing them.
+    pub fn samples(&self) -> Samples {
+        match self.samples.try_lock() {
+            Ok(held) => Samples {
+                taken: held.taken,
+                given: held.given,
+            },
+            Err(_) => Samples::default(),
+        }
+    }
+
+    /// Record what the vehicle took from this node.
+    pub fn took(&self, how: Outcome) {
+        match how {
+            Outcome::Moved(bytes) => {
+                self.counters.taken_bytes.fetch_add(bytes as u64, Ordering::Relaxed);
+                self.counters.reads.fetch_add(1, Ordering::Relaxed);
+                self.counters.moved(Timestamp::now());
+            }
+            Outcome::Failed => {
+                self.counters.reads_failed.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// And what it gave it.
+    pub fn gave(&self, how: Outcome) {
+        match how {
+            Outcome::Moved(bytes) => {
+                self.counters.given_bytes.fetch_add(bytes as u64, Ordering::Relaxed);
+                self.counters.writes.fetch_add(1, Ordering::Relaxed);
+                self.counters.moved(Timestamp::now());
+            }
+            Outcome::Failed => {
+                self.counters.writes_failed.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// A delivery dropped because this node is disabled.
+    pub fn dropped(&self) {
+        self.counters.dropped.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// A trigger sent to it, or one it would not take.
+    pub fn asked(&self, how: Outcome) {
+        match how {
+            Outcome::Moved(_) => {
+                self.counters.asks.fetch_add(1, Ordering::Relaxed);
+            }
+            Outcome::Failed => {
+                self.counters.asks_failed.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// Keep the last datum taken from this node.
+    pub fn sample_taken(&self, data: &[u8]) {
+        if let Ok(mut held) = self.samples.try_lock() {
+            held.taken.record(data);
+        }
+    }
+
+    /// And the last given it.
+    pub fn sample_given(&self, data: &[u8]) {
+        if let Ok(mut held) = self.samples.try_lock() {
+            held.given.record(data);
+        }
     }
 
     /// What this node's ports wait on beside their own descriptors.
@@ -422,15 +591,57 @@ impl NodeStates {
     }
 }
 
-/// What the fabric asks before it touches a node.
+/// What the fabric asks about a node, and tells about it.
 ///
-/// The same answer the command interpreter set, read without taking anything:
-/// a pass that had to take a lock the interpreter also takes would be a pass
-/// the interpreter could stall, which is the thing the separate thread was
-/// for.
-impl crate::runtime::fabric::Gate for NodeStates {
+/// The enabled answer is the one the command interpreter set, read without
+/// taking anything: a pass that had to take a lock the interpreter also takes
+/// would be a pass the interpreter could stall, which is the thing the
+/// separate thread was for. The counts go the other way, written by the pass
+/// and read by the interpreter, and are atomics for the same reason.
+///
+/// A name with no state is a link to the ground rather than a node, and
+/// nothing is counted for it: what reaches the ground is counted at the node
+/// that produced it, and counting the link as well would be the same bytes
+/// twice.
+impl crate::runtime::fabric::Watch for NodeStates {
     fn is_enabled(&self, node: &str) -> bool {
         NodeStates::is_enabled(self, node)
+    }
+
+    fn took(&self, node: &str, how: Outcome) {
+        if let Some(state) = self.named(node) {
+            state.took(how);
+        }
+    }
+
+    fn gave(&self, node: &str, how: Outcome) {
+        if let Some(state) = self.named(node) {
+            state.gave(how);
+        }
+    }
+
+    fn dropped(&self, node: &str) {
+        if let Some(state) = self.named(node) {
+            state.dropped();
+        }
+    }
+
+    fn asked(&self, node: &str, how: Outcome) {
+        if let Some(state) = self.named(node) {
+            state.asked(how);
+        }
+    }
+
+    fn sample_taken(&self, node: &str, data: &[u8]) {
+        if let Some(state) = self.named(node) {
+            state.sample_taken(data);
+        }
+    }
+
+    fn sample_given(&self, node: &str, data: &[u8]) {
+        if let Some(state) = self.named(node) {
+            state.sample_given(data);
+        }
     }
 }
 

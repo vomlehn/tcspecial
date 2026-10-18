@@ -803,9 +803,28 @@ mod tests {
 
     // What a port answers with, for the stand-ins below.
     use crate::runtime::fabric::{Arriving, Taken};
-    use std::cell::RefCell;
     use std::path::Path;
-    use std::rc::Rc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex as TestLock;
+
+    /// What a stand-in port records, shared with the test that reads it.
+    ///
+    /// A lock and not a `RefCell`, and an `Arc` and not an `Rc`, because a
+    /// port is `Send`: a node operation runs on a thread of its own, so
+    /// anything a stand-in holds has to be able to go with it.
+    type Kept = Arc<TestLock<Vec<Vec<u8>>>>;
+
+    /// And a count it keeps, for the same reason.
+    type Tally = Arc<AtomicUsize>;
+
+    fn kept() -> Kept {
+        Arc::new(TestLock::new(Vec::new()))
+    }
+
+    fn tally() -> Tally {
+        Arc::new(AtomicUsize::new(0))
+    }
+
 
     use tcslibgs::graph::Node;
     use tcslibgs::Scalar;
@@ -817,12 +836,12 @@ mod tests {
     /// assembly and the loop: with real hardware here these would be tests of
     /// a bus.
     struct Sensor {
-        readings: Rc<RefCell<Vec<Vec<u8>>>>,
+        readings: Kept,
     }
 
     impl Port for Sensor {
         fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
-            let mut readings = self.readings.borrow_mut();
+            let mut readings = self.readings.lock().expect("the record");
             if readings.is_empty() {
                 return Ok(Taken::NOTHING);
             }
@@ -843,7 +862,7 @@ mod tests {
     /// Somewhere the ground link's telemetry can be looked at.
     #[derive(Default)]
     struct Ground {
-        got: Rc<RefCell<Vec<Vec<u8>>>>,
+        got: Kept,
     }
 
     impl Port for Ground {
@@ -852,7 +871,7 @@ mod tests {
         }
 
         fn give(&mut self, _arriving: Arriving<'_>, data: &[u8]) -> Result<(), String> {
-            self.got.borrow_mut().push(data.to_vec());
+            self.got.lock().expect("the record").push(data.to_vec());
             Ok(())
         }
     }
@@ -860,18 +879,18 @@ mod tests {
     /// A node that counts how often it is read and how often it is asked, and
     /// has nothing to say.
     struct Counted {
-        reads: Rc<std::cell::Cell<usize>>,
-        asks: Rc<std::cell::Cell<usize>>,
+        reads: Tally,
+        asks: Tally,
     }
 
     impl Port for Counted {
         fn take(&mut self, _buffer: &mut [u8]) -> Result<Taken, String> {
-            self.reads.set(self.reads.get() + 1);
+            self.reads.fetch_add(1, Ordering::Relaxed);
             Ok(Taken::NOTHING)
         }
 
         fn ask(&mut self) -> Result<(), String> {
-            self.asks.set(self.asks.get() + 1);
+            self.asks.fetch_add(1, Ordering::Relaxed);
             Ok(())
         }
 
@@ -885,13 +904,13 @@ mod tests {
     /// [`Sensor`] with the asking counted, for the one test where stopping a
     /// node has to stop an ask as well as a read.
     struct Asked {
-        readings: Rc<RefCell<Vec<Vec<u8>>>>,
-        asks: Rc<std::cell::Cell<usize>>,
+        readings: Kept,
+        asks: Tally,
     }
 
     impl Port for Asked {
         fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
-            let mut readings = self.readings.borrow_mut();
+            let mut readings = self.readings.lock().expect("the record");
             if readings.is_empty() {
                 return Ok(Taken::NOTHING);
             }
@@ -901,7 +920,7 @@ mod tests {
         }
 
         fn ask(&mut self) -> Result<(), String> {
-            self.asks.set(self.asks.get() + 1);
+            self.asks.fetch_add(1, Ordering::Relaxed);
             Ok(())
         }
 
@@ -915,7 +934,7 @@ mod tests {
     }
 
     /// Reads and asks, by node.
-    type Counts = BTreeMap<String, (Rc<std::cell::Cell<usize>>, Rc<std::cell::Cell<usize>>)>;
+    type Counts = BTreeMap<String, (Tally, Tally)>;
 
     /// Payloads in no group, each sending to the ground and each paced every
     /// 100 ms in one of the three ways -- `exchanged`, an I2C part that is
@@ -952,7 +971,7 @@ payloads:
             .map(|node| {
                 (
                     node.name.clone(),
-                    (Rc::new(std::cell::Cell::new(0)), Rc::new(std::cell::Cell::new(0))),
+                    (tally(), tally()),
                 )
             })
             .collect();
@@ -966,8 +985,8 @@ payloads:
             move |node: &Node, _: &Routes, _: &Abandon| {
                 let (reads, asks) = &opening[&node.name];
                 Ok(Box::new(Counted {
-                    reads: Rc::clone(reads),
-                    asks: Rc::clone(asks),
+                    reads: Arc::clone(reads),
+                    asks: Arc::clone(asks),
                 }) as Box<dyn Port>)
             },
             |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
@@ -982,7 +1001,7 @@ payloads:
     fn a_quiet_part_is_asked_and_read_every_trigger_interval() {
         let start = Instant::now();
         let (mut system, counts) = paced(start, false);
-        let reads = || counts["exchanged"].0.get();
+        let reads = || counts["exchanged"].0.load(Ordering::Relaxed);
 
         system.pass(start);
         assert_eq!(reads(), 1, "everything is due as the vehicle starts");
@@ -1015,12 +1034,12 @@ payloads:
         let (reads, asks) = (&counts["asked"].0, &counts["asked"].1);
 
         system.pass(start);
-        assert_eq!((reads.get(), asks.get()), (1, 1));
+        assert_eq!((reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)), (1, 1));
         system.pass(start + Duration::from_millis(20));
         system.pass(start + Duration::from_millis(40));
-        assert_eq!((reads.get(), asks.get()), (3, 1), "read every pass, asked once");
+        assert_eq!((reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)), (3, 1), "read every pass, asked once");
         system.pass(start + Duration::from_millis(100));
-        assert_eq!((reads.get(), asks.get()), (4, 2));
+        assert_eq!((reads.load(Ordering::Relaxed), asks.load(Ordering::Relaxed)), (4, 2));
     }
 
     /// A `poll_interval` is a floor: the least time between one read and the
@@ -1029,7 +1048,7 @@ payloads:
     fn a_poll_interval_is_the_least_time_between_reads() {
         let start = Instant::now();
         let (mut system, counts) = paced(start, false);
-        let reads = || counts["floored"].0.get();
+        let reads = || counts["floored"].0.load(Ordering::Relaxed);
 
         system.pass(start);
         system.pass(start + Duration::from_millis(99));
@@ -1043,7 +1062,7 @@ payloads:
         system.pass(start + Duration::from_millis(230));
         assert_eq!(reads(), 3);
         // Never asked: it has no trigger.
-        assert_eq!(counts["floored"].1.get(), 0);
+        assert_eq!(counts["floored"].1.load(Ordering::Relaxed), 0);
     }
 
     /// A node that states no interval is read on every pass.
@@ -1054,7 +1073,7 @@ payloads:
         for n in 0..5 {
             system.pass(start + Duration::from_millis(n * 20));
         }
-        assert_eq!(counts["always"].0.get(), 5);
+        assert_eq!(counts["always"].0.load(Ordering::Relaxed), 5);
     }
 
     /// The loop waits until the next node is due, and wakes no sooner unless
@@ -1087,8 +1106,8 @@ payloads:
             start,
             |_: &Node, _: &Routes, _: &Abandon| {
                 Ok(Box::new(Counted {
-                    reads: Rc::new(std::cell::Cell::new(0)),
-                    asks: Rc::new(std::cell::Cell::new(0)),
+                    reads: tally(),
+                    asks: tally(),
                 }) as Box<dyn Port>)
             },
             |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
@@ -1144,9 +1163,9 @@ vehicle:
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
 
-        let readings = Rc::new(RefCell::new(Vec::new()));
-        let arrived: Rc<RefCell<Vec<Vec<u8>>>> = Rc::new(RefCell::new(Vec::new()));
-        let asks = Rc::new(std::cell::Cell::new(0usize));
+        let readings = kept();
+        let arrived: Kept = kept();
+        let asks = tally();
 
         let scripted = readings.clone();
         let watched = arrived.clone();
@@ -1169,12 +1188,12 @@ vehicle:
 
         // Running: the part is asked, the reading is taken, and it reaches the
         // node the link goes to.
-        readings.borrow_mut().push(b"warm".to_vec());
+        readings.lock().expect("the record").push(b"warm".to_vec());
         let moved = system.pass(start);
         assert_eq!(moved.delivered, 1, "{moved:?}");
         assert_eq!(moved.dropped, 0);
-        assert_eq!(asks.get(), 1, "it was asked");
-        assert_eq!(arrived.borrow().len(), 1);
+        assert_eq!(asks.load(Ordering::Relaxed), 1, "it was asked");
+        assert_eq!(arrived.lock().expect("the record").len(), 1);
 
         let states = system.states();
 
@@ -1182,13 +1201,13 @@ vehicle:
         // reading waiting in it stays there.
         states.named("asked").expect("the node").disable();
         assert_eq!(states.disabled(), vec!["asked"]);
-        readings.borrow_mut().push(b"cold".to_vec());
+        readings.lock().expect("the record").push(b"cold".to_vec());
         let moved = system.pass(start + Duration::from_millis(100));
         assert_eq!(moved.delivered, 0, "{moved:?}");
         assert!(moved.all_delivered(), "and nothing is reported: {moved:?}");
-        assert_eq!(asks.get(), 1, "a stopped node is not asked either");
-        assert_eq!(readings.borrow().len(), 1, "the reading was not taken");
-        assert_eq!(arrived.borrow().len(), 1);
+        assert_eq!(asks.load(Ordering::Relaxed), 1, "a stopped node is not asked either");
+        assert_eq!(readings.lock().expect("the record").len(), 1, "the reading was not taken");
+        assert_eq!(arrived.lock().expect("the record").len(), 1);
 
         // And with the other end stopped instead, the reading is taken and the
         // delivery is dropped and counted -- not queued. A queue for a node
@@ -1205,16 +1224,16 @@ vehicle:
             "dropped is not refused: a node the ground stopped is the \
              configuration working as asked and not a fault: {moved:?}"
         );
-        assert_eq!(arrived.borrow().len(), 1, "nothing new arrived");
+        assert_eq!(arrived.lock().expect("the record").len(), 1, "nothing new arrived");
 
         // Started again, it moves what it moves.
         states.named("average").expect("the computation").enable();
         assert!(states.disabled().is_empty());
-        readings.borrow_mut().push(b"warm".to_vec());
+        readings.lock().expect("the record").push(b"warm".to_vec());
         let moved = system.pass(start + Duration::from_millis(300));
         assert_eq!(moved.delivered, 1, "{moved:?}");
         assert_eq!(moved.dropped, 0);
-        assert_eq!(arrived.borrow().len(), 2);
+        assert_eq!(arrived.lock().expect("the record").len(), 2);
     }
 
     /// Every node counts what it has moved, and the counts survive a stop.
@@ -1244,8 +1263,8 @@ vehicle:
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
 
-        let readings = Rc::new(RefCell::new(Vec::new()));
-        let asks = Rc::new(std::cell::Cell::new(0usize));
+        let readings = kept();
+        let asks = tally();
         let scripted = readings.clone();
         let counted = asks.clone();
         let mut system = System::of_opening(
@@ -1280,7 +1299,7 @@ vehicle:
         assert_eq!(counts("asked").last_moved, None);
 
         // And one with a reading, which the computation is given.
-        readings.borrow_mut().push(b"warm".to_vec());
+        readings.lock().expect("the record").push(b"warm".to_vec());
         system.pass(start + Duration::from_millis(100));
         let taken = counts("asked");
         assert_eq!((taken.reads, taken.taken_bytes), (1, 4));
@@ -1306,14 +1325,14 @@ vehicle:
         // ground asked rather than a node that would not take what it was
         // given.
         states.named("average").expect("the node").disable();
-        readings.borrow_mut().push(b"cold".to_vec());
+        readings.lock().expect("the record").push(b"cold".to_vec());
         system.pass(start + Duration::from_millis(200));
         assert_eq!(counts("average").dropped, 1);
         assert_eq!(counts("average").writes, 1, "and no second delivery");
 
         // Started again, the counts go on from where they were.
         states.named("average").expect("the node").enable();
-        readings.borrow_mut().push(b"warm".to_vec());
+        readings.lock().expect("the record").push(b"warm".to_vec());
         system.pass(start + Duration::from_millis(300));
         let given = counts("average");
         assert_eq!(
@@ -1352,25 +1371,25 @@ vehicle:
 
         // How many times each node has been opened, and whether the next
         // opening is to fail.
-        let opens = Rc::new(std::cell::Cell::new(0usize));
-        let broken = Rc::new(std::cell::Cell::new(false));
+        let opens = tally();
+        let broken = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let counted = opens.clone();
         let failing = broken.clone();
         let mut system = System::of_opening(
             &graph,
             start,
             move |_: &Node, _: &Routes, _: &Abandon| {
-                if failing.get() {
+                if failing.load(Ordering::Relaxed) {
                     return Err("/dev/nothing is not there".to_string());
                 }
-                counted.set(counted.get() + 1);
+                counted.fetch_add(1, Ordering::Relaxed);
                 Ok(Box::new(Ground::default()) as Box<dyn Port>)
             },
             |_: &Telemetered| Ok(Box::new(Ground::default()) as Box<dyn Port>),
         )
         .expect("it opens");
 
-        assert_eq!(opens.get(), 2, "both nodes were opened at startup");
+        assert_eq!(opens.load(Ordering::Relaxed), 2, "both nodes were opened at startup");
         let states = system.states();
 
         // Stopped, as the command interpreter stops it, and then released as
@@ -1389,7 +1408,7 @@ vehicle:
 
         // A node that will not open is left stopped and the reason given
         // back, rather than left enabled over a port that is not there.
-        broken.set(true);
+        broken.store(true, Ordering::Relaxed);
         let why = system.reopen("asked").expect_err("it cannot open");
         assert!(why.contains("not there"), "{why}");
         assert!(
@@ -1398,9 +1417,9 @@ vehicle:
         );
 
         // And opened again, it is opened by the same function and let back in.
-        broken.set(false);
+        broken.store(false, Ordering::Relaxed);
         system.reopen("asked").expect("it opens again");
-        assert_eq!(opens.get(), 3, "the opener ran again");
+        assert_eq!(opens.load(Ordering::Relaxed), 3, "the opener ran again");
         assert!(states.is_enabled("asked"), "and the flag goes up with it");
         assert!(states.disabled().is_empty());
 
@@ -1467,17 +1486,17 @@ vehicle:
     /// link and the heaters watched.
     struct Vehicle {
         system: System,
-        ground: Rc<RefCell<Vec<Vec<u8>>>>,
-        heaters: Rc<RefCell<Vec<Vec<u8>>>>,
+        ground: Kept,
+        heaters: Kept,
         /// What the sensors sent over their own links to the ground.
-        telemetry: Rc<RefCell<Vec<Vec<u8>>>>,
+        telemetry: Kept,
         log: std::path::PathBuf,
         /// Each sensor's script, kept so that a test can feed it again.
         ///
         /// A test of one pass scripts the readings once and is done; a test
         /// of something that happens *between* passes has to give the sensors
         /// something to say on the second one.
-        sensors: BTreeMap<String, Rc<RefCell<Vec<Vec<u8>>>>>,
+        sensors: BTreeMap<String, Kept>,
     }
 
     impl Vehicle {
@@ -1486,7 +1505,7 @@ vehicle:
             self.sensors
                 .get(name)
                 .unwrap_or_else(|| panic!("there is no sensor called \"{name}\" here"))
-                .borrow_mut()
+                .lock().expect("the record")
                 .push(datum.to_vec());
         }
     }
@@ -1512,24 +1531,24 @@ vehicle:
         let log = where_.path().to_path_buf();
 
         // One script per sensor, shared with the test: see `Vehicle::scripted`.
-        let sensors: BTreeMap<String, Rc<RefCell<Vec<Vec<u8>>>>> = readings
+        let sensors: BTreeMap<String, Kept> = readings
             .iter()
             .map(|(name, datum)| {
                 (
                     name.to_string(),
-                    Rc::new(RefCell::new(vec![datum.to_vec()])),
+                    Arc::new(TestLock::new(vec![datum.to_vec()])),
                 )
             })
             .collect();
 
-        let ground = Rc::new(RefCell::new(Vec::new()));
-        let heaters = Rc::new(RefCell::new(Vec::new()));
-        let telemetry = Rc::new(RefCell::new(Vec::new()));
+        let ground = kept();
+        let heaters = kept();
+        let telemetry = kept();
 
         // Cloned into the opener for the reason above: what the test watches
         // and what the opener fills are the same reference-counted places.
-        let opening_heaters = Rc::clone(&heaters);
-        let opening_ground = Rc::clone(&ground);
+        let opening_heaters = Arc::clone(&heaters);
+        let opening_ground = Arc::clone(&ground);
         let opening_sensors = sensors.clone();
         let system = System::of_opening(
             &graph,
@@ -1540,13 +1559,13 @@ vehicle:
                 "i2c" | "spi" => Ok(Box::new(Sensor {
                     readings: opening_sensors
                         .get(&node.name)
-                        .map_or_else(|| Rc::new(RefCell::new(Vec::new())), Rc::clone),
+                        .map_or_else(kept, Arc::clone),
                 }) as Box<dyn Port>),
                 "gpio" => Ok(Box::new(Ground {
-                    got: Rc::clone(&opening_heaters),
+                    got: Arc::clone(&opening_heaters),
                 }) as Box<dyn Port>),
                 "moc" => Ok(Box::new(Ground {
-                    got: Rc::clone(&opening_ground),
+                    got: Arc::clone(&opening_ground),
                 }) as Box<dyn Port>),
                 // And the ones that need nothing but a configuration, which
                 // are opened for real.
@@ -1560,8 +1579,8 @@ vehicle:
             // apart.
             |link: &Telemetered| {
                 let got = match link.via {
-                    tcslibgs::graph::telemetry::Via::Moc(_) => Rc::clone(&ground),
-                    tcslibgs::graph::telemetry::Via::PayloadTelemetry => Rc::clone(&telemetry),
+                    tcslibgs::graph::telemetry::Via::Moc(_) => Arc::clone(&ground),
+                    tcslibgs::graph::telemetry::Via::PayloadTelemetry => Arc::clone(&telemetry),
                 };
                 Ok(Box::new(Ground { got }) as Box<dyn Port>)
             },
@@ -1602,7 +1621,7 @@ vehicle:
 
         let to_ground: Vec<String> = vehicle
             .ground
-            .borrow()
+            .lock().expect("the record")
             .iter()
             .map(|datum| String::from_utf8_lossy(datum).to_string())
             .collect();
@@ -1612,12 +1631,12 @@ vehicle:
             "the ground should have three readings and their mean"
         );
         assert_eq!(
-            vehicle.heaters.borrow().clone(),
+            vehicle.heaters.lock().expect("the record").clone(),
             vec![b"1".to_vec()],
             "a cabin below the band should have its heaters on"
         );
         assert!(
-            vehicle.telemetry.borrow().is_empty(),
+            vehicle.telemetry.lock().expect("the record").is_empty(),
             "the sensors are drawn into their conversions, and report only through them"
         );
 
@@ -1642,19 +1661,19 @@ vehicle:
         let graph =
             Graph::load(root.join("examples/minimal/minimal.yaml")).expect("the example reads");
 
-        let sent = Rc::new(RefCell::new(Vec::new()));
+        let sent = kept();
         let mut system = System::of_opening(
             &graph,
             Instant::now(),
             |_node: &Node, _routes: &Routes, _: &Abandon| {
                 Ok(Box::new(Sensor {
-                    readings: Rc::new(RefCell::new(vec![b"reading 1".to_vec()])),
+                    readings: Arc::new(TestLock::new(vec![b"reading 1".to_vec()])),
                 }) as Box<dyn Port>)
             },
             |link: &Telemetered| {
                 assert_eq!(link.source, "sensor");
                 Ok(Box::new(Ground {
-                    got: Rc::clone(&sent),
+                    got: Arc::clone(&sent),
                 }) as Box<dyn Port>)
             },
         )
@@ -1663,7 +1682,7 @@ vehicle:
         assert_eq!(system.polled(), ["sensor"], "it is read, being in no group");
         let moved = system.pass(Instant::now());
         assert!(moved.all_delivered(), "{:?}", moved.refused);
-        assert_eq!(sent.borrow().clone(), vec![b"reading 1".to_vec()]);
+        assert_eq!(sent.lock().expect("the record").clone(), vec![b"reading 1".to_vec()]);
     }
 
     /// The group is read on its interval and not before.
@@ -1805,7 +1824,7 @@ vehicle:
         let mut vehicle = vehicle(start, &readings);
         vehicle.system.pass(start);
         assert_eq!(
-            vehicle.heaters.borrow().clone(),
+            vehicle.heaters.lock().expect("the record").clone(),
             vec![b"1".to_vec()],
             "a cabin below the band has its heaters on"
         );
@@ -1860,7 +1879,7 @@ vehicle:
         vehicle.system.pass(start + Duration::from_secs(4));
 
         assert_eq!(
-            vehicle.heaters.borrow().clone(),
+            vehicle.heaters.lock().expect("the record").clone(),
             vec![b"1".to_vec(), b"0".to_vec()],
             "the same cabin is now above the band, so the heaters go off"
         );
@@ -1895,6 +1914,6 @@ vehicle:
             "the loop should have waited for the next group: {:?}",
             waits.get()
         );
-        assert_eq!(vehicle.heaters.borrow().len(), 1);
+        assert_eq!(vehicle.heaters.lock().expect("the record").len(), 1);
     }
 }

@@ -43,6 +43,18 @@ export struct DHInfo {
     // nothing can change the files while the window is up, and this is not
     // telemetry -- no part of it is asked of the spacecraft.
     parameters: string,
+    // Which of this node's attributes the configuration lets the ground set,
+    // for the line that says so: "setpoint", or "setpoint, band". Empty for a
+    // node no command binding names, which is most of them.
+    //
+    // From the configuration and not from the spacecraft: what may be set is
+    // written in the file both ends read, which is the whole point of writing
+    // it there.
+    settable: string,
+    // The one the field starts with, which is the first of them. A node with
+    // one binding -- the ordinary case -- then needs nothing typed but the
+    // value.
+    setting: string,
 }
 
 component DHPanel inherits Rectangle {
@@ -56,9 +68,14 @@ component DHPanel inherits Rectangle {
     in property <int> packets-recv: 0;
     in property <color> data-color: #c4c4c4;
     in property <string> parameters: "";
+    in property <string> settable: "";
+    in property <string> setting: "";
 
     callback enable-clicked();
     callback disable-clicked();
+    // The attribute and the value, as they were typed. Which node they are
+    // about is the panel's, which the parent supplies when it connects this.
+    callback set-clicked(string, string);
 
     background: #f0f0f0;
     border-color: #808080;
@@ -157,7 +174,7 @@ component DHPanel inherits Rectangle {
             x: 4px;
             y: 4px;
             width: 300px;
-            height: 240px;
+            height: 340px;
             // Closed by a press outside it, not by any press: a press inside
             // is somebody selecting what it says to copy it.
             close-policy: close-on-click-outside;
@@ -199,6 +216,52 @@ component DHPanel inherits Rectangle {
                             wrap: no-wrap;
                             text: parameters;
                         }
+                    }
+
+                    // What the ground may set on this node, and the field to
+                    // set it with. The attribute is typed rather than chosen
+                    // from a list because a node has one binding in the
+                    // ordinary case and the field is already filled with it:
+                    // a list of one is a control that asks for a decision
+                    // nobody has to make.
+                    if settable != "": VerticalLayout {
+                        spacing: 4px;
+                        Text {
+                            text: "The ground may set: " + settable;
+                            font-size: 10px;
+                            wrap: word-wrap;
+                        }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            attribute-field := LineEdit {
+                                text: setting;
+                                font-size: 11px;
+                                min-width: 80px;
+                            }
+                            Text {
+                                text: "=";
+                                vertical-alignment: center;
+                            }
+                            value-field := LineEdit {
+                                placeholder-text: "value";
+                                font-size: 11px;
+                                min-width: 60px;
+                            }
+                            Button {
+                                text: "Set";
+                                clicked => {
+                                    set-clicked(attribute-field.text, value-field.text);
+                                }
+                            }
+                        }
+                    }
+
+                    // And a node no binding names says so, rather than
+                    // showing a field whose every press would be refused.
+                    if settable == "": Text {
+                        text: "No command binding names this node, so nothing on it may be set from the ground.";
+                        font-size: 10px;
+                        wrap: word-wrap;
                     }
                 }
             }
@@ -412,6 +475,8 @@ export component MainWindow inherits Window {
     // Rust's to decide, from the status the button's own label comes from.
     callback enable-dh(int);
     callback disable-dh(int);
+    // Which panel, which attribute, and what to set it to.
+    callback set-dh(int, string, string);
     callback quit-clicked();
     callback menu-action(MenuAction);
 
@@ -694,8 +759,11 @@ export component MainWindow inherits Window {
                             packets-recv: dh.packets-recv;
                             data-color: dh.data-color;
                             parameters: dh.parameters;
+                            settable: dh.settable;
+                            setting: dh.setting;
                             enable-clicked => { enable-dh(i); }
                             disable-clicked => { disable-dh(i); }
+                            set-clicked(attribute, value) => { set-dh(i, attribute, value); }
                         }
                     }
                     Rectangle { }

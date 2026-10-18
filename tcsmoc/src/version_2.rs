@@ -89,9 +89,38 @@ fn may_command_nodes(agreed: &Agreed) -> bool {
     matches!(agreed.lock().as_deref(), Ok(Some(true)))
 }
 
+/// Which attributes of each node the configuration lets the ground set.
+///
+/// From the `commands` section, in the order it is written: `{ from: moc,
+/// sets: thermostat.setpoint }` puts `setpoint` under `thermostat`. A node no
+/// binding names is absent, which is most of them.
+///
+/// Read here rather than asked of the spacecraft: what the ground may set is
+/// written in the file both ends read, which is the whole point of writing it
+/// there. A binding that names no attribute is left out -- the checking
+/// refuses a configuration for one, and this is not the place to guess.
+pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
+    let mut settable: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for binding in &graph.commands {
+        let target = binding.target();
+        if let Some(attribute) = target.input {
+            let theirs = settable.entry(target.node).or_default();
+            // Once each: two bindings of one attribute, from two moc nodes,
+            // are one thing the ground may set.
+            if !theirs.contains(&attribute) {
+                theirs.push(attribute);
+            }
+        }
+    }
+    settable
+}
+
 /// One panel per link to the ground, in the order the configuration declares
 /// the sources.
-pub fn panels(links: &[Telemetered]) -> Vec<DHInfo> {
+///
+/// `settable` is what [`settable_of`] found, so that each panel offers what
+/// the configuration says may be set on its node and nothing else.
+pub fn panels(links: &[Telemetered], settable: &BTreeMap<String, Vec<String>>) -> Vec<DHInfo> {
     let mut links: Vec<&Telemetered> = links.iter().collect();
     links.sort_by_key(|link| link.id);
     links
@@ -121,6 +150,21 @@ pub fn panels(links: &[Telemetered]) -> Vec<DHInfo> {
                     "{} (device id {})\nsends {via}\nthe ground receives at {}:{}",
                     link.source, link.id, link.ground.address, link.ground.port
                 )),
+                // What the ground may set on this node: all of them for the
+                // line that says so, and the first for the field to start
+                // with.
+                settable: SharedString::from(
+                    settable
+                        .get(&link.source)
+                        .map(|theirs| theirs.join(", "))
+                        .unwrap_or_default(),
+                ),
+                setting: SharedString::from(
+                    settable
+                        .get(&link.source)
+                        .and_then(|theirs| theirs.first().cloned())
+                        .unwrap_or_default(),
+                ),
             }
         })
         .collect()
@@ -242,6 +286,75 @@ fn hear_what_the_vehicle_read(
             ui.set_last_response(SharedString::from(format!("CONNECT failed: {e}")));
         }
     }
+}
+
+/// Set an attribute of the node a panel is for, and say how it went.
+///
+/// `attribute` and `value` are as they were typed. Neither is checked here:
+/// the vehicle refuses an attribute no binding mentions and a value the node
+/// will not take, and it is the end that has the configuration it is flying.
+/// What is checked here is that there is something to send -- an empty field
+/// is a press nobody meant.
+fn set_a_nodes_attribute(
+    ui: &MainWindow,
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    model: &Rc<VecModel<DHInfo>>,
+    row: usize,
+    attribute: &str,
+    value: &str,
+) {
+    let Some(info) = model.row_data(row) else {
+        return;
+    };
+    let node = tcslibgs::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
+    let name = info.name.to_string();
+
+    if attribute.trim().is_empty() || value.is_empty() {
+        ui.set_last_response(SharedString::from(format!(
+            "SET_NODE {node} ({name}) needs an attribute and a value"
+        )));
+        return;
+    }
+
+    if !may_command_nodes(agreed) {
+        ui.set_last_response(SharedString::from(NOT_AGREED));
+        return;
+    }
+
+    let answer = {
+        let mut guard = link.lock().unwrap();
+        match guard.client() {
+            Some(client) => client.set_node(node, attribute.trim(), value.as_bytes()),
+            None => {
+                ui.set_last_response(SharedString::from(crate::ci_link::NOT_CONNECTED));
+                return;
+            }
+        }
+    };
+
+    let said = match answer {
+        Ok((status, answered)) if answered != node => format!(
+            "SET_NODE {node} ({name}) was answered about {answered}: the two ends \
+             are not reading the same configuration ({status:?})"
+        ),
+        Ok((status, _)) if status.is_success() => {
+            format!("SET_NODE {node} ({name}).{} = {value}: {status:?}", attribute.trim())
+        }
+        // What was refused and why are two things, and only the first is on
+        // the wire: an attribute no binding mentions and a value the node
+        // will not take are both InvalidParameter, and the vehicle's log says
+        // which. Said here as the two possibilities, because an operator with
+        // the window and no log should still know where to look.
+        Ok((status, _)) => format!(
+            "SET_NODE {node} ({name}).{} = {value} was refused: {status:?} -- no \
+             binding names that attribute, or the node will not take that value",
+            attribute.trim()
+        ),
+        Err(e) => format!("SET_NODE {node} ({name}) failed: {e}"),
+    };
+    eprintln!("{said}");
+    ui.set_last_response(SharedString::from(said));
 }
 
 /// Send one node command about the node a panel is for, and say how it went.
@@ -439,6 +552,25 @@ pub(crate) fn command_buttons(
             }
         });
     }
+    {
+        let weak = ui.as_weak();
+        let link = link.clone();
+        let agreed = agreed.clone();
+        let model = model.clone();
+        ui.on_set_dh(move |row, attribute, value| {
+            if let Some(ui) = weak.upgrade() {
+                set_a_nodes_attribute(
+                    &ui,
+                    &link,
+                    &agreed,
+                    &model,
+                    row as usize,
+                    attribute.as_str(),
+                    value.as_str(),
+                );
+            }
+        });
+    }
 }
 
 /// Say, from every control, that this configuration names no command link.
@@ -481,6 +613,12 @@ fn no_command_link(ui: &MainWindow) {
     });
     let weak = ui.as_weak();
     ui.on_disable_dh(move |_| {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_last_response(SharedString::from(NO_LINK));
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_set_dh(move |_, _, _| {
         if let Some(ui) = weak.upgrade() {
             ui.set_last_response(SharedString::from(NO_LINK));
         }
@@ -546,7 +684,7 @@ pub fn run(payload_path: &str, sim_path: &str, mut startup: Startup) -> ! {
     crate::remember_main_window(&ui);
     let _ = Sizes::settle(&ui);
 
-    let rows_in_order = panels(&links);
+    let rows_in_order = panels(&links, &settable_of(&graph));
     let rows: Arc<BTreeMap<String, usize>> = Arc::new(
         rows_in_order
             .iter()
@@ -751,8 +889,9 @@ pub(crate) mod tests {
     /// arrives.
     #[test]
     fn each_source_has_a_panel_in_device_id_order() {
-        let links = telemetry::of(&example("thermostat")).expect("its links");
-        let panels = panels(&links);
+        let graph = example("thermostat");
+        let links = telemetry::of(&graph).expect("its links");
+        let panels = panels(&links, &settable_of(&graph));
         let named: Vec<(String, i32)> = panels
             .iter()
             .map(|p| (p.name.to_string(), p.dev_id))
@@ -773,8 +912,9 @@ pub(crate) mod tests {
     /// The minimal example's sensor reports over payload_telemetry.
     #[test]
     fn an_untouched_payload_has_a_panel_too() {
-        let links = telemetry::of(&example("minimal")).expect("its links");
-        let panels = panels(&links);
+        let graph = example("minimal");
+        let links = telemetry::of(&graph).expect("its links");
+        let panels = panels(&links, &settable_of(&graph));
         assert_eq!(panels.len(), 1);
         assert_eq!(panels[0].name.as_str(), "sensor");
         assert!(panels[0].config.contains("payload_telemetry"), "{}", panels[0].config);
@@ -806,6 +946,49 @@ pub(crate) mod tests {
             }
             Commanded::Payloads(_) => panic!("a graph's nodes are not payloads"),
         }
+    }
+
+    /// A panel offers what the configuration says may be set on its node, and
+    /// nothing else.
+    ///
+    /// From the `commands` section and not from the spacecraft: what the
+    /// ground may set is written in the file both ends read. The thermostat
+    /// example binds one attribute of one node, so one of its four panels
+    /// offers a field and the other three say they offer none.
+    #[test]
+    fn a_panel_offers_what_its_node_binds() {
+        let graph = example("thermostat");
+        let settable = settable_of(&graph);
+        assert_eq!(
+            settable.get("thermostat").map(Vec::as_slice),
+            Some(&["setpoint".to_string()][..]),
+            "the example binds the thermostat's setpoint and nothing else"
+        );
+
+        let shown = panels(&telemetry::of(&graph).expect("its links"), &settable);
+        // The thermostat is not drawn into the moc node in this example -- its
+        // decision goes to the heaters -- so the panels are the four sources,
+        // none of which binds anything.
+        for panel in &shown {
+            assert_eq!(
+                (panel.settable.as_str(), panel.setting.as_str()),
+                ("", ""),
+                "{} binds nothing, so its panel offers nothing",
+                panel.name
+            );
+        }
+
+        // And a source that does bind something offers it, with the first of
+        // them in the field: one binding is the ordinary case, and then
+        // nothing has to be typed but the value.
+        let mut both = settable.clone();
+        both.insert(
+            shown[0].name.to_string(),
+            vec!["setpoint".to_string(), "band".to_string()],
+        );
+        let offered = panels(&telemetry::of(&graph).expect("its links"), &both);
+        assert_eq!(offered[0].settable.as_str(), "setpoint, band");
+        assert_eq!(offered[0].setting.as_str(), "setpoint");
     }
 
     /// A node command waits for the two ends to agree what they read.
@@ -865,10 +1048,14 @@ pub(crate) mod tests {
         // went out on. Two commands, then it stops.
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         let at = vehicle.local_addr().expect("where it is").to_string();
+        // What the stub was asked to set, so the test can say the typed
+        // attribute and value are what went out.
+        let was_set: Arc<Mutex<Option<(String, Vec<u8>)>>> = Arc::new(Mutex::new(None));
+        let setting = was_set.clone();
         let answering = std::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
             let mut seen = Vec::new();
-            for _ in 0..2 {
+            for _ in 0..3 {
                 let (size, from) = match vehicle.recv_from(&mut buffer) {
                     Ok(got) => got,
                     Err(_) => return seen,
@@ -891,6 +1078,15 @@ pub(crate) mod tests {
                         tcslibgs::CommandStatus::Success,
                         cmd.node,
                     )),
+                    Command::SetNode(cmd) => {
+                        *setting.lock().expect("the record") =
+                            Some((cmd.attribute.clone(), cmd.value.clone()));
+                        Telemetry::SetNode(tcslibgs::NodeTelemetry::set(
+                            seq,
+                            tcslibgs::CommandStatus::Success,
+                            cmd.node,
+                        ))
+                    }
                     other => panic!("the window sent {:?}", other.cmd_type()),
                 };
                 let data = serde_json::to_vec(&answer).expect("telemetry");
@@ -902,10 +1098,16 @@ pub(crate) mod tests {
         let ui = MainWindow::new().expect("a window");
         let _ = Sizes::settle(&ui);
 
-        // One panel, for a node whose id is 1, as the example's is.
+        // One panel, for a node whose id is 1, as the example's is -- and a
+        // binding on it, so the popup has a field to press Set in. The
+        // example states none, so the test states one: what is being checked
+        // is the press and not the file.
+        let graph = example("simple-app");
+        let links = telemetry::of(&graph).expect("its links");
+        let mut settable = settable_of(&graph);
+        settable.insert(links[0].source.clone(), vec!["setpoint".to_string()]);
         let model: Rc<VecModel<DHInfo>> =
-            Rc::new(VecModel::from(panels(&telemetry::of(&example("simple-app"))
-                .expect("its links"))));
+            Rc::new(VecModel::from(panels(&links, &settable)));
         ui.set_dh_model(ModelRc::from(model.clone()));
         ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
         ui.set_ci_address(SharedString::from(at.clone()));
@@ -965,14 +1167,65 @@ pub(crate) mod tests {
             "and say which node it was about: {said}"
         );
 
+        // And the Set button in the panel's popup, which has to be opened
+        // first: a popup's contents are not built until it is shown.
+        press("Configuration");
+
+        // The popup's two fields, found by what is in them rather than by a
+        // label: a LineEdit carries no accessible label, and these two are
+        // told apart by the thing the test is checking -- the attribute comes
+        // filled in from the binding and the value does not.
+        let fields: Vec<ElementHandle> =
+            ElementHandle::find_by_element_type_name(&ui, "LineEdit")
+                .filter(|field| {
+                    field
+                        .accessible_value()
+                        .is_some_and(|held| held == "setpoint" || held.is_empty())
+                })
+                .collect();
+        assert_eq!(
+            fields.len(),
+            2,
+            "the popup should have the attribute and the value: {:?}",
+            fields
+                .iter()
+                .map(|f| f.accessible_value().map(|v| v.to_string()))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            fields
+                .iter()
+                .any(|field| field.accessible_value().is_some_and(|held| held == "setpoint")),
+            "one field should start with the attribute the binding names, so that \
+             only the value has to be typed"
+        );
+        let value = fields
+            .iter()
+            .find(|field| field.accessible_value().is_some_and(|held| held.is_empty()))
+            .expect("the value field, which starts empty");
+        value.set_accessible_value("300.0");
+        press("Set");
+
+        let said = ui.get_last_response().to_string();
+        assert!(
+            said.contains("SET_NODE") && said.contains("setpoint") && said.contains("300.0"),
+            "the answer should be shown: {said}"
+        );
+        assert_eq!(
+            was_set.lock().expect("the record").clone(),
+            Some(("setpoint".to_string(), b"300.0".to_vec())),
+            "what was typed is what went out"
+        );
+
         let sent = answering.join().expect("the stand-in answered");
         assert_eq!(
             sent,
             vec![
                 tcslibgs::CommandType::Connect,
-                tcslibgs::CommandType::StopNode
+                tcslibgs::CommandType::StopNode,
+                tcslibgs::CommandType::SetNode
             ],
-            "the two commands the presses should have sent"
+            "the three commands the presses should have sent"
         );
     }
 

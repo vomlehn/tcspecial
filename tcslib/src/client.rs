@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tcslibgs::{
     ArmKey, BeaconInterval, Command, CommandLink, CommandStatus, ConfigCommand, DHName, DHState,
-    DHSample, DHType, NodeCommand, NodeId, Timestamp,
+    DHSample, DHType, NodeCommand, NodeId, SetNodeCommand, Timestamp,
     PingCommand, QueryDHCommand, QueryDHSampleCommand, RestartArmCommand, RestartCommand,
     ConfigDigest, ConfigVersion, ConnectCommand,
     StartDHCommand, Statistics, StopDHCommand, TcsError, TcsResult, Telemetry,
@@ -331,6 +331,31 @@ impl TcsClient {
         let cmd = Command::StopNode(NodeCommand::stop(seq, node));
         match self.send_command(cmd)? {
             Telemetry::StopNode(tm) => Ok((tm.header.status, tm.node)),
+            _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
+        }
+    }
+
+    /// Set an attribute of a node: SET_NODE.
+    ///
+    /// Refused unless the configuration binds that attribute of that node to
+    /// the ground -- the `commands` section is what says a setpoint may be
+    /// set in flight -- and refused again if the node will not take the
+    /// value. Both come back as `InvalidParameter`: they are the same thing
+    /// from the ground's side, the configuration not allowing what was asked.
+    ///
+    /// The value is bytes because what an attribute takes is the node's
+    /// business: a setpoint is a temperature and a band is a width, and the
+    /// node is what reads them.
+    pub fn set_node(
+        &mut self,
+        node: NodeId,
+        attribute: &str,
+        value: &[u8],
+    ) -> TcsResult<(CommandStatus, NodeId)> {
+        let seq = self.next_sequence();
+        let cmd = Command::SetNode(SetNodeCommand::new(seq, node, attribute, value));
+        match self.send_command(cmd)? {
+            Telemetry::SetNode(tm) => Ok((tm.header.status, tm.node)),
             _ => Err(TcsError::Protocol("Unexpected telemetry type".to_string())),
         }
     }

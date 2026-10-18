@@ -1560,12 +1560,21 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     The last datum that node produced, for an operator who wants to see the
     bytes rather than a count of them.
 
-``CONFIG_DH``
-    Sets an attribute of a node. Version 1 carried a name and nothing to
-    configure with, and refused the command as unimplemented; version 2 has
-    something for it to do, because a graph's ``commands`` section already
-    says which attribute of which node the ground may set, and ``System::set``
-    already applies one.
+``SET_NODE``
+    Sets an attribute of a node: version 1's ``CONFIG_DH``, with something for
+    it to do. Version 1's carried a name and nothing to configure with and was
+    refused as unimplemented; a graph's ``commands`` section already says which
+    attribute of which node the ground may set, so this is the command that
+    section was written for -- until there was one, the bindings were checked
+    when the file was read and then applied by nothing.
+
+    Which node, by its id; which attribute, by the name the section spells;
+    and the value, as bytes. The attribute is text where the node is a number
+    because a node has a position in the configuration and an attribute has no
+    such number of its own -- a binding's position in the ``commands`` section
+    would be one, and would carry the node with it, but the value is text of no
+    fixed length anyway, so a message of fixed length was never on offer and a
+    command that says ``setpoint`` is one a log reads back.
 
 Requirement
     Any node may be disabled, whatever its kind. A graph does not divide into
@@ -1624,17 +1633,38 @@ Requirement
     last twenty milliseconds.
 
 Requirement
-    A ``CONFIG_DH`` is refused unless the configuration binds that attribute
+    A ``SET_NODE`` is refused unless the configuration binds that attribute
     of that node to the ground. The ``commands`` section is what says a
     setpoint may be set from the ground, and a vehicle that took any attribute
     from a command would have no checked configuration at all: a bus address
     or a set of line numbers is what the file said.
 
 Requirement
+    An attribute no binding mentions and a value the node will not take are
+    both ``InvalidParameter``. From the ground's side they are the same thing
+    -- the configuration does not allow what was asked -- and the two are told
+    apart in the vehicle's log rather than on the wire.
+
+Requirement
+    Nothing is half applied. The value is read and checked before anything
+    changes, so a command that is refused leaves the node running on what it
+    had: a thermostat that took half of a setpoint would be a thermostat
+    holding a temperature nobody chose.
+
+Requirement
+    A ``SET_NODE`` is applied between stages, like every other change a
+    command makes. A node whose setpoint moved in the middle of a computation
+    would be a node doing half of one thing and half of another, and the
+    answer waits for it, so a success means the node is running on the new
+    value.
+
+Requirement
     A command about a disabled node is answered rather than ignored. A
     ``QUERY_DH`` of a disabled node answers with its counters and says it is
-    disabled; a ``CONFIG_DH`` of one is applied if the attribute is bound,
-    since what it sets is the node's configuration rather than its traffic.
+    disabled; a ``SET_NODE`` of one is applied if the attribute is bound,
+    since what it sets is the node's configuration rather than its traffic --
+    so a payload the ground stopped can be reconfigured before it is started
+    again.
 
 How a command names a node
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1869,7 +1899,7 @@ conduit.
 
    The command interpreter is there: two links, each taking commands only from
    the address the configuration states, answering PING, CONNECT, CONFIG,
-   START_NODE and STOP_NODE, and recording every answer in the telemetry log
+   START_NODE, STOP_NODE and SET_NODE, and recording every answer in the log
    beside the beacons. Each node has a state and a wakeup descriptor, and
    stopping a node takes effect at once -- it is not read, not asked, and
    deliveries to it are dropped and counted.
@@ -1892,10 +1922,15 @@ conduit.
    stage: a stage's node operations run one after another on the conductor's
    own thread, where the design starts a thread for each of them.
 
-   RESTART_ARM, RESTART, QUERY_DH, QUERY_DH_SAMPLE and CONFIG_DH are refused
-   as unimplemented rather than left unanswered. A command the vehicle does
-   not implement is something the ground can see and work around; a command
-   that goes quiet is a link the ground cannot tell from a dead one.
+   SET_NODE is answered too, so the ``commands`` section finally does
+   something: a setpoint set from the ground reaches the node between stages,
+   and the next pass decides by it.
+
+   RESTART_ARM, RESTART, QUERY_DH and QUERY_DH_SAMPLE are refused as
+   unimplemented rather than left unanswered. A command the vehicle does not
+   implement is something the ground can see and work around; a command that
+   goes quiet is a link the ground cannot tell from a dead one. The two
+   queries want per-node counters, which are not kept.
 
 Running a graph
 ---------------

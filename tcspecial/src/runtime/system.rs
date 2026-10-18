@@ -79,6 +79,17 @@ pub enum Work {
     Enable(String),
     /// Release what it held, it having already been told to stop.
     Disable(String),
+    /// Set one of its attributes, as the configuration binds it.
+    ///
+    /// The pass's work and not the command interpreter's, because what it
+    /// changes is a node's configuration: a node whose setpoint moved in the
+    /// middle of a computation would be a node doing half of one thing and
+    /// half of another.
+    Set {
+        node: String,
+        attribute: String,
+        value: Vec<u8>,
+    },
 }
 
 /// One piece of work and where its answer goes.
@@ -468,6 +479,11 @@ impl System {
             let how = match &job.work {
                 Work::Enable(node) => self.reopen(node),
                 Work::Disable(node) => self.release(node),
+                Work::Set {
+                    node,
+                    attribute,
+                    value,
+                } => self.set(node, attribute, value),
             };
             // A reply nobody is waiting for is a caller that gave up, which is
             // not a reason to have left the work undone.
@@ -1349,6 +1365,23 @@ vehicle:
         /// What the sensors sent over their own links to the ground.
         telemetry: Rc<RefCell<Vec<Vec<u8>>>>,
         log: std::path::PathBuf,
+        /// Each sensor's script, kept so that a test can feed it again.
+        ///
+        /// A test of one pass scripts the readings once and is done; a test
+        /// of something that happens *between* passes has to give the sensors
+        /// something to say on the second one.
+        sensors: BTreeMap<String, Rc<RefCell<Vec<Vec<u8>>>>>,
+    }
+
+    impl Vehicle {
+        /// Give one sensor another reading, for the next pass to take.
+        fn scripted(&self, name: &str, datum: &[u8]) {
+            self.sensors
+                .get(name)
+                .unwrap_or_else(|| panic!("there is no sensor called \"{name}\" here"))
+                .borrow_mut()
+                .push(datum.to_vec());
+        }
     }
 
     fn vehicle(now: Instant, readings: &[(&str, &[u8])]) -> Vehicle {
@@ -1371,9 +1404,15 @@ vehicle:
         }
         let log = where_.path().to_path_buf();
 
-        let scripted: BTreeMap<String, Vec<Vec<u8>>> = readings
+        // One script per sensor, shared with the test: see `Vehicle::scripted`.
+        let sensors: BTreeMap<String, Rc<RefCell<Vec<Vec<u8>>>>> = readings
             .iter()
-            .map(|(name, datum)| (name.to_string(), vec![datum.to_vec()]))
+            .map(|(name, datum)| {
+                (
+                    name.to_string(),
+                    Rc::new(RefCell::new(vec![datum.to_vec()])),
+                )
+            })
             .collect();
 
         let ground = Rc::new(RefCell::new(Vec::new()));
@@ -1384,6 +1423,7 @@ vehicle:
         // and what the opener fills are the same reference-counted places.
         let opening_heaters = Rc::clone(&heaters);
         let opening_ground = Rc::clone(&ground);
+        let opening_sensors = sensors.clone();
         let system = System::of_opening(
             &graph,
             now,
@@ -1391,9 +1431,9 @@ vehicle:
             match node.node_type.as_str() {
                 // The nodes that would touch hardware.
                 "i2c" | "spi" => Ok(Box::new(Sensor {
-                    readings: Rc::new(RefCell::new(
-                        scripted.get(&node.name).cloned().unwrap_or_default(),
-                    )),
+                    readings: opening_sensors
+                        .get(&node.name)
+                        .map_or_else(|| Rc::new(RefCell::new(Vec::new())), Rc::clone),
                 }) as Box<dyn Port>),
                 "gpio" => Ok(Box::new(Ground {
                     got: Rc::clone(&opening_heaters),
@@ -1427,6 +1467,7 @@ vehicle:
             heaters,
             telemetry,
             log,
+            sensors,
         }
     }
 
@@ -1629,6 +1670,93 @@ vehicle:
         assert_eq!(described["moc"], "moc, read");
         assert_eq!(described["k_fore"], "compute");
         assert_eq!(described["housekeeping"], "log");
+    }
+
+    /// A setpoint the ground sets through the pass changes what the vehicle
+    /// decides.
+    ///
+    /// The whole way through, on the shipped example: the command interpreter
+    /// hands `Work::Set` over from a thread of its own, the pass applies it
+    /// between stages, and the next pass reads the same temperatures and
+    /// tells the heaters the opposite thing. That is what the `commands`
+    /// section is for -- it has been checked when the file is read since
+    /// version 2 began, and until now nothing applied it.
+    ///
+    /// An attribute no binding mentions is refused, and the reason reaches
+    /// the thread that asked: what the ground may change in flight is written
+    /// down, so that it is checkable before it flies.
+    #[test]
+    fn a_setpoint_the_ground_sets_changes_what_the_vehicle_decides() {
+        let start = Instant::now();
+        // A cabin at 289.15 K, which is below the example's band around
+        // 293.15: the heaters go on.
+        let readings = [
+            ("temp_fore", &[0x01, 0x00][..]),
+            ("temp_aft", &[0x01, 0x00][..]),
+            ("temp_bay", &[0x00, 0x10, 0x00][..]),
+        ];
+        let mut vehicle = vehicle(start, &readings);
+        vehicle.system.pass(start);
+        assert_eq!(
+            vehicle.heaters.borrow().clone(),
+            vec![b"1".to_vec()],
+            "a cabin below the band has its heaters on"
+        );
+
+        // The ground lowers the setpoint under the cabin, from a thread of
+        // its own as the command interpreter does.
+        let bench = vehicle.system.workbench();
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let finished = done.clone();
+        let asking = std::thread::spawn(move || {
+            let set = bench.ask(Work::Set {
+                node: "thermostat".to_string(),
+                attribute: "setpoint".to_string(),
+                value: b"280.0".to_vec(),
+            });
+            // And an attribute the configuration does not bind, which must
+            // come back refused rather than applied.
+            let unbound = bench.ask(Work::Set {
+                node: "thermostat".to_string(),
+                attribute: "above".to_string(),
+                value: b"5.0".to_vec(),
+            });
+            finished.store(true, std::sync::atomic::Ordering::SeqCst);
+            (set, unbound)
+        });
+
+        // The passes that take the work, with the sensors holding nothing:
+        // a pass is what answers the asking thread, and a pass that read a
+        // temperature would have the thermostat decide before the setpoint
+        // arrived -- which is the test asking the wrong question.
+        let waited = Instant::now();
+        while !done.load(std::sync::atomic::Ordering::SeqCst)
+            && waited.elapsed() < Duration::from_secs(5)
+        {
+            vehicle.system.pass(start);
+            std::thread::sleep(Duration::from_millis(2));
+        }
+
+        let (set, unbound) = asking.join().expect("the asking thread");
+        assert_eq!(set, Ok(()), "a bound attribute is set");
+        let why = unbound.expect_err("an attribute no binding mentions");
+        assert!(
+            why.contains("command binding") && why.contains("thermostat.above"),
+            "the reason should reach the ground: {why}"
+        );
+
+        // And now the same temperatures again, on a clock past the group's
+        // three-second interval so that the pass reads them.
+        for (name, datum) in readings {
+            vehicle.scripted(name, datum);
+        }
+        vehicle.system.pass(start + Duration::from_secs(4));
+
+        assert_eq!(
+            vehicle.heaters.borrow().clone(),
+            vec![b"1".to_vec(), b"0".to_vec()],
+            "the same cabin is now above the band, so the heaters go off"
+        );
     }
 
     /// The loop makes passes until it is told to stop.

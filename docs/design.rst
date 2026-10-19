@@ -947,6 +947,14 @@ same reason a node with no outbound link is -- a configuration that cannot do
 anything is more likely a mistake than an intention.
 
 Requirement
+    A temperature a configuration states is held to the range a value
+    carries, and the attributes that are temperatures are the ones held to it:
+    a hysteresis's ``setpoint`` and ``half_band``, and a conversion's
+    ``offset``, which is what a count of nought converts to. A ``scale`` is
+    not -- it is kelvin per count rather than a temperature, and what it may
+    be depends on the part's counts, which no file states.
+
+Requirement
     A fixed-length log takes only sources whose record length the
     configuration states, which means a device with a ``read_size``. A
     computation's length is its function's and not the file's -- four bytes
@@ -1053,6 +1061,18 @@ below zero, and not pinned to the end of the range, which would turn a runaway
 into a part that looks hot but surviving: either is a thermostat acting
 confidently on a number nobody produced. A node that must carry more than this
 wants a unit of its own, and that is a change to make deliberately.
+
+The same range holds a temperature a *file* states, and that is checked where
+a file is read: a setpoint of 3000 K is a thermostat whose readings can never
+reach it, so the heaters would be driven on and held there for the whole
+flight, and an offset of -2500 K is every reading of that part outside the
+range. On a desk each is one line to change, which is the argument for the
+rule living with the other rules. The form of a value lives there too, in
+``tcslibgs``: the range and the representation are the same fact, and half of
+a fact in each crate is two places for it to drift. It is also one thing the
+vehicle writes and the ground reads back, so it belongs beside the protocol
+the two already share -- a ground station that decodes a reading rather than
+showing four bytes of hexadecimal has it to hand.
 
 Four bytes carry one other consequence worth saying plainly. Every four bytes
 are a value, there being no bit pattern of a 32-bit integer that is not a

@@ -1353,6 +1353,14 @@ otherwise produces a payload that looks configured and is not:
   exists to prevent: a file stating an interval has said something about the
   payload's timing, and reading it as though it had not is reading a different
   file than the one that was written.
+* **A temperature a value could not carry**. A ``setpoint`` or a
+  ``half_band`` on a thermostat, or an ``offset`` on a conversion, is a
+  temperature in kelvin, and a value carries 2147.483647 K either way. A
+  setpoint of 3000 K is a thermostat whose readings can never reach it, so the
+  heaters would be driven on and held there for the whole flight; an offset
+  outside the range is every reading of that part outside it. A ``scale`` is
+  not held to this -- it is kelvin per count, not a temperature, and what it
+  may be depends on counts no file states.
 * **Two nodes wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the

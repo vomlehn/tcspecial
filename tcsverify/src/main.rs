@@ -4,6 +4,7 @@
 //! tcsverify tests/manual/tcspecial2.yaml
 //! tcsverify tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
 //! tcsverify tests/manual/tcspecial2.xml tests/manual/tcspecial2.yaml tests/manual/tcspecial2sim.yaml
+//! tcsverify --digest tests/manual/tcspecial2.yaml
 //! ```
 //!
 //! Prints one line per problem -- file, line, and what is wrong -- and exits
@@ -14,6 +15,7 @@
 //! and their simulator file: each spelling is checked with the simulator
 //! file, and then the two are compared, every section, attribute and value.
 
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -41,6 +43,16 @@ file, the first first, and then the two are compared: every section,
 attribute and value, which must be the same for the two to be read as one
 configuration.
 
+  --digest           print each configuration's digest as well, one line
+                     per file, before the problems. With two files that is
+                     the first of them and with three it is the first two:
+                     a payload simulator file has none. The digest is of
+                     what a file says and not of its bytes, so the two
+                     spellings of one configuration have the same digest
+                     and `md5sum` of the file does not. It is the digest
+                     tcspecial prints as it starts and puts in every
+                     beacon, which the MOC compares with its own to know
+                     the vehicle is flying the configuration on the desk
   --error-limit=<n>  stop after <n> errors: a whole number, 0 included,
                      or \"unlimited\", which is the default and looks
                      at everything
@@ -51,7 +63,8 @@ configuration.
 
 Exit status: 0 no error was printed -- a run that stopped before it found
 one included, as --error-limit=0 always does, and warnings never fail a
-run -- 1 an error was printed, 2 the command line was not one of these.";
+run -- 1 an error was printed, or a digest was asked for and the file
+could not be read to take one, 2 the command line was not one of these.";
 
 /// How many errors are printed before the run stops looking: every one
 /// unless asked.
@@ -65,15 +78,26 @@ const ERROR_LIMIT_FLAG: &str = "--error-limit=";
 /// What is done with warnings: printed and not counted unless asked.
 const WARNINGS_FLAG: &str = "--warnings=";
 
+/// Whether to print each configuration's digest as well as its problems.
+///
+/// Takes no value, where the other two do: there is one digest of a
+/// configuration and nothing to choose about it.
+const DIGEST_FLAG: &str = "--digest";
+
 fn main() -> ExitCode {
     let mut files: Vec<PathBuf> = Vec::new();
     let mut limits = tcsverify::Limits::EVERYTHING;
+    let mut digest = false;
     for arg in std::env::args_os().skip(1) {
         let said = arg.to_string_lossy();
         // Asked for, so on stdout and a success: the message is the answer.
         if said == "-h" || said == "--help" {
             println!("{USAGE}");
             return ExitCode::SUCCESS;
+        }
+        if said == DIGEST_FLAG {
+            digest = true;
+            continue;
         }
         let asked = if let Some(value) = said.strip_prefix(ERROR_LIMIT_FLAG) {
             error_limit(value).map(|limit| limits.error_limit = limit)
@@ -114,6 +138,34 @@ fn main() -> ExitCode {
     // say says nothing: this is a program that is run from a Makefile and
     // whose silence is the good answer.
     let mut out = std::io::stdout().lock();
+    // What was asked for comes before what was found: a digest is the answer
+    // to a question, and the problems are what the files have to say for
+    // themselves.
+    let mut digest_failed = false;
+    if digest {
+        for path in configurations(&files) {
+            match tcslibgs::config_digest::digest_of_file(path) {
+                Ok(said) => {
+                    if let Err(e) = writeln!(out, "{}: md5 {said}", path.display()) {
+                        eprintln!("tcsverify: cannot write the digest: {e}");
+                        return ExitCode::from(2);
+                    }
+                }
+                // On stderr and remembered rather than returned on: the
+                // problems found in the file are the reason there is no
+                // digest, and a reader wants them printed. A digest asked for
+                // and not given is a failed run even where the checking found
+                // nothing to count -- `--error-limit=0` prints no errors, and
+                // without this the run would end silently and successfully
+                // having answered nothing.
+                Err(why) => {
+                    eprintln!("tcsverify: {}: no digest: {why}", path.display());
+                    digest_failed = true;
+                }
+            }
+        }
+    }
+
     // Every one recorded, in the order found: the limit was applied as the
     // run looked.
     if let Err(e) = report.write(&mut out) {
@@ -135,7 +187,30 @@ fn main() -> ExitCode {
         eprintln!("tcsverify: the simulator file was read but not checked against {against}");
     }
 
+    if digest_failed {
+        return ExitCode::from(1);
+    }
+
     ExitCode::from(u8::try_from(report.status()).unwrap_or(1))
+}
+
+/// The configurations among the pathnames: every one but the simulator file.
+///
+/// One pathname is a configuration. Two are a configuration and its simulator
+/// file, and three are one configuration written twice and their simulator
+/// file -- so the simulator file is the last of two or three, and the rest are
+/// configurations.
+///
+/// A simulator file has no digest of this kind. It is not a graph, so there is
+/// nothing to digest it over, and it does not fly: the digest exists so that
+/// the vehicle and the ground can prove they read the same configuration, and
+/// nothing aboard reads a simulator file.
+fn configurations(files: &[PathBuf]) -> &[PathBuf] {
+    match files.len() {
+        0 => &[],
+        1 => &files[..1],
+        other => &files[..other - 1],
+    }
 }
 
 /// What `--error-limit=` was given, as how many to list: `None` for every one.

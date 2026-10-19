@@ -221,7 +221,7 @@ pub fn read(configuration: &Path) -> Option<Journal> {
 /// The same, in a directory given rather than found.
 pub fn read_in(directory: &Path, configuration: &Path) -> Option<Journal> {
     let text = std::fs::read_to_string(journal_in(directory, configuration)).ok()?;
-    let kept: Kept = serde_yaml::from_str(&text).ok()?;
+    let kept: Kept = serde_norway::from_str(&text).ok()?;
     (kept.configuration == absolute(configuration)).then_some(kept.journal)
 }
 
@@ -252,7 +252,7 @@ pub fn write_in(directory: &Path, configuration: &Path, journal: &Journal) -> Re
         configuration: absolute(configuration),
         journal: journal.clone(),
     };
-    let text = serde_yaml::to_string(&kept).map_err(|why| why.to_string())?;
+    let text = serde_norway::to_string(&kept).map_err(|why| why.to_string())?;
     crate::save::write_atomically(&path, text.as_bytes()).map_err(|why| why.to_string())
 }
 
@@ -315,7 +315,7 @@ pub fn prune_in(directory: &Path, now: SystemTime) -> usize {
         // cannot be read at all is left alone: it is not this function's to
         // decide that somebody else's file in this directory is rubbish.
         let orphaned = match std::fs::read_to_string(&path) {
-            Ok(text) => match serde_yaml::from_str::<Kept>(&text) {
+            Ok(text) => match serde_norway::from_str::<Kept>(&text) {
                 Ok(kept) => !kept.configuration.exists(),
                 Err(_) => false,
             },
@@ -395,7 +395,7 @@ mod tests {
             configuration: two.clone(),
             journal: journal.clone(),
         };
-        std::fs::write(&named, serde_yaml::to_string(&elsewhere).unwrap())
+        std::fs::write(&named, serde_norway::to_string(&elsewhere).unwrap())
             .expect("a file of somebody else's");
         assert!(
             read_in(&state, &one).is_none(),
@@ -472,5 +472,59 @@ mod tests {
         // And neither: nowhere to keep a history. The editor still edits, and
         // what is lost is undo across a crash.
         assert_eq!(said_by(None, None), None);
+    }
+
+    /// A history written before the editor moved to serde_norway still
+    /// reads, and is written back the same.
+    ///
+    /// The text is what serde_yaml wrote, taken from the last build that
+    /// used it: tags, a null, a quoted value and a block of two lines, which
+    /// are the shapes a journal's edits take. serde_norway is the maintained
+    /// fork of serde_yaml, and an editor that lost its undo history across
+    /// the change would be losing exactly what the history is kept for.
+    #[test]
+    fn a_history_serde_yaml_wrote_still_reads() {
+        const WRITTEN: &str = r#"configuration: /home/operator/vehicle.yaml
+journal:
+  done:
+  - !AddNode
+    name: sensor
+    node_type: i2c
+  - !SetAttribute
+    node: sensor
+    attribute: address
+    was: null
+    now: '0x48'
+  - !AddLink
+    link:
+      from: sensor
+      to: cabin
+      input: in0
+  - !SetNodeComment
+    node: sensor
+    was: null
+    now: |-
+      The forward sensor.
+      Two bytes, unsigned: 'big end first'.
+  - !RenameNode
+    was: sensor
+    now: temp_1
+  cursor: 5
+"#;
+        let kept: Kept = serde_norway::from_str(WRITTEN).expect("it reads");
+        assert_eq!(
+            kept.configuration,
+            PathBuf::from("/home/operator/vehicle.yaml")
+        );
+        assert_eq!(
+            kept.journal.depth(),
+            5,
+            "every edit, and the cursor after them"
+        );
+        assert_eq!(
+            serde_norway::to_string(&kept).expect("it writes"),
+            WRITTEN,
+            "written back the same"
+        );
     }
 }

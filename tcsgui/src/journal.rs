@@ -847,8 +847,8 @@ mod tests {
         });
         journal.undo();
 
-        let written = serde_yaml::to_string(&journal).expect("a journal writes");
-        let read: Journal = serde_yaml::from_str(&written).expect("and reads back");
+        let written = serde_norway::to_string(&journal).expect("a journal writes");
+        let read: Journal = serde_norway::from_str(&written).expect("and reads back");
 
         assert_eq!(read, journal);
         assert_eq!(read.depth(), 1);

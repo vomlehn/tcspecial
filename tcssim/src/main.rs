@@ -373,7 +373,11 @@ fn main() {
     // all where any of it is an error.
     let mut startup = Startup::default();
     startup.report(
-        &tcsverify::verify(Path::new(&payload_path), Some(Path::new(&sim_path))),
+        &tcsverify::verify(
+            Path::new(&payload_path),
+            Some(Path::new(&sim_path)),
+            tcsverify::Limits::EVERYTHING,
+        ),
         true,
     );
     let loaded = if startup.fatal() {

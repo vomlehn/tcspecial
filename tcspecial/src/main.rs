@@ -67,7 +67,11 @@ fn main() {
     // A version 2 configuration is refused on a warning as well: a node whose
     // attributes are not all in is a node that cannot be opened, so aboard it
     // is not a question of degree -- see `tcslibgs::graph::check::Severity`.
-    let report = tcsverify::verify(std::path::Path::new(&payload_path), None);
+    let report = tcsverify::verify(
+        std::path::Path::new(&payload_path),
+        None,
+        tcsverify::Limits::EVERYTHING,
+    );
     let graph = runtime::start::is_a_graph(&payload_path);
     for (error, line) in report.lines() {
         if error || graph {

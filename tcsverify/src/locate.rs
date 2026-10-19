@@ -180,53 +180,68 @@ fn xml(text: &str) -> Where {
     let mut section = String::new();
     let mut depth = 0usize;
 
-    for (index, line) in text.lines().enumerate() {
-        let number = index + 1;
-        let mut rest = line;
+    // The whole text and not a line at a time: a start tag may be written
+    // over several lines -- a root carrying its namespace and schema is --
+    // and a comment may run on for a paragraph. A tag is reported on the line
+    // it starts on.
+    let mut rest = text;
+    let mut number = 1;
+    while let Some(start) = rest.find('<') {
+        number += rest[..start].matches('\n').count();
+        let after = &rest[start + 1..];
 
-        while let Some(start) = rest.find('<') {
-            let after = &rest[start + 1..];
-            let Some(end) = after.find('>') else { break };
-            let tag = &after[..end];
-            rest = &after[end + 1..];
+        // A comment ends at `-->` and not at the first `>`, which it may
+        // hold; a declaration or a doctype at its `>`. Neither is an element.
+        let skipped = if after.starts_with("!--") {
+            after.find("-->").map(|end| end + "-->".len())
+        } else if after.starts_with('?') || after.starts_with('!') {
+            after.find('>').map(|end| end + 1)
+        } else {
+            None
+        };
+        if let Some(skipped) = skipped {
+            number += after[..skipped].matches('\n').count();
+            rest = &after[skipped..];
+            continue;
+        }
 
-            // Declarations, comments and doctypes are not elements.
-            if tag.starts_with('?') || tag.starts_with('!') {
-                continue;
-            }
+        let Some(end) = after.find('>') else { break };
+        let tag = &after[..end];
+        rest = &after[end + 1..];
+        let opened_on = number;
+        number += tag.matches('\n').count();
 
-            if tag.starts_with('/') {
-                depth = depth.saturating_sub(1);
-                continue;
-            }
+        if tag.starts_with('/') {
+            depth = depth.saturating_sub(1);
+            continue;
+        }
 
-            let self_closing = tag.ends_with('/');
-            let body = tag.trim_end_matches('/').trim();
-            let element = body.split_whitespace().next().unwrap_or("");
+        let self_closing = tag.ends_with('/');
+        let body = tag.trim_end_matches('/').trim();
+        let element = body.split_whitespace().next().unwrap_or("");
 
-            // An element under the root is a section. One with no children --
-            // a payload written entirely as attributes -- is its own section
-            // as well as its own entry.
-            if depth == 1 {
-                section = element.to_string();
-                found.note_section(&section, number);
-            }
+        // An element under the root is a section. One with no children --
+        // a payload written entirely as attributes -- is its own section
+        // as well as its own entry.
+        if depth == 1 {
+            section = element.to_string();
+            found.note_section(&section, opened_on);
+        }
 
-            if let Some(value) = attribute(body, "name") {
-                found.note(&section, value, number);
-            }
+        if let Some(value) = attribute(body, "name") {
+            found.note(&section, value, opened_on);
+        }
 
-            if self_closing {
-                continue;
-            }
-            depth += 1;
+        if self_closing {
+            continue;
+        }
+        depth += 1;
 
-            // `<name>DH0</name>`, which is how a tcspecial configuration written in XML
-            // says which payload this is.
-            if element == "name" {
-                if let Some(close) = rest.find("</") {
-                    found.note(&section, rest[..close].trim(), number);
-                }
+        // `<name>DH0</name>`, which is how a tcspecial configuration written in XML
+        // says which payload this is.
+        if element == "name" {
+            if let Some(close) = rest.find("</") {
+                found.note(&section, rest[..close].trim(), opened_on);
             }
         }
     }
@@ -387,6 +402,43 @@ simulated_payloads:
         let found = Where::of(text, ConfigFormat::Xml);
         assert_eq!(found.line_of(&About::Payload("DH0".to_string())), 2);
         assert_eq!(found.line_of(&About::Payload("DH1".to_string())), 3);
+    }
+
+    /// A root whose start tag runs over several lines, and a comment holding
+    /// a `>`, leave every entry where it is.
+    ///
+    /// Both are how the shipped examples are written: the root carries its
+    /// namespace and schema on lines of their own, and the comments explain
+    /// what the addresses are. A scan that lost count of either put every
+    /// problem on line 1.
+    #[test]
+    fn a_tag_or_a_comment_over_several_lines_is_followed() {
+        let text = "\
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<configuration
+    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"
+    xsi:noNamespaceSchemaLocation=\"tcspecial.xsd\">
+    <version>2.0</version>
+    <tcspecial>
+        <!-- beacons go from send -> recv, and
+             commands the other way -->
+        <beacon>
+            <interval>1 s</interval>
+        </beacon>
+    </tcspecial>
+    <moc>
+        <name>moc-1</name>
+    </moc>
+    <payloads
+        type=\"i2c\">
+        <name>sensor</name>
+    </payloads>
+</configuration>
+";
+        let found = Where::of(text, ConfigFormat::Xml);
+        assert_eq!(found.line_of(&About::Section("tcspecial")), 6);
+        assert_eq!(found.line_of(&About::Node("moc-1".to_string())), 14);
+        assert_eq!(found.line_of(&About::Node("sensor".to_string())), 18);
     }
 
     /// The scan does not mistake the root for a section, nor a closing tag

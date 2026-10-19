@@ -1042,10 +1042,27 @@ struct JustTheVersion {
 /// better complaint about an unreadable file belongs to whatever tries to read
 /// it properly.
 pub fn version_of(path: &Path) -> Option<String> {
+    read_version(path).flatten()
+}
+
+/// Whether a file reads and says no version at all.
+///
+/// The one way of not answering [`version_of`] that is the file's own doing
+/// and has a short answer. Taken for "not version 2", such a file was read as
+/// version 1, and a graph read so was refused for whatever of it version 1
+/// does not know first -- a namespace on the root, a number written as a
+/// string -- and never for the line that was missing.
+pub fn states_no_version(path: &Path) -> bool {
+    matches!(read_version(path), Some(None))
+}
+
+/// The version a file says, `None` inside for a file that says none, and
+/// `None` outside for one that cannot be asked.
+fn read_version(path: &Path) -> Option<Option<String>> {
     let format = ConfigFormat::of_file(path).ok()?;
     let text = std::fs::read_to_string(path).ok()?;
     let said: JustTheVersion = format.parse(&text).ok()?;
-    said.version
+    Some(said.version)
 }
 
 /// Whether this file says it is the version this module reads.

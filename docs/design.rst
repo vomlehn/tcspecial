@@ -3970,8 +3970,11 @@ It prints one line per problem -- the file, the line to look at, and what is
 wrong -- and says nothing at all about a configuration it accepts. Which
 version a file is decides which checks are run: the two describe different
 things, so a version 1 file goes to the payload-set checks and a version 2 one
-to these. A configuration made of several files has each problem reported in
-the file it is in, which is not the file that was named on the command line.
+to these. A file that states no version goes to neither and is told which line
+to add: read by either set of checks, it would be refused for whatever of it
+the other version has, which is not where it is wrong. A configuration made
+of several files has each problem reported in the file it is in, which is not
+the file that was named on the command line.
 
 These are the checks:
 

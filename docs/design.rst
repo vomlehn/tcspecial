@@ -8935,10 +8935,12 @@ Requirement
     begins on, and one about the file as a whole from its first line.
 
 Requirement
-    A file that does not parse is reported from where the parser stopped, when
-    the parser says where that was. YAML says; XML does not, and a missing
-    element has no position even in principle, so such a file is reported from
-    its first line.
+    A file that does not parse is reported from where the parser stopped.
+    YAML's parser says where that was. XML's does not, so the line is the
+    reader's position when it failed: the ``<`` of markup that does not parse,
+    and otherwise just past the element it was refused at -- an element nothing
+    has a field for, or a missing one's parent closing. The message says it too,
+    as ``at line N column M``, which is how YAML's is written.
 
 Requirement
     The simulator file is checked against the tcspecial configuration only when

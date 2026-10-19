@@ -16,8 +16,16 @@ pub enum TcsError {
     #[error("YAML error: {0}")]
     Yaml(#[from] serde_norway::Error),
 
-    #[error("XML error: {0}")]
-    Xml(#[from] quick_xml::DeError),
+    /// Where the reader had got to when it failed, as YAML's error says
+    /// itself: quick-xml's carries no position, so `ConfigFormat::parse`
+    /// asks the reader and puts it here. Written "at line N column M" as
+    /// YAML's is, so what reads a line back out of a message reads either.
+    #[error("XML error at line {line} column {column}: {error}")]
+    Xml {
+        error: quick_xml::DeError,
+        line: usize,
+        column: usize,
+    },
 
     #[error("Configuration error: {0}")]
     Config(String),

@@ -735,11 +735,11 @@ fn check_payloads(path: &Path, report: &mut Report) -> Option<Vec<DHConfig>> {
             // that is gone, is told so: "names endpoints, which was a second
             // way to describe payloads" says what to do about it, where
             // "missing field `payloads`" says what the parser wanted.
-            let message = match describes_payloads_text(&text, format) {
-                Err(e) => e.to_string(),
-                Ok(()) => parse_error.to_string(),
-            };
-            report.add(path, line_of(&parse_error), message);
+            // Told at the line of whichever error is said: the two are
+            // different parses, and stop at different places.
+            let said = describes_payloads_text(&text, format).err();
+            let said = said.as_ref().unwrap_or(&parse_error);
+            report.add(path, line_of(said), said.to_string());
             return None;
         }
     };
@@ -802,12 +802,6 @@ fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
     }
 }
 
-/// Where a parser stopped, when it says.
-///
-/// YAML says, and that is the line a reader has to look at: the file does not
-/// parse, so nothing in it has a name yet to be found by. XML does not say,
-/// and a deserialization error -- a missing element, say -- has no position at
-/// all even in principle, so such a file is reported from its first line.
 /// The line a message mentions, if it mentions one.
 ///
 /// A parse error carries its location in a field, and `line_of` reads it
@@ -827,9 +821,16 @@ fn line_in_message(message: &str) -> usize {
         .unwrap_or(THE_FILE_ITSELF)
 }
 
+/// Where a parser stopped.
+///
+/// That is the line a reader has to look at: the file does not parse, so
+/// nothing in it has a name yet to be found by. Both parsers say -- YAML in
+/// its error, XML by the reader's position, which `ConfigFormat::parse` puts
+/// in its error -- and anything else is reported from the first line.
 fn line_of(e: &TcsError) -> usize {
     match e {
         TcsError::Yaml(e) => e.location().map_or(THE_FILE_ITSELF, |at| at.line()),
+        TcsError::Xml { line, .. } => *line,
         _ => THE_FILE_ITSELF,
     }
 }
@@ -1324,6 +1325,41 @@ payloads:
             "the YAML parser says which line: {:?}",
             report.findings[0]
         );
+    }
+
+    /// An XML file that does not parse is reported from where the reader
+    /// stopped, as a YAML file is.
+    ///
+    /// A version 2 file, refused by its own reader and by the version 1 one
+    /// it is tried with when it does not read as a graph: both are told at
+    /// the line that is wrong, and not at the file's first.
+    #[test]
+    fn an_xml_file_that_does_not_parse_says_where_it_stopped() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
+        let good = std::fs::read_to_string(root.join("minimal.xml")).expect("the example");
+        let line_holding = |text: &str, what: &str| {
+            text.lines()
+                .position(|line| line.contains(what))
+                .map(|at| at + 1)
+                .expect("the edit is in the file")
+        };
+        for (from, to) in [
+            // An element the editor's section has no field for.
+            ("<x>34</x>", "<z>34</z>"),
+            // A closing tag that is not its element's.
+            ("5 s</interval>", "5 s</intervl>"),
+        ] {
+            let text = good.replacen(from, to, 1);
+            let (_dir, path) = graph_written(".xml", &text);
+            let report = verify(&path, None, Limits::EVERYTHING);
+            assert_eq!(report.findings.len(), 1, "{to}: {:?}", report.findings);
+            assert_eq!(
+                report.findings[0].line,
+                line_holding(&text, to),
+                "{to}: {:?}",
+                report.findings[0]
+            );
+        }
     }
 
     /// A file written in the language that is gone is told what became of it.

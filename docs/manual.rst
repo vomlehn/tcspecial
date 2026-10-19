@@ -2925,3 +2925,148 @@ The times and bytes are the simulator's own account of what it did, where
 tcsmoc's panels show the same transfers as the spacecraft reported them. Two
 panels disagreeing about one transfer is worth knowing about, which is why
 both are shown the same way.
+
+Crates Used
+===========
+These are the crates the workspace's ``Cargo.toml`` files name directly --
+every one of the seventeen manifests, the root and each crate under it. The
+crates they depend on in turn are not listed: ``cargo tree`` shows the whole
+graph, and ``Cargo.lock`` says which version of each is built.
+
+Every one is fetched from `crates.io <https://crates.io>`_, the Rust package
+registry, which is where ``cargo build`` downloads it from; none is taken from
+a git repository or a local path. Each name below links to its page there, the
+version links to its documentation on `docs.rs <https://docs.rs>`_, and the
+last column to the repository its source is developed in.
+
+*Asked* is the version the manifests ask for -- ``1.18`` admits any 1.x from
+1.18 on -- and *locked* is the one ``Cargo.lock`` builds. Two figures under
+*asked* are two crates asking differently, which Cargo settles on one version
+that satisfies both.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 10 14 22 26 10
+
+   * - Crate
+     - Asked
+     - Locked
+     - Used by
+     - What for
+     - Source
+   * - `env_logger <https://crates.io/crates/env_logger>`__
+     - 0.10
+     - `0.10.2 <https://docs.rs/env_logger/0.10.2>`__
+     - tcspecial
+     - Prints tcspecial's log, at the level ``RUST_LOG`` sets.
+     - `repository <https://github.com/rust-cli/env_logger>`__
+   * - `i-slint-backend-testing <https://crates.io/crates/i-slint-backend-testing>`__
+     - 1.18
+     - `1.18.1 <https://docs.rs/i-slint-backend-testing/1.18.1>`__
+     - tcsgui, tcsmoc, tcssim, examples/beacon (tests only)
+     - Runs the windows with no display, so their tests can press buttons.
+     - `repository <https://github.com/slint-ui/slint>`__
+   * - `libc <https://crates.io/crates/libc>`__
+     - 0.2
+     - `0.2.190 <https://docs.rs/libc/0.2.190>`__
+     - tcsapp, tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim
+     - The operating system's own calls: terminals and their settings, pseudo-terminals, device controls.
+     - `repository <https://github.com/rust-lang/libc>`__
+   * - `log <https://crates.io/crates/log>`__
+     - 0.4
+     - `0.4.34 <https://docs.rs/log/0.4.34>`__
+     - tcspecial
+     - The logging calls tcspecial makes, which ``env_logger`` prints.
+     - `repository <https://github.com/rust-lang/log>`__
+   * - `md5 <https://crates.io/crates/md5>`__
+     - 0.8
+     - `0.8.1 <https://docs.rs/md5/0.8.1>`__
+     - tcslibgs
+     - The digest of a configuration, which both ends compare.
+     - `repository <https://github.com/stainless-steel/md5>`__
+   * - `nix <https://crates.io/crates/nix>`__
+     - 0.27
+     - `0.27.1 <https://docs.rs/nix/0.27.1>`__
+     - tcspecial
+     - Waiting on several descriptors at once, and file controls.
+     - `repository <https://github.com/nix-rust/nix>`__
+   * - `quick-xml <https://crates.io/crates/quick-xml>`__
+     - 0.42
+     - `0.42.0 <https://docs.rs/quick-xml/0.42.0>`__
+     - tcslibgs
+     - Reads configuration files written in XML.
+     - `repository <https://github.com/tafia/quick-xml>`__
+   * - `rand <https://crates.io/crates/rand>`__
+     - 0.8
+     - `0.8.8 <https://docs.rs/rand/0.8.8>`__
+     - tcssim
+     - What a simulated payload sends, and the faults it is told to make.
+     - `repository <https://github.com/rust-random/rand>`__
+   * - `serde <https://crates.io/crates/serde>`__
+     - 1.0
+     - `1.0.229 <https://docs.rs/serde/1.0.229>`__
+     - tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim
+     - Turns the configuration, the commands and the telemetry into Rust types and back.
+     - `repository <https://github.com/serde-rs/serde>`__
+   * - `serde_json <https://crates.io/crates/serde_json>`__
+     - 1.0
+     - `1.0.151 <https://docs.rs/serde_json/1.0.151>`__
+     - tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim, tcsverify, examples/beacon
+     - The JSON the command link carries between the ground and the vehicle.
+     - `repository <https://github.com/serde-rs/json>`__
+   * - `serde_norway <https://crates.io/crates/serde_norway>`__
+     - 0.9.42
+     - `0.9.42 <https://docs.rs/serde_norway/0.9.42>`__
+     - tcsgui, tcslibgs
+     - Reads configuration files written in YAML.
+     - `repository <https://github.com/cafkafk/serde-yaml>`__
+   * - `serde_yaml <https://crates.io/crates/serde_yaml>`__
+     - 0.9
+     - `0.9.34+deprecated <https://docs.rs/serde_yaml/0.9.34+deprecated>`__
+     - tcsgui
+     - The editor's undo history, kept on disk. Deprecated by its author; ``serde_norway`` is the maintained fork the configuration files are read with.
+     - `repository <https://github.com/dtolnay/serde-yaml>`__
+   * - `slint <https://crates.io/crates/slint>`__
+     - 1.3, 1.18
+     - `1.18.1 <https://docs.rs/slint/1.18.1>`__
+     - tcsgui, tcsmoc, tcssim, tcsui, examples/beacon
+     - The toolkit every window is drawn with.
+     - `repository <https://github.com/slint-ui/slint>`__
+   * - `slint-build <https://crates.io/crates/slint-build>`__
+     - 1.3, 1.18
+     - `1.18.1 <https://docs.rs/slint-build/1.18.1>`__
+     - tcsgui, tcsmoc, tcssim, examples/beacon (build scripts)
+     - Compiles the ``.slint`` files that describe the windows.
+     - `repository <https://github.com/slint-ui/slint>`__
+   * - `socket2 <https://crates.io/crates/socket2>`__
+     - 0.6.2
+     - `0.6.5 <https://docs.rs/socket2/0.6.5>`__
+     - tcspecial
+     - Sets a socket up before it is bound, which the standard library cannot.
+     - `repository <https://github.com/rust-lang/socket2>`__
+   * - `tcslog <https://crates.io/crates/tcslog>`__
+     - 0.3.1
+     - `0.3.1 <https://docs.rs/tcslog/0.3.1>`__
+     - tcspecial
+     - The vehicle's telemetry log: segment files, and recovering them after a power loss.
+     - `repository <https://github.com/vomlehn/tcslog>`__
+   * - `tempfile <https://crates.io/crates/tempfile>`__
+     - 3, 3.27.0
+     - `3.27.0 <https://docs.rs/tempfile/3.27.0>`__
+     - most crates, including examples/simple-app (tests only)
+     - Scratch files and directories for tests, removed afterwards.
+     - `repository <https://github.com/Stebalien/tempfile>`__
+   * - `thiserror <https://crates.io/crates/thiserror>`__
+     - 1.0
+     - `1.0.69 <https://docs.rs/thiserror/1.0.69>`__
+     - tcslib, tcslibgs, tcspecial
+     - Writes the error types and their messages.
+     - `repository <https://github.com/dtolnay/thiserror>`__
+
+``tcslog`` is this project's own: it is the telemetry log, kept as a crate of
+its own so that it can be used and tested apart from tcspecial.
+
+To see where everything in the build comes from, its dependencies included::
+
+   $ cargo tree --workspace
+   $ cargo metadata --format-version 1

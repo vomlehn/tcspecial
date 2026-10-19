@@ -207,6 +207,23 @@ pub enum Problem {
     /// the `trigger`: a payload with none is one the configuration describes
     /// as only read, so a link delivering into it has nowhere to go.
     UntriggeredInput { node: String, from: String },
+    /// A set of discrete lines used the way its `direction` does not allow.
+    ///
+    /// `driven` is what the links do with it: true where something is
+    /// delivered into lines that are inputs, false where something reads
+    /// lines that are driven. Either way the flight software refuses it at
+    /// the first read or write of the node -- a line is watched or driven and
+    /// a request asks the kernel for one of the two -- so a vehicle would
+    /// come up and then refuse every datum for that node for as long as it
+    /// ran. The reason it is checked here is that it can be: `direction` is
+    /// in the file and so are the links.
+    ///
+    /// The default is what makes this worth a rule of its own. Lines with no
+    /// `direction` are inputs, a set of discretes being more often something
+    /// read -- a deployment switch, an arming line -- so a heater that forgot
+    /// to say `output` is not a file with a word missing but a file that says
+    /// something else, and reads as though it were right.
+    LinesAgainstTheirDirection { node: String, driven: bool },
     /// A node nothing reads and nothing writes.
     ///
     /// More likely a mistake than an intention: a node with no link at all
@@ -256,6 +273,7 @@ impl Problem {
             // about where it sends, and the payload is where the trigger
             // would have to be written.
             Problem::UntriggeredInput { node, .. } => About::Node(node.clone()),
+            Problem::LinesAgainstTheirDirection { node, .. } => About::Node(node.clone()),
             // The section, where there is one to point at. A missing section
             // has no line of its own and is reported on the file, which is
             // where it would have to be written.
@@ -395,6 +413,24 @@ impl Problem {
                  beacons go or where the telemetry log is written"
                 .to_string(),
             Problem::BadTcspecial { why } => format!("tcspecial: {why}"),
+            Problem::LinesAgainstTheirDirection { node, driven } => {
+                if *driven {
+                    format!(
+                        "something is delivered to \"{node}\", whose lines are \
+                         inputs: inputs are read and not written, and driving one \
+                         would be commanding a device rather than reading it. Say \
+                         \"direction: output\" to drive them -- lines with no \
+                         direction are inputs"
+                    )
+                } else {
+                    format!(
+                        "\"{node}\" is read, and its lines are driven: a driven \
+                         line reports nothing, so reading one would be reporting \
+                         what this node itself asked for. Leave direction unsaid, \
+                         or say input, to read them"
+                    )
+                }
+            }
             Problem::UntriggeredInput { node, from } => format!(
                 "\"{from}\" is delivered to \"{node}\", which states no trigger: \
                  what is written to a payload that is read is what asks it for \
@@ -1076,6 +1112,45 @@ impl Graph {
             }
         }
 
+        // Which way a set of discrete lines is used, against which way it
+        // says it goes.
+        //
+        // The direction is parsed by the same code the flight software opens
+        // the node with, so the two cannot come to disagree about what the
+        // word means. What is checked here is the pair the flight software
+        // cannot see until it is flying: `direction` and the links.
+        //
+        // A node whose terms will not parse at all is left to the rule above,
+        // which names what is actually wrong with it; this one says nothing
+        // about it rather than adding a second complaint built on a direction
+        // nobody stated properly.
+        for node in self.nodes.iter().filter(|n| n.node_type == "gpio") {
+            let Ok(reach) = crate::graph::reach::reach_of(node) else {
+                continue;
+            };
+            let crate::types::EndpointConfig::Gpio(gpio) = &reach.endpoint else {
+                continue;
+            };
+
+            let read = self.links.iter().any(|link| {
+                link.from.split('.').next().unwrap_or(&link.from) == node.name
+            });
+            let driven = !self.sources_of(&node.name).is_empty();
+
+            if driven && !gpio.direction.is_output() {
+                problems.push(Problem::LinesAgainstTheirDirection {
+                    node: node.name.clone(),
+                    driven: true,
+                });
+            }
+            if read && gpio.direction.is_output() {
+                problems.push(Problem::LinesAgainstTheirDirection {
+                    node: node.name.clone(),
+                    driven: false,
+                });
+            }
+        }
+
         // What may be written to a payload.
         //
         // A payload that is read is asked for its readings, and the bytes
@@ -1664,6 +1739,97 @@ mod tests {
             !g.check()
                 .iter()
                 .any(|p| matches!(p, Problem::UntriggeredInput { .. })),
+            "{:?}",
+            g.check()
+        );
+    }
+
+    /// Discrete lines are used the way their `direction` says, or refused.
+    ///
+    /// The flight software refuses it too, at the first read or write of the
+    /// node -- a line is watched or driven and the request asks the kernel
+    /// for one of the two -- so without this a vehicle comes up and then
+    /// refuses every datum for that node for as long as it runs. The
+    /// direction is in the file and so are the links, so there is nothing to
+    /// wait for.
+    #[test]
+    fn lines_are_used_the_way_their_direction_says() {
+        // A heater that forgot to say output. The lines default to inputs,
+        // because a set of discretes is more often something read, so this is
+        // not a file with a word missing: it is a file that says something
+        // else and reads as though it were right.
+        let mut heater = node("heaters", "gpio");
+        let g = graph(
+            vec![
+                node("thermostat", "compute"),
+                heater.clone(),
+                node("moc", "moc"),
+            ],
+            vec![link("thermostat", &["heaters", "moc"])],
+        );
+        let problems = g.check();
+        let said = problems
+            .iter()
+            .find(|p| matches!(p, Problem::LinesAgainstTheirDirection { .. }))
+            .unwrap_or_else(|| panic!("driven inputs were allowed: {problems:?}"));
+        assert_eq!(said.about(), About::Node("heaters".to_string()));
+        assert!(
+            said.describe().contains("direction: output"),
+            "the complaint should say what to write: {}",
+            said.describe()
+        );
+
+        // With `output` it is the heater it was meant to be.
+        heater
+            .attributes
+            .insert("direction".to_string(), Scalar::of("output"));
+        let g = graph(
+            vec![
+                node("thermostat", "compute"),
+                heater.clone(),
+                node("moc", "moc"),
+            ],
+            vec![link("thermostat", &["heaters", "moc"])],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::LinesAgainstTheirDirection { .. })),
+            "{:?}",
+            g.check()
+        );
+
+        // And the other way about: driven lines that something reads. A
+        // driven line reports nothing, so what came back would be what this
+        // node itself asked for.
+        let g = graph(
+            vec![heater.clone(), node("moc", "moc")],
+            vec![link("heaters", &["moc"])],
+        );
+        let problems = g.check();
+        let said = problems
+            .iter()
+            .find(|p| matches!(
+                p,
+                Problem::LinesAgainstTheirDirection { node, driven } if node == "heaters" && !driven
+            ))
+            .unwrap_or_else(|| panic!("a read of driven lines was allowed: {problems:?}"));
+        assert!(
+            said.describe().contains("reports nothing"),
+            "{}",
+            said.describe()
+        );
+
+        // A set of lines that is read and says nothing is the ordinary input:
+        // a deployment switch, an arming line.
+        let g = graph(
+            vec![node("switch", "gpio"), node("moc", "moc")],
+            vec![link("switch", &["moc"])],
+        );
+        assert!(
+            !g.check()
+                .iter()
+                .any(|p| matches!(p, Problem::LinesAgainstTheirDirection { .. })),
             "{:?}",
             g.check()
         );

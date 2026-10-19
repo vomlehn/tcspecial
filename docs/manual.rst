@@ -1639,30 +1639,58 @@ The simulator configuration has the sensor send one packet a second.
 The thermostat example
 ----------------------
 .. figure:: ../examples/thermostat/thermostat.svg
-   :alt: The thermostat example: three temperature sensors, converted to
-         kelvin, averaged, logged and sent to the ground, with a hysteresis
-         thermostat driving GPIO heaters.
+   :alt: The thermostat example: three temperature sensors of one place,
+         converted to kelvin, voted on, logged and sent to the ground, with a
+         hysteresis thermostat driving two sets of GPIO heaters.
    :width: 100%
 
-   ``examples/thermostat``: three sensors, a mean, a thermostat and its
-   heaters.
+   ``examples/thermostat``: a trio of sensors, a vote, a thermostat and its
+   two heaters.
 
-The worked example of computing aboard. Three temperature sensors --
-``temp_fore`` and ``temp_aft`` on I\ :superscript:`2`\ C, ``temp_bay`` on SPI --
-are read together every three seconds as the group ``cabin_temps``, which is
-what a group is for: readings that will be compared are taken as close
-together as the hardware allows.
+The worked example of computing aboard, and of surviving a part that fails.
+Three temperature sensors -- ``temp_1`` and ``temp_2`` on
+I\ :superscript:`2`\ C, ``temp_3`` on SPI -- are read together ten times a
+second as the group ``cabin_temps``, which is what a group is for: readings
+that will be compared are taken as close together as the hardware allows.
 
-Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_fore``,
-``k_aft`` or ``k_bay``, and each converted reading goes three ways: to the
-ground through the ``moc`` node -- at its ``ground_base``, ``127.0.0.1:5100``,
-plus each source's device id, so ``k_fore``, ``k_aft`` and ``k_bay``, ids 1 to
-3, arrive on ports 5101 to 5103 -- into ``mean_temp`` as the input ``in0``,
-``in1`` or ``in2``, and into the log ``housekeeping``. The mean goes to the
-ground and to ``thermostat``, a hysteresis that holds the cabin at its
-setpoint, 293.15 K, switching two degrees either side of it. The thermostat's
-decision is logged and drives the three heater circuits, ``heaters``, on GPIO
-lines 3, 4 and 5.
+The three are sensors of *one place*, separated only because two parts cannot
+occupy one point. ``temp_3`` is a different part on a different bus, reporting
+three unsigned bytes on a scale of its own where the first two report two
+signed bytes on theirs, so that no one bus and no one part number can take the
+whole trio out.
+
+Each reading is converted to kelvin by its own ``to_kelvin`` node, ``k_1``,
+``k_2`` or ``k_3``, and each converted reading goes three ways: to the ground
+through the ``moc`` node -- at its ``ground_base``, ``127.0.0.1:5100``, plus
+each source's device id, so ``k_1``, ``k_2`` and ``k_3``, ids 1 to 3, arrive on
+ports 5101 to 5103 -- into ``cabin_temp`` as the input ``in0``, ``in1`` or
+``in2``, and into the log ``housekeeping``.
+
+``cabin_temp`` is a ``vote``: one temperature out of the three by the algorithm
+it names, ``median``, which takes the middle reading. A mean would be the wrong
+arithmetic twice over -- it carries a bad reading into the answer in proportion
+to how wrong it is, and waiting for all three turns one dead sensor into no
+answer at all. The vote keeps the last reading from each input and produces a
+value on every arrival, so a sensor that stops reporting is outvoted by the two
+that are working. Fed 296.0, 296.1 and 270.0 -- two sensors warm and one stuck
+cold -- it says 296 and the heaters stay off, where a mean would have said
+287.4 and switched them on because one sensor had failed.
+
+The voted temperature goes to the ground, on port 5104, and to ``thermostat``:
+a hysteresis holding the cabin at its ``setpoint``, 293.15 K, with a
+``half_band`` of 2.0, so the heaters switch two degrees either side of it and
+the setpoint is in the middle of its own band. Its decision is logged, sent to
+the ground on port 5105, and drives two heaters -- ``heaters_1`` on GPIO lines
+3, 4 and 5, ``heaters_2`` on lines 6, 7 and 8. Two of them, each three circuits
+driven together, because one failing must not leave the cabin with no way to be
+warmed: either alone holds the band, and both together hold it twice as fast.
+They are separate nodes rather than six lines on one so that the ground can
+stop one and leave the other holding the temperature.
+
+The decision is asserted on every sample rather than only when it changes, so
+the heaters are held at what the vehicle last decided and a decision that went
+missing is corrected on the next sample. What is logged and sent to the ground
+is the transitions alone.
 
 Every payload here has lines, so none has a telemetry link of its own: the
 sensors' readings reach the ground through their conversions, and the heaters
@@ -1674,6 +1702,13 @@ naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
 decides by it. An attribute no binding mentions is refused, which is the
 point of writing the bindings down.
+
+The simulator file beside it declares a thermal mass, ``cabin``, and attaches
+the three sensors to it, so that what they report is one temperature rather
+than three streams of noise, which is what a thermal mass is for: see **The
+Simulator Configuration** below. Its heaters are not
+attached to the mass, discrete lines being a kind the simulator drives rather
+than being driven through, so what it shows is the vehicle's half of the loop.
 
 The sensors and heaters are hardware, so ``make -C examples run-thermostat``
 needs ``/dev/i2c-1``, ``/dev/spidev0.0`` and ``/dev/gpiochip0``; ``make

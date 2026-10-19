@@ -1,6 +1,6 @@
 Schemas for the files tcsgui edits.
 
-    tcspecial.xsd            a version 2 configuration, written in XML
+    tcspecial.xsd            a configuration, written in XML
     tcspecial.schema.json    the same, written in YAML
     tcspecial-sim.xsd        a simulator configuration, written in XML
     tcspecial-sim.schema.json  the same, written in YAML

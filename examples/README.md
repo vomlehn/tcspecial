@@ -68,8 +68,8 @@ What a ground station can know about a spacecraft without asking it anything.
 tcspecial sends a beacon every `beacon.interval` for as long as it runs, over
 a socket of its own, whether or not anything has connected to it -- so this
 example commands nothing and still says whether the vehicle is alive, which
-build it is, which version of a configuration it is serving, and whether that
-is the configuration the ground read.
+build it is, and whether the configuration it is serving is the one the ground
+read.
 
 It is also the example of how a ground program is put together, because almost
 nothing in it is its own:

@@ -48,7 +48,7 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
   `app_moc_veh` and `app_all_veh` on the vehicle; `app_pl` and `app_all_pl`
   on the payload side.
 - Older code still says `payload`, `PayloadConfig`, `payloads:`. That rename
-  is held back on purpose until the version 2 schema is complete, because
+  is held back on purpose until the configuration schema is complete, because
   those names mirror configuration keys. Do not start it piecemeal.
 
 ## Fixed facts
@@ -58,10 +58,6 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
 - Configurations are YAML or XML, chosen by the file's extension. The two
   spellings of a configuration must say the same thing, so change both
   together. `tcsverify a.xml a.yaml a-sim.yaml` compares them.
-- A configuration states `version: "2.0"`, and that is the only version there
-  is. Version 1 described a set of payloads, each paired with a ground
-  endpoint and commanded by name; it is deleted, and a file saying `1.0` is
-  told what became of it rather than read.
 
 ## Building and testing
 

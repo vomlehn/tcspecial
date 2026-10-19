@@ -1,23 +1,31 @@
-// A window holding the beacon panel and nothing else.
+// A window holding the beacon panel, and a button that starts and stops the
+// vehicle it watches.
 //
 // The point of the example: the panel is not this program's, and neither is
 // what it shows. The markup comes from tcsui, which tcsmoc shows the same
 // panel from, and what fills it in comes from tcslib::beacon -- so this
-// window is the wiring and nothing more.
+// window is the wiring and nothing more. The button is there so that what
+// the panel shows can be made to change: start the vehicle and its beacons
+// arrive, stop it and they cease.
 
+import { Button } from "std-widgets.slint";
 import { BeaconPanel } from "../../../tcsui/ui/beacon.slint";
 
 export component WatchWindow inherits Window {
     title: "Beacon";
     // Enough for the panel and the longest line it shows, which is what a
     // beacon says: the build, the configuration version and a sixteen-byte
-    // digest.
+    // digest; and the button below it.
     width: 460px;
-    height: 120px;
+    height: 160px;
 
     in-out property <color> indicator-color: #c0c0c0;
     in-out property <string> last-received: "--:--:--";
     in-out property <string> last-message: "<none>";
+    // What the button says: what a click will do to the vehicle. It opens
+    // saying start, tcspecial not being running until somebody starts it.
+    in-out property <string> tcspecial-label: "Start tcspecial";
+    callback tcspecial-clicked();
 
     VerticalLayout {
         padding: 8px;
@@ -26,6 +34,13 @@ export component WatchWindow inherits Window {
             indicator-color: root.indicator-color;
             last-received: root.last-received;
             last-message: root.last-message;
+        }
+
+        tcspecial-button := Button {
+            text: root.tcspecial-label;
+            clicked => {
+                root.tcspecial-clicked();
+            }
         }
     }
 }

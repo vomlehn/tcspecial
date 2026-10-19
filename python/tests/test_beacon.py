@@ -192,23 +192,37 @@ class PanelTest(unittest.TestCase):
         from tcsui.beacon_panel import indicator, palette
 
         s = Schedule.standard()
-        self.assertEqual(indicator(s.after(None, AT)), palette.UNKNOWN)
-        self.assertEqual(indicator(s.at(0)), palette.WELL)
-        self.assertEqual(indicator(s.at(6 * SECOND)), palette.WELL)
+        self.assertEqual(indicator(s.after(None, AT), False), palette.UNKNOWN)
+        self.assertEqual(indicator(s.at(0), True), palette.WELL)
+        self.assertEqual(indicator(s.at(6 * SECOND), True), palette.WELL)
         ageing = s.at(8_200 * MS)
         self.assertTrue(ageing.lit)
-        self.assertEqual(indicator(ageing), palette.WATCH)
+        self.assertEqual(indicator(ageing, True), palette.WATCH)
         silent = s.at(30_200 * MS)
         self.assertTrue(silent.lit)
-        self.assertEqual(indicator(silent), palette.WRONG)
-        self.assertEqual(indicator(s.at(9_200 * MS)), palette.UNKNOWN)
-        self.assertEqual(indicator(s.at(30_700 * MS)), palette.UNKNOWN)
+        self.assertEqual(indicator(silent, True), palette.WRONG)
+        # The dark half of a blink, once a beacon has arrived: white.
+        self.assertEqual(indicator(s.at(8_700 * MS), True), palette.OFF)
+        self.assertEqual(indicator(s.at(30_700 * MS), True), palette.OFF)
+        self.assertEqual(indicator(s.at(5_500 * MS), True), palette.OFF)
+
+    def test_once_heard_the_light_is_never_grey_again(self):
+        from tcsui.beacon_panel import indicator, palette
+
+        s = Schedule.standard()
+        for ms in range(0, 60_000, 100):
+            self.assertNotEqual(indicator(s.at(ms * MS), True), palette.UNKNOWN, ms)
+        # A last beacon a moved clock puts in the future is unheard, and white.
+        in_the_future = s.after(AT, AT - SECOND)
+        self.assertEqual(in_the_future.stage, Stage.UNHEARD)
+        self.assertEqual(indicator(in_the_future, True), palette.OFF)
 
     def test_the_palette_is_tcsuis(self):
         from tcsui.beacon_panel import palette
 
         # tcsui::palette, byte for byte.
         self.assertEqual(palette.UNKNOWN, "#c4c4c4")
+        self.assertEqual(palette.OFF, "#ffffff")
         self.assertEqual(palette.WELL, "#00ff00")
         self.assertEqual(palette.WATCH, "#ffff00")
         self.assertEqual(palette.WRONG, "#ff0000")

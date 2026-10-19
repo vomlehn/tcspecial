@@ -66,7 +66,18 @@ nothing in it is its own:
   to show on it: which colour the light is, and the two lines beside it.
 - `beacon_watch`, the program here, reads the configuration to find where the
   beacons are, starts the loop on a thread, and puts each pass in the window.
-  That is all of it.
+  That is all of it, but for a button.
+
+The button starts tcspecial on the same configuration and stops it, so that
+the light can be watched coming on with the first beacon and going out after
+the last. The window opens with it saying `Start tcspecial`, because tcspecial
+is not running. Pressed, it starts tcspecial and says `Stop tcspecial`;
+pressed again, it stops tcspecial with `kill()` and says `Start tcspecial`,
+which is where it began. tcspecial is the binary beside `beacon_watch`, run
+directly rather than through `cargo run`, so that the kill stops tcspecial
+itself. Closing the window stops it as well, and so does the watcher dying,
+which the kernel is told to see to; and a tcspecial that stops by itself puts
+the button back to `Start tcspecial`.
 
 tcsmoc shows the same panel from the same library, in a row beside its command
 link, which is the point of their being apart: an operator who has read one has
@@ -80,27 +91,19 @@ looked at. It opens a window, so it wants a display.
 make run-beacon
 ```
 
-That checks for Python 3, builds the vehicle and the ground station, starts
-the vehicle in the background and the ground in the foreground, prints the
-line, and then stops the vehicle. To watch the two separately, run them in two
-terminals instead, in either order:
+That builds tcspecial and the watcher and opens the window, and tcspecial
+starts when the button is pressed. Without make:
 
 ```
-cargo build                     # lorem_moc and tcspecial
-cargo run --bin lorem_moc       # in one terminal: the ground
-cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another
+cargo build --bin tcspecial --bin beacon_watch
+cargo run --bin beacon_watch
 ```
 
-Run the vehicle from the repository's root, where the configuration's
-`executable` path starts. Either order works because the payload waits a couple
-of seconds before its first word: the vehicle sends each word to the ground
-station's address as soon as it has it, and a word sent before `lorem_moc` is
-listening is lost.
+Languages:
 
-The text itself is `simple_app`'s library: the first paragraph of the lorem
-ipsum text as one array per line, each holding that line's words. Nothing
-holds a line terminator; the end of a word array is the end of the line, and
-what stands for it on the wire is the one constant both programs read.
+- MOC: Rust -- `beacon_watch`, on `tcslib::beacon` and `tcsui`.
+- Vehicle: Rust -- tcspecial.
+- Payload: Rust -- tcssim stands in for `sensor`, a network payload.
 
 ### ping
 
@@ -134,11 +137,29 @@ make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_moc.py --pings 3     # no window: three pings, printed
 ```
 
+`ping_moc.py` starts the vehicle itself: tcspecial from the build, on the same
+configuration. It kills it when it exits, however it exits -- if it is killed
+or crashes, the kernel is told to kill tcspecial -- so a vehicle is running
+exactly while its ground station is. Build tcspecial first (`make run-ping`
+does). To run the vehicle yourself, in another terminal, say `--no-vehicle`:
+
+```
+cargo run --bin tcspecial -- examples/ping/ping.xml          # in one terminal
+python3 examples/ping/ping_moc.py --no-vehicle               # in another
+```
+
 Its ports are all in the seven thousands, which no other example uses.
 
 tcsmoc pings it too: `make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping`,
 then the `Ping node` button beside `Command`. It is the same panel, kept by
 `tcslib::ping`, which `ping_ground.py` is written after.
+
+Languages:
+
+- MOC: Python 3 -- `ping_moc.py`, on `python/`; or Rust, in tcsmoc.
+- Vehicle: Rust -- tcspecial, whose `ping` node answers.
+- Payload: none. The `ping` node is the vehicle's own, and nothing is
+  simulated.
 
 ## More complex examples
 
@@ -170,3 +191,31 @@ see what an app node is. Two programs, both in `examples/simple-app`:
 ```
 make run-simple-app
 ```
+
+That checks for Python 3, builds the vehicle and the ground station, starts
+the vehicle in the background and the ground in the foreground, prints the
+line, and then stops the vehicle. To watch the two separately, run them in two
+terminals instead, in either order:
+
+```
+cargo build                     # lorem_moc and tcspecial
+cargo run --bin lorem_moc       # in one terminal: the ground
+cargo run --bin tcspecial -- examples/simple-app/simple-app.yaml   # in another
+```
+
+Run the vehicle from the repository's root, where the configuration's
+`executable` path starts. Either order works because the payload waits a couple
+of seconds before its first word: the vehicle sends each word to the ground
+station's address as soon as it has it, and a word sent before `lorem_moc` is
+listening is lost.
+
+The text itself is `simple_app`'s library: the first paragraph of the lorem
+ipsum text as one array per line, each holding that line's words. Nothing
+holds a line terminator; the end of a word array is the end of the line, and
+what stands for it on the wire is the one constant both programs read.
+
+Languages:
+
+- MOC: Rust -- `lorem_moc`, on `tcslib::moc`.
+- Vehicle: Rust -- tcspecial, which runs the payload as its `app_pl` node.
+- Payload: Python 3 -- `lorem_pl.py`.

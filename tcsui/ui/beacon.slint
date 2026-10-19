@@ -17,7 +17,8 @@
 
 export component BeaconPanel inherits Rectangle {
     // The light's colour, which says how stale the last beacon is. Grey
-    // before any has arrived, and grey again for the dark half of a blink.
+    // before any has arrived and never after: once one has, the dark half of
+    // a blink is white. See `tcsui::indicator`.
     in property <color> indicator-color: #c0c0c0;
     // When the last beacon arrived, as a time of day, and the placeholder
     // until one has.

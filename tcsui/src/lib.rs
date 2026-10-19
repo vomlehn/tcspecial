@@ -43,6 +43,15 @@ pub mod palette {
         Color::from_rgb_u8(196, 196, 196)
     }
 
+    /// A light that has shown a colour and is not showing one now: the dark
+    /// half of a blink, once a beacon has arrived. White and not grey, so
+    /// that grey keeps the one meaning it had -- nothing has been heard yet --
+    /// and a light that has been heard from never goes back to looking as if
+    /// it had not.
+    pub fn off() -> Color {
+        Color::from_rgb_u8(255, 255, 255)
+    }
+
     /// All is well: the spacecraft is being heard from.
     pub fn well() -> Color {
         Color::from_rgb_u8(0, 255, 0)
@@ -59,24 +68,38 @@ pub mod palette {
     }
 }
 
-/// What a light shows for a stage of staleness.
+/// What a light shows for a stage of staleness, `heard` saying whether a
+/// beacon has ever arrived.
 ///
 /// Green while the spacecraft is being heard from, yellow once it is late
 /// enough that contact is not claimed, red once nothing is being heard, and
-/// grey before anything has arrived. The dark half of a blink is grey too: a
+/// grey before anything has arrived. Grey is for that and nothing else: once
+/// a beacon has arrived the light has shown a colour, and wherever it shows
+/// none after that it is white. So the dark half of a blink is white -- a
 /// blinking light is one colour going dark and back, rather than two colours
-/// alternating, because two would read as two different things being said.
+/// alternating, because two would read as two different things being said --
+/// and so is a last beacon that a moved clock puts in the future.
+///
+/// `heard` is [`Pass::at`] having a time in it, which it keeps for good once
+/// a beacon arrives. A beacon arriving is always shown in a colour, being
+/// [`Stage::Heard`], so the light has been coloured exactly when `heard` is
+/// true and no state of its own need be kept.
 ///
 /// No red for the stages in between, and no green for the last: red is for a
 /// condition somebody must act on, and a light that is red whenever a
 /// datagram is late is a light nobody reads.
-pub fn indicator(showing: &Showing) -> Color {
+pub fn indicator(showing: &Showing, heard: bool) -> Color {
+    let dark = if heard {
+        palette::off()
+    } else {
+        palette::unknown()
+    };
     if !showing.lit {
-        return palette::unknown();
+        return dark;
     }
 
     match showing.stage {
-        Stage::Unheard => palette::unknown(),
+        Stage::Unheard => dark,
         Stage::Heard => palette::well(),
         Stage::Ageing => palette::watch(),
         Stage::Silent => palette::wrong(),
@@ -102,7 +125,7 @@ impl Shown {
     /// What to show for a pass of the beacon loop.
     pub fn of(pass: &Pass) -> Shown {
         Shown {
-            indicator: indicator(&pass.showing),
+            indicator: indicator(&pass.showing, pass.at.is_some()),
             received: received_at(pass.at),
             message: pass.said.clone(),
         }
@@ -115,7 +138,7 @@ impl Shown {
     /// shows a beacon it did not receive on this pass.
     pub fn at(showing: &Showing, at: Option<SystemTime>, said: &str) -> Shown {
         Shown {
-            indicator: indicator(showing),
+            indicator: indicator(showing, at.is_some()),
             received: received_at(at),
             message: said.to_string(),
         }
@@ -162,7 +185,7 @@ mod tests {
     use tcslib::beacon::Schedule;
 
     /// The standard schedule's light ages green, yellow, red, and blinks
-    /// through grey.
+    /// through white; grey is for before anything has arrived.
     ///
     /// The colours are the point of the panel: an operator reads the light
     /// and not the stage behind it, so what each stage looks like is worth
@@ -173,14 +196,17 @@ mod tests {
 
         // Nothing heard: the colour of knowing nothing, which is not green.
         assert_eq!(
-            indicator(&schedule.after(None, SystemTime::now())),
+            indicator(&schedule.after(None, SystemTime::now()), false),
             palette::unknown()
         );
 
         // Just arrived, and one beacon missed: still well.
-        assert_eq!(indicator(&schedule.at(Duration::ZERO)), palette::well());
         assert_eq!(
-            indicator(&schedule.at(Duration::from_secs(6))),
+            indicator(&schedule.at(Duration::ZERO), true),
+            palette::well()
+        );
+        assert_eq!(
+            indicator(&schedule.at(Duration::from_secs(6)), true),
             palette::well()
         );
 
@@ -189,29 +215,63 @@ mod tests {
         // which is what the stage's own colour is shown in.
         let ageing = schedule.at(Duration::from_millis(8_200));
         assert!(ageing.lit, "{ageing:?}");
-        assert_eq!(indicator(&ageing), palette::watch());
+        assert_eq!(indicator(&ageing, true), palette::watch());
 
         let silent = schedule.at(Duration::from_millis(30_200));
         assert!(silent.lit, "{silent:?}");
-        assert_eq!(indicator(&silent), palette::wrong());
+        assert_eq!(indicator(&silent, true), palette::wrong());
 
-        // And the dark half of either is the same grey, whichever stage it
+        // And the dark half of either is the same white, whichever stage it
         // is: what the blink says is that time is passing, and what the
         // colour says is how much.
         assert_eq!(
-            indicator(&schedule.at(Duration::from_millis(9_200))),
-            palette::unknown()
+            indicator(&schedule.at(Duration::from_millis(8_700)), true),
+            palette::off()
         );
         assert_eq!(
-            indicator(&schedule.at(Duration::from_millis(30_700))),
-            palette::unknown()
+            indicator(&schedule.at(Duration::from_millis(30_700)), true),
+            palette::off()
         );
 
-        // The dark half of a blink is the colour of nothing known rather than
-        // a second colour: the light is one colour going dark and back.
+        // The dark half of a blink is white rather than a second colour: the
+        // light is one colour going dark and back. And not grey, a beacon
+        // having arrived: grey would say nothing had been heard.
         let blinking = schedule.at(Duration::from_millis(5_500));
         assert!(!blinking.lit, "four to eight seconds is the blinking stage");
-        assert_eq!(indicator(&blinking), palette::unknown());
+        assert_eq!(indicator(&blinking, true), palette::off());
+        assert_ne!(palette::off(), palette::unknown());
+    }
+
+    /// Once a beacon has arrived the light is never grey again: wherever it
+    /// shows no colour, it is white.
+    ///
+    /// Grey says nothing has been heard. A light that went grey after being
+    /// green would say the spacecraft had never been heard from, which is not
+    /// so, and would look like the window had just opened.
+    #[test]
+    fn once_heard_the_light_is_never_grey_again() {
+        let schedule = Schedule::standard();
+
+        // Nothing has arrived: grey, as the window opens.
+        let nothing = Shown::at(&schedule.after(None, SystemTime::now()), None, "<none>");
+        assert_eq!(nothing.indicator, palette::unknown());
+
+        // A beacon, then every moment after it over the whole schedule: a
+        // colour or white, and never grey.
+        let at = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(3661));
+        for ms in (0..60_000).step_by(100) {
+            let shown = Shown::at(&schedule.at(Duration::from_millis(ms)), at, "said");
+            assert_ne!(shown.indicator, palette::unknown(), "at {ms} ms");
+        }
+
+        // And a last beacon in the future, which a clock that moved makes and
+        // which is Unheard: white too, a beacon having arrived.
+        let in_the_future = schedule.after(at, SystemTime::UNIX_EPOCH);
+        assert_eq!(in_the_future.stage, Stage::Unheard);
+        assert_eq!(
+            Shown::at(&in_the_future, at, "said").indicator,
+            palette::off()
+        );
     }
 
     /// The three things the panel shows come from one reading.

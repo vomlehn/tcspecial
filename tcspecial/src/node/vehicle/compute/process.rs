@@ -381,17 +381,34 @@ impl Function for Process {
             self.start()?;
         }
 
-        // What the program reads: the value, and the input's name where the
-        // link gave one. See the module comment.
-        let datum = std::str::from_utf8(data)
-            .map_err(|_| "what arrived is not text, and a line is text".to_string())?;
+        // What the program reads: the value as a decimal, and the input's name
+        // where the link gave one. See the module comment.
+        //
+        // The value arrives as eight bytes of a double -- see
+        // `super::as_value` -- and goes to the program as text, because the
+        // far end is a program reading lines. This is the one boundary where a
+        // value is written out and read back, and both halves of it are here:
+        // the number this writes and the number the answer is read as.
+        let datum = super::as_text(super::from_value(data, "what arrived")?);
         let line = match input {
-            Some(input) => format!("{input}={}\n", datum.trim_end()),
-            None => format!("{}\n", datum.trim_end()),
+            Some(input) => format!("{input}={datum}\n"),
+            None => format!("{datum}\n"),
         };
 
         match self.ask(&line) {
-            Ok(answer) => Ok(answer),
+            // The program's answer is a number it wrote as text, and what
+            // leaves this node is a value like any other.
+            Ok(Some(answer)) => {
+                let said = std::str::from_utf8(&answer).map_err(|_| {
+                    format!(
+                        "\"{}\" answered with something that is not text",
+                        self.executable
+                    )
+                })?;
+                let number = super::from_text(said, &format!("\"{}\"", self.executable))?;
+                Ok(Some(super::as_value(number)))
+            }
+            Ok(None) => Ok(None),
             Err(why) => {
                 // Put down whatever is left of it before deciding: a program
                 // that missed its deadline is still running, and a second
@@ -445,6 +462,9 @@ impl Drop for Process {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // What a program is handed and what it answers with: a value on the link
+    // and a decimal in the pipe. See `give`.
+    use crate::node::vehicle::compute::{as_value, from_value};
 
     /// A program of these parameters, not started.
     ///
@@ -572,19 +592,41 @@ mod tests {
             Duration::from_secs(2),
         );
 
-        assert_eq!(p.give(None, b"21").expect("an answer"), Some(b"42".to_vec()));
-        assert_eq!(p.give(None, b"50").expect("an answer"), Some(b"100".to_vec()));
+        assert_eq!(answered(&mut p, 21.0), 42.0);
+        assert_eq!(answered(&mut p, 50.0), 100.0);
+    }
+
+    /// What a program answered, as a number.
+    ///
+    /// The value goes in as eight bytes, reaches the program as a decimal,
+    /// and its answer comes back as eight bytes again: see `give`.
+    fn answered(p: &mut Process, number: f64) -> f64 {
+        let out = p.give(None, &as_value(number)).expect("an answer");
+        from_value(&out.expect("a value"), "the program").expect("a value")
     }
 
     /// A named input reaches the program as its name and its value.
+    ///
+    /// The program answers 1 for a line that begins with the name and 0 for
+    /// one that does not, because what it answers with is a number: the line
+    /// itself is not one, and a program that echoed it would be answering
+    /// with something this cannot read as a value.
     #[test]
     fn a_named_input_arrives_named() {
-        let (_where, mut p) = running("while read line; do echo \"$line\"; done\n", Duration::from_secs(2));
+        let (_where, mut p) = running(
+            "while read line; do case \"$line\" in in1=293.15) echo 1;; *) echo 0;; esac; \
+             done\n",
+            Duration::from_secs(2),
+        );
 
+        let out = p
+            .give(Some("in1"), &as_value(293.15))
+            .expect("an answer")
+            .expect("a value");
         assert_eq!(
-            p.give(Some("in1"), b"293.15").expect("an answer"),
-            Some(b"in1=293.15".to_vec()),
-            "the program should see which input this is"
+            from_value(&out, "the program").expect("a value"),
+            1.0,
+            "the program should see which input this is, and its value"
         );
     }
 
@@ -597,15 +639,15 @@ mod tests {
     fn an_empty_line_is_nothing_to_send_yet() {
         let (_where, mut p) = running(
             "n=0\nwhile read line; do n=$(( $n + 1 )); \
-             if [ $n -eq 3 ]; then echo ready; else echo; fi; done\n",
+             if [ $n -eq 3 ]; then echo $n; else echo; fi; done\n",
             Duration::from_secs(2),
         );
 
-        assert_eq!(p.give(None, b"1").expect("a pass"), None);
-        assert_eq!(p.give(None, b"2").expect("a pass"), None);
+        assert_eq!(p.give(None, &as_value(1.0)).expect("a pass"), None);
+        assert_eq!(p.give(None, &as_value(2.0)).expect("a pass"), None);
         assert_eq!(
-            p.give(None, b"3").expect("a pass"),
-            Some(b"ready".to_vec()),
+            answered(&mut p, 3.0),
+            3.0,
             "the third arrival is the one that answers"
         );
     }
@@ -618,10 +660,7 @@ mod tests {
             Duration::from_secs(3),
         );
 
-        assert_eq!(
-            p.give(None, b"go").expect("an answer"),
-            Some(b"291.5".to_vec())
-        );
+        assert_eq!(answered(&mut p, 1.0), 291.5);
     }
 
     /// A program that does not answer in time is treated as having failed.
@@ -632,7 +671,7 @@ mod tests {
             Duration::from_millis(200),
         );
 
-        let said = p.give(None, b"1").expect_err("a program that took too long");
+        let said = p.give(None, &as_value(1_f64)).expect_err("a program that took too long");
         assert!(
             said.contains("did not answer within") && said.contains("rather than waited for"),
             "{said}"
@@ -642,7 +681,7 @@ mod tests {
         // will read: the next datum is refused with the same reason, so a
         // ground station sees a computation that has stopped.
         assert!(!p.is_running());
-        let again = p.give(None, b"2").expect_err("a stopped computation");
+        let again = p.give(None, &as_value(2_f64)).expect_err("a stopped computation");
         assert!(again.contains("is not running"), "{again}");
     }
 
@@ -651,7 +690,7 @@ mod tests {
     fn a_program_that_exits_is_reported() {
         let (_where, mut p) = running("read line\nexit 3\n", Duration::from_secs(2));
 
-        let said = p.give(None, b"1").expect_err("a program that exited");
+        let said = p.give(None, &as_value(1_f64)).expect_err("a program that exited");
         assert!(said.contains("exited with status 3"), "{said}");
         assert!(!p.is_running());
     }
@@ -685,7 +724,7 @@ mod tests {
         // The first datum kills it, and it is started again. The datum is
         // refused all the same: it went into a program that died without
         // answering, and saying otherwise would be inventing a result.
-        let said = p.give(None, b"1").expect_err("the program exited");
+        let said = p.give(None, &as_value(1_f64)).expect_err("the program exited");
         assert!(
             said.contains("started again") && said.contains("this datum is lost"),
             "{said}"
@@ -694,7 +733,7 @@ mod tests {
 
         // And the second the same way: a program told to come back comes back
         // however often it stops, and every datum that died with it is lost.
-        let said = p.give(None, b"2").expect_err("the program exited again");
+        let said = p.give(None, &as_value(2_f64)).expect_err("the program exited again");
         assert!(
             said.contains("started again") && said.contains("this datum is lost"),
             "{said}"

@@ -189,10 +189,7 @@ mod tests {
 
     /// What a vote says, as a number.
     fn said(out: Option<Vec<u8>>) -> f64 {
-        String::from_utf8(out.expect("a value"))
-            .expect("text")
-            .parse()
-            .expect("a number")
+        from_value(&out.expect("a value"), "a vote").expect("a value")
     }
 
     /// Nothing is produced until every input has reported once.
@@ -203,12 +200,12 @@ mod tests {
     fn nothing_is_produced_until_every_input_has_reported() {
         let mut vote = vote(Algorithm::Median);
 
-        assert_eq!(vote.give(Some("in0"), b"290").unwrap(), None);
+        assert_eq!(vote.give(Some("in0"), &as_value(290_f64)).unwrap(), None);
         assert_eq!(vote.waiting_for(), 2);
-        assert_eq!(vote.give(Some("in1"), b"293").unwrap(), None);
+        assert_eq!(vote.give(Some("in1"), &as_value(293_f64)).unwrap(), None);
         assert_eq!(vote.waiting_for(), 1);
 
-        let out = vote.give(Some("in2"), b"296").unwrap();
+        let out = vote.give(Some("in2"), &as_value(296_f64)).unwrap();
         assert_eq!(said(out), 293.0, "the middle of 290, 293 and 296");
         assert_eq!(vote.waiting_for(), 0);
     }
@@ -221,18 +218,18 @@ mod tests {
     #[test]
     fn every_arrival_after_the_first_set_produces_a_value() {
         let mut vote = vote(Algorithm::Median);
-        for (input, reading) in [("in0", b"290"), ("in1", b"293"), ("in2", b"296")] {
-            vote.give(Some(input), reading).unwrap();
+        for (input, reading) in [("in0", as_value(290_f64)), ("in1", as_value(293_f64)), ("in2", as_value(296_f64))] {
+            vote.give(Some(input), &reading).unwrap();
         }
 
         // One sensor reports again, and the vote is taken over its new
         // reading and the last from the other two.
-        let out = vote.give(Some("in0"), b"294").unwrap();
+        let out = vote.give(Some("in0"), &as_value(294_f64)).unwrap();
         assert_eq!(said(out), 294.0, "the middle of 294, 293 and 296");
 
         // And again, from the same sensor: nothing is waiting for the others,
         // so the one that is still reporting keeps the value current.
-        let out = vote.give(Some("in0"), b"299").unwrap();
+        let out = vote.give(Some("in0"), &as_value(299_f64)).unwrap();
         assert_eq!(said(out), 296.0, "the middle of 299, 293 and 296");
     }
 
@@ -250,11 +247,11 @@ mod tests {
             (Algorithm::ClosestMean, 293.2),
         ] {
             let mut vote = vote(algorithm);
-            vote.give(Some("in0"), b"293").unwrap();
-            vote.give(Some("in1"), b"293.4").unwrap();
+            vote.give(Some("in0"), &as_value(293_f64)).unwrap();
+            vote.give(Some("in1"), &as_value(293.4_f64)).unwrap();
             // Twenty kelvin high, which is a sensor to replace rather than a
             // temperature to act on.
-            let got = said(vote.give(Some("in2"), b"313").unwrap());
+            let got = said(vote.give(Some("in2"), &as_value(313_f64)).unwrap());
             assert!(
                 (got - expected).abs() < 1e-9,
                 "{}: {got} is not {expected}",
@@ -270,16 +267,16 @@ mod tests {
         // The close pair is the two low ones, so the answer is below the
         // median rather than at it.
         let mut low = vote(Algorithm::ClosestMean);
-        low.give(Some("in0"), b"290.0").unwrap();
-        low.give(Some("in1"), b"290.2").unwrap();
-        let got = said(low.give(Some("in2"), b"300.0").unwrap());
+        low.give(Some("in0"), &as_value(290.0_f64)).unwrap();
+        low.give(Some("in1"), &as_value(290.2_f64)).unwrap();
+        let got = said(low.give(Some("in2"), &as_value(300.0_f64)).unwrap());
         assert!((got - 290.1).abs() < 1e-9, "{got}");
 
         // And the two high ones, which the median would miss the other way.
         let mut high = vote(Algorithm::ClosestMean);
-        high.give(Some("in0"), b"280.0").unwrap();
-        high.give(Some("in1"), b"299.8").unwrap();
-        let got = said(high.give(Some("in2"), b"300.0").unwrap());
+        high.give(Some("in0"), &as_value(280.0_f64)).unwrap();
+        high.give(Some("in1"), &as_value(299.8_f64)).unwrap();
+        let got = said(high.give(Some("in2"), &as_value(300.0_f64)).unwrap());
         assert!((got - 299.9).abs() < 1e-9, "{got}");
     }
 
@@ -290,11 +287,11 @@ mod tests {
         let mut vote = vote(Algorithm::Median);
 
         let said = vote
-            .give(Some("in7"), b"290")
+            .give(Some("in7"), &as_value(290_f64))
             .expect_err("an input it does not have");
         assert!(said.contains("in7") && said.contains("in0"), "{said}");
 
-        let said = vote.give(None, b"290").expect_err("no input name");
+        let said = vote.give(None, &as_value(290_f64)).expect_err("no input name");
         assert!(said.contains("named inputs"), "{said}");
     }
 

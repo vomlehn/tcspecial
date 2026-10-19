@@ -674,6 +674,26 @@ Requirement
     version 1 payload triggered, so a second word could only disagree with it.
 
 Requirement
+    A trigger on an interface that cannot be asked is refused. A set of
+    discrete lines is read or driven and not both, so a trigger written on one
+    is bytes nothing would send; an IIO device's sample buffer is read and
+    never written, what such a device is configured with being in sysfs and
+    not in the character device, so a trigger there would be a question asked
+    down a path that carries answers. Both are refused with the configuration
+    rather than at the first read, because what the node would then do is
+    nothing at all -- a vehicle that came up and asked a question it cannot
+    ask would have a sensor reporting nothing and nothing saying why.
+
+Requirement
+    A ``read_size`` larger than one read of the interface carries is refused,
+    and the message names both numbers. A CAN frame carries eight bytes, or
+    sixty-four on an FD bus, and an rpmsg message carries what the channel's
+    ``max_message_bytes`` says, 496 by default. A read asking for more than
+    that is refused rather than split across two frames: a reading assembled
+    out of two frames is a reading that half arrives when one of them is lost,
+    and nothing in the configuration says how to put the halves back together.
+
+Requirement
     A port of ``0`` is refused. It is the one number a socket would accept and
     a configuration cannot mean -- it asks the kernel for whichever port is
     free, so a configuration stating it describes a link nothing could be told
@@ -929,10 +949,14 @@ anything is more likely a mistake than an intention.
 Requirement
     A fixed-length log takes only sources whose record length the
     configuration states, which means a device with a ``read_size``. A
-    computation's result is a number written out as text and its width depends
-    on the number, so nothing in the file could say otherwise -- and a source
-    whose length is not knowable is refused with that reason rather than with a
-    number it does not have. The two variable formats take any source.
+    computation's length is its function's and not the file's -- eight bytes
+    from one built-in and one byte of a decision from another -- and it is
+    deliberately not read off the function: a configuration that fitted a log
+    only because of what a built-in happens to produce would be made valid or
+    invalid by a change to tcspecial, which is not something a file can be
+    checked against. A source whose length is not knowable is refused with that
+    reason rather than with a number it does not have. The two variable formats
+    take any source.
 
 Requirement
     A log is never read, and no link may leave one. It is where data stops; a
@@ -992,6 +1016,36 @@ Compute elements
 
 Two of them, and the difference is where the code lives.
 
+What a computation reads and writes is a **value**: eight bytes of an
+IEEE-754 binary64, least significant byte first. A reading is a value from
+the conversion that made it to the computation that uses it, to the log that
+records it and to the link that carries it to the ground, and it is a value in
+kelvins -- one unit everywhere, so that a comparison between two readings is a
+comparison and not a conversion.
+
+Decimal text was tried first and gave the number up a digit at a time. A
+temperature written to four places and read back is a different number from
+the one the sensor's counts converted to, every hop rounds it again, and a
+vote between three sensors was being decided on the fourth decimal place of
+numbers that had each lost it. Eight bytes carry what the arithmetic
+produced. They are also the width of a timestamp and of a node id, which are
+written the same way round, so there is one byte order in the software rather
+than one for numbers and another for everything else.
+
+A **decision** is not a value and is still text: ``1`` or ``0``, one byte,
+which is what a thermostat sends a heater. A device driven by a decision is
+driven by the byte the configuration says that device wants, and a heater's
+line is not a number. Where a value becomes text -- a program's pipe, a
+command's value from the ground -- the conversion happens at that boundary and
+nowhere else.
+
+The cost is paid where data is shown rather than used. A log holds eight bytes
+per reading where it held six or seven characters, and a panel showing the head
+of what arrived shows eight bytes of hexadecimal where it showed a number
+somebody could read. The log is read by a program that knows the format; the
+panel is the one place a reader loses something, and it is a reading nobody is
+deciding on.
+
 A **built-in** names a function compiled into tcspecial: ``to_kelvin``,
 ``mean``, ``hysteresis`` and the rest of a catalogue that grows as flights need
 it. These are the ones to prefer. They are written in Rust, tested with the
@@ -1042,9 +1096,16 @@ per answer on its standard output:
    out:                 an empty line: nothing to send yet
 
 Requirement
-    The program is handed lines and answers in lines. A value on a link is
-    decimal text, and a line is what every language reads without a library --
-    which is the point of this type of node existing at all.
+    The program is handed lines and answers in lines, in decimal. A value on a
+    link is eight bytes of a binary64, and tcspecial converts at the pipe in
+    both directions: a line is what every language reads without a library,
+    which is the point of this type of node existing at all, and a program that
+    had to unpack eight bytes of a float in the host's byte order would not be
+    writable in a shell. What a program loses by it is what decimal loses --
+    the shortest text that reads back as the same double is written, so the
+    number a program is handed is the number that arrived, and a program that
+    answers with fewer digits than it was given has answered with fewer
+    digits.
 
 Requirement
     An empty line is the program saying "nothing to send yet", and is the same
@@ -5351,11 +5412,24 @@ Requirement
     what says what it said, rather than told the word is unknown.
 
 Requirement
-    No two data handlers want the same thing. Two at one address cannot both
-    be started; two on one device file, one serial line or one SPI peripheral
-    is worse, each taking part of the one stream and reporting it as though it
-    were the whole. A handler's own address and the address it reaches the OC
-    on are compared together, since a port is a port whatever claims it.
+    No two nodes want the same thing. Two at one address cannot both be
+    started; two on one device file, one serial line or one SPI peripheral is
+    worse, each taking part of the one stream and reporting it as though it
+    were the whole. Every node that is opened is compared with every other --
+    the payloads and the MOC node, a port being a port whatever claims it --
+    and the node whose claim came second is the one named, since the first
+    claim is the one that stands and a reader given both names has to change
+    one of them. The claim is per kind, because what a kind shares by design
+    differs: a path is claimed whole, an I\ :superscript:`2`\ C bus is shared
+    and an address on it is not, a CAN interface is shared and an identifier
+    on it is not, and a GPIO chip is shared while a line of it is given to one
+    request at a time.
+
+    An app node is not compared, having no interface to claim: a payload that
+    is a program is reached by running it, which is why it names a program and
+    no bus. A node whose terms will not parse is left out as well, so that the
+    complaint about what is actually wrong with it is not buried under a
+    second one built on half-read terms.
 
 Requirement
     Hosts that certainly mean this host -- ``localhost``, ``127.0.0.1`` and
@@ -5606,8 +5680,9 @@ Requirement
     come. Each refusal names the direction that would allow what was tried.
 
 Requirement
-    Driven lines are driven together, to the one state, by a value on a link
-    -- the text ``1`` or ``0``, and nothing else. There is nothing in the
+    Driven lines are driven together, to the one state, by a decision on a
+    link -- the text ``1`` or ``0``, and nothing else, a decision being the
+    one thing on a link that is text rather than a value. There is nothing in the
     configuration to say which line of a set is which, so a pattern would
     have no meaning; and three heater circuits switched one at a time would be
     three thermal states of a vehicle on the way to the one asked for. A datum
@@ -8275,7 +8350,8 @@ of them does instead is described in ``design.rst``.
 
 Where a note calls something **experimental**, it means what ``design.rst``
 and ``manual.rst`` mean by it: written, parsing, reaching a handler and tested,
-but never run against the hardware it describes and in no shipped payload set.
+but never run against the hardware it describes and in no configuration
+this tree ships.
 Six things are in that state, all of them types of payload interface:
 RS-485 on a serial line, and the ``can``, ``iio``, ``rpmsg``, ``gpio`` and
 ``hdlc`` types.
@@ -8330,31 +8406,46 @@ DH_UDP must implement DH and use UDP to send telemetry to tcslib
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
-   Implemented differently. There is no ``DH_UDP``. A handler's endpoints are
-   per type -- ``UdpEndpoint``, ``TcpEndpoint``, ``SerialEndpoint``,
+   Implemented differently. There is no ``DH_UDP``. A node's endpoint is per
+   type -- ``UdpEndpoint``, ``TcpEndpoint``, ``SerialEndpoint``,
    ``I2cEndpoint``, ``SpiEndpoint``, ``DeviceEndpoint``, the Unix socket pair,
    and the experimental ``CanEndpoint``, ``IioEndpoint``, ``RpmsgEndpoint``
-   and ``GpioEndpoint`` -- and a handler's OC endpoint is UDP whichever type
-   its payload is.
+   and ``GpioEndpoint``. Telemetry no longer leaves from the payload's own
+   node: every payload had an OC endpoint of its own, and a node's data now
+   reaches the ground along the links the configuration draws, through the
+   ``moc`` node, which is the one UDP socket to the ground whatever types the
+   nodes behind it are. What that is for is that the graph decides where a
+   datum goes -- to the ground, to a log, to a computation, or to all three --
+   and a payload wired to send its own telemetry could only decide the one.
 
 CI must support the following functions for implementing commands: ping(), exit(), status(), config(), start_dh(), stop_dh(), status_dh()
 
 .. note::
-   ``ping``, ``config``, ``start_dh`` and ``stop_dh`` are there.
-   ``status_dh`` is ``query_dh``, which also has a companion,
-   ``query_dh_sample``, for what a handler last sent and received. ``exit``
-   and ``status`` are not implemented; see below. Two commands this did not
-   ask for were added: ``connect``, which is each end saying what
-   configuration it read, and ``restart_arm`` with ``restart``.
+   ``ping`` and ``config`` are there. The three that name a payload are
+   there under other names, and they name a node by id rather than a handler
+   by name: ``START_NODE``, ``STOP_NODE``, ``QUERY_NODE`` -- which is what
+   ``status_dh`` asked for -- and ``QUERY_NODE_SAMPLE``, for the last datum a
+   node moved each way. The five commands that named a handler by name
+   (``START_DH``, ``STOP_DH``, ``QUERY_DH``, ``QUERY_DH_SAMPLE`` and
+   ``CONFIG_DH``) went with version 1, and their opcodes are not reused: a
+   ground station of the older build is told its command is not one, rather
+   than having it acted on as another. ``exit`` and ``status`` are not
+   implemented; see below. Three commands this did not ask for were added:
+   ``connect``, which is each end saying what configuration it read,
+   ``restart_arm`` with ``restart``, and ``SET_NODE``, which sets an attribute
+   the ``commands`` section says the ground may set.
 
 CI must have an element named dh of type BTreeMap
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
-   Implemented, named ``data_handlers``, and behind a mutex and a reference
-   count: ``Arc<Mutex<BTreeMap<DHName, DataHandler>>>``. Keyed by name, a
-   handler having no number; two command links and the handlers' own threads
-   reach it.
+   Implemented as a ``BTreeMap``, of nodes rather than of handlers and under
+   another name: ``Fabric::nodes``, a ``BTreeMap<String, Mutex<Box<dyn
+   Port>>>``, keyed by the name the configuration gives a node. It was
+   ``Arc<Mutex<BTreeMap<DHName, DataHandler>>>`` and went with version 1. The
+   lock moved inward with it: one mutex per node rather than one over the
+   whole map, so a node held open for a slow read does not hold up a command
+   about another.
 
 CI must support sending telemetry responses to all CI commands
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -8381,7 +8472,7 @@ CI must periodically send a Telemetry::Beacon message with a timestamp and uniqu
    interface whose being wrong lost every beacon in silence. The number is
    counted by the sender from one, so it starts again when tcspecial does,
    and the MOC tells a gap from a restart by that. A beacon also carries what a CONNECT is answered with -- the
-   software version, the version the payload set states, and the digest of
+   software version, the version the configuration states, and the digest of
    the configuration file the spacecraft read -- which this did not ask for.
 
 CI must parse commands from the ground receved via UDP/IP
@@ -8410,9 +8501,23 @@ CI must support a STATUS command that sends telemetry containing status to groun
 Tcspecial includes zero or more components named Data Handler (DH)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. note::
+   Implemented, as nodes: a configuration draws zero or more, and what a
+   requirement calls a handler is one node of the graph. Where a handler was
+   a payload and nothing else, a node is a payload, a link to the ground, a
+   log or a computation, and the three kinds that are not payloads are what
+   let a decision be made aboard.
 
 The top part of the tcsmoc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI
 ---------------------------------------------------------------------------------------------------------------------
 
 The middle part of the tcsmoc window is for viewing telemetry from individual DHs
 ---------------------------------------------------------------------------------
+
+.. note::
+   Implemented, one panel per node the configuration draws. What the panel
+   shows is the ground's own account of what arrived -- when it came, the head
+   of it, and how many have come since the MOC started -- and not the
+   spacecraft's count of what its handler had read. The count shown before was
+   the spacecraft's, which is the other direction, and read nought for a
+   payload nobody sends to.

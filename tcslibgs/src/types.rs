@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use crate::node::payload::hdlc::{ClockType, Encoding, FrameCheck};
 use crate::node::payload::serial::{Parity, StopBits};
 use crate::node::payload::spi::{BitOrder, CsActive, SpiMode};
-use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -226,34 +225,13 @@ pub enum DHType {
     Hdlc,
 }
 
-/// Something one handler takes for itself, and so which no other may take.
-///
-/// A handler's own address is exclusive, and so is the address it reaches the
-/// OC on: two handlers on one of them is a start that fails at the second,
-/// or worse, two handlers splitting one stream between them and each
-/// reporting half of it. The whole point of a bus is the exception, which is
-/// why a device on one is a claim on the address and not on the bus.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum Claim {
-    /// A port on a host.
-    Port { host: String, port: u16 },
-    /// A path in the filesystem: a device, a line, a peripheral, or the file
-    /// a Unix socket is named by. One kind of claim for all of them, since
-    /// what collides is the path and not what opens it.
-    Path(String),
-    /// A payload on a CAN interface. The bus is shared by design; the
-    /// identifier its frames carry is not.
-    OnCanBus { interface: String, can_id: u32 },
-    /// One line of a GPIO chip. The chip is shared by design; a line is given
-    /// to one request at a time.
-    OnChip { chip: String, line: u32 },
-    /// Nothing, for a kind whose claims are made one at a time: a GPIO
-    /// payload claims a line at a time and has no single claim of its own.
-    None,
-    /// A device on a bus. The bus is shared by design; the address on it is
-    /// not.
-    OnBus { bus: String, address: u16 },
-}
+// The rule about two nodes wanting one thing is `graph::check`'s. It was here
+// as well, over the handlers a payload section produced: a `Claim`, a
+// `claims_of` and a `no_two_handlers_claim_one_thing`, which nothing called
+// once the rule moved to the graph. One copy, in the one place a configuration
+// is checked -- two would be two answers to the question of what a bus shares.
+// `one_host` stays here, because two files naming one host differently is
+// asked about outside that rule too.
 
 /// The names that mean this host, as one name.
 ///
@@ -270,141 +248,6 @@ pub fn one_host(address: &str) -> String {
         "localhost" | "127.0.0.1" | "::1" => "localhost".to_string(),
         other => other.to_string(),
     }
-}
-
-/// What this handler claims, and what to call each claim in an error.
-fn claims_of(dh: &DHConfig) -> Vec<(Claim, String)> {
-    let mut claims = Vec::new();
-
-    // What the payload side takes. One claim for every kind but GPIO, which
-    // takes a line at a time: a chip is shared the way a bus is, and several
-    // payloads commonly watch lines of one chip.
-    let payload = match &dh.endpoint {
-        EndpointConfig::Network(net) => match net.protocol {
-            // A Unix socket is named by a file rather than by a port.
-            NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
-                Claim::Path(net.address.clone())
-            }
-            NetworkProtocol::Tcp | NetworkProtocol::Udp => Claim::Port {
-                host: one_host(&net.address),
-                port: net.port,
-            },
-        },
-        EndpointConfig::Device(device) => Claim::Path(device.path.clone()),
-        EndpointConfig::Serial(serial) => Claim::Path(serial.path.clone()),
-        // The whole interface, not a part of it. A raw HDLC frame carries no
-        // address, so there is nothing to tell two payloads on one line
-        // apart -- which is what makes this a claim on the interface where a
-        // CAN payload's is a claim on an identifier.
-        EndpointConfig::Hdlc(hdlc) => Claim::Path(hdlc.interface.clone()),
-        EndpointConfig::Iio(iio) => Claim::Path(iio.path.clone()),
-        EndpointConfig::Rpmsg(rpmsg) => Claim::Path(rpmsg.path.clone()),
-        EndpointConfig::Spi(spi) => Claim::Path(spi.path.clone()),
-        EndpointConfig::I2c(i2c) => Claim::OnBus {
-            bus: i2c.bus.clone(),
-            address: i2c.address,
-        },
-        // A CAN bus is shared by design, like an I2C bus, and what one
-        // payload takes on it is an identifier: two payloads answering to one
-        // identifier on one interface are two handlers reading each other's
-        // frames.
-        EndpointConfig::Can(can) => Claim::OnCanBus {
-            interface: can.interface.clone(),
-            can_id: can.can_id,
-        },
-        // A line at a time, and the chip not at all: two payloads may watch
-        // lines of one chip and may not watch one line, the kernel giving a
-        // line to one request at a time -- so the second handler's start
-        // would fail.
-        EndpointConfig::Gpio(gpio) => {
-            for line in &gpio.lines {
-                claims.push((
-                    Claim::OnChip {
-                        chip: gpio.path.clone(),
-                        line: *line,
-                    },
-                    format!("{}'s line {line}", dh.name.0),
-                ));
-            }
-            // Its claims are made above, so there is no single one to make
-            // here.
-            Claim::None
-        }
-    };
-    if payload != Claim::None {
-        claims.push((payload, format!("{}'s payload", dh.name.0)));
-    }
-
-    if let Some(oc) = &dh.oc {
-        claims.push((
-            Claim::Port {
-                host: one_host(&oc.address),
-                port: oc.port,
-            },
-            format!("{}'s OC address", dh.name.0),
-        ));
-    }
-
-    claims
-}
-
-/// How a claim reads in an error.
-fn claim_text(claim: &Claim) -> String {
-    match claim {
-        Claim::Port { host, port } => format!("{host}:{port}"),
-        Claim::Path(path) => path.clone(),
-        Claim::OnBus { bus, address } => format!("address {address:#04X} on {bus}"),
-        Claim::OnCanBus { interface, can_id } => {
-            format!("can_id {can_id:#x} on {interface}")
-        }
-        Claim::OnChip { chip, line } => format!("line {line} on {chip}"),
-        // Never in an error: a payload with no single claim makes its claims
-        // one at a time, and each of those is named above.
-        Claim::None => "nothing".to_string(),
-    }
-}
-
-/// Refuse two handlers that want the same thing.
-///
-/// Both configuration formats end here, because the hazard is in the handlers
-/// rather than in the words that described them: whichever file they were
-/// written in, two handlers at one address cannot both be started, and two
-/// handlers on one device file split its stream between them and each report
-/// part of it as though it were the whole. A handler's own address and the
-/// address it reaches the OC on are compared together, since a port is a port
-/// whatever means to claim it.
-pub fn no_two_handlers_claim_one_thing(handlers: &[DHConfig]) -> Result<(), String> {
-    match collisions(handlers).into_iter().next() {
-        Some((_, message)) => Err(message),
-        None => Ok(()),
-    }
-}
-
-/// Every pair of handlers that want one thing, each named by the handler
-/// whose claim came second.
-///
-/// The second one, because the first claim is the one that stands: a reader
-/// given both names has to change one of them, and the one that came second
-/// is the one the file can lose without the other becoming unreachable.
-pub fn collisions(handlers: &[DHConfig]) -> Vec<(DHName, String)> {
-    let mut taken: BTreeMap<Claim, String> = BTreeMap::new();
-    let mut found = Vec::new();
-
-    for dh in handlers {
-        for (claim, what) in claims_of(dh) {
-            match taken.get(&claim) {
-                Some(first) => found.push((
-                    dh.name.clone(),
-                    format!("{first} and {what} both want {}", claim_text(&claim)),
-                )),
-                None => {
-                    taken.insert(claim, what);
-                }
-            }
-        }
-    }
-
-    found
 }
 
 /// Whether a datagram came from the socket a configuration names.
@@ -3507,76 +3350,6 @@ mod tests {
 
 
 
-    /// A bus is shared; a place on it is not.
-    ///
-    /// The one exception the rule has to make, and the reason a claim is on the
-    /// address rather than on the bus device: several devices on one I2C bus is
-    /// what a bus is for, and refusing that would refuse the normal case. These
-    /// handlers cannot be written in a tcspecial configuration, so they are
-    /// built directly.
-    #[test]
-    fn a_bus_is_shared_and_a_place_on_it_is_not() {
-        let on_bus = |name: &str, address: u16| DHConfig {
-            name: DHName::new(name),
-            endpoint: EndpointConfig::I2c(I2cConfig {
-                bus: "/dev/i2c-1".to_string(),
-                address,
-                ten_bit: false,
-                pec: false,
-            }),
-            packet_size: 4,
-            oc: None,
-            ground: None,
-            mode: DHMode::Periodic,
-            stale_interval: None,
-        };
-
-        no_two_handlers_claim_one_thing(&[on_bus("DH0", 0x48), on_bus("DH1", 0x49)])
-            .expect("two devices on one bus is what a bus is for");
-
-        let said = no_two_handlers_claim_one_thing(&[on_bus("DH0", 0x48), on_bus("DH1", 0x48)])
-            .expect_err("two devices at one address on one bus");
-        assert!(
-            said.contains("0x48") && said.contains("/dev/i2c-1"),
-            "the error should name the address and the bus: {said}"
-        );
-    }
-
-    /// A Unix socket is named by a file, so it collides like a file.
-    ///
-    /// Its port is meaningless -- two Unix payloads with different ports and
-    /// one path are one socket -- and a device handler opening that same path
-    /// is the same collision from the other side, which is why every path is
-    /// one kind of claim.
-    #[test]
-    fn a_unix_socket_collides_by_its_path() {
-        let socket = |name: &str, port: u16| DHConfig {
-            name: DHName::new(name),
-            endpoint: EndpointConfig::Network(NetworkConfig {
-                protocol: NetworkProtocol::UnixStream,
-                address: "/tmp/dh.sock".to_string(),
-                port,
-            }),
-            packet_size: 4,
-            oc: None,
-            ground: None,
-            mode: DHMode::Periodic,
-            stale_interval: None,
-        };
-
-        let said = no_two_handlers_claim_one_thing(&[socket("DH0", 0), socket("DH1", 7)])
-            .expect_err("one socket path, whatever the ports say");
-        assert!(said.contains("/tmp/dh.sock"), "{said}");
-
-        let mut device = socket("DH1", 0);
-        device.endpoint = EndpointConfig::Device(DeviceConfig {
-            path: "/tmp/dh.sock".to_string(),
-        });
-        assert!(
-            no_two_handlers_claim_one_thing(&[socket("DH0", 0), device]).is_err(),
-            "a path is a path, whichever kind of handler opens it"
-        );
-    }
 
 
 

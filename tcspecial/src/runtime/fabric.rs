@@ -937,6 +937,16 @@ mod tests {
         (record.clone(), Box::new(Recorder(record)))
     }
 
+    /// A temperature on a link, which is a value and not text.
+    ///
+    /// What a sensor's conversion produces and what a computation reads: see
+    /// [`crate::node::vehicle::compute::as_value`]. A decision is still text,
+    /// so the decisions these tests look for are written as `b"1"` and
+    /// `b"0"`.
+    fn kelvin(number: f64) -> Vec<u8> {
+        crate::node::vehicle::compute::as_value(number)
+    }
+
     /// The example's links, and only its links.
     ///
     /// Without its links to the ground: these tests hold a recorder for every
@@ -1077,18 +1087,36 @@ mod tests {
 
         // What the ground saw: three temperatures, the one voted out of them,
         // and the decision.
-        let payload_out: Vec<String> = moc
-            .lock().expect("the record")
+        //
+        // A temperature is eight bytes of a double and a decision is text, so
+        // they are read back differently -- which is what the two are: a
+        // reading, and the thing a set of discrete lines is driven to.
+        let given: Vec<Vec<u8>> = moc
+            .lock()
+            .expect("the record")
             .given
             .iter()
-            .map(|(_, _, datum)| String::from_utf8_lossy(datum).to_string())
+            .map(|(_, _, datum)| datum.clone())
             .collect();
+        let temperatures: Vec<f64> = given
+            .iter()
+            .take(4)
+            .map(|datum| {
+                crate::node::vehicle::compute::from_value(datum, "the ground").expect("a value")
+            })
+            .collect();
+        for (shown, wanted) in temperatures.iter().zip([289.15, 289.15, 287.3188, 289.15]) {
+            assert!(
+                (shown - wanted).abs() < 1e-9,
+                // 289.15 and not the mean's 288.5396: the low reading is the
+                // outlier, and the median leaves it out.
+                "the ground should have had {wanted} and had {shown}"
+            );
+        }
         assert_eq!(
-            payload_out,
-            // 289.15 and not the mean's 288.5396: the low reading is the
-            // outlier, and the median leaves it out.
-            vec!["289.15", "289.15", "287.3188", "289.15", "1"],
-            "the ground should have the three readings, the vote and the decision"
+            given.last().map(|datum| datum.as_slice()),
+            Some(&b"1"[..]),
+            "the decision reaches the ground as well as the heaters"
         );
 
         // The log saw the same three and the decision, which is the other
@@ -1228,7 +1256,7 @@ mod tests {
 
         // 294 kelvin against a setpoint of 293.15 with two degrees either
         // side: inside the band, so nothing is decided.
-        let moved = fabric.deliver("cabin_temp", b"294.0");
+        let moved = fabric.deliver("cabin_temp", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert!(
             heaters.lock().expect("the record").given.is_empty(),
@@ -1242,7 +1270,7 @@ mod tests {
         assert!(heaters.lock().expect("the record").given.is_empty());
 
         // And the same reading now calls for heat.
-        let moved = fabric.deliver("cabin_temp", b"294.0");
+        let moved = fabric.deliver("cabin_temp", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(
             heaters.lock().expect("the record").given,
@@ -1291,7 +1319,7 @@ mod tests {
 
         // Cold: the first decision, which is a change and goes everywhere its
         // links lead.
-        let moved = fabric.deliver("cabin_temp", b"280.0");
+        let moved = fabric.deliver("cabin_temp", &kelvin(280.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         // The decisions a node was handed, and not the temperatures: the
         // example logs the voted temperature and reports it to the ground as
@@ -1315,7 +1343,7 @@ mod tests {
         // heaters again -- it is what they are to be held at -- and the
         // record of it stands at the one transition.
         for _ in 0..4 {
-            let moved = fabric.deliver("cabin_temp", b"280.0");
+            let moved = fabric.deliver("cabin_temp", &kelvin(280.0));
             assert!(moved.all_delivered(), "{:?}", moved.refused);
         }
         assert_eq!(said(&heaters).len(), 5, "{:?}", said(&heaters));
@@ -1334,14 +1362,14 @@ mod tests {
 
         // A reading inside the band decides nothing new, and the heaters are
         // still held at what they were told: that is what the band means.
-        let moved = fabric.deliver("cabin_temp", b"294.0");
+        let moved = fabric.deliver("cabin_temp", &kelvin(294.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(said(&heaters).len(), 6);
         assert_eq!(said(&log).len(), 1);
 
         // Warm enough to switch them off: a change, so it is recorded with
         // the first one and the heaters are driven to it.
-        let moved = fabric.deliver("cabin_temp", b"300.0");
+        let moved = fabric.deliver("cabin_temp", &kelvin(300.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(said(&heaters).last(), Some(&b"0".to_vec()));
         assert_eq!(

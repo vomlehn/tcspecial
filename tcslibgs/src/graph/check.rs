@@ -12,6 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{terminals, Destination, Graph};
+use crate::types::{EndpointConfig, NetworkProtocol};
 use crate::verify::About;
 
 /// How much a problem matters to somebody editing the configuration.
@@ -185,6 +186,25 @@ pub enum Problem {
     /// entered belongs here, where the complaint can name the file, the line
     /// and the attribute.
     BadNode { node: String, why: String },
+    /// Two nodes that want the same device, address, bus place, line or
+    /// socket.
+    ///
+    /// Neither could be opened beside the other. Two nodes on one device file
+    /// split its stream between them and each report part of it as though it
+    /// were the whole; two at one address cannot both bind it; two at one
+    /// place on a bus are each other's answers; two watching one line are a
+    /// start that fails at the second, the kernel giving a line to one
+    /// request at a time.
+    ///
+    /// `node` is the one whose claim came second, because the first is the
+    /// one that stands: a reader has to change one of the two, and the second
+    /// is the one the file can lose without the other becoming unreachable.
+    /// `message` names both and what they want.
+    ///
+    /// What is shared by design is not a claim. A bus is shared and a place on
+    /// it is not; a CAN interface is shared and an identifier on it is not; a
+    /// GPIO chip is shared and a line of it is not.
+    TwoNodesWantOneThing { node: String, message: String },
     /// A configuration with no `tcspecial` section.
     ///
     /// Required, and required rather than defaulted for the reason the beacon
@@ -274,6 +294,7 @@ impl Problem {
             // would have to be written.
             Problem::UntriggeredInput { node, .. } => About::Node(node.clone()),
             Problem::LinesAgainstTheirDirection { node, .. } => About::Node(node.clone()),
+            Problem::TwoNodesWantOneThing { node, .. } => About::Node(node.clone()),
             // The section, where there is one to point at. A missing section
             // has no line of its own and is reported on the file, which is
             // where it would have to be written.
@@ -408,6 +429,7 @@ impl Problem {
             // The reason already names the node: see reach_of, whose
             // complaints are written to be read on their own.
             Problem::BadNode { why, .. } => why.clone(),
+            Problem::TwoNodesWantOneThing { message, .. } => message.clone(),
             Problem::NoTcspecial => "this configuration has no tcspecial \
                  section, so nothing says where commands are taken, where \
                  beacons go or where the telemetry log is written"
@@ -470,8 +492,8 @@ impl Problem {
             } => format!(
                 "log \"{log}\" holds records of exactly {wanted} bytes, and nothing \
                  says how long \"{source}\"'s records are: a fixed-length log takes \
-                 only sources whose length the configuration states, which a \
-                 computation's does not"
+                 only sources whose length the configuration states, and a \
+                 computation's length is its function's rather than the file's"
             ),
         }
     }
@@ -1112,6 +1134,37 @@ impl Graph {
             }
         }
 
+        // Two nodes that want one thing. Run over every node that is
+        // opened, in the order the configuration declares them, so that the
+        // claim which came first is the one that stands.
+        let mut taken: BTreeMap<Claim, String> = BTreeMap::new();
+        for node in self.nodes.iter().filter(|node| {
+            (node.is_payload() && crate::node::app::Kind::of(&node.node_type).is_none())
+                || node.node_type == "moc"
+        }) {
+            // A node whose terms will not parse has no claim to compare: the
+            // rule above names what is wrong with it, and a second complaint
+            // built on half-read terms would bury that one.
+            let Ok(reach) = crate::graph::reach::reach_of(node) else {
+                continue;
+            };
+            for (claim, what) in claims_of(&node.name, &reach.endpoint) {
+                match taken.get(&claim) {
+                    Some(first) => problems.push(Problem::TwoNodesWantOneThing {
+                        node: node.name.clone(),
+                        message: format!(
+                            "{first} and {what} both want {}: neither could be \
+                             opened beside the other",
+                            claim_text(&claim)
+                        ),
+                    }),
+                    None => {
+                        taken.insert(claim, what);
+                    }
+                }
+            }
+        }
+
         // Which way a set of discrete lines is used, against which way it
         // says it goes.
         //
@@ -1248,10 +1301,14 @@ impl Graph {
     ///
     /// `read_size` and nothing else. A device read in fixed-size packets says
     /// so and is the case a fixed-length log exists for; a computation's
-    /// result is a number written out as text, whose width depends on the
-    /// number, and nothing in the file could say otherwise. `None` is "not
-    /// knowable from this configuration", which is different from a length
-    /// that disagrees and is reported differently.
+    /// result is a value of eight bytes from one function and a decision of
+    /// one byte from another, so its width is a property of the function and
+    /// not of the file. It could be read off the function instead, and is
+    /// deliberately not: a configuration that fitted a log only because of
+    /// what a built-in happens to produce would be made valid or invalid by a
+    /// change to tcspecial, which is not something a file can be checked
+    /// against. `None` is "not knowable from this configuration", which is
+    /// different from a length that disagrees and is reported differently.
     fn record_bytes_of(&self, node: &str) -> Option<u32> {
         let node = self.node(node)?;
         if node.node_type == "compute" || node.node_type == "log" {
@@ -1261,6 +1318,103 @@ impl Graph {
         stated.as_str().parse().ok()
     }
 }
+
+/// What a node claims that nothing else may claim too.
+///
+/// What a claim *is* differs by kind, and the difference is what is shared by
+/// design. A bus is shared and a place on it is not; a CAN interface is
+/// shared and an identifier on it is not; a GPIO chip is shared and a line of
+/// it is not. Everything else -- a device file, a socket, a peripheral's node
+/// -- is claimed whole.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Claim {
+    /// A port on a host. `localhost`, `127.0.0.1` and `::1` are one host, as
+    /// they are everywhere else in these rules, so naming it differently does
+    /// not make it a different port.
+    Port { host: String, port: u16 },
+    /// A path in the filesystem: a device, a line, a peripheral, or the file a
+    /// Unix socket is named by. One kind of claim for all of them, since what
+    /// collides is the path and not what opens it.
+    Path(String),
+    /// A device on a bus.
+    OnBus { bus: String, address: u16 },
+    /// A node on a CAN interface, by the identifier its frames carry.
+    OnCanBus { interface: String, can_id: u32 },
+    /// One line of a GPIO chip.
+    OnChip { chip: String, line: u32 },
+}
+
+/// What this node claims, and what to call each claim in a complaint.
+///
+/// A list because a set of discrete lines claims a line at a time: several
+/// nodes commonly watch lines of one chip, and the kernel gives a line to one
+/// request at a time, so the chip is not the claim.
+fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
+    let mut claims = Vec::new();
+
+    let whole = match endpoint {
+        EndpointConfig::Network(net) => match net.protocol {
+            // A Unix socket is named by a file rather than by a port.
+            NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
+                Claim::Path(net.address.clone())
+            }
+            NetworkProtocol::Tcp | NetworkProtocol::Udp => Claim::Port {
+                host: crate::types::one_host(&net.address),
+                port: net.port,
+            },
+        },
+        EndpointConfig::Device(device) => Claim::Path(device.path.clone()),
+        EndpointConfig::Serial(serial) => Claim::Path(serial.path.clone()),
+        // The whole interface, not a part of it. A raw HDLC frame carries no
+        // address, so there is nothing to tell two nodes on one line apart --
+        // which is what makes this a claim on the interface where a CAN
+        // node's is a claim on an identifier.
+        EndpointConfig::Hdlc(hdlc) => Claim::Path(hdlc.interface.clone()),
+        EndpointConfig::Iio(iio) => Claim::Path(iio.path.clone()),
+        EndpointConfig::Rpmsg(rpmsg) => Claim::Path(rpmsg.path.clone()),
+        EndpointConfig::Spi(spi) => Claim::Path(spi.path.clone()),
+        EndpointConfig::I2c(i2c) => Claim::OnBus {
+            bus: i2c.bus.clone(),
+            address: i2c.address,
+        },
+        // A CAN bus is shared by design, like an I2C bus, and what one node
+        // takes on it is an identifier: two nodes answering to one identifier
+        // on one interface are two nodes reading each other's frames.
+        EndpointConfig::Can(can) => Claim::OnCanBus {
+            interface: can.interface.clone(),
+            can_id: can.can_id,
+        },
+        // A line at a time, and the chip not at all. Each claim is named by
+        // the node alone: which line it is is the claim's own words.
+        EndpointConfig::Gpio(gpio) => {
+            for line in &gpio.lines {
+                claims.push((
+                    Claim::OnChip {
+                        chip: gpio.path.clone(),
+                        line: *line,
+                    },
+                    format!("\"{name}\""),
+                ));
+            }
+            return claims;
+        }
+    };
+
+    claims.push((whole, format!("\"{name}\"")));
+    claims
+}
+
+/// How a claim reads in a complaint.
+fn claim_text(claim: &Claim) -> String {
+    match claim {
+        Claim::Port { host, port } => format!("{host}:{port}"),
+        Claim::Path(path) => path.clone(),
+        Claim::OnBus { bus, address } => format!("address {address:#04X} on {bus}"),
+        Claim::OnCanBus { interface, can_id } => format!("can_id {can_id:#x} on {interface}"),
+        Claim::OnChip { chip, line } => format!("line {line} on {chip}"),
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -1503,8 +1657,8 @@ mod tests {
     /// answers, which is what a payload does.
     #[test]
     fn an_app_node_is_held_to_what_it_may_say() {
-        let mut sensor = node("a", "i2c");
-        let mut answers = node("b", "i2c");
+        let mut sensor = node_at("a", "i2c", 0);
+        let mut answers = node_at("b", "i2c", 1);
         for one in [&mut sensor, &mut answers] {
             // Written to, so each says what asks it for a reading.
             one.attributes
@@ -1742,6 +1896,181 @@ mod tests {
             "{:?}",
             g.check()
         );
+    }
+
+    /// A node of this kind, at a place of its own.
+    ///
+    /// The `node` helper gives every node of a kind the same attributes,
+    /// which for a device on a bus is the same address: several of them in one
+    /// graph are several devices at one place, which is refused -- see
+    /// `two_nodes_may_not_want_one_thing`. A test about something else wants
+    /// them apart, and `which` is what tells them apart.
+    fn node_at(name: &str, node_type: &str, which: u16) -> Node {
+        let mut made = node(name, node_type);
+        match node_type {
+            "i2c" => {
+                made.attributes.insert(
+                    "address".to_string(),
+                    Scalar::of(&format!("{:#04x}", 0x48 + which)),
+                );
+            }
+            "network" => {
+                made.attributes
+                    .insert("port".to_string(), Scalar::of(&(5100 + which).to_string()));
+            }
+            _ => {
+                made.attributes.insert(
+                    "path".to_string(),
+                    Scalar::of(&format!("/dev/{node_type}-{which}")),
+                );
+            }
+        }
+        made
+    }
+
+    /// Two nodes may not want one device, one place on a bus, one line or one
+    /// socket.
+    ///
+    /// Neither could be opened beside the other: two nodes on one device file
+    /// split its stream between them and each report part of it as though it
+    /// were the whole, two at one address cannot both bind it, two at one
+    /// place on a bus are each other's answers, and the kernel gives a line
+    /// to one request at a time.
+    ///
+    /// What is shared by design is not a claim, and that is the other half of
+    /// the rule: the thermostat's two sensors share an I2C bus, its three
+    /// sensors are read together, and its two heaters share a chip.
+    #[test]
+    fn two_nodes_may_not_want_one_thing() {
+        let two = |first: Node, second: Node| {
+            graph(
+                vec![first, second, node("moc", "moc")],
+                vec![link("a", &["moc"]), link("b", &["moc"])],
+            )
+        };
+        let wanted = |g: &Graph| -> Option<String> {
+            g.check().into_iter().find_map(|p| match p {
+                Problem::TwoNodesWantOneThing { message, .. } => Some(message),
+                _ => None,
+            })
+        };
+        let named = |kind: &str, name: &str| {
+            let mut made = node(kind, kind);
+            made.name = name.to_string();
+            made
+        };
+
+        // One device file, which is one stream split between two.
+        let first = named("device-file", "a");
+        let mut second = named("device-file", "b");
+        let said = wanted(&two(first.clone(), second.clone()))
+            .expect("two nodes on one device file");
+        assert!(said.contains("/dev/urandom"), "{said}");
+        assert!(said.contains("\"a\"") && said.contains("\"b\""), "{said}");
+
+        // And two device files are two devices.
+        second
+            .attributes
+            .insert("path".to_string(), Scalar::of("/dev/zero"));
+        assert_eq!(wanted(&two(first.clone(), second.clone())), None);
+
+        // One place on one bus. The bus itself is shared: that is what a bus
+        // is for.
+        let mut here = named("i2c", "a");
+        let mut there = named("i2c", "b");
+        assert!(
+            wanted(&two(here.clone(), there.clone()))
+                .expect("two devices at one address")
+                .contains("0x48"),
+            "the address is what collides"
+        );
+        there
+            .attributes
+            .insert("address".to_string(), Scalar::of("0x49"));
+        assert_eq!(
+            wanted(&two(here.clone(), there.clone())),
+            None,
+            "two addresses on one bus are two devices"
+        );
+        here.attributes
+            .insert("path".to_string(), Scalar::of("/dev/i2c-2"));
+        assert_eq!(wanted(&two(here, there)), None, "and so are two buses");
+
+        // One line of one chip. The chip is shared and the line is not.
+        let mut watching = named("gpio", "a");
+        let mut driving = named("gpio", "b");
+        driving
+            .attributes
+            .insert("lines".to_string(), Scalar::of("5,6,7"));
+        let said = wanted(&two(watching.clone(), driving.clone()))
+            .expect("two nodes on one line");
+        assert!(said.contains("line 5"), "{said}");
+        assert!(
+            said.contains("/dev/gpiochip0"),
+            "the chip is worth naming too: {said}"
+        );
+        driving
+            .attributes
+            .insert("lines".to_string(), Scalar::of("6,7,8"));
+        assert_eq!(
+            wanted(&two(watching.clone(), driving.clone())),
+            None,
+            "a chip is shared, which is the point of a chip"
+        );
+
+        // One socket, however the host is spelled: localhost and 127.0.0.1
+        // are one host everywhere else in these rules.
+        let mut mine = named("network", "a");
+        let mut theirs = named("network", "b");
+        theirs
+            .attributes
+            .insert("address".to_string(), Scalar::of("localhost"));
+        let said = wanted(&two(mine.clone(), theirs.clone()))
+            .expect("two nodes at one port");
+        assert!(said.contains("5100"), "{said}");
+        theirs
+            .attributes
+            .insert("port".to_string(), Scalar::of("5101"));
+        assert_eq!(wanted(&two(mine.clone(), theirs.clone())), None);
+
+        // A Unix socket is named by a file, so it collides like a file and
+        // its port means nothing: two nodes with one path and different ports
+        // are one socket. (A port is written at all because the language asks
+        // every network node for one; what a Unix socket does with it is
+        // nothing.)
+        let named_socket = |name: &str, port: &str| {
+            let mut made = named("network", name);
+            made.attributes
+                .insert("protocol".to_string(), Scalar::of("unix_stream"));
+            made.attributes
+                .insert("address".to_string(), Scalar::of("/tmp/node.sock"));
+            made.attributes
+                .insert("port".to_string(), Scalar::of(port));
+            made
+        };
+        let said = wanted(&two(named_socket("a", "5200"), named_socket("b", "5201")))
+            .expect("one socket path, whatever the ports say");
+        assert!(said.contains("/tmp/node.sock"), "{said}");
+
+        // And a path is a path, whichever kind of node opens it: a device
+        // file on the socket's path is the same collision from the other
+        // side, which is why every path is one kind of claim.
+        let mut over_it = named("device-file", "b");
+        over_it
+            .attributes
+            .insert("path".to_string(), Scalar::of("/tmp/node.sock"));
+        assert!(
+            wanted(&two(named_socket("a", "5200"), over_it)).is_some(),
+            "a device file and a socket on one path collide"
+        );
+
+        // And a node is not told it collides with itself.
+        mine.attributes
+            .insert("port".to_string(), Scalar::of("5102"));
+        watching
+            .attributes
+            .insert("lines".to_string(), Scalar::of("3,4,5"));
+        assert_eq!(wanted(&two(mine, watching)), None);
     }
 
     /// Discrete lines are used the way their `direction` says, or refused.
@@ -2803,9 +3132,9 @@ mod tests {
     fn the_ground_takes_every_payload_at_once() {
         let g = graph(
             vec![
-                node("a", "i2c"),
-                node("b", "i2c"),
-                node("c", "i2c"),
+                node_at("a", "i2c", 0),
+                node_at("b", "i2c", 1),
+                node_at("c", "i2c", 2),
                 node("moc", "moc"),
             ],
             vec![

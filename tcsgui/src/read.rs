@@ -7,8 +7,8 @@
 //! configurations once.
 //!
 //! The structure comes from `tcslibgs::graph::Graph`, which is the one reader
-//! of the version 2 schema: it reads YAML and XML, follows `include`, and has
-//! the rules about what a node may say. Nothing here parses a configuration a
+//! of the schema: it reads YAML and XML, follows `include`, and has the rules
+//! about what a node may say. Nothing here parses a configuration a
 //! second time.
 //!
 //! # The comments

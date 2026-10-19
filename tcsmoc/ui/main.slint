@@ -286,13 +286,12 @@ component DHPanel inherits Rectangle {
         last-recv-row := HorizontalLayout {
             spacing: 4px;
             min-height: 14px;
-            // There was an indicator beside this time, saying whether what
-            // arrived was recent enough for this payload. It went with
-            // version 1, which is the only thing that ever said how often a
-            // payload's data should arrive: a version 2 node produces when
-            // something reaches it, and a thermostat that emits only when its
-            // decision changes has no rate to be judged against. A light that
-            // could never change is worse than no light.
+            // No indicator beside this time says whether what arrived was
+            // recent enough: nothing states how often a payload's data
+            // should arrive. A node produces when something reaches it, and
+            // a thermostat that emits only when its decision changes has no
+            // rate to be judged against. A light that could never change is
+            // worse than no light.
             Text { text: "Last recv:"; font-size: 10px; vertical-alignment: center; }
             Text { text: oc-time; font-size: 10px; vertical-alignment: center; }
         }

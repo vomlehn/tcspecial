@@ -1541,19 +1541,17 @@ impl SimConfigFile {
     /// Everything wrong with this file that can be said from the names of
     /// the payloads it is joined to.
     ///
-    /// For a version 2 configuration, whose payloads are nodes of a graph
-    /// rather than data handlers: what a node is settled into aboard is not
-    /// a [`DHConfig`], so the rules that need one -- the kind, the transport,
-    /// the intervals a triggered payload may not have -- have nothing to be
-    /// asked of. What is left is every rule about names, which are the whole
-    /// of how the two files are joined: an entry for a payload the
-    /// configuration does not have, a group nobody declared or nobody uses,
-    /// two entries of one name, a setting that is not one.
+    /// A configuration's payloads are nodes of a graph, and what a node is
+    /// settled into aboard is not a [`DHConfig`], so the rules that need one
+    /// -- the kind, the transport, the intervals a triggered payload may not
+    /// have -- have nothing to be asked of. What is left is every rule about
+    /// names, which are the whole of how the two files are joined: an entry
+    /// for a payload the configuration does not have, a group nobody declared
+    /// or nobody uses, two entries of one name, a setting that is not one.
     ///
     /// A payload with no entry is not one of them. A graph's simulator file
     /// says which of its payloads are simulated -- the one a bench has for
-    /// real is left out on purpose -- where version 1's simulator stood in
-    /// for every handler or none.
+    /// real is left out on purpose.
     pub fn problems_by_name(&self, payloads: &[&str]) -> Vec<SimConfigError> {
         let mut problems: Vec<SimConfigError> = Vec::new();
         let (groups, entries) = self.entries(payloads, &mut problems);

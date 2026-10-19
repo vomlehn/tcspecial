@@ -37,18 +37,12 @@ use tcslibgs::{HostPort, TcsResult, Timestamp};
 pub const LOCAL_BIND_ANY: &str = "0.0.0.0:0";
 
 
-/// What the second command link is, which is where the two versions differ.
-///
 /// Where every node's commands go, which is the second of the two links.
 ///
 /// Commands go on two links, for the reason they always have: what the ground
 /// needs in a hurry must never be queued behind what it asked for at leisure.
 /// One is the spacecraft's own -- `tcs_cmd` -- and this is the other, which
 /// serves every node because a command carries the node's id.
-///
-/// It was an enum of two, the other being version 1's arrangement: a socket
-/// per payload, that being how a command said which payload it was about. One
-/// socket and an id is what there is now.
 #[derive(Debug, Clone)]
 pub struct Commanded {
     /// Where node commands are sent from, which is
@@ -77,7 +71,7 @@ pub struct CiLink {
     /// this sends from is a socket the file names -- which is also what lets
     /// a firewall rule or a capture filter describe the link beforehand.
     from: String,
-    /// What the second link is: one per payload, or one for every node.
+    /// What the second link is: one socket for every node.
     ///
     /// Held rather than passed to [`CiLink::connect`]: it is the same for the
     /// life of the link, as the file states it, and Connect moves only the
@@ -90,7 +84,7 @@ impl CiLink {
 
     /// And one whose second link is whatever `commanded` says.
     ///
-    /// What a version 2 configuration uses: see [`Commanded`].
+    /// What a configuration's node commands go on: see [`Commanded`].
     pub fn down_commanding(from: &str, commanded: Commanded) -> Self {
         Self {
             address: String::new(),
@@ -305,8 +299,7 @@ mod tests {
     /// spacecraft's.
     ///
     /// One socket and not one per node: the node's id is in the message, so
-    /// one socket says which node every command is about. Version 1 bound one
-    /// per payload, which is the arrangement this replaced.
+    /// one socket says which node every command is about.
     #[test]
     fn every_node_is_commanded_on_one_socket() {
         let here = |port| HostPort {

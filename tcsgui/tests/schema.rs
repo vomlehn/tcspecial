@@ -234,9 +234,8 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
 
 /// Every XML file this repository ships is well formed XML.
 ///
-/// Weaker than the validation above and over a wider set: a file of the
-/// version 1 payload language has no schema to be held against, but it is
-/// still XML, and XML it is not is a file no editor and no other tool can
+/// Weaker than the validation above and over a wider set: a file with no
+/// schema to be held against is still XML, and XML it is not is a file no editor and no other tool can
 /// open whatever this program's own reader tolerates. Four of these said
 /// `--` inside a comment, which XML forbids, and nothing noticed because
 /// `quick-xml` reads them anyway.
@@ -272,7 +271,7 @@ fn every_shipped_xml_file_is_well_formed() {
     }
 }
 
-/// Every shipped version 2 configuration says which schema describes it.
+/// Every shipped configuration says which schema describes it.
 ///
 /// The reference is what makes shipping the schemas worth anything: an editor
 /// opening one of these validates it without being set up to, and a file that

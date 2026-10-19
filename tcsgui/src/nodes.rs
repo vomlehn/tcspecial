@@ -554,7 +554,7 @@ pub fn schema_in(data: &Path) -> PathBuf {
     data.join("schema")
 }
 
-/// The XSD and the JSON Schema that describe a version 2 configuration.
+/// The XSD and the JSON Schema that describe a configuration.
 ///
 /// Named here rather than spelled out where a file is written, because a
 /// configuration says which schema describes it and the two names have to be

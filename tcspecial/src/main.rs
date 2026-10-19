@@ -23,12 +23,10 @@ fn main() {
 
     debug!("starting");
 
-    // One file. tcspecial used to read a configuration of its own as well --
-    // where commands are taken, where beacons go, where the log is written --
-    // because a version 1 payload set did not have to say. A version 2
-    // configuration must have a `tcspecial` section, so there is nothing left
-    // for a second file to answer, and a second file could only disagree with
-    // the one being flown.
+    // One file. Where commands are taken, where beacons go and where the log
+    // is written are all in the configuration's `tcspecial` section, which it
+    // must have, so there is nothing left for a second file to answer, and a
+    // second file could only disagree with the one being flown.
     //
     // The startup summary is said on stderr, plainly and one fact a line --
     // `label: value` -- whether or not anyone set RUST_LOG: it is what

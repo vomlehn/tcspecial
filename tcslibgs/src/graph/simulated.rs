@@ -1,19 +1,19 @@
-//! The payloads of a version 2 configuration that a simulator stands in for.
+//! The payloads of a configuration that a simulator stands in for.
 //!
-//! The simulator was written for version 1 payload sets, and what it takes of
-//! a payload is a [`DHConfig`]: where the payload is, how big a packet is, and
-//! whether it sends of its own accord or answers a trigger. This makes the
-//! same from a version 2 payload node, so that every stand-in the simulator
-//! has -- a socket, a pty, an I2C stub, a CAN bus -- is reused unchanged.
+//! What the simulator takes of a payload is a [`DHConfig`]: where the payload
+//! is, how big a packet is, and whether it sends of its own accord or answers
+//! a trigger. This makes one from a payload node, so that every stand-in the
+//! simulator has -- a socket, a pty, an I2C stub, a CAN bus -- needs to know
+//! nothing of the graph.
 //!
 //! Where the payload is comes from [`reach_of`], which is what tcspecial opens
 //! a node with: so the simulator stands where the vehicle reaches. A node with
 //! a trigger answers one, as it does aboard.
 //!
-//! A version 2 configuration may leave payloads unsimulated on purpose -- a
-//! payload that is a program is the program itself, and a payload on real
-//! hardware needs no stand-in -- so only the payloads the simulator file
-//! names are simulated, and a file naming none is one with nothing to do.
+//! A configuration may leave payloads unsimulated on purpose -- a payload that
+//! is a program is the program itself, and a payload on real hardware needs no
+//! stand-in -- so only the payloads the simulator file names are simulated,
+//! and a file naming none is one with nothing to do.
 
 use super::reach::reach_of;
 use super::{parse_interval, Destination, Graph};

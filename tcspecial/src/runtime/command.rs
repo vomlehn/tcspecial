@@ -1,8 +1,7 @@
 //! The ground's commands, answered on a thread of their own.
 //!
-//! A version 2 vehicle takes commands the way a version 1 one does -- two UDP
-//! links, each from the one address the configuration states -- and answers
-//! them from a thread that is not the thread making the pass. That is the
+//! The vehicle takes commands on two UDP links, each from the one address the
+//! configuration states, and answers them from a thread that is not the thread making the pass. That is the
 //! whole reason this is a module and not a branch inside the loop: a command
 //! interpreter that took its turn inside a pass would answer at the rate of
 //! the slowest group in the configuration, and the one command that matters
@@ -10,26 +9,21 @@
 //!
 //! # The two links
 //!
-//! One for the spacecraft and one for commands about nodes, as version 1 has,
-//! and for version 1's reason: what the ground needs in a hurry must never be
-//! queued behind what it asked for at leisure, and a RESTART waiting behind a
+//! One for the spacecraft and one for commands about nodes, because what the
+//! ground needs in a hurry must never be queued behind what it asked for at leisure, and a RESTART waiting behind a
 //! node's statistics is a vehicle that cannot be rescued while it is busy. On
 //! a space link the two become two virtual channels, which is where the
 //! priority between them is really decided; over IP they are two ports.
 //!
-//! Where version 2 differs is how many sockets the second link is. Version 1
-//! bound one per payload, which did two things: it said which payload a
-//! command was about, and it kept a command that takes time from delaying a
-//! command about another payload. The node id in the message does the first
-//! now -- see [`tcslibgs::NodeId`] -- so the link is one socket, at
-//! `payload_command.dest_base` with nothing added to it. A graph has more
-//! nodes than a payload set has payloads, so a socket apiece would spend ports
-//! on computations and logs that nothing addresses from the ground.
+//! The second link is one socket, at `payload_command.dest_base` with nothing
+//! added to it. The node id in the message says which node a command is about
+//! -- see [`tcslibgs::NodeId`] -- so the socket need not. A socket per node
+//! would spend ports on computations and logs that nothing addresses from the
+//! ground.
 //!
-//! The check version 1 made by binding a socket per payload -- a command about
-//! one payload arriving on another's is one end reading a different
-//! configuration -- is not lost with the sockets. It is made earlier and for
-//! every command: the ids two ends use are the same ids exactly when their
+//! A command about one node read as being about another is one end reading a
+//! different configuration, and that is checked for every command without a
+//! socket apiece: the ids two ends use are the same ids exactly when their
 //! digests agree, and CONNECT is what establishes that.
 //!
 //! # One thread, waiting on both
@@ -37,9 +31,9 @@
 //! Both sockets are in one poll set, with the stop descriptor beside them.
 //! The thread therefore waits for a command or for the stop and for nothing
 //! else: it wakes when there is something to do, and a vehicle whose ground
-//! station has gone quiet costs it nothing. Version 1 gave each link a thread
-//! and a read timeout, which is a wakeup every two hundred milliseconds per
-//! link to ask a question whose answer is almost always no.
+//! station has gone quiet costs it nothing. A thread per link with a read
+//! timeout would be a wakeup every two hundred milliseconds per link to ask a
+//! question whose answer is almost always no.
 //!
 //! # What it does not do on this thread
 //!
@@ -75,16 +69,15 @@ use crate::telemetry_log::TelemetryLog;
 ///
 /// A whole datagram, because a command that arrived truncated would be read as
 /// a different command or as none: the buffer is the largest a UDP payload can
-/// be, which is what version 1's links use.
+/// be.
 const COMMAND_BYTES: usize = 65535;
 
-/// What this version calls each of the two links.
+/// What this vehicle calls each of the two links.
 ///
-/// [`CommandLink::spelling`] says "payload command", which is what the link is
-/// in version 1 and what a version 1 message calls it. A version 2 graph has
-/// no payloads to command: the same link carries commands about nodes, so a
-/// message from a version 2 vehicle says so. The wire is unaffected -- this is
-/// the word in a log line somebody reads.
+/// [`CommandLink::spelling`] says "payload command", after the link's name in
+/// the protocol and the configuration. A graph has no payloads to command: the
+/// link carries commands about nodes, so a message from this vehicle says so.
+/// The wire is unaffected -- this is the word in a log line somebody reads.
 fn spelling(which: CommandLink) -> &'static str {
     match which {
         CommandLink::Spacecraft => "spacecraft command",
@@ -159,8 +152,8 @@ impl Commands {
             socket: bound(
                 "the spacecraft command link",
                 // Its own two fields rather than a HostPort, which is how
-                // version 1's own configuration states it: `tcs_cmd.recv`
-                // becomes the address and the port beside each other.
+                // the configuration states it: `tcs_cmd.recv` becomes the
+                // address and the port beside each other.
                 &HostPort {
                     address: ci.address.clone(),
                     port: ci.port,
@@ -359,10 +352,10 @@ impl Serving {
             // Recorded before it is sent, as a beacon is, so that an answer
             // the send fails on is still known to have been produced.
             self.log.record(&data);
-            // Back to the address it came from, which is version 1's rule: a
-            // datagram's sender is the only statement of where the ground is,
-            // and a configuration that stated it as well would be a second
-            // answer that can disagree.
+            // Back to the address it came from, because a datagram's sender
+            // is the only statement of where the ground is, and a
+            // configuration that stated it as well would be a second answer
+            // that can disagree.
             let _ = link.socket.send_to(&data, from);
         }
     }
@@ -486,7 +479,7 @@ impl Serving {
             // module.
             Command::RestartArm(_) | Command::Restart(_) => {
                 warn!(
-                    "{:?} is not answered by a version 2 vehicle yet",
+                    "{:?} is not answered by this vehicle yet",
                     command.cmd_type()
                 );
                 answer_to(command, CommandStatus::InvalidCommand)

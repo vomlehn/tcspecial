@@ -411,8 +411,7 @@ impl System {
             (Some(due), true) => due.min(POLL_PAUSE),
             (Some(due), false) => due,
             // Nothing scheduled at all: a configuration of ungrouped nodes
-            // that state no interval, which is every version 1 payload set's
-            // shape.
+            // that state no interval.
             (None, true) => POLL_PAUSE,
             // Nothing scheduled and nothing polled, which a checked
             // configuration does not have -- every node is on a link, and a
@@ -1825,8 +1824,8 @@ vehicle:
     /// hands `Work::Set` over from a thread of its own, the pass applies it
     /// between stages, and the next pass reads the same temperatures and
     /// tells the heaters the opposite thing. That is what the `commands`
-    /// section is for -- it has been checked when the file is read since
-    /// version 2 began, and until now nothing applied it.
+    /// section is for: it is checked when the file is read, and this is the
+    /// test that it is applied.
     ///
     /// An attribute no binding mentions is refused, and the reason reaches
     /// the thread that asked: what the ground may change in flight is written

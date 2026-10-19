@@ -981,10 +981,10 @@ tcsgui:
     /// A session given a simulator configuration writes a form, whether or
     /// not anything has been typed into it.
     ///
-    /// What the file said before was `version: "1.0"` and nothing else, so a
-    /// reader of it could not tell which payloads there were to configure or
-    /// what could be said about them. Every payload of the configuration and
-    /// every setting of a payload, empty until somebody fills one in.
+    /// A form, because a file with nothing in it leaves its reader unable to
+    /// tell which payloads there are to configure or what can be said about
+    /// them. Every payload of the configuration and every setting of a
+    /// payload, empty until somebody fills one in.
     #[test]
     fn a_new_simulator_configuration_is_written_as_a_form() {
         let where_ = tempfile::tempdir().expect("a directory");

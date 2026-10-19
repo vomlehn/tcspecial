@@ -118,14 +118,13 @@ const END_OF_ENTRY: u8 = 0x1d;
 /// it parses into, so the format cannot show through.
 pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
     // A configuration is a graph, possibly across several files: see
-    // digest_of_graph. It was one of two things, and a version 1 payload set
-    // was digested from the file's own text.
+    // digest_of_graph.
     digest_of_graph(&crate::graph::Graph::load(path.as_ref())?)
 }
 
 
 
-/// The digest of a version 2 configuration: everything the vehicle and the
+/// The digest of a configuration: everything the vehicle and the
 /// ground act on, across every file it was read from.
 ///
 /// Taken over the configuration as loaded rather than over a file's text, so
@@ -154,7 +153,7 @@ pub fn interpretation_of_file<P: AsRef<Path>>(path: P) -> TcsResult<serde_json::
     )?))
 }
 
-/// What a version 2 configuration is read as: see [`digest_of_graph`], which
+/// What a configuration is read as: see [`digest_of_graph`], which
 /// says what is in it and what is not.
 pub fn interpretation_of_graph(graph: &crate::graph::Graph) -> serde_json::Value {
     use serde_json::{json, Map, Value};
@@ -318,7 +317,7 @@ mod tests {
             .expect("the example reads")
     }
 
-    /// A version 2 configuration digests alike in either spelling, and
+    /// A configuration digests alike in either spelling, and
     /// through the file as through the graph.
     #[test]
     fn a_graph_digests_alike_in_both_spellings() {

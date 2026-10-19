@@ -1,4 +1,4 @@
-//! Running a version 2 configuration: nodes joined by links.
+//! Running a configuration: nodes joined by links.
 //!
 //! What replaces the data handler. A handler was a fixed pair -- one device
 //! endpoint, one ground endpoint, a conduit each way -- and that is the whole

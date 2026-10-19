@@ -6,9 +6,8 @@
 //! answered -- so the section is required, and [`crate::graph::Graph::check`]
 //! says so about a configuration that has none.
 //!
-//! The same section a payload set's file holds, and the same struct reads it:
 //! [`CIConfigJson`] is the one statement of what the command interpreter needs,
-//! and a second one for the version 2 schema would be two statements drifting
+//! and a second one written for the graph would be two statements drifting
 //! apart a flight at a time.
 //!
 //! # Why it is read as text first

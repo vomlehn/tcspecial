@@ -11,13 +11,7 @@
 //! that run the files get them -- so a file this accepts is a file they
 //! accept, which is the only thing that makes a verifier worth running.
 //!
-//! Which checks are run depends on the version the file says it is. The two
-//! versions describe different things, so there is no sense in running one's
-//! checks over the other's file: a version 2 configuration reported as a
-//! version 1 one would be a page of complaints about missing payloads, which
-//! hides the only thing worth saying about it.
-//!
-//! A version 2 configuration -- a graph of nodes:
+//! A configuration is a graph of nodes, and this checks:
 //!
 //! * that it reads, following the files it includes;
 //! * and that `tcslibgs::graph::Graph::check` finds nothing wrong with it,
@@ -32,20 +26,11 @@
 //!   so the rules about what a handler is settled into are not asked of them;
 //!   see `tcslibgs::SimConfigFile::problems_by_name`.
 //!
-//! A version 1 configuration -- a set of payloads, with a simulator file:
-//!
-//! * The tcspecial configuration file on its own: that it parses, that it
-//!   describes payloads, that every payload and group is settled by the rules
-//!   for its type, and that no two payloads want one address or one device.
-//! * The simulator file, if one is given: that it parses, and that it and the
-//!   tcspecial configuration agree -- every payload simulated, every simulated
-//!   payload a payload, and every setting one that payload can have.
-//!
-//! The second is checked against the first only when the first has no problems
-//! of its own. A tcspecial configuration that did not settle has no handlers to
-//! join to, and a join against half of them would report every missing payload
-//! as unsimulated: a page of problems caused by this program rather than by the
-//! files.
+//! The simulator file is checked against the configuration only when the
+//! configuration reads. One that does not read has no payloads to join to,
+//! and a join against payloads nobody could name would report every simulated
+//! payload as unknown: a page of problems caused by this program rather than
+//! by the files.
 
 use std::fmt;
 use std::io::{self, Write};
@@ -114,7 +99,7 @@ pub struct Finding {
     /// saying it. See [`Severity`], which is `tcslibgs`'s: the split belongs
     /// with the rules and not with the program that prints them.
     pub severity: Severity,
-    /// The rule's own answer, where it came from a version 2 configuration's
+    /// The rule's own answer, where it came from a configuration's
     /// [`tcslibgs::graph::Graph::check`].
     ///
     /// Kept for a program that has rules of its own about the same thing and
@@ -597,12 +582,11 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
     found.unwrap_or(THE_FILE_ITSELF)
 }
 
-/// Check a version 2 configuration: read it, then ask what is wrong with it.
+/// Check a configuration: read it, then ask what is wrong with it.
 ///
 /// The checking is `tcslibgs::graph::Graph::check`, which is the same code
-/// tcspecial runs aboard. This adds only the line numbers, which it gets the
-/// way version 1's problems get theirs: by scanning the text for the name the
-/// problem is about.
+/// tcspecial runs aboard. This adds only the line numbers, which it gets by
+/// scanning the text for the name the problem is about.
 ///
 /// Hands back the names of the graph's payloads, for a simulator file to be
 /// joined to, when the graph read at all.
@@ -670,8 +654,8 @@ fn check_graph(path: &Path, report: &mut Report) -> Option<Vec<String>> {
     )
 }
 
-/// Check a version 2 configuration's simulator file, against the names of its
-/// payloads if the configuration read.
+/// Check a configuration's simulator file, against the names of its payloads
+/// if the configuration read.
 ///
 /// By name only: see `tcslibgs::SimConfigFile::problems_by_name`, which says
 /// which of the simulator's rules a graph has anything to be asked of.
@@ -865,7 +849,7 @@ mod tests {
         }
     }
 
-    /// A version 2 configuration in a temporary directory.
+    /// A configuration in a temporary directory.
     fn graph_written(extension: &str, text: &str) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join(format!("vehicle{extension}"));
@@ -897,7 +881,7 @@ moc:
   - { name: moc, type: moc, address: \"10.0.0.1\", port: \"5000\", ground_base: \"10.0.0.2:5100\" }
 ";
 
-    /// A sound version 2 configuration is accepted in silence.
+    /// A sound configuration is accepted in silence.
     #[test]
     fn a_sound_graph_is_accepted() {
         let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
@@ -910,18 +894,14 @@ moc:
         assert_eq!(report.status(), 0);
     }
 
-    /// The version decides which checks are run.
-    ///
-    /// A version 2 file reported as a version 1 one would be a list of
-    /// complaints about missing payloads, which is noise hiding the fact that
-    /// it is a different language.
+    /// A sound configuration is accepted on its own, and with a simulator
+    /// file beside it.
     #[test]
-    fn the_version_decides_which_checks_run() {
+    fn a_sound_configuration_is_accepted_alone_and_with_its_simulator_file() {
         let (_dir, path) = graph_written(".yaml", SOUND_GRAPH);
         let report = verify(&path, None, Limits::EVERYTHING);
         assert!(!report.found_errors());
 
-        // And a version 1 file still goes down version 1's path.
         let set = written(".yaml", GOOD, GOOD_SIM);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
         assert!(!report.found_errors(), "{:?}", report.findings);
@@ -997,7 +977,7 @@ vehicle:
         assert_eq!(lonely.line, 2, "{lonely}");
     }
 
-    /// A version 2 configuration's simulator file is joined to it by name.
+    /// A configuration's simulator file is joined to it by name.
     ///
     /// The rule the editor holds a simulator file to as it opens one, asked
     /// here of the same pair: an entry for a payload the graph does not have
@@ -1087,9 +1067,8 @@ vehicle:
     /// every configuration must have: the `tcspecial` section and a payload.
     ///
     /// Two payloads, neither touched by a link, which report to the ground
-    /// over `payload_telemetry` -- the shape of `examples/minimal`. It was a
-    /// version 1 payload set, each payload paired with a ground endpoint; the
-    /// tests below are about the reporting rather than about either version,
+    /// over `payload_telemetry` -- the shape of `examples/minimal`. The tests
+    /// below are about the reporting rather than about any one kind of node,
     /// so what they are given is the simplest thing that reads.
     const GOOD: &str = "\
 description: two payloads
@@ -1274,9 +1253,8 @@ payloads:
     /// An XML file that does not parse is reported from where the reader
     /// stopped, as a YAML file is.
     ///
-    /// A version 2 file, refused by its own reader and by the version 1 one
-    /// it is tried with when it does not read as a graph: both are told at
-    /// the line that is wrong, and not at the file's first.
+    /// Refused by its reader, and told at the line that is wrong, not at the
+    /// file's first.
     #[test]
     fn an_xml_file_that_does_not_parse_says_where_it_stopped() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
@@ -1408,8 +1386,7 @@ simulated_payloads:
         //
         // Not merely a configuration with an error in it. A graph that reads
         // and fails a check still says which payloads it has, so the two
-        // files are still read against each other -- which is where version 1
-        // differed: it joined only a set whose handlers had settled.
+        // files are still read against each other.
         let text = GOOD.replace("payloads:", "payloads: [oh dear");
         let set = written(".yaml", &text, GOOD_SIM);
         let report = verify(&set.payload, Some(&set.sim), Limits::EVERYTHING);
@@ -1598,7 +1575,7 @@ simulated_payloads:
     }
 
 
-    /// Every shipped version 2 configuration verifies, in both formats.
+    /// Every shipped configuration verifies, in both formats.
     ///
     /// The examples somebody is handed first. A graph has no simulator file
     /// beside it, so each is checked on its own -- and both spellings of each

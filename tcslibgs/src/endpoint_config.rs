@@ -475,10 +475,9 @@ impl Scalar {
 
     /// The text, trimmed.
     ///
-    /// Public because a version 2 node's attributes are these, and a node's
-    /// attributes are public: a caller handed a `Graph` has to be able to read
-    /// what a node says about itself. They were crate-private while the only
-    /// readers were the version 1 rules in this crate, which is no longer so.
+    /// Public because a node's attributes are these, and a node's attributes
+    /// are public: a caller handed a `Graph` has to be able to read what a
+    /// node says about itself.
     pub fn as_str(&self) -> &str {
         self.0.trim()
     }
@@ -626,8 +625,8 @@ impl ByteList {
     /// or spaces between them, decimal or `0x`.
     ///
     /// For a caller building a configuration rather than reading one -- a
-    /// version 2 node states its terminators as one attribute, where a
-    /// version 1 file could state them as a list.
+    /// node states its terminators as one attribute, and this is how that
+    /// one attribute becomes the list.
     pub fn of(text: &str) -> ByteList {
         ByteList(split_list(text))
     }

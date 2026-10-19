@@ -68,9 +68,9 @@ pub enum Problem {
     /// A group nothing is in, which reads nothing on its interval.
     ///
     /// What a group whose name a node misspelled looks like from the group's
-    /// end, as version 1 says of a payload group nobody names. tcsgui marked
-    /// this as a fault long before anything aboard refused it, which made
-    /// the editor and the flight software disagree about the one file.
+    /// end. tcsgui marked this as a fault long before anything aboard refused
+    /// it, which made the editor and the flight software disagree about the one
+    /// file.
     EmptyGroup { group: String },
     /// A node with no name, which nothing can link to.
     NamelessNode,
@@ -255,11 +255,12 @@ pub enum Problem {
 impl Problem {
     /// What this problem is about, for working out which line to report it on.
     ///
-    /// The same `About` version 1's problems use, because the question is the
-    /// same: where in the file is the thing called this. `tcsverify` scans the
-    /// text for it -- a line number cannot be had from a parsed document, and
-    /// carrying one through every struct here would put the file's shape into
-    /// types that exist so two formats can describe one thing.
+    /// The same `About` the simulator file's problems use, because the question
+    /// is the same: where in the file is the thing called this. `tcsverify`
+    /// scans the text for it -- a line number cannot be had from a parsed
+    /// document, and carrying one through every struct here would put the
+    /// file's shape into types that exist so two formats can describe one
+    /// thing.
     pub fn about(&self) -> About {
         match self {
             Problem::DuplicateNode { name } => About::Node(name.clone()),

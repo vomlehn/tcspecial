@@ -84,10 +84,10 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                 Command::Config(_) => {
                     Telemetry::Config(ConfigTelemetry::new(seq, CommandStatus::Success))
                 }
-                // A version 2 vehicle's own two. This client is version 1's,
-                // so it sends neither; they are answered here because the
-                // stub reads whatever arrives and a command it could not
-                // answer would look like a link that had gone quiet.
+                // A node's commands, each answered for the node it named.
+                // Every command has an answer here because the stub reads
+                // whatever arrives, and a command it could not answer would
+                // look like a link that had gone quiet.
                 Command::StartNode(cmd) => Telemetry::StartNode(NodeTelemetry::started(
                     seq,
                     CommandStatus::Success,

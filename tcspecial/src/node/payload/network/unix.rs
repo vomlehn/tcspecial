@@ -20,7 +20,7 @@
 use std::io::{self, Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::{UnixDatagram, UnixStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use log::info;
 use nix::poll::PollFlags;
@@ -102,6 +102,10 @@ impl EndpointWritable for UnixStreamEndpoint {
 /// The far end is learnt rather than configured, as it is over UDP: a
 /// datagram's sender is the only statement of where it came from. A device's
 /// own path is its own business, so nothing here knows it until it writes.
+///
+/// Except for a node that is only driven, where there is nothing to learn
+/// from and the configured path is where the device is: see
+/// [`UnixDatagramEndpoint::driving`].
 pub struct UnixDatagramEndpoint {
     /// The handler this endpoint belongs to, as the device configuration
     /// names it.
@@ -112,6 +116,15 @@ pub struct UnixDatagramEndpoint {
     /// Shared between the two endpoints of a conduit pair, so that the one
     /// writing sends where the one reading learnt.
     peer: std::sync::Arc<std::sync::Mutex<Option<std::os::unix::net::SocketAddr>>>,
+    /// Where the configuration says the device is, for a node that is only
+    /// driven.
+    ///
+    /// What is written down beats what was learnt, as it does over UDP: a
+    /// node that is only driven has nothing to learn from, and one that is
+    /// read binds its path and leaves this `None`. Not shared between the
+    /// pair, because it does not change: it is the file's word, and both
+    /// endpoints are made from the same file.
+    told: Option<PathBuf>,
     _buffer: Vec<u8>,
 }
 
@@ -131,6 +144,43 @@ impl UnixDatagramEndpoint {
             what: what.to_string(),
             socket,
             peer: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            told: None,
+            _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
+        })
+    }
+
+    /// Send where the configuration says the device is, from a socket of this
+    /// end's own.
+    ///
+    /// For a node that is only driven -- a heater, a valve, a latch -- which
+    /// [`UnixDatagramEndpoint::bind`] cannot serve. Binding the path and
+    /// waiting to hear from the device is what every datagram node does, and
+    /// a device that is never read never writes, so the wait would not end
+    /// and every write would be refused for want of a path to send to. The
+    /// vehicle decides and the device obeys; the address in the file is where
+    /// the device is, which is what it always meant.
+    ///
+    /// The socket is unbound, where the UDP equivalent binds a port of its
+    /// own: a datagram sent from an unbound socket arrives, and what it
+    /// costs is that the device cannot answer -- which a device that is only
+    /// driven does not do. This is the thing that needed a path of this end's
+    /// own and now needs none, and nothing is left in the filesystem when the
+    /// node goes, where a bound path would have to be cleared up.
+    pub fn driving(what: &str, config: &NetworkConfig) -> TcsResult<Self> {
+        let socket = UnixDatagram::unbound().map_err(|e| {
+            TcsError::Endpoint(format!(
+                "{what}: a Unix datagram socket to drive \"{}\" with could not be \
+                 made: {e}",
+                config.address
+            ))
+        })?;
+        socket.set_nonblocking(true)?;
+
+        Ok(Self {
+            what: what.to_string(),
+            socket,
+            peer: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            told: Some(PathBuf::from(&config.address)),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -141,6 +191,7 @@ impl UnixDatagramEndpoint {
             what: self.what.clone(),
             socket: self.socket.try_clone()?,
             peer: self.peer.clone(),
+            told: self.told.clone(),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
     }
@@ -174,29 +225,44 @@ impl EndpointReadable for UnixDatagramEndpoint {
 
 impl EndpointWritable for UnixDatagramEndpoint {
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
-        let peer = self
-            .peer
-            .lock()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| {
-                TcsError::Endpoint(format!(
-                    "{}: nothing has been received on this socket yet, so there is \
-                     no path to send to",
-                    self.what
-                ))
-            })?;
+        // What the file says, where it says anything: a node that is only
+        // driven is sent to at the path it names, without waiting to be
+        // written to first. See `UnixDatagramEndpoint::driving`.
+        let learnt;
+        let path: &Path = match &self.told {
+            Some(told) => told.as_path(),
+            None => {
+                let peer = self
+                    .peer
+                    .lock()
+                    .ok()
+                    .and_then(|guard| guard.clone())
+                    .ok_or_else(|| {
+                        TcsError::Endpoint(format!(
+                            "{}: nothing has been received on this socket yet, so \
+                             there is no path to send to",
+                            self.what
+                        ))
+                    })?;
 
-        // An unnamed sender has no path to be answered at. A device that
-        // never bound one cannot be written to, which is worth saying rather
-        // than failing as though the write itself had gone wrong.
-        let path = peer.as_pathname().ok_or_else(|| {
-            TcsError::Endpoint(format!(
-                "{}: the far end of this socket has no path of its own, so it cannot \
-                 be sent to: a datagram device binds a path in order to be answered",
-                self.what
-            ))
-        })?;
+                // An unnamed sender has no path to be answered at. A device
+                // that never bound one cannot be written to, which is worth
+                // saying rather than failing as though the write itself had
+                // gone wrong.
+                learnt = peer
+                    .as_pathname()
+                    .ok_or_else(|| {
+                        TcsError::Endpoint(format!(
+                            "{}: the far end of this socket has no path of its own, \
+                             so it cannot be sent to: a datagram device binds a path \
+                             in order to be answered",
+                            self.what
+                        ))
+                    })?
+                    .to_path_buf();
+                learnt.as_path()
+            }
+        };
 
         match self.socket.send_to(data, path) {
             Ok(n) => Ok(n),
@@ -362,6 +428,54 @@ mod tests {
         assert_eq!(&back[..n], b"to the device");
 
         std::fs::remove_file(&handler_path).ok();
+        std::fs::remove_file(&device_path).ok();
+    }
+
+    /// A node that is only driven is sent to where the file says it is.
+    ///
+    /// The case binding cannot serve: a device that is never read never
+    /// writes, so a handler waiting to learn where it is would wait for ever
+    /// and refuse every write meanwhile -- which for a heater or a valve is
+    /// the vehicle deciding and nothing happening. Driven from an unbound
+    /// socket, so nothing is left in the filesystem and the device does not
+    /// have to be able to answer.
+    #[test]
+    fn a_driven_datagram_device_is_sent_to_where_it_is() {
+        let device_path = a_path("driven-device");
+        std::fs::remove_file(&device_path).ok();
+
+        // The device, standing in for tcssim: it binds the path the
+        // configuration names and waits to be driven, saying nothing.
+        let device = UnixDatagram::bind(&device_path).expect("the device binds");
+
+        let mut endpoint = UnixDatagramEndpoint::driving(
+            "heaters",
+            &config_at(&device_path, NetworkProtocol::UnixDgram),
+        )
+        .expect("the vehicle's end opens");
+
+        // Written at once, where a bound endpoint would have refused this for
+        // want of anything to answer.
+        endpoint.write(b"1").expect("the decision goes out");
+        let mut back = [0u8; 64];
+        let (n, from) = device.recv_from(&mut back).expect("the device reads");
+        assert_eq!(&back[..n], b"1");
+        assert_eq!(
+            from.as_pathname(),
+            None,
+            "an unbound sender has no path, which is what a driven device does \
+             not need"
+        );
+
+        // Again, because a decision is asserted on every sample rather than
+        // once: the endpoint holds where the device is rather than learning
+        // it, so the second write goes the same way as the first.
+        endpoint.write(b"0").expect("the next decision goes out");
+        let (n, _) = device.recv_from(&mut back).expect("the device reads again");
+        assert_eq!(&back[..n], b"0");
+
+        // And nothing of this end is in the filesystem to clear up.
+        drop(endpoint);
         std::fs::remove_file(&device_path).ok();
     }
 

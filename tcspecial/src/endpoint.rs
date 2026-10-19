@@ -257,12 +257,16 @@ pub fn bind_endpoint_pair(
 /// So this sends where the node says the device is, and binds a port of its
 /// own that nothing has to find. See [`UdpEndpoint::driving`].
 ///
-/// Only UDP differs. A TCP payload is connected to whichever way it is used,
-/// a device is opened, and both work as well written as read, so for anything
-/// else this is [`connect_endpoint_pair`]. A Unix datagram payload is the one
-/// gap left: it is bound here as a UDP payload used to be, and driving one
-/// would need a path of this end's own, which is a configuration decision and
-/// not a thing to invent.
+/// A Unix datagram payload has the same shape and is driven the same way:
+/// see [`UnixDatagramEndpoint::driving`]. Its socket is unbound rather than
+/// bound to a port of its own, a datagram from an unbound Unix socket
+/// arriving all the same -- what it costs is that the device cannot answer,
+/// which a device that is only driven does not do. That is the path of this
+/// end's own that this used to want and no longer needs.
+///
+/// Nothing else differs. A TCP or Unix stream payload is connected to
+/// whichever way it is used, a device is opened, and both work as well
+/// written as read, so for anything else this is [`connect_endpoint_pair`].
 pub fn driven_endpoint_pair(
     what: &str,
     config: &EndpointConfig,
@@ -270,6 +274,13 @@ pub fn driven_endpoint_pair(
     match config {
         EndpointConfig::Network(net_config) if net_config.protocol == NetworkProtocol::Udp => {
             let reader = UdpEndpoint::driving(what, net_config)?;
+            let writer = reader.try_clone()?;
+            Ok((Box::new(reader), Box::new(writer)))
+        }
+        EndpointConfig::Network(net_config)
+            if net_config.protocol == NetworkProtocol::UnixDgram =>
+        {
+            let reader = UnixDatagramEndpoint::driving(what, net_config)?;
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }

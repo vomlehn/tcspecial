@@ -1283,6 +1283,7 @@ mod tests {
         panels_fill_left_to_right();
         every_panel_in_a_row_is_the_same_width();
         crate::vehicle::tests::pressing_connect_and_enable_commands_the_vehicle();
+        crate::vehicle::tests::pressing_send_ping_pings_the_node_and_times_its_answer();
     }
 
     /// The MOC listens where tcspecial sends, by reading the same files.

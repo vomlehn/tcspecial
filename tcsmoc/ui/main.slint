@@ -3,6 +3,7 @@ import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 // The beacon's panel, shared with the other ground programs: see tcsui. What
 // it shows is worked out in Rust, from what tcslib::beacon reports.
 import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
+import { PingPanel } from "../../tcsui/ui/ping.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcsmoc and tcssim share, beside tcsverify, whose report it shows.
 export { StartupWindow, StartupLine } from "../../tcsverify/ui/startup.slint";
@@ -459,6 +460,13 @@ export component MainWindow inherits Window {
 
     callback link-clicked();
     callback ping-clicked();
+    // Whether the configuration has a ping node the ground can reach both
+    // ways, and so whether there is a Ping node button: see
+    // `tcslib::ping::route_of`. Not the PING above, which asks whether the
+    // command link reaches the vehicle; this asks a node of the vehicle the
+    // time and times the answer.
+    in property <bool> can-ping-node: false;
+    callback ping-node-clicked();
     callback query-all-clicked();
     // One callback for the one button a panel has. Which command it sends is
     // Rust's to decide, from the status the button's own label comes from.
@@ -646,6 +654,14 @@ export component MainWindow inherits Window {
                         }
                     }
 
+                    // In the row the Command button is in, so that it costs
+                    // the window no height: the panel it opens is a window of
+                    // its own.
+                    if can-ping-node: Button {
+                        text: "Ping node";
+                        clicked => { ping-node-clicked(); }
+                    }
+
                 }
 
                 HorizontalLayout {
@@ -788,6 +804,41 @@ export component DiffersWindow inherits Window {
                 text: "Continue anyway";
                 clicked => { root.continue-anyway(); }
             }
+        }
+    }
+}
+
+// The ping panel, in a window of its own beside the MOC's, opened by Ping
+// node. A window rather than a row of the main one, because the main
+// window's height is stated -- see `chrome-height` -- and seven more rows
+// in it would cost every panel below them their room.
+export component PingWindow inherits Window {
+    title: "tcsmoc: ping";
+    in property <string> node: "ping";
+    in property <string> sent;
+    in property <string> sent-time;
+    in property <string> received;
+    in property <string> received-time;
+    in property <string> round-trip;
+    in property <string> up;
+    in property <string> down;
+    callback send-clicked();
+
+    preferred-width: 560px;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 6px;
+        Text { text: "Pinging " + node; font-italic: true; }
+        PingPanel {
+            sent: root.sent;
+            sent-time: root.sent-time;
+            received: root.received;
+            received-time: root.received-time;
+            round-trip: root.round-trip;
+            up: root.up;
+            down: root.down;
+            send-clicked => { root.send-clicked(); }
         }
     }
 }

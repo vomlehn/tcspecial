@@ -1,0 +1,90 @@
+// The ping panel: a button that pings the vehicle's ping node, the ping sent,
+// the answer received, and the three times between them.
+//
+// Shared markup, as the beacon panel is, for a ground program that pings:
+// tcsmoc shows it in a window of its own. The ping example's Python ground
+// station shows the same rows in the same words.
+//
+// Imported by path, which is what Slint resolves relative to the importing
+// file:
+//
+//     import { PingPanel } from "../../tcsui/ui/ping.slint";
+//
+// Nothing is computed here. What each row says is worked out in Rust, from
+// what `tcslib::ping` keeps, and set as properties: see the crate's
+// `PingShown`.
+import { Button } from "std-widgets.slint";
+
+export component PingPanel inherits Rectangle {
+    // The last ping sent, as it went, and when, to the nanosecond.
+    in property <string> sent: "";
+    in property <string> sent-time: "";
+    // The last thing received from the ping node, and when the answer to the
+    // last ping arrived: empty from the moment a ping is sent until its own
+    // answer does.
+    in property <string> received: "";
+    in property <string> received-time: "";
+    // The three times: the round trip, and the two halves of it.
+    in property <string> round-trip: "";
+    in property <string> up: "";
+    in property <string> down: "";
+
+    callback send-clicked();
+
+    border-width: 1px;
+    border-color: #808080;
+    border-radius: 4px;
+
+    VerticalLayout {
+        padding: 6px;
+        spacing: 4px;
+
+        HorizontalLayout {
+            alignment: start;
+            Button {
+                text: "Send ping";
+                clicked => { send-clicked(); }
+            }
+        }
+
+        GridLayout {
+            spacing: 4px;
+            Row {
+                Text { text: "Sent:"; }
+                Text { text: sent; }
+            }
+            Row {
+                Text { text: "Time sent:"; }
+                Text { text: sent-time; }
+            }
+            Row {
+                Text { text: "Last received:"; }
+                Text { text: received; }
+            }
+            Row {
+                Text { text: "Time received:"; }
+                Text { text: received-time; }
+            }
+            Row {
+                Text { text: "Round trip:"; }
+                Text { text: round-trip; }
+            }
+            Row {
+                Text { text: "MOC to tcspecial:"; }
+                Text { text: up; }
+            }
+            Row {
+                Text { text: "tcspecial to MOC:"; }
+                Text { text: down; }
+            }
+        }
+
+        // What the two one-way times are, which is the thing about them a
+        // reader would otherwise get wrong.
+        Text {
+            text: "Times are UTC. The two one-way times are each read across two clocks, the MOC's and tcspecial's, so each includes how far apart they are; their sum is the round trip.";
+            wrap: word-wrap;
+            color: #4b5563;
+        }
+    }
+}

@@ -1842,6 +1842,15 @@ no display, ``python3 examples/ping/ping_moc.py --pings 3`` sends three pings,
 prints each answer and its times, and stops. Every port the example uses is in
 the seven thousands, which no other example uses.
 
+tcsmoc pings it too. ``make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping``
+runs the MOC on the example, and a configuration with a ``ping`` node the
+ground can reach both ways -- a ``moc`` node binding an address and port with a
+link to it, and its link back down -- gives the MOC a ``Ping node`` button
+beside ``Command``. It opens the same panel, in a window of its own: the
+button, the ping sent and the answer, and the three times. Both ground stations
+keep them by the same rules, ``tcslib::ping`` in Rust and ``ping_ground.py`` in
+Python.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how

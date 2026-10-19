@@ -85,8 +85,7 @@ impl TcsClient {
     ///
     /// For a program that commands the vehicle itself and no node of it: a
     /// PING, a CONNECT, a CONFIGURE. A node command is refused rather than
-    /// sent -- see [`Self::link_for`] -- because there is nowhere for it to
-    /// go.
+    /// sent -- see `link_for` -- because there is nowhere for it to go.
     pub fn spacecraft_only(connection: Box<dyn Connection>) -> Self {
         Self {
             connection,

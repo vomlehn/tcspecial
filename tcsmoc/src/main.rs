@@ -380,9 +380,9 @@ fn stop(startup: &Startup) -> ! {
 /// Put what the ground received into the panels.
 ///
 /// What no command asked for: the listeners in [`oc_link`] put it where this
-/// can pick it up, as the poller does. Read every pass rather than taken,
-/// because it is the last thing that arrived rather than a queue of events --
-/// a panel shows the latest, as it does for the times beside it.
+/// can pick it up, on the panel refresh timer. Read every pass rather than
+/// taken, because it is the last thing that arrived rather than a queue of
+/// events -- a panel shows the latest, as it does for the times beside it.
 ///
 /// All three of a panel's readings of its payload come from here, and that is
 /// the point of them coming from one place: when the data arrived, what it

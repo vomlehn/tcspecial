@@ -13,14 +13,6 @@
 //! one `Arc<Mutex<TcsClient>>`, so a disconnect had nowhere to put the fact
 //! that there was no longer a connection: taking the client away from one
 //! holder would have left the others talking to a socket that was closed.
-//!
-//! The panel poller is the one holder that does not share the window's link.
-//! It has a link of its own and keeps it wherever that one is, by
-//! [`CiLink::follow`]: its commands wait on the spacecraft for as long as the
-//! timeout allows, and a window whose buttons waited behind that is a window
-//! that does nothing at the moment the operator is trying to disconnect.
-//! Following keeps one account of what the operator asked for -- the link the
-//! buttons control -- without the poller having to hold it.
 
 use tcslib::{TcsClient, UdpConnection};
 use tcslibgs::{HostPort, TcsResult, Timestamp};

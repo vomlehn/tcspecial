@@ -1,8 +1,16 @@
-//! What a compute node may say, and what each computation must be told.
+//! What a compute node may say, what each computation must be told, and the
+//! form a value takes on a link.
 //!
-//! The rules only -- what the attributes are, which are required, and what
-//! each value may be. The arithmetic is `tcspecial::node::vehicle::compute`, which
+//! The rules -- what the attributes are, which are required, and what each
+//! value may be. The arithmetic is `tcspecial::node::vehicle::compute`, which
 //! holds the running computations and nothing about files.
+//!
+//! The form of a value is here for a second reason: it is one fact that the
+//! vehicle writes and the ground reads back, so it belongs where the two share
+//! what they agree about, beside the protocol. And the range it can carry is a
+//! rule about what a configuration may say -- a setpoint no reading can reach
+//! is a thermostat that will hold its heaters on for ever -- which is checked
+//! on a desk by `tcsverify` and must therefore be stated on this side.
 //!
 //! They are here for one reason: `tcsverify` checks a configuration on a desk,
 //! and it cannot check what it cannot see. The rules used to live beside the
@@ -18,6 +26,155 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::Scalar;
+
+/// How wide a value is on a link: a 32-bit integer.
+pub const VALUE_BYTES: usize = 4;
+
+/// How many of them are in a kelvin.
+///
+/// A micro-kelvin is finer than anything a spacecraft's thermometry resolves
+/// -- the parts the examples use report in sixteenths and hundredths of a
+/// kelvin -- so the unit is below the noise of every sensor that will be read
+/// through it, which is what a unit has to be if rounding to it is to be
+/// nothing at all.
+pub const MICRO_KELVIN: f64 = 1_000_000.0;
+
+/// The coldest and the hottest a value can say, in kelvin.
+///
+/// Said out loud so that a message can name it and a tool can ask: these are
+/// the ends of [`micro_kelvin`], which is the one place the range is decided.
+pub fn kelvin_range() -> (f64, f64) {
+    (
+        f64::from(i32::MIN) / MICRO_KELVIN,
+        f64::from(i32::MAX) / MICRO_KELVIN,
+    )
+}
+
+/// A temperature as the count of micro-kelvin a value carries, or why it
+/// cannot be one.
+///
+/// The one place the range of a value is decided, and everything that turns a
+/// number into a temperature comes here: a reading on its way onto a link, a
+/// number read from text -- which is a program's answer or an operator's
+/// command -- and a temperature written in a configuration.
+///
+/// A signed count of micro-kelvin reaches a little past 2147 K either way,
+/// which is above anything these nodes are pointed at and below a great deal
+/// that exists -- a thruster's throat is hotter. A temperature outside it is
+/// refused and named rather than wrapped or pinned to the end of the range:
+/// wrapping turns 2200 K into a cabin that is 42 K below zero, pinning turns
+/// a runaway into a reading that looks like a hot but surviving part, and
+/// either is a thermostat acting confidently on a number nobody produced. A
+/// node that must carry more than this wants a unit of its own, and that is a
+/// change to make deliberately.
+///
+/// A NaN or an infinity is refused here too, and it is the comparison that
+/// makes it matter: a vote sorts its readings, and NaN compares as neither
+/// less nor greater, so a sort that met one would order the readings by where
+/// they happened to lie and the middle one would be the middle of nothing.
+pub fn micro_kelvin(number: f64) -> Result<i32, String> {
+    if !number.is_finite() {
+        return Err(format!(
+            "{number} is not a number anything can be decided on"
+        ));
+    }
+
+    // Rounded to the nearest micro-kelvin rather than truncated: the
+    // conversions land a hair either side of the figure the part reported --
+    // 289.15 K arrives from a count as 289.14999999999998 -- and truncating
+    // would take a micro-kelvin off half of them.
+    let micro = (number * MICRO_KELVIN).round();
+    let (coldest, hottest) = kelvin_range();
+    if micro < f64::from(i32::MIN) || micro > f64::from(i32::MAX) {
+        return Err(format!(
+            "{number} K is outside what a value carries, which is \
+             {coldest:.6} K to {hottest:.6} K in micro-kelvin"
+        ));
+    }
+    Ok(micro as i32)
+}
+
+/// A value as it travels: four bytes of a signed count of micro-kelvin,
+/// little endian.
+///
+/// A temperature is carried as a whole number of micro-kelvin rather than as
+/// the double the arithmetic produced. The unit is finer than any sensor here
+/// resolves, so nothing a part reported is lost by it, and what is gained is
+/// that the number on the link is exact: a conversion, a vote and a thermostat
+/// all see the same integer, where three doubles of the same temperature can
+/// differ in their last bit and a comparison between them turns on dust. It
+/// halves what a reading costs in a log and on a link as well.
+///
+/// Signed, although a temperature in kelvin is not, for two reasons. The
+/// arithmetic that produces one is signed -- a conversion is `counts * scale +
+/// offset` and a wrong scale produces a negative, which must arrive as a
+/// negative to be seen for what it is rather than as a temperature near
+/// 4295 K. And a difference of two temperatures is a temperature's width,
+/// which a band is, and that is signed by nature.
+///
+/// Little endian because every other number this software puts on a wire is:
+/// a timestamp's microseconds, a node's id, a beacon interval. A sensor's own
+/// bytes are the exception and say which way round they are -- `i16_be`,
+/// `u24_be` -- because the part decides that and the file states it.
+///
+/// What it costs is the range, which is where this is refused rather than
+/// wrapped: see [`micro_kelvin`]. And a value in a telemetry log is four bytes
+/// rather than a readable number, as is the datum a panel shows for a source.
+/// A decision is still text, `1` or `0`, because what it drives is a set of
+/// discrete lines and that is the value they take.
+pub fn as_value(number: f64) -> Result<Vec<u8>, String> {
+    Ok(micro_kelvin(number)?.to_le_bytes().to_vec())
+}
+
+/// A value that arrived, as a number of kelvin.
+///
+/// Exactly four bytes, and every four bytes are a value: a count of
+/// micro-kelvin is a number whatever the bits say, so the width is the whole
+/// of what there is to check here. What cannot be represented is refused
+/// where a value is made instead, by [`micro_kelvin`], which is where the
+/// complaint can name the number that would not fit.
+///
+/// A width that is not four is a link carrying something that is not a value
+/// -- a sensor's raw bytes delivered where a conversion's output was meant, or
+/// a node whose output is a decision -- and taking four of them would be a
+/// temperature made of whatever was there.
+pub fn from_value(data: &[u8], what: &str) -> Result<f64, String> {
+    let bytes: [u8; VALUE_BYTES] = data.try_into().map_err(|_| {
+        format!(
+            "{what}: a value is {VALUE_BYTES} bytes of micro-kelvin, and {} arrived",
+            data.len()
+        )
+    })?;
+
+    Ok(f64::from(i32::from_le_bytes(bytes)) / MICRO_KELVIN)
+}
+
+/// A value as a program reads and writes one: decimal text.
+///
+/// The one place a value is text, because the far end is a program reading
+/// lines -- see `tcspecial::node::vehicle::compute::process` -- and a line is
+/// text. Written out of the kelvin the value carried, which is a whole number
+/// of micro-kelvin, so a program is handed at most six decimal places and what
+/// it reads back is what arrived.
+pub fn as_text(number: f64) -> String {
+    format!("{number}")
+}
+
+/// And a number a program wrote, as a number of kelvin.
+///
+/// Held to the same range as a reading, by [`micro_kelvin`], because what is
+/// read here becomes one: a program's answer goes straight onto a link, and
+/// an operator's setpoint or band is compared against readings that cannot
+/// leave that range. A number outside it is told so when it is sent rather
+/// than carried as far as the arithmetic and lost there.
+pub fn from_text(text: &str, what: &str) -> Result<f64, String> {
+    let said = text.trim();
+    let number: f64 = said
+        .parse()
+        .map_err(|_| format!("{what}: \"{said}\" is not a number"))?;
+    micro_kelvin(number).map_err(|why| format!("{what}: {why}"))?;
+    Ok(number)
+}
 
 /// How a sensor's bytes are laid out.
 ///
@@ -273,7 +430,9 @@ pub fn params_of(
             Ok(Computation::ToKelvin(ToKelvinParams {
                 format,
                 scale,
-                offset: number(attributes, "offset").map_err(named)?,
+                // A temperature: it is what a count of nought converts to, so
+                // an offset outside the range is every reading outside it.
+                offset: temperature(attributes, "offset").map_err(named)?,
             }))
         }
         "vote" => {
@@ -327,7 +486,9 @@ pub fn params_of(
             Ok(Computation::Vote(VoteParams { inputs, algorithm }))
         }
         "hysteresis" => {
-            let half_band = number(attributes, "half_band").map_err(named)?;
+            // Both are temperatures -- a goal and the width of a band around
+            // it -- so both are held to what a value carries.
+            let half_band = temperature(attributes, "half_band").map_err(named)?;
             if half_band <= 0.0 {
                 return Err(named(
                     "half_band is how far from the setpoint the decision changes, \
@@ -338,7 +499,7 @@ pub fn params_of(
             }
 
             Ok(Computation::Hysteresis(HysteresisParams {
-                setpoint: number(attributes, "setpoint").map_err(named)?,
+                setpoint: temperature(attributes, "setpoint").map_err(named)?,
                 half_band,
             }))
         }
@@ -405,9 +566,152 @@ fn number(attributes: &BTreeMap<String, Scalar>, name: &str) -> Result<f64, Stri
         .map_err(|_| format!("{name}: \"{}\" is not a number", text.as_str()))
 }
 
+/// A temperature a file states, held to what a value carries.
+///
+/// The same range a reading is held to, and for the same reason it is a rule
+/// here rather than aboard: a setpoint of 3000 K is a thermostat whose
+/// readings can never reach it, so the heaters would be driven on and held
+/// there for the whole flight. A file is checked on a desk, where that is one
+/// line to change.
+///
+/// Only the attributes that are temperatures. A `scale` goes through
+/// [`number`] and not through this: it is a number of kelvin per count, not a
+/// temperature, and what it may be depends on the part's counts, which no
+/// file states.
+fn temperature(attributes: &BTreeMap<String, Scalar>, name: &str) -> Result<f64, String> {
+    let said = number(attributes, name)?;
+    micro_kelvin(said).map_err(|why| format!("{name}: {why}"))?;
+    Ok(said)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A value survives the trip there and back.
+    #[test]
+    fn a_value_reads_back_as_itself() {
+        for number in [0.0, 1.0, 273.15, 293.15, -40.0, 0.0625, 1000.0] {
+            let sent = as_value(number).expect("a temperature a value carries");
+            let back = from_value(&sent, "a value").expect("it reads back");
+            assert!(
+                (back - number).abs() < 0.0001,
+                "{number} came back as {back}"
+            );
+        }
+    }
+
+    /// A value is four bytes of micro-kelvin, least significant first.
+    ///
+    /// Rounded to the unit and exact in it: what goes on the link is a whole
+    /// number of micro-kelvin, so every node that reads it reads the same
+    /// number rather than its own last bit of a double.
+    #[test]
+    fn a_value_is_a_count_of_micro_kelvin() {
+        assert_eq!(
+            as_value(293.15).expect("a temperature"),
+            293_150_000_i32.to_le_bytes()
+        );
+        assert_eq!(as_value(0.0).expect("nought").len(), VALUE_BYTES);
+        // Below zero, which is what the sign is for: a conversion with the
+        // wrong offset produces one, and it must arrive as what it is.
+        assert_eq!(
+            as_value(-40.0).expect("below zero"),
+            (-40_000_000_i32).to_le_bytes()
+        );
+
+        // The trip is exact for every temperature that is a whole number of
+        // micro-kelvin, which is every temperature a value carries.
+        for number in [0.0, 273.15, 293.15, -40.0, 0.0625, 1000.0, 0.000_001] {
+            assert_eq!(
+                from_value(&as_value(number).expect("a temperature"), "a value")
+                    .expect("it reads back"),
+                number
+            );
+        }
+
+        // And what is finer than the unit is rounded to it, rather than
+        // truncated: a third of a kelvin is 333_333 micro-kelvin and a hair.
+        let third = from_value(&as_value(1.0 / 3.0).expect("a third"), "a third")
+            .expect("it reads back");
+        assert_eq!(third, 0.333_333);
+    }
+
+    /// A temperature a value cannot carry is refused, and named.
+    ///
+    /// Refused where it is made rather than where it is read, because this is
+    /// where the number is still in hand to put in the complaint. Wrapping it
+    /// would turn 2200 K into a cabin 42 K below zero and a thermostat would
+    /// act on that.
+    #[test]
+    fn a_temperature_outside_the_range_is_refused() {
+        for wrong in [2200.0, -2200.0, 1.0e9, f64::NAN, f64::INFINITY] {
+            let said = as_value(wrong).expect_err("outside what a value carries");
+            assert!(
+                said.contains("2147.483647") || said.contains("number"),
+                "the complaint should say what the range is: {said}"
+            );
+        }
+
+        // The ends themselves are carried, and are what they say.
+        assert_eq!(
+            from_value(&as_value(2147.483647).expect("the top"), "the top"),
+            Ok(2147.483647)
+        );
+        assert_eq!(
+            from_value(&as_value(-2147.483648).expect("the bottom"), "the bottom"),
+            Ok(-2147.483648)
+        );
+    }
+
+    /// What is not a value is reported rather than read as one.
+    #[test]
+    fn a_datum_that_is_not_a_value_is_reported() {
+        // A width that is not four: a sensor's own bytes delivered where a
+        // conversion's output was meant, or a decision, which is text.
+        let said = from_value(b"293.15", "the fore sensor").expect_err("not a value");
+        assert!(said.contains("fore sensor"), "{said}");
+        assert!(said.contains('6'), "the width is worth saying: {said}");
+        assert!(from_value(b"1", "a decision").is_err());
+
+        // Four bytes are a value whatever they hold, there being no bit
+        // pattern of a 32-bit integer that is not a number of micro-kelvin.
+        // What a sensor cannot produce is refused where a value is made.
+        assert_eq!(from_value(&[0xFF, 0xFF, 0xFF, 0x7F], "the top"), Ok(2147.483647));
+    }
+
+    /// A program's pipe carries a decimal, and it round-trips.
+    ///
+    /// The one place a value is written out and read back, by the node that
+    /// runs a program of its own: see
+    /// `tcspecial::node::vehicle::compute::process`. A value is a whole
+    /// number of micro-kelvin, so six decimal places say all of it and
+    /// nothing drifts by going through a program.
+    #[test]
+    fn a_program_reads_and_writes_a_decimal() {
+        assert_eq!(as_text(293.15), "293.15");
+        assert_eq!(as_text(-40.0), "-40");
+
+        for number in [0.0, 293.15, 0.333_333, -40.0, 1.0e-9] {
+            assert_eq!(
+                from_text(&as_text(number), "a program").expect("it reads back"),
+                number
+            );
+        }
+
+        assert!(from_text("nearly", "a program").is_err());
+        assert!(
+            from_text("NaN", "a program").is_err(),
+            "a program may not answer with a number nothing can be decided on"
+        );
+        // And the range a reading is held to, because what a program answers
+        // with becomes a reading: see `from_text`.
+        let said = from_text("3000", "a program").expect_err("outside the range");
+        assert!(
+            said.contains("a program") && said.contains("2147.483647"),
+            "the refusal should name the program and the range: {said}"
+        );
+    }
 
     fn attributes(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
         pairs
@@ -422,6 +726,72 @@ mod tests {
 
     fn refused(pairs: &[(&str, &str)]) -> String {
         params_of("node", &attributes(pairs)).expect_err("a computation that is wrong")
+    }
+
+    /// A temperature a value could not carry is refused in the file.
+    ///
+    /// The same range a reading is held to, checked where the file is read:
+    /// a setpoint of 3000 K is a thermostat whose readings can never reach
+    /// it, so the heaters would be driven on and held there for the whole
+    /// flight -- and on a desk that is one line to change. An offset is the
+    /// temperature a count of nought converts to, so an offset outside the
+    /// range is every reading outside it.
+    #[test]
+    fn a_temperature_no_value_could_carry_is_refused() {
+        let (coldest, hottest) = kelvin_range();
+
+        for (pairs, attribute) in [
+            (
+                vec![
+                    ("function", "hysteresis"),
+                    ("setpoint", "3000"),
+                    ("half_band", "2.0"),
+                ],
+                "setpoint",
+            ),
+            (
+                vec![
+                    ("function", "hysteresis"),
+                    ("setpoint", "293.15"),
+                    ("half_band", "4000"),
+                ],
+                "half_band",
+            ),
+            (
+                vec![
+                    ("function", "to_kelvin"),
+                    ("format", "i16_be"),
+                    ("scale", "0.0625"),
+                    ("offset", "-2500"),
+                ],
+                "offset",
+            ),
+        ] {
+            let said = refused(&pairs);
+            assert!(
+                said.contains(attribute) && said.contains("2147.483647"),
+                "the refusal should name {attribute} and the range: {said}"
+            );
+        }
+
+        // The ends themselves are accepted: a rule that refused what it
+        // allows would be a rule nobody could satisfy at the edge.
+        for setpoint in [coldest, hottest] {
+            params(&[
+                ("function", "hysteresis"),
+                ("setpoint", &format!("{setpoint}")),
+                ("half_band", "2.0"),
+            ]);
+        }
+
+        // And a scale is not a temperature: it is kelvin per count, and what
+        // it may be depends on counts no file states.
+        params(&[
+            ("function", "to_kelvin"),
+            ("format", "i16_be"),
+            ("scale", "100000"),
+            ("offset", "0"),
+        ]);
     }
 
     /// Each computation is built from what its node says.

@@ -101,7 +101,7 @@ pub struct Described {
 /// state plainly and what a reader of one can check at a glance: a type either
 /// has somewhere for a stream to arrive or it has not. The names the four
 /// answer to are `tcslibgs::graph::terminals`'s -- `payload-sink` is the
-/// terminal called `payload-in` -- and [`Terminals::of`] is the one place that
+/// terminal called `payload-in` -- and `Terminals::each` is the one place that
 /// correspondence is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Terminals {

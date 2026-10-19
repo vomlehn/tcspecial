@@ -19,7 +19,7 @@
 //! import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
 //! ```
 //!
-//! The Rust side sets its three properties from [`shown`].
+//! The Rust side sets its three properties from [`Shown::of`].
 
 use std::time::SystemTime;
 

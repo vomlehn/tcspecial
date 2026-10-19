@@ -1,15 +1,29 @@
 # yaml-language-server: $schema=tcsgui/share/schema/tcspecial.schema.json
 
 version: "2.0"
-description: "One payload on a UDP link, its telemetry going to the ground"
+description: "The ground link alone, ready for payloads to be added"
 
 tcspecial:
   beacon:
     interval: "1 s"
+    recv: "127.0.0.1:5650"
+    send: "0.0.0.0:5550"
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
 
 moc:
   - name: moc-1
     type: moc
+    address: "127.0.0.1"
+    ground_base: "127.0.0.1:5100"
+    port: "5000"
 
 tcsgui:
   nodes:
